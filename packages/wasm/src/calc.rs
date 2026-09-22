@@ -2295,4 +2295,45 @@ mod tests {
         let unknown = parse("=X.TEST(1)").expect("unknown dotted function should preserve");
         assert_eq!(parse(&serialize(&unknown)), Ok(unknown));
     }
+
+    #[test]
+    fn unary_plus_resolves_its_operand_without_losing_the_sign_node() {
+        let named = parse("=+Total").expect("unary plus before a name should parse");
+        let resolved = resolve_named_ranges(named, 2, &|name, sheet| {
+            (name == "Total").then(|| NamedRangeRef {
+                name: "Total".to_string(),
+                scope: None,
+                sheet,
+                row_start: 1,
+                col_start: 0,
+                row_end: 4,
+                col_end: 0,
+            })
+        });
+        match resolved {
+            Ast::Pos(inner) => assert!(matches!(*inner, Ast::NamedRange(_))),
+            other => panic!("named-range resolution dropped the sign node: {other:?}"),
+        }
+
+        let structured = parse("=+Table1[Amount]").expect("unary plus before a table ref parses");
+        let resolved =
+            resolve_structured_refs(structured, 2, 3, 1, &|_reference, _sheet, _row, _col| {
+                Some(StructuredRef {
+                    table_id: "table-1".to_string(),
+                    table_name: "Table1".to_string(),
+                    column_id: "amount".to_string(),
+                    column_name: "Amount".to_string(),
+                    sheet: 2,
+                    row_start: 1,
+                    row_end: 4,
+                    col: 0,
+                    section: TableSection::Body,
+                    qualified: true,
+                })
+            });
+        match resolved {
+            Ast::Pos(inner) => assert!(matches!(*inner, Ast::Structured(_))),
+            other => panic!("structured-ref resolution dropped the sign node: {other:?}"),
+        }
+    }
 }
