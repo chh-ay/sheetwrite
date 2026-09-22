@@ -1024,6 +1024,39 @@ body .sw-code-popover__tag-link:hover {
   overflow-wrap: anywhere;
 }
 
+/* Long member lists open with an anchor index, so a page with dozens of rows
+   reads as an outline instead of a scroll with a click per member. */
+.api-member-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.85rem;
+  align-items: baseline;
+  margin: 1.25rem 0 2rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.6rem;
+  background: var(--sw-surface-1);
+  font-size: 0.78rem;
+}
+
+.sw-prose .api-member-index a {
+  color: var(--sw-fg-muted);
+  text-decoration: none;
+}
+
+.sw-prose .api-member-index a code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+.sw-prose .api-member-index a:hover,
+.sw-prose .api-member-index a:hover code {
+  color: var(--sw-accent-strong);
+}
+
 /* Entry-point tables: editorial rules instead of a boxed grid; the numeric
    column right-aligns and rows light up on hover. */
 .sw-prose .api-entry-table {
@@ -1300,6 +1333,129 @@ body .sw-code-popover__tag-link:hover {
   background: transparent;
   color: var(--sw-fg);
   font-size: 0.72rem;
+}
+
+/* An aliased union prints as the alias name beside the member name; the chip
+   stays quiet so the member name and its summary still lead the row. */
+.sw-prose .api-member-alias {
+  flex: 0 0 auto;
+}
+
+.sw-prose .api-member-alias a {
+  text-decoration: none;
+}
+
+.sw-prose .api-member-alias code {
+  border: 1px solid color-mix(in srgb, var(--sw-type-name) 30%, var(--sw-border));
+  padding: 0.04rem 0.3rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--sw-type-name) 8%, var(--sw-surface-2));
+  color: color-mix(in srgb, var(--sw-type-name) 74%, var(--sw-fg));
+  font: 550 0.72rem / 1.5 var(--sw-font-mono);
+}
+
+.sw-prose .api-member-alias a:hover code {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  color: var(--sw-accent-strong);
+}
+
+/* One labelled copy control per signature block. It stays visible instead of
+   appearing on hover, and the icon-only Expressive Code button is suppressed
+   inside API blocks so a signature never offers two copy affordances. */
+.sw-prose .api-member .expressive-code .copy,
+.sw-prose .api-declaration .expressive-code .copy,
+.sw-prose .api-declaration-open .expressive-code .copy,
+.sw-prose .api-variant .expressive-code .copy {
+  display: none;
+}
+
+.sw-prose .api-copy {
+  display: block;
+  width: fit-content;
+  margin: 0.3rem 0 0.4rem auto;
+  padding: 0.16rem 0.6rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+  font: 600 0.67rem / 1.5 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.sw-prose .api-copy:hover,
+.sw-prose .api-copy:focus-visible {
+  border-color: color-mix(in srgb, var(--sw-accent) 42%, var(--sw-border));
+  color: var(--sw-accent-strong);
+}
+
+/* The declaration panel has no padding of its own: its fence docks flush. */
+.sw-prose .api-declaration .api-copy,
+.sw-prose .api-declaration-open .api-copy,
+.sw-prose .api-variant .api-copy {
+  margin: 0.5rem 0.6rem 0.35rem auto;
+}
+
+/* Referenced by: who depends on the owning package, and which documented
+   exports name the symbol. Each chip carries the consumer and the relationship. */
+.api-consumers-label {
+  margin: 1.4rem 0 0.55rem;
+  color: var(--sw-fg-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-consumer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .api-consumer-list li {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  background: var(--sw-surface-1);
+  font-size: 0.76rem;
+}
+
+.sw-prose .api-consumer-list a {
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+}
+
+.sw-prose .api-consumer-list a:hover {
+  color: var(--sw-accent-strong);
+}
+
+.sw-prose .api-consumer-list code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+
+.api-consumer-kind {
+  color: var(--sw-fg-dim);
+  font: 600 0.63rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.02em;
+}
+
+.sw-prose .api-consumer-list .api-consumer-more {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sw-fg-dim);
+  font-style: italic;
 }
 
 .api-declaration > summary {

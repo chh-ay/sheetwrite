@@ -16,8 +16,10 @@ Remote document operations paired with a contiguous server version.
 
 <div class="api-member-list">
 
-<details class="api-member" id="versioned-operation-version" data-pagefind-weight="1">
+<details class="api-member" id="versioned-operation-version" data-pagefind-weight="1" open>
 <summary><code>version</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="version: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 version: number;
@@ -25,8 +27,10 @@ version: number;
 
 </details>
 
-<details class="api-member" id="versioned-operation-operations" data-pagefind-weight="1">
+<details class="api-member" id="versioned-operation-operations" data-pagefind-weight="1" open>
 <summary><code>operations</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="readonly operations: readonly DocumentOp[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operations: readonly DocumentOp[];
@@ -34,8 +38,10 @@ readonly operations: readonly DocumentOp[];
 
 </details>
 
-<details class="api-member" id="versioned-operation-client-mutation-id" data-pagefind-weight="1">
+<details class="api-member" id="versioned-operation-client-mutation-id" data-pagefind-weight="1" open>
 <summary><code>clientMutationId</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="clientMutationId?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 clientMutationId?: string;
@@ -49,6 +55,8 @@ clientMutationId?: string;
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
+<button class="api-copy" type="button" data-copy-code="export interface VersionedOperation {&#10;  version: number;&#10;  readonly operations: readonly DocumentOp[];&#10;  clientMutationId?: string;&#10;}" data-pagefind-ignore>Copy</button>
+
 ```ts generated
 export interface VersionedOperation {
   version: number;
@@ -58,3 +66,71 @@ export interface VersionedOperation {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>VersionedOperation</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/persistence-commit-response/"><code>PersistenceCommitResponse</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/remote-operation-source/"><code>RemoteOperationSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-coordinator-event/"><code>SyncCoordinatorEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-coordinator-options/"><code>SyncCoordinatorOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>
+
+<script>
+(() => {
+  if (window.__sheetwriteApiCopy !== undefined) return;
+  window.__sheetwriteApiCopy = true;
+  const selectCopy = (text) => {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+    area.remove();
+    return copied;
+  };
+  const copy = (button) => {
+    const text = button.dataset.copyCode ?? "";
+    const confirm = () => {
+      button.textContent = "Copied";
+      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
+    };
+    if (navigator.clipboard === undefined) {
+      if (selectCopy(text)) confirm();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(confirm, () => {
+      if (selectCopy(text)) confirm();
+    });
+  };
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    const button = target instanceof Element ? target.closest(".api-copy") : null;
+    if (button !== null) copy(button);
+  });
+})();
+</script>

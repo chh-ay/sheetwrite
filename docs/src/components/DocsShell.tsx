@@ -1,14 +1,20 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { DOCS_NAVIGATION } from "../lib/navigation.js";
 import { DocsSearch } from "./DocsSearch.js";
-import { TableOfContents } from "./TableOfContents.js";
+import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface DocsShellProps {
   activeHref?: string;
   children: ReactNode;
   description: string;
+  /**
+   * Reserves the outline slot above the article. Markdown document pages pass
+   * true so their outline can arrive after hydration without shifting the
+   * text; authored pages (the overview) have no outline and skip the slot.
+   */
+  reserveOutline?: boolean;
   title: string;
 }
 
@@ -24,25 +30,87 @@ function Brand() {
   );
 }
 
-function nearestNavigationHref(activeHref: string | undefined): string | undefined {
+interface NavigationLocation {
+  section: string;
+  label: string;
+  href: string;
+}
+
+/** Deepest navigation entry whose href contains the current page. */
+function nearestNavigationItem(activeHref: string | undefined): NavigationLocation | undefined {
   if (activeHref === undefined) return undefined;
-  let nearest: string | undefined;
+  let nearest: NavigationLocation | undefined;
   for (const section of DOCS_NAVIGATION) {
     for (const item of section.items) {
       const matches =
         activeHref === item.href || (item.href !== "/docs/" && activeHref.startsWith(item.href));
-      if (matches && (nearest === undefined || item.href.length > nearest.length)) {
-        nearest = item.href;
+      if (matches && (nearest === undefined || item.href.length > nearest.href.length)) {
+        nearest = { section: section.label, label: item.label, href: item.href };
       }
     }
   }
   return nearest;
 }
 
-function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
-  const currentHref = nearestNavigationHref(activeHref);
+interface Crumb {
+  href?: string;
+  label: string;
+}
+
+/**
+ * Trail for the page header. Section and package names come from the same
+ * navigation model the sidebar renders, so the two never disagree about where
+ * a page sits; the page's own name ends the trail.
+ */
+function breadcrumbsFor(activeHref: string | undefined, title: string): readonly Crumb[] {
+  const trail: Crumb[] = [{ href: "/docs/", label: "Documentation" }];
+  // The overview is the destination itself.
+  if (activeHref === undefined || activeHref === "/docs/") return trail;
+  const nearest = nearestNavigationItem(activeHref);
+  if (nearest === undefined) return [...trail, { label: title }];
+  trail.push({ label: nearest.section });
+  // The entry the page itself belongs to is not a step above it.
+  if (nearest.href !== activeHref) trail.push({ href: nearest.href, label: nearest.label });
+  return [...trail, { label: title }];
+}
+
+function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
   return (
-    <nav aria-label="Documentation" className="sw-sidebar__nav">
+    <nav aria-label="Breadcrumb" className="sw-breadcrumb" data-pagefind-ignore>
+      <ol>
+        {trail.map((crumb) => (
+          <li key={`${crumb.href ?? "current"}|${crumb.label}`}>
+            {crumb.href === undefined ? (
+              <span aria-current={crumb === trail.at(-1) ? "page" : undefined}>{crumb.label}</span>
+            ) : (
+              // Ancestors are never the current page; the last crumb owns
+              // aria-current="page".
+              <Link activeOptions={{ exact: true }} to={crumb.href}>
+                {crumb.label}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
+  const currentHref = nearestNavigationItem(activeHref)?.href;
+  const nav = useRef<HTMLElement>(null);
+
+  // Below 48rem the sidebar is a horizontal scroller, so the current page is
+  // off-screen unless it is brought into view.
+  useEffect(() => {
+    if (currentHref === undefined) return;
+    nav.current
+      ?.querySelector('a[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [currentHref]);
+
+  return (
+    <nav aria-label="Documentation" className="sw-sidebar__nav" ref={nav}>
       {DOCS_NAVIGATION.map((section) => (
         <section key={section.label}>
           <h2>{section.label}</h2>
@@ -68,10 +136,17 @@ function Sidebar({ activeHref }: Readonly<{ activeHref?: string }>) {
   );
 }
 
-export function DocsShell({ activeHref, children, description, title }: Readonly<DocsShellProps>) {
+export function DocsShell({
+  activeHref,
+  children,
+  description,
+  reserveOutline,
+  title,
+}: Readonly<DocsShellProps>) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
   // better as a chip than as part of a display-size heading.
   const [titleMain, titlePackage] = title.split(" | ", 2);
+  const outline = useDocumentOutline();
   return (
     <div className="sw-docs">
       <a className="sw-skip-link" href="#main-content">
@@ -97,7 +172,7 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
         id="main-content"
       >
         <header className="sw-document__header">
-          <p data-pagefind-ignore>Sheetwrite / Documentation</p>
+          <Breadcrumbs trail={breadcrumbsFor(activeHref, titleMain ?? title)} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
             {titlePackage ? (
@@ -108,12 +183,13 @@ export function DocsShell({ activeHref, children, description, title }: Readonly
           </h1>
           <span>{description}</span>
         </header>
+        {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
         <article
           className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
         >
           {children}
         </article>
-        <TableOfContents />
+        <TableOfContents items={outline} />
         <footer className="sw-document__footer" data-pagefind-ignore>
           <span>Sheetwrite is MIT licensed.</span>
           <a href="https://github.com/chh-ay/sheetwrite/issues">Report a documentation issue</a>

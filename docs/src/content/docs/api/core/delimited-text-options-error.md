@@ -16,8 +16,10 @@ Stable invalid-option failure for a delimited-text resource ceiling.
 
 <div class="api-member-list">
 
-<details class="api-member" id="delimited-text-options-error-constructor" data-pagefind-weight="1">
+<details class="api-member" id="delimited-text-options-error-constructor" data-pagefind-weight="1" open>
 <summary><code>constructor</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
@@ -25,8 +27,10 @@ constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
 
 </details>
 
-<details class="api-member" id="delimited-text-options-error-name" data-pagefind-weight="1">
+<details class="api-member" id="delimited-text-options-error-name" data-pagefind-weight="1" open>
 <summary><code>name</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="name: &quot;DelimitedTextOptionsError&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: "DelimitedTextOptionsError";
@@ -34,8 +38,10 @@ name: "DelimitedTextOptionsError";
 
 </details>
 
-<details class="api-member" id="delimited-text-options-error-resource" data-pagefind-weight="1">
+<details class="api-member" id="delimited-text-options-error-resource" data-pagefind-weight="1" open>
 <summary><code>resource</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="resource: keyof DelimitedTextResourceLimits;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 resource: keyof DelimitedTextResourceLimits;
@@ -43,8 +49,10 @@ resource: keyof DelimitedTextResourceLimits;
 
 </details>
 
-<details class="api-member" id="delimited-text-options-error-value" data-pagefind-weight="1">
+<details class="api-member" id="delimited-text-options-error-value" data-pagefind-weight="1" open>
 <summary><code>value</code></summary>
+
+<button class="api-copy" type="button" data-copy-code="value: unknown" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 value: unknown
@@ -58,6 +66,8 @@ value: unknown
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
 
+<button class="api-copy" type="button" data-copy-code="class DelimitedTextOptionsError extends SheetwriteError {&#10;  constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);&#10;  name: &quot;DelimitedTextOptionsError&quot;;&#10;  resource: keyof DelimitedTextResourceLimits;&#10;  value: unknown;&#10;}" data-pagefind-ignore>Copy</button>
+
 ```ts generated
 class DelimitedTextOptionsError extends SheetwriteError {
   constructor(resource: keyof DelimitedTextResourceLimits, value: unknown);
@@ -68,3 +78,67 @@ class DelimitedTextOptionsError extends SheetwriteError {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>DelimitedTextOptionsError</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>
+
+<script>
+(() => {
+  if (window.__sheetwriteApiCopy !== undefined) return;
+  window.__sheetwriteApiCopy = true;
+  const selectCopy = (text) => {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+    area.remove();
+    return copied;
+  };
+  const copy = (button) => {
+    const text = button.dataset.copyCode ?? "";
+    const confirm = () => {
+      button.textContent = "Copied";
+      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
+    };
+    if (navigator.clipboard === undefined) {
+      if (selectCopy(text)) confirm();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(confirm, () => {
+      if (selectCopy(text)) confirm();
+    });
+  };
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    const button = target instanceof Element ? target.closest(".api-copy") : null;
+    if (button !== null) copy(button);
+  });
+})();
+</script>

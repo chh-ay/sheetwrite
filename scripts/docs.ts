@@ -1,8 +1,22 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
-import * as ts from "typescript-compiler";
+import {
+  isCallSignatureDeclaration,
+  isClassDeclaration,
+  isConstructorDeclaration,
+  isConstructSignatureDeclaration,
+  isIndexSignatureDeclaration,
+  isInterfaceDeclaration,
+  isTypeAliasDeclaration,
+  isTypeLiteralNode,
+  isUnionTypeNode,
+  type Node,
+  type SourceFile,
+} from "typescript/unstable/ast";
+import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -363,13 +377,14 @@ function html(value: string): string {
 }
 interface DocumentationLinkCandidate {
   readonly packageName: string;
+  readonly entry: ApiEntryPoint;
   readonly route: string;
   readonly item: ApiExport;
 }
 
 type DocumentationLinkRoutes = ReadonlyMap<string, readonly DocumentationLinkCandidate[]>;
 
-function documentationLinkRoutes(manifest: PublicApiManifest): DocumentationLinkRoutes {
+export function documentationLinkRoutes(manifest: PublicApiManifest): DocumentationLinkRoutes {
   const routes = new Map<string, DocumentationLinkCandidate[]>();
   for (const pkg of manifest.packages) {
     for (const entry of pkg.entryPoints) {
@@ -377,6 +392,7 @@ function documentationLinkRoutes(manifest: PublicApiManifest): DocumentationLink
         const candidates = routes.get(item.name) ?? [];
         candidates.push({
           packageName: pkg.name,
+          entry,
           route: symbolRoute(pkg, entry, item),
           item,
         });
@@ -396,6 +412,20 @@ function uniqueDocumentationCandidate(
   const packageCandidates = candidates.filter((candidate) => candidate.packageName === packageName);
   if (packageCandidates.length === 1) return packageCandidates[0];
   return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+/**
+ * The same symbol is re-exported from several entry points, so a reference resolves to
+ * the page's own entry first, then its package, then an unambiguous match anywhere.
+ */
+function closestCandidate<
+  T extends { readonly packageName: string; readonly entry: ApiEntryPoint },
+>(candidates: readonly T[], packageName: string, entry: ApiEntryPoint): T | undefined {
+  const local = candidates.filter(
+    (candidate) => candidate.packageName === packageName && candidate.entry === entry,
+  );
+  const samePackage = candidates.filter((candidate) => candidate.packageName === packageName);
+  return [local, samePackage, candidates].find((group) => group.length === 1)?.[0];
 }
 
 function hasRenderedMember(item: ApiExport, memberName: string): boolean {
@@ -421,6 +451,7 @@ function documentationLinkRoute(
         ? uniqueDocumentationCandidate(routes, pkg.name, ownerName ?? "")
         : {
             packageName: pkg.name,
+            entry,
             route: symbolRoute(pkg, entry, localOwner),
             item: localOwner,
           };
@@ -532,6 +563,75 @@ function anchor(value: string): string {
 const DECLARATION_KEYWORD =
   /^(?:declare|export|abstract|interface|type|class|enum|function|const|let|var|namespace)\b/;
 
+/** Members at or under this width open by default; longer signatures stay collapsed. */
+const SHORT_MEMBER_SIGNATURE_LIMIT = 100;
+/** Top-level union variants at which a member reads as a union wall, not a signature. */
+const HEAVY_UNION_VARIANTS = 4;
+/** Member lists longer than this get an anchor index at the top of the page. */
+const MEMBER_INDEX_MINIMUM = 6;
+/** References listed per group before the remainder is summarized. */
+const REFERENCE_DISPLAY_LIMIT = 12;
+
+/**
+ * A quiet copy control for one signature block. `API_COPY_SCRIPT` wires every
+ * `.api-copy` on the page, so the button carries its own text and no ids.
+ */
+function copyButton(code: string): string {
+  // Newlines survive as character references: attributes stay on one line and
+  // the browser (or MDX) decodes them back into the copied text.
+  return `<button class="api-copy" type="button" data-copy-code="${html(code).replaceAll("\n", "&#10;")}" data-pagefind-ignore>Copy</button>`;
+}
+
+/**
+ * Copy wiring for the generated pages, inlined so it needs neither the app bundle
+ * nor a hydrated component. The listener is delegated on `document`: one script
+ * serves every signature block, and it keeps working after client-side navigation.
+ */
+const API_COPY_SCRIPT = [
+  "<script>",
+  "(() => {",
+  "  if (window.__sheetwriteApiCopy !== undefined) return;",
+  "  window.__sheetwriteApiCopy = true;",
+  "  const selectCopy = (text) => {",
+  '    const area = document.createElement("textarea");',
+  "    area.value = text;",
+  '    area.setAttribute("readonly", "");',
+  '    area.style.position = "fixed";',
+  '    area.style.opacity = "0";',
+  "    document.body.append(area);",
+  "    area.select();",
+  "    let copied = false;",
+  "    try {",
+  '      copied = document.execCommand("copy");',
+  "    } catch {",
+  "      copied = false;",
+  "    }",
+  "    area.remove();",
+  "    return copied;",
+  "  };",
+  "  const copy = (button) => {",
+  '    const text = button.dataset.copyCode ?? "";',
+  "    const confirm = () => {",
+  '      button.textContent = "Copied";',
+  '      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);',
+  "    };",
+  "    if (navigator.clipboard === undefined) {",
+  "      if (selectCopy(text)) confirm();",
+  "      return;",
+  "    }",
+  "    navigator.clipboard.writeText(text).then(confirm, () => {",
+  "      if (selectCopy(text)) confirm();",
+  "    });",
+  "  };",
+  '  document.addEventListener("click", (event) => {',
+  "    const target = event.target;",
+  '    const button = target instanceof Element ? target.closest(".api-copy") : null;',
+  "    if (button !== null) copy(button);",
+  "  });",
+  "})();",
+  "</script>",
+].join("\n");
+
 /** Bare call-signature or type strings from the checker are not statements; wrap them so the TS parser and printer cannot mangle them. */
 function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">): string {
   const signature = item.signature.trim();
@@ -542,50 +642,392 @@ function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">): stri
   return `declare const ${item.name}: ${signature};`;
 }
 
-function declarationShape(signature: string): DeclarationShape {
-  const source = ts.createSourceFile(
-    "api.d.ts",
-    signature,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-  const declaration = source.statements[0];
-  if (declaration === undefined) return { formatted: signature, members: [], variants: [] };
-  const formatted = ts
-    .createPrinter({ newLine: ts.NewLineKind.LineFeed })
-    .printNode(ts.EmitHint.Unspecified, declaration, source);
+/**
+ * Declaration shapes keyed by signature text. The TypeScript 7 API only parses files that
+ * belong to a project, so shapes are parsed in batches by {@link prepareDeclarationShapes}
+ * and then read synchronously by the link resolution and page renderers.
+ */
+const declarationShapes = new Map<string, DeclarationShape>();
 
-  const memberNodes =
-    ts.isInterfaceDeclaration(declaration) || ts.isClassDeclaration(declaration)
+/**
+ * Parse declarations with the TypeScript 7 API: each signature becomes a file in a scratch
+ * inferred project, printed by its emitter and read back as `typescript/unstable/ast` nodes.
+ */
+async function prepareDeclarationShapes(signatures: Iterable<string>): Promise<void> {
+  const pending = [...new Set(signatures)].filter((signature) => !declarationShapes.has(signature));
+  if (pending.length === 0) return;
+  const directory = await mkdtemp(join(tmpdir(), "sheetwrite-declarations-"));
+  const api = new API({ cwd: directory });
+  try {
+    const declarations: Array<{ signature: string; path: string }> = [];
+    for (const [index, signature] of pending.entries()) {
+      const path = join(directory, `declaration-${index}.d.ts`);
+      await writeFile(path, signature);
+      declarations.push({ signature, path });
+    }
+    const snapshot = await api.updateSnapshot({
+      openFiles: declarations.map((declaration) => declaration.path),
+    });
+    try {
+      let project: Project | undefined;
+      for (const declaration of declarations) {
+        project ??= await snapshot.getDefaultProjectForFile(declaration.path);
+        if (project === undefined) {
+          throw new Error("TypeScript 7 could not open the scratch declaration project");
+        }
+        declarationShapes.set(
+          declaration.signature,
+          await readDeclarationShape(project, declaration.path, declaration.signature),
+        );
+      }
+    } finally {
+      await snapshot.dispose();
+    }
+  } finally {
+    await api.close();
+    await rm(directory, { force: true, recursive: true });
+  }
+}
+
+async function readDeclarationShape(
+  project: Project,
+  path: string,
+  signature: string,
+): Promise<DeclarationShape> {
+  const sourceFile = await project.program.getSourceFile(path);
+  const declaration = sourceFile?.statements[0];
+  if (sourceFile === undefined || declaration === undefined) {
+    return { formatted: signature, members: [], variants: [] };
+  }
+  const memberNodes: readonly Node[] =
+    isInterfaceDeclaration(declaration) || isClassDeclaration(declaration)
       ? declaration.members
-      : ts.isTypeAliasDeclaration(declaration) && ts.isTypeLiteralNode(declaration.type)
+      : isTypeAliasDeclaration(declaration) && isTypeLiteralNode(declaration.type)
         ? declaration.type.members
         : [];
-  const members = memberNodes.map((member, index) => {
-    const named = member as ts.NamedDeclaration;
-    const name =
-      named.name === undefined
-        ? ts.isConstructorDeclaration(member)
-          ? "constructor"
-          : ts.isCallSignatureDeclaration(member)
-            ? "call"
-            : ts.isConstructSignatureDeclaration(member)
-              ? "new"
-              : ts.isIndexSignatureDeclaration(member)
-                ? "index"
-                : `member-${index + 1}`
-        : named.name.getText(source).replace(/^["']|["']$/g, "");
-    return {
-      name,
-      signature: member.getText(source).replace(/\s+/g, " ").trim(),
-    };
-  });
-  const variants =
-    ts.isTypeAliasDeclaration(declaration) && ts.isUnionTypeNode(declaration.type)
-      ? declaration.type.types.map((variant) => variant.getText(source).replace(/\s+/g, " ").trim())
-      : [];
-  return { formatted, members, variants };
+  return {
+    formatted: await project.emitter.printNode(declaration),
+    members: memberNodes.map((member, index) => ({
+      name: declarationMemberName(member, index, sourceFile),
+      signature: member.getText(sourceFile).replace(/\s+/g, " ").trim(),
+    })),
+    variants:
+      isTypeAliasDeclaration(declaration) && isUnionTypeNode(declaration.type)
+        ? declaration.type.types.map((variant) =>
+            variant.getText(sourceFile).replace(/\s+/g, " ").trim(),
+          )
+        : [],
+  };
+}
+
+/** Named members carry their name; signature-only members fall back to a positional label. */
+function declarationMemberName(member: Node, index: number, sourceFile: SourceFile): string {
+  const named = member as Node & { name?: Node };
+  if (named.name !== undefined) {
+    return named.name.getText(sourceFile).replace(/^["']|["']$/g, "");
+  }
+  if (isConstructorDeclaration(member)) return "constructor";
+  if (isCallSignatureDeclaration(member)) return "call";
+  if (isConstructSignatureDeclaration(member)) return "new";
+  if (isIndexSignatureDeclaration(member)) return "index";
+  return `member-${index + 1}`;
+}
+
+function declarationShape(signature: string): DeclarationShape {
+  return declarationShapes.get(signature) ?? { formatted: signature, members: [], variants: [] };
+}
+
+/**
+ * Split `text` on `separator` where it is not nested in brackets and not inside a
+ * string literal. Member signatures are one-liners, so a single scan is enough.
+ */
+function splitTopLevel(text: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | undefined;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index] ?? "";
+    if (quote !== undefined) {
+      if (character === quote && text[index - 1] !== "\\") quote = undefined;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === "(" || character === "[" || character === "{") {
+      depth += 1;
+    } else if (character === ")" || character === "]" || character === "}") {
+      depth -= 1;
+    } else if (character === separator && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts;
+}
+
+interface MemberTypeParts {
+  /** Everything up to and including the member's top-level colon. */
+  readonly prefix: string;
+  /** The declared type, without the statement terminator. */
+  readonly type: string;
+  readonly terminated: boolean;
+}
+
+/**
+ * The declared type of a member row. Call signatures, constructors, and index
+ * signatures keep every colon inside their brackets and have no type of their own.
+ */
+function memberTypeParts(signature: string): MemberTypeParts | undefined {
+  const parts = splitTopLevel(signature, ":");
+  if (parts.length < 2) return undefined;
+  const rest = parts.slice(1).join(":").trim();
+  const terminated = rest.endsWith(";");
+  return {
+    prefix: `${parts[0] ?? ""}:`,
+    type: terminated ? rest.slice(0, -1).trim() : rest,
+    terminated,
+  };
+}
+
+/** Order- and duplicate-insensitive identity of a string-literal union. */
+function literalUnionKey(literals: readonly string[]): string {
+  return [...new Set(literals)].sort().join("\u0000");
+}
+
+/** A union of string literals prints every value inline; its alias prints one name. */
+function stringLiteralUnionVariants(type: string): string[] | undefined {
+  const variants = splitTopLevel(type, "|").map((variant) => variant.trim());
+  if (variants.length < 2) return undefined;
+  if (!variants.every((variant) => /^"(?:[^"\\]|\\.)*"$/.test(variant))) return undefined;
+  return variants.map((variant) => variant.slice(1, -1));
+}
+
+interface UnionAlias {
+  readonly name: string;
+  readonly route: string;
+}
+
+/**
+ * The checker expands an aliased union at every use site, so `code: SheetwriteErrorCode`
+ * prints as its 47 literals. This index maps that expansion back to the alias that names
+ * it: an alias qualifies when its declaration is a string-literal union, or the
+ * `(typeof SOME_EXPORTED_ARRAY)[number]` form whose array holds the same literals.
+ */
+async function unionAliasIndex(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  routes: DocumentationLinkRoutes,
+): Promise<Map<string, UnionAlias>> {
+  const candidates = [...routes.values()].flat().filter(({ item }) => item.kind === "type");
+  if (candidates.length === 0) return new Map();
+  await prepareDeclarationShapes(candidates.map(({ item }) => parseableDeclaration(item)));
+  const byLiteralSet = new Map<
+    string,
+    Array<UnionAlias & { entry: ApiEntryPoint; packageName: string }>
+  >();
+  for (const candidate of candidates) {
+    const shape = declarationShape(parseableDeclaration(candidate.item));
+    let literals: string[] | undefined;
+    if (shape.variants.length > 0) {
+      literals = stringLiteralUnionVariants(shape.variants.join(" | "));
+    } else {
+      const indirect = /^\(typeof\s+([A-Za-z0-9_$]+)\)\[\s*number\s*\]$/.exec(
+        candidate.item.signature
+          .replace(/^[^=]*=/, "")
+          .replace(/;\s*$/, "")
+          .trim(),
+      );
+      const source =
+        indirect === null
+          ? undefined
+          : closestCandidate(
+              routes.get(indirect[1] ?? "") ?? [],
+              candidate.packageName,
+              candidate.entry,
+            );
+      // The referenced array is an export of its own; its literals are the expansion.
+      literals =
+        source === undefined
+          ? undefined
+          : (source.item.signature.match(/"((?:[^"\\]|\\.)*)"/g) ?? []).map((value) =>
+              value.slice(1, -1),
+            );
+    }
+    if (literals === undefined || literals.length < 2) continue;
+    const key = literalUnionKey(literals);
+    const resolved = byLiteralSet.get(key) ?? [];
+    resolved.push({
+      name: candidate.item.name,
+      route: candidate.route,
+      entry: candidate.entry,
+      packageName: candidate.packageName,
+    });
+    byLiteralSet.set(key, resolved);
+  }
+  const aliases = new Map<string, UnionAlias>();
+  for (const [key, resolved] of byLiteralSet) {
+    const chosen = closestCandidate(resolved, pkg.name, entry);
+    if (chosen !== undefined) aliases.set(key, { name: chosen.name, route: chosen.route });
+  }
+  return aliases;
+}
+
+interface WorkspaceDependent {
+  readonly name: string;
+  readonly kind: "dependency" | "peer" | "optional" | "dev";
+}
+
+interface SymbolReference {
+  readonly packageName: string;
+  readonly name: string;
+  readonly route: string;
+}
+
+interface WorkspaceManifest {
+  name?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+/** Declaration order is precedence: a package that both depends on and dev-depends on
+ * another workspace reports the runtime edge, which is what a reader needs. */
+const DEPENDENCY_KINDS: ReadonlyArray<
+  readonly [WorkspaceDependent["kind"], keyof WorkspaceManifest]
+> = [
+  ["dependency", "dependencies"],
+  ["optional", "optionalDependencies"],
+  ["peer", "peerDependencies"],
+  ["dev", "devDependencies"],
+];
+
+/** Every workspace package manifest the repository declares, in workspace order. */
+async function workspaceManifests(): Promise<WorkspaceManifest[]> {
+  const root = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8")) as {
+    workspaces?: string[];
+  };
+  const directories: string[] = [];
+  for (const workspace of root.workspaces ?? []) {
+    if (!workspace.endsWith("/*")) {
+      directories.push(join(repositoryRoot, workspace));
+      continue;
+    }
+    const parent = join(repositoryRoot, workspace.slice(0, -2));
+    if (!(await exists(parent))) continue;
+    for (const entry of await readdir(parent, { withFileTypes: true })) {
+      if (entry.isDirectory()) directories.push(join(parent, entry.name));
+    }
+  }
+  const manifests: WorkspaceManifest[] = [];
+  for (const directory of directories) {
+    const path = join(directory, "package.json");
+    if (!(await exists(path))) continue;
+    manifests.push(JSON.parse(await readFile(path, "utf8")) as WorkspaceManifest);
+  }
+  return manifests;
+}
+
+/**
+ * Reverse indexes behind "Referenced by", built once per generation: the workspace
+ * packages that depend on each package, and the documented exports whose declaration
+ * names a symbol. Both come from repository manifests, so the section never claims a
+ * consumer the repository cannot show.
+ */
+export interface ConsumerIndex {
+  readonly dependents: ReadonlyMap<string, readonly WorkspaceDependent[]>;
+  readonly references: ReadonlyMap<string, readonly SymbolReference[]>;
+}
+
+const EMPTY_CONSUMER_INDEX: ConsumerIndex = { dependents: new Map(), references: new Map() };
+
+async function consumerIndex(manifest: PublicApiManifest): Promise<ConsumerIndex> {
+  const dependents = new Map<string, WorkspaceDependent[]>();
+  for (const workspace of await workspaceManifests()) {
+    if (workspace.name === undefined) continue;
+    const declared = new Map<string, WorkspaceDependent["kind"]>();
+    for (const [kind, field] of DEPENDENCY_KINDS) {
+      for (const dependency of Object.keys(workspace[field] ?? {})) {
+        if (!declared.has(dependency)) declared.set(dependency, kind);
+      }
+    }
+    for (const [dependency, kind] of declared) {
+      if (dependency === workspace.name) continue;
+      dependents.set(dependency, [
+        ...(dependents.get(dependency) ?? []),
+        { name: workspace.name, kind },
+      ]);
+    }
+  }
+  for (const list of dependents.values()) {
+    list.sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  const references = new Map<string, SymbolReference[]>();
+  for (const pkg of manifest.packages) {
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const named = new Set<string>();
+        for (const match of item.signature.matchAll(/[A-Za-z_$][A-Za-z0-9_$]*/g)) {
+          const name = match[0] ?? "";
+          if (name === item.name || named.has(name)) continue;
+          named.add(name);
+          references.set(name, [
+            ...(references.get(name) ?? []),
+            { packageName: pkg.name, name: item.name, route: symbolRoute(pkg, entry, item) },
+          ]);
+        }
+      }
+    }
+  }
+  return { dependents, references };
+}
+
+/**
+ * Who consumes the symbol: the workspaces that depend on its package, and the
+ * documented exports that name it. Each entry names the consumer and its relationship.
+ */
+function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
+  const dependents = consumers.dependents.get(pkg.name) ?? [];
+  const references = (consumers.references.get(item.name) ?? []).filter(
+    (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
+  );
+  const body = [
+    "## Referenced by",
+    "",
+    '<div class="api-consumers" data-pagefind-ignore>',
+    `<p class="api-consumers-label">Workspace packages depending on <code>${html(pkg.name)}</code></p>`,
+    "",
+    '<ul class="api-consumer-list">',
+  ];
+  for (const dependent of dependents) {
+    body.push(
+      `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+    );
+  }
+  if (dependents.length === 0) body.push("<li>None.</li>");
+  body.push(
+    "</ul>",
+    "",
+    `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
+    "",
+    '<ul class="api-consumer-list">',
+  );
+  for (const reference of references.slice(0, REFERENCE_DISPLAY_LIMIT)) {
+    body.push(
+      `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+    );
+  }
+  if (references.length === 0) body.push("<li>None.</li>");
+  if (references.length > REFERENCE_DISPLAY_LIMIT) {
+    body.push(
+      `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
+    );
+  }
+  body.push("</ul>", "</div>", "");
+  return body.join("\n");
 }
 
 async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
@@ -595,6 +1037,8 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   if (expanded) {
     return [
       '<div class="api-declaration-open" data-pagefind-ignore>',
+      "",
+      copyButton(formatted),
       "",
       "```ts generated",
       formatted,
@@ -607,6 +1051,8 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
     '<details class="api-declaration" data-pagefind-ignore>',
     "<summary>View full TypeScript declaration</summary>",
     "",
+    copyButton(formatted),
+    "",
     "```ts generated",
     formatted,
     "```",
@@ -615,13 +1061,19 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   ].join("\n");
 }
 
+/**
+ * Member rows plus the anchor index that leads into them. Aliased unions print as the
+ * alias name, short members open by default, and every signature block carries a copy
+ * button; the index is emitted only when the list is long enough to need one.
+ */
 function renderMembers(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   members: readonly DeclarationMember[],
   routes: DocumentationLinkRoutes,
-): string {
+  aliases: ReadonlyMap<string, UnionAlias>,
+): { index: string; list: string } {
   const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
@@ -632,8 +1084,14 @@ function renderMembers(
   );
   const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
   const documented = new Set<string>();
+  const indexLinks: string[] = [];
+  const indexed = new Set<string>();
   const rows = members.map((member, index) => {
     const id = `${anchor(item.name)}-${anchor(member.name) || index + 1}`;
+    if (!indexed.has(id)) {
+      indexed.add(id);
+      indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
+    }
     const searchAnchor = searchTargets.has(member.name)
       ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
       : "";
@@ -647,14 +1105,33 @@ function renderMembers(
       documentation === undefined
         ? ""
         : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, item, summary, routes)}</span>`;
+    const parts = memberTypeParts(member.signature);
+    const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
+    const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
+    // The alias names the type; its expansion stays in the Declaration section.
+    const signature =
+      alias === undefined || parts === undefined
+        ? member.signature
+        : `${parts.prefix} ${alias.name}${parts.terminated ? ";" : ""}`;
+    const aliasChip =
+      alias === undefined
+        ? ""
+        : ` <span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`;
+    // Long signatures and union walls keep their weight in the summary; everything
+    // shorter opens, so a page reads top to bottom without a click per row.
+    const isShortMember =
+      member.signature.length <= SHORT_MEMBER_SIGNATURE_LIMIT &&
+      splitTopLevel(parts?.type ?? member.signature, "|").length < HEAVY_UNION_VARIANTS;
     return [
       searchAnchor,
-      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
-      `<summary><code>${html(member.name)}</code>${summaryDoc}</summary>`,
+      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}"${isShortMember ? " open" : ""}>`,
+      `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
+      "",
+      copyButton(signature),
       "",
       // A fenced block so member signatures get real syntax highlighting.
       "```ts generated",
-      member.signature,
+      signature,
       "```",
       "",
       // Skip the body paragraph when it would only restate the summary line.
@@ -667,13 +1144,23 @@ function renderMembers(
       "</details>",
     ].join("\n");
   });
-  return [
-    `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
-    "",
-    '<div class="api-member-list">',
-    ...rows,
-    "</div>",
-  ].join("\n");
+  return {
+    index:
+      members.length <= MEMBER_INDEX_MINIMUM
+        ? ""
+        : [
+            '<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>',
+            ...indexLinks,
+            "</nav>",
+          ].join("\n"),
+    list: [
+      `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
+      "",
+      '<div class="api-member-list">',
+      ...rows,
+      "</div>",
+    ].join("\n"),
+  };
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
@@ -685,12 +1172,16 @@ export async function renderSymbolPage(
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
+  consumers: ConsumerIndex = EMPTY_CONSUMER_INDEX,
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
   const summary = documentationMarkdown(pkg, entry, item, routes);
   const description = compactSummary(summary);
-  const shape = declarationShape(parseableDeclaration(item));
+  const declaration = parseableDeclaration(item);
+  await prepareDeclarationShapes([declaration]);
+  const shape = declarationShape(declaration);
+  const aliases = await unionAliasIndex(pkg, entry, routes);
   const body = [
     frontmatter(`${item.name} | ${label}`, description).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
@@ -705,7 +1196,9 @@ export async function renderSymbolPage(
     "",
   ];
   if (shape.members.length > 0) {
-    body.push(renderMembers(pkg, entry, item, shape.members, routes), "");
+    const members = renderMembers(pkg, entry, item, shape.members, routes, aliases);
+    if (members.index.length > 0) body.push(members.index, "");
+    body.push(members.list, "");
   }
   // A variants section earns its space only for structured unions; scalar
   // unions read best inline in the (expanded) declaration, where identifiers
@@ -720,11 +1213,14 @@ export async function renderSymbolPage(
       '<div class="api-variant-list" data-pagefind-ignore>',
     );
     for (const variant of structuredVariants) {
+      const formatted = await formatTypeExpression(variant);
       body.push(
         '<div class="api-variant">',
         "",
+        copyButton(formatted),
+        "",
         "```ts generated",
-        await formatTypeExpression(variant),
+        formatted,
         "```",
         "",
         "</div>",
@@ -744,6 +1240,8 @@ export async function renderSymbolPage(
       shape.members.length === 0 && structuredVariants.length === 0,
     ),
     "",
+    renderReferencedBy(pkg, item, consumers),
+    API_COPY_SCRIPT,
   );
   return `${body.join("\n").trimEnd()}\n`;
 }
@@ -2099,9 +2597,19 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     loadFormulaContractInventory(repositoryRoot),
     compatibilityResults(),
   ]);
+  // Link resolution and entry pages read declaration shapes synchronously, so every
+  // manifest declaration is parsed up front, in one batch.
+  await prepareDeclarationShapes(
+    manifest.packages.flatMap((pkg) =>
+      pkg.entryPoints.flatMap((entry) => entry.exports.map((item) => parseableDeclaration(item))),
+    ),
+  );
   const documentationLinkIssues = unresolvedDocumentationLinks(manifest);
   if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
   const linkRoutes = documentationLinkRoutes(manifest);
+  // "Referenced by" reads repository manifests and the whole API surface, so it is
+  // indexed once here rather than per symbol page.
+  const consumers = await consumerIndex(manifest);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
@@ -2126,7 +2634,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         symbolOwners.set(symbolPath, owner);
         apiFiles.push({
           path: symbolPath,
-          content: await renderSymbolPage(pkg, entry, item, linkRoutes),
+          content: await renderSymbolPage(pkg, entry, item, linkRoutes, consumers),
         });
       }
     }
@@ -2399,11 +2907,54 @@ function validateImports(
   return failures;
 }
 
+/**
+ * Compiler options for the compiled snippets. TypeScript 7 removed `baseUrl`, so the
+ * `paths` targets are relative to the scratch tsconfig beside the snippets.
+ */
+const SNIPPET_COMPILER_OPTIONS = {
+  jsx: "react-jsx",
+  lib: ["esnext", "dom", "dom.iterable"],
+  module: "esnext",
+  moduleResolution: "bundler",
+  noEmit: true,
+  paths: {
+    "@sheetwrite/core": ["../packages/core/dist/index.d.ts"],
+    "@sheetwrite/core/*": ["../packages/core/dist/*"],
+    "@sheetwrite/react": ["../packages/react/dist/index.d.ts"],
+    "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
+    "@sheetwrite/vue": ["../packages/vue/dist/index.d.ts"],
+    "@sheetwrite/xlsx": ["../packages/xlsx/dist/index.d.ts"],
+  },
+  skipLibCheck: false,
+  strict: true,
+  target: "es2022",
+} as const;
+
+/** Flattens a diagnostic and its message chain the way `flattenDiagnosticMessageText` did. */
+function diagnosticText(diagnostic: Diagnostic): string {
+  return [diagnostic.text, ...(diagnostic.messageChain ?? []).map(diagnosticText)].join("\n");
+}
+
+/** The TypeScript 7 equivalent of `getPreEmitDiagnostics`: config, syntax, options, global, semantic. */
+async function preEmitDiagnostics(project: Project): Promise<readonly Diagnostic[]> {
+  const diagnostics = [...(await project.program.getConfigFileParsingDiagnostics())];
+  const configFileCount = diagnostics.length;
+  diagnostics.push(...(await project.program.getSyntacticDiagnostics()));
+  if (diagnostics.length !== configFileCount) return diagnostics;
+  diagnostics.push(...(await project.program.getProgramDiagnostics()));
+  diagnostics.push(...(await project.program.getGlobalDiagnostics()));
+  if (diagnostics.length === configFileCount) {
+    diagnostics.push(...(await project.program.getSemanticDiagnostics()));
+  }
+  return diagnostics;
+}
+
 async function validateCompiledSnippets(
   snippets: Array<{ document: MarkdownDocument; fence: Fence }>,
 ): Promise<string[]> {
   if (snippets.length === 0) return [];
   const directory = await mkdtemp(join(repositoryRoot, ".docs-snippets-"));
+  const api = new API({ cwd: repositoryRoot });
   try {
     const files: string[] = [];
     for (const [index, snippet] of snippets.entries()) {
@@ -2416,37 +2967,41 @@ async function validateCompiledSnippets(
       await writeFile(path, `${compileSource}\nexport {};\n`);
       files.push(path);
     }
-    const program = ts.createProgram(files, {
-      baseUrl: repositoryRoot,
-      jsx: ts.JsxEmit.ReactJSX,
-      ignoreDeprecations: "6.0",
-      lib: ["lib.esnext.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      paths: {
-        "@sheetwrite/core": ["packages/core/dist/index.d.ts"],
-        "@sheetwrite/core/*": ["packages/core/dist/*"],
-        "@sheetwrite/react": ["packages/react/dist/index.d.ts"],
-        "@sheetwrite/svelte": ["packages/svelte/src/index.ts"],
-        "@sheetwrite/vue": ["packages/vue/dist/index.d.ts"],
-        "@sheetwrite/xlsx": ["packages/xlsx/dist/index.d.ts"],
-      },
-      noEmit: true,
-      skipLibCheck: false,
-      strict: true,
-      target: ts.ScriptTarget.ES2022,
-    });
-    return ts.getPreEmitDiagnostics(program).map((diagnostic) => {
-      const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
-      const index = diagnostic.file === undefined ? -1 : files.indexOf(diagnostic.file.fileName);
-      if (index < 0) return `compiled snippet: ${message}`;
-      const snippet = snippets[index];
-      const position = diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
-      return `${posix(relative(repositoryRoot, snippet?.document.path ?? ""))}:${
-        (snippet?.fence.line ?? 0) + (position?.line ?? 0) + 1
-      } compiled snippet: ${message}`;
-    });
+    const configPath = join(directory, "tsconfig.json");
+    await writeFile(
+      configPath,
+      `${JSON.stringify({ compilerOptions: SNIPPET_COMPILER_OPTIONS, files }, null, 2)}\n`,
+    );
+    const snapshot = await api.updateSnapshot({ openProjects: [configPath] });
+    try {
+      const project = snapshot.getProject(configPath);
+      if (project === undefined) {
+        throw new Error(`TypeScript 7 could not open the snippet project ${configPath}`);
+      }
+      const failures: string[] = [];
+      for (const diagnostic of await preEmitDiagnostics(project)) {
+        const message = diagnosticText(diagnostic);
+        const fileName = diagnostic.fileName;
+        const index = fileName === undefined ? -1 : files.indexOf(fileName);
+        if (fileName === undefined || index < 0) {
+          failures.push(`compiled snippet: ${message}`);
+          continue;
+        }
+        const sourceFile = await project.program.getSourceFile(fileName);
+        const snippet = snippets[index];
+        const position = sourceFile?.getLineAndCharacterOfPosition(diagnostic.pos);
+        failures.push(
+          `${posix(relative(repositoryRoot, snippet?.document.path ?? ""))}:${
+            (snippet?.fence.line ?? 0) + (position?.line ?? 0) + 1
+          } compiled snippet: ${message}`,
+        );
+      }
+      return failures;
+    } finally {
+      await snapshot.dispose();
+    }
   } finally {
+    await api.close();
     await rm(directory, { force: true, recursive: true });
   }
 }
