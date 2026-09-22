@@ -52,6 +52,8 @@ jobs:
         run: bun scripts/ci-paths.ts >> "$GITHUB_OUTPUT"
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Assert clean checkout and exact toolchain
         run: |
           test -z "$(git status --porcelain --untracked-files=all)"
@@ -111,6 +113,8 @@ jobs:
             wasm-target-${{ runner.os }}-${{ env.RUST_VERSION }}-
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install coverage toolchain
         run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       # `bench:verify` launches Chromium only; Firefox and WebKit are exercised
@@ -186,6 +190,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: release-tools-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install release verification tools
         run: |
           command -v cargo-audit >/dev/null || cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
