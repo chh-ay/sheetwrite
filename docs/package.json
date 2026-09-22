@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite dev",
-    "build": "bun ../scripts/docs.ts check && bun --bun vite build && bun ../scripts/normalize-sitemap.ts && bunx pagefind --site dist/client && bun ../scripts/indexnow.ts",
+    "build": "bun ../scripts/docs.ts check && bun --bun vite build && bun ../scripts/normalize-sitemap.ts && bunx pagefind --site dist/client",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -28,10 +28,10 @@
     "lucide-react": "^1.24.0",
     "lucide-svelte": "^1.0.1",
     "lucide-vue-next": "^1.0.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "svelte": "5.56.5",
-    "vue": "^3.5.39"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "svelte": "5.57.1",
+    "vue": "^3.5.43"
   },
   "devDependencies": {
     "@expressive-code/core": "0.44.0",
