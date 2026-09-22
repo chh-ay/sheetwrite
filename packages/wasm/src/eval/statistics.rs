@@ -108,16 +108,11 @@ fn mode_sngl(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 fn large_small(values: &FuncAccumulator, ascending: bool) -> Result<f64, FormulaError> {
     require_arity(values, 2, 2)?;
     let mut numbers = collect_numbers(values.arg(0).unwrap_or_default())?;
-    let k = usize::try_from(integer_arg(values, 1, None)?)
-        .map_err(|_| FormulaError::Num)?;
+    let k = usize::try_from(integer_arg(values, 1, None)?).map_err(|_| FormulaError::Num)?;
     if k == 0 || k > numbers.len() {
         return Err(FormulaError::Num);
     }
-    let index = if ascending {
-        k - 1
-    } else {
-        numbers.len() - k
-    };
+    let index = if ascending { k - 1 } else { numbers.len() - k };
     let (_, selected, _) = numbers.select_nth_unstable_by(index, f64::total_cmp);
     Ok(*selected)
 }
@@ -362,7 +357,7 @@ fn count_blank(values: &FuncAccumulator) -> Value {
 
 fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
     let arg_count = values.arg_count();
-    if arg_count < 3 || arg_count % 2 == 0 || (arg_count - 1) / 2 > MAX_CRITERIA_PAIRS {
+    if arg_count < 3 || arg_count.is_multiple_of(2) || (arg_count - 1) / 2 > MAX_CRITERIA_PAIRS {
         return Value::Error(FormulaError::Value);
     }
     let target = values.arg(0).unwrap_or_default();
@@ -456,8 +451,8 @@ mod tests {
             .into_iter()
             .map(Value::number)
             .collect::<Vec<_>>();
-        assert_near(result(Func::Median, &[data.clone()]), 3.0);
-        assert_near(result(Func::ModeSngl, &[data.clone()]), 3.0);
+        assert_near(result(Func::Median, std::slice::from_ref(&data)), 3.0);
+        assert_near(result(Func::ModeSngl, std::slice::from_ref(&data)), 3.0);
         assert_near(result(Func::Large, &[data.clone(), scalar(2.0)]), 3.0);
         assert_near(result(Func::Small, &[data.clone(), scalar(1.0)]), 1.0);
         assert_eq!(
@@ -483,18 +478,12 @@ mod tests {
             Value::number(2.0)
         );
         assert_eq!(
-            result(
-                Func::RankEq,
-                &[scalar(3.0), data.clone(), scalar(1.0)],
-            ),
+            result(Func::RankEq, &[scalar(3.0), data.clone(), scalar(1.0)],),
             Value::number(2.0)
         );
         for order in [0.0, 1.0] {
             assert_eq!(
-                result(
-                    Func::RankEq,
-                    &[scalar(4.0), data.clone(), scalar(order)],
-                ),
+                result(Func::RankEq, &[scalar(4.0), data.clone(), scalar(order)],),
                 Value::Error(FormulaError::Na)
             );
         }
@@ -522,25 +511,39 @@ mod tests {
 
     #[test]
     fn stable_moments_preserve_small_spread_on_large_offsets() {
-        let data = vec![1_000_000_000_001.0, 1_000_000_000_002.0, 1_000_000_000_003.0]
-            .into_iter()
-            .map(Value::number)
-            .collect::<Vec<_>>();
-        assert_near(result(Func::VarS, &[data.clone()]), 1.0);
-        assert_near(result(Func::VarP, &[data.clone()]), 2.0 / 3.0);
-        assert_near(result(Func::StdevS, &[data.clone()]), 1.0);
+        let data = vec![
+            1_000_000_000_001.0,
+            1_000_000_000_002.0,
+            1_000_000_000_003.0,
+        ]
+        .into_iter()
+        .map(Value::number)
+        .collect::<Vec<_>>();
+        assert_near(result(Func::VarS, std::slice::from_ref(&data)), 1.0);
+        assert_near(result(Func::VarP, std::slice::from_ref(&data)), 2.0 / 3.0);
+        assert_near(result(Func::StdevS, std::slice::from_ref(&data)), 1.0);
         assert_near(result(Func::GeoMean, &[data]), 1_000_000_000_002.0);
     }
 
     #[test]
     fn paired_statistics_enforce_shape_and_pairwise_numeric_values() {
-        let left = vec![Value::number(1.0), Value::text("ignored"), Value::number(3.0)];
+        let left = vec![
+            Value::number(1.0),
+            Value::text("ignored"),
+            Value::number(3.0),
+        ];
         let right = vec![Value::number(2.0), Value::number(9.0), Value::number(6.0)];
         assert_near(result(Func::Correl, &[left.clone(), right.clone()]), 1.0);
-        assert_near(result(Func::CovarianceP, &[left.clone(), right.clone()]), 2.0);
+        assert_near(
+            result(Func::CovarianceP, &[left.clone(), right.clone()]),
+            2.0,
+        );
         assert_near(result(Func::CovarianceS, &[left, right]), 4.0);
         assert_eq!(
-            result(Func::Correl, &[scalar(1.0), vec![Value::number(1.0), Value::number(2.0)]]),
+            result(
+                Func::Correl,
+                &[scalar(1.0), vec![Value::number(1.0), Value::number(2.0)]]
+            ),
             Value::Error(FormulaError::Na)
         );
     }
@@ -548,7 +551,11 @@ mod tests {
     #[test]
     fn conditional_extremes_share_criteria_and_require_equal_shapes() {
         let target = vec![Value::number(-4.0), Value::number(8.0), Value::number(3.0)];
-        let groups = vec![Value::text("west"), Value::text("east"), Value::text("west")];
+        let groups = vec![
+            Value::text("west"),
+            Value::text("east"),
+            Value::text("west"),
+        ];
         assert_near(
             result(
                 Func::MaxIfs,
@@ -557,16 +564,17 @@ mod tests {
             3.0,
         );
         assert_near(
-            result(
-                Func::MinIfs,
-                &[target, groups, vec![Value::text("w*")]],
-            ),
+            result(Func::MinIfs, &[target, groups, vec![Value::text("w*")]]),
             -4.0,
         );
         assert_eq!(
             result(
                 Func::MaxIfs,
-                &[scalar(1.0), vec![Value::number(1.0), Value::number(2.0)], scalar(1.0)],
+                &[
+                    scalar(1.0),
+                    vec![Value::number(1.0), Value::number(2.0)],
+                    scalar(1.0)
+                ],
             ),
             Value::Error(FormulaError::Value)
         );

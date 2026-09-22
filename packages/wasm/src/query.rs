@@ -1050,7 +1050,7 @@ fn radix_sort_numeric_pairs(pairs: &mut [NumericSortPair]) {
     for (pass, histogram) in counts.iter().enumerate() {
         // Every key shares this byte (sheet data is rarely full-range f64:
         // money/ids/dates leave most high bytes constant) — nothing to move.
-        if histogram.iter().any(|&count| count == n) {
+        if histogram.contains(&n) {
             continue;
         }
 

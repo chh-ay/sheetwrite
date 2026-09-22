@@ -3,18 +3,18 @@
 mod array;
 mod criteria;
 mod date;
-mod financial;
 mod dependency;
+mod financial;
 mod functions;
-mod math;
 mod lookup;
+mod math;
 mod matrix;
 mod statistics;
 mod text;
 mod value;
 
-use std::cmp::Ordering;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use crate::calc::{Ast, CmpOp, Func, Op};
@@ -82,9 +82,7 @@ pub(super) fn expand_let_ast(args: &[Ast]) -> Result<Ast, FormulaError> {
 
 pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     let mut bindings = Vec::new();
-    bindings
-        .try_reserve(4)
-        .map_err(|_| FormulaError::Num)?;
+    bindings.try_reserve(4).map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
     expand_let_node(ast, &mut bindings, &mut nodes)
 }
@@ -94,11 +92,11 @@ fn expand_let_args<'a>(
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
 ) -> Result<Ast, FormulaError> {
-    if args.len() < 3 || args.len() % 2 == 0 || args.len() / 2 > LET_BINDING_LIMIT {
+    if args.len() < 3 || args.len().is_multiple_of(2) || args.len() / 2 > LET_BINDING_LIMIT {
         return Err(FormulaError::Value);
     }
     let original_len = bindings.len();
-    for pair in args[..args.len() - 1].chunks_exact(2) {
+    for pair in args[..args.len() - 1].as_chunks::<2>().0 {
         let Ast::Name(name) = &pair[0] else {
             bindings.truncate(original_len);
             return Err(FormulaError::Value);
@@ -286,10 +284,14 @@ impl CellStore {
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
             let data = &self.sheets[sheet];
-            affected.extend(data.spill_ranges.iter().filter_map(|(&anchor, &range)| {
-                (data.all_dirty || data.dirty_cells.iter().any(|&cell| range.contains(cell)))
-                    .then(|| AbsCellKey::from_local(sheet, anchor))
-            }));
+            affected.extend(
+                data.spill_ranges
+                    .iter()
+                    .filter(|&(&_anchor, &range)| {
+                        data.all_dirty || data.dirty_cells.iter().any(|&cell| range.contains(cell))
+                    })
+                    .map(|(&anchor, &_range)| AbsCellKey::from_local(sheet, anchor)),
+            );
         }
         if affected.is_empty() {
             for &sheet in seeds {
@@ -372,10 +374,10 @@ impl CellStore {
                     let collision_dependents: Vec<AbsCellKey> = self.sheets[output_sheet]
                         .spill_ranges
                         .iter()
-                        .filter_map(|(&anchor, &attempt)| {
-                            (anchor != local && attempt.intersects(vacated))
-                                .then(|| AbsCellKey::from_local(output_sheet, anchor))
+                        .filter(|&(&anchor, &attempt)| {
+                            anchor != local && attempt.intersects(vacated)
                         })
+                        .map(|(&anchor, &_attempt)| AbsCellKey::from_local(output_sheet, anchor))
                         .collect();
                     for dependent in collision_dependents {
                         affected.insert(dependent);
@@ -1009,7 +1011,11 @@ impl CellStore {
                 let Some((row, col)) = current_formula_origin() else {
                     return Value::Error(FormulaError::Value);
                 };
-                if func == Func::Row { row } else { col }
+                if func == Func::Row {
+                    row
+                } else {
+                    col
+                }
             };
             return Value::number(coordinate as f64 + 1.0);
         }
@@ -1018,17 +1024,11 @@ impl CellStore {
             if args.len() != 1 {
                 return Value::Error(FormulaError::Value);
             }
-            let matrix = match self.eval_matrix_arg(
-                &args[0],
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ) {
-                Ok(matrix) => matrix,
-                Err(error) => return Value::Error(error),
-            };
+            let matrix =
+                match self.eval_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1) {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Value::Error(error),
+                };
             return Value::number(if func == Func::Rows {
                 matrix.rows as f64
             } else {
@@ -1132,10 +1132,10 @@ impl CellStore {
         }
 
         if func == Func::Ifs {
-            if args.len() < 2 || args.len() % 2 != 0 {
+            if args.len() < 2 || !args.len().is_multiple_of(2) {
                 return Value::Error(FormulaError::Value);
             }
-            for pair in args.chunks_exact(2) {
+            for pair in args.as_chunks::<2>().0 {
                 let condition = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
                 match bool_from_value(&condition) {
                     Ok(true) => {
@@ -1156,12 +1156,12 @@ impl CellStore {
             if let Value::Error(error) = expression {
                 return Value::Error(error);
             }
-            let pairs_end = if args.len() % 2 == 0 {
+            let pairs_end = if args.len().is_multiple_of(2) {
                 args.len() - 1
             } else {
                 args.len()
             };
-            for pair in args[1..pairs_end].chunks_exact(2) {
+            for pair in args[1..pairs_end].as_chunks::<2>().0 {
                 let case = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
                 match compare_values(&expression, &case) {
                     Ok(Ordering::Equal) => {
@@ -1339,9 +1339,7 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 }
             } else if ast_produces_array(arg) {
-                let shape = match self
-                    .eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1)
-                {
+                match self.eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {
                             return Value::Error(error);
@@ -1359,8 +1357,7 @@ impl CellStore {
                     }
                     Some(Err(error)) => return Value::Error(error),
                     None => {
-                        let value =
-                            self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
+                        let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
                         if let Value::Error(error) = value {
                             return Value::Error(error);
                         }
@@ -1376,8 +1373,7 @@ impl CellStore {
                         }
                         (1, 1)
                     }
-                };
-                shape
+                }
             } else {
                 let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
                 if let Value::Error(error) = value {
@@ -1395,11 +1391,9 @@ impl CellStore {
                 }
                 (1, 1)
             };
-            if let Err(error) = values.finish_arg_with_missing(
-                shape.0,
-                shape.1,
-                matches!(arg, Ast::Missing),
-            ) {
+            if let Err(error) =
+                values.finish_arg_with_missing(shape.0, shape.1, matches!(arg, Ast::Missing))
+            {
                 return Value::Error(error);
             }
         }
@@ -1532,12 +1526,12 @@ impl CellStore {
                 ))
             }
             Func::CountIfs => {
-                if args.is_empty() || args.len() % 2 != 0 {
+                if args.is_empty() || !args.len().is_multiple_of(2) {
                     return Value::Error(FormulaError::Value);
                 }
                 let mut ranges = Vec::with_capacity(args.len() / 2);
                 let mut criteria = Vec::with_capacity(args.len() / 2);
-                for pair in args.chunks_exact(2) {
+                for pair in args.as_chunks::<2>().0 {
                     let range = match self.eval_matrix_arg(
                         &pair[0],
                         sheet,
@@ -1618,7 +1612,7 @@ impl CellStore {
                 aggregate_if(&value_range, &[(&criteria_range, &criterion)])
             }
             Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
-                if args.len() < 3 || args.len() % 2 == 0 {
+                if args.len() < 3 || args.len().is_multiple_of(2) {
                     return Value::Error(FormulaError::Value);
                 }
                 let value_range = match self.eval_matrix_arg(
@@ -1634,7 +1628,7 @@ impl CellStore {
                 };
                 let mut ranges = Vec::with_capacity((args.len() - 1) / 2);
                 let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
-                for pair in args[1..].chunks_exact(2) {
+                for pair in args[1..].as_chunks::<2>().0 {
                     let range = match self.eval_matrix_arg(
                         &pair[0],
                         sheet,
@@ -1665,8 +1659,7 @@ impl CellStore {
                 }
                 let pairs: Vec<_> = ranges.iter().zip(&criteria).collect();
                 if matches!(func, Func::MaxIfs | Func::MinIfs) {
-                    extreme_if(&value_range, &pairs, func == Func::MaxIfs)
-                        .map(|value| (value, 0))
+                    extreme_if(&value_range, &pairs, func == Func::MaxIfs).map(|value| (value, 0))
                 } else {
                     aggregate_if(&value_range, &pairs)
                 }

@@ -824,7 +824,7 @@ impl CellStore {
         };
 
         let mut rules: Vec<CondRule> = Vec::with_capacity(kinds.len().min(32));
-        for (i, (&kind, text)) in kinds.iter().zip(strs.into_iter()).take(32).enumerate() {
+        for (i, (&kind, text)) in kinds.iter().zip(strs).take(32).enumerate() {
             let b = i * 4;
             let (Some(&r0), Some(&c0), Some(&r1), Some(&c1)) = (
                 bounds.get(b),
@@ -2508,14 +2508,14 @@ impl CellStore {
     /// without weakening the old gate.
     #[wasm_bindgen(js_name = setSpillBlockers)]
     pub fn set_spill_blockers(&mut self, sheet: usize, bounds: &[u32]) -> bool {
-        if bounds.len() % 4 != 0 || bounds.len() / 4 > 100_000 {
+        if !bounds.len().is_multiple_of(4) || bounds.len() / 4 > 100_000 {
             return false;
         }
         let Some(data) = self.sheets.get(sheet) else {
             return false;
         };
         let mut blockers = Vec::with_capacity(bounds.len() / 4);
-        for range in bounds.chunks_exact(4) {
+        for range in bounds.as_chunks::<4>().0 {
             if range[0] > range[2]
                 || range[1] > range[3]
                 || !data.contains_cell(range[2] as usize, range[3] as usize)

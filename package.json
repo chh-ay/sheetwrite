@@ -2,7 +2,7 @@
   "name": "sheetwrite",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "bun@1.3.14",
+  "packageManager": "bun@1.4.2",
   "type": "module",
   "description": "Framework-agnostic, high-performance spreadsheet grid.",
   "license": "MIT",
@@ -13,8 +13,8 @@
     "bench"
   ],
   "engines": {
-    "bun": ">=1.3.0",
-    "node": ">=24.3.0 <25"
+    "bun": ">=1.4.0",
+    "node": "24.21.0"
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
@@ -36,7 +36,7 @@
     "build:packages": "bun scripts/workspace-tooling.ts build",
     "build:examples": "bun scripts/workspace-tooling.ts build-examples",
     "build": "bun run build:packages",
-    "build:docs:production": "rm -rf docs/dist docs/.tanstack packages/*/dist packages/wasm/pkg packages/wasm/target && bun scripts/install-wasm-pack.ts && rustup target add wasm32-unknown-unknown && bun run build:packages && bun run docs:generate && bun run docs:check && bun run --filter '@sheetwrite/docs-start' build",
+    "build:docs:production": "rm -rf docs/dist docs/.tanstack packages/*/dist packages/wasm/pkg packages/wasm/target && bun scripts/install-wasm-pack.ts && rustup toolchain install && rustup target add wasm32-unknown-unknown && bun run build:packages && bun run docs:generate && bun run docs:check && bun run --filter '@sheetwrite/docs-start' build",
     "changeset:status": "changeset status",
     "changeset:ci": "bun scripts/changeset-ci.ts",
     "typecheck:packages": "bun scripts/workspace-tooling.ts typecheck-packages",
@@ -85,7 +85,7 @@
     "@changesets/cli": "2.31.0",
     "@happy-dom/global-registrator": "^20.10.6",
     "@playwright/test": "^1.61.1",
-    "@types/bun": "^1.3.14",
+    "@types/bun": "^1.4.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -103,6 +103,7 @@
   ],
   "overrides": {
     "nanoid": "3.3.18",
-    "postcss": "^8.5.18"
+    "postcss": "^8.5.18",
+    "toml": "^4.2.0"
   }
 }

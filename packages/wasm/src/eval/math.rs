@@ -46,9 +46,8 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
                 0.0
             })
         }),
-        Func::Pi => {
-            require_arity(values, 0, 0).map_or_else(Value::Error, |_| Value::number(std::f64::consts::PI))
-        }
+        Func::Pi => require_arity(values, 0, 0)
+            .map_or_else(Value::Error, |_| Value::number(std::f64::consts::PI)),
         Func::Product => product(values),
         Func::SumProduct => sum_product(values),
         Func::Exp => unary(values, |value| finite(value.exp())),
@@ -355,7 +354,10 @@ fn gcd_lcm(values: &FuncAccumulator, lcm: bool) -> Value {
                 continue;
             }
             let divisor = gcd(result, value);
-            result = match result.checked_div(divisor).and_then(|part| part.checked_mul(value)) {
+            result = match result
+                .checked_div(divisor)
+                .and_then(|part| part.checked_mul(value))
+            {
                 Some(value) => value,
                 None => return Value::Error(FormulaError::Num),
             };
@@ -439,7 +441,9 @@ fn subtotal(values: &FuncAccumulator) -> Value {
             }
             _ => unreachable!(),
         }
-        let selected = if matches!(function, 1) { mean } else if matches!(function, 7 | 8 | 10 | 11) {
+        let selected = if matches!(function, 1) {
+            mean
+        } else if matches!(function, 7 | 8 | 10 | 11) {
             squared_deviations
         } else {
             aggregate
@@ -474,7 +478,6 @@ fn subtotal(values: &FuncAccumulator) -> Value {
         _ => unreachable!(),
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -513,25 +516,42 @@ mod tests {
             panic!("expected number {expected}, got {value:?}");
         };
         let tolerance = expected.abs().max(1.0) * 1e-12;
-        assert!((actual - expected).abs() <= tolerance, "{actual} != {expected}");
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "{actual} != {expected}"
+        );
     }
 
     #[test]
     fn scalar_domains_and_arities() {
         let cases = [
-            (Func::Power, vec![Value::number(2.0), Value::number(10.0)], 1024.0),
+            (
+                Func::Power,
+                vec![Value::number(2.0), Value::number(10.0)],
+                1024.0,
+            ),
             (Func::Exp, vec![Value::number(1.0)], std::f64::consts::E),
             (Func::Ln, vec![Value::number(std::f64::consts::E)], 1.0),
             (Func::Log, vec![Value::number(8.0), Value::number(2.0)], 3.0),
             (Func::Log10, vec![Value::number(1000.0)], 3.0),
-            (Func::Quotient, vec![Value::number(-7.0), Value::number(3.0)], -2.0),
+            (
+                Func::Quotient,
+                vec![Value::number(-7.0), Value::number(3.0)],
+                -2.0,
+            ),
         ];
         for (func, arguments, expected) in cases {
             assert_number(evaluate(func, arguments), expected);
         }
 
-        assert_eq!(evaluate(Func::Power, vec![Value::number(2.0)]), Value::Error(FormulaError::Value));
-        assert_eq!(evaluate(Func::Ln, vec![Value::number(0.0)]), Value::Error(FormulaError::Num));
+        assert_eq!(
+            evaluate(Func::Power, vec![Value::number(2.0)]),
+            Value::Error(FormulaError::Value)
+        );
+        assert_eq!(
+            evaluate(Func::Ln, vec![Value::number(0.0)]),
+            Value::Error(FormulaError::Num)
+        );
         assert_eq!(
             evaluate(Func::Log, vec![Value::number(10.0), Value::number(1.0)]),
             Value::Error(FormulaError::Num)
@@ -571,14 +591,23 @@ mod tests {
             (Func::RoundDown, -149.0, -2.0, -100.0),
         ];
         for (func, number, digits, expected) in cases {
-            assert_number(evaluate(func, vec![Value::number(number), Value::number(digits)]), expected);
+            assert_number(
+                evaluate(func, vec![Value::number(number), Value::number(digits)]),
+                expected,
+            );
         }
         assert_number(
-            evaluate(Func::RoundDown, vec![Value::number(2.0), Value::number(308.0)]),
+            evaluate(
+                Func::RoundDown,
+                vec![Value::number(2.0), Value::number(308.0)],
+            ),
             2.0,
         );
         assert_eq!(
-            evaluate(Func::RoundUp, vec![Value::number(1.0), Value::number(309.0)]),
+            evaluate(
+                Func::RoundUp,
+                vec![Value::number(1.0), Value::number(309.0)]
+            ),
             Value::Error(FormulaError::Num)
         );
     }
@@ -590,7 +619,12 @@ mod tests {
             (false, vec![Value::text("3")]),
             (
                 true,
-                vec![Value::number(2.0), Value::Bool(true), Value::text("9"), Value::Blank],
+                vec![
+                    Value::number(2.0),
+                    Value::Bool(true),
+                    Value::text("9"),
+                    Value::Blank,
+                ],
             ),
         ]);
         assert_number(apply(Func::Product, &values).unwrap(), 6.0);
@@ -598,11 +632,21 @@ mod tests {
         let paired = accumulator(vec![
             (
                 true,
-                vec![Value::number(2.0), Value::Bool(true), Value::text("4"), Value::Blank],
+                vec![
+                    Value::number(2.0),
+                    Value::Bool(true),
+                    Value::text("4"),
+                    Value::Blank,
+                ],
             ),
             (
                 true,
-                vec![Value::number(3.0), Value::number(4.0), Value::number(5.0), Value::number(6.0)],
+                vec![
+                    Value::number(3.0),
+                    Value::number(4.0),
+                    Value::number(5.0),
+                    Value::number(6.0),
+                ],
             ),
         ]);
         assert_number(apply(Func::SumProduct, &paired).unwrap(), 6.0);
@@ -627,7 +671,10 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
         let error = accumulator(vec![
-            (true, vec![Value::number(1.0), Value::Error(FormulaError::Ref)]),
+            (
+                true,
+                vec![Value::number(1.0), Value::Error(FormulaError::Ref)],
+            ),
             (true, vec![Value::number(2.0), Value::number(3.0)]),
         ]);
         assert_eq!(
@@ -716,10 +763,16 @@ mod tests {
             Value::Bool(true),
             Value::Blank,
         ];
-        let count = accumulator(vec![(false, vec![Value::number(2.0)]), (true, range.clone())]);
+        let count = accumulator(vec![
+            (false, vec![Value::number(2.0)]),
+            (true, range.clone()),
+        ]);
         assert_number(apply(Func::Subtotal, &count).unwrap(), 2.0);
 
-        let count_a = accumulator(vec![(false, vec![Value::number(3.0)]), (true, range.clone())]);
+        let count_a = accumulator(vec![
+            (false, vec![Value::number(3.0)]),
+            (true, range.clone()),
+        ]);
         assert_number(apply(Func::Subtotal, &count_a).unwrap(), 5.0);
 
         let sum = accumulator(vec![(false, vec![Value::number(9.0)]), (true, range)]);

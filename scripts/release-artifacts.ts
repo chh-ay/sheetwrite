@@ -493,7 +493,7 @@ function digest(bytes: Uint8Array, algorithm: "sha1" | "sha512", encoding: "hex"
 async function assertToolchain(): Promise<ReleaseToolchain> {
   const toolchain: ReleaseToolchain = {
     bun: Bun.version,
-    node: process.versions.node,
+    node: (await run(["node", "--version"])).replace(/^v/, ""),
     npm: await run(["npm", "--version"]),
     rust: (await run(["rustc", "--version"])).match(/^rustc\s+([^\s]+)/)?.[1] ?? "missing",
     wasmTarget: WASM_TARGET,

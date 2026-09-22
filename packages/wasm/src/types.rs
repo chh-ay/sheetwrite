@@ -280,7 +280,10 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
     }
     let expanded = expand_let_reachable_ast(ast).ok();
     let metadata = expanded.as_ref().unwrap_or(ast);
-    (ReadSet::from_ast(metadata, formula_sheet), ast_is_volatile(metadata))
+    (
+        ReadSet::from_ast(metadata, formula_sheet),
+        ast_is_volatile(metadata),
+    )
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

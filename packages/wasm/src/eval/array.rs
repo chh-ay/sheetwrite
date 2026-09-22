@@ -9,19 +9,17 @@ use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
+use super::expand_let_ast;
 use super::lookup::integer_arg;
 use super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
 };
 use super::value::{bool_from_value, compare_values, number_from_value};
-use super::expand_let_ast;
 
 fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
         Ast::Num(value)
-            if value.is_finite()
-                && *value >= i64::MIN as f64
-                && *value <= i64::MAX as f64 =>
+            if value.is_finite() && *value >= i64::MIN as f64 && *value <= i64::MAX as f64 =>
         {
             Some(value.trunc() as i64)
         }
@@ -69,11 +67,7 @@ fn sequence_shape(args: &[Ast]) -> Result<(usize, usize, usize), FormulaError> {
     Ok((rows, cols, cells))
 }
 
-fn transformed_axis_bound(
-    size: usize,
-    requested: i64,
-    drop: bool,
-) -> Result<usize, FormulaError> {
+fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usize, FormulaError> {
     if requested == 0 {
         return Err(FormulaError::Calc);
     }
@@ -282,11 +276,14 @@ impl CellStore {
                 let (rows, cols, _) = self.matrix_shape(source, formula_sheet)?;
                 let drop = matches!(ast, Ast::Func(Func::Drop, _));
                 let output_rows = static_integer(optional_ast(args, 1))
-                    .map_or(Ok(rows), |requested| transformed_axis_bound(rows, requested, drop))?;
+                    .map_or(Ok(rows), |requested| {
+                        transformed_axis_bound(rows, requested, drop)
+                    })?;
                 let output_cols = match optional_ast(args, 2) {
-                    Some(requested) => static_integer(Some(requested)).map_or(Ok(cols), |requested| {
-                        transformed_axis_bound(cols, requested, drop)
-                    })?,
+                    Some(requested) => static_integer(Some(requested))
+                        .map_or(Ok(cols), |requested| {
+                            transformed_axis_bound(cols, requested, drop)
+                        })?,
                     None => cols,
                 };
                 let cells = EvalMatrix::validate_shape(output_rows, output_cols, 1, 0)?;
@@ -788,7 +785,11 @@ impl CellStore {
             .unwrap_or(usize::MAX)
             .min(source.cols);
         let row_start = if drop {
-            if rows > 0 { row_magnitude } else { 0 }
+            if rows > 0 {
+                row_magnitude
+            } else {
+                0
+            }
         } else if rows < 0 {
             source.rows - row_magnitude
         } else {
@@ -797,7 +798,11 @@ impl CellStore {
         let col_start = match requested_cols {
             None => 0,
             Some(_) if drop => {
-                if cols > 0 { col_magnitude } else { 0 }
+                if cols > 0 {
+                    col_magnitude
+                } else {
+                    0
+                }
             }
             Some(_) if cols < 0 => source.cols - col_magnitude,
             Some(_) => 0,
@@ -857,11 +862,7 @@ impl CellStore {
         }
         let source =
             self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
-        let dimension = if rows_axis {
-            source.rows
-        } else {
-            source.cols
-        };
+        let dimension = if rows_axis { source.rows } else { source.cols };
         let (output_rows, output_cols) = if rows_axis {
             (selector_count, source.cols)
         } else {
@@ -936,17 +937,9 @@ impl CellStore {
         Ok(EvalMatrix::new(
             1,
             1,
-            vec![self.scalar_array_arg(
-                selected,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )],
+            vec![self.scalar_array_arg(selected, sheet, affected, memo, visiting, depth + 1)],
         ))
     }
-
 }
 
 pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Option<usize> {
@@ -1047,12 +1040,19 @@ mod tests {
     #[test]
     fn generic_dynamic_array_roots_install_exact_matrix_shapes() {
         let cases: [(&str, usize, usize, &[f64]); 7] = [
-            ("=SEQUENCE(2,3,10,2)", 2, 3, &[10.0, 12.0, 14.0, 16.0, 18.0, 20.0]),
+            (
+                "=SEQUENCE(2,3,10,2)",
+                2,
+                3,
+                &[10.0, 12.0, 14.0, 16.0, 18.0, 20.0],
+            ),
             (
                 "=TRANSPOSE(SEQUENCE(A1,B1,1,1))",
                 4,
                 3,
-                &[1.0, 5.0, 9.0, 2.0, 6.0, 10.0, 3.0, 7.0, 11.0, 4.0, 8.0, 12.0],
+                &[
+                    1.0, 5.0, 9.0, 2.0, 6.0, 10.0, 3.0, 7.0, 11.0, 4.0, 8.0, 12.0,
+                ],
             ),
             (
                 "=TAKE(SEQUENCE(A1,B1,1,1),2,-2)",
@@ -1076,7 +1076,9 @@ mod tests {
                 "=CHOOSEROWS(SEQUENCE(A1,B1,1,1),3,1,3)",
                 3,
                 4,
-                &[9.0, 10.0, 11.0, 12.0, 1.0, 2.0, 3.0, 4.0, 9.0, 10.0, 11.0, 12.0],
+                &[
+                    9.0, 10.0, 11.0, 12.0, 1.0, 2.0, 3.0, 4.0, 9.0, 10.0, 11.0, 12.0,
+                ],
             ),
             (
                 "=LET(values,SEQUENCE(2,2,1,1),TRANSPOSE(values))",
@@ -1210,13 +1212,7 @@ mod tests {
 
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(4, 500_000, 256, 1_000_000, 1_000_000);
-        store.set_formula(
-            sheet,
-            0,
-            1,
-            "=CHOOSECOLS(SEQUENCE(500000,1),1,1,1)",
-            0,
-        );
+        store.set_formula(sheet, 0, 1, "=CHOOSECOLS(SEQUENCE(500000,1),1,1,1)", 0);
         reset_matrix_resource_stats();
         store.recompute(sheet);
         assert_eq!(text(&store, sheet, 0, 1).as_deref(), Some("#NUM!"));
@@ -1231,9 +1227,7 @@ mod tests {
         store.set_formula(sheet, 0, 0, formula, 0);
         store.recompute(sheet);
 
-        let copied = store
-            .capture_range(sheet, 0, 0, 1, 1)
-            .expect("copy source");
+        let copied = store.capture_range(sheet, 0, 0, 1, 1).expect("copy source");
         assert!(store.restore_range(sheet, 0, 3, &copied));
         store.set_formula(sheet, 0, 6, formula, 0);
         store.recompute(sheet);

@@ -940,14 +940,12 @@ impl SheetData {
     }
 
     pub(crate) fn set_kind(&mut self, index: usize, kind: u8) {
-        if self.paged.is_some() {
+        if let Some(paged) = self.paged.as_ref() {
             let (row, col) = self.coordinates(index);
-            let (_, payload, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ = self
-                .paged
-                .as_mut()
-                .unwrap()
-                .write(row, col, kind, payload, style, None);
+            let (_, payload, style, _, _) = paged.read(row, col);
+            if let Some(paged) = self.paged.as_mut() {
+                let _ = paged.write(row, col, kind, payload, style, None);
+            }
         } else {
             self.kind[index] = kind;
         }
@@ -1163,14 +1161,12 @@ impl SheetData {
 
     #[inline]
     pub(crate) fn set_num(&mut self, i: usize, value: f64) {
-        if self.paged.is_some() {
+        if let Some(paged) = self.paged.as_ref() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ =
-                self.paged
-                    .as_mut()
-                    .unwrap()
-                    .write(row, col, kind, encode_num(value), style, None);
+            let (kind, _, style, _, _) = paged.read(row, col);
+            if let Some(paged) = self.paged.as_mut() {
+                let _ = paged.write(row, col, kind, encode_num(value), style, None);
+            }
         } else {
             self.payload[i] = encode_num(value);
         }
@@ -1178,14 +1174,12 @@ impl SheetData {
 
     #[inline]
     pub(crate) fn set_str(&mut self, i: usize, id: u32) {
-        if self.paged.is_some() {
+        if let Some(paged) = self.paged.as_ref() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ =
-                self.paged
-                    .as_mut()
-                    .unwrap()
-                    .write(row, col, kind, encode_str_id(id), style, None);
+            let (kind, _, style, _, _) = paged.read(row, col);
+            if let Some(paged) = self.paged.as_mut() {
+                let _ = paged.write(row, col, kind, encode_str_id(id), style, None);
+            }
         } else {
             self.payload[i] = encode_str_id(id);
         }
@@ -1193,14 +1187,12 @@ impl SheetData {
 
     #[inline]
     pub(crate) fn clear_payload(&mut self, i: usize) {
-        if self.paged.is_some() {
+        if let Some(paged) = self.paged.as_ref() {
             let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = self.paged.as_ref().unwrap().read(row, col);
-            let _ = self
-                .paged
-                .as_mut()
-                .unwrap()
-                .write(row, col, kind, 0, style, None);
+            let (kind, _, style, _, _) = paged.read(row, col);
+            if let Some(paged) = self.paged.as_mut() {
+                let _ = paged.write(row, col, kind, 0, style, None);
+            }
         } else {
             self.payload[i] = 0;
         }

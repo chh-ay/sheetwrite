@@ -61,7 +61,9 @@ pub(super) fn date_serial(mut year: i64, month: i64, day: i64) -> Result<f64, Fo
         first_serial -= 1;
     }
     let day_offset = day.checked_sub(1).ok_or(FormulaError::Num)?;
-    let serial = first_serial.checked_add(day_offset).ok_or(FormulaError::Num)?;
+    let serial = first_serial
+        .checked_add(day_offset)
+        .ok_or(FormulaError::Num)?;
     let (result_year, _, _) = date_parts(serial as f64).ok_or(FormulaError::Num)?;
     if !(0..=9999).contains(&result_year) {
         return Err(FormulaError::Num);
@@ -133,10 +135,7 @@ fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
     }
     let (date, time) = if let Some(separator) = raw.rfind(['T', ' ']) {
         let prefix = raw.get(..separator)?.trim();
-        if prefix.is_empty()
-            || prefix.contains('T')
-            || prefix.chars().any(char::is_whitespace)
-        {
+        if prefix.is_empty() || prefix.contains('T') || prefix.chars().any(char::is_whitespace) {
             return None;
         }
         (
@@ -169,8 +168,7 @@ fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
         None if !(0..24).contains(&hour) => return None,
         None => {}
     }
-    let fraction =
-        (hour as f64 * 3_600.0 + minute as f64 * 60.0 + second) / SECONDS_PER_DAY as f64;
+    let fraction = (hour as f64 * 3_600.0 + minute as f64 * 60.0 + second) / SECONDS_PER_DAY as f64;
     Some((date, fraction))
 }
 
@@ -463,13 +461,11 @@ fn actual_actual_yearfrac(start: i64, end: i64) -> Result<f64, FormulaError> {
     if start == end {
         return Ok(0.0);
     }
-    let (start_year, start_month, start_day) =
-        date_parts(start as f64).ok_or(FormulaError::Num)?;
+    let (start_year, start_month, start_day) = date_parts(start as f64).ok_or(FormulaError::Num)?;
     let (end_year, end_month, end_day) = date_parts(end as f64).ok_or(FormulaError::Num)?;
     let days = (end - start) as f64;
     if start_year == end_year
-        || (end_year == start_year + 1
-            && (end_month, end_day) <= (start_month, start_day))
+        || (end_year == start_year + 1 && (end_month, end_day) <= (start_month, start_day))
     {
         let divisor = if interval_has_leap_day(start, end) {
             366.0
@@ -493,14 +489,12 @@ fn is_last_day_of_february(year: i64, month: i64, day: i64) -> bool {
 fn days_360(start: i64, end: i64, european: bool) -> Result<i64, FormulaError> {
     let (start_year, start_month, mut start_day) =
         date_parts(start as f64).ok_or(FormulaError::Num)?;
-    let (end_year, end_month, mut end_day) =
-        date_parts(end as f64).ok_or(FormulaError::Num)?;
+    let (end_year, end_month, mut end_day) = date_parts(end as f64).ok_or(FormulaError::Num)?;
     if european {
         start_day = start_day.min(30);
         end_day = end_day.min(30);
     } else {
-        let start_last_feb =
-            is_last_day_of_february(start_year, start_month, start_day);
+        let start_last_feb = is_last_day_of_february(start_year, start_month, start_day);
         let end_last_feb = is_last_day_of_february(end_year, end_month, end_day);
         if start_last_feb {
             start_day = 30;
@@ -515,10 +509,7 @@ fn days_360(start: i64, end: i64, european: bool) -> Result<i64, FormulaError> {
             start_day = 30;
         }
     }
-    Ok((end_year - start_year) * 360
-        + (end_month - start_month) * 30
-        + end_day
-        - start_day)
+    Ok((end_year - start_year) * 360 + (end_month - start_month) * 30 + end_day - start_day)
 }
 
 fn yearfrac(values: &FuncAccumulator) -> Result<f64, FormulaError> {
@@ -558,7 +549,11 @@ fn time_function(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
     let total = hour
         .checked_mul(3_600)
-        .and_then(|value| minute.checked_mul(60).and_then(|minute| value.checked_add(minute)))
+        .and_then(|value| {
+            minute
+                .checked_mul(60)
+                .and_then(|minute| value.checked_add(minute))
+        })
         .and_then(|value| value.checked_add(second))
         .ok_or(FormulaError::Num)?;
     Ok(total.rem_euclid(SECONDS_PER_DAY) as f64 / SECONDS_PER_DAY as f64)
@@ -678,7 +673,9 @@ mod tests {
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
 
-    use super::{apply, date_parts, date_serial, format_date_serial, parse_date_value, FuncAccumulator};
+    use super::{
+        apply, date_parts, date_serial, format_date_serial, parse_date_value, FuncAccumulator,
+    };
 
     fn accumulator(args: &[Vec<Value>]) -> FuncAccumulator {
         let mut values = FuncAccumulator::default();
@@ -762,9 +759,18 @@ mod tests {
         );
         let noon = number(result(Func::TimeValue, &[vec![Value::text("12:30 PM")]]));
         assert!((noon - 0.520_833_333_333_333_3).abs() < 1e-15);
-        assert_eq!(result(Func::Hour, &[vec![Value::text("12:30 AM")]]), scalar(0.0)[0]);
-        assert_eq!(result(Func::Minute, &[vec![Value::text("23:59:58")]]), scalar(59.0)[0]);
-        assert_eq!(result(Func::Second, &[vec![Value::text("23:59:58")]]), scalar(58.0)[0]);
+        assert_eq!(
+            result(Func::Hour, &[vec![Value::text("12:30 AM")]]),
+            scalar(0.0)[0]
+        );
+        assert_eq!(
+            result(Func::Minute, &[vec![Value::text("23:59:58")]]),
+            scalar(59.0)[0]
+        );
+        assert_eq!(
+            result(Func::Second, &[vec![Value::text("23:59:58")]]),
+            scalar(58.0)[0]
+        );
         assert_eq!(
             result(Func::Hour, &[vec![Value::text("2024-06-01 14:00")]]),
             Value::number(14.0)
@@ -774,7 +780,11 @@ mod tests {
             &[vec![Value::text("2024-06-01T14:00")]],
         ));
         assert!((parsed - 14.0 / 24.0).abs() < 1e-15);
-        for invalid in ["not-a-date 14:00", "2024-02-30 14:00", "2024-06-01 junk 14:00"] {
+        for invalid in [
+            "not-a-date 14:00",
+            "2024-02-30 14:00",
+            "2024-06-01 junk 14:00",
+        ] {
             assert_eq!(
                 result(Func::TimeValue, &[vec![Value::text(invalid)]]),
                 Value::Error(FormulaError::Value)
@@ -853,19 +863,31 @@ mod tests {
         let tuesday = date_serial(2024, 1, 9).unwrap();
         let holidays = vec![Value::number(monday), Value::number(monday)];
         assert_eq!(
-            result(Func::Workday, &[scalar(friday), scalar(1.0), holidays.clone()]),
+            result(
+                Func::Workday,
+                &[scalar(friday), scalar(1.0), holidays.clone()]
+            ),
             Value::number(tuesday)
         );
         assert_eq!(
-            result(Func::Workday, &[scalar(tuesday), scalar(-1.0), holidays.clone()]),
+            result(
+                Func::Workday,
+                &[scalar(tuesday), scalar(-1.0), holidays.clone()]
+            ),
             Value::number(friday)
         );
         assert_eq!(
-            result(Func::NetworkDays, &[scalar(friday), scalar(tuesday), holidays.clone()]),
+            result(
+                Func::NetworkDays,
+                &[scalar(friday), scalar(tuesday), holidays.clone()]
+            ),
             Value::number(2.0)
         );
         assert_eq!(
-            result(Func::NetworkDays, &[scalar(tuesday), scalar(friday), holidays]),
+            result(
+                Func::NetworkDays,
+                &[scalar(tuesday), scalar(friday), holidays]
+            ),
             Value::number(-2.0)
         );
         assert_eq!(
@@ -882,12 +904,14 @@ mod tests {
             result(Func::Days, &[scalar(end), scalar(start)]),
             Value::number(365.0)
         );
-        assert!((number(result(
-            Func::YearFrac,
-            &[scalar(start), scalar(end), scalar(1.0)],
-        )) - 1.0)
-            .abs()
-            < 1e-15);
+        assert!(
+            (number(result(
+                Func::YearFrac,
+                &[scalar(start), scalar(end), scalar(1.0)],
+            )) - 1.0)
+                .abs()
+                < 1e-15
+        );
         assert_eq!(
             result(Func::Days360, &[scalar(start), scalar(end)]),
             Value::number(358.0)
@@ -897,7 +921,11 @@ mod tests {
         assert_eq!(
             result(
                 Func::Days360,
-                &[scalar(january_31), scalar(february_29), vec![Value::Bool(true)]],
+                &[
+                    scalar(january_31),
+                    scalar(february_29),
+                    vec![Value::Bool(true)]
+                ],
             ),
             Value::number(29.0)
         );

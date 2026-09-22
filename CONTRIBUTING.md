@@ -2,9 +2,10 @@
 
 ## Prerequisites
 
-Use Bun 1.3.14, Rust 1.96.0 with `wasm32-unknown-unknown`, Node 24.3.0, and npm 11.18.0. Install dependencies with:
+Use Bun 1.4.2, Rust 1.98.1 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
 
 ```sh
+rustup toolchain install
 bun install --frozen-lockfile
 bun scripts/install-wasm-pack.ts
 ```

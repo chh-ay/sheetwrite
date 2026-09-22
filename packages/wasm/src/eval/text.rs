@@ -4,9 +4,7 @@ use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::date::parse_date_value;
-use super::functions::{
-    bool_arg, integer_arg, require_arity, text_arg, FuncAccumulator,
-};
+use super::functions::{bool_arg, integer_arg, require_arity, text_arg, FuncAccumulator};
 use super::value::{format_basic_text, text_from_value};
 
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
@@ -14,7 +12,9 @@ const MAX_SEARCH_STEPS: usize = 4_000_000;
 
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
-        Func::Len => unary_text(values, |text| Ok(Value::number(text.chars().count() as f64))),
+        Func::Len => unary_text(values, |text| {
+            Ok(Value::number(text.chars().count() as f64))
+        }),
         Func::Left => left_right(values, false),
         Func::Right => left_right(values, true),
         Func::Mid => mid(values),
@@ -101,7 +101,9 @@ fn checked_push_character(output: &mut String, character: char) -> Result<(), Fo
         .checked_add(additional)
         .filter(|length| *length <= MAX_TEXT_OUTPUT_BYTES)
         .ok_or(FormulaError::Num)?;
-    output.try_reserve(additional).map_err(|_| FormulaError::Num)?;
+    output
+        .try_reserve(additional)
+        .map_err(|_| FormulaError::Num)?;
     output.push(character);
     Ok(())
 }
@@ -138,7 +140,11 @@ fn clean_text(text: String) -> Result<Value, FormulaError> {
     Ok(Value::text(output))
 }
 
-fn count_arg(values: &FuncAccumulator, index: usize, default: Option<i64>) -> Result<usize, FormulaError> {
+fn count_arg(
+    values: &FuncAccumulator,
+    index: usize,
+    default: Option<i64>,
+) -> Result<usize, FormulaError> {
     let count = integer_arg(values, index, default)?;
     if count < 0 {
         Err(FormulaError::Value)
@@ -301,10 +307,8 @@ fn substitute(values: &FuncAccumulator) -> Value {
     };
     let mut output = String::new();
     let mut cursor = 0;
-    let mut occurrence = 0;
-    for (offset, _) in text.match_indices(&old) {
-        occurrence += 1;
-        if instance.is_none_or(|wanted| wanted == occurrence) {
+    for (index, (offset, _)) in text.match_indices(&old).enumerate() {
+        if instance.is_none_or(|wanted| wanted == index + 1) {
             if let Err(error) = checked_push(&mut output, &text[cursor..offset])
                 .and_then(|_| checked_push(&mut output, &new))
             {
@@ -425,12 +429,18 @@ fn collect_code_points(text: &str) -> Result<Vec<char>, FormulaError> {
     }
     let count = text.chars().count();
     let mut characters = Vec::new();
-    characters.try_reserve_exact(count).map_err(|_| FormulaError::Num)?;
+    characters
+        .try_reserve_exact(count)
+        .map_err(|_| FormulaError::Num)?;
     characters.extend(text.chars());
     Ok(characters)
 }
 
-fn literal_find(haystack: &[char], needle: &[char], start: usize) -> Result<Option<usize>, FormulaError> {
+fn literal_find(
+    haystack: &[char],
+    needle: &[char],
+    start: usize,
+) -> Result<Option<usize>, FormulaError> {
     if needle.is_empty() {
         return Ok(Some(start));
     }
@@ -446,7 +456,11 @@ fn literal_find(haystack: &[char], needle: &[char], start: usize) -> Result<Opti
         .find(|&index| haystack[index..index + needle.len()] == *needle))
 }
 
-fn wildcard_find(haystack: &[char], pattern: &[char], start: usize) -> Result<Option<usize>, FormulaError> {
+fn wildcard_find(
+    haystack: &[char],
+    pattern: &[char],
+    start: usize,
+) -> Result<Option<usize>, FormulaError> {
     let mut steps = 0usize;
     for candidate in start..=haystack.len() {
         if wildcard_prefix(&haystack[candidate..], pattern, &mut steps)? {
@@ -456,7 +470,11 @@ fn wildcard_find(haystack: &[char], pattern: &[char], start: usize) -> Result<Op
     Ok(None)
 }
 
-fn wildcard_prefix(text: &[char], pattern: &[char], steps: &mut usize) -> Result<bool, FormulaError> {
+fn wildcard_prefix(
+    text: &[char],
+    pattern: &[char],
+    steps: &mut usize,
+) -> Result<bool, FormulaError> {
     let (mut text_index, mut pattern_index) = (0usize, 0usize);
     let mut star: Option<(usize, usize)> = None;
     loop {
@@ -585,7 +603,9 @@ fn code(values: &FuncAccumulator) -> Value {
         Ok(text) => text
             .chars()
             .next()
-            .map_or(Value::Error(FormulaError::Value), |ch| Value::number(ch as u32 as f64)),
+            .map_or(Value::Error(FormulaError::Value), |ch| {
+                Value::number(ch as u32 as f64)
+            }),
         Err(error) => Value::Error(error),
     }
 }
@@ -594,7 +614,9 @@ fn proper(values: &FuncAccumulator) -> Value {
     unary_text(values, |text| {
         let mut begins_word = true;
         let mut output = String::new();
-        output.try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES)).map_err(|_| FormulaError::Num)?;
+        output
+            .try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES))
+            .map_err(|_| FormulaError::Num)?;
         for character in text.chars() {
             if begins_word {
                 for transformed in character.to_uppercase() {
@@ -653,7 +675,9 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
     }
 
     let mut normalized = String::new();
-    normalized.try_reserve(source.len()).map_err(|_| FormulaError::Num)?;
+    normalized
+        .try_reserve(source.len())
+        .map_err(|_| FormulaError::Num)?;
     let mut decimal_seen = false;
     for character in source.chars() {
         if group == Some(character) {
@@ -678,7 +702,10 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
         .filter(|value| value.is_finite())
         .ok_or(FormulaError::Value)?;
     let result = value * percent;
-    result.is_finite().then_some(result).ok_or(FormulaError::Num)
+    result
+        .is_finite()
+        .then_some(result)
+        .ok_or(FormulaError::Num)
 }
 
 #[cfg(test)]
@@ -720,7 +747,10 @@ mod tests {
             panic!("expected number {expected}, got {value:?}");
         };
         let tolerance = expected.abs().max(1.0) * 1e-12;
-        assert!((actual - expected).abs() <= tolerance, "{actual} != {expected}");
+        assert!(
+            (actual - expected).abs() <= tolerance,
+            "{actual} != {expected}"
+        );
     }
 
     #[test]
@@ -730,10 +760,18 @@ mod tests {
             (false, vec![Value::Bool(true)]),
             (
                 true,
-                vec![Value::text("a"), Value::Blank, Value::Bool(true), Value::number(2.0)],
+                vec![
+                    Value::text("a"),
+                    Value::Blank,
+                    Value::Bool(true),
+                    Value::number(2.0),
+                ],
             ),
         ]);
-        assert_eq!(apply(Func::TextJoin, &values).unwrap(), Value::text("a|TRUE|2"));
+        assert_eq!(
+            apply(Func::TextJoin, &values).unwrap(),
+            Value::text("a|TRUE|2")
+        );
 
         let error = accumulator(vec![
             (false, vec![Value::text(",")]),
@@ -824,11 +862,17 @@ mod tests {
             2.0,
         );
         assert_number(
-            evaluate(Func::Search, vec![Value::text("BAR"), Value::text("xxBarista")]),
+            evaluate(
+                Func::Search,
+                vec![Value::text("BAR"), Value::text("xxBarista")],
+            ),
             3.0,
         );
         assert_number(
-            evaluate(Func::Search, vec![Value::text("a?c"), Value::text("--A😀C--")]),
+            evaluate(
+                Func::Search,
+                vec![Value::text("a?c"), Value::text("--A😀C--")],
+            ),
             3.0,
         );
         assert_number(
@@ -843,7 +887,10 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
         assert_number(
-            evaluate(Func::Search, vec![Value::text("b*r"), Value::text("xxBarista")]),
+            evaluate(
+                Func::Search,
+                vec![Value::text("b*r"), Value::text("xxBarista")],
+            ),
             3.0,
         );
         assert_number(
@@ -867,23 +914,21 @@ mod tests {
     fn search_work_is_bounded_before_quadratic_scans() {
         let haystack = vec!['a'; 2_001];
         let needle = vec!['b'; 2_000];
-        assert_eq!(
-            literal_find(&haystack, &needle, 0),
-            Err(FormulaError::Num)
-        );
+        assert_eq!(literal_find(&haystack, &needle, 0), Err(FormulaError::Num));
         assert_eq!(MAX_SEARCH_STEPS, 4_000_000);
     }
 
     #[test]
     fn value_and_numbervalue_are_locale_neutral_and_strict() {
-        assert_number(
-            evaluate(Func::Value, vec![Value::text("1,234.5%")]),
-            12.345,
-        );
+        assert_number(evaluate(Func::Value, vec![Value::text("1,234.5%")]), 12.345);
         assert_number(
             evaluate(
                 Func::NumberValue,
-                vec![Value::text(" 1.234,5 %% "), Value::text(","), Value::text(".")],
+                vec![
+                    Value::text(" 1.234,5 %% "),
+                    Value::text(","),
+                    Value::text("."),
+                ],
             ),
             0.12345,
         );
@@ -924,7 +969,10 @@ mod tests {
             Value::text("abc\u{7f}")
         );
         assert_eq!(
-            evaluate(Func::Rept, vec![Value::text(""), Value::number(i64::MAX as f64)]),
+            evaluate(
+                Func::Rept,
+                vec![Value::text(""), Value::number(i64::MAX as f64)]
+            ),
             Value::text("")
         );
         assert_eq!(
@@ -937,7 +985,10 @@ mod tests {
             ),
             Value::Error(FormulaError::Num)
         );
-        assert_eq!(evaluate(Func::Char, vec![Value::number(65.0)]), Value::text("A"));
+        assert_eq!(
+            evaluate(Func::Char, vec![Value::number(65.0)]),
+            Value::text("A")
+        );
         assert_eq!(
             evaluate(Func::Char, vec![Value::number(0.0)]),
             Value::Error(FormulaError::Value)
@@ -951,7 +1002,10 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
         assert_number(evaluate(Func::Code, vec![Value::text("é")]), 233.0);
-        assert_number(evaluate(Func::Unicode, vec![Value::text("😀")]), 0x1f600 as f64);
+        assert_number(
+            evaluate(Func::Unicode, vec![Value::text("😀")]),
+            0x1f600 as f64,
+        );
         assert_eq!(
             evaluate(Func::Rept, vec![Value::text("a"), Value::number(-1.0)]),
             Value::Error(FormulaError::Value)
@@ -986,24 +1040,16 @@ mod tests {
         );
     }
 
-
     #[test]
     fn code_point_slices_enforce_output_bounds() {
         assert_eq!(
-            evaluate(
-                Func::Right,
-                vec![Value::text("a😀ç"), Value::number(2.0)],
-            ),
+            evaluate(Func::Right, vec![Value::text("a😀ç"), Value::number(2.0)],),
             Value::text("😀ç")
         );
         assert_eq!(
             evaluate(
                 Func::Mid,
-                vec![
-                    Value::text("a😀ç"),
-                    Value::number(2.0),
-                    Value::number(1.0),
-                ],
+                vec![Value::text("a😀ç"), Value::number(2.0), Value::number(1.0),],
             ),
             Value::text("😀")
         );
