@@ -179,8 +179,8 @@ Contributor and CI tooling is pinned to Bun 1.4.2, Rust 1.98.1 with the
 `wasm32-unknown-unknown` target, wasm-pack 0.15.0, and cargo-audit 0.22.2.
 The Bun engine range in `package.json` describes supported consumers; the
 `packageManager` field and `rust-toolchain.toml` define the exact contributor
-toolchain. Node 26.9.0 is the CI and development runtime; the `engines.node`
-value tracks the Node line the documentation deployment supports.
+toolchain. Node 26.9.0 is the CI and development runtime. Vercel hosts the tested
+static docs output; it does not install the toolchain or run a build.
 
 ```sh
 rustup toolchain install
@@ -222,3 +222,6 @@ bun run size:report
 `size:report` records package, bundle, stylesheet, and WASM sizes without enforcing a release ceiling.
 
 The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See the [changelog](CHANGELOG.md), [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.
+
+Docs deployment uses the tested CI output. See [deployment setup](CONTRIBUTING.md#documentation-deployment)
+for the required GitHub secrets and the production branch.

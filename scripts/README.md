@@ -66,7 +66,7 @@ you want without reading all of them:
 | `verify:` | Composite gates that prove a real consumer scenario works |
 | `api:` | Public API surface: report it, gate it, re-baseline it |
 | `size:` | Delivery-size measurement and history |
-| `docs:` | Generating and checking the documentation site |
+| `docs:` | Generating, checking, and packaging the documentation site |
 | `compatibility:` | The Excel/Sheets conformance lab |
 | `release:`, `changeset:` | Release machinery — maintainers only |
 
@@ -77,6 +77,11 @@ a script nobody will run.
 
 - **`docs:generate` owns `docs/src/generated/*`** and the API pages. Never
   hand-edit its output.
+- **`docs:prepare-deployment` packages an existing docs build** as
+  `.vercel/output`. It does not build packages or install tools. CI tests and
+  deploys this output; Vercel does not rebuild it. See
+  [deployment setup](../CONTRIBUTING.md#documentation-deployment) before enabling
+  production deployment.
 - **Benchmarks live in the `bench` workspace**, not here:
   `bun run --filter '@sheetwrite/bench' bench:verify`. Baselines under
   `bench/results/` and the delivery-size budgets are reviewed evidence — changing

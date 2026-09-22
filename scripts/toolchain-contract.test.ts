@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import { assertReviewedActionPins, parseWorkflowContract } from "./workflow-contract.js";
@@ -40,13 +40,6 @@ function commandOutput(command: readonly [string, ...string[]]): string {
   return result.stdout.toString().trim();
 }
 
-describe("documentation hosting contract", () => {
-  it("keeps deployment Vercel-only", () => {
-    expect(existsSync(resolve(root, ".github/workflows/docs.yml"))).toBeFalse();
-    expect(existsSync(resolve(root, "vercel.json"))).toBeTrue();
-  });
-});
-
 describe("contributor and CI toolchain contract", () => {
   it("pins Bun while preserving the documented consumer engine range", () => {
     expect(packageManifest.packageManager).toBe(`bun@${BUN_VERSION}`);
@@ -57,8 +50,7 @@ describe("contributor and CI toolchain contract", () => {
 
   it("pins Node and npm as exact release inputs", () => {
     expect(nodeVersion).toBe(NODE_VERSION);
-    // `engines.node` is the Vercel-supported deployment range; NODE_VERSION is
-    // the exact CI/dev runtime and may be newer than what Vercel offers.
+    // Consumer engines and the exact CI/dev runtime are separate contracts.
     expect(packageManifest.engines?.node).toBe("24.21.0");
     expect(workflow).toContain(`NODE_VERSION: "${NODE_VERSION}"`);
     expect(workflow).toContain(`NPM_VERSION: "${NPM_VERSION}"`);
@@ -123,9 +115,16 @@ describe("contributor and CI toolchain contract", () => {
     );
 
     const requiredNeeds = needsOf("required");
-    expect(new Set(requiredNeeds)).toEqual(
-      new Set(Object.keys(jobs).filter((name) => name !== "required")),
-    );
+    expect(requiredNeeds.toSorted()).toEqual([
+      "artifact-build",
+      "browser-smoke",
+      "bundler-consumers",
+      "delivery-size",
+      "docs-build",
+      "packed-consumers",
+      "preflight",
+      "unit-coverage",
+    ]);
     expect(jobs.required?.name).toBe("Required CI");
     for (const gate of requiredNeeds) {
       if (gate === artifactBuild || dependsOn(artifactBuild, gate)) continue;
@@ -179,13 +178,25 @@ describe("contributor and CI toolchain contract", () => {
     expect(docsCommand).toContain("@sheetwrite/docs-start' build");
     expect(JSON.stringify(jobs["delivery-size"])).toContain("size-evidence");
     expect(JSON.stringify(jobs["docs-build"])).toContain("size-evidence");
-
-    const requiredCommand = jobs.required?.steps?.find((step) =>
-      step.run?.includes('test "$PREFLIGHT" = success'),
-    )?.run;
-    expect(requiredCommand).toContain('if [ "$DOCS_REQUIRED" = "true" ]');
-    expect(requiredCommand).toContain('test "$DOCS" = skipped');
-    expect(requiredCommand).toContain('test "$BROWSER" = skipped');
+    const upload = jobs["docs-build"]?.steps?.find((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    );
+    expect(upload?.with).toEqual({
+      name: "production-docs",
+      path: ".vercel/output/",
+      "if-no-files-found": "error",
+      "include-hidden-files": true,
+      "retention-days": 7,
+    });
+    for (const consumer of ["browser-smoke", "docs-deploy"]) {
+      const download = jobs[consumer]?.steps?.find((step) =>
+        step.uses?.startsWith("actions/download-artifact@"),
+      );
+      expect(download?.with).toEqual({
+        name: upload?.with?.name,
+        path: ".vercel/output",
+      });
+    }
   });
 
   it("shares a source-keyed Rust compilation cache across build and test jobs", () => {

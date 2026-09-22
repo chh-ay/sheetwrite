@@ -9,6 +9,13 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 - [`@sheetwrite/vue`](packages/vue/CHANGELOG.md)
 - [`@sheetwrite/svelte`](packages/svelte/CHANGELOG.md)
 
+## Unreleased
+
+- Build the docs once in CI, test the packaged static site, then deploy that
+  output to Vercel. Vercel no longer rebuilds packages or installs Rust tools.
+- Send IndexNow updates after a successful production deployment, not during
+  the docs build.
+
 ## 0.2.0
 
 - Hardened collaboration recovery, persistence queues, paged datasources, snapshots, and spreadsheet interchange resource boundaries.

@@ -122,6 +122,7 @@ const TOOLING_TESTS: CommandNode = {
     "scripts/release-workflow.test.ts",
     "scripts/docs.test.ts",
     "scripts/coverage-check.test.ts",
+    "scripts/prepare-docs-deployment.test.ts",
   ],
 };
 
