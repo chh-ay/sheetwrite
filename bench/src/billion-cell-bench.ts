@@ -22,6 +22,12 @@ import type {
 
 export const BILLION_CELL_BENCHMARK_SCHEMA_VERSION = 2 as const;
 export const BILLION_CELL_SAMPLE_RUNS = 5;
+// The first measured run in a cold process absorbs one-time runtime
+// initialization (module evaluation, JIT, allocator growth) that is not
+// workbook metadata, so startup-metadata fields come from the first warmed run.
+export const BILLION_CELL_STARTUP_WARMUP_RUNS = 1;
+export const RUNTIME_METADATA_POLICY =
+  "positive JS-heap delta after schema construction, sampled from the first warmed run" as const;
 export const VISIBLE_TILE_ROWS = 120;
 export const VISIBLE_TILE_COLUMNS = 20;
 export const PAGED_CACHE_BYTES = 32 * 1024 * 1024;
@@ -224,7 +230,7 @@ export interface BillionCellBenchmarkArtifact {
     readonly diagonalChurnTiles: number;
     readonly dirtyEdits: number;
     readonly ownershipSumPolicy: "exclusive-owner-sum; runtime observations and subset counters excluded";
-    readonly runtimeMetadataPolicy: "positive JS-heap delta after schema construction";
+    readonly runtimeMetadataPolicy: typeof RUNTIME_METADATA_POLICY;
     readonly ceilings: {
       readonly directCellAmplification: number;
       readonly startupMedianMs: number;
@@ -1003,6 +1009,7 @@ async function runScale(config: ScaleConfig): Promise<ScaleEvidence> {
   const runs: SingleScaleRun[] = [];
   for (let run = 0; run < BILLION_CELL_SAMPLE_RUNS; run += 1) runs.push(await runScaleOnce(config));
   const representative = runs[0]!;
+  const startupRun = runs[BILLION_CELL_STARTUP_WARMUP_RUNS] ?? representative;
   const scenarios = representative.scenarios.map((base, scenarioIndex): ScenarioEvidence => {
     const samples: number[] = [];
     for (const run of runs) {
@@ -1034,8 +1041,8 @@ async function runScale(config: ScaleConfig): Promise<ScaleEvidence> {
     rows: config.rows,
     columns: config.columns,
     logicalCells: config.logicalCells,
-    startupRuntimeBaseline: representative.startupBaseline,
-    startupRuntimeMetadataBytes: representative.startupRuntimeMetadataBytes,
+    startupRuntimeBaseline: startupRun.startupBaseline,
+    startupRuntimeMetadataBytes: startupRun.startupRuntimeMetadataBytes,
     protocol: {
       contract: "protocol-2-windowed",
       capabilities: { protocol: 2, columns: "windowed" },
@@ -1275,6 +1282,11 @@ export function deriveBillionCellGateChecks(scales: readonly ScaleEvidence[]): G
 
 export async function runBillionCellBenchmark(): Promise<BillionCellBenchmarkArtifact> {
   await initSheetwrite();
+  // The first measured scale otherwise absorbs one-time runtime growth (JIT,
+  // interned strings, engine caches) into its startup-metadata delta. Warm the
+  // process once, discard the result, and start every scale from a warm heap.
+  await runScaleOnce(BILLION_CELL_SCALE_CONFIGS[0]!);
+  Bun.gc(true);
   const scales: ScaleEvidence[] = [];
   for (const config of BILLION_CELL_SCALE_CONFIGS) scales.push(await runScale(config));
   const checks = deriveBillionCellGateChecks(scales);
@@ -1305,7 +1317,7 @@ export async function runBillionCellBenchmark(): Promise<BillionCellBenchmarkArt
       diagonalChurnTiles: DIAGONAL_CHURN_TILES,
       dirtyEdits: DIRTY_EDIT_COUNT,
       ownershipSumPolicy: "exclusive-owner-sum; runtime observations and subset counters excluded",
-      runtimeMetadataPolicy: "positive JS-heap delta after schema construction",
+      runtimeMetadataPolicy: RUNTIME_METADATA_POLICY,
       ceilings: {
         directCellAmplification: HORIZONTAL_TILE_AMPLIFICATION_LIMIT,
         startupMedianMs: STARTUP_MEDIAN_LIMIT_MS,
@@ -1536,7 +1548,7 @@ export function validateBillionCellBenchmark(
   );
   exact(
     configuration.runtimeMetadataPolicy,
-    "positive JS-heap delta after schema construction",
+    RUNTIME_METADATA_POLICY,
     "configuration.runtimeMetadataPolicy",
   );
   const ceilings = record(configuration.ceilings, "configuration.ceilings");
