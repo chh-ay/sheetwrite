@@ -5,8 +5,8 @@ use std::mem::MaybeUninit;
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
-use super::{date, financial, math, statistics, text};
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
+use super::{date, financial, math, statistics, text};
 
 const MAX_FUNCTION_ARGS: usize = 254;
 
@@ -74,20 +74,13 @@ impl FuncAccumulator {
         if self.values.len() >= RANGE_CELL_LIMIT as usize {
             return Err(FormulaError::Num);
         }
-        self.values
-            .try_reserve(1)
-            .map_err(|_| FormulaError::Num)?;
+        self.values.try_reserve(1).map_err(|_| FormulaError::Num)?;
         self.values.push(FuncValue { value, from_range });
         Ok(())
     }
 
-
     #[cfg(test)]
-    pub(super) fn finish_arg(
-        &mut self,
-        rows: usize,
-        cols: usize,
-    ) -> Result<(), FormulaError> {
+    pub(super) fn finish_arg(&mut self, rows: usize, cols: usize) -> Result<(), FormulaError> {
         self.finish_arg_with_missing(rows, cols, false)
     }
 
@@ -141,13 +134,13 @@ impl FuncAccumulator {
     }
 
     pub(super) fn arg_shape(&self, index: usize) -> Option<(usize, usize)> {
-        self.arg_metadata(index).map(|argument| {
-            (argument.rows as usize, argument.cols as usize)
-        })
+        self.arg_metadata(index)
+            .map(|argument| (argument.rows as usize, argument.cols as usize))
     }
 
     pub(super) fn arg_missing(&self, index: usize) -> bool {
-        self.arg_metadata(index).is_some_and(|argument| argument.missing)
+        self.arg_metadata(index)
+            .is_some_and(|argument| argument.missing)
     }
 
     pub(super) fn arg_value(&self, index: usize) -> Option<&Value> {
@@ -202,12 +195,12 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         Func::True if values.arg_count() == 0 => Value::Bool(true),
         Func::False if values.arg_count() == 0 => Value::Bool(false),
         Func::And | Func::Or | Func::Xor => logical_reduce(func, values),
-        Func::Not if values.arg_count() == 1 => match bool_from_value(
-            values.arg_value(0).unwrap_or(&Value::Blank),
-        ) {
-            Ok(value) => Value::Bool(!value),
-            Err(error) => Value::Error(error),
-        },
+        Func::Not if values.arg_count() == 1 => {
+            match bool_from_value(values.arg_value(0).unwrap_or(&Value::Blank)) {
+                Ok(value) => Value::Bool(!value),
+                Err(error) => Value::Error(error),
+            }
+        }
         Func::Na if values.arg_count() == 0 => Value::Error(FormulaError::Na),
         Func::Abs
         | Func::Sqrt
@@ -235,8 +228,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal => math::apply(func, values)
-            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        | Func::Subtotal => math::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
         Func::Len
         | Func::Left
         | Func::Right
@@ -261,8 +253,9 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Unicode
         | Func::UniChar
         | Func::Proper
-        | Func::NumberValue => text::apply(func, values)
-            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        | Func::NumberValue => {
+            text::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+        }
         Func::Date
         | Func::DateValue
         | Func::Day
@@ -281,8 +274,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Workday
         | Func::NetworkDays
         | Func::YearFrac
-        | Func::Days360 => date::apply(func, values)
-            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        | Func::Days360 => date::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
         Func::Median
         | Func::ModeSngl
         | Func::Large
@@ -300,8 +292,9 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::CovarianceP
         | Func::CountBlank
         | Func::MaxIfs
-        | Func::MinIfs => statistics::apply(func, values)
-            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        | Func::MinIfs => {
+            statistics::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
+        }
         Func::Pv
         | Func::Fv
         | Func::Pmt
@@ -309,8 +302,7 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Irr
         | Func::Rate
         | Func::Ipmt
-        | Func::Ppmt => financial::apply(func, values)
-            .unwrap_or_else(|| Value::Error(FormulaError::Value)),
+        | Func::Ppmt => financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value)),
         _ => Value::Error(FormulaError::Value),
     }
 }
@@ -440,15 +432,11 @@ pub(super) fn text_arg(
     default: Option<&str>,
 ) -> Result<String, FormulaError> {
     if values.arg_missing(index) {
-        return default
-            .map(str::to_string)
-            .ok_or(FormulaError::Value);
+        return default.map(str::to_string).ok_or(FormulaError::Value);
     }
     match values.arg_value(index) {
         Some(value) => text_from_value(value),
-        None => default
-            .map(str::to_string)
-            .ok_or(FormulaError::Value),
+        None => default.map(str::to_string).ok_or(FormulaError::Value),
     }
 }
 

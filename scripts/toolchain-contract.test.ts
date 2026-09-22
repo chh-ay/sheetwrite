@@ -57,7 +57,7 @@ describe("contributor and CI toolchain contract", () => {
 
   it("pins Node and npm as exact release inputs", () => {
     expect(nodeVersion).toBe(NODE_VERSION);
-    expect(packageManifest.engines?.node).toBe(">=24.3.0 <25");
+    expect(packageManifest.engines?.node).toBe(">=26.9.0 <27");
     expect(workflow).toContain(`NODE_VERSION: "${NODE_VERSION}"`);
     expect(workflow).toContain(`NPM_VERSION: "${NPM_VERSION}"`);
     expect(workflow).toContain(`node-version: ${WORKFLOW_NODE_VERSION}`);
@@ -202,7 +202,7 @@ describe("contributor and CI toolchain contract", () => {
 
   it("matches the active pinned tools", () => {
     expect(commandOutput(["bun", "--version"])).toBe(BUN_VERSION);
-    expect(process.versions.node).toBe(NODE_VERSION);
+    expect(commandOutput(["node", "--version"])).toBe(`v${NODE_VERSION}`);
     expect(commandOutput(["npm", "--version"])).toBe(NPM_VERSION);
     expect(commandOutput(["rustc", "--version"])).toMatch(
       new RegExp(`^rustc ${RUST_VERSION.replaceAll(".", "\\.")}\\b`),

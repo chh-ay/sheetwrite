@@ -525,7 +525,6 @@ mod tests {
             "=DROP(B1:B2,1)",
             "=CHOOSECOLS(B1:C2,1)",
             "=CHOOSEROWS(B1:B2,1)",
-
             "=LET(x,B1:B2,x)",
             "=CHOOSE(1,B1:B2,SEQUENCE(2))",
             "=LET(x,CHOOSE(1,SEQUENCE(2),B1:B2),x)",
@@ -547,17 +546,9 @@ mod tests {
         for row in 0..16 {
             store.set_formula(sheet, row, 1, "=1", 0);
         }
-        store.set_formula(
-            sheet,
-            0,
-            0,
-            "=B1+B1+SUM(B1:B16)+SUM(B1:B2)+SUM(B8:B16)",
-            0,
-        );
+        store.set_formula(sheet, 0, 0, "=B1+B1+SUM(B1:B16)+SUM(B1:B2)+SUM(B8:B16)", 0);
         let dependent = AbsCellKey::new(sheet, 0, 0);
-        let mut affected: HashSet<_> = (0..16)
-            .map(|row| AbsCellKey::new(sheet, row, 1))
-            .collect();
+        let mut affected: HashSet<_> = (0..16).map(|row| AbsCellKey::new(sheet, row, 1)).collect();
         affected.insert(dependent);
 
         let index = build_dep_index(&store.sheets, store.formula_epoch);

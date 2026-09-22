@@ -1286,6 +1286,7 @@ async function buildSizeReport(
       }
     }
 
+    const nodeVersion = (await runCommand(["node", "--version"])).trim().replace(/^v/, "");
     const npmVersion = (await runCommand(["npm", "--version"])).trim();
 
     return {
@@ -1302,7 +1303,7 @@ async function buildSizeReport(
       toolchain: {
         bun: Bun.version,
         next: bundlers.find((entry) => entry.name === "next")?.version ?? "missing",
-        node: process.versions.node,
+        node: nodeVersion,
         npm: npmVersion,
         vite: bundlers.find((entry) => entry.name === "vite")?.version ?? "missing",
         webpack: bundlers.find((entry) => entry.name === "webpack")?.version ?? "missing",

@@ -120,20 +120,11 @@ fn rate(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     let future_value = number_arg(values, 3, Some(0.0))?;
     let timing = payment_timing(values, 4)?;
     let guess = number_arg(values, 5, Some(0.1))?;
-    if periods <= 0.0
-        || (payment == 0.0 && present_value == 0.0 && future_value == 0.0)
-    {
+    if periods <= 0.0 || (payment == 0.0 && present_value == 0.0 && future_value == 0.0) {
         return Err(FormulaError::Num);
     }
     solve_root(guess, |x| {
-        rate_sample(
-            periods,
-            payment,
-            present_value,
-            future_value,
-            timing,
-            x,
-        )
+        rate_sample(periods, payment, present_value, future_value, timing, x)
     })
 }
 
@@ -145,14 +136,7 @@ fn ipmt(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     let present_value = number_arg(values, 3, None)?;
     let future_value = number_arg(values, 4, Some(0.0))?;
     let timing = payment_timing(values, 5)?;
-    ipmt_value(
-        rate,
-        period,
-        periods,
-        present_value,
-        future_value,
-        timing,
-    )
+    ipmt_value(rate, period, periods, present_value, future_value, timing)
 }
 
 fn ppmt(values: &FuncAccumulator) -> Result<f64, FormulaError> {
@@ -163,14 +147,7 @@ fn ppmt(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     let present_value = number_arg(values, 3, None)?;
     let future_value = number_arg(values, 4, Some(0.0))?;
     let timing = payment_timing(values, 5)?;
-    let interest = ipmt_value(
-        rate,
-        period,
-        periods,
-        present_value,
-        future_value,
-        timing,
-    )?;
+    let interest = ipmt_value(rate, period, periods, present_value, future_value, timing)?;
     let payment = pmt_value(rate, periods, present_value, future_value, timing)?;
     finite(payment - interest)
 }
@@ -199,10 +176,7 @@ fn periodic_terms(rate: f64, periods: f64) -> Result<(f64, f64), FormulaError> {
         };
         (growth, (growth - 1.0) / rate)
     } else {
-        if periods.fract() != 0.0
-            || periods < i64::MIN as f64
-            || periods > i64::MAX as f64
-        {
+        if periods.fract() != 0.0 || periods < i64::MIN as f64 || periods > i64::MAX as f64 {
             return Err(FormulaError::Num);
         }
         let magnitude = base.abs().powf(periods);
@@ -279,13 +253,7 @@ fn ipmt_value(
     if timing && period == 1.0 {
         return Ok(0.0);
     }
-    let balance = fv_value(
-        rate,
-        period - 1.0,
-        payment,
-        present_value,
-        timing,
-    )?;
+    let balance = fv_value(rate, period - 1.0, payment, present_value, timing)?;
     let mut interest = balance * rate;
     if timing {
         let base = 1.0 + rate;
@@ -332,8 +300,7 @@ impl RootSample {
         self.value.is_finite()
             && self.scale.is_finite()
             && self.scale > 0.0
-            && (self.value == 0.0
-                || self.value.abs() <= ROOT_VALUE_REL_TOLERANCE * self.scale)
+            && (self.value == 0.0 || self.value.abs() <= ROOT_VALUE_REL_TOLERANCE * self.scale)
     }
 }
 
@@ -375,22 +342,14 @@ fn rate_sample(
         } else {
             numerator / rate
         };
-        (
-            present_value,
-            future_value * (-exponent).exp(),
-            annuity,
-        )
+        (present_value, future_value * (-exponent).exp(), annuity)
     } else {
         let annuity = if timing {
             exponent.exp_m1() / -(-x).exp_m1()
         } else {
             exponent.exp_m1() / rate
         };
-        (
-            present_value * exponent.exp(),
-            future_value,
-            annuity,
-        )
+        (present_value * exponent.exp(), future_value, annuity)
     };
     let payment_term = if payment == 0.0 {
         0.0
@@ -556,8 +515,7 @@ fn secant_candidate(bracket: RootBracket) -> Option<f64> {
     if denominator == 0.0 {
         return None;
     }
-    let candidate =
-        bracket.low_x - low * (bracket.high_x - bracket.low_x) / denominator;
+    let candidate = bracket.low_x - low * (bracket.high_x - bracket.low_x) / denominator;
     candidate.is_finite().then_some(candidate)
 }
 
@@ -591,10 +549,7 @@ mod tests {
         scalar_args(args.into_iter().map(Value::Number))
     }
 
-    fn irr_args(
-        cashflows: impl IntoIterator<Item = f64>,
-        guess: Option<f64>,
-    ) -> FuncAccumulator {
+    fn irr_args(cashflows: impl IntoIterator<Item = f64>, guess: Option<f64>) -> FuncAccumulator {
         let cashflows: Vec<f64> = cashflows.into_iter().collect();
         let mut values = FuncAccumulator::default();
         for cashflow in cashflows {
@@ -668,17 +623,11 @@ mod tests {
             -62.7453948825115,
         );
         assert_close(
-            result_number(
-                Func::Ipmt,
-                &number_args([0.1, 1.5, 10.0, 1000.0]),
-            ),
+            result_number(Func::Ipmt, &number_args([0.1, 1.5, 10.0, 1000.0])),
             -96.93746954780329,
         );
         assert_close(
-            result_number(
-                Func::Ppmt,
-                &number_args([0.1, 1.5, 10.0, 1000.0]),
-            ),
+            result_number(Func::Ppmt, &number_args([0.1, 1.5, 10.0, 1000.0])),
             -65.80792533470833,
         );
     }
@@ -747,14 +696,10 @@ mod tests {
             result_number(Func::Pmt, &number_args([0.0, 10.0, 1000.0])),
             -100.0,
         );
-        let near_zero_payment =
-            result_number(Func::Pmt, &number_args([1e-14, 360.0, 250_000.0]));
+        let near_zero_payment = result_number(Func::Pmt, &number_args([1e-14, 360.0, 250_000.0]));
         assert_close(near_zero_payment, -250_000.0 / 360.0);
         assert_close(
-            result_number(
-                Func::Ipmt,
-                &number_args([0.1, 1.0, 10.0, 1000.0, 0.0, 7.0]),
-            ),
+            result_number(Func::Ipmt, &number_args([0.1, 1.0, 10.0, 1000.0, 0.0, 7.0])),
             0.0,
         );
         assert_error(
@@ -791,11 +736,7 @@ mod tests {
             &number_args([0.0, -100.0, 1000.0]),
             FormulaError::Num,
         );
-        assert_error(
-            Func::Pv,
-            &number_args([0.1, 10.0]),
-            FormulaError::Value,
-        );
+        assert_error(Func::Pv, &number_args([0.1, 10.0]), FormulaError::Value);
     }
 
     #[test]
@@ -824,10 +765,8 @@ mod tests {
                 for timing in [false, true] {
                     let present = 1234.5;
                     let payment = -37.25;
-                    let future =
-                        fv_value(rate, periods, payment, present, timing).unwrap();
-                    let recovered =
-                        pv_value(rate, periods, payment, future, timing).unwrap();
+                    let future = fv_value(rate, periods, payment, present, timing).unwrap();
+                    let recovered = pv_value(rate, periods, payment, future, timing).unwrap();
                     assert_close(recovered, present);
                 }
             }
@@ -841,22 +780,14 @@ mod tests {
                 let periods = 12.0;
                 let present = 1000.0;
                 let target_future = 250.0;
-                let payment =
-                    pmt_value(rate, periods, present, target_future, timing).unwrap();
+                let payment = pmt_value(rate, periods, present, target_future, timing).unwrap();
                 assert_close(
                     fv_value(rate, periods, payment, present, timing).unwrap(),
                     target_future,
                 );
                 for period in [1.0, 2.0, 6.0, 12.0] {
-                    let interest = ipmt_value(
-                        rate,
-                        period,
-                        periods,
-                        present,
-                        target_future,
-                        timing,
-                    )
-                    .unwrap();
+                    let interest =
+                        ipmt_value(rate, period, periods, present, target_future, timing).unwrap();
                     let principal = payment - interest;
                     assert_close(interest + principal, payment);
                 }
@@ -867,18 +798,11 @@ mod tests {
     #[test]
     fn irr_solves_generated_two_cashflow_properties() {
         for expected_rate in [-0.5, -1e-10, 0.0, 0.1, 2.0] {
-            let values = irr_args(
-                [-1000.0, 1000.0 * (1.0 + expected_rate)],
-                Some(0.05),
-            );
+            let values = irr_args([-1000.0, 1000.0 * (1.0 + expected_rate)], Some(0.05));
             assert_close(result_number(Func::Irr, &values), expected_rate);
         }
 
-        let underflow_regression =
-            irr_args([0.0, 0.0, 1.0, -2.0], Some(ROOT_X_MAX.exp_m1()));
-        assert_close(
-            result_number(Func::Irr, &underflow_regression),
-            1.0,
-        );
+        let underflow_regression = irr_args([0.0, 0.0, 1.0, -2.0], Some(ROOT_X_MAX.exp_m1()));
+        assert_close(result_number(Func::Irr, &underflow_regression), 1.0);
     }
 }

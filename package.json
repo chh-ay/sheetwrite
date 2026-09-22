@@ -2,7 +2,7 @@
   "name": "sheetwrite",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "bun@1.3.14",
+  "packageManager": "bun@1.4.2",
   "type": "module",
   "description": "Framework-agnostic, high-performance spreadsheet grid.",
   "license": "MIT",
@@ -14,7 +14,7 @@
   ],
   "engines": {
     "bun": ">=1.3.0",
-    "node": ">=24.3.0 <25"
+    "node": ">=26.9.0 <27"
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
@@ -85,7 +85,7 @@
     "@changesets/cli": "2.31.0",
     "@happy-dom/global-registrator": "^20.10.6",
     "@playwright/test": "^1.61.1",
-    "@types/bun": "^1.3.14",
+    "@types/bun": "^1.4.2",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
