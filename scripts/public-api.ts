@@ -1,7 +1,55 @@
 import { createHash } from "node:crypto";
 import { access, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
-import * as ts from "typescript-compiler";
+import {
+  type Expression,
+  type ExpressionWithTypeArguments,
+  getJSDocTags,
+  getTextOfJSDocComment,
+  type HeritageClause,
+  type InterfaceDeclaration,
+  isAwaitExpression,
+  isBlock,
+  isCallExpression,
+  isClassDeclaration,
+  isElementAccessExpression,
+  isEnumDeclaration,
+  isExportDeclaration,
+  isExportSpecifier,
+  isIdentifier,
+  isImportDeclaration,
+  isImportTypeNode,
+  isInterfaceDeclaration,
+  isJSDoc,
+  isLiteralTypeNode,
+  isNamedExports,
+  isNamespaceImport,
+  isObjectBindingPattern,
+  isParenthesizedExpression,
+  isPropertyAccessExpression,
+  isQualifiedName,
+  isStringLiteral,
+  isTypeAliasDeclaration,
+  isVariableDeclaration,
+  isVariableStatement,
+  type ModifiersBase,
+  type Node,
+  type NodeArray,
+  type PropertyName,
+  type SourceFile,
+  SyntaxKind,
+} from "typescript/unstable/ast";
+import {
+  API,
+  type Symbol as ApiSymbol,
+  type Diagnostic,
+  NodeBuilderFlags,
+  type Project,
+  type Signature,
+  SignatureKind,
+  SymbolFlags,
+  type Type,
+} from "typescript/unstable/async";
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
@@ -259,145 +307,318 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-function symbolKind(symbol: ts.Symbol): string {
+/**
+ * `TypeFormatFlags` is not part of the TypeScript 7 API surface, but its values
+ * are unchanged; these are the two flags the manifest has always rendered with.
+ */
+const TYPE_FORMAT_FLAGS = {
+  NoTruncation: 1,
+  UseAliasDefinedOutsideCurrentScope: 1 << 14,
+} as const;
+
+const TYPE_STRING_FLAGS =
+  TYPE_FORMAT_FLAGS.NoTruncation | TYPE_FORMAT_FLAGS.UseAliasDefinedOutsideCurrentScope;
+
+/**
+ * TypeScript 7 renders signatures as declaration nodes. These are the builder
+ * flags classic `Checker.signatureToString` used: the flags mapped from
+ * `TypeFormatFlags` plus `IgnoreErrors | WriteTypeParametersInQualifiedName`.
+ */
+const SIGNATURE_BUILDER_FLAGS =
+  NodeBuilderFlags.NoTruncation |
+  NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
+  NodeBuilderFlags.IgnoreErrors |
+  NodeBuilderFlags.WriteTypeParametersInQualifiedName;
+
+/** TypeScript reports an ambiguous duplicate re-export under this code. */
+const duplicateExportDiagnosticCode = 2308;
+
+/** `flattenDiagnosticMessageText` with the newline separator the report used. */
+function diagnosticText(diagnostic: Diagnostic, indent = 0): string {
+  const chain = diagnostic.messageChain ?? [];
+  return `${"\n".repeat(indent)}${diagnostic.text}${chain
+    .map((message) => diagnosticText(message, indent + 1))
+    .join("")}`;
+}
+
+/** Every member except call and index signatures carries a name. */
+type NamedElement = Node & { readonly name?: PropertyName };
+
+/** Types that can carry heritage clauses, so members can inherit documents. */
+type HeritageCarrier = Node & { readonly heritageClauses?: NodeArray<HeritageClause> };
+
+/**
+ * `Symbol.declarations` holds node handles; the analysis walks real AST nodes.
+ * Handles that no longer resolve are dropped, as if the declaration were absent.
+ */
+async function declarationsOf(symbol: ApiSymbol, project: Project): Promise<Node[]> {
+  const declarations = await Promise.all(
+    symbol.declarations.map((handle) => handle.resolve(project)),
+  );
+  return declarations.filter((declaration): declaration is Node => declaration !== undefined);
+}
+
+/** `getModifiers` reported syntactic modifiers, so only the written ones count. */
+function hasModifier(node: Node, kind: SyntaxKind): boolean {
+  const modifiers = (node as ModifiersBase).modifiers;
+  return modifiers?.some((modifier) => modifier.kind === kind) === true;
+}
+
+/**
+ * Comment text of the JSDoc blocks documenting a node, in source order. A
+ * variable declaration is documented by the statement that declares it alone,
+ * mirroring where the compiler looks for its comments.
+ */
+function jsDocCommentTexts(node: Node): string[] {
+  const hosts = [node];
+  const statement = node.parent?.parent;
+  if (
+    statement !== undefined &&
+    isVariableStatement(statement) &&
+    statement.declarationList.declarations.length === 1 &&
+    statement.declarationList.declarations[0] === node
+  ) {
+    hosts.push(statement);
+  }
+  const comments: string[] = [];
+  for (const host of hosts) {
+    // Only the last block written on a node documents it; earlier blocks are
+    // stray prose the compiler ignores.
+    const block = (host.jsDoc ?? []).filter(isJSDoc).at(-1);
+    if (block === undefined) continue;
+    const comment = getTextOfJSDocComment(block.comment);
+    if (comment !== undefined && comment.length > 0) comments.push(comment);
+  }
+  return comments;
+}
+
+/** JSDoc comment text of a node, as `getJSDocCommentsAndTags` joined it. */
+function jsDocCommentText(node: Node): string {
+  return jsDocCommentTexts(node).join(" ").trim();
+}
+
+/**
+ * Documentation of a symbol, as the classic `getDocumentationComment` reported
+ * it: the JSDoc comments its own declarations carry, or — when they carry none
+ * — the comments of the same-named member it inherits from a base type, which
+ * is how implemented-interface documentation reaches a class member. Comments
+ * come from the AST because the API server renders `{@link …}` links as plain
+ * text, while the manifest documents them as links.
+ */
+async function symbolDocumentation(
+  symbol: ApiSymbol,
+  project: Project,
+  visited: Set<ApiSymbol> = new Set(),
+): Promise<string> {
+  const declarations = await declarationsOf(symbol, project);
+  const comments: string[] = [];
+  for (const declaration of declarations) {
+    for (const comment of jsDocCommentTexts(declaration)) {
+      if (!comments.includes(comment)) comments.push(comment);
+    }
+  }
+  if (comments.length > 0) return comments.join("\n");
+  if (visited.has(symbol)) return "";
+  visited.add(symbol);
+  for (const declaration of declarations) {
+    const inherited = await inheritedMemberDocumentation(declaration, project, visited);
+    if (inherited.length > 0) return inherited;
+  }
+  return "";
+}
+
+/** Documentation a member declaration inherits from the base type declaring it. */
+async function inheritedMemberDocumentation(
+  declaration: Node,
+  project: Project,
+  visited: Set<ApiSymbol>,
+): Promise<string> {
+  const name = (declaration as Partial<NamedElement>).name?.getText();
+  if (name === undefined) return "";
+  const staticMember = hasModifier(declaration, SyntaxKind.StaticKeyword);
+  for (const clause of (declaration.parent as Partial<HeritageCarrier>).heritageClauses ?? []) {
+    for (const base of clause.types) {
+      const baseType = await project.checker.getTypeAtLocation(base);
+      if (baseType === undefined) continue;
+      // The static side of a base type is reachable through its value symbol.
+      const baseSymbol = staticMember ? await baseType.getSymbol() : undefined;
+      const inheritedType =
+        baseSymbol === undefined ? baseType : await project.checker.getTypeOfSymbol(baseSymbol);
+      if (inheritedType === undefined) continue;
+      const member = await project.checker.getPropertyOfType(inheritedType, name);
+      if (member === undefined || visited.has(member)) continue;
+      const documentation = await symbolDocumentation(member, project, visited);
+      if (documentation.length > 0) return documentation;
+    }
+  }
+  return "";
+}
+
+/**
+ * Classic `Checker.signatureToString` printed call signatures through a
+ * single-line writer that turned every line break into one space and dropped
+ * indentation, and deferred the trailing semicolon; the emitter keeps the
+ * declaration's own line breaks and terminates it.
+ */
+async function signatureText(
+  signature: Signature,
+  declaration: Node,
+  project: Project,
+): Promise<string> {
+  const node = await project.checker.signatureToSignatureDeclaration(
+    signature,
+    SyntaxKind.CallSignature,
+    declaration,
+    SIGNATURE_BUILDER_FLAGS,
+  );
+  if (node === undefined) return "";
+  return (await project.emitter.printNode(node)).replace(/\n[ \t]*/g, " ").replace(/;$/, "");
+}
+
+/** Documentation attached to a signature's declaration. */
+async function signatureDocumentation(signature: Signature, project: Project): Promise<string> {
+  const declaration = await signature.declaration?.resolve(project);
+  if (declaration === undefined) return "";
+  return jsDocCommentTexts(declaration).join("\n");
+}
+
+function symbolKind(symbol: ApiSymbol): string {
   const flags = symbol.flags;
-  if (flags & ts.SymbolFlags.Class) return "class";
-  if (flags & ts.SymbolFlags.Interface) return "interface";
-  if (flags & ts.SymbolFlags.TypeAlias) return "type";
-  if (flags & ts.SymbolFlags.Enum) return "enum";
-  if (flags & ts.SymbolFlags.Function) return "function";
-  if (flags & ts.SymbolFlags.Variable) return "variable";
-  if (flags & ts.SymbolFlags.NamespaceModule) return "namespace";
+  if (flags & SymbolFlags.Class) return "class";
+  if (flags & SymbolFlags.Interface) return "interface";
+  if (flags & SymbolFlags.TypeAlias) return "type";
+  if (flags & SymbolFlags.Enum) return "enum";
+  if (flags & SymbolFlags.Function) return "function";
+  if (flags & SymbolFlags.Variable) return "variable";
+  if (flags & SymbolFlags.NamespaceModule) return "namespace";
   return "symbol";
 }
 
-function isPrivateSymbol(symbol: ts.Symbol): boolean {
-  const declarations = symbol.getDeclarations() ?? [];
+async function isPrivateSymbol(symbol: ApiSymbol, project: Project): Promise<boolean> {
+  const declarations = await declarationsOf(symbol, project);
   return (
     declarations.length > 0 &&
-    declarations.every((declaration) => {
-      if (!ts.canHaveModifiers(declaration)) return false;
-      return (
-        ts
-          .getModifiers(declaration)
-          ?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword) === true
-      );
-    })
+    declarations.every((declaration) => hasModifier(declaration, SyntaxKind.PrivateKeyword))
   );
 }
 
-function publicPropertySignature(
-  symbol: ts.Symbol,
-  checker: ts.TypeChecker,
+async function publicPropertySignature(
+  symbol: ApiSymbol,
+  project: Project,
   prefix = "",
-): string | undefined {
-  if (isPrivateSymbol(symbol) || symbol.getName() === "prototype") return undefined;
-  const location = symbol.getDeclarations()?.[0];
+): Promise<string | undefined> {
+  if ((await isPrivateSymbol(symbol, project)) || symbol.name === "prototype") return undefined;
+  const location = (await declarationsOf(symbol, project))[0];
   if (location === undefined) return undefined;
-  const type = checker.getTypeOfSymbolAtLocation(symbol, location);
-  const optional = symbol.flags & ts.SymbolFlags.Optional ? "?" : "";
-  return `${prefix}${symbol.getName()}${optional}: ${checker.typeToString(
+  const checker = project.checker;
+  const type = await checker.getTypeOfSymbolAtLocation(symbol, location);
+  const optional = symbol.flags & SymbolFlags.Optional ? "?" : "";
+  return `${prefix}${symbol.name}${optional}: ${await checker.typeToString(
     type,
     location,
-    ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+    TYPE_STRING_FLAGS,
   )}`;
 }
 
-function memberDocumentation(symbol: ts.Symbol, checker: ts.TypeChecker): ApiMemberDoc[] {
+async function memberDocumentation(symbol: ApiSymbol, project: Project): Promise<ApiMemberDoc[]> {
+  const checker = project.checker;
   const docs = new Map<string, string>();
   const record = (name: string, documentation: string): void => {
     if (documentation.length > 0 && !docs.has(name)) docs.set(name, documentation);
   };
-  const collectFromType = (type: ts.Type): void => {
-    for (const property of checker.getPropertiesOfType(type)) {
-      if (isPrivateSymbol(property) || property.getName() === "prototype") continue;
-      record(
-        property.getName(),
-        ts.displayPartsToString(property.getDocumentationComment(checker)).trim(),
-      );
+  const collectFromType = async (type: Type): Promise<void> => {
+    for (const property of await checker.getPropertiesOfType(type)) {
+      if ((await isPrivateSymbol(property, project)) || property.name === "prototype") continue;
+      record(property.name, (await symbolDocumentation(property, project)).trim());
     }
     const signatureKinds = [
-      [ts.SignatureKind.Call, "call"],
-      [ts.SignatureKind.Construct, "new"],
+      [SignatureKind.Call, "call"],
+      [SignatureKind.Construct, "new"],
     ] as const;
     for (const [kind, name] of signatureKinds) {
-      for (const signature of checker.getSignaturesOfType(type, kind)) {
-        record(name, ts.displayPartsToString(signature.getDocumentationComment(checker)).trim());
+      for (const signature of await checker.getSignaturesOfType(type, kind)) {
+        record(name, (await signatureDocumentation(signature, project)).trim());
       }
     }
-    for (const info of checker.getIndexInfosOfType(type)) {
-      const declaration = info.declaration;
+    for (const info of await checker.getIndexInfosOfType(type)) {
+      const declaration = await info.declaration?.resolve(project);
       if (declaration === undefined) continue;
-      const comment = ts
-        .getJSDocCommentsAndTags(declaration)
-        .map((doc) =>
-          doc.kind === ts.SyntaxKind.JSDoc ? (ts.getTextOfJSDocComment(doc.comment) ?? "") : "",
-        )
-        .join(" ")
-        .trim();
-      record("index", comment);
+      record("index", jsDocCommentText(declaration));
     }
   };
-  if (symbol.flags & (ts.SymbolFlags.Interface | ts.SymbolFlags.Class)) {
-    collectFromType(checker.getDeclaredTypeOfSymbol(symbol));
+  const declarations = await declarationsOf(symbol, project);
+  if (symbol.flags & (SymbolFlags.Interface | SymbolFlags.Class)) {
+    await collectFromType(await checker.getDeclaredTypeOfSymbol(symbol));
   }
-  const classDeclaration = symbol.getDeclarations()?.find(ts.isClassDeclaration);
+  const classDeclaration = declarations.find(isClassDeclaration);
   if (classDeclaration !== undefined) {
-    collectFromType(checker.getTypeOfSymbolAtLocation(symbol, classDeclaration));
+    await collectFromType(await checker.getTypeOfSymbolAtLocation(symbol, classDeclaration));
   }
-  const aliasDeclaration = symbol.getDeclarations()?.find(ts.isTypeAliasDeclaration);
+  const aliasDeclaration = declarations.find(isTypeAliasDeclaration);
   if (aliasDeclaration !== undefined) {
-    collectFromType(checker.getTypeAtLocation(aliasDeclaration.type));
+    const aliasType = await checker.getTypeAtLocation(aliasDeclaration.type);
+    if (aliasType !== undefined) await collectFromType(aliasType);
   }
   return [...docs.entries()]
     .map(([name, documentation]) => ({ name, documentation }))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
-  const declaration = symbol.getDeclarations()?.find(ts.isClassDeclaration);
-  if (declaration === undefined) return `class ${symbol.getName()}`;
-  const instanceType = checker.getDeclaredTypeOfSymbol(symbol);
-  const valueType = checker.getTypeOfSymbolAtLocation(symbol, declaration);
+async function classSignature(symbol: ApiSymbol, project: Project): Promise<string> {
+  const checker = project.checker;
+  const declaration = (await declarationsOf(symbol, project)).find(isClassDeclaration);
+  if (declaration === undefined) return `class ${symbol.name}`;
+  const instanceType = await checker.getDeclaredTypeOfSymbol(symbol);
+  const valueType = await checker.getTypeOfSymbolAtLocation(symbol, declaration);
   const heritage = declaration.heritageClauses
     ?.map((clause) => clause.getText(declaration.getSourceFile()).replace(/\s+/g, " ").trim())
     .join(" ");
-  const constructors = checker
-    .getSignaturesOfType(valueType, ts.SignatureKind.Construct)
-    .map((signature) =>
-      checker.signatureToString(
-        signature,
-        declaration,
-        ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-      ),
+  const constructors = (
+    await Promise.all(
+      (
+        await checker.getSignaturesOfType(valueType, SignatureKind.Construct)
+      ).map((signature) => signatureText(signature, declaration, project)),
     )
+  )
     // `(args): Instance` is a call signature — invalid inside a class body.
     // Emit the real `constructor(args)` member (drop the return type).
     .map((signature) => `constructor${signature.replace(/\)\s*:\s*[^:]*$/, ")")}`)
     // A default constructor adds nothing the class name doesn't already say.
     .filter((signature) => signature !== "constructor()");
-  const declaredHere = (property: ts.Symbol): boolean =>
-    property
-      .getDeclarations()
-      ?.some(
-        (memberDeclaration) =>
-          memberDeclaration.getSourceFile() === declaration.getSourceFile() &&
-          memberDeclaration.pos >= declaration.pos &&
-          memberDeclaration.end <= declaration.end,
-      ) ?? false;
-  const members = checker
-    .getPropertiesOfType(instanceType)
-    // Inherited platform members (Error.name/message/stack) are noise here.
-    .filter(declaredHere)
-    .map((property) => publicPropertySignature(property, checker))
-    .filter((signature): signature is string => signature !== undefined);
-  const staticMembers = checker
-    .getPropertiesOfType(valueType)
-    .filter(declaredHere)
-    .map((property) => publicPropertySignature(property, checker, "static "))
-    .filter((signature): signature is string => signature !== undefined);
+  const sourceFile = declaration.getSourceFile();
+  const declaredHere = async (property: ApiSymbol): Promise<ApiSymbol | undefined> => {
+    const memberDeclarations = await declarationsOf(property, project);
+    return memberDeclarations.some(
+      (memberDeclaration) =>
+        memberDeclaration.getSourceFile().fileName === sourceFile.fileName &&
+        memberDeclaration.pos >= declaration.pos &&
+        memberDeclaration.end <= declaration.end,
+    )
+      ? property
+      : undefined;
+  };
+  // Inherited platform members (Error.name/message/stack) are noise here, so
+  // only properties declared in the class body are listed.
+  const declaredMembers = async (type: Type): Promise<ApiSymbol[]> =>
+    (await Promise.all((await checker.getPropertiesOfType(type)).map(declaredHere))).filter(
+      (property): property is ApiSymbol => property !== undefined,
+    );
+  const members = (
+    await Promise.all(
+      (
+        await declaredMembers(instanceType)
+      ).map((property) => publicPropertySignature(property, project)),
+    )
+  ).filter((signature): signature is string => signature !== undefined);
+  const staticMembers = (
+    await Promise.all(
+      (
+        await declaredMembers(valueType)
+      ).map((property) => publicPropertySignature(property, project, "static ")),
+    )
+  ).filter((signature): signature is string => signature !== undefined);
   const body = [...constructors, ...members.sort(), ...staticMembers.sort()].join("; ");
-  const head = heritage ? `class ${symbol.getName()} ${heritage}` : `class ${symbol.getName()}`;
+  const head = heritage ? `class ${symbol.name} ${heritage}` : `class ${symbol.name}`;
   return body.length > 0 ? `${head} { ${body} }` : `${head} {}`;
 }
 /**
@@ -406,14 +627,17 @@ function classSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
  * through realpath, so third-party bases are exactly the ones that still live
  * under `node_modules`.
  */
-function isSheetwriteOwnedBase(
-  base: ts.ExpressionWithTypeArguments,
-  checker: ts.TypeChecker,
-): boolean {
-  const type = checker.getTypeAtLocation(base);
-  const symbol = type.aliasSymbol ?? type.getSymbol();
-  const declarations = symbol?.getDeclarations();
-  if (declarations === undefined || declarations.length === 0) return false;
+async function isSheetwriteOwnedBase(
+  base: ExpressionWithTypeArguments,
+  project: Project,
+): Promise<boolean> {
+  const type = await project.checker.getTypeAtLocation(base);
+  if (type === undefined) return false;
+  const aliasSymbol = await type.getAliasSymbol();
+  const symbol = aliasSymbol ?? (await type.getSymbol());
+  if (symbol === undefined) return false;
+  const declarations = await declarationsOf(symbol, project);
+  if (declarations.length === 0) return false;
   return declarations.every(
     (declaration) => !declaration.getSourceFile().fileName.includes("node_modules"),
   );
@@ -426,17 +650,18 @@ function isSheetwriteOwnedBase(
  * bases (React/Vue/Svelte attributes, lib utility types) stay heritage-only
  * and never dump third-party internals into the manifest.
  */
-function interfaceSignature(
-  symbol: ts.Symbol,
-  declaration: ts.InterfaceDeclaration,
-  checker: ts.TypeChecker,
-): string {
+async function interfaceSignature(
+  symbol: ApiSymbol,
+  declaration: InterfaceDeclaration,
+  project: Project,
+): Promise<string> {
+  const checker = project.checker;
   const sourceFile = declaration.getSourceFile();
   const externalHeritage: string[] = [];
   let ownedBases = 0;
   for (const clause of declaration.heritageClauses ?? []) {
     for (const base of clause.types) {
-      if (isSheetwriteOwnedBase(base, checker)) ownedBases += 1;
+      if (await isSheetwriteOwnedBase(base, project)) ownedBases += 1;
       else externalHeritage.push(normalizeText(base.getText(sourceFile)));
     }
   }
@@ -447,13 +672,18 @@ function interfaceSignature(
   for (const member of declaration.members) {
     const text = normalizeText(member.getText(sourceFile));
     members.push(text.endsWith(";") || text.endsWith(",") ? text : `${text};`);
-    const name = (member as ts.NamedDeclaration).name?.getText(sourceFile);
+    // Call and index signatures carry no name, so only named members are seen.
+    const name = (member as Partial<NamedElement>).name?.getText(sourceFile);
     if (name !== undefined) seen.add(name.replace(/^["']|["']$/g, ""));
   }
-  for (const property of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol))) {
-    const name = property.getName();
-    if (seen.has(name) || isPrivateSymbol(property) || name === "prototype") continue;
-    const memberDeclaration = property.getDeclarations()?.[0];
+  for (const property of await checker.getPropertiesOfType(
+    await checker.getDeclaredTypeOfSymbol(symbol),
+  )) {
+    const name = property.name;
+    if (seen.has(name) || (await isPrivateSymbol(property, project)) || name === "prototype") {
+      continue;
+    }
+    const memberDeclaration = (await declarationsOf(property, project))[0];
     if (memberDeclaration === undefined) continue;
     if (memberDeclaration.getSourceFile().fileName.includes("node_modules")) continue;
     seen.add(name);
@@ -473,13 +703,19 @@ function interfaceSignature(
   return members.length > 0 ? `${head} { ${members.join(" ")} }` : `${head} {}`;
 }
 
-function declarationSignature(symbol: ts.Symbol, checker: ts.TypeChecker): string {
-  const declarations = symbol.getDeclarations() ?? [];
-  if (symbol.flags & ts.SymbolFlags.Class) return classSignature(symbol, checker);
-  if (symbol.flags & (ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Enum)) {
-    const interfaceDeclarations = declarations.filter(ts.isInterfaceDeclaration);
-    if (interfaceDeclarations.length === 1 && interfaceDeclarations[0]!.heritageClauses) {
-      return interfaceSignature(symbol, interfaceDeclarations[0]!, checker);
+async function declarationSignature(symbol: ApiSymbol, project: Project): Promise<string> {
+  const checker = project.checker;
+  const declarations = await declarationsOf(symbol, project);
+  if (symbol.flags & SymbolFlags.Class) return classSignature(symbol, project);
+  if (symbol.flags & (SymbolFlags.Interface | SymbolFlags.TypeAlias | SymbolFlags.Enum)) {
+    const interfaceDeclarations = declarations.filter(isInterfaceDeclaration);
+    const [onlyInterfaceDeclaration] = interfaceDeclarations;
+    if (
+      interfaceDeclarations.length === 1 &&
+      onlyInterfaceDeclaration !== undefined &&
+      onlyInterfaceDeclaration.heritageClauses !== undefined
+    ) {
+      return interfaceSignature(symbol, onlyInterfaceDeclaration, project);
     }
     return declarations
       .map((declaration) => normalizeText(declaration.getText()))
@@ -488,68 +724,48 @@ function declarationSignature(symbol: ts.Symbol, checker: ts.TypeChecker): strin
   }
 
   const location = declarations[0];
-  if (location === undefined) return symbol.getName();
-  const type = checker.getTypeOfSymbolAtLocation(symbol, location);
-  const callSignatures = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
+  if (location === undefined) return symbol.name;
+  const type = await checker.getTypeOfSymbolAtLocation(symbol, location);
+  const callSignatures = await checker.getSignaturesOfType(type, SignatureKind.Call);
   if (callSignatures.length > 0) {
-    return callSignatures
-      .map((signature) =>
-        checker.signatureToString(
-          signature,
-          location,
-          ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-        ),
-      )
-      .sort()
-      .join(" | ");
+    const rendered = await Promise.all(
+      callSignatures.map((signature) => signatureText(signature, location, project)),
+    );
+    return rendered.sort().join(" | ");
   }
-  return checker.typeToString(
-    type,
-    location,
-    ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-  );
+  return checker.typeToString(type, location, TYPE_STRING_FLAGS);
 }
 
-function exportStatementDocumentation(symbol: ts.Symbol): string {
-  for (const declaration of symbol.getDeclarations() ?? []) {
-    if (!ts.isExportSpecifier(declaration)) continue;
-    const statement = declaration.parent.parent;
-    const comment = ts
-      .getJSDocCommentsAndTags(statement)
-      .map((doc) =>
-        doc.kind === ts.SyntaxKind.JSDoc ? (ts.getTextOfJSDocComment(doc.comment) ?? "") : "",
-      )
-      .join(" ")
-      .trim();
+async function exportStatementDocumentation(symbol: ApiSymbol, project: Project): Promise<string> {
+  for (const declaration of await declarationsOf(symbol, project)) {
+    if (!isExportSpecifier(declaration)) continue;
+    const comment = jsDocCommentText(declaration.parent.parent);
     if (comment.length > 0) return comment;
   }
   return "";
 }
 
-function collectTags(symbol: ts.Symbol, checker: ts.TypeChecker): string[] {
-  const tags = new Set(symbol.getJsDocTags(checker).map((tag) => tag.name));
-  for (const declaration of symbol.getDeclarations() ?? []) {
-    const visit = (node: ts.Node): void => {
-      if (ts.isBlock(node)) return;
-      if (ts.canHaveModifiers(node)) {
-        const modifiers = ts.getModifiers(node);
-        if (modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword)) return;
-      }
-      for (const tag of ts.getJSDocTags(node)) tags.add(tag.tagName.text);
-      ts.forEachChild(node, visit);
+async function collectTags(symbol: ApiSymbol, project: Project): Promise<string[]> {
+  const tags = new Set((await symbol.getJsDocTags(project.checker)).map((tag) => tag.name));
+  for (const declaration of await declarationsOf(symbol, project)) {
+    const visit = (node: Node): void => {
+      if (isBlock(node)) return;
+      if (hasModifier(node, SyntaxKind.PrivateKeyword)) return;
+      for (const tag of getJSDocTags(node)) tags.add(tag.tagName.text);
+      node.forEachChild(visit);
     };
     visit(declaration);
   }
   return [...tags].sort();
 }
 
-function resolvedSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
+async function resolvedSymbol(symbol: ApiSymbol, project: Project): Promise<ApiSymbol> {
   let current = symbol;
-  const seen = new Set<ts.Symbol>();
-  while (current.flags & ts.SymbolFlags.Alias) {
+  const seen = new Set<ApiSymbol>();
+  while (current.flags & SymbolFlags.Alias) {
     if (seen.has(current)) break;
     seen.add(current);
-    current = checker.getAliasedSymbol(current);
+    current = await project.checker.getAliasedSymbol(current);
   }
   return current;
 }
@@ -573,11 +789,42 @@ function unstableErrorContract(apiExport: ApiExport): string | null {
   return null;
 }
 
-function analyzeEntry(
+/**
+ * Compiler options the manifest has always been rendered with. TypeScript 7
+ * only analyzes configured projects, so each entry point is served through a
+ * single-root project file carrying exactly these options.
+ */
+const ENTRY_COMPILER_OPTIONS = {
+  allowJs: false,
+  module: "esnext",
+  moduleResolution: "bundler",
+  noEmit: true,
+  skipLibCheck: false,
+  strict: true,
+  target: "es2022",
+} as const;
+
+/** A single-root project file, served to the compiler by a virtual file system. */
+interface EntryProjectFile {
+  readonly source: string;
+  readonly configFileName: string;
+  readonly contents: string;
+}
+
+function entryProjectFile(repositoryRoot: string, index: number, source: string): EntryProjectFile {
+  return {
+    source,
+    configFileName: join(repositoryRoot, `tsconfig.public-api.${index}.json`),
+    contents: `${JSON.stringify({ compilerOptions: ENTRY_COMPILER_OPTIONS, files: [source] }, null, 2)}\n`,
+  };
+}
+
+async function analyzeEntry(
   packageName: string,
   packageRoot: string,
   entry: ResolvedEntry,
-): { entry: ApiEntryPoint; issues: ApiIssue[] } {
+  project: Project | undefined,
+): Promise<{ entry: ApiEntryPoint; issues: ApiIssue[] }> {
   const issues: ApiIssue[] = [];
   if (entry.source === undefined) {
     issues.push({
@@ -589,18 +836,9 @@ function analyzeEntry(
     return { entry: { ...entry, exports: [] }, issues };
   }
 
-  const program = ts.createProgram([entry.source], {
-    allowJs: false,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    noEmit: true,
-    skipLibCheck: false,
-    strict: true,
-    target: ts.ScriptTarget.ES2022,
-  });
-
-  const sourceFile = program.getSourceFile(entry.source);
-  if (sourceFile === undefined) {
+  const sourceFile =
+    project === undefined ? undefined : await project.program.getSourceFile(entry.source);
+  if (project === undefined || sourceFile === undefined) {
     issues.push({
       code: "parse-error",
       message: `${packageName} ${entry.subpath} was resolved but not parsed`,
@@ -613,26 +851,26 @@ function analyzeEntry(
     };
   }
 
-  for (const diagnostic of program.getSyntacticDiagnostics(sourceFile)) {
+  for (const diagnostic of await project.program.getSyntacticDiagnostics(entry.source)) {
     issues.push({
       code: "parse-error",
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+      message: diagnosticText(diagnostic),
       package: packageName,
       entryPoint: entry.subpath,
     });
   }
-  for (const diagnostic of program.getSemanticDiagnostics()) {
-    if (diagnostic.code !== 2308) continue;
+  for (const diagnostic of await project.program.getSemanticDiagnostics()) {
+    if (diagnostic.code !== duplicateExportDiagnosticCode) continue;
     issues.push({
       code: "duplicate-export",
-      message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
+      message: diagnosticText(diagnostic),
       package: packageName,
       entryPoint: entry.subpath,
     });
   }
 
-  const checker = program.getTypeChecker();
-  const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
+  const checker = project.checker;
+  const moduleSymbol = await checker.getSymbolAtLocation(sourceFile);
   if (moduleSymbol === undefined) {
     issues.push({
       code: "parse-error",
@@ -647,52 +885,56 @@ function analyzeEntry(
   }
 
   const mergedDeclarationSymbols: string[] = [];
-  const apiExports = checker
-    .getExportsOfModule(moduleSymbol)
-    .map((exported): ApiExport => {
-      const target = resolvedSymbol(exported, checker);
-      const declarations = target.getDeclarations() ?? [];
-      const structuralDeclarations = declarations.filter(
-        (candidate) =>
-          ts.isInterfaceDeclaration(candidate) ||
-          ts.isTypeAliasDeclaration(candidate) ||
-          ts.isEnumDeclaration(candidate),
-      );
-      if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.getName());
-      const owners = new Set(
-        declarations.map((declaration) =>
-          posix(relative(packageRoot, declaration.getSourceFile().fileName)),
+  const apiExports: ApiExport[] = [];
+  for (const exported of await checker.getExportsOfModule(moduleSymbol)) {
+    const target = await resolvedSymbol(exported, project);
+    const declarations = await declarationsOf(target, project);
+    const structuralDeclarations = declarations.filter(
+      (candidate) =>
+        isInterfaceDeclaration(candidate) ||
+        isTypeAliasDeclaration(candidate) ||
+        isEnumDeclaration(candidate),
+    );
+    if (structuralDeclarations.length > 1) mergedDeclarationSymbols.push(exported.name);
+    const owners = new Set(
+      declarations.map((declaration) =>
+        posix(relative(packageRoot, declaration.getSourceFile().fileName)),
+      ),
+    );
+    const declaration = declarations[0];
+    const source =
+      declaration === undefined
+        ? ""
+        : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
+            declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart()).line +
+            1
+          }`;
+    const tags = new Set([
+      ...(await collectTags(exported, project)),
+      ...(await collectTags(target, project)),
+    ]);
+    const documentation = [
+      await exportStatementDocumentation(exported, project),
+      ...(await Promise.all(
+        [exported, target].map(async (symbol) =>
+          (await symbolDocumentation(symbol, project)).trim(),
         ),
-      );
-      const declaration = declarations[0];
-      const source =
-        declaration === undefined
-          ? ""
-          : `${posix(relative(packageRoot, declaration.getSourceFile().fileName))}#L${
-              declaration.getSourceFile().getLineAndCharacterOfPosition(declaration.getStart())
-                .line + 1
-            }`;
-      const tags = new Set([...collectTags(exported, checker), ...collectTags(target, checker)]);
-      const documentation = [
-        exportStatementDocumentation(exported),
-        ...[exported, target].map((symbol) =>
-          ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim(),
-        ),
-      ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
-      const kind = symbolKind(target);
-      return {
-        name: exported.getName(),
-        kind,
-        signature: declarationSignature(target, checker),
-        owners: [...owners].sort(),
-        source,
-        jsDocTags: [...tags].sort(),
-        documentation: documentation.join("\n\n"),
-        memberDocs:
-          kind === "interface" || kind === "class" ? memberDocumentation(target, checker) : [],
-      };
-    })
-    .sort((left, right) => left.name.localeCompare(right.name));
+      )),
+    ].filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+    const kind = symbolKind(target);
+    apiExports.push({
+      name: exported.name,
+      kind,
+      signature: await declarationSignature(target, project),
+      owners: [...owners].sort(),
+      source,
+      jsDocTags: [...tags].sort(),
+      documentation: documentation.join("\n\n"),
+      memberDocs:
+        kind === "interface" || kind === "class" ? await memberDocumentation(target, project) : [],
+    });
+  }
+  apiExports.sort((left, right) => left.name.localeCompare(right.name));
 
   for (const symbol of mergedDeclarationSymbols) {
     issues.push({
@@ -949,7 +1191,7 @@ function scriptFragments(path: string, source: string): string[] {
 }
 
 function collectImportedNames(
-  sourceFile: ts.SourceFile,
+  sourceFile: SourceFile,
   specifiers: ReadonlyMap<string, string>,
   consumed: Map<string, Set<string>>,
 ): void {
@@ -961,30 +1203,30 @@ function collectImportedNames(
     consumed.set(key, names);
   };
   const namespaceSpecifiers = new Map<string, string>();
-  const dynamicImportSpecifier = (expression: ts.Expression): string | undefined => {
+  const dynamicImportSpecifier = (expression: Expression): string | undefined => {
     let current = expression;
-    while (ts.isAwaitExpression(current) || ts.isParenthesizedExpression(current)) {
+    while (isAwaitExpression(current) || isParenthesizedExpression(current)) {
       current = current.expression;
     }
-    if (!ts.isCallExpression(current) || current.expression.kind !== ts.SyntaxKind.ImportKeyword) {
+    if (!isCallExpression(current) || current.expression.kind !== SyntaxKind.ImportKeyword) {
       return undefined;
     }
     const argument = current.arguments[0];
-    return current.arguments.length === 1 && argument !== undefined && ts.isStringLiteral(argument)
+    return current.arguments.length === 1 && argument !== undefined && isStringLiteral(argument)
       ? argument.text
       : undefined;
   };
-  const visit = (node: ts.Node): void => {
+  const visit = (node: Node): void => {
     if (
-      ts.isImportDeclaration(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
+      isImportDeclaration(node) &&
+      isStringLiteral(node.moduleSpecifier) &&
       node.importClause !== undefined
     ) {
       const specifier = node.moduleSpecifier.text;
       if (node.importClause.name !== undefined) record(specifier, "default");
       const bindings = node.importClause.namedBindings;
       if (bindings !== undefined) {
-        if (ts.isNamespaceImport(bindings)) {
+        if (isNamespaceImport(bindings)) {
           namespaceSpecifiers.set(bindings.name.text, specifier);
         } else {
           for (const element of bindings.elements) {
@@ -993,75 +1235,81 @@ function collectImportedNames(
         }
       }
     } else if (
-      ts.isExportDeclaration(node) &&
+      isExportDeclaration(node) &&
       node.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
+      isStringLiteral(node.moduleSpecifier) &&
       node.exportClause !== undefined &&
-      ts.isNamedExports(node.exportClause)
+      isNamedExports(node.exportClause)
     ) {
       const specifier = node.moduleSpecifier.text;
       for (const element of node.exportClause.elements) {
         record(specifier, element.propertyName?.text ?? element.name.text);
       }
-    } else if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+    } else if (isVariableDeclaration(node) && node.initializer !== undefined) {
       const dynamicSpecifier = dynamicImportSpecifier(node.initializer);
       if (dynamicSpecifier !== undefined) {
-        if (ts.isIdentifier(node.name)) {
+        if (isIdentifier(node.name)) {
           namespaceSpecifiers.set(node.name.text, dynamicSpecifier);
-        } else if (ts.isObjectBindingPattern(node.name)) {
+        } else if (isObjectBindingPattern(node.name)) {
           for (const element of node.name.elements) {
             const importedName = element.propertyName ?? element.name;
-            if (ts.isIdentifier(importedName) || ts.isStringLiteral(importedName)) {
+            if (
+              importedName !== undefined &&
+              (isIdentifier(importedName) || isStringLiteral(importedName))
+            ) {
               record(dynamicSpecifier, importedName.text);
             }
           }
         }
       } else if (
-        ts.isObjectBindingPattern(node.name) &&
-        ts.isIdentifier(node.initializer) &&
+        isObjectBindingPattern(node.name) &&
+        isIdentifier(node.initializer) &&
         namespaceSpecifiers.has(node.initializer.text)
       ) {
         const specifier = namespaceSpecifiers.get(node.initializer.text) ?? "";
         for (const element of node.name.elements) {
           const importedName = element.propertyName ?? element.name;
-          if (ts.isIdentifier(importedName) || ts.isStringLiteral(importedName)) {
+          if (
+            importedName !== undefined &&
+            (isIdentifier(importedName) || isStringLiteral(importedName))
+          ) {
             record(specifier, importedName.text);
           }
         }
       }
-    } else if (ts.isPropertyAccessExpression(node)) {
+    } else if (isPropertyAccessExpression(node)) {
       const dynamicSpecifier = dynamicImportSpecifier(node.expression);
       if (dynamicSpecifier !== undefined) {
         record(dynamicSpecifier, node.name.text);
-      } else if (ts.isIdentifier(node.expression)) {
+      } else if (isIdentifier(node.expression)) {
         record(namespaceSpecifiers.get(node.expression.text) ?? "", node.name.text);
       }
     } else if (
-      ts.isElementAccessExpression(node) &&
+      isElementAccessExpression(node) &&
       node.argumentExpression !== undefined &&
-      ts.isStringLiteral(node.argumentExpression)
+      isStringLiteral(node.argumentExpression)
     ) {
       const dynamicSpecifier = dynamicImportSpecifier(node.expression);
       if (dynamicSpecifier !== undefined) {
         record(dynamicSpecifier, node.argumentExpression.text);
-      } else if (ts.isIdentifier(node.expression)) {
+      } else if (isIdentifier(node.expression)) {
         record(namespaceSpecifiers.get(node.expression.text) ?? "", node.argumentExpression.text);
       }
     } else if (
-      ts.isQualifiedName(node) &&
-      ts.isIdentifier(node.left) &&
+      isQualifiedName(node) &&
+      isIdentifier(node.left) &&
       namespaceSpecifiers.has(node.left.text)
     ) {
       record(namespaceSpecifiers.get(node.left.text) ?? "", node.right.text);
     } else if (
-      ts.isImportTypeNode(node) &&
-      ts.isLiteralTypeNode(node.argument) &&
-      ts.isStringLiteral(node.argument.literal) &&
+      isImportTypeNode(node) &&
+      isLiteralTypeNode(node.argument) &&
+      isStringLiteral(node.argument.literal) &&
       node.qualifier !== undefined
     ) {
       record(node.argument.literal.text, node.qualifier.getText(sourceFile).split(".")[0] ?? "");
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sourceFile);
 }
@@ -1095,6 +1343,8 @@ async function crossWorkspaceConsumers(
     (root): root is string => root !== undefined,
   );
   const consumed = new Map<string, Set<string>>();
+  const virtualSources = new Map<string, string>();
+  const parseTargets: Array<{ path: string; specifiers: ReadonlyMap<string, string> }> = [];
   for (const consumerRoot of consumerRoots) {
     const specifiers = new Map<string, string>();
     for (const pkg of manifest.packages) {
@@ -1110,17 +1360,44 @@ async function crossWorkspaceConsumers(
     if (specifiers.size === 0) continue;
     for (const path of await sourceFiles(consumerRoot)) {
       const source = await readFile(path, "utf8");
-      for (const fragment of scriptFragments(path, source)) {
-        const sourceFile = ts.createSourceFile(
-          path,
-          fragment,
-          ts.ScriptTarget.Latest,
-          true,
-          ts.ScriptKind.TSX,
-        );
-        collectImportedNames(sourceFile, specifiers, consumed);
-      }
+      // The manifest only reads import bindings, so each file — and each
+      // `<script>` block — is parsed standalone as TSX through the API server,
+      // which has no text-to-AST entry point of its own.
+      scriptFragments(path, source).forEach((fragment, index) => {
+        const virtualPath = `${path}.${index}.tsx`;
+        virtualSources.set(virtualPath, fragment);
+        parseTargets.push({ path: virtualPath, specifiers });
+      });
     }
+  }
+  if (parseTargets.length === 0) return consumed;
+
+  const api = new API({
+    cwd: repositoryRoot,
+    fs: {
+      // Virtual paths hold synthetic fragments; the untouched callbacks keep
+      // every other read on the real filesystem.
+      fileExists: (fileName) => (virtualSources.has(fileName) ? true : undefined),
+      readFile: (fileName) => virtualSources.get(fileName),
+    },
+  });
+  try {
+    const snapshot = await api.updateSnapshot({
+      openFiles: parseTargets.map((target) => target.path),
+    });
+    try {
+      for (const target of parseTargets) {
+        const project = await snapshot.getDefaultProjectForFile(target.path);
+        const sourceFile =
+          project === undefined ? undefined : await project.program.getSourceFile(target.path);
+        if (sourceFile === undefined) continue;
+        collectImportedNames(sourceFile, target.specifiers, consumed);
+      }
+    } finally {
+      await snapshot.dispose();
+    }
+  } finally {
+    await api.close();
   }
   return consumed;
 }
@@ -1174,22 +1451,69 @@ export async function analyzePublicApi(repositoryRoot: string): Promise<{
 }> {
   const packages: ApiPackage[] = [];
   const issues: ApiIssue[] = [];
+  const packageEntries: Array<{
+    name: string;
+    packageRoot: string;
+    entries: ResolvedEntry[];
+  }> = [];
   for (const packageRoot of await packageDirectories(repositoryRoot)) {
     const packageManifest = await readJson<PackageJson>(join(packageRoot, "package.json"));
     if (packageManifest.name === undefined || packageManifest.private === true) continue;
     const resolved = await resolveEntries(packageRoot, packageManifest);
     issues.push(...resolved.issues);
-    const entryPoints: ApiEntryPoint[] = [];
-    for (const entry of resolved.entries) {
-      if (entry.kind === "asset") {
-        entryPoints.push({ ...entry, exports: [] });
-        continue;
+    packageEntries.push({
+      name: packageManifest.name,
+      packageRoot,
+      entries: resolved.entries,
+    });
+  }
+
+  // Each entry point is analyzed in its own single-root project, reproducing
+  // the program the classic compiler API built for it — including the closure
+  // of files that program contained, which drives the diagnostics reported.
+  const projectFiles = [
+    ...new Set(
+      packageEntries.flatMap(({ entries }) =>
+        entries.flatMap((entry) => (entry.source === undefined ? [] : [entry.source])),
+      ),
+    ),
+  ].map((source, index) => entryProjectFile(repositoryRoot, index, source));
+  const virtualConfigs = new Map(projectFiles.map((file) => [file.configFileName, file.contents]));
+  const configBySource = new Map(projectFiles.map((file) => [file.source, file.configFileName]));
+  const api = new API({
+    cwd: repositoryRoot,
+    fs: {
+      fileExists: (fileName) => (virtualConfigs.has(fileName) ? true : undefined),
+      readFile: (fileName) => virtualConfigs.get(fileName),
+    },
+  });
+  try {
+    const snapshot = await api.updateSnapshot({
+      openProjects: projectFiles.map((file) => file.configFileName),
+    });
+    try {
+      for (const { name, packageRoot, entries } of packageEntries) {
+        const entryPoints: ApiEntryPoint[] = [];
+        for (const entry of entries) {
+          if (entry.kind === "asset") {
+            entryPoints.push({ ...entry, exports: [] });
+            continue;
+          }
+          const configFileName =
+            entry.source === undefined ? undefined : configBySource.get(entry.source);
+          const project =
+            configFileName === undefined ? undefined : snapshot.getProject(configFileName);
+          const analyzed = await analyzeEntry(name, packageRoot, entry, project);
+          entryPoints.push(analyzed.entry);
+          issues.push(...analyzed.issues);
+        }
+        if (entryPoints.length > 0) packages.push({ name, entryPoints });
       }
-      const analyzed = analyzeEntry(packageManifest.name, packageRoot, entry);
-      entryPoints.push(analyzed.entry);
-      issues.push(...analyzed.issues);
+    } finally {
+      await snapshot.dispose();
     }
-    if (entryPoints.length > 0) packages.push({ name: packageManifest.name, entryPoints });
+  } finally {
+    await api.close();
   }
 
   const manifest: PublicApiManifest = { formatVersion: 2, packages };

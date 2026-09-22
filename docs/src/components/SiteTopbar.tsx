@@ -1,13 +1,13 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface SiteTopbarProps {
   /**
-   * Current showcase context: an owner id on a showcase-family route, or
-   * "showcases" on the hub itself. The Showcases link is `page`-current on the
-   * hub and ancestor-current everywhere in the family.
+   * Declares showcase context for routes outside `/showcases/` (the framework
+   * workbenches). Routes inside the family are recognised from the URL, so a
+   * page can never lose its "where am I" marker by passing the wrong id.
    */
   active?: CapabilityOwnerId | "showcases";
 }
@@ -18,6 +18,12 @@ interface SiteTopbarProps {
  * Framework deep links and benchmark navigation live in their dedicated surfaces.
  */
 export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
+  const pathname = useLocation({ select: (location) => location.pathname });
+  // The hub is the destination itself; every other page in the family is one
+  // step below it.
+  const isShowcaseHub = pathname === "/showcases/";
+  const inShowcaseFamily =
+    isShowcaseHub || pathname.startsWith("/showcases/") || active !== undefined;
   return (
     <header className="sw-showcase-nav sw-product-nav">
       <Link aria-label="Sheetwrite home" className="sw-showcase-brand" to="/">
@@ -31,13 +37,7 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
         <Link to="/docs/">Docs</Link>
         <Link
           activeOptions={{ exact: true }}
-          aria-current={
-            active === "showcases"
-              ? "page"
-              : active && active !== "performance"
-                ? "true"
-                : undefined
-          }
+          aria-current={isShowcaseHub ? "page" : inShowcaseFamily ? "true" : undefined}
           to="/showcases/"
         >
           Showcases

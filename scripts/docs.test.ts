@@ -8,6 +8,7 @@ import {
   adapterContractIssues,
   collectCompatibilityDigestIssues,
   contentPathForRoute,
+  documentationLinkRoutes,
   entrySlug,
   expectedGeneratedFiles,
   headingAnchors,
@@ -21,7 +22,7 @@ import {
   unresolvedCssTokens,
   unresolvedDocumentationLinks,
 } from "./docs.js";
-import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
+import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import type { SizeHistory } from "./size-report.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
@@ -624,6 +625,141 @@ describe("adapter documentation contract", () => {
     reason.signature = 'export type GridReadyReason = "initial" | "reset";';
     const issues = adapterContractIssues(manifest);
     expect(issues.some((issue) => issue.startsWith("GridReadyReason documents"))).toBe(true);
+  });
+});
+
+describe("API symbol page reading experience", () => {
+  const apiExport = (
+    name: string,
+    kind: string,
+    signature: string,
+    documentation = `${name} summary.`,
+  ): ApiExport => ({
+    name,
+    kind,
+    signature,
+    owners: ["src/index.ts"],
+    source: "src/index.ts#L1",
+    jsDocTags: [],
+    documentation,
+    memberDocs: [],
+  });
+
+  const entryPoint = (subpath: string, exports: ApiExport[]): ApiEntryPoint => ({
+    subpath,
+    target: "./dist/index.d.ts",
+    source: "src/index.ts",
+    kind: "typescript",
+    classification: "supported",
+    exports,
+  });
+
+  const storageEntry = () =>
+    entryPoint(".", [
+      apiExport(
+        "STORAGE_MODES",
+        "variable",
+        'readonly ["memory", "session"]',
+        "Every storage mode.",
+      ),
+      apiExport("StorageMode", "type", "export type StorageMode = (typeof STORAGE_MODES)[number];"),
+      apiExport(
+        "StorageOptions",
+        "interface",
+        [
+          "interface StorageOptions {",
+          '  mode: "memory" | "session";',
+          "  storage?: StorageMode;",
+          "}",
+        ].join("\n"),
+      ),
+      apiExport(
+        "StoreOwner",
+        "class",
+        [
+          "class StoreOwner {",
+          "  constructor(options?: StorageOptions);",
+          '  getRendererKind(): "canvas" | "worker";',
+          "  getCell(addr: string): string | null;",
+          "  getState(key: string): string | null;",
+          "  setState(key: string, value: string): void;",
+          "  dispose(): void;",
+          "  getVisibleWindow(sheet: string, startRow: number, endRow: number, columns: readonly number[], includeHidden: boolean): string[];",
+          '  describe(): "canvas" | "worker" | "fallback" | "shadow";',
+          "}",
+        ].join("\n"),
+      ),
+    ]);
+
+  it("opens short members, keeps union walls collapsed, and indexes long lists", async () => {
+    const entry = storageEntry();
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
+    const owner = entry.exports.find((item) => item.name === "StoreOwner");
+    if (owner === undefined) throw new Error("fixture shape changed");
+
+    const page = await renderSymbolPage(pkg, entry, owner);
+
+    const expanded = [
+      ...page.matchAll(/<details class="api-member" id="([^"]+)"[^>]*? open>/g),
+    ].map((match) => match[1] ?? "");
+    // The line-long signature and the four-way union keep their weight in the
+    // summary; every member a reader can take in at a glance opens.
+    expect(expanded).toEqual([
+      "store-owner-constructor",
+      "store-owner-get-renderer-kind",
+      "store-owner-get-cell",
+      "store-owner-get-state",
+      "store-owner-set-state",
+      "store-owner-dispose",
+    ]);
+    expect(page).toContain('id="store-owner-describe" data-pagefind-weight="1">');
+    expect(page).toContain('<nav class="api-member-index"');
+    expect(page).toContain('href="#store-owner-get-cell"');
+  });
+
+  it("omits the member index on short lists", async () => {
+    const entry = storageEntry();
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
+    const options = entry.exports.find((item) => item.name === "StorageOptions");
+    if (options === undefined) throw new Error("fixture shape changed");
+
+    const page = await renderSymbolPage(pkg, entry, options);
+
+    expect(page).not.toContain('<nav class="api-member-index"');
+  });
+
+  it("links an expanded union member to the alias that names it", async () => {
+    const entry = storageEntry();
+    const adapter = entryPoint("./adapter", [
+      apiExport(
+        "STORAGE_MODES",
+        "variable",
+        'readonly ["memory", "session"]',
+        "Every storage mode.",
+      ),
+      apiExport("StorageMode", "type", "export type StorageMode = (typeof STORAGE_MODES)[number];"),
+    ]);
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry, adapter] };
+    const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
+    const options = entry.exports.find((item) => item.name === "StorageOptions");
+    if (options === undefined) throw new Error("fixture shape changed");
+
+    const page = await renderSymbolPage(pkg, entry, options, routes);
+
+    const memberRow =
+      /<details class="api-member" id="storage-options-mode"[\s\S]*?<\/details>/.exec(page)?.[0] ??
+      "";
+    const declaration = /<details class="api-declaration"[\s\S]*?<\/details>/.exec(page)?.[0] ?? "";
+    // The checker prints the expansion; the member row names the alias and links its
+    // own entry point, not the adapter's re-export of the same name.
+    expect(memberRow).toContain(
+      '<a href="/docs/api/core/storage-mode/"><code>StorageMode</code></a>',
+    );
+    expect(memberRow).toContain("mode: StorageMode;");
+    expect(memberRow).not.toContain('"memory"');
+    // The full expansion stays available in the collapsed Declaration section.
+    expect(declaration).toContain('mode: "memory" | "session"');
+    expect(page).not.toContain("core-adapter/storage-mode");
   });
 });
 
