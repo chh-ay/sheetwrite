@@ -2336,4 +2336,151 @@ mod tests {
             other => panic!("structured-ref resolution dropped the sign node: {other:?}"),
         }
     }
+
+    #[test]
+    fn heap_memory_stats_accounts_owning_ast_shapes() {
+        let boxed = std::mem::size_of::<Ast>();
+        let cases: Vec<(&str, Ast, usize)> = vec![
+            ("string", Ast::Str("abc".to_string()), 3),
+            ("name", Ast::Name("Total".to_string()), 5),
+            (
+                "named range",
+                Ast::NamedRange(NamedRangeRef {
+                    name: "Band".to_string(),
+                    scope: None,
+                    sheet: 1,
+                    row_start: 0,
+                    col_start: 0,
+                    row_end: 4,
+                    col_end: 0,
+                }),
+                4,
+            ),
+            (
+                "unqualified structured ref",
+                Ast::UnresolvedStructured(UnresolvedStructuredRef {
+                    table_name: None,
+                    column_name: "Amount".to_string(),
+                    section: TableSection::Body,
+                }),
+                6,
+            ),
+            (
+                "qualified structured ref",
+                Ast::UnresolvedStructured(UnresolvedStructuredRef {
+                    table_name: Some("Table1".to_string()),
+                    column_name: "Amount".to_string(),
+                    section: TableSection::Body,
+                }),
+                12,
+            ),
+            (
+                "resolved structured ref",
+                Ast::Structured(Box::new(StructuredRef {
+                    table_id: "t1".to_string(),
+                    table_name: "Table1".to_string(),
+                    column_id: "c1".to_string(),
+                    column_name: "Amount".to_string(),
+                    sheet: 1,
+                    row_start: 0,
+                    row_end: 3,
+                    col: 0,
+                    section: TableSection::Body,
+                    qualified: true,
+                })),
+                std::mem::size_of::<StructuredRef>() + 16,
+            ),
+            (
+                "sheet cell",
+                Ast::SheetCell(
+                    UnresolvedSheetRef {
+                        name: "Data".to_string(),
+                        quoted: false,
+                    },
+                    0,
+                    0,
+                    RefFlags::default(),
+                ),
+                4,
+            ),
+            (
+                "sheet range",
+                Ast::SheetRange(
+                    UnresolvedSheetRef {
+                        name: "Data".to_string(),
+                        quoted: false,
+                    },
+                    0,
+                    0,
+                    1,
+                    1,
+                    RangeFlags::default(),
+                ),
+                4,
+            ),
+            (
+                "absolute cell",
+                Ast::AbsCell(
+                    SheetRef {
+                        handle: 1,
+                        name: "Wide".to_string(),
+                        quoted: false,
+                    },
+                    0,
+                    0,
+                    RefFlags::default(),
+                ),
+                4,
+            ),
+            (
+                "absolute range",
+                Ast::AbsRange(
+                    SheetRef {
+                        handle: 1,
+                        name: "Wide".to_string(),
+                        quoted: false,
+                    },
+                    0,
+                    0,
+                    1,
+                    1,
+                    RangeFlags::default(),
+                ),
+                4,
+            ),
+            (
+                "function arguments",
+                Ast::Func(Func::Rept, vec![Ast::Num(1.0)]),
+                boxed,
+            ),
+            (
+                "unknown function",
+                Ast::UnknownFunc("Foo".to_string(), vec![Ast::Num(1.0), Ast::Num(2.0)]),
+                3 + boxed * 2,
+            ),
+            (
+                "binary",
+                Ast::Bin(Op::Add, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
+                boxed * 2,
+            ),
+            (
+                "comparison",
+                Ast::Cmp(CmpOp::Eq, Box::new(Ast::Num(1.0)), Box::new(Ast::Num(2.0))),
+                boxed * 2,
+            ),
+            ("negation", Ast::Neg(Box::new(Ast::Num(1.0))), boxed),
+            ("unary plus", Ast::Pos(Box::new(Ast::Num(1.0))), boxed),
+            ("percent", Ast::Percent(Box::new(Ast::Num(1.0))), boxed),
+            ("inline leaf", Ast::Cell(2, 3, RefFlags::default()), 0),
+            ("invalid reference", Ast::InvalidRef, 0),
+        ];
+        for (label, ast, expected_logical) in cases {
+            let mut stats = MemoryOwnerStats::default();
+            ast.heap_memory_stats(&mut stats);
+            assert_eq!(stats.logical_bytes, expected_logical, "{label}");
+            assert!(stats.allocated_bytes >= stats.logical_bytes, "{label}");
+        }
+        assert_eq!(parse_col(""), None);
+        assert_eq!(parse_col("A1"), None);
+    }
 }
