@@ -6,9 +6,9 @@
     "version": "2.0.0"
   },
   "meta": {
-    "commit": "463f0005ab328ad52efeaa8747df93f2f67277e0",
-    "dirty": true,
-    "timestamp": "2026-09-18T08:30:01.605Z"
+    "commit": "6c097dd9dbdcc198aff1e5bf593292cc3eeaa5e5",
+    "dirty": false,
+    "timestamp": "2026-09-22T07:49:39.929Z"
   },
   "toolchain": {
     "bun": "1.4.2",
@@ -3129,7 +3129,7 @@
       ],
       "assets": [
         {
-          "path": "test/bundler-fixtures/next/.next/static/_KRQx1nbEvDXfyetkAovl/_buildManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/3a0LvUlBmL45dVOr_eeMD/_buildManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
@@ -3139,7 +3139,7 @@
           "sha256": "9de87d6d2d392f8791be55e547eb3eb7764d034dcc178ed624a3c5a339f35807"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/_KRQx1nbEvDXfyetkAovl/_ssgManifest.js",
+          "path": "test/bundler-fixtures/next/.next/static/3a0LvUlBmL45dVOr_eeMD/_ssgManifest.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
