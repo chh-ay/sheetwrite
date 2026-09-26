@@ -8,18 +8,15 @@ description: "Local operation and protected-range context supplied to the host p
 Local operation and protected-range context supplied to the host policy.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L228</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L228"><code>packages/core/src/types/document.ts#L228</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="protection-request-protected-range" data-pagefind-weight="1" open>
+<details class="api-member" id="protection-request-protected-range" data-pagefind-weight="1">
 <summary><code>protectedRange</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="protectedRange: Readonly&lt;ProtectedRange&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 protectedRange: Readonly<ProtectedRange>;
@@ -27,10 +24,8 @@ protectedRange: Readonly<ProtectedRange>;
 
 </details>
 
-<details class="api-member" id="protection-request-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="protection-request-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="operation: Readonly&lt;DocumentOp&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 operation: Readonly<DocumentOp>;
@@ -38,10 +33,8 @@ operation: Readonly<DocumentOp>;
 
 </details>
 
-<details class="api-member" id="protection-request-commit-reason" data-pagefind-weight="1" open>
+<details class="api-member" id="protection-request-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="commitReason: CommitReason;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 commitReason: CommitReason;
@@ -54,8 +47,6 @@ commitReason: CommitReason;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface ProtectionRequest {&#10;  protectedRange: Readonly&lt;ProtectedRange&gt;;&#10;  operation: Readonly&lt;DocumentOp&gt;;&#10;  commitReason: CommitReason;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface ProtectionRequest {
@@ -87,46 +78,3 @@ export interface ProtectionRequest {
 <li><a href="/docs/api/core/protection-resolver/"><code>ProtectionResolver</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

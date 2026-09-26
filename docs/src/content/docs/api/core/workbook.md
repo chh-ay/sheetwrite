@@ -8,18 +8,15 @@ description: "Live workbook schema containing ordered sheets and the active shee
 Live workbook schema containing ordered sheets and the active sheet ID.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L109</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L109"><code>packages/core/src/types/document.ts#L109</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="workbook-sheets" data-pagefind-weight="1" open>
+<details class="api-member" id="workbook-sheets" data-pagefind-weight="1">
 <summary><code>sheets</code> <span class="api-member-summary">Sheets in display/tab order.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="sheets: Sheet[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 sheets: Sheet[];
@@ -27,10 +24,8 @@ sheets: Sheet[];
 
 </details>
 
-<details class="api-member" id="workbook-active-sheet" data-pagefind-weight="1" open>
+<details class="api-member" id="workbook-active-sheet" data-pagefind-weight="1">
 <summary><code>activeSheet</code> <span class="api-member-summary">Active sheet ID and initial tab presented when the grid is created.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="activeSheet: SheetId;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 activeSheet: SheetId;
@@ -38,10 +33,8 @@ activeSheet: SheetId;
 
 </details>
 
-<details class="api-member" id="workbook-named-ranges" data-pagefind-weight="1" open>
+<details class="api-member" id="workbook-named-ranges" data-pagefind-weight="1">
 <summary><code>namedRanges</code> <span class="api-member-summary">Formula names shared by the workbook or shadowed within a sheet scope.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="namedRanges?: NamedRangeSnapshot[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 namedRanges?: NamedRangeSnapshot[];
@@ -54,8 +47,6 @@ namedRanges?: NamedRangeSnapshot[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface Workbook {&#10;  sheets: Sheet[];&#10;  activeSheet: SheetId;&#10;  namedRanges?: NamedRangeSnapshot[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface Workbook {
@@ -97,46 +88,3 @@ export interface Workbook {
 <li><a href="/docs/api/xlsx/build-xlsx-model/"><code>buildXlsxModel</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,18 +8,15 @@ description: "Workbook-global or sheet-scoped named range used by formulas and p
 Workbook-global or sheet-scoped named range used by formulas and persistence.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L126</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L126"><code>packages/core/src/types/document.ts#L126</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="named-range-snapshot-name" data-pagefind-weight="1" open>
+<details class="api-member" id="named-range-snapshot-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="name: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: string;
@@ -27,10 +24,8 @@ name: string;
 
 </details>
 
-<details class="api-member" id="named-range-snapshot-scope" data-pagefind-weight="1" open>
+<details class="api-member" id="named-range-snapshot-scope" data-pagefind-weight="1">
 <summary><code>scope</code> <span class="api-member-summary">Formula-context sheet whose local definition shadows the workbook definition.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="scope?: SheetId;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 scope?: SheetId;
@@ -38,10 +33,8 @@ scope?: SheetId;
 
 </details>
 
-<details class="api-member" id="named-range-snapshot-range" data-pagefind-weight="1" open>
+<details class="api-member" id="named-range-snapshot-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="range: Range;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 range: Range;
@@ -54,8 +47,6 @@ range: Range;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface NamedRangeSnapshot {&#10;  name: string;&#10;  scope?: SheetId;&#10;  range: Range;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface NamedRangeSnapshot {
@@ -89,46 +80,3 @@ export interface NamedRangeSnapshot {
 <li><a href="/docs/api/core/workbook-snapshot/"><code>WorkbookSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

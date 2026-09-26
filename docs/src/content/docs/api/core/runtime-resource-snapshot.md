@@ -8,8 +8,7 @@ description: "Complete retained-resource and boundary snapshot for one operation
 Complete retained-resource and boundary snapshot for one operation phase.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L99</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L99"><code>packages/core/src/resource-accounting.ts#L99</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -27,10 +26,8 @@ Complete retained-resource and boundary snapshot for one operation phase.
 
 <div class="api-member-list">
 
-<details class="api-member" id="runtime-resource-snapshot-schema-version" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-schema-version" data-pagefind-weight="1">
 <summary><code>schemaVersion</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
@@ -38,10 +35,8 @@ readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operation: RuntimeResourceOperation;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operation: RuntimeResourceOperation;
@@ -49,10 +44,8 @@ readonly operation: RuntimeResourceOperation;
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-phase" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-phase" data-pagefind-weight="1">
 <summary><code>phase</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly phase: RuntimeResourcePhase;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly phase: RuntimeResourcePhase;
@@ -60,10 +53,8 @@ readonly phase: RuntimeResourcePhase;
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-wasm" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-wasm" data-pagefind-weight="1">
 <summary><code>wasm</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly wasm: StoreMemoryBreakdown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly wasm: StoreMemoryBreakdown;
@@ -71,10 +62,8 @@ readonly wasm: StoreMemoryBreakdown;
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-js-owners" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-js-owners" data-pagefind-weight="1">
 <summary><code>jsOwners</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly jsOwners: readonly ResourceOwnerBytes[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly jsOwners: readonly ResourceOwnerBytes[];
@@ -82,10 +71,8 @@ readonly jsOwners: readonly ResourceOwnerBytes[];
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-boundary" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-boundary" data-pagefind-weight="1">
 <summary><code>boundary</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly boundary: readonly BoundaryOperationStats[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly boundary: readonly BoundaryOperationStats[];
@@ -93,10 +80,8 @@ readonly boundary: readonly BoundaryOperationStats[];
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-runtime" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-runtime" data-pagefind-weight="1">
 <summary><code>runtime</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly runtime: RuntimeMemoryObservation;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly runtime: RuntimeMemoryObservation;
@@ -104,10 +89,8 @@ readonly runtime: RuntimeMemoryObservation;
 
 </details>
 
-<details class="api-member" id="runtime-resource-snapshot-totals" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-snapshot-totals" data-pagefind-weight="1">
 <summary><code>totals</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly totals: { readonly logicalLiveBytes: number; readonly allocatedCapacityBytes: number; };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly totals: { readonly logicalLiveBytes: number; readonly allocatedCapacityBytes: number; };
@@ -120,8 +103,6 @@ readonly totals: { readonly logicalLiveBytes: number; readonly allocatedCapacity
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RuntimeResourceSnapshot {&#10;  readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;&#10;  readonly operation: RuntimeResourceOperation;&#10;  readonly phase: RuntimeResourcePhase;&#10;  readonly wasm: StoreMemoryBreakdown;&#10;  readonly jsOwners: readonly ResourceOwnerBytes[];&#10;  readonly boundary: readonly BoundaryOperationStats[];&#10;  readonly runtime: RuntimeMemoryObservation;&#10;  readonly totals: {&#10;    readonly logicalLiveBytes: number;&#10;    readonly allocatedCapacityBytes: number;&#10;  };&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RuntimeResourceSnapshot {
@@ -168,46 +149,3 @@ export interface RuntimeResourceSnapshot {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,16 +8,13 @@ description: "Datasource cell value with optional cell-specific styling."
 Datasource cell value with optional cell-specific styling.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L11</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L11"><code>packages/core/src/types/data.ts#L11</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="CellScalar" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 CellScalar
@@ -26,16 +23,12 @@ CellScalar
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="CellValue" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 CellValue
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{ value: CellValue; style?: CellStyle }" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 { value: CellValue; style?: CellStyle }
@@ -48,8 +41,6 @@ CellValue
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type DataCell =&#10;  | CellScalar&#10;  | CellValue&#10;  | {&#10;      value: CellValue;&#10;      style?: CellStyle;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type DataCell =
@@ -83,46 +74,3 @@ export type DataCell =
 <li><a href="/docs/api/core/row-data/"><code>RowData</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

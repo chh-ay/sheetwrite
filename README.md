@@ -223,5 +223,7 @@ bun run size:report
 
 The documentation site is available at [sheetwrite.vercel.app](https://sheetwrite.vercel.app/). See the [changelog](CHANGELOG.md), [support](SUPPORT.md), [security](SECURITY.md), and [contributing](CONTRIBUTING.md) policies in this repository.
 
+For AI-assisted development, point your agent at [`/llms.txt`](https://sheetwrite.vercel.app/llms.txt). It links the task-oriented documentation index and [`/llms-full.txt`](https://sheetwrite.vercel.app/llms-full.txt), containing every authored guide and all generated API declarations.
+
 Docs deployment uses the tested CI output. See [deployment setup](CONTRIBUTING.md#documentation-deployment)
 for the required GitHub secrets and the production branch.

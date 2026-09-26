@@ -8,18 +8,15 @@ description: "Case, whole-cell, sheet, and column constraints for grid search."
 Case, whole-cell, sheet, and column constraints for grid search.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L388</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L388"><code>packages/core/src/types/grid.ts#L388</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="search-options-match-case" data-pagefind-weight="1" open>
+<details class="api-member" id="search-options-match-case" data-pagefind-weight="1">
 <summary><code>matchCase</code> <span class="api-member-summary">Case-sensitive match (default false).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="matchCase?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 matchCase?: boolean;
@@ -27,10 +24,8 @@ matchCase?: boolean;
 
 </details>
 
-<details class="api-member" id="search-options-whole-cell" data-pagefind-weight="1" open>
+<details class="api-member" id="search-options-whole-cell" data-pagefind-weight="1">
 <summary><code>wholeCell</code> <span class="api-member-summary">Match only when the whole cell text equals the query (default false: substring).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="wholeCell?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 wholeCell?: boolean;
@@ -38,10 +33,8 @@ wholeCell?: boolean;
 
 </details>
 
-<details class="api-member" id="search-options-sheet" data-pagefind-weight="1" open>
+<details class="api-member" id="search-options-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code> <span class="api-member-summary">Restrict to a sheet (defaults to the active sheet).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="sheet?: SheetId;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 sheet?: SheetId;
@@ -49,10 +42,8 @@ sheet?: SheetId;
 
 </details>
 
-<details class="api-member" id="search-options-columns" data-pagefind-weight="1" open>
+<details class="api-member" id="search-options-columns" data-pagefind-weight="1">
 <summary><code>columns</code> <span class="api-member-summary">Restrict to these column indices (defaults to all columns).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="columns?: number[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 columns?: number[];
@@ -65,8 +56,6 @@ columns?: number[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface SearchOptions {&#10;  matchCase?: boolean;&#10;  wholeCell?: boolean;&#10;  sheet?: SheetId;&#10;  columns?: number[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface SearchOptions {
@@ -102,46 +91,3 @@ export interface SearchOptions {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

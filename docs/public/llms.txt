@@ -1,0 +1,77 @@
+# Sheetwrite
+
+> Sheetwrite is a framework-agnostic, high-performance spreadsheet grid: a canvas grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.
+
+Sheetwrite packages are released together at version 0.4.0. This index is generated from the repository documentation and the compiler-verified public API manifest.
+
+## Full text
+
+- [llms-full.txt](https://sheetwrite.vercel.app/llms-full.txt): every authored guide plus every public API declaration in one plain-text file. Fetch this when you need to answer a question or write code.
+
+## Agent workflow
+
+1. Choose one base package for your framework: `@sheetwrite/core` for vanilla, or `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte`. Adapters bring core and the WebAssembly engine transitively and expose a package-local `styles.css`. Add optional feature packages, such as `@sheetwrite/xlsx`, only when the relevant guide requires them.
+2. Initialize the runtime before mounting a grid. The imperative core awaits `initSheetwrite()` once per document; framework components initialize WebAssembly automatically after client mount, so server-rendered hosts need a client-only boundary.
+3. The host owns the document. Sheetwrite never mutates host rows, so read Runtime ownership and Adapter lifecycle before choosing `defaultRows` seeding or explicit `workbook` plus `data`/`datasource` ownership.
+4. Readiness is generation-scoped: adapters publish `{ grid, generation, reason }` with reason `initial`, `input-reset`, or `renderer-reset`, and replacing reset-bound inputs replaces the grid. Destroy the grid when its host element's lifetime ends.
+5. Verify every symbol, option, event, and error code against the public API declarations in `llms-full.txt` or the generated API pages before using it. Anything absent from those declarations is not public API.
+6. Recover through typed errors with stable codes (Error handling), and read Compatibility and limits before claiming Excel, Google Sheets, LibreOffice, or OpenFormula parity.
+
+## Start
+
+- [Installation](https://sheetwrite.vercel.app/docs/start/installation/): Install Sheetwrite for Vanilla, React, Vue, or Svelte and initialize its WebAssembly runtime.
+- [Your first grid](https://sheetwrite.vercel.app/docs/start/first-grid/): Initialize Sheetwrite, create a workbook, and observe committed changes.
+
+## Ownership and lifecycle
+
+- [Runtime ownership](https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/): Understand Sheetwrite runtime, renderer, store, virtualization, and document ownership boundaries.
+- [Adapter lifecycle](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/): Initialization, readiness, resets, and transaction ownership across every Sheetwrite framework adapter.
+
+## Framework adapters
+
+- [Vanilla JavaScript](https://sheetwrite.vercel.app/docs/frameworks/vanilla/): Own Sheetwrite initialization and Grid lifetime without a framework adapter.
+- [React](https://sheetwrite.vercel.app/docs/frameworks/react/): Integrate Sheetwrite with React ownership, readiness, and controlled resets.
+- [Vue](https://sheetwrite.vercel.app/docs/frameworks/vue/): Integrate Sheetwrite with Vue events, exposed Grid state, and resets.
+- [Svelte](https://sheetwrite.vercel.app/docs/frameworks/svelte/): Integrate Sheetwrite with Svelte bindings, callbacks, and reset ownership.
+
+## Guides
+
+- [Configuration](https://sheetwrite.vercel.app/docs/guides/configuration/): Configure data ownership, rendering, interaction, theming, protection, and toolbar behavior.
+- [Interaction and editing](https://sheetwrite.vercel.app/docs/guides/interaction/): Configure selection, editing, clipboard, validation, protection, search, merge, and fill behavior.
+- [Data operations and export](https://sheetwrite.vercel.app/docs/guides/data-operations/): Sort, filter, aggregate, load paged data, and export CSV, TSV, tables, or workbooks.
+- [Formulas](https://sheetwrite.vercel.app/docs/guides/formulas/): Use Sheetwrite formula syntax, references, functions, errors, and compatibility limits.
+- [Styling and theming](https://sheetwrite.vercel.app/docs/guides/styling/): Customize Sheetwrite with package CSS, theme tokens, cell styles, borders, and number formats.
+- [Persistence and recovery](https://sheetwrite.vercel.app/docs/guides/persistence/): Persist versioned snapshots and durable pending mutations without confusing session state with document state.
+- [Collaboration and offline work](https://sheetwrite.vercel.app/docs/guides/collaboration/): Sequence, persist, acknowledge, retry, and conservatively rebase Sheetwrite document operations.
+- [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/): Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
+- [XLSX and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/): Register the optional XLSX backend and choose table or workbook interchange deliberately.
+- [Accessibility](https://sheetwrite.vercel.app/docs/guides/accessibility/): Understand the ARIA grid mirror, keyboard behavior, focus, and visible-window accessibility limits.
+- [Keep app rows in your store](https://sheetwrite.vercel.app/docs/guides/host-owned-rows/): Use the row bridge when your app owns the row objects and Sheetwrite owns editing, history, sorting, and filtering. The bridge is optional. Without `getRowId`, `defaultRows` keeps its existing one-ti…
+
+## Contracts and reference
+
+- [Public API contract](https://sheetwrite.vercel.app/docs/reference/api-contract/): How Sheetwrite defines supported entry points, declaration stability, and generated reference pages.
+- [Document operations](https://sheetwrite.vercel.app/docs/reference/document-operations/): Transaction boundaries, local and remote application, snapshot validation, and conservative rebase.
+- [Error handling](https://sheetwrite.vercel.app/docs/reference/events-errors/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
+- [Compatibility and limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/): Explicit compatibility boundaries, resource ceilings, tuning defaults, limit behavior, and override paths.
+
+## Public API
+
+- [API reference](https://sheetwrite.vercel.app/docs/api/): Generated reference for every classified Sheetwrite package entry point.
+- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 312 exports across 8 entry points (primary entry point: supported).
+- [`@sheetwrite/react`](https://sheetwrite.vercel.app/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
+- [`@sheetwrite/svelte`](https://sheetwrite.vercel.app/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
+- [`@sheetwrite/vue`](https://sheetwrite.vercel.app/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).
+- [`@sheetwrite/wasm`](https://sheetwrite.vercel.app/docs/api/wasm/): 12 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/xlsx`](https://sheetwrite.vercel.app/docs/api/xlsx/): 7 exports across 2 entry points (primary entry point: supported).
+- [Public API declarations](https://sheetwrite.vercel.app/llms-full.txt): every export signature grouped by package and entry point. Do not invent symbols absent from it.
+
+## Generated reference pages (HTML)
+
+These pages are generated from checked inventories and evidence. Their tables are published as HTML, not reproduced as plain text, so fetch these links directly.
+
+- [Performance and delivery evidence](https://sheetwrite.vercel.app/docs/guides/performance-resources/): Freshness-gated benchmark and package-size evidence for Sheetwrite.
+- [Detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/): Checked formula, workbook, clipboard, and XLSX examples with exact sources and limits.
+- [Formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/): Generated, source-linked formula names, signatures, semantics, dialect status, and unsupported boundaries.
+- [Moved guides](https://sheetwrite.vercel.app/docs/reference/moved-guides/): Where each former repository guide now lives in the documentation site.
+- [Package entry-point inventory](https://sheetwrite.vercel.app/docs/reference/package-entry-points/): Compiler-backed classification of every publishable Sheetwrite package export.

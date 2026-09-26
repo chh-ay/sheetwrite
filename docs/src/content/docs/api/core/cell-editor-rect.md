@@ -8,18 +8,15 @@ description: "Viewport-relative geometry of the cell currently owned by an edito
 Viewport-relative geometry of the cell currently owned by an editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L66</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L66"><code>packages/core/src/types/grid.ts#L66</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="cell-editor-rect-x" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-rect-x" data-pagefind-weight="1">
 <summary><code>x</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly x: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly x: number;
@@ -27,10 +24,8 @@ readonly x: number;
 
 </details>
 
-<details class="api-member" id="cell-editor-rect-y" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-rect-y" data-pagefind-weight="1">
 <summary><code>y</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly y: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly y: number;
@@ -38,10 +33,8 @@ readonly y: number;
 
 </details>
 
-<details class="api-member" id="cell-editor-rect-width" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-rect-width" data-pagefind-weight="1">
 <summary><code>width</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly width: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly width: number;
@@ -49,10 +42,8 @@ readonly width: number;
 
 </details>
 
-<details class="api-member" id="cell-editor-rect-height" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-rect-height" data-pagefind-weight="1">
 <summary><code>height</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly height: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly height: number;
@@ -65,8 +56,6 @@ readonly height: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface CellEditorRect {&#10;  readonly x: number;&#10;  readonly y: number;&#10;  readonly width: number;&#10;  readonly height: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface CellEditorRect {
@@ -102,46 +91,3 @@ export interface CellEditorRect {
 <li><a href="/docs/api/vue/cell-editor-instance/"><code>CellEditorInstance</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

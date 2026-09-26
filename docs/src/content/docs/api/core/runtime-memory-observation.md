@@ -8,18 +8,15 @@ description: "Available runtime-level memory observations, kept separate from re
 Available runtime-level memory observations, kept separate from retained owner totals.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L83</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L83"><code>packages/core/src/resource-accounting.ts#L83</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="runtime-memory-observation-used-jsheap-size" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-memory-observation-used-jsheap-size" data-pagefind-weight="1">
 <summary><code>usedJSHeapSize</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly usedJSHeapSize: number | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly usedJSHeapSize: number | null;
@@ -27,10 +24,8 @@ readonly usedJSHeapSize: number | null;
 
 </details>
 
-<details class="api-member" id="runtime-memory-observation-array-buffer-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-memory-observation-array-buffer-bytes" data-pagefind-weight="1">
 <summary><code>arrayBufferBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly arrayBufferBytes: number | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly arrayBufferBytes: number | null;
@@ -38,10 +33,8 @@ readonly arrayBufferBytes: number | null;
 
 </details>
 
-<details class="api-member" id="runtime-memory-observation-external-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-memory-observation-external-bytes" data-pagefind-weight="1">
 <summary><code>externalBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly externalBytes: number | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly externalBytes: number | null;
@@ -49,10 +42,8 @@ readonly externalBytes: number | null;
 
 </details>
 
-<details class="api-member" id="runtime-memory-observation-browser-backing-store-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-memory-observation-browser-backing-store-bytes" data-pagefind-weight="1">
 <summary><code>browserBackingStoreBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly browserBackingStoreBytes: number | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly browserBackingStoreBytes: number | null;
@@ -65,8 +56,6 @@ readonly browserBackingStoreBytes: number | null;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RuntimeMemoryObservation {&#10;  readonly usedJSHeapSize: number | null;&#10;  readonly arrayBufferBytes: number | null;&#10;  readonly externalBytes: number | null;&#10;  readonly browserBackingStoreBytes: number | null;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RuntimeMemoryObservation {
@@ -106,46 +95,3 @@ export interface RuntimeMemoryObservation {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

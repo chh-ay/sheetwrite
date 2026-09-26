@@ -8,18 +8,15 @@ description: "One stable, range-scoped data-entry rule."
 One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L176</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L176"><code>packages/core/src/types/document.ts#L176</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="data-validation-rule-id" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="id: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 id: string;
@@ -27,10 +24,8 @@ id: string;
 
 </details>
 
-<details class="api-member" id="data-validation-rule-range" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="range: Range;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 range: Range;
@@ -38,10 +33,8 @@ range: Range;
 
 </details>
 
-<details class="api-member" id="data-validation-rule-condition" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-condition" data-pagefind-weight="1">
 <summary><code>condition</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="condition: DataValidationCondition;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 condition: DataValidationCondition;
@@ -49,10 +42,8 @@ condition: DataValidationCondition;
 
 </details>
 
-<details class="api-member" id="data-validation-rule-policy" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-policy" data-pagefind-weight="1">
 <summary><code>policy</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="policy: ValidationPolicy;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 policy: ValidationPolicy;
@@ -60,10 +51,8 @@ policy: ValidationPolicy;
 
 </details>
 
-<details class="api-member" id="data-validation-rule-allow-blank" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-allow-blank" data-pagefind-weight="1">
 <summary><code>allowBlank</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="allowBlank?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 allowBlank?: boolean;
@@ -71,10 +60,8 @@ allowBlank?: boolean;
 
 </details>
 
-<details class="api-member" id="data-validation-rule-help-text" data-pagefind-weight="1" open>
+<details class="api-member" id="data-validation-rule-help-text" data-pagefind-weight="1">
 <summary><code>helpText</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="helpText?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 helpText?: string;
@@ -87,8 +74,6 @@ helpText?: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface DataValidationRule {&#10;  id: string;&#10;  range: Range;&#10;  condition: DataValidationCondition;&#10;  policy: ValidationPolicy;&#10;  allowBlank?: boolean;&#10;  helpText?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface DataValidationRule {
@@ -129,46 +114,3 @@ export interface DataValidationRule {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,18 +8,15 @@ description: "Remote document operations paired with a contiguous server version
 Remote document operations paired with a contiguous server version.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L97</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L97"><code>packages/core/src/types/transaction.ts#L97</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="versioned-operation-version" data-pagefind-weight="1" open>
+<details class="api-member" id="versioned-operation-version" data-pagefind-weight="1">
 <summary><code>version</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="version: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 version: number;
@@ -27,10 +24,8 @@ version: number;
 
 </details>
 
-<details class="api-member" id="versioned-operation-operations" data-pagefind-weight="1" open>
+<details class="api-member" id="versioned-operation-operations" data-pagefind-weight="1">
 <summary><code>operations</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operations: readonly DocumentOp[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operations: readonly DocumentOp[];
@@ -38,10 +33,8 @@ readonly operations: readonly DocumentOp[];
 
 </details>
 
-<details class="api-member" id="versioned-operation-client-mutation-id" data-pagefind-weight="1" open>
+<details class="api-member" id="versioned-operation-client-mutation-id" data-pagefind-weight="1">
 <summary><code>clientMutationId</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="clientMutationId?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 clientMutationId?: string;
@@ -54,8 +47,6 @@ clientMutationId?: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface VersionedOperation {&#10;  version: number;&#10;  readonly operations: readonly DocumentOp[];&#10;  clientMutationId?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface VersionedOperation {
@@ -91,46 +82,3 @@ export interface VersionedOperation {
 <li><a href="/docs/api/core/sync-coordinator-options/"><code>SyncCoordinatorOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

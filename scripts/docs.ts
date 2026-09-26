@@ -47,6 +47,7 @@ import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
 import { runOffline } from "./conformance/offline.js";
+import { expectedLlmsFiles } from "./docs-llms.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
   type ApiEntryPoint,
@@ -563,74 +564,10 @@ function anchor(value: string): string {
 const DECLARATION_KEYWORD =
   /^(?:declare|export|abstract|interface|type|class|enum|function|const|let|var|namespace)\b/;
 
-/** Members at or under this width open by default; longer signatures stay collapsed. */
-const SHORT_MEMBER_SIGNATURE_LIMIT = 100;
-/** Top-level union variants at which a member reads as a union wall, not a signature. */
-const HEAVY_UNION_VARIANTS = 4;
 /** Member lists longer than this get an anchor index at the top of the page. */
 const MEMBER_INDEX_MINIMUM = 6;
 /** References listed per group before the remainder is summarized. */
 const REFERENCE_DISPLAY_LIMIT = 12;
-
-/**
- * A quiet copy control for one signature block. `API_COPY_SCRIPT` wires every
- * `.api-copy` on the page, so the button carries its own text and no ids.
- */
-function copyButton(code: string): string {
-  // Newlines survive as character references: attributes stay on one line and
-  // the browser (or MDX) decodes them back into the copied text.
-  return `<button class="api-copy" type="button" data-copy-code="${html(code).replaceAll("\n", "&#10;")}" data-pagefind-ignore>Copy</button>`;
-}
-
-/**
- * Copy wiring for the generated pages, inlined so it needs neither the app bundle
- * nor a hydrated component. The listener is delegated on `document`: one script
- * serves every signature block, and it keeps working after client-side navigation.
- */
-const API_COPY_SCRIPT = [
-  "<script>",
-  "(() => {",
-  "  if (window.__sheetwriteApiCopy !== undefined) return;",
-  "  window.__sheetwriteApiCopy = true;",
-  "  const selectCopy = (text) => {",
-  '    const area = document.createElement("textarea");',
-  "    area.value = text;",
-  '    area.setAttribute("readonly", "");',
-  '    area.style.position = "fixed";',
-  '    area.style.opacity = "0";',
-  "    document.body.append(area);",
-  "    area.select();",
-  "    let copied = false;",
-  "    try {",
-  '      copied = document.execCommand("copy");',
-  "    } catch {",
-  "      copied = false;",
-  "    }",
-  "    area.remove();",
-  "    return copied;",
-  "  };",
-  "  const copy = (button) => {",
-  '    const text = button.dataset.copyCode ?? "";',
-  "    const confirm = () => {",
-  '      button.textContent = "Copied";',
-  '      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);',
-  "    };",
-  "    if (navigator.clipboard === undefined) {",
-  "      if (selectCopy(text)) confirm();",
-  "      return;",
-  "    }",
-  "    navigator.clipboard.writeText(text).then(confirm, () => {",
-  "      if (selectCopy(text)) confirm();",
-  "    });",
-  "  };",
-  '  document.addEventListener("click", (event) => {',
-  "    const target = event.target;",
-  '    const button = target instanceof Element ? target.closest(".api-copy") : null;',
-  "    if (button !== null) copy(button);",
-  "  });",
-  "})();",
-  "</script>",
-].join("\n");
 
 /** Bare call-signature or type strings from the checker are not statements; wrap them so the TS parser and printer cannot mangle them. */
 function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">): string {
@@ -1038,8 +975,6 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
     return [
       '<div class="api-declaration-open" data-pagefind-ignore>',
       "",
-      copyButton(formatted),
-      "",
       "```ts generated",
       formatted,
       "```",
@@ -1051,8 +986,6 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
     '<details class="api-declaration" data-pagefind-ignore>',
     "<summary>View full TypeScript declaration</summary>",
     "",
-    copyButton(formatted),
-    "",
     "```ts generated",
     formatted,
     "```",
@@ -1062,9 +995,8 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
 }
 
 /**
- * Member rows plus the anchor index that leads into them. Aliased unions print as the
- * alias name, short members open by default, and every signature block carries a copy
- * button; the index is emitted only when the list is long enough to need one.
+ * Member rows plus an anchor index for long lists. Members start collapsed;
+ * explicit fragment navigation reveals its target through the docs shell.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -1117,17 +1049,10 @@ function renderMembers(
       alias === undefined
         ? ""
         : ` <span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`;
-    // Long signatures and union walls keep their weight in the summary; everything
-    // shorter opens, so a page reads top to bottom without a click per row.
-    const isShortMember =
-      member.signature.length <= SHORT_MEMBER_SIGNATURE_LIMIT &&
-      splitTopLevel(parts?.type ?? member.signature, "|").length < HEAVY_UNION_VARIANTS;
     return [
       searchAnchor,
-      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}"${isShortMember ? " open" : ""}>`,
+      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
       `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
-      "",
-      copyButton(signature),
       "",
       // A fenced block so member signatures get real syntax highlighting.
       "```ts generated",
@@ -1190,8 +1115,7 @@ export async function renderSymbolPage(
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    `<div><dt>Package</dt><dd><code>${html(label)}</code></dd></div>`,
-    `<div><dt>Source</dt><dd><code>${html(source)}</code></dd></div>`,
+    `<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/${html(source)}"><code>${html(source)}</code></a></dd></div>`,
     "</dl>",
     "",
   ];
@@ -1214,17 +1138,7 @@ export async function renderSymbolPage(
     );
     for (const variant of structuredVariants) {
       const formatted = await formatTypeExpression(variant);
-      body.push(
-        '<div class="api-variant">',
-        "",
-        copyButton(formatted),
-        "",
-        "```ts generated",
-        formatted,
-        "```",
-        "",
-        "</div>",
-      );
+      body.push('<div class="api-variant">', "", "```ts generated", formatted, "```", "", "</div>");
     }
     body.push("</div>", "");
   }
@@ -1241,7 +1155,6 @@ export async function renderSymbolPage(
     ),
     "",
     renderReferencedBy(pkg, item, consumers),
-    API_COPY_SCRIPT,
   );
   return `${body.join("\n").trimEnd()}\n`;
 }
@@ -2660,7 +2573,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       .update(JSON.stringify(formulaInventory))
       .digest("hex"),
   };
-  return [
+  const files: ExpectedFile[] = [
     ...apiFiles,
     {
       path: join(contentRoot, "reference/package-entry-points.md"),
@@ -2709,7 +2622,9 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
         })),
       ),
     },
-  ].sort((left, right) => left.path.localeCompare(right.path));
+  ];
+  files.push(...(await expectedLlmsFiles(manifest, repositoryRoot, files)));
+  return files.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 async function writeIfChanged(path: string, content: string): Promise<void> {

@@ -9,16 +9,13 @@ Native comparison semantics for numeric, date-serial, and text-length validation
 Interval operands are inclusive; `notBetween` accepts values outside that interval.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L139</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L139"><code>packages/core/src/types/document.ts#L139</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  operator: &quot;between&quot; | &quot;notBetween&quot;;&#10;  min: number;&#10;  max: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -30,8 +27,6 @@ Interval operands are inclusive; `notBetween` accepts values outside that interv
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  operator:&#10;    | &quot;equal&quot;&#10;    | &quot;notEqual&quot;&#10;    | &quot;greaterThan&quot;&#10;    | &quot;lessThan&quot;&#10;    | &quot;greaterThanOrEqual&quot;&#10;    | &quot;lessThanOrEqual&quot;;&#10;  value: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -53,8 +48,6 @@ Interval operands are inclusive; `notBetween` accepts values outside that interv
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type DataValidationComparison =&#10;  | {&#10;      operator: &quot;between&quot; | &quot;notBetween&quot;;&#10;      min: number;&#10;      max: number;&#10;    }&#10;  | {&#10;      operator:&#10;        | &quot;equal&quot;&#10;        | &quot;notEqual&quot;&#10;        | &quot;greaterThan&quot;&#10;        | &quot;lessThan&quot;&#10;        | &quot;greaterThanOrEqual&quot;&#10;        | &quot;lessThanOrEqual&quot;;&#10;      value: number;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type DataValidationComparison =
@@ -97,46 +90,3 @@ export type DataValidationComparison =
 <li><a href="/docs/api/core/data-validation-condition/"><code>DataValidationCondition</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

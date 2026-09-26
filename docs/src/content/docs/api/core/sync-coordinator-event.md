@@ -8,16 +8,13 @@ description: "Queue, version, connection, or error transition emitted by synchro
 Queue, version, connection, or error transition emitted by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L217</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L217"><code>packages/core/src/sync.ts#L217</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>12</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;state&quot;; state: SyncStateSnapshot }" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 { type: "state"; state: SyncStateSnapshot }
@@ -26,16 +23,12 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;restored&quot;; pending: readonly SyncMutationRecord[] }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "restored"; pending: readonly SyncMutationRecord[] }
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;persisting&quot;; mutation: SyncMutationRecord }" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 { type: "persisting"; mutation: SyncMutationRecord }
@@ -44,8 +37,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;pending&quot;; mutation: SyncMutationRecord }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "pending"; mutation: SyncMutationRecord }
 ```
@@ -53,16 +44,12 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;sending&quot;; mutation: SyncMutationRecord }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "sending"; mutation: SyncMutationRecord }
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;acknowledged&quot;;&#10;  clientMutationId: string;&#10;  version: number;&#10;  duplicate: boolean;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -76,8 +63,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;conflict&quot;;&#10;  mutation: SyncMutationRecord;&#10;  response: Extract&lt;PersistenceCommitResponse, { status: &quot;conflict&quot; }&gt;;&#10;}" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 {
   type: "conflict";
@@ -89,16 +74,12 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;remote-applied&quot;; operation: VersionedOperation }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "remote-applied"; operation: VersionedOperation }
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;reload-required&quot;;&#10;  expectedVersion: number;&#10;  receivedVersion: number;&#10;  snapshot?: WorkbookSnapshot;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -112,8 +93,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;reloaded&quot;;&#10;  serverVersion: number;&#10;  pending: readonly SyncMutationRecord[];&#10;}" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 {
   type: "reloaded";
@@ -125,8 +104,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;storage-error&quot;;&#10;  error: SheetwriteError;&#10;  clientMutationId?: string;&#10;}" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 {
   type: "storage-error";
@@ -137,8 +114,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;error&quot;;&#10;  error: SheetwriteError;&#10;  clientMutationId?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -155,8 +130,6 @@ Queue, version, connection, or error transition emitted by synchronization.
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type SyncCoordinatorEvent =&#10;  | {&#10;      type: &quot;state&quot;;&#10;      state: SyncStateSnapshot;&#10;    }&#10;  | {&#10;      type: &quot;restored&quot;;&#10;      pending: readonly SyncMutationRecord[];&#10;    }&#10;  | {&#10;      type: &quot;persisting&quot;;&#10;      mutation: SyncMutationRecord;&#10;    }&#10;  | {&#10;      type: &quot;pending&quot;;&#10;      mutation: SyncMutationRecord;&#10;    }&#10;  | {&#10;      type: &quot;sending&quot;;&#10;      mutation: SyncMutationRecord;&#10;    }&#10;  | {&#10;      type: &quot;acknowledged&quot;;&#10;      clientMutationId: string;&#10;      version: number;&#10;      duplicate: boolean;&#10;    }&#10;  | {&#10;      type: &quot;conflict&quot;;&#10;      mutation: SyncMutationRecord;&#10;      response: Extract&lt;&#10;        PersistenceCommitResponse,&#10;        {&#10;          status: &quot;conflict&quot;;&#10;        }&#10;      &gt;;&#10;    }&#10;  | {&#10;      type: &quot;remote-applied&quot;;&#10;      operation: VersionedOperation;&#10;    }&#10;  | {&#10;      type: &quot;reload-required&quot;;&#10;      expectedVersion: number;&#10;      receivedVersion: number;&#10;      snapshot?: WorkbookSnapshot;&#10;    }&#10;  | {&#10;      type: &quot;reloaded&quot;;&#10;      serverVersion: number;&#10;      pending: readonly SyncMutationRecord[];&#10;    }&#10;  | {&#10;      type: &quot;storage-error&quot;;&#10;      error: SheetwriteError;&#10;      clientMutationId?: string;&#10;    }&#10;  | {&#10;      type: &quot;error&quot;;&#10;      error: SheetwriteError;&#10;      clientMutationId?: string;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type SyncCoordinatorEvent =
@@ -245,46 +218,3 @@ export type SyncCoordinatorEvent =
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -9,8 +9,7 @@ Host subscription contract for ordered versioned operations. Sources that
 can pause intake should await the listener promise to preserve backpressure.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L132</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L132"><code>packages/core/src/types/transaction.ts#L132</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
@@ -19,8 +18,6 @@ can pause intake should await the listener promise to preserve backpressure.
 
 <details class="api-member" id="remote-operation-source-subscribe" data-pagefind-weight="1">
 <summary><code>subscribe</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="subscribe( listener: (operation: VersionedOperation) =&gt; void | Promise&lt;void&gt;, signal?: AbortSignal, ): undefined | (() =&gt; void);" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 subscribe( listener: (operation: VersionedOperation) => void | Promise<void>, signal?: AbortSignal, ): undefined | (() => void);
@@ -33,8 +30,6 @@ subscribe( listener: (operation: VersionedOperation) => void | Promise<void>, si
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RemoteOperationSource {&#10;  subscribe(&#10;    listener: (operation: VersionedOperation) =&gt; void | Promise&lt;void&gt;,&#10;    signal?: AbortSignal,&#10;  ): undefined | (() =&gt; void);&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RemoteOperationSource {
@@ -67,46 +62,3 @@ export interface RemoteOperationSource {
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,18 +8,15 @@ description: "Public collaborator identity attached to presence updates."
 Public collaborator identity attached to presence updates.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L8</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L8"><code>packages/core/src/collaboration.ts#L8</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="presence-actor-id" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-actor-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="id: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 id: string;
@@ -27,10 +24,8 @@ id: string;
 
 </details>
 
-<details class="api-member" id="presence-actor-display-name" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-actor-display-name" data-pagefind-weight="1">
 <summary><code>displayName</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="displayName?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 displayName?: string;
@@ -38,10 +33,8 @@ displayName?: string;
 
 </details>
 
-<details class="api-member" id="presence-actor-color" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-actor-color" data-pagefind-weight="1">
 <summary><code>color</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="color?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 color?: string;
@@ -54,8 +47,6 @@ color?: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface PresenceActor {&#10;  id: string;&#10;  displayName?: string;&#10;  color?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface PresenceActor {
@@ -90,46 +81,3 @@ export interface PresenceActor {
 <li><a href="/docs/api/core/revision-summary/"><code>RevisionSummary</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

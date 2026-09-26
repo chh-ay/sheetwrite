@@ -8,18 +8,15 @@ description: "Implementation-neutral cell in the first-sheet table export model.
 Implementation-neutral cell in the first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L14</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L14"><code>packages/xlsx/src/table-export.ts#L14</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="xlsx-model-cell-value" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-model-cell-value" data-pagefind-weight="1">
 <summary><code>value</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="value: CellScalar;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 value: CellScalar;
@@ -27,10 +24,8 @@ value: CellScalar;
 
 </details>
 
-<details class="api-member" id="xlsx-model-cell-style" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-model-cell-style" data-pagefind-weight="1">
 <summary><code>style</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="style?: CellStyle;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 style?: CellStyle;
@@ -38,10 +33,8 @@ style?: CellStyle;
 
 </details>
 
-<details class="api-member" id="xlsx-model-cell-number-format" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-model-cell-number-format" data-pagefind-weight="1">
 <summary><code>numberFormat</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="numberFormat?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 numberFormat?: string;
@@ -49,10 +42,8 @@ numberFormat?: string;
 
 </details>
 
-<details class="api-member" id="xlsx-model-cell-column-span" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-model-cell-column-span" data-pagefind-weight="1">
 <summary><code>columnSpan</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="columnSpan?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 columnSpan?: number;
@@ -60,10 +51,8 @@ columnSpan?: number;
 
 </details>
 
-<details class="api-member" id="xlsx-model-cell-row-span" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-model-cell-row-span" data-pagefind-weight="1">
 <summary><code>rowSpan</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="rowSpan?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 rowSpan?: number;
@@ -76,8 +65,6 @@ rowSpan?: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface XlsxModelCell {&#10;  value: CellScalar;&#10;  style?: CellStyle;&#10;  numberFormat?: string;&#10;  columnSpan?: number;&#10;  rowSpan?: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface XlsxModelCell {
@@ -106,46 +93,3 @@ export interface XlsxModelCell {
 <li><a href="/docs/api/xlsx/xlsx-model/"><code>XlsxModel</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,18 +8,15 @@ description: "The canonical transaction identity carried by each projected delta
 The canonical transaction identity carried by each projected delta.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L48</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L48"><code>packages/core/src/row-bridge.ts#L48</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="row-bridge-transaction-id" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-transaction-id" data-pagefind-weight="1">
 <summary><code>id</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly id: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly id: string;
@@ -27,10 +24,8 @@ readonly id: string;
 
 </details>
 
-<details class="api-member" id="row-bridge-transaction-source" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-transaction-source" data-pagefind-weight="1">
 <summary><code>source</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly source: OperationSource;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly source: OperationSource;
@@ -38,10 +33,8 @@ readonly source: OperationSource;
 
 </details>
 
-<details class="api-member" id="row-bridge-transaction-commit-reason" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-transaction-commit-reason" data-pagefind-weight="1">
 <summary><code>commitReason</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly commitReason: CommitReason;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly commitReason: CommitReason;
@@ -49,10 +42,8 @@ readonly commitReason: CommitReason;
 
 </details>
 
-<details class="api-member" id="row-bridge-transaction-epoch" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-transaction-epoch" data-pagefind-weight="1">
 <summary><code>epoch</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly epoch: number | undefined;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly epoch: number | undefined;
@@ -60,10 +51,8 @@ readonly epoch: number | undefined;
 
 </details>
 
-<details class="api-member" id="row-bridge-transaction-patches" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-transaction-patches" data-pagefind-weight="1">
 <summary><code>patches</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly patches: readonly DocumentOp[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly patches: readonly DocumentOp[];
@@ -76,8 +65,6 @@ readonly patches: readonly DocumentOp[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RowBridgeTransaction {&#10;  readonly id: string;&#10;  readonly source: OperationSource;&#10;  readonly commitReason: CommitReason;&#10;  readonly epoch: number | undefined;&#10;  readonly patches: readonly DocumentOp[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RowBridgeTransaction {
@@ -123,46 +110,3 @@ export interface RowBridgeTransaction {
 <li class="api-consumer-more">and 9 more</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

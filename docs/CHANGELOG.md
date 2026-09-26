@@ -1,5 +1,13 @@
 # @sheetwrite/docs-start
 
+## Unreleased
+
+- Replace the documentation layout with a task-focused home, grouped navigation, a dedicated reading panel, and redesigned API rows. Add explicit Home and Showcases links on desktop and mobile.
+- Keep the overview free of the guide outline; retain the right rail on wide guide pages and the collapsible outline on mobile.
+- Add a filter for large API indexes; start API members collapsed, preserve deep-link expansion, remove signature copy controls, and link source locations.
+- Publish generated `/llms.txt` and `/llms-full.txt` endpoints with stale-output checks for AI-assisted development.
+- Run the production Vite build under Node to avoid a Bun server-compilation crash.
+
 ## 0.0.2
 
 ### Patch Changes

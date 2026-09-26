@@ -691,7 +691,7 @@ describe("API symbol page reading experience", () => {
       ),
     ]);
 
-  it("opens short members, keeps union walls collapsed, and indexes long lists", async () => {
+  it("keeps every member collapsed regardless of signature length or union shape", async () => {
     const entry = storageEntry();
     const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
     const owner = entry.exports.find((item) => item.name === "StoreOwner");
@@ -702,30 +702,11 @@ describe("API symbol page reading experience", () => {
     const expanded = [
       ...page.matchAll(/<details class="api-member" id="([^"]+)"[^>]*? open>/g),
     ].map((match) => match[1] ?? "");
-    // The line-long signature and the four-way union keep their weight in the
-    // summary; every member a reader can take in at a glance opens.
-    expect(expanded).toEqual([
-      "store-owner-constructor",
-      "store-owner-get-renderer-kind",
-      "store-owner-get-cell",
-      "store-owner-get-state",
-      "store-owner-set-state",
-      "store-owner-dispose",
-    ]);
-    expect(page).toContain('id="store-owner-describe" data-pagefind-weight="1">');
+    expect(expanded).toEqual([]);
+    expect(page).not.toContain('class="api-copy"');
+    expect(page).not.toContain("data-copy-code");
     expect(page).toContain('<nav class="api-member-index"');
     expect(page).toContain('href="#store-owner-get-cell"');
-  });
-
-  it("omits the member index on short lists", async () => {
-    const entry = storageEntry();
-    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
-    const options = entry.exports.find((item) => item.name === "StorageOptions");
-    if (options === undefined) throw new Error("fixture shape changed");
-
-    const page = await renderSymbolPage(pkg, entry, options);
-
-    expect(page).not.toContain('<nav class="api-member-index"');
   });
 
   it("links an expanded union member to the alias that names it", async () => {

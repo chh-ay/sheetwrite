@@ -8,18 +8,15 @@ description: "Allocation and load statistics for one paged datasource sheet."
 Allocation and load statistics for one paged datasource sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L120</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L120"><code>packages/core/src/types/store.ts#L120</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="paged-store-stats-chunks" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-chunks" data-pagefind-weight="1">
 <summary><code>chunks</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="chunks: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 chunks: number;
@@ -27,10 +24,8 @@ chunks: number;
 
 </details>
 
-<details class="api-member" id="paged-store-stats-loaded-cells" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-loaded-cells" data-pagefind-weight="1">
 <summary><code>loadedCells</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="loadedCells: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 loadedCells: number;
@@ -38,10 +33,8 @@ loadedCells: number;
 
 </details>
 
-<details class="api-member" id="paged-store-stats-dirty-cells" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-dirty-cells" data-pagefind-weight="1">
 <summary><code>dirtyCells</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="dirtyCells: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 dirtyCells: number;
@@ -49,10 +42,8 @@ dirtyCells: number;
 
 </details>
 
-<details class="api-member" id="paged-store-stats-allocated-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-allocated-bytes" data-pagefind-weight="1">
 <summary><code>allocatedBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="allocatedBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 allocatedBytes: number;
@@ -60,10 +51,8 @@ allocatedBytes: number;
 
 </details>
 
-<details class="api-member" id="paged-store-stats-dirty-allocated-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-dirty-allocated-bytes" data-pagefind-weight="1">
 <summary><code>dirtyAllocatedBytes</code> <span class="api-member-summary">Sparse local-edit overlay bytes, excluded from the clean chunk cache budget.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="dirtyAllocatedBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 dirtyAllocatedBytes: number;
@@ -71,10 +60,8 @@ dirtyAllocatedBytes: number;
 
 </details>
 
-<details class="api-member" id="paged-store-stats-fully-loaded" data-pagefind-weight="1" open>
+<details class="api-member" id="paged-store-stats-fully-loaded" data-pagefind-weight="1">
 <summary><code>fullyLoaded</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="fullyLoaded: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 fullyLoaded: boolean;
@@ -87,8 +74,6 @@ fullyLoaded: boolean;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface PagedStoreStats {&#10;  chunks: number;&#10;  loadedCells: number;&#10;  dirtyCells: number;&#10;  allocatedBytes: number;&#10;  dirtyAllocatedBytes: number;&#10;  fullyLoaded: boolean;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface PagedStoreStats {
@@ -123,46 +108,3 @@ export interface PagedStoreStats {
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

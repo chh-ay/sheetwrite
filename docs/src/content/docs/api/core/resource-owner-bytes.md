@@ -8,18 +8,15 @@ description: "Retained logical payload and allocated capacity attributed to one 
 Retained logical payload and allocated capacity attributed to one exclusive owner.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L21</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L21"><code>packages/core/src/types/store.ts#L21</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="resource-owner-bytes-owner" data-pagefind-weight="1" open>
+<details class="api-member" id="resource-owner-bytes-owner" data-pagefind-weight="1">
 <summary><code>owner</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly owner: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly owner: string;
@@ -27,10 +24,8 @@ readonly owner: string;
 
 </details>
 
-<details class="api-member" id="resource-owner-bytes-logical-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="resource-owner-bytes-logical-bytes" data-pagefind-weight="1">
 <summary><code>logicalBytes</code> <span class="api-member-summary">Bytes containing live logical payload.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly logicalBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly logicalBytes: number;
@@ -39,10 +34,8 @@ readonly logicalBytes: number;
 <p class="api-member-doc">Bytes containing live logical payload. Never includes runtime observations.</p>
 </details>
 
-<details class="api-member" id="resource-owner-bytes-allocated-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="resource-owner-bytes-allocated-bytes" data-pagefind-weight="1">
 <summary><code>allocatedBytes</code> <span class="api-member-summary">Container capacity owned exclusively by this owner.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly allocatedBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly allocatedBytes: number;
@@ -50,10 +43,8 @@ readonly allocatedBytes: number;
 
 </details>
 
-<details class="api-member" id="resource-owner-bytes-entries" data-pagefind-weight="1" open>
+<details class="api-member" id="resource-owner-bytes-entries" data-pagefind-weight="1">
 <summary><code>entries</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly entries: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly entries: number;
@@ -63,8 +54,6 @@ readonly entries: number;
 
 <details class="api-member" id="resource-owner-bytes-measurement" data-pagefind-weight="1">
 <summary><code>measurement</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly measurement: | &quot;exact-capacity&quot; | &quot;hash-capacity-v1&quot; | &quot;typed-array-byte-length&quot; | &quot;utf16-upper-bound&quot; | &quot;entry-count-only&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly measurement: | "exact-capacity" | "hash-capacity-v1" | "typed-array-byte-length" | "utf16-upper-bound" | "entry-count-only";
@@ -77,8 +66,6 @@ readonly measurement: | "exact-capacity" | "hash-capacity-v1" | "typed-array-byt
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface ResourceOwnerBytes {&#10;  readonly owner: string;&#10;  readonly logicalBytes: number;&#10;  readonly allocatedBytes: number;&#10;  readonly entries: number;&#10;  readonly measurement:&#10;    | &quot;exact-capacity&quot;&#10;    | &quot;hash-capacity-v1&quot;&#10;    | &quot;typed-array-byte-length&quot;&#10;    | &quot;utf16-upper-bound&quot;&#10;    | &quot;entry-count-only&quot;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface ResourceOwnerBytes {
@@ -119,46 +106,3 @@ export interface ResourceOwnerBytes {
 <li><a href="/docs/api/core/store-memory-breakdown/"><code>StoreMemoryBreakdown</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -107,27 +107,6 @@ a {
   white-space: nowrap;
 }
 
-.sw-docs {
-  min-height: 100vh;
-}
-
-.sw-docs-header {
-  position: fixed;
-  z-index: 50;
-  top: 0;
-  right: 0;
-  left: 0;
-  display: grid;
-  height: var(--sw-header-height);
-  grid-template-columns: var(--sw-sidebar-width) minmax(15rem, 34rem) minmax(0, 1fr);
-  align-items: center;
-  gap: 1.5rem;
-  padding-inline: 1.25rem;
-  border-bottom: 1px solid var(--sw-border);
-  background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
-  backdrop-filter: blur(18px);
-}
-
 .sw-brand {
   display: inline-flex;
   width: max-content;
@@ -162,69 +141,6 @@ a {
 
 .sw-skip-link:focus-visible {
   transform: none;
-}
-.sw-docs-header__links {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.3rem;
-}
-
-.sw-docs-header__links > a,
-.sw-docs-header__links summary {
-  display: inline-flex;
-  min-height: 2.35rem;
-  align-items: center;
-  border-radius: 0.45rem;
-  padding-inline: 0.7rem;
-  color: var(--sw-fg-muted);
-  font-size: 0.82rem;
-  font-weight: 650;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.sw-docs-header__links > a:hover,
-.sw-docs-header__links summary:hover {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-}
-
-.sw-docs-header__links details {
-  position: relative;
-}
-
-.sw-docs-header__links summary {
-  list-style: none;
-}
-
-.sw-docs-header__links summary::-webkit-details-marker {
-  display: none;
-}
-
-.sw-docs-header__links details > div {
-  position: absolute;
-  top: calc(100% + 0.45rem);
-  right: 0;
-  display: grid;
-  min-width: 10rem;
-  overflow: hidden;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
-  padding: 0.35rem;
-  background: var(--sw-surface-1);
-  box-shadow: var(--sw-shadow);
-}
-
-.sw-docs-header__links details > div a {
-  border-radius: 0.4rem;
-  padding: 0.55rem 0.65rem;
-  color: var(--sw-fg);
-  text-decoration: none;
-}
-
-.sw-docs-header__links details > div a:hover {
-  background: var(--sw-surface-2);
 }
 
 .sw-icon-button {
@@ -417,115 +333,6 @@ a {
   border-radius: 0.2rem;
 }
 
-.sw-sidebar {
-  position: fixed;
-  z-index: 10;
-  top: var(--sw-header-height);
-  bottom: 0;
-  left: 0;
-  width: var(--sw-sidebar-width);
-  overflow-y: auto;
-  border-right: 1px solid var(--sw-border);
-  padding: 1.65rem 1.25rem 2.5rem;
-  background: var(--sw-surface-1);
-  scrollbar-width: thin;
-}
-
-.sw-sidebar__nav {
-  display: grid;
-  gap: 1.55rem;
-}
-
-.sw-sidebar__nav section {
-  display: grid;
-  gap: 0.12rem;
-}
-
-.sw-sidebar__nav h2 {
-  margin: 0 0 0.35rem;
-  color: var(--sw-fg-dim);
-  font: 650 0.66rem / 1.4 var(--sw-font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.sw-sidebar__nav a {
-  position: relative;
-  display: block;
-  border-radius: 0.4rem;
-  padding: 0.38rem 0.55rem;
-  color: var(--sw-fg-muted);
-  font-size: 0.82rem;
-  font-weight: 520;
-  line-height: 1.35;
-  text-decoration: none;
-}
-
-.sw-sidebar__nav a:hover {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-}
-
-.sw-sidebar__nav a[aria-current="page"] {
-  color: var(--sw-accent-strong);
-  background: var(--sw-accent-soft);
-  font-weight: 680;
-}
-
-.sw-sidebar__nav a[aria-current="page"]::before {
-  position: absolute;
-  top: 0.45rem;
-  bottom: 0.45rem;
-  left: -1.25rem;
-  width: 2px;
-  background: var(--sw-accent);
-  content: "";
-}
-
-.sw-document {
-  width: min(
-    var(--sw-content-width),
-    calc(100vw - var(--sw-sidebar-width) - clamp(3rem, 10vw, 12rem))
-  );
-  margin-left: calc(
-    var(--sw-sidebar-width) +
-    max(2rem, (100vw - var(--sw-sidebar-width) - var(--sw-content-width)) / 2)
-  );
-  padding: calc(var(--sw-header-height) + 4rem) 0 5rem;
-}
-
-.sw-document__header {
-  margin-bottom: 3.25rem;
-  padding-bottom: 2rem;
-  border-bottom: 1px solid var(--sw-border);
-}
-
-.sw-document__header p {
-  margin: 0 0 0.75rem;
-  color: var(--sw-accent-strong);
-  font: 650 0.68rem / 1 var(--sw-font-mono);
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
-.sw-document__header h1 {
-  margin: 0;
-  color: var(--sw-fg-strong);
-  font: 650 clamp(2.4rem, 5vw, 4rem) / 0.98 var(--sw-font-display);
-  letter-spacing: -0.05em;
-  text-wrap: balance;
-}
-
-/* Direct child only: the h1 title span must not inherit description styling. */
-.sw-document__header > span {
-  display: block;
-  max-width: 42rem;
-  margin-top: 1.1rem;
-  color: var(--sw-fg-muted);
-  font-size: 1.05rem;
-  line-height: 1.65;
-}
-
 .sw-prose {
   color: var(--sw-fg);
 }
@@ -666,56 +473,6 @@ a {
   box-shadow: none;
 }
 
-.sw-landing-lead {
-  color: var(--sw-fg-strong);
-  font-size: 1.05rem;
-  line-height: 1.75;
-}
-
-.sw-landing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.sw-landing-grid--frameworks {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.sw-prose .sw-landing-grid > a {
-  display: grid;
-  gap: 0.55rem;
-  min-height: 9rem;
-  padding: 1rem;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
-  color: var(--sw-fg);
-  background: var(--sw-surface-1);
-  text-decoration: none;
-}
-
-.sw-prose .sw-landing-grid > a:hover {
-  border-color: var(--sw-accent);
-  background: var(--sw-surface-2);
-}
-
-.sw-landing-grid strong {
-  font-family: var(--sw-font-display);
-  font-size: 1rem;
-}
-
-.sw-landing-grid span {
-  color: var(--sw-fg-muted);
-  font-size: 0.88rem;
-  line-height: 1.55;
-}
-
-.sw-landing-links {
-  display: grid;
-  gap: 0.6rem;
-  padding-left: 1.1rem;
-}
-
 .sw-tabs {
   margin: 1.5rem 0 2.5rem;
   border: 1px solid var(--sw-border);
@@ -813,15 +570,23 @@ body .sw-code-popover__tag-link:hover {
   text-decoration: underline;
 }
 
+/* Reading order first, colophon last: the footer closes the page with where
+   to go next rather than with licence small print. */
 .sw-document__footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  gap: 1.5rem;
   margin-top: 5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--sw-border);
   color: var(--sw-fg-dim);
   font-size: 0.75rem;
+}
+
+.sw-document__colophon {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem 1rem;
 }
 
 .sw-document__footer a {
@@ -1203,7 +968,7 @@ body .sw-code-popover__tag-link:hover {
    Every row keeps a real top border and an opaque background (contract-
    checked); the background matches the page so the list reads flat. */
 .api-member-list {
-  margin: 1.1rem 0 2.75rem;
+  margin: 1rem 0 2.25rem;
   border-bottom: 1px solid var(--sw-border);
 }
 
@@ -1232,10 +997,11 @@ body .sw-code-popover__tag-link:hover {
 .api-member summary,
 .api-declaration summary {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.5rem;
   align-items: baseline;
   border-radius: 0.35rem;
-  padding: 0.55rem 0.3rem;
+  /* Member rows are a scan list: the name, then the one-line meaning. */
+  padding: 0.42rem 0.35rem;
   color: var(--sw-fg-strong);
   cursor: pointer;
   list-style: none;
@@ -1245,6 +1011,12 @@ body .sw-code-popover__tag-link:hover {
 .api-declaration summary {
   border-radius: calc(0.6rem - 1px);
   padding: 0.7rem 0.95rem;
+}
+
+/* An open row keeps its name where the reader left it and tints its own
+   header, so the revealed signature reads as part of that row. */
+.api-member[open] > summary {
+  background: color-mix(in srgb, var(--sw-surface-2) 80%, transparent);
 }
 
 .api-member summary::-webkit-details-marker,
@@ -1325,6 +1097,7 @@ body .sw-code-popover__tag-link:hover {
   color: var(--sw-fg-muted);
   font-family: var(--sw-font-body);
   font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .sw-prose .api-member-summary code {
@@ -1357,43 +1130,6 @@ body .sw-code-popover__tag-link:hover {
 .sw-prose .api-member-alias a:hover code {
   border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
   color: var(--sw-accent-strong);
-}
-
-/* One labelled copy control per signature block. It stays visible instead of
-   appearing on hover, and the icon-only Expressive Code button is suppressed
-   inside API blocks so a signature never offers two copy affordances. */
-.sw-prose .api-member .expressive-code .copy,
-.sw-prose .api-declaration .expressive-code .copy,
-.sw-prose .api-declaration-open .expressive-code .copy,
-.sw-prose .api-variant .expressive-code .copy {
-  display: none;
-}
-
-.sw-prose .api-copy {
-  display: block;
-  width: fit-content;
-  margin: 0.3rem 0 0.4rem auto;
-  padding: 0.16rem 0.6rem;
-  border: 1px solid var(--sw-border);
-  border-radius: 999px;
-  background: var(--sw-surface-2);
-  color: var(--sw-fg-muted);
-  font: 600 0.67rem / 1.5 var(--sw-font-mono);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-}
-
-.sw-prose .api-copy:hover,
-.sw-prose .api-copy:focus-visible {
-  border-color: color-mix(in srgb, var(--sw-accent) 42%, var(--sw-border));
-  color: var(--sw-accent-strong);
-}
-
-/* The declaration panel has no padding of its own: its fence docks flush. */
-.sw-prose .api-declaration .api-copy,
-.sw-prose .api-declaration-open .api-copy,
-.sw-prose .api-variant .api-copy {
-  margin: 0.5rem 0.6rem 0.35rem auto;
 }
 
 /* Referenced by: who depends on the owning package, and which documented
@@ -1482,7 +1218,7 @@ body .sw-code-popover__tag-link:hover {
 /* Member signatures sit as one compact framed line indented under the name;
    docs follow as plain prose, not another surface. */
 .sw-prose .api-member .expressive-code {
-  margin: 0.2rem 0 0.85rem 1.32rem;
+  margin: 0.15rem 0 0.7rem 1.25rem;
 }
 
 .sw-prose .api-member .expressive-code figure.frame {
@@ -1503,8 +1239,8 @@ body .sw-code-popover__tag-link:hover {
 
 .api-member .api-member-doc {
   max-width: 47rem;
-  margin: -0.35rem 0 0.9rem;
-  padding: 0 0.3rem 0 1.32rem;
+  margin: -0.3rem 0 0.8rem;
+  padding: 0 0.3rem 0 1.25rem;
   color: var(--sw-fg-muted);
   font-size: 0.82rem;
 }
@@ -1562,7 +1298,7 @@ body .sw-code-popover__tag-link:hover {
 
   .api-member-summary {
     flex: 1 0 100%;
-    padding-left: 1.02rem;
+    padding-left: 0.95rem;
   }
 
   .sw-prose .api-member .expressive-code {
@@ -1739,21 +1475,6 @@ body .sw-code-popover__accessible-signature {
   }
 }
 
-@media (max-width: 62rem) {
-  .sw-docs-header {
-    grid-template-columns: auto minmax(13rem, 1fr) auto;
-  }
-
-  .sw-sidebar {
-    width: 15rem;
-  }
-
-  .sw-document {
-    width: min(var(--sw-content-width), calc(100vw - 19rem));
-    margin-left: 17rem;
-  }
-}
-
 .sw-test-fixture {
   min-height: 100vh;
   padding: 1rem;
@@ -1778,84 +1499,12 @@ body .sw-code-popover__accessible-signature {
 }
 
 @media (max-width: 48rem) {
-  .sw-docs-header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.7rem;
-    padding-inline: 0.8rem;
-  }
-
-  .sw-brand span,
-  .sw-search-button span,
-  .sw-search-button kbd,
-  .sw-docs-header__links details,
-  .sw-docs-header__links > a:not([class]) {
-    display: none;
-  }
-
-  .sw-sidebar {
-    position: static;
-    width: auto;
-    max-height: none;
-    margin-top: var(--sw-header-height);
-    border-right: 0;
-    border-bottom: 1px solid var(--sw-border);
-    padding: 0.75rem;
-  }
-
-  .sw-sidebar__nav {
-    display: flex;
-    gap: 0.35rem;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .sw-sidebar__nav section {
-    display: contents;
-  }
-
-  .sw-sidebar__nav h2 {
-    display: none;
-  }
-
-  .sw-sidebar__nav a {
-    min-width: max-content;
-    border: 1px solid var(--sw-border);
-    background: var(--sw-surface-1);
-  }
-
-  .sw-sidebar__nav a[aria-current="page"]::before {
-    display: none;
-  }
-
-  .sw-document {
-    width: min(100% - 2rem, var(--sw-content-width));
-    margin-inline: auto;
-    padding-top: 3rem;
-  }
-
-  .sw-document__header {
-    margin-bottom: 2.25rem;
-  }
-
-  .sw-document__header h1 {
-    font-size: clamp(2.2rem, 12vw, 3.3rem);
-  }
-
   .sw-architecture__step > div {
     grid-template-columns: 2rem 1fr;
   }
 
   .sw-architecture__step p {
     grid-column: 2;
-  }
-
-  .sw-landing-grid,
-  .sw-landing-grid--frameworks {
-    grid-template-columns: 1fr;
-  }
-
-  .sw-document__footer {
-    flex-direction: column;
   }
 
   body .sw-code-popover__signature--wide {
@@ -1877,100 +1526,6 @@ body .sw-code-popover__accessible-signature {
   overflow: hidden;
   font-size: 0;
   scroll-margin-top: calc(var(--sw-header-height) + 1.5rem);
-}
-
-.sw-title-package {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-left: 0.8rem;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.45rem;
-  padding: 0.3rem 0.55rem;
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-1);
-  font: 600 0.85rem / 1.2 var(--sw-font-mono);
-  letter-spacing: 0;
-}
-
-/* ---- On-this-page rail (owned by navigation work, not the api block) ---- */
-
-.sw-toc {
-  display: none;
-}
-
-/* The document becomes a two-column unit (prose + rail) once both fit. */
-@media (min-width: 88rem) {
-  .sw-document {
-    display: grid;
-    grid-template-columns: minmax(0, var(--sw-content-width)) 12rem;
-    column-gap: 3rem;
-    width: min(calc(var(--sw-content-width) + 15rem), calc(100vw - var(--sw-sidebar-width) - 4rem));
-    margin-left: calc(
-      var(--sw-sidebar-width) +
-      max(2rem, (100vw - var(--sw-sidebar-width) - var(--sw-content-width) - 15rem) / 2)
-    );
-  }
-
-  .sw-document__header,
-  .sw-document__footer,
-  .sw-document > .sw-prose {
-    grid-column: 1;
-    min-width: 0;
-  }
-
-  .sw-toc {
-    display: block;
-    position: sticky;
-    top: calc(var(--sw-header-height) + 2.5rem);
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
-    max-height: calc(100vh - var(--sw-header-height) - 5rem);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--sw-border-strong) transparent;
-    font-size: 0.78rem;
-  }
-}
-
-.sw-toc__label {
-  display: block;
-  margin-bottom: 0.6rem;
-  color: var(--sw-fg-dim);
-  font: 650 0.62rem / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.sw-toc ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sw-toc li[data-depth="1"] {
-  padding-left: 0.75rem;
-}
-
-.sw-toc a {
-  display: block;
-  overflow: hidden;
-  padding: 0.22rem 0.5rem;
-  border-radius: 0.35rem;
-  color: var(--sw-fg-muted);
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sw-toc a:hover {
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-}
-
-.sw-toc a[aria-current="location"] {
-  color: var(--sw-accent-strong);
-  font-weight: 600;
 }
 
 /* ToC deep links target member rows; keep them clear of the fixed header. */

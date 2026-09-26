@@ -8,16 +8,13 @@ description: "State transition emitted by the comment coordinator."
 State transition emitted by the comment coordinator.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L490</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L490"><code>packages/core/src/collaboration.ts#L490</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;loaded&quot;;&#10;  version: number;&#10;  threads: readonly CommentThread[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -30,8 +27,6 @@ State transition emitted by the comment coordinator.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;changed&quot;; version: number; thread: CommentThread }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "changed"; version: number; thread: CommentThread }
 ```
@@ -39,16 +34,12 @@ State transition emitted by the comment coordinator.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;conflict&quot;; currentVersion: number }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "conflict"; currentVersion: number }
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  type: &quot;gap&quot;;&#10;  expectedVersion: number;&#10;  receivedVersion: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -61,8 +52,6 @@ State transition emitted by the comment coordinator.
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ type: &quot;error&quot;; error: SheetwriteError }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { type: "error"; error: SheetwriteError }
 ```
@@ -74,8 +63,6 @@ State transition emitted by the comment coordinator.
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type CommentCoordinatorEvent =&#10;  | {&#10;      type: &quot;loaded&quot;;&#10;      version: number;&#10;      threads: readonly CommentThread[];&#10;    }&#10;  | {&#10;      type: &quot;changed&quot;;&#10;      version: number;&#10;      thread: CommentThread;&#10;    }&#10;  | {&#10;      type: &quot;conflict&quot;;&#10;      currentVersion: number;&#10;    }&#10;  | {&#10;      type: &quot;gap&quot;;&#10;      expectedVersion: number;&#10;      receivedVersion: number;&#10;    }&#10;  | {&#10;      type: &quot;error&quot;;&#10;      error: SheetwriteError;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type CommentCoordinatorEvent =
@@ -126,46 +113,3 @@ export type CommentCoordinatorEvent =
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

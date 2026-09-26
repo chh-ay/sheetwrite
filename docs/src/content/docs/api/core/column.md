@@ -8,8 +8,7 @@ description: "Schema and default presentation for one workbook column."
 Schema and default presentation for one workbook column.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L107</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L107"><code>packages/core/src/types/cell.ts#L107</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -30,10 +29,8 @@ Schema and default presentation for one workbook column.
 
 <div class="api-member-list">
 
-<details class="api-member" id="column-key" data-pagefind-weight="1" open>
+<details class="api-member" id="column-key" data-pagefind-weight="1">
 <summary><code>key</code> <span class="api-member-summary">Non-empty key, unique within the sheet, used to map input and datasource values.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="key: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 key: string;
@@ -41,10 +38,8 @@ key: string;
 
 </details>
 
-<details class="api-member" id="column-header" data-pagefind-weight="1" open>
+<details class="api-member" id="column-header" data-pagefind-weight="1">
 <summary><code>header</code> <span class="api-member-summary">Schema label used by table exports and data-grid presentation headers.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="header: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 header: string;
@@ -52,10 +47,8 @@ header: string;
 
 </details>
 
-<details class="api-member" id="column-width" data-pagefind-weight="1" open>
+<details class="api-member" id="column-width" data-pagefind-weight="1">
 <summary><code>width</code> <span class="api-member-summary">Unzoomed column width in CSS pixels.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="width: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 width: number;
@@ -63,10 +56,8 @@ width: number;
 
 </details>
 
-<details class="api-member" id="column-type" data-pagefind-weight="1" open>
+<details class="api-member" id="column-type" data-pagefind-weight="1">
 <summary><code>type</code> <span class="api-member-summary">Controls cell input parsing and default value formatting for this column.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="type: CellFormat;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 type: CellFormat;
@@ -74,10 +65,8 @@ type: CellFormat;
 
 </details>
 
-<details class="api-member" id="column-number-format" data-pagefind-weight="1" open>
+<details class="api-member" id="column-number-format" data-pagefind-weight="1">
 <summary><code>numberFormat</code> <span class="api-member-summary">Excel number-format code, e.g.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="numberFormat?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 numberFormat?: string;
@@ -86,10 +75,8 @@ numberFormat?: string;
 <p class="api-member-doc">Excel number-format code, e.g. &quot;#,##0.00&quot;</p>
 </details>
 
-<details class="api-member" id="column-number-locale" data-pagefind-weight="1" open>
+<details class="api-member" id="column-number-locale" data-pagefind-weight="1">
 <summary><code>numberLocale</code> <span class="api-member-summary">Explicit BCP 47 locale for separators; omitted keeps the deterministic default.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="numberLocale?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 numberLocale?: string;
@@ -97,10 +84,8 @@ numberLocale?: string;
 
 </details>
 
-<details class="api-member" id="column-header-style" data-pagefind-weight="1" open>
+<details class="api-member" id="column-header-style" data-pagefind-weight="1">
 <summary><code>headerStyle</code> <span class="api-member-summary">Overrides theme styling for the painted column header.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="headerStyle?: CellStyle;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 headerStyle?: CellStyle;
@@ -108,10 +93,8 @@ headerStyle?: CellStyle;
 
 </details>
 
-<details class="api-member" id="column-cell-style" data-pagefind-weight="1" open>
+<details class="api-member" id="column-cell-style" data-pagefind-weight="1">
 <summary><code>cellStyle</code> <span class="api-member-summary">Base style merged beneath each cell's own style.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="cellStyle?: CellStyle;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 cellStyle?: CellStyle;
@@ -119,10 +102,8 @@ cellStyle?: CellStyle;
 
 </details>
 
-<details class="api-member" id="column-visible" data-pagefind-weight="1" open>
+<details class="api-member" id="column-visible" data-pagefind-weight="1">
 <summary><code>visible</code> <span class="api-member-summary">Set to false to exclude the column from the live view and table exports.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="visible?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 visible?: boolean;
@@ -130,10 +111,8 @@ visible?: boolean;
 
 </details>
 
-<details class="api-member" id="column-renderer" data-pagefind-weight="1" open>
+<details class="api-member" id="column-renderer" data-pagefind-weight="1">
 <summary><code>renderer</code> <span class="api-member-summary">Name of a registered custom cell renderer (see Grid.defineCellRenderer).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="renderer?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 renderer?: string;
@@ -141,10 +120,8 @@ renderer?: string;
 
 </details>
 
-<details class="api-member" id="column-editor" data-pagefind-weight="1" open>
+<details class="api-member" id="column-editor" data-pagefind-weight="1">
 <summary><code>editor</code> <span class="api-member-summary">Name of a registered custom editor (see GridOptions.editors).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="editor?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 editor?: string;
@@ -157,8 +134,6 @@ editor?: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface Column {&#10;  key: string;&#10;  header: string;&#10;  width: number;&#10;  type: CellFormat;&#10;  numberFormat?: string;&#10;  numberLocale?: string;&#10;  headerStyle?: CellStyle;&#10;  cellStyle?: CellStyle;&#10;  visible?: boolean;&#10;  renderer?: string;&#10;  editor?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface Column {
@@ -207,46 +182,3 @@ export interface Column {
 <li><a href="/docs/api/vue/cell-editor-context/"><code>CellEditorContext</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

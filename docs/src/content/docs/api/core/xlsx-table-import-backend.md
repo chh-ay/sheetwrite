@@ -10,18 +10,15 @@ Pluggable table import backend. Parses raw `.xlsx` bytes into the same
 format-agnostic.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L348</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L348"><code>packages/core/src/export.ts#L348</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="xlsx-table-import-backend-name" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-table-import-backend-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="name: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: string;
@@ -31,8 +28,6 @@ name: string;
 
 <details class="api-member" id="xlsx-table-import-backend-from-xlsx-table" data-pagefind-weight="1">
 <summary><code>fromXlsxTable</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise&lt;ColumnarData&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<ColumnarData>;
@@ -45,8 +40,6 @@ fromXlsxTable( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ):
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface XlsxTableImportBackend {&#10;  name: string;&#10;  fromXlsxTable(&#10;    data: ArrayBuffer | Uint8Array,&#10;    options?: XlsxWorkbookOptions,&#10;  ): Promise&lt;ColumnarData&gt;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface XlsxTableImportBackend {
@@ -81,46 +74,3 @@ export interface XlsxTableImportBackend {
 <li><a href="/docs/api/xlsx/sheetwrite-table-import-backend/"><code>sheetwriteTableImportBackend</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

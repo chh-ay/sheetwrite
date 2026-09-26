@@ -9,8 +9,7 @@ Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L278</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L278"><code>packages/core/src/types/grid.ts#L278</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -37,10 +36,8 @@ shown; control flags default to `true` except the opt-in `export` flag.
 
 <div class="api-member-list">
 
-<details class="api-member" id="grid-config-toolbar" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-toolbar" data-pagefind-weight="1">
 <summary><code>toolbar</code> <span class="api-member-summary">Show the built-in toolbar (true), hide it (false), or supply a custom item list.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="toolbar?: boolean | ToolbarItem[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 toolbar?: boolean | ToolbarItem[];
@@ -48,10 +45,8 @@ toolbar?: boolean | ToolbarItem[];
 
 </details>
 
-<details class="api-member" id="grid-config-bold" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-bold" data-pagefind-weight="1">
 <summary><code>bold</code> <span class="api-member-summary">Show the bold control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="bold?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 bold?: boolean;
@@ -59,10 +54,8 @@ bold?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-italic" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-italic" data-pagefind-weight="1">
 <summary><code>italic</code> <span class="api-member-summary">Show the italic control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="italic?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 italic?: boolean;
@@ -70,10 +63,8 @@ italic?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-align" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-align" data-pagefind-weight="1">
 <summary><code>align</code> <span class="api-member-summary">Show left, center, and right alignment controls (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="align?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 align?: boolean;
@@ -81,10 +72,8 @@ align?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-text-color" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-text-color" data-pagefind-weight="1">
 <summary><code>textColor</code> <span class="api-member-summary">Show the text-color control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="textColor?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 textColor?: boolean;
@@ -92,10 +81,8 @@ textColor?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-fill-color" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-fill-color" data-pagefind-weight="1">
 <summary><code>fillColor</code> <span class="api-member-summary">Show the fill-color control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="fillColor?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 fillColor?: boolean;
@@ -103,10 +90,8 @@ fillColor?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-border" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-border" data-pagefind-weight="1">
 <summary><code>border</code> <span class="api-member-summary">Show the border control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="border?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 border?: boolean;
@@ -114,10 +99,8 @@ border?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-clear-format" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-clear-format" data-pagefind-weight="1">
 <summary><code>clearFormat</code> <span class="api-member-summary">Show the clear-format control in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="clearFormat?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 clearFormat?: boolean;
@@ -125,10 +108,8 @@ clearFormat?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-merge" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-merge" data-pagefind-weight="1">
 <summary><code>merge</code> <span class="api-member-summary">Show merge and unmerge controls in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="merge?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 merge?: boolean;
@@ -136,10 +117,8 @@ merge?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-sort" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-sort" data-pagefind-weight="1">
 <summary><code>sort</code> <span class="api-member-summary">Show ascending and descending sort controls in the default toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="sort?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 sort?: boolean;
@@ -147,10 +126,8 @@ sort?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-export" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-export" data-pagefind-weight="1">
 <summary><code>export</code> <span class="api-member-summary">Show CSV/XLSX export controls in the default toolbar (default false).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="export?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export?: boolean;
@@ -158,10 +135,8 @@ export?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-icons" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
 <summary><code>icons</code> <span class="api-member-summary">Override built-in toolbar icons by action name.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="icons?: Partial&lt;Record&lt;ToolbarActionName, ToolbarIcon&gt;&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
@@ -170,10 +145,8 @@ icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
 <p class="api-member-doc">Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons.</p>
 </details>
 
-<details class="api-member" id="grid-config-context-menu" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-context-menu" data-pagefind-weight="1">
 <summary><code>contextMenu</code> <span class="api-member-summary">Built-in menu, disabled menu, static rows, or a request-aware row factory.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="contextMenu?: boolean | ContextMenuItems;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 contextMenu?: boolean | ContextMenuItems;
@@ -181,10 +154,8 @@ contextMenu?: boolean | ContextMenuItems;
 
 </details>
 
-<details class="api-member" id="grid-config-undo" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-undo" data-pagefind-weight="1">
 <summary><code>undo</code> <span class="api-member-summary">Show undo/redo controls in the built-in toolbar (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="undo?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 undo?: boolean;
@@ -192,10 +163,8 @@ undo?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-find" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-find" data-pagefind-weight="1">
 <summary><code>find</code> <span class="api-member-summary">Built-in Ctrl+F find widget: enabled (true, default) or disabled (false).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="find?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 find?: boolean;
@@ -203,10 +172,8 @@ find?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-tabs" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-tabs" data-pagefind-weight="1">
 <summary><code>tabs</code> <span class="api-member-summary">Bottom sheet-tab bar for multi-sheet workbooks (default true).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="tabs?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 tabs?: boolean;
@@ -214,10 +181,8 @@ tabs?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-config-keyboard" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-config-keyboard" data-pagefind-weight="1">
 <summary><code>keyboard</code> <span class="api-member-summary">Built-in keyboard handling.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) =&gt; boolean);" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
@@ -236,8 +201,6 @@ through to the stock bindings.</p>
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface GridConfig {&#10;  toolbar?: boolean | ToolbarItem[];&#10;  bold?: boolean;&#10;  italic?: boolean;&#10;  align?: boolean;&#10;  textColor?: boolean;&#10;  fillColor?: boolean;&#10;  border?: boolean;&#10;  clearFormat?: boolean;&#10;  merge?: boolean;&#10;  sort?: boolean;&#10;  export?: boolean;&#10;  icons?: Partial&lt;Record&lt;ToolbarActionName, ToolbarIcon&gt;&gt;;&#10;  contextMenu?: boolean | ContextMenuItems;&#10;  undo?: boolean;&#10;  find?: boolean;&#10;  tabs?: boolean;&#10;  keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) =&gt; boolean);&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface GridConfig {
@@ -290,46 +253,3 @@ export interface GridConfig {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

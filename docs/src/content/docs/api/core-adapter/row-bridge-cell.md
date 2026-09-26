@@ -8,8 +8,7 @@ description: "A cell effect with semantic column and host row identity."
 A cell effect with semantic column and host row identity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L37</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L37"><code>packages/core/src/row-bridge.ts#L37</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -26,10 +25,8 @@ A cell effect with semantic column and host row identity.
 
 <div class="api-member-list">
 
-<details class="api-member" id="row-bridge-cell-sheet" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-sheet" data-pagefind-weight="1">
 <summary><code>sheet</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly sheet: SheetId;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly sheet: SheetId;
@@ -37,10 +34,8 @@ readonly sheet: SheetId;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-row" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-row" data-pagefind-weight="1">
 <summary><code>row</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly row: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly row: number;
@@ -48,10 +43,8 @@ readonly row: number;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-row-id" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-row-id" data-pagefind-weight="1">
 <summary><code>rowId</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly rowId: Id | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly rowId: Id | null;
@@ -59,10 +52,8 @@ readonly rowId: Id | null;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-col" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-col" data-pagefind-weight="1">
 <summary><code>col</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly col: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly col: number;
@@ -70,10 +61,8 @@ readonly col: number;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-column-key" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-column-key" data-pagefind-weight="1">
 <summary><code>columnKey</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly columnKey: string | null;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly columnKey: string | null;
@@ -81,10 +70,8 @@ readonly columnKey: string | null;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-previous" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-previous" data-pagefind-weight="1">
 <summary><code>previous</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly previous: CellValue | undefined;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly previous: CellValue | undefined;
@@ -92,10 +79,8 @@ readonly previous: CellValue | undefined;
 
 </details>
 
-<details class="api-member" id="row-bridge-cell-next" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-cell-next" data-pagefind-weight="1">
 <summary><code>next</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly next: CellValue | undefined;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly next: CellValue | undefined;
@@ -108,8 +93,6 @@ readonly next: CellValue | undefined;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RowBridgeCell&lt;Id extends RowBridgeId = RowBridgeId&gt; {&#10;  readonly sheet: SheetId;&#10;  readonly row: number;&#10;  readonly rowId: Id | null;&#10;  readonly col: number;&#10;  readonly columnKey: string | null;&#10;  readonly previous: CellValue | undefined;&#10;  readonly next: CellValue | undefined;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RowBridgeCell<Id extends RowBridgeId = RowBridgeId> {
@@ -152,46 +135,3 @@ export interface RowBridgeCell<Id extends RowBridgeId = RowBridgeId> {
 <li><a href="/docs/api/core-adapter/row-bridge-range-delta/"><code>RowBridgeRangeDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

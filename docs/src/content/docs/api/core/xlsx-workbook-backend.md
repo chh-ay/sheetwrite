@@ -8,18 +8,15 @@ description: "Optional backend contract for complete workbook XLSX interchange."
 Optional backend contract for complete workbook XLSX interchange.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L418</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L418"><code>packages/core/src/export.ts#L418</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="xlsx-workbook-backend-name" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-workbook-backend-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="name: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: string;
@@ -27,10 +24,8 @@ name: string;
 
 </details>
 
-<details class="api-member" id="xlsx-workbook-backend-to-xlsx-workbook" data-pagefind-weight="1" open>
+<details class="api-member" id="xlsx-workbook-backend-to-xlsx-workbook" data-pagefind-weight="1">
 <summary><code>toXlsxWorkbook</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise&lt;Uint8Array&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
@@ -40,8 +35,6 @@ toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promi
 
 <details class="api-member" id="xlsx-workbook-backend-from-xlsx-workbook" data-pagefind-weight="1">
 <summary><code>fromXlsxWorkbook</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise&lt;WorkbookSnapshot&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>;
@@ -54,8 +47,6 @@ fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions,
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface XlsxWorkbookBackend {&#10;  name: string;&#10;  toXlsxWorkbook(&#10;    snapshot: WorkbookSnapshot,&#10;    options?: XlsxWorkbookOptions,&#10;  ): Promise&lt;Uint8Array&gt;;&#10;  fromXlsxWorkbook(&#10;    data: ArrayBuffer | Uint8Array,&#10;    options?: XlsxWorkbookOptions,&#10;  ): Promise&lt;WorkbookSnapshot&gt;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface XlsxWorkbookBackend {
@@ -94,46 +85,3 @@ export interface XlsxWorkbookBackend {
 <li><a href="/docs/api/xlsx/sheetwrite-workbook-backend/"><code>sheetwriteWorkbookBackend</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

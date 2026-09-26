@@ -8,8 +8,7 @@ description: "Workbook, data, rendering, policy, and built-in UI options used to
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L323</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L323"><code>packages/core/src/types/grid.ts#L323</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -37,10 +36,8 @@ Workbook, data, rendering, policy, and built-in UI options used to create a Grid
 
 <div class="api-member-list">
 
-<details class="api-member" id="grid-options-workbook" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-workbook" data-pagefind-weight="1">
 <summary><code>workbook</code> <span class="api-member-summary">Live workbook schema adopted by the store and updated by document operations.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="workbook: Workbook;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 workbook: Workbook;
@@ -48,10 +45,8 @@ workbook: Workbook;
 
 </details>
 
-<details class="api-member" id="grid-options-data" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-data" data-pagefind-weight="1">
 <summary><code>data</code> <span class="api-member-summary">Eager column-major values loaded into workbook.activeSheet; use instead of datasource.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="data?: ColumnarData;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 data?: ColumnarData;
@@ -59,10 +54,8 @@ data?: ColumnarData;
 
 </details>
 
-<details class="api-member" id="grid-options-datasource" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-datasource" data-pagefind-weight="1">
 <summary><code>datasource</code> <span class="api-member-summary">Lazy row provider requested for visible windows; use instead of eager data.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="datasource?: DataSource;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 datasource?: DataSource;
@@ -70,10 +63,8 @@ datasource?: DataSource;
 
 </details>
 
-<details class="api-member" id="grid-options-datasource-storage" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-datasource-storage" data-pagefind-weight="1">
 <summary><code>datasourceStorage</code> <span class="api-member-summary">Allocation and cache policy for datasource-backed cell storage.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="datasourceStorage?: DataSourceStorageOptions;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 datasourceStorage?: DataSourceStorageOptions;
@@ -81,10 +72,8 @@ datasourceStorage?: DataSourceStorageOptions;
 
 </details>
 
-<details class="api-member" id="grid-options-renderer" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-renderer" data-pagefind-weight="1">
 <summary><code>renderer</code> <span class="api-member-summary">Paint backend; defaults to main-thread canvas and falls back there if a worker fails.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="renderer?: &quot;canvas&quot; | &quot;worker&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 renderer?: "canvas" | "worker";
@@ -92,10 +81,8 @@ renderer?: "canvas" | "worker";
 
 </details>
 
-<details class="api-member" id="grid-options-worker-url" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-worker-url" data-pagefind-weight="1">
 <summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER — the platform Worker constructor does not consult package exports, so a bare specifier like new URL(&quot;@sheetwrite/core/worker&quot;,…</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="workerUrl?: string | URL;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 workerUrl?: string | URL;
@@ -112,10 +99,8 @@ can't be constructed, the grid falls back to the main-thread canvas
 renderer and emits `renderer-fallback` once.</p>
 </details>
 
-<details class="api-member" id="grid-options-presentation" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-presentation" data-pagefind-weight="1">
 <summary><code>presentation</code> <span class="api-member-summary">Header presentation. Spreadsheet mode (default) paints positional A/B/C labels; data-grid mode paints each column's semantic header.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="presentation?: GridPresentation;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 presentation?: GridPresentation;
@@ -127,10 +112,8 @@ addressing, row indices, clipboard values, formulas, and exports are
 unchanged in both modes.</p>
 </details>
 
-<details class="api-member" id="grid-options-theme" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-theme" data-pagefind-weight="1">
 <summary><code>theme</code> <span class="api-member-summary">Overrides merged over the default theme and host CSS custom properties.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="theme?: Partial&lt;Theme&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 theme?: Partial<Theme>;
@@ -138,10 +121,8 @@ theme?: Partial<Theme>;
 
 </details>
 
-<details class="api-member" id="grid-options-read-only" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-read-only" data-pagefind-weight="1">
 <summary><code>readOnly</code> <span class="api-member-summary">Disables mutating interactions while preserving navigation and selection.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="readOnly?: boolean;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readOnly?: boolean;
@@ -149,10 +130,8 @@ readOnly?: boolean;
 
 </details>
 
-<details class="api-member" id="grid-options-hyperlink-activation" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-hyperlink-activation" data-pagefind-weight="1">
 <summary><code>hyperlinkActivation</code> <span class="api-member-summary">Hyperlink activation never opens a browser URL.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="hyperlinkActivation?: &quot;event-only&quot; | &quot;internal-navigation&quot; | &quot;disabled&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 hyperlinkActivation?: "event-only" | "internal-navigation" | "disabled";
@@ -163,10 +142,8 @@ emits a safe resolved target; `internal-navigation` additionally moves to
 stable internal destinations; `disabled` rejects every activation request.</p>
 </details>
 
-<details class="api-member" id="grid-options-protection-resolver" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-protection-resolver" data-pagefind-weight="1">
 <summary><code>protectionResolver</code> <span class="api-member-summary">Host-owned client UX permission check.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="protectionResolver?: ProtectionResolver;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 protectionResolver?: ProtectionResolver;
@@ -176,10 +153,8 @@ protectionResolver?: ProtectionResolver;
 every submitted operation; this resolver is not an authentication boundary.</p>
 </details>
 
-<details class="api-member" id="grid-options-mutation-policy" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-mutation-policy" data-pagefind-weight="1">
 <summary><code>mutationPolicy</code> <span class="api-member-summary">Atomic rejects the transaction; partial skips denied operation objects.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="mutationPolicy?: MutationPolicyMode;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 mutationPolicy?: MutationPolicyMode;
@@ -187,10 +162,8 @@ mutationPolicy?: MutationPolicyMode;
 
 </details>
 
-<details class="api-member" id="grid-options-transaction-resource-limits" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-transaction-resource-limits" data-pagefind-weight="1">
 <summary><code>transactionResourceLimits</code> <span class="api-member-summary">Overrides inclusive operation-count and encoded-byte ceilings for every atomic mutation.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="transactionResourceLimits?: Partial&lt;TransactionResourceLimits&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 transactionResourceLimits?: Partial<TransactionResourceLimits>;
@@ -198,10 +171,8 @@ transactionResourceLimits?: Partial<TransactionResourceLimits>;
 
 </details>
 
-<details class="api-member" id="grid-options-renderers" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-renderers" data-pagefind-weight="1">
 <summary><code>renderers</code> <span class="api-member-summary">Custom cell renderers registered up front; also see Grid.defineCellRenderer.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="renderers?: Record&lt;string, CellRenderer&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 renderers?: Record<string, CellRenderer>;
@@ -209,10 +180,8 @@ renderers?: Record<string, CellRenderer>;
 
 </details>
 
-<details class="api-member" id="grid-options-editors" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-editors" data-pagefind-weight="1">
 <summary><code>editors</code> <span class="api-member-summary">Named custom editors resolved from each column's editor field.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="editors?: Record&lt;string, CellEditor&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 editors?: Record<string, CellEditor>;
@@ -220,10 +189,8 @@ editors?: Record<string, CellEditor>;
 
 </details>
 
-<details class="api-member" id="grid-options-overscan" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-overscan" data-pagefind-weight="1">
 <summary><code>overscan</code> <span class="api-member-summary">Extra row and visible-column positions painted on each viewport edge.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="overscan?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 overscan?: number;
@@ -233,10 +200,8 @@ overscan?: number;
 Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
-<details class="api-member" id="grid-options-min-columns" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-min-columns" data-pagefind-weight="1">
 <summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns (empty padding columns past the data, like a spreadsheet).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="minColumns?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 minColumns?: number;
@@ -244,10 +209,8 @@ minColumns?: number;
 
 </details>
 
-<details class="api-member" id="grid-options-config" data-pagefind-weight="1" open>
+<details class="api-member" id="grid-options-config" data-pagefind-weight="1">
 <summary><code>config</code> <span class="api-member-summary">Built-in UI controls; providing an object enables the toolbar unless toolbar is false.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="config?: GridConfig;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 config?: GridConfig;
@@ -260,8 +223,6 @@ config?: GridConfig;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface GridOptions {&#10;  workbook: Workbook;&#10;  data?: ColumnarData;&#10;  datasource?: DataSource;&#10;  datasourceStorage?: DataSourceStorageOptions;&#10;  renderer?: &quot;canvas&quot; | &quot;worker&quot;;&#10;  workerUrl?: string | URL;&#10;  presentation?: GridPresentation;&#10;  theme?: Partial&lt;Theme&gt;;&#10;  readOnly?: boolean;&#10;  hyperlinkActivation?: &quot;event-only&quot; | &quot;internal-navigation&quot; | &quot;disabled&quot;;&#10;  protectionResolver?: ProtectionResolver;&#10;  mutationPolicy?: MutationPolicyMode;&#10;  transactionResourceLimits?: Partial&lt;TransactionResourceLimits&gt;;&#10;  renderers?: Record&lt;string, CellRenderer&gt;;&#10;  editors?: Record&lt;string, CellEditor&gt;;&#10;  overscan?: number;&#10;  minColumns?: number;&#10;  config?: GridConfig;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface GridOptions {
@@ -316,46 +277,3 @@ export interface GridOptions {
 <li><a href="/docs/api/vue/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

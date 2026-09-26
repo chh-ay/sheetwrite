@@ -8,8 +8,7 @@ description: "Identity, privacy, and timing options for presence coordination."
 Identity, privacy, and timing options for presence coordination.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L40</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L40"><code>packages/core/src/collaboration.ts#L40</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -26,10 +25,8 @@ Identity, privacy, and timing options for presence coordination.
 
 <div class="api-member-list">
 
-<details class="api-member" id="presence-coordinator-options-actor" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-actor" data-pagefind-weight="1">
 <summary><code>actor</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="actor: PresenceActor;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 actor: PresenceActor;
@@ -37,10 +34,8 @@ actor: PresenceActor;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-options-privacy" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-privacy" data-pagefind-weight="1">
 <summary><code>privacy</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="privacy?: PresencePrivacyOptions;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 privacy?: PresencePrivacyOptions;
@@ -48,10 +43,8 @@ privacy?: PresencePrivacyOptions;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-options-heartbeat-ms" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-heartbeat-ms" data-pagefind-weight="1">
 <summary><code>heartbeatMs</code> <span class="api-member-summary">Publish/prune interval in milliseconds; defaults to 15,000.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="heartbeatMs?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 heartbeatMs?: number;
@@ -60,10 +53,8 @@ heartbeatMs?: number;
 <p class="api-member-doc">Publish/prune interval in milliseconds; defaults to 15,000. Use 0 to disable the timer.</p>
 </details>
 
-<details class="api-member" id="presence-coordinator-options-timeout-ms" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-timeout-ms" data-pagefind-weight="1">
 <summary><code>timeoutMs</code> <span class="api-member-summary">Idle receipt time before a remote actor expires; defaults to 45,000 milliseconds.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="timeoutMs?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 timeoutMs?: number;
@@ -71,10 +62,8 @@ timeoutMs?: number;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-options-max-actors" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-max-actors" data-pagefind-weight="1">
 <summary><code>maxActors</code> <span class="api-member-summary">Remote actors retained at once; defaults to 32 and is clamped to at least 1.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="maxActors?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 maxActors?: number;
@@ -82,10 +71,8 @@ maxActors?: number;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-options-max-ranges-per-actor" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-max-ranges-per-actor" data-pagefind-weight="1">
 <summary><code>maxRangesPerActor</code> <span class="api-member-summary">Selection ranges sent or accepted per actor; defaults to 8 and is clamped to at least 1.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="maxRangesPerActor?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 maxRangesPerActor?: number;
@@ -93,10 +80,8 @@ maxRangesPerActor?: number;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-options-now" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-options-now" data-pagefind-weight="1">
 <summary><code>now</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="now?: () =&gt; number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 now?: () => number;
@@ -109,8 +94,6 @@ now?: () => number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface PresenceCoordinatorOptions {&#10;  actor: PresenceActor;&#10;  privacy?: PresencePrivacyOptions;&#10;  heartbeatMs?: number;&#10;  timeoutMs?: number;&#10;  maxActors?: number;&#10;  maxRangesPerActor?: number;&#10;  now?: () =&gt; number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface PresenceCoordinatorOptions {
@@ -146,46 +129,3 @@ export interface PresenceCoordinatorOptions {
 <li><a href="/docs/api/core/presence-coordinator/"><code>PresenceCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

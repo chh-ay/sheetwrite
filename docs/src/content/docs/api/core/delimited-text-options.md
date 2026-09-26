@@ -8,18 +8,15 @@ description: "Optional resource ceilings for an in-memory delimited-text operati
 Optional resource ceilings for an in-memory delimited-text operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/delimited-text.ts#L21</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L21"><code>packages/core/src/delimited-text.ts#L21</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="delimited-text-options-resource-limits" data-pagefind-weight="1" open>
+<details class="api-member" id="delimited-text-options-resource-limits" data-pagefind-weight="1">
 <summary><code>resourceLimits</code> <span class="api-member-summary">Positive safe-integer overrides merged over DEFAULTDELIMITEDTEXTRESOURCELIMITS.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="resourceLimits?: Partial&lt;DelimitedTextResourceLimits&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 resourceLimits?: Partial<DelimitedTextResourceLimits>;
@@ -33,8 +30,6 @@ resourceLimits?: Partial<DelimitedTextResourceLimits>;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface DelimitedTextOptions {&#10;  resourceLimits?: Partial&lt;DelimitedTextResourceLimits&gt;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface DelimitedTextOptions {
@@ -67,46 +62,3 @@ export interface DelimitedTextOptions {
 <li><a href="/docs/api/core/to-tsv/"><code>toTsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

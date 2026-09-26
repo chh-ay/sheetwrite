@@ -8,18 +8,15 @@ description: "Retained lifecycle returned by a custom editor's mount method."
 Retained lifecycle returned by a custom editor's mount method.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/react</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L36</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L36"><code>packages/core/dist/types/grid.d.ts#L36</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="cell-editor-instance-update" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-instance-update" data-pagefind-weight="1">
 <summary><code>update</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="update(context: CellEditorContext): void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 update(context: CellEditorContext): void;
@@ -27,10 +24,8 @@ update(context: CellEditorContext): void;
 
 </details>
 
-<details class="api-member" id="cell-editor-instance-reposition" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-instance-reposition" data-pagefind-weight="1">
 <summary><code>reposition</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="reposition(rect: CellEditorRect): void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 reposition(rect: CellEditorRect): void;
@@ -41,18 +36,14 @@ reposition(rect: CellEditorRect): void;
 <details class="api-member" id="cell-editor-instance-commit" data-pagefind-weight="1">
 <summary><code>commit</code></summary>
 
-<button class="api-copy" type="button" data-copy-code="commit(navigation: CellEditorNavigation): string | undefined | Promise&lt;string | undefined&gt;;" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>;
 ```
 
 </details>
 
-<details class="api-member" id="cell-editor-instance-cancel" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-instance-cancel" data-pagefind-weight="1">
 <summary><code>cancel</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="cancel(): void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 cancel(): void;
@@ -60,10 +51,8 @@ cancel(): void;
 
 </details>
 
-<details class="api-member" id="cell-editor-instance-destroy" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-editor-instance-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="destroy(): void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 destroy(): void;
@@ -76,8 +65,6 @@ destroy(): void;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface CellEditorInstance {&#10;  update(context: CellEditorContext): void;&#10;  reposition(rect: CellEditorRect): void;&#10;  commit(&#10;    navigation: CellEditorNavigation,&#10;  ): string | undefined | Promise&lt;string | undefined&gt;;&#10;  cancel(): void;&#10;  destroy(): void;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface CellEditorInstance {
@@ -111,46 +98,3 @@ export interface CellEditorInstance {
 <li><a href="/docs/api/vue/cell-editor/"><code>CellEditor</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,16 +8,13 @@ description: "Outcome of applying a document transaction, including conflict, re
 Outcome of applying a document transaction, including conflict, rejection, and no-op states.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L35</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L35"><code>packages/core/src/types/transaction.ts#L35</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  status: &quot;applied&quot;;&#10;  epoch: number;&#10;  transaction: Transaction;&#10;  warnings?: MutationIssue[];&#10;  rejections?: MutationIssue[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -32,8 +29,6 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{&#10;  status: &quot;conflict&quot;;&#10;  expectedEpoch: number;&#10;  actualEpoch: number;&#10;}" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 {
   status: "conflict";
@@ -45,8 +40,6 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 </div>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{&#10;  status: &quot;rejected&quot;;&#10;  epoch: number;&#10;  issues: MutationIssue[];&#10;}" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 {
   status: "rejected";
@@ -57,8 +50,6 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{&#10;  status: &quot;noop&quot;;&#10;  epoch: number;&#10;  reason: &quot;empty&quot; | &quot;out-of-bounds&quot; | &quot;incomplete-data&quot; | &quot;read-only&quot;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 {
@@ -75,8 +66,6 @@ Outcome of applying a document transaction, including conflict, rejection, and n
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type ApplyTransactionResult =&#10;  | {&#10;      status: &quot;applied&quot;;&#10;      epoch: number;&#10;      transaction: Transaction;&#10;      warnings?: MutationIssue[];&#10;      rejections?: MutationIssue[];&#10;    }&#10;  | {&#10;      status: &quot;conflict&quot;;&#10;      expectedEpoch: number;&#10;      actualEpoch: number;&#10;    }&#10;  | {&#10;      status: &quot;rejected&quot;;&#10;      epoch: number;&#10;      issues: MutationIssue[];&#10;    }&#10;  | {&#10;      status: &quot;noop&quot;;&#10;      epoch: number;&#10;      reason: &quot;empty&quot; | &quot;out-of-bounds&quot; | &quot;incomplete-data&quot; | &quot;read-only&quot;;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type ApplyTransactionResult =
@@ -132,46 +121,3 @@ export type ApplyTransactionResult =
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

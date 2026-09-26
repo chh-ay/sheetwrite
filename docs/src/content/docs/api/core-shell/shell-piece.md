@@ -8,18 +8,15 @@ description: "A mounted shell piece: its root element plus an idempotent teardow
 A mounted shell piece: its root element plus an idempotent teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L13</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L13"><code>packages/core/src/shell/formula-controls.ts#L13</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="shell-piece-element" data-pagefind-weight="1" open>
+<details class="api-member" id="shell-piece-element" data-pagefind-weight="1">
 <summary><code>element</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly element: HTMLElement;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly element: HTMLElement;
@@ -27,10 +24,8 @@ readonly element: HTMLElement;
 
 </details>
 
-<details class="api-member" id="shell-piece-destroy" data-pagefind-weight="1" open>
+<details class="api-member" id="shell-piece-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="destroy(): void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 destroy(): void;
@@ -43,8 +38,6 @@ destroy(): void;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface ShellPiece {&#10;  readonly element: HTMLElement;&#10;  destroy(): void;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface ShellPiece {
@@ -77,46 +70,3 @@ export interface ShellPiece {
 <li><a href="/docs/api/core-shell/create-toolbar/"><code>createToolbar</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

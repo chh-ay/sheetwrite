@@ -9,9 +9,10 @@ export interface OutlineItem {
 
 /**
  * Outline of the rendered document: h2/h3 headings (ids come from rehype-slug
- * in the prerendered HTML) plus generated API member rows. Read from the DOM
- * because that is the one source the shell and the generator cannot disagree
- * about - the ids the reader can click are exactly the ids the article has.
+ * in the prerendered HTML) plus, on pages without their own member index,
+ * generated API member rows. Read from the DOM because that is the one source
+ * the shell and the generator cannot disagree about - the ids the reader can
+ * click are exactly the ids the article has.
  */
 export function useDocumentOutline(): readonly OutlineItem[] {
   const [items, setItems] = useState<readonly OutlineItem[]>([]);
@@ -29,9 +30,15 @@ export function useDocumentOutline(): readonly OutlineItem[] {
 
     const scan = (): void => {
       const collected: OutlineItem[] = [];
-      for (const node of article.querySelectorAll<HTMLElement>(
-        "h2[id], h3[id], details.api-member[id]",
-      )) {
+      // Generated member lists carry their own anchor index at the top, so the
+      // rail lists headings instead of repeating every member a second time.
+      const memberTargets =
+        article.querySelector(".api-member-index") === null
+          ? "h2[id], h3[id], details.api-member[id]"
+          : "h2[id], h3[id]";
+      for (const node of article.querySelectorAll<HTMLElement>(memberTargets)) {
+        // Search-target anchors are invisible duplicates of the member rows.
+        if (node.classList.contains("api-search-anchor")) continue;
         const isMember = node.tagName === "DETAILS";
         // Member rows: only the name code, never the trailing doc summary.
         // Headings: own text minus decorations like the .api-count chip.
@@ -119,9 +126,8 @@ function OutlineLinks({
 const MIN_OUTLINE_ENTRIES = 2;
 
 /**
- * Right-rail outline for wide viewports, where site.css lays the document out
- * as a two-column grid. Hidden below 88rem, where the disclosure above the
- * article carries the same links.
+ * Right-rail outline for guide and API pages on wide screens. Smaller
+ * viewports use the disclosure above the article instead.
  */
 export function TableOfContents({ items }: Readonly<{ items: readonly OutlineItem[] }>) {
   const active = useActiveHeading(items);
@@ -138,10 +144,6 @@ export function TableOfContents({ items }: Readonly<{ items: readonly OutlineIte
  * The same outline as a disclosure under the page title: a long guide needs an
  * outline on a laptop and a phone too, not only in the rail's 88rem-and-up
  * window. Native `<details>`, so opening it needs no script.
- *
- * The collapsed summary renders on every page, empty or not, so the outline
- * cannot push the article down when it arrives; site-shell.css keeps an empty
- * slot invisible rather than offering a disclosure that opens onto nothing.
  */
 export function InlineTableOfContents({ items }: Readonly<{ items: readonly OutlineItem[] }>) {
   return (

@@ -8,18 +8,15 @@ description: "Aggregate ceilings for local commits retained until durable acknow
 Aggregate ceilings for local commits retained until durable acknowledgement.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L102</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L102"><code>packages/core/src/sync.ts#L102</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="sync-pending-queue-limits-max-pending-commits" data-pagefind-weight="1" open>
+<details class="api-member" id="sync-pending-queue-limits-max-pending-commits" data-pagefind-weight="1">
 <summary><code>maxPendingCommits</code> <span class="api-member-summary">Pending local commits, including synchronous reservations; defaults to 10,000.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="maxPendingCommits: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 maxPendingCommits: number;
@@ -27,10 +24,8 @@ maxPendingCommits: number;
 
 </details>
 
-<details class="api-member" id="sync-pending-queue-limits-max-pending-operations" data-pagefind-weight="1" open>
+<details class="api-member" id="sync-pending-queue-limits-max-pending-operations" data-pagefind-weight="1">
 <summary><code>maxPendingOperations</code> <span class="api-member-summary">Aggregate DocumentOp count across pending commits; defaults to 100,000.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="maxPendingOperations: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 maxPendingOperations: number;
@@ -38,10 +33,8 @@ maxPendingOperations: number;
 
 </details>
 
-<details class="api-member" id="sync-pending-queue-limits-max-pending-encoded-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="sync-pending-queue-limits-max-pending-encoded-bytes" data-pagefind-weight="1">
 <summary><code>maxPendingEncodedBytes</code> <span class="api-member-summary">Aggregate UTF-8 bytes across pending operation arrays; defaults to 128 MiB.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="maxPendingEncodedBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 maxPendingEncodedBytes: number;
@@ -54,8 +47,6 @@ maxPendingEncodedBytes: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface SyncPendingQueueLimits {&#10;  maxPendingCommits: number;&#10;  maxPendingOperations: number;&#10;  maxPendingEncodedBytes: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface SyncPendingQueueLimits {
@@ -87,46 +78,3 @@ export interface SyncPendingQueueLimits {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,8 +8,7 @@ description: "A clearRange effect expanded to its exact changed cells."
 A clearRange effect expanded to its exact changed cells.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L81</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L81"><code>packages/core/src/row-bridge.ts#L81</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -29,10 +28,8 @@ A clearRange effect expanded to its exact changed cells.
 
 <div class="api-member-list">
 
-<details class="api-member" id="row-bridge-clear-delta-kind" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-kind" data-pagefind-weight="1">
 <summary><code>kind</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly kind: &quot;clear&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly kind: "clear";
@@ -40,10 +37,8 @@ readonly kind: "clear";
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-range" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly range: Range;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly range: Range;
@@ -51,10 +46,8 @@ readonly range: Range;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-cells" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly cells: readonly RowBridgeCell&lt;Id&gt;[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly cells: readonly RowBridgeCell<Id>[];
@@ -62,10 +55,8 @@ readonly cells: readonly RowBridgeCell<Id>[];
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-transaction" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-transaction" data-pagefind-weight="1">
 <summary><code>transaction</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly transaction: RowBridgeTransaction;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly transaction: RowBridgeTransaction;
@@ -73,10 +64,8 @@ readonly transaction: RowBridgeTransaction;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-transaction-id" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-transaction-id" data-pagefind-weight="1">
 <summary><code>transactionId</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly transactionId: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly transactionId: string;
@@ -84,10 +73,8 @@ readonly transactionId: string;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-source" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-source" data-pagefind-weight="1">
 <summary><code>source</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly source: OperationSource;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly source: OperationSource;
@@ -95,10 +82,8 @@ readonly source: OperationSource;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-previous" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-previous" data-pagefind-weight="1">
 <summary><code>previous</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly previous: unknown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly previous: unknown;
@@ -106,10 +91,8 @@ readonly previous: unknown;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-next" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-next" data-pagefind-weight="1">
 <summary><code>next</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly next: unknown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly next: unknown;
@@ -117,10 +100,8 @@ readonly next: unknown;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operation: DocumentOp;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operation: DocumentOp;
@@ -128,10 +109,8 @@ readonly operation: DocumentOp;
 
 </details>
 
-<details class="api-member" id="row-bridge-clear-delta-row-ids" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-clear-delta-row-ids" data-pagefind-weight="1">
 <summary><code>rowIds</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly rowIds: readonly (Id | null)[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly rowIds: readonly (Id | null)[];
@@ -144,8 +123,6 @@ readonly rowIds: readonly (Id | null)[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RowBridgeClearDelta&lt;Id extends RowBridgeId = RowBridgeId&gt; {&#10;  readonly kind: &quot;clear&quot;;&#10;  readonly range: Range;&#10;  readonly cells: readonly RowBridgeCell&lt;Id&gt;[];&#10;  readonly transaction: RowBridgeTransaction;&#10;  readonly transactionId: string;&#10;  readonly source: OperationSource;&#10;  readonly previous: unknown;&#10;  readonly next: unknown;&#10;  readonly operation: DocumentOp;&#10;  readonly rowIds: readonly (Id | null)[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RowBridgeClearDelta<Id extends RowBridgeId = RowBridgeId> {
@@ -188,46 +165,3 @@ export interface RowBridgeClearDelta<Id extends RowBridgeId = RowBridgeId> {
 <li><a href="/docs/api/vue/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

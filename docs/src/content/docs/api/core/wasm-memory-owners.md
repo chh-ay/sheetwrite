@@ -8,15 +8,12 @@ description: "Stable ordered owner list encoded by the WASM store-memory protoco
 Stable ordered owner list encoded by the WASM store-memory protocol.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L13</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L13"><code>packages/core/src/resource-accounting.ts#L13</code></a></dd></div>
 </dl>
 
 ## Declaration
 
 <div class="api-declaration-open" data-pagefind-ignore>
-
-<button class="api-copy" type="button" data-copy-code="const WASM_MEMORY_OWNERS: readonly [&#10;  &quot;wasm.dense.kinds&quot;,&#10;  &quot;wasm.dense.payloads&quot;,&#10;  &quot;wasm.dense.styles&quot;,&#10;  &quot;wasm.paged.kinds&quot;,&#10;  &quot;wasm.paged.payloads&quot;,&#10;  &quot;wasm.paged.styles&quot;,&#10;  &quot;wasm.paged.loaded-bitmaps&quot;,&#10;  &quot;wasm.paged.dirty-bitmaps&quot;,&#10;  &quot;wasm.paged.indexes&quot;,&#10;  &quot;wasm.string-pool.utf8&quot;,&#10;  &quot;wasm.string-pool.spans&quot;,&#10;  &quot;wasm.string-index&quot;,&#10;  &quot;wasm.formulas&quot;,&#10;  &quot;wasm.dependency-nodes&quot;,&#10;  &quot;wasm.dependency-edges&quot;,&#10;  &quot;wasm.sheet-indexes-metadata&quot;,&#10;  &quot;wasm.spill-ranges&quot;,&#10;  &quot;wasm.spill-owners&quot;,&#10;  &quot;wasm.spill-blockers&quot;,&#10;]" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 const WASM_MEMORY_OWNERS: readonly [
@@ -64,46 +61,3 @@ const WASM_MEMORY_OWNERS: readonly [
 <li><a href="/docs/api/core/wasm-memory-owner/"><code>WasmMemoryOwner</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

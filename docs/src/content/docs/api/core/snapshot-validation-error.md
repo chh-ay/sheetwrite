@@ -8,18 +8,15 @@ description: "Path-qualified schema failure found while validating an untrusted 
 Path-qualified schema failure found while validating an untrusted snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L235</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L235"><code>packages/core/src/document-protocol.ts#L235</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="snapshot-validation-error-constructor" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-validation-error-constructor" data-pagefind-weight="1">
 <summary><code>constructor</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="constructor(errors: readonly DocumentValidationError[]);" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 constructor(errors: readonly DocumentValidationError[]);
@@ -27,10 +24,8 @@ constructor(errors: readonly DocumentValidationError[]);
 
 </details>
 
-<details class="api-member" id="snapshot-validation-error-errors" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-validation-error-errors" data-pagefind-weight="1">
 <summary><code>errors</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="errors: readonly DocumentValidationError[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 errors: readonly DocumentValidationError[];
@@ -38,10 +33,8 @@ errors: readonly DocumentValidationError[];
 
 </details>
 
-<details class="api-member" id="snapshot-validation-error-name" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-validation-error-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="name: &quot;SnapshotValidationError&quot;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: "SnapshotValidationError"
@@ -54,8 +47,6 @@ name: "SnapshotValidationError"
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="class SnapshotValidationError extends SheetwriteError {&#10;  constructor(errors: readonly DocumentValidationError[]);&#10;  errors: readonly DocumentValidationError[];&#10;  name: &quot;SnapshotValidationError&quot;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 class SnapshotValidationError extends SheetwriteError {
@@ -87,46 +78,3 @@ class SnapshotValidationError extends SheetwriteError {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

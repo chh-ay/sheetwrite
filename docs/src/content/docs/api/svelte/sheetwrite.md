@@ -10,15 +10,12 @@ Convenience component for local object rows. Bind `grid` to access the live `Gri
 Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte/src/Sheetwrite.svelte.d.ts#L7</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/Sheetwrite.svelte.d.ts#L7"><code>packages/svelte/src/Sheetwrite.svelte.d.ts#L7</code></a></dd></div>
 </dl>
 
 ## Declaration
 
 <div class="api-declaration-open" data-pagefind-ignore>
-
-<button class="api-copy" type="button" data-copy-code="function Sheetwrite(&#10;  this: void,&#10;  internals: ComponentInternals,&#10;  props: SheetwriteProps&lt;Record&lt;string, CellScalar&gt;&gt;,&#10;): {&#10;  $on?(type: string, callback: (e: any) =&gt; void): () =&gt; void;&#10;  $set?(props: Partial&lt;SheetwriteProps&lt;Record&lt;string, CellScalar&gt;&gt;&gt;): void;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 function Sheetwrite(
@@ -48,46 +45,3 @@ function Sheetwrite(
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,18 +8,15 @@ description: "Host elements and callbacks used to bind a formula bar to a Grid."
 Host elements and callbacks used to bind a formula bar to a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L116</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L116"><code>packages/core/src/shell/formula-controls.ts#L116</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="formula-bar-options-focus-grid" data-pagefind-weight="1" open>
+<details class="api-member" id="formula-bar-options-focus-grid" data-pagefind-weight="1">
 <summary><code>focusGrid</code> <span class="api-member-summary">Called after Enter commits or Escape cancels, so the grid regains focus.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="focusGrid?: () =&gt; void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 focusGrid?: () => void;
@@ -27,10 +24,8 @@ focusGrid?: () => void;
 
 </details>
 
-<details class="api-member" id="formula-bar-options-label" data-pagefind-weight="1" open>
+<details class="api-member" id="formula-bar-options-label" data-pagefind-weight="1">
 <summary><code>label</code> <span class="api-member-summary">Accessible label (default &quot;Formula bar&quot;).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="label?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 label?: string;
@@ -43,8 +38,6 @@ label?: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface FormulaBarOptions {&#10;  focusGrid?: () =&gt; void;&#10;  label?: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface FormulaBarOptions {
@@ -75,46 +68,3 @@ export interface FormulaBarOptions {
 <li><a href="/docs/api/core-shell/create-formula-bar/"><code>createFormulaBar</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -8,8 +8,7 @@ description: "Fixed-cardinality boundary crossing counters for one operation."
 Fixed-cardinality boundary crossing counters for one operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L72</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L72"><code>packages/core/src/resource-accounting.ts#L72</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -26,10 +25,8 @@ Fixed-cardinality boundary crossing counters for one operation.
 
 <div class="api-member-list">
 
-<details class="api-member" id="boundary-operation-stats-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operation: RuntimeResourceOperation;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operation: RuntimeResourceOperation;
@@ -37,10 +34,8 @@ readonly operation: RuntimeResourceOperation;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-ffi-calls" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-ffi-calls" data-pagefind-weight="1">
 <summary><code>ffiCalls</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly ffiCalls: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly ffiCalls: number;
@@ -48,10 +43,8 @@ readonly ffiCalls: number;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-js-to-wasm-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-js-to-wasm-bytes" data-pagefind-weight="1">
 <summary><code>jsToWasmBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly jsToWasmBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly jsToWasmBytes: number;
@@ -59,10 +52,8 @@ readonly jsToWasmBytes: number;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-wasm-to-js-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-wasm-to-js-bytes" data-pagefind-weight="1">
 <summary><code>wasmToJsBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly wasmToJsBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly wasmToJsBytes: number;
@@ -70,10 +61,8 @@ readonly wasmToJsBytes: number;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-largest-transfer-bytes" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-largest-transfer-bytes" data-pagefind-weight="1">
 <summary><code>largestTransferBytes</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly largestTransferBytes: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly largestTransferBytes: number;
@@ -81,10 +70,8 @@ readonly largestTransferBytes: number;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-bulk-calls" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-bulk-calls" data-pagefind-weight="1">
 <summary><code>bulkCalls</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly bulkCalls: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly bulkCalls: number;
@@ -92,10 +79,8 @@ readonly bulkCalls: number;
 
 </details>
 
-<details class="api-member" id="boundary-operation-stats-scalar-calls" data-pagefind-weight="1" open>
+<details class="api-member" id="boundary-operation-stats-scalar-calls" data-pagefind-weight="1">
 <summary><code>scalarCalls</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly scalarCalls: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly scalarCalls: number;
@@ -108,8 +93,6 @@ readonly scalarCalls: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface BoundaryOperationStats {&#10;  readonly operation: RuntimeResourceOperation;&#10;  readonly ffiCalls: number;&#10;  readonly jsToWasmBytes: number;&#10;  readonly wasmToJsBytes: number;&#10;  readonly largestTransferBytes: number;&#10;  readonly bulkCalls: number;&#10;  readonly scalarCalls: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface BoundaryOperationStats {
@@ -146,46 +129,3 @@ export interface BoundaryOperationStats {
 <li><a href="/docs/api/core/runtime-resource-snapshot/"><code>RuntimeResourceSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

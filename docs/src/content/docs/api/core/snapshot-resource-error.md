@@ -8,8 +8,7 @@ description: "Stable resource failure raised by direct workbook construction pat
 Stable resource failure raised by direct workbook construction paths.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L194</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L194"><code>packages/core/src/document-protocol.ts#L194</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -19,18 +18,14 @@ Stable resource failure raised by direct workbook construction paths.
 <details class="api-member" id="snapshot-resource-error-constructor" data-pagefind-weight="1">
 <summary><code>constructor</code></summary>
 
-<button class="api-copy" type="button" data-copy-code="constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions);" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 constructor(resource: keyof SnapshotResourceLimits, limit: number, actual: number, options?: ErrorOptions);
 ```
 
 </details>
 
-<details class="api-member" id="snapshot-resource-error-actual" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-resource-error-actual" data-pagefind-weight="1">
 <summary><code>actual</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="actual: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 actual: number;
@@ -38,10 +33,8 @@ actual: number;
 
 </details>
 
-<details class="api-member" id="snapshot-resource-error-limit" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-resource-error-limit" data-pagefind-weight="1">
 <summary><code>limit</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="limit: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 limit: number;
@@ -49,10 +42,8 @@ limit: number;
 
 </details>
 
-<details class="api-member" id="snapshot-resource-error-name" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-resource-error-name" data-pagefind-weight="1">
 <summary><code>name</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="name: &quot;SnapshotResourceError&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 name: "SnapshotResourceError";
@@ -60,10 +51,8 @@ name: "SnapshotResourceError";
 
 </details>
 
-<details class="api-member" id="snapshot-resource-error-resource" data-pagefind-weight="1" open>
+<details class="api-member" id="snapshot-resource-error-resource" data-pagefind-weight="1">
 <summary><code>resource</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="resource: keyof SnapshotResourceLimits" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 resource: keyof SnapshotResourceLimits
@@ -76,8 +65,6 @@ resource: keyof SnapshotResourceLimits
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="class SnapshotResourceError extends SheetwriteError {&#10;  constructor(&#10;    resource: keyof SnapshotResourceLimits,&#10;    limit: number,&#10;    actual: number,&#10;    options?: ErrorOptions,&#10;  );&#10;  actual: number;&#10;  limit: number;&#10;  name: &quot;SnapshotResourceError&quot;;&#10;  resource: keyof SnapshotResourceLimits;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 class SnapshotResourceError extends SheetwriteError {
@@ -116,46 +103,3 @@ class SnapshotResourceError extends SheetwriteError {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

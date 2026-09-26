@@ -8,8 +8,7 @@ description: "An explicit projection record for an operation with no row-space m
 An explicit projection record for an operation with no row-space meaning.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L148</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L148"><code>packages/core/src/row-bridge.ts#L148</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -28,10 +27,8 @@ An explicit projection record for an operation with no row-space meaning.
 
 <div class="api-member-list">
 
-<details class="api-member" id="row-bridge-unprojectable-delta-kind" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-kind" data-pagefind-weight="1">
 <summary><code>kind</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly kind: &quot;unprojectable&quot;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly kind: "unprojectable";
@@ -39,10 +36,8 @@ readonly kind: "unprojectable";
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-reason" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-reason" data-pagefind-weight="1">
 <summary><code>reason</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly reason: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly reason: string;
@@ -50,10 +45,8 @@ readonly reason: string;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-transaction" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-transaction" data-pagefind-weight="1">
 <summary><code>transaction</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly transaction: RowBridgeTransaction;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly transaction: RowBridgeTransaction;
@@ -61,10 +54,8 @@ readonly transaction: RowBridgeTransaction;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-transaction-id" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-transaction-id" data-pagefind-weight="1">
 <summary><code>transactionId</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly transactionId: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly transactionId: string;
@@ -72,10 +63,8 @@ readonly transactionId: string;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-source" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-source" data-pagefind-weight="1">
 <summary><code>source</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly source: OperationSource;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly source: OperationSource;
@@ -83,10 +72,8 @@ readonly source: OperationSource;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-previous" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-previous" data-pagefind-weight="1">
 <summary><code>previous</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly previous: unknown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly previous: unknown;
@@ -94,10 +81,8 @@ readonly previous: unknown;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-next" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-next" data-pagefind-weight="1">
 <summary><code>next</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly next: unknown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly next: unknown;
@@ -105,10 +90,8 @@ readonly next: unknown;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operation: DocumentOp;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operation: DocumentOp;
@@ -116,10 +99,8 @@ readonly operation: DocumentOp;
 
 </details>
 
-<details class="api-member" id="row-bridge-unprojectable-delta-row-ids" data-pagefind-weight="1" open>
+<details class="api-member" id="row-bridge-unprojectable-delta-row-ids" data-pagefind-weight="1">
 <summary><code>rowIds</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly rowIds: readonly (Id | null)[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly rowIds: readonly (Id | null)[];
@@ -132,8 +113,6 @@ readonly rowIds: readonly (Id | null)[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RowBridgeUnprojectableDelta&lt;&#10;  Id extends RowBridgeId = RowBridgeId,&#10;&gt; {&#10;  readonly kind: &quot;unprojectable&quot;;&#10;  readonly reason: string;&#10;  readonly transaction: RowBridgeTransaction;&#10;  readonly transactionId: string;&#10;  readonly source: OperationSource;&#10;  readonly previous: unknown;&#10;  readonly next: unknown;&#10;  readonly operation: DocumentOp;&#10;  readonly rowIds: readonly (Id | null)[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RowBridgeUnprojectableDelta<
@@ -177,46 +156,3 @@ export interface RowBridgeUnprojectableDelta<
 <li><a href="/docs/api/vue/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

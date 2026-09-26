@@ -8,18 +8,15 @@ description: "Host load and commit contract for versioned workbook persistence."
 Host load and commit contract for versioned workbook persistence.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/transaction.ts#L123</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L123"><code>packages/core/src/types/transaction.ts#L123</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="persistence-adapter-load" data-pagefind-weight="1" open>
+<details class="api-member" id="persistence-adapter-load" data-pagefind-weight="1">
 <summary><code>load</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="load(documentId: string, signal?: AbortSignal): Promise&lt;WorkbookSnapshot&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
@@ -27,10 +24,8 @@ load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
 
 </details>
 
-<details class="api-member" id="persistence-adapter-commit" data-pagefind-weight="1" open>
+<details class="api-member" id="persistence-adapter-commit" data-pagefind-weight="1">
 <summary><code>commit</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="commit(request: PersistenceCommitRequest): Promise&lt;PersistenceCommitResponse&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
@@ -43,8 +38,6 @@ commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface PersistenceAdapter {&#10;  load(documentId: string, signal?: AbortSignal): Promise&lt;WorkbookSnapshot&gt;;&#10;  commit(&#10;    request: PersistenceCommitRequest,&#10;  ): Promise&lt;PersistenceCommitResponse&gt;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface PersistenceAdapter {
@@ -78,46 +71,3 @@ export interface PersistenceAdapter {
 <li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

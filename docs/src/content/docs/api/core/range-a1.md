@@ -8,15 +8,12 @@ description: "Two cell corners → A1 range (\"A1:B3\"), collapsing to a single 
 Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/a1.ts#L30</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/a1.ts#L30"><code>packages/core/src/a1.ts#L30</code></a></dd></div>
 </dl>
 
 ## Declaration
 
 <div class="api-declaration-open" data-pagefind-ignore>
-
-<button class="api-copy" type="button" data-copy-code="function rangeA1(a: CellRef, b: CellRef): string" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 function rangeA1(a: CellRef, b: CellRef): string
@@ -44,46 +41,3 @@ function rangeA1(a: CellRef, b: CellRef): string
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

@@ -46,26 +46,47 @@ const representativeRoutes = [
   "api/xlsx/",
 ] as const;
 
-test("documentation root serves the overview", async ({ page }) => {
-  await page.goto(docsUrl());
-  await expect(page).toHaveURL(docsUrl());
-  await expect(page.locator("main h1")).toHaveText("Build web spreadsheets you still own.");
-  await expect(page.locator('.sw-sidebar__nav a[href="/docs/"]')).toBeVisible();
-});
-
-test("sidebar lists performance inside the start section", async ({ page }) => {
-  await page.goto(docsUrl());
-  const navigation = page.getByRole("navigation", { name: "Documentation" });
-  const start = navigation.getByRole("heading", { name: "Start" }).locator("..");
-
-  await expect(start.getByRole("link")).toHaveText([
-    "Overview",
-    "Installation",
-    "First grid",
-    "Performance",
-  ]);
-  await expect(navigation.getByRole("heading", { name: "Benchmark" })).toHaveCount(0);
-});
+for (const [width, hasDesktopOutline] of [
+  [390, false],
+  [1440, true],
+] as const) {
+  test(`documentation has a visible route back home at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(docsUrl("api/core/grid/"));
+    await waitForHydration(page);
+    if (hasDesktopOutline) {
+      await expect(
+        page.getByRole("navigation", { name: "On this page", exact: true }),
+      ).toBeVisible();
+    }
+    await page
+      .getByRole("navigation", { name: "Product links" })
+      .getByRole("link", { name: "Home", exact: true })
+      .click();
+    await expect(page).toHaveURL(siteUrl("/"));
+    await page
+      .getByRole("navigation", { name: "Site", exact: true })
+      .getByRole("link", { name: "Docs", exact: true })
+      .click();
+    await expect(page).toHaveURL(docsUrl());
+    await expect(page.getByRole("navigation", { name: "On this page", exact: true })).toHaveCount(
+      0,
+    );
+    if (width < 1024) {
+      await page.getByRole("button", { name: "Documentation menu", exact: true }).click();
+      await page
+        .getByRole("dialog", { name: "Documentation", exact: true })
+        .getByRole("link", { name: "Showcases", exact: true })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: "Product links" })
+        .getByRole("link", { name: "Showcases", exact: true })
+        .click();
+    }
+    await expect(page).toHaveURL(siteUrl("/showcases/"));
+  });
+}
 
 test("sidebar marks only the nearest documentation route as current", async ({ page }) => {
   for (const [path, label] of [
@@ -420,23 +441,6 @@ test.describe("documentation site", () => {
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
     await expect(page.locator(":focus")).toHaveAttribute("href", /#_top|#main-content/);
-  });
-
-  test("desktop documentation article is centered within its pane", async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto(docsUrl("start/installation/"));
-    const gutters = await page.evaluate(() => {
-      const sidebar = document.querySelector(".sw-sidebar")?.getBoundingClientRect();
-      const article = document.querySelector(".sw-document")?.getBoundingClientRect();
-      if (!sidebar || !article) return null;
-      return {
-        left: article.left - sidebar.right,
-        right: window.innerWidth - article.right,
-      };
-    });
-
-    expect(gutters).not.toBeNull();
-    expect(Math.abs((gutters?.left ?? 0) - (gutters?.right ?? 0))).toBeLessThanOrEqual(1);
   });
 
   test("documentation tokens resolve into the critical computed surfaces", async ({ page }) => {
@@ -854,7 +858,8 @@ test.describe("documentation site", () => {
     await page.locator(`a[href="${SITE_BASE}/docs/api/core/grid/"]`).first().click();
     await expect(page).toHaveURL(/\/docs\/api\/core\/grid\/$/);
     await expect(page.locator("main h1")).toContainText("Grid");
-    await expect(page.locator(".api-member").first()).not.toHaveAttribute("open");
+    await expect(page.locator(".api-member[open]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /copy/i })).toHaveCount(0);
     await page.locator("#grid-get-cell-at-point summary").click();
     await expect(page.locator("#grid-get-cell-at-point pre")).toContainText(
       "clientX: number, clientY: number",
@@ -913,12 +918,22 @@ test.describe("documentation site", () => {
     await page.goto(docsUrl("start/installation/"));
     await waitForHydration(page);
 
-    const navigation = page.getByRole("navigation", { name: "Documentation" });
+    const menu = page.getByRole("button", { name: "Documentation menu", exact: true });
+    await menu.click();
+    const drawer = page.getByRole("dialog", { name: "Documentation", exact: true });
+    const navigation = drawer.getByRole("navigation", { name: "Documentation", exact: true });
     await expect(navigation).toBeVisible();
     await expect(navigation.getByRole("link", { name: "Installation" })).toHaveAttribute(
       "aria-current",
       "page",
     );
+    await page.keyboard.press("Escape");
+    await expect(drawer).not.toBeVisible();
+    await expect(menu).toBeFocused();
+    await menu.click();
+    await navigation.getByRole("link", { name: "First grid", exact: true }).click();
+    await expect(page).toHaveURL(docsUrl("start/first-grid/"));
+    await expect(drawer).not.toBeVisible();
     const theme = page.getByRole("button", { name: "Use light theme" });
     await expect(theme).toBeVisible();
     await theme.click();
@@ -927,12 +942,8 @@ test.describe("documentation site", () => {
 
     const layout = await page.evaluate(() => ({
       fits: document.documentElement.scrollWidth <= window.innerWidth,
-      navigationScrollable:
-        (document.querySelector(".sw-sidebar__nav")?.scrollWidth ?? 0) >=
-        (document.querySelector(".sw-sidebar__nav")?.clientWidth ?? 0),
     }));
     expect(layout.fits).toBe(true);
-    expect(layout.navigationScrollable).toBe(true);
   });
 
   test("documentation live example renders request-aware context-menu items", async ({ page }) => {

@@ -8,18 +8,15 @@ description: "Owner and runtime deltas between two phases of the same operation.
 Owner and runtime deltas between two phases of the same operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/resource-accounting.ts#L123</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/resource-accounting.ts#L123"><code>packages/core/src/resource-accounting.ts#L123</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="runtime-resource-phase-delta-schema-version" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-phase-delta-schema-version" data-pagefind-weight="1">
 <summary><code>schemaVersion</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
@@ -27,10 +24,8 @@ readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
 
 </details>
 
-<details class="api-member" id="runtime-resource-phase-delta-operation" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-phase-delta-operation" data-pagefind-weight="1">
 <summary><code>operation</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly operation: RuntimeResourceOperation;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly operation: RuntimeResourceOperation;
@@ -38,10 +33,8 @@ readonly operation: RuntimeResourceOperation;
 
 </details>
 
-<details class="api-member" id="runtime-resource-phase-delta-from" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-phase-delta-from" data-pagefind-weight="1">
 <summary><code>from</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly from: RuntimeResourcePhase;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly from: RuntimeResourcePhase;
@@ -49,10 +42,8 @@ readonly from: RuntimeResourcePhase;
 
 </details>
 
-<details class="api-member" id="runtime-resource-phase-delta-to" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-phase-delta-to" data-pagefind-weight="1">
 <summary><code>to</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly to: RuntimeResourcePhase;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly to: RuntimeResourcePhase;
@@ -60,10 +51,8 @@ readonly to: RuntimeResourcePhase;
 
 </details>
 
-<details class="api-member" id="runtime-resource-phase-delta-owners" data-pagefind-weight="1" open>
+<details class="api-member" id="runtime-resource-phase-delta-owners" data-pagefind-weight="1">
 <summary><code>owners</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly owners: readonly ResourceOwnerDelta[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly owners: readonly ResourceOwnerDelta[];
@@ -73,8 +62,6 @@ readonly owners: readonly ResourceOwnerDelta[];
 
 <details class="api-member" id="runtime-resource-phase-delta-runtime" data-pagefind-weight="1">
 <summary><code>runtime</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly runtime: { readonly usedJSHeapSize: number | null; readonly arrayBufferBytes: number | null; readonly externalBytes: number | null; readonly browserBackingStoreBytes: number | null; };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly runtime: { readonly usedJSHeapSize: number | null; readonly arrayBufferBytes: number | null; readonly externalBytes: number | null; readonly browserBackingStoreBytes: number | null; };
@@ -87,8 +74,6 @@ readonly runtime: { readonly usedJSHeapSize: number | null; readonly arrayBuffer
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RuntimeResourcePhaseDelta {&#10;  readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;&#10;  readonly operation: RuntimeResourceOperation;&#10;  readonly from: RuntimeResourcePhase;&#10;  readonly to: RuntimeResourcePhase;&#10;  readonly owners: readonly ResourceOwnerDelta[];&#10;  readonly runtime: {&#10;    readonly usedJSHeapSize: number | null;&#10;    readonly arrayBufferBytes: number | null;&#10;    readonly externalBytes: number | null;&#10;    readonly browserBackingStoreBytes: number | null;&#10;  };&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RuntimeResourcePhaseDelta {
@@ -128,46 +113,3 @@ export interface RuntimeResourcePhaseDelta {
 <li><a href="/docs/api/core/diff-runtime-resource-phases/"><code>diffRuntimeResourcePhases</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

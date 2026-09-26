@@ -10,8 +10,7 @@ that counts its invocations in `calls`, so tests can assert paint activity
 (e.g. `ctx.calls.fillText > 0`) without a real canvas.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L10</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/testing.ts#L10"><code>packages/core/src/testing.ts#L10</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -29,10 +28,8 @@ that counts its invocations in `calls`, so tests can assert paint activity
 
 <div class="api-member-list">
 
-<details class="api-member" id="recording-context2-d-calls" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-calls" data-pagefind-weight="1">
 <summary><code>calls</code> <span class="api-member-summary">Per-method invocation counts, keyed by the 2D-context method name.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="readonly calls: Record&lt;string, number&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 readonly calls: Record<string, number>;
@@ -40,10 +37,8 @@ readonly calls: Record<string, number>;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-fill-style" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-fill-style" data-pagefind-weight="1">
 <summary><code>fillStyle</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="fillStyle: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 fillStyle: string;
@@ -51,10 +46,8 @@ fillStyle: string;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-stroke-style" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-stroke-style" data-pagefind-weight="1">
 <summary><code>strokeStyle</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="strokeStyle: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 strokeStyle: string;
@@ -62,10 +55,8 @@ strokeStyle: string;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-font" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-font" data-pagefind-weight="1">
 <summary><code>font</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="font: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 font: string;
@@ -73,10 +64,8 @@ font: string;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-text-align" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-text-align" data-pagefind-weight="1">
 <summary><code>textAlign</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="textAlign: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 textAlign: string;
@@ -84,10 +73,8 @@ textAlign: string;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-text-baseline" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-text-baseline" data-pagefind-weight="1">
 <summary><code>textBaseline</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="textBaseline: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 textBaseline: string;
@@ -95,10 +82,8 @@ textBaseline: string;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-line-width" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-line-width" data-pagefind-weight="1">
 <summary><code>lineWidth</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="lineWidth: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 lineWidth: number;
@@ -106,10 +91,8 @@ lineWidth: number;
 
 </details>
 
-<details class="api-member" id="recording-context2-d-index" data-pagefind-weight="1" open>
+<details class="api-member" id="recording-context2-d-index" data-pagefind-weight="1">
 <summary><code>index</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="[method: string]: unknown;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 [method: string]: unknown;
@@ -122,8 +105,6 @@ lineWidth: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface RecordingContext2D {&#10;  readonly calls: Record&lt;string, number&gt;;&#10;  fillStyle: string;&#10;  strokeStyle: string;&#10;  font: string;&#10;  textAlign: string;&#10;  textBaseline: string;&#10;  lineWidth: number;&#10;  [method: string]: unknown;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface RecordingContext2D {
@@ -160,46 +141,3 @@ export interface RecordingContext2D {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

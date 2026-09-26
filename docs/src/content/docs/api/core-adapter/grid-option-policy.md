@@ -8,15 +8,12 @@ description: "Classification of adapter options as live-updatable or reset-sensi
 Classification of adapter options as live-updatable or reset-sensitive.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L69</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L69"><code>packages/core/src/adapter.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration
 
 <div class="api-declaration-open" data-pagefind-ignore>
-
-<button class="api-copy" type="button" data-copy-code="const GRID_OPTION_POLICY: {&#10;  readonly workbook: &quot;reset&quot;;&#10;  readonly data: &quot;reset&quot;;&#10;  readonly datasource: &quot;reset&quot;;&#10;  readonly datasourceStorage: &quot;reset&quot;;&#10;  readonly renderer: &quot;reset&quot;;&#10;  readonly workerUrl: &quot;reset&quot;;&#10;  readonly presentation: &quot;reset&quot;;&#10;  readonly renderers: &quot;reset&quot;;&#10;  readonly editors: &quot;reset&quot;;&#10;  readonly protectionResolver: &quot;reset&quot;;&#10;  readonly mutationPolicy: &quot;reset&quot;;&#10;  readonly transactionResourceLimits: &quot;reset&quot;;&#10;  readonly hyperlinkActivation: &quot;reset&quot;;&#10;  readonly theme: &quot;live&quot;;&#10;  readonly readOnly: &quot;live&quot;;&#10;  readonly config: &quot;live&quot;;&#10;  readonly overscan: &quot;live&quot;;&#10;  readonly minColumns: &quot;live&quot;;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 const GRID_OPTION_POLICY: {
@@ -63,46 +60,3 @@ const GRID_OPTION_POLICY: {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

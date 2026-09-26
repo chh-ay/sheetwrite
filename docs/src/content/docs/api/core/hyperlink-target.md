@@ -8,8 +8,7 @@ description: "Browser-safe external target or stable workbook-internal range tar
 Browser-safe external target or stable workbook-internal range target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L51</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L51"><code>packages/core/src/types/cell.ts#L51</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>
@@ -17,16 +16,12 @@ Browser-safe external target or stable workbook-internal range target.
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
 
-<button class="api-copy" type="button" data-copy-code="{ kind: &quot;external&quot;; url: string }" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 { kind: "external"; url: string }
 ```
 
 </div>
 <div class="api-variant">
-
-<button class="api-copy" type="button" data-copy-code="{ kind: &quot;internal&quot;; range: Range }" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 { kind: "internal"; range: Range }
@@ -39,8 +34,6 @@ Browser-safe external target or stable workbook-internal range target.
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export type HyperlinkTarget =&#10;  | {&#10;      kind: &quot;external&quot;;&#10;      url: string;&#10;    }&#10;  | {&#10;      kind: &quot;internal&quot;;&#10;      range: Range;&#10;    };" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export type HyperlinkTarget =
@@ -77,46 +70,3 @@ export type HyperlinkTarget =
 <li><a href="/docs/api/core/resolve-hyperlink-target/"><code>resolveHyperlinkTarget</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

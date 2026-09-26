@@ -8,18 +8,15 @@ description: "Path-qualified validation failure for a document operation."
 Path-qualified validation failure for a document operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L215</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L215"><code>packages/core/src/document-protocol.ts#L215</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="document-validation-error-path" data-pagefind-weight="1" open>
+<details class="api-member" id="document-validation-error-path" data-pagefind-weight="1">
 <summary><code>path</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="path: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 path: string;
@@ -30,18 +27,14 @@ path: string;
 <details class="api-member" id="document-validation-error-code" data-pagefind-weight="1">
 <summary><code>code</code></summary>
 
-<button class="api-copy" type="button" data-copy-code="code: | &quot;unsupported-schema&quot; | &quot;invalid-value&quot; | &quot;duplicate-id&quot; | &quot;missing-reference&quot; | &quot;out-of-bounds&quot; | &quot;overlapping-merge&quot; | &quot;non-serializable&quot; | &quot;resource-limit&quot;;" data-pagefind-ignore>Copy</button>
-
 ```ts generated
 code: | "unsupported-schema" | "invalid-value" | "duplicate-id" | "missing-reference" | "out-of-bounds" | "overlapping-merge" | "non-serializable" | "resource-limit";
 ```
 
 </details>
 
-<details class="api-member" id="document-validation-error-message" data-pagefind-weight="1" open>
+<details class="api-member" id="document-validation-error-message" data-pagefind-weight="1">
 <summary><code>message</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="message: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 message: string;
@@ -54,8 +47,6 @@ message: string;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface DocumentValidationError {&#10;  path: string;&#10;  code:&#10;    | &quot;unsupported-schema&quot;&#10;    | &quot;invalid-value&quot;&#10;    | &quot;duplicate-id&quot;&#10;    | &quot;missing-reference&quot;&#10;    | &quot;out-of-bounds&quot;&#10;    | &quot;overlapping-merge&quot;&#10;    | &quot;non-serializable&quot;&#10;    | &quot;resource-limit&quot;;&#10;  message: string;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface DocumentValidationError {
@@ -96,46 +87,3 @@ export interface DocumentValidationError {
 <li><a href="/docs/api/core/snapshot-validation-error/"><code>SnapshotValidationError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

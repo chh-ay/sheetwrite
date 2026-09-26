@@ -8,18 +8,15 @@ description: "Sparse row-major cells bounded by one rectangular block."
 Sparse row-major cells bounded by one rectangular block.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L327</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L327"><code>packages/core/src/types/document.ts#L327</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="cell-block-start-row" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-block-start-row" data-pagefind-weight="1">
 <summary><code>startRow</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="startRow: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 startRow: number;
@@ -27,10 +24,8 @@ startRow: number;
 
 </details>
 
-<details class="api-member" id="cell-block-start-col" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-block-start-col" data-pagefind-weight="1">
 <summary><code>startCol</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="startCol: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 startCol: number;
@@ -38,10 +33,8 @@ startCol: number;
 
 </details>
 
-<details class="api-member" id="cell-block-row-count" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-block-row-count" data-pagefind-weight="1">
 <summary><code>rowCount</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="rowCount: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 rowCount: number;
@@ -49,10 +42,8 @@ rowCount: number;
 
 </details>
 
-<details class="api-member" id="cell-block-col-count" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-block-col-count" data-pagefind-weight="1">
 <summary><code>colCount</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="colCount: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 colCount: number;
@@ -60,10 +51,8 @@ colCount: number;
 
 </details>
 
-<details class="api-member" id="cell-block-cells" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-block-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="cells: SnapshotCell[];" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 cells: SnapshotCell[];
@@ -76,8 +65,6 @@ cells: SnapshotCell[];
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface CellBlock {&#10;  startRow: number;&#10;  startCol: number;&#10;  rowCount: number;&#10;  colCount: number;&#10;  cells: SnapshotCell[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface CellBlock {
@@ -111,46 +98,3 @@ export interface CellBlock {
 <li><a href="/docs/api/core/sheet-snapshot/"><code>SheetSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

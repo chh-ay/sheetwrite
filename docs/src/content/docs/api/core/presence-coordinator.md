@@ -8,18 +8,15 @@ description: "Ephemeral presence lifecycle; it never calls a document mutation A
 Ephemeral presence lifecycle; it never calls a document mutation API.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L78</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L78"><code>packages/core/src/collaboration.ts#L78</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="presence-coordinator-constructor" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-constructor" data-pagefind-weight="1">
 <summary><code>constructor</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="constructor(grid: Grid, transport: PresenceTransport, options: PresenceCoordinatorOptions);" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 constructor(grid: Grid, transport: PresenceTransport, options: PresenceCoordinatorOptions);
@@ -27,10 +24,8 @@ constructor(grid: Grid, transport: PresenceTransport, options: PresenceCoordinat
 
 </details>
 
-<details class="api-member" id="presence-coordinator-destroy" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-destroy" data-pagefind-weight="1">
 <summary><code>destroy</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="destroy: () =&gt; void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 destroy: () => void;
@@ -38,10 +33,8 @@ destroy: () => void;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-on" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-on" data-pagefind-weight="1">
 <summary><code>on</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="on: (listener: PresenceListener) =&gt; () =&gt; void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 on: (listener: PresenceListener) => () => void;
@@ -49,10 +42,8 @@ on: (listener: PresenceListener) => () => void;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-prune-stale" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-prune-stale" data-pagefind-weight="1">
 <summary><code>pruneStale</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="pruneStale: () =&gt; void;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 pruneStale: () => void;
@@ -60,10 +51,8 @@ pruneStale: () => void;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-publish-now" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-publish-now" data-pagefind-weight="1">
 <summary><code>publishNow</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="publishNow: () =&gt; Promise&lt;void&gt;;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 publishNow: () => Promise<void>;
@@ -71,10 +60,8 @@ publishNow: () => Promise<void>;
 
 </details>
 
-<details class="api-member" id="presence-coordinator-remote-presence" data-pagefind-weight="1" open>
+<details class="api-member" id="presence-coordinator-remote-presence" data-pagefind-weight="1">
 <summary><code>remotePresence</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="remotePresence: () =&gt; readonly PresenceMessage[]" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 remotePresence: () => readonly PresenceMessage[]
@@ -87,8 +74,6 @@ remotePresence: () => readonly PresenceMessage[]
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="class PresenceCoordinator {&#10;  constructor(&#10;    grid: Grid,&#10;    transport: PresenceTransport,&#10;    options: PresenceCoordinatorOptions,&#10;  );&#10;  destroy: () =&gt; void;&#10;  on: (listener: PresenceListener) =&gt; () =&gt; void;&#10;  pruneStale: () =&gt; void;&#10;  publishNow: () =&gt; Promise&lt;void&gt;;&#10;  remotePresence: () =&gt; readonly PresenceMessage[];&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 class PresenceCoordinator {
@@ -127,46 +112,3 @@ class PresenceCoordinator {
 <li>None.</li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

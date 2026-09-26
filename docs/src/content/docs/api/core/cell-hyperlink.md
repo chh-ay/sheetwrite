@@ -8,18 +8,15 @@ description: "Bounded serializable hyperlink metadata applied to one cell or ran
 Bounded serializable hyperlink metadata applied to one cell or range.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L56</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L56"><code>packages/core/src/types/cell.ts#L56</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="cell-hyperlink-id" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-hyperlink-id" data-pagefind-weight="1">
 <summary><code>id</code> <span class="api-member-summary">Stable identity used by operations, history, and collaboration rebase.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="id: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 id: string;
@@ -27,10 +24,8 @@ id: string;
 
 </details>
 
-<details class="api-member" id="cell-hyperlink-range" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-hyperlink-range" data-pagefind-weight="1">
 <summary><code>range</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="range: Range;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 range: Range;
@@ -38,10 +33,8 @@ range: Range;
 
 </details>
 
-<details class="api-member" id="cell-hyperlink-target" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-hyperlink-target" data-pagefind-weight="1">
 <summary><code>target</code></summary>
-
-<button class="api-copy" type="button" data-copy-code="target: HyperlinkTarget;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 target: HyperlinkTarget;
@@ -49,10 +42,8 @@ target: HyperlinkTarget;
 
 </details>
 
-<details class="api-member" id="cell-hyperlink-display" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-hyperlink-display" data-pagefind-weight="1">
 <summary><code>display</code> <span class="api-member-summary">Optional accessible/OOXML display label; cell values remain authoritative.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="display?: string;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 display?: string;
@@ -60,10 +51,8 @@ display?: string;
 
 </details>
 
-<details class="api-member" id="cell-hyperlink-style" data-pagefind-weight="1" open>
+<details class="api-member" id="cell-hyperlink-style" data-pagefind-weight="1">
 <summary><code>style</code> <span class="api-member-summary">Optional override merged over the deterministic blue/underline link style.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="style?: CellStyle;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 style?: CellStyle;
@@ -76,8 +65,6 @@ style?: CellStyle;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface CellHyperlink {&#10;  id: string;&#10;  range: Range;&#10;  target: HyperlinkTarget;&#10;  display?: string;&#10;  style?: CellStyle;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface CellHyperlink {
@@ -120,46 +107,3 @@ export interface CellHyperlink {
 <li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>

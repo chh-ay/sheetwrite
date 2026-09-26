@@ -8,18 +8,15 @@ description: "Layout dimensions installed by installCanvasTestStubs in DOM test 
 Layout dimensions installed by [`installCanvasTestStubs`](/docs/api/core-testing/install-canvas-test-stubs/) in DOM test environments.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/testing</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/testing.ts#L23</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/testing.ts#L23"><code>packages/core/src/testing.ts#L23</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
-<details class="api-member" id="canvas-test-stub-options-width" data-pagefind-weight="1" open>
+<details class="api-member" id="canvas-test-stub-options-width" data-pagefind-weight="1">
 <summary><code>width</code> <span class="api-member-summary">Stubbed clientWidth for every element (happy-dom/jsdom have no layout).</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="width?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 width?: number;
@@ -28,10 +25,8 @@ width?: number;
 <p class="api-member-doc">Stubbed `clientWidth` for every element (happy-dom/jsdom have no layout). Default 800.</p>
 </details>
 
-<details class="api-member" id="canvas-test-stub-options-height" data-pagefind-weight="1" open>
+<details class="api-member" id="canvas-test-stub-options-height" data-pagefind-weight="1">
 <summary><code>height</code> <span class="api-member-summary">Stubbed clientHeight for every element.</span></summary>
-
-<button class="api-copy" type="button" data-copy-code="height?: number;" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 height?: number;
@@ -45,8 +40,6 @@ height?: number;
 
 <details class="api-declaration" data-pagefind-ignore>
 <summary>View full TypeScript declaration</summary>
-
-<button class="api-copy" type="button" data-copy-code="export interface CanvasTestStubOptions {&#10;  width?: number;&#10;  height?: number;&#10;}" data-pagefind-ignore>Copy</button>
 
 ```ts generated
 export interface CanvasTestStubOptions {
@@ -77,46 +70,3 @@ export interface CanvasTestStubOptions {
 <li><a href="/docs/api/core-testing/install-canvas-test-stubs/"><code>installCanvasTestStubs</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>
-
-<script>
-(() => {
-  if (window.__sheetwriteApiCopy !== undefined) return;
-  window.__sheetwriteApiCopy = true;
-  const selectCopy = (text) => {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.append(area);
-    area.select();
-    let copied = false;
-    try {
-      copied = document.execCommand("copy");
-    } catch {
-      copied = false;
-    }
-    area.remove();
-    return copied;
-  };
-  const copy = (button) => {
-    const text = button.dataset.copyCode ?? "";
-    const confirm = () => {
-      button.textContent = "Copied";
-      window.setTimeout(() => { button.textContent = "Copy"; }, 1400);
-    };
-    if (navigator.clipboard === undefined) {
-      if (selectCopy(text)) confirm();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(confirm, () => {
-      if (selectCopy(text)) confirm();
-    });
-  };
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const button = target instanceof Element ? target.closest(".api-copy") : null;
-    if (button !== null) copy(button);
-  });
-})();
-</script>
