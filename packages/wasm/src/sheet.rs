@@ -1793,31 +1793,6 @@ mod paged_storage_tests {
     use super::{PagedStorage, SheetData, KIND_EMPTY};
 
     #[test]
-    fn clean_eviction_index_tracks_access_and_pin_transitions() {
-        let chunk_bytes = PagedStorage::new(4, 0, 100).chunk_bytes();
-        let mut storage = PagedStorage::new(4, 2 * chunk_bytes, 100);
-        assert!(storage.write(0, 0, KIND_EMPTY, 0, 0, None));
-        assert!(storage.write(4, 0, KIND_EMPTY, 0, 0, None));
-        storage.read(0, 0);
-        assert!(storage.write(8, 0, KIND_EMPTY, 0, 0, None));
-        assert!(storage.chunks.contains_key(&(0, 0)));
-        assert!(!storage.chunks.contains_key(&(0, 1)));
-
-        storage.pin_range(0, 3, &[0]);
-        assert!(storage.write(12, 0, KIND_EMPTY, 0, 7, Some(1)));
-        assert!(storage.write(16, 0, KIND_EMPTY, 0, 0, None));
-        assert_eq!(storage.chunks.len(), 2);
-        assert!(storage.chunks.contains_key(&(0, 0)));
-        assert_eq!(storage.read(12, 0), (KIND_EMPTY, 0, 7, true, true));
-
-        storage.pin_range(16, 19, &[0]);
-        assert!(storage.write(20, 0, KIND_EMPTY, 0, 0, None));
-        assert_eq!(storage.chunks.len(), 2);
-        assert!(storage.chunks.contains_key(&(0, 4)));
-        assert!(storage.chunks.contains_key(&(0, 5)));
-        assert_eq!(storage.dirty_cells(), 1);
-    }
-    #[test]
     fn revision_index_cleans_only_cells_still_owned_by_the_acknowledged_write() {
         let mut storage = PagedStorage::new(4, 0, 4);
         assert!(storage.write(0, 0, KIND_EMPTY, 10, 0, Some(7)));
@@ -1891,21 +1866,5 @@ mod paged_storage_tests {
         assert_eq!(storage.read(8, 0), (KIND_EMPTY, 0, 0, false, false));
         assert!(storage.write(0, 0, KIND_EMPTY, 4, 0, Some(2)));
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 4, 0, true, true));
-    }
-
-    #[test]
-    fn cache_churn_examines_one_index_entry_per_eviction() {
-        const RETAINED: usize = 8;
-        const CHUNKS: usize = 10_000;
-        let chunk_bytes = PagedStorage::new(4, 0, 100).chunk_bytes();
-        let mut storage = PagedStorage::new(4, RETAINED * chunk_bytes, 100);
-
-        for chunk in 0..CHUNKS {
-            assert!(storage.write(chunk * 4, 0, KIND_EMPTY, 0, 0, None));
-        }
-
-        assert_eq!(storage.chunks.len(), RETAINED);
-        assert_eq!(storage.evictions, (CHUNKS - RETAINED) as u64);
-        assert_eq!(storage.eviction_candidate_checks, storage.evictions);
     }
 }

@@ -8,8 +8,7 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L374</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L374"><code>packages/core/src/types/document.ts#L374</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>33</span>
@@ -522,3 +521,36 @@ export type DocumentOp =
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>DocumentOp</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/document-op-target/"><code>documentOpTarget</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/document-rebase-result/"><code>DocumentRebaseResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-transaction/"><code>GridTransaction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/pending-commit/"><code>PendingCommit</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/persistence-commit-request/"><code>PersistenceCommitRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/protection-request/"><code>ProtectionRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/rebase-document-operations/"><code>rebaseDocumentOperations</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/row-bridge/"><code>RowBridge</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/row-bridge-clear-delta/"><code>RowBridgeClearDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/row-bridge-fill-delta/"><code>RowBridgeFillDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/row-bridge-host-action-delta/"><code>RowBridgeHostActionDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li class="api-consumer-more">and 30 more</li>
+</ul>
+</div>

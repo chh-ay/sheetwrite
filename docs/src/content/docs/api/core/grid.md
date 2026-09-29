@@ -8,9 +8,99 @@ description: "Imperative grid handle for document commands, events, rendering, a
 Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L478</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L478"><code>packages/core/src/types/grid.ts#L478</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-store"><code>store</code></a>
+<a href="#grid-actions"><code>actions</code></a>
+<a href="#grid-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
+<a href="#grid-get-command-state"><code>getCommandState</code></a>
+<a href="#grid-set-active-sheet"><code>setActiveSheet</code></a>
+<a href="#grid-scroll-to-cell"><code>scrollToCell</code></a>
+<a href="#grid-get-cell-at-point"><code>getCellAtPoint</code></a>
+<a href="#grid-get-active-sheet"><code>getActiveSheet</code></a>
+<a href="#grid-get-cell-input"><code>getCellInput</code></a>
+<a href="#grid-get-selection"><code>getSelection</code></a>
+<a href="#grid-set-selection"><code>setSelection</code></a>
+<a href="#grid-set-theme"><code>setTheme</code></a>
+<a href="#grid-replace-theme"><code>replaceTheme</code></a>
+<a href="#grid-get-effective-theme"><code>getEffectiveTheme</code></a>
+<a href="#grid-set-read-only"><code>setReadOnly</code></a>
+<a href="#grid-set-config"><code>setConfig</code></a>
+<a href="#grid-apply-transaction"><code>applyTransaction</code></a>
+<a href="#grid-export-snapshot"><code>exportSnapshot</code></a>
+<a href="#grid-apply-remote-operations"><code>applyRemoteOperations</code></a>
+<a href="#grid-define-cell-renderer"><code>defineCellRenderer</code></a>
+<a href="#grid-aggregate"><code>aggregate</code></a>
+<a href="#grid-sort-by"><code>sortBy</code></a>
+<a href="#grid-sort-by-multi"><code>sortByMulti</code></a>
+<a href="#grid-filter-by"><code>filterBy</code></a>
+<a href="#grid-set-column-filter"><code>setColumnFilter</code></a>
+<a href="#grid-set-sort"><code>setSort</code></a>
+<a href="#grid-get-column-filters"><code>getColumnFilters</code></a>
+<a href="#grid-distinct-values"><code>distinctValues</code></a>
+<a href="#grid-hide-rows"><code>hideRows</code></a>
+<a href="#grid-show-rows"><code>showRows</code></a>
+<a href="#grid-hidden-rows"><code>hiddenRows</code></a>
+<a href="#grid-hide-columns"><code>hideColumns</code></a>
+<a href="#grid-show-columns"><code>showColumns</code></a>
+<a href="#grid-hidden-columns"><code>hiddenColumns</code></a>
+<a href="#grid-group-rows"><code>groupRows</code></a>
+<a href="#grid-ungroup-rows"><code>ungroupRows</code></a>
+<a href="#grid-set-group-collapsed"><code>setGroupCollapsed</code></a>
+<a href="#grid-row-groups"><code>rowGroups</code></a>
+<a href="#grid-clear-view"><code>clearView</code></a>
+<a href="#grid-undo"><code>undo</code></a>
+<a href="#grid-redo"><code>redo</code></a>
+<a href="#grid-export-csv"><code>exportCsv</code></a>
+<a href="#grid-export-xlsx"><code>exportXlsx</code></a>
+<a href="#grid-search"><code>search</code></a>
+<a href="#grid-find-next"><code>findNext</code></a>
+<a href="#grid-find-prev"><code>findPrev</code></a>
+<a href="#grid-clear-search"><code>clearSearch</code></a>
+<a href="#grid-replace-current"><code>replaceCurrent</code></a>
+<a href="#grid-replace-all"><code>replaceAll</code></a>
+<a href="#grid-insert-rows"><code>insertRows</code></a>
+<a href="#grid-remove-rows"><code>removeRows</code></a>
+<a href="#grid-insert-columns"><code>insertColumns</code></a>
+<a href="#grid-remove-columns"><code>removeColumns</code></a>
+<a href="#grid-add-sheet"><code>addSheet</code></a>
+<a href="#grid-remove-sheet"><code>removeSheet</code></a>
+<a href="#grid-rename-sheet"><code>renameSheet</code></a>
+<a href="#grid-move-sheet"><code>moveSheet</code></a>
+<a href="#grid-set-sheet-visibility"><code>setSheetVisibility</code></a>
+<a href="#grid-set-conditional-formats"><code>setConditionalFormats</code></a>
+<a href="#grid-set-hyperlink"><code>setHyperlink</code></a>
+<a href="#grid-remove-hyperlink"><code>removeHyperlink</code></a>
+<a href="#grid-get-hyperlink"><code>getHyperlink</code></a>
+<a href="#grid-activate-hyperlink"><code>activateHyperlink</code></a>
+<a href="#grid-set-validation-rule"><code>setValidationRule</code></a>
+<a href="#grid-remove-validation-rule"><code>removeValidationRule</code></a>
+<a href="#grid-set-protected-range"><code>setProtectedRange</code></a>
+<a href="#grid-remove-protected-range"><code>removeProtectedRange</code></a>
+<a href="#grid-set-protection-resolver"><code>setProtectionResolver</code></a>
+<a href="#grid-set-note"><code>setNote</code></a>
+<a href="#grid-get-note"><code>getNote</code></a>
+<a href="#grid-set-overscan"><code>setOverscan</code></a>
+<a href="#grid-set-min-columns"><code>setMinColumns</code></a>
+<a href="#grid-highlight-cells"><code>highlightCells</code></a>
+<a href="#grid-set-presence-overlays"><code>setPresenceOverlays</code></a>
+<a href="#grid-style-range"><code>styleRange</code></a>
+<a href="#grid-begin-edit"><code>beginEdit</code></a>
+<a href="#grid-data-edge"><code>dataEdge</code></a>
+<a href="#grid-set-row-height"><code>setRowHeight</code></a>
+<a href="#grid-set-column-width"><code>setColumnWidth</code></a>
+<a href="#grid-auto-fit-rows"><code>autoFitRows</code></a>
+<a href="#grid-auto-fit-columns"><code>autoFitColumns</code></a>
+<a href="#grid-set-frozen"><code>setFrozen</code></a>
+<a href="#grid-set-zoom"><code>setZoom</code></a>
+<a href="#grid-get-zoom"><code>getZoom</code></a>
+<a href="#grid-renderer-kind"><code>rendererKind</code></a>
+<a href="#grid-on"><code>on</code></a>
+<a href="#grid-refresh"><code>refresh</code></a>
+<a href="#grid-destroy"><code>destroy</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>88</span>
 
@@ -982,3 +1072,36 @@ export interface Grid {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>Grid</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/cell-editor-context/"><code>CellEditorContext</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/context-menu-item/"><code>ContextMenuItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/create-grid/"><code>createGrid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/create-grid-from-snapshot/"><code>createGridFromSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-config/"><code>GridConfig</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/presence-coordinator/"><code>PresenceCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/revision-coordinator/"><code>RevisionCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/toolbar-item/"><code>ToolbarItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-workbook/"><code>toXlsxWorkbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-ready-event/"><code>GridReadyEvent</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li class="api-consumer-more">and 16 more</li>
+</ul>
+</div>

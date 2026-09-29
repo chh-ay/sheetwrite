@@ -12,9 +12,19 @@ part of the serialized document protocol. String payloads remain interned in
 the owning `CellStore`, so snapshots must only be restored into that store.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L334</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L334"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L334</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#range-snapshot-byte-length"><code>byteLength</code></a>
+<a href="#range-snapshot-formula-offsets"><code>formulaOffsets</code></a>
+<a href="#range-snapshot-formula-sources"><code>formulaSources</code></a>
+<a href="#range-snapshot-free"><code>free</code></a>
+<a href="#range-snapshot-kinds"><code>kinds</code></a>
+<a href="#range-snapshot-reference-offsets"><code>referenceOffsets</code></a>
+<a href="#range-snapshot-reference-targets"><code>referenceTargets</code></a>
+<a href="#range-snapshot-style-ids"><code>styleIds</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>
 
@@ -112,3 +122,21 @@ class RangeSnapshot {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>RangeSnapshot</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/wasm/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
+</ul>
+</div>

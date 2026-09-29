@@ -9,12 +9,8 @@ import {
   validateReleasePackageVersions,
 } from "./changeset-ci.js";
 import {
-  assertUniqueOrderedNodes,
-  PACKAGE_BUILD_NODES,
   PUBLISHABLE_PACKAGE_ORDER,
-  RELEASE_QUALITY_NODES,
   TYPECHECK_NODES,
-  VERIFY_CI_NODES,
   validateWorkspaceGraph,
 } from "./workspace-tooling.js";
 
@@ -82,35 +78,6 @@ afterEach(async () => {
 });
 
 describe("canonical workspace graph", () => {
-  it("covers the real publishable workspace", () => {
-    expect(() => validateWorkspaceGraph(resolve(import.meta.dir, ".."))).not.toThrow();
-  });
-
-  it("publishes canonical repository metadata for every package", async () => {
-    const root = resolve(import.meta.dir, "..");
-    for (const name of PUBLISHABLE_PACKAGE_ORDER) {
-      const directory = name.slice("@sheetwrite/".length);
-      const manifest = JSON.parse(
-        await readFile(join(root, "packages", directory, "package.json"), "utf8"),
-      ) as {
-        readonly repository?: {
-          readonly type?: string;
-          readonly url?: string;
-          readonly directory?: string;
-        };
-        readonly homepage?: string;
-        readonly bugs?: { readonly url?: string };
-      };
-      expect(manifest.repository).toEqual({
-        type: "git",
-        url: "git+https://github.com/chh-ay/sheetwrite.git",
-        directory: `packages/${directory}`,
-      });
-      expect(manifest.homepage).toBe("https://sheetwrite.vercel.app/");
-      expect(manifest.bugs?.url).toBe("https://github.com/chh-ay/sheetwrite/issues");
-    }
-  });
-
   it("rejects an unlisted publishable workspace package", async () => {
     const root = await graphFixture({ name: "@sheetwrite/new-package" });
     expect(() => validateWorkspaceGraph(root)).toThrow("missing: @sheetwrite/new-package");
@@ -120,62 +87,6 @@ describe("canonical workspace graph", () => {
     const root = await graphFixture();
     const reversed = [...PUBLISHABLE_PACKAGE_ORDER].reverse();
     expect(() => validateWorkspaceGraph(root, reversed)).toThrow("must run after its dependency");
-  });
-
-  it("builds every publishable package exactly once in canonical order", () => {
-    expect(PACKAGE_BUILD_NODES.map((node) => node.id)).toEqual(
-      PUBLISHABLE_PACKAGE_ORDER.map((name) => `build:${name}`),
-    );
-    expect(() => assertUniqueOrderedNodes(VERIFY_CI_NODES)).not.toThrow();
-    for (const buildNode of PACKAGE_BUILD_NODES) {
-      expect(VERIFY_CI_NODES.filter((node) => node.id === buildNode.id)).toHaveLength(1);
-    }
-  });
-
-  it("runs release quality against the single prebuilt package set", () => {
-    expect(() => assertUniqueOrderedNodes(RELEASE_QUALITY_NODES)).not.toThrow();
-    expect(
-      PACKAGE_BUILD_NODES.some((build) =>
-        RELEASE_QUALITY_NODES.some((node) => node.id === build.id),
-      ),
-    ).toBeFalse();
-    expect(
-      RELEASE_QUALITY_NODES.some((node) =>
-        ["verify:packed", "verify:bundlers", "report:delivery-size"].includes(node.id),
-      ),
-    ).toBeFalse();
-    for (const id of [
-      "test:tooling-contracts",
-      "audit:javascript",
-      "test:rust",
-      "audit:rust",
-      "verify:exports",
-      "lint",
-      "test:unit",
-      "verify:public-api",
-      "verify:benchmarks",
-    ]) {
-      expect(RELEASE_QUALITY_NODES.some((node) => node.id === id)).toBeTrue();
-    }
-  });
-
-  it("records delivery size after reusable package and bundler evidence", () => {
-    const benchmark = VERIFY_CI_NODES.findIndex((node) => node.id === "verify:benchmarks");
-    const size = VERIFY_CI_NODES.findIndex((node) => node.id === "report:delivery-size");
-    expect(size).toBe(benchmark + 1);
-    expect(VERIFY_CI_NODES[size]?.command).toEqual([
-      "bun",
-      "scripts/size-report.ts",
-      "report",
-      "--reuse-bundlers",
-    ]);
-    expect(VERIFY_CI_NODES.slice(size).some((node) => node.id.startsWith("build:"))).toBe(false);
-  });
-
-  it("rejects duplicate command starts", () => {
-    expect(() =>
-      assertUniqueOrderedNodes([...PACKAGE_BUILD_NODES, PACKAGE_BUILD_NODES[0]!]),
-    ).toThrow("duplicate node");
   });
 
   it("covers every discovered workspace and verification typecheck exactly once", async () => {

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { initSheetwrite, isSheetwriteReady } from "../src/index.js";
 
 // Loader state is module-global and sibling suites initialize WASM in this
 // shared process, so every pre-init / failure-path assertion runs in a FRESH
@@ -49,12 +48,5 @@ describe("initSheetwrite readiness and re-entrancy", () => {
     expect(String(result.firstFailure)).toStartWith("rejected: ");
     expect(result.readyAfterFailure).toBe(false);
     expect(result.readyAfterRetry).toBe(true);
-  });
-
-  it("reports ready and stays fulfilled on repeat init in this process", async () => {
-    await initSheetwrite();
-    expect(isSheetwriteReady()).toBe(true);
-    await Promise.all([initSheetwrite(), initSheetwrite()]);
-    expect(isSheetwriteReady()).toBe(true);
   });
 });

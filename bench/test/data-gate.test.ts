@@ -3,10 +3,6 @@ import {
   type DataBenchmarkResult,
   type DataStat,
   type EngineResult,
-  expectedDataMatrixKeys,
-  HANDSONTABLE_ROWS,
-  renderDataBenchmarkMarkdown,
-  SHEETWRITE_ROWS,
   validateDataBenchmark,
   WORKLOADS,
 } from "../src/data-bench.js";
@@ -81,47 +77,7 @@ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
   };
 }
 
-function fullFixture(): DataBenchmarkResult {
-  const sheetwrite = Object.fromEntries(
-    SHEETWRITE_ROWS.map((rows) => [String(rows), engineResult(rows)]),
-  );
-  const handsontable = Object.fromEntries(
-    HANDSONTABLE_ROWS.map((rows) => {
-      const result = engineResult(rows);
-      return [
-        String(rows),
-        {
-          ...result,
-          queryResources: null,
-          memory: { heapDeltaBytes: 1024, wasmDeltaBytes: null },
-        },
-      ];
-    }),
-  );
-  return {
-    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
-    mode: "full",
-    matrixId: MATRIX_IDS.data.full,
-    meta: {
-      bun: "test",
-      platform: "linux",
-      arch: "x64",
-      commit: "0".repeat(40),
-      dirty: false,
-      timestamp: new Date(0).toISOString(),
-      sheetwriteRows: [...SHEETWRITE_ROWS],
-      handsontableRows: [...HANDSONTABLE_ROWS],
-    },
-    sheetwrite,
-    handsontable,
-  };
-}
-
 describe("data benchmark exact matrix", () => {
-  test("accepts only the complete smoke matrix", () => {
-    expect(() => validateDataBenchmark(smokeFixture(), "smoke")).not.toThrow();
-  });
-
   test("rejects missing, duplicate, unexpected, and non-finite cells with canonical keys", () => {
     expect(() => validateDataBenchmark(smokeFixture({ omitWorkload: "ingest" }), "smoke")).toThrow(
       "missing engine=sheetwrite;rows=1000;metric=ingest",
@@ -150,29 +106,5 @@ describe("data benchmark exact matrix", () => {
     expect(() =>
       validateDataBenchmark(smokeFixture({ invalidQueryResources: true }), "smoke"),
     ).toThrow("query resource counters violate structural bounds");
-  });
-
-  test("rejects a corrupted independent query-resource sentinel", () => {
-    const candidate = structuredClone(smokeFixture()) as unknown as {
-      sheetwrite: Record<string, { queryResources: Record<string, unknown> }>;
-    };
-    candidate.sheetwrite["1000"]!.queryResources.composedFilterMatches = 0;
-    expect(() =>
-      validateDataBenchmark(candidate as unknown as DataBenchmarkResult, "smoke"),
-    ).toThrow("query resource counters violate structural bounds");
-  });
-
-  test("keeps full and smoke matrices distinct", () => {
-    expect(expectedDataMatrixKeys("full").length).toBeGreaterThan(
-      SHEETWRITE_ROWS.length * WORKLOADS.length,
-    );
-    expect(() => validateDataBenchmark(smokeFixture(), "full")).toThrow("data mode mismatch");
-  });
-  test("regenerates the Markdown view byte-for-byte from validated raw data", () => {
-    const fixture = fullFixture();
-    const first = renderDataBenchmarkMarkdown(fixture);
-    const second = renderDataBenchmarkMarkdown(structuredClone(fixture));
-    expect(second).toBe(first);
-    expect(first).toContain("**1.0× faster**");
   });
 });

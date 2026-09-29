@@ -14,9 +14,29 @@ transferred during paint, so main-thread code must not read it after `paint`.
 Lifetime: valid until the next store mutation or window refresh.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L45</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L45"><code>packages/core/src/types/store.ts#L45</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#visible-window-view-sheet"><code>sheet</code></a>
+<a href="#visible-window-view-rows"><code>rows</code></a>
+<a href="#visible-window-view-cols"><code>cols</code></a>
+<a href="#visible-window-view-values"><code>values</code></a>
+<a href="#visible-window-view-style-ids"><code>styleIds</code></a>
+<a href="#visible-window-view-styles"><code>styles</code></a>
+<a href="#visible-window-view-value-kinds"><code>valueKinds</code></a>
+<a href="#visible-window-view-number-values"><code>numberValues</code></a>
+<a href="#visible-window-view-string-pool-ids"><code>stringPoolIds</code></a>
+<a href="#visible-window-view-string-local-ids"><code>stringLocalIds</code></a>
+<a href="#visible-window-view-string-pool-update-ids"><code>stringPoolUpdateIds</code></a>
+<a href="#visible-window-view-string-pool-update-values"><code>stringPoolUpdateValues</code></a>
+<a href="#visible-window-view-local-strings"><code>localStrings</code></a>
+<a href="#visible-window-view-ffi-calls"><code>ffiCalls</code></a>
+<a href="#visible-window-view-ffi-boundary-calls"><code>ffiBoundaryCalls</code></a>
+<a href="#visible-window-view-ffi-input-bytes"><code>ffiInputBytes</code></a>
+<a href="#visible-window-view-ffi-output-bytes"><code>ffiOutputBytes</code></a>
+<a href="#visible-window-view-ffi-largest-transfer-bytes"><code>ffiLargestTransferBytes</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>18</span>
 
@@ -218,3 +238,25 @@ export interface VisibleWindowView {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>VisibleWindowView</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

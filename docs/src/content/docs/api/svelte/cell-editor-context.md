@@ -8,9 +8,23 @@ description: "Immutable state and guarded completion callbacks for one mounted e
 Immutable state and guarded completion callbacks for one mounted editor.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/types/grid.d.ts#L21</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L21"><code>packages/core/dist/types/grid.d.ts#L21</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#cell-editor-context-grid"><code>grid</code></a>
+<a href="#cell-editor-context-address"><code>address</code></a>
+<a href="#cell-editor-context-view-address"><code>viewAddress</code></a>
+<a href="#cell-editor-context-column"><code>column</code></a>
+<a href="#cell-editor-context-value"><code>value</code></a>
+<a href="#cell-editor-context-text"><code>text</code></a>
+<a href="#cell-editor-context-initial-input"><code>initialInput</code></a>
+<a href="#cell-editor-context-select-all"><code>selectAll</code></a>
+<a href="#cell-editor-context-label"><code>label</code></a>
+<a href="#cell-editor-context-signal"><code>signal</code></a>
+<a href="#cell-editor-context-commit"><code>commit</code></a>
+<a href="#cell-editor-context-cancel"><code>cancel</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>12</span>
 
@@ -148,3 +162,26 @@ export interface CellEditorContext {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/svelte</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>CellEditorContext</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/cell-editor/"><code>CellEditor</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/cell-editor-instance/"><code>CellEditorInstance</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/cell-editor/"><code>CellEditor</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/react/cell-editor-instance/"><code>CellEditorInstance</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/cell-editor/"><code>CellEditor</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/svelte/cell-editor-instance/"><code>CellEditorInstance</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/cell-editor/"><code>CellEditor</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/vue/cell-editor-instance/"><code>CellEditorInstance</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

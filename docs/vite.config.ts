@@ -23,12 +23,16 @@ interface HastNode {
   children?: HastNode[];
 }
 
-/** Marks pre blocks hydration-safe and strips Expressive Code's idle-callback
- * tabindex script: the docs app owns scroll-focus sync deterministically in
- * `initializeCodeEnhancements`. */
+/** Keeps code focus client-owned and removes copy controls from API signatures. */
 function markResponsiveCodeBlocks() {
   return (tree: HastNode): void => {
-    const visit = (node: HastNode): void => {
+    const visit = (node: HastNode, insideApiSignature = false): void => {
+      const classes = String(node.properties?.className ?? "").split(/[ ,]+/);
+      const apiSignature =
+        insideApiSignature ||
+        classes.some((name) =>
+          ["api-member", "api-declaration", "api-declaration-open", "api-variant"].includes(name),
+        );
       if (node.tagName === "pre") {
         node.properties = { ...node.properties, suppressHydrationWarning: true };
       }
@@ -36,14 +40,18 @@ function markResponsiveCodeBlocks() {
         node.children = node.children.filter(
           (child) =>
             !(
-              child.tagName === "script" &&
-              child.children?.some(
-                (content) =>
-                  content.type === "text" && content.value?.includes("tabindex-js-module"),
-              )
+              (apiSignature &&
+                String(child.properties?.className ?? "")
+                  .split(/[ ,]+/)
+                  .includes("copy")) ||
+              (child.tagName === "script" &&
+                child.children?.some(
+                  (content) =>
+                    content.type === "text" && content.value?.includes("tabindex-js-module"),
+                ))
             ),
         );
-        for (const child of node.children) visit(child);
+        for (const child of node.children) visit(child, apiSignature);
       }
     };
     visit(tree);

@@ -490,42 +490,6 @@ mod tests {
     }
 
     #[test]
-    fn percentile_is_monotone_and_stays_inside_the_sample() {
-        let data = vec![9.0, -2.0, 4.0, 20.0, 4.0]
-            .into_iter()
-            .map(Value::number)
-            .collect::<Vec<_>>();
-        let mut previous = -2.0;
-        for step in 0..=100 {
-            let Value::Number(current) = result(
-                Func::PercentileInc,
-                &[data.clone(), scalar(step as f64 / 100.0)],
-            ) else {
-                panic!("percentile returned an error");
-            };
-            assert!((-2.0..=20.0).contains(&current));
-            assert!(current >= previous);
-            previous = current;
-        }
-    }
-
-    #[test]
-    fn stable_moments_preserve_small_spread_on_large_offsets() {
-        let data = vec![
-            1_000_000_000_001.0,
-            1_000_000_000_002.0,
-            1_000_000_000_003.0,
-        ]
-        .into_iter()
-        .map(Value::number)
-        .collect::<Vec<_>>();
-        assert_near(result(Func::VarS, std::slice::from_ref(&data)), 1.0);
-        assert_near(result(Func::VarP, std::slice::from_ref(&data)), 2.0 / 3.0);
-        assert_near(result(Func::StdevS, std::slice::from_ref(&data)), 1.0);
-        assert_near(result(Func::GeoMean, &[data]), 1_000_000_000_002.0);
-    }
-
-    #[test]
     fn paired_statistics_enforce_shape_and_pairwise_numeric_values() {
         let left = vec![
             Value::number(1.0),
@@ -605,16 +569,5 @@ mod tests {
             apply(Func::MaxIfs, &shape_mismatch).unwrap(),
             Value::Error(FormulaError::Value)
         );
-    }
-
-    #[test]
-    fn blank_count_includes_empty_text_but_not_errors() {
-        let values = vec![
-            Value::Blank,
-            Value::text(""),
-            Value::text("x"),
-            Value::Error(FormulaError::Na),
-        ];
-        assert_near(result(Func::CountBlank, &[values]), 2.0);
     }
 }

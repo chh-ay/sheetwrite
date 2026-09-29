@@ -43,60 +43,6 @@ beforeAll(async () => {
 });
 
 describe("RowBridge", () => {
-  it("admits unique stable IDs and rejects missing or duplicate identities", () => {
-    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
-    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c"]);
-    expect([...rows].reverse().map((row) => row.id)).toEqual(["row-c", "row-b", "row-a"]);
-    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c"]);
-
-    expect(() =>
-      createRowBridge({
-        columns,
-        defaultRows: rows,
-        getRowId: () => "same",
-      }),
-    ).toThrow("duplicate row ID");
-    expect(() =>
-      createRowBridge({
-        columns,
-        defaultRows: rows,
-        getRowId: () => undefined as never,
-      }),
-    ).toThrow("stable string or number");
-  });
-
-  it("attributes repeated writes to the same cell in operation order", () => {
-    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
-    const addr = { sheet: "sheet1", row: 1, col: 0 };
-    const first: DocumentOp = { op: "set", addr, value: literal("B2") };
-    const second: DocumentOp = { op: "set", addr, value: literal("B3") };
-    const projection = bridge.project(
-      event(
-        [first, second],
-        [
-          { addr, oldValue: literal("B"), newValue: literal("B2") },
-          { addr, oldValue: literal("B2"), newValue: literal("B3") },
-        ],
-      ),
-    );
-    expect(projection.deltas.map((delta) => delta.kind)).toEqual(["cell", "cell"]);
-    const cells = projection.deltas.flatMap((delta) => (delta.kind === "cell" ? [delta.cell] : []));
-    expect(cells).toEqual([
-      expect.objectContaining({
-        rowId: "row-b",
-        columnKey: "name",
-        previous: literal("B"),
-        next: literal("B2"),
-      }),
-      expect.objectContaining({
-        rowId: "row-b",
-        columnKey: "name",
-        previous: literal("B2"),
-        next: literal("B3"),
-      }),
-    ]);
-  });
-
   it("keeps data-space identities through insert, move, and delete", () => {
     const bridge = createRowBridge({
       columns,

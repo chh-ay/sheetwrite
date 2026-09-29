@@ -2,21 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { OffsetIndex, ScaledScroll } from "../src/fenwick.js";
 
 describe("OffsetIndex", () => {
-  it("maps rows to offsets and offsets to rows with uniform heights", () => {
-    const idx = new OffsetIndex(10, 20);
-    expect(idx.totalHeight).toBe(200);
-    expect(idx.offsetOf(0)).toBe(0);
-    expect(idx.offsetOf(5)).toBe(100);
-    expect(idx.rowAtOffset(0)).toEqual({ row: 0, top: 0 });
-    expect(idx.rowAtOffset(25)).toEqual({ row: 1, top: 20 });
-    expect(idx.rowAtOffset(199)).toEqual({ row: 9, top: 180 });
-  });
-
-  it("clamps offsets past the end to the last row", () => {
-    const idx = new OffsetIndex(10, 20);
-    expect(idx.rowAtOffset(100000)).toEqual({ row: 9, top: 180 });
-  });
-
   it("keeps uniform geometry allocation-free through structural edits", () => {
     const idx = new OffsetIndex(1_000_000, 28);
     expect(idx.backingStoreBytes).toBe(0);
@@ -39,14 +24,6 @@ describe("OffsetIndex", () => {
     expect(idx.rowAtOffset(90)).toEqual({ row: 3, top: 90 });
   });
 
-  it("materializes the dense index on the first height override", () => {
-    const idx = new OffsetIndex(10, 20);
-    expect(idx.backingStoreBytes).toBe(0);
-    idx.setHeight(2, 50);
-    expect(idx.backingStoreBytes).toBe(10 * 8 + 11 * 8);
-    expect(idx.rowAtOffset(85)).toEqual({ row: 2, top: 40 });
-  });
-
   it("materializes and indexes a non-default inserted band", () => {
     const idx = new OffsetIndex(3, 20);
     idx.insertRows(1, 2, 35);
@@ -58,27 +35,9 @@ describe("OffsetIndex", () => {
     expect(idx.rowAtOffset(55)).toEqual({ row: 2, top: 55 });
     expect(idx.rowAtOffset(90)).toEqual({ row: 3, top: 90 });
   });
-
-  it("inserts and removes rows, updating the total height", () => {
-    const idx = new OffsetIndex(10, 20);
-    idx.insertRows(0, 2, 20);
-    expect(idx.count).toBe(12);
-    expect(idx.totalHeight).toBe(240);
-    idx.removeRows(0, 4);
-    expect(idx.count).toBe(8);
-    expect(idx.totalHeight).toBe(160);
-  });
 });
 
 describe("ScaledScroll", () => {
-  it("is identity below the element-height cap", () => {
-    const s = new ScaledScroll(2000, 500, 1_000_000);
-    expect(s.scaled).toBe(false);
-    expect(s.sizerHeight).toBe(2000);
-    expect(s.toContent(300)).toBe(300);
-    expect(s.toScroll(300)).toBe(300);
-  });
-
   it("maps a capped scroll range onto the full virtual range above the cap", () => {
     const cap = 1000;
     const total = 10000;

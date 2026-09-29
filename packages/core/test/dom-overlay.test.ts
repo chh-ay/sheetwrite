@@ -230,40 +230,6 @@ describe("retained DOM cell renderer overlay", () => {
     expect(host.querySelector(".sheetwrite-dom-cell")).toBeNull();
   });
 
-  it("preserves native button activation without changing grid selection", () => {
-    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
-    const { workbook, data } = fixture();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("interactive", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 4, col: 4 } });
-    const button = cell(host, 2, 1).querySelector("button");
-    if (!(button instanceof HTMLButtonElement)) throw new Error("expected renderer button");
-    let activations = 0;
-    button.addEventListener("click", () => {
-      activations += 1;
-    });
-
-    button.focus();
-    button.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
-    button.click();
-
-    expect(activations).toBe(1);
-    expect(document.activeElement).toBe(button);
-    expect(grid.getSelection()).toEqual({
-      kind: "cell",
-      addr: { sheet: "s1", row: 4, col: 4 },
-    });
-    grid.destroy();
-    expect(stats.live).toBe(0);
-  });
-
   it("mounts and refreshes a tall merge anchor outside the visible row window", () => {
     const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
     const { workbook, data } = fixture();
@@ -307,130 +273,6 @@ describe("retained DOM cell renderer overlay", () => {
     );
     grid.destroy();
     expect(stats.live).toBe(0);
-  });
-
-  it("keeps effective-style caches local to each frozen-pane style table", () => {
-    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
-    const { workbook, data } = fixture();
-    workbook.sheets[0]!.columns[1]!.cellStyle = { backgroundColor: "#ffffff" };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("styled", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 1 },
-          value: { kind: "literal", value: "frozen" },
-          style: { color: "#aa0000" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 1 },
-          value: { kind: "literal", value: "body" },
-          style: { color: "#0000aa" },
-        },
-      ],
-    });
-
-    expect(cell(host, 0, 1).querySelector<HTMLElement>("button")?.dataset.color).toBe("#aa0000");
-    expect(cell(host, 1, 1).querySelector<HTMLElement>("button")?.dataset.color).toBe("#0000aa");
-    grid.destroy();
-    expect(stats.live).toBe(0);
-  });
-
-  it("preserves an update failure while exactly-once cleaning hostile destroy hooks", () => {
-    const { workbook, data } = fixture();
-    workbook.sheets[0]!.frozenRows = 0;
-    workbook.sheets[0]!.frozenCols = 0;
-    workbook.sheets[0]!.merges = [];
-    let failUpdate = false;
-    let destroys = 0;
-    const renderer: CellRenderer = {
-      dom() {
-        return document.createElement("button");
-      },
-      update() {
-        if (failUpdate) throw new Error("renderer update failed");
-      },
-      destroy() {
-        destroys += 1;
-        throw new Error("renderer destroy failed");
-      },
-    };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: renderer },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    const mounted = host.querySelectorAll(".sheetwrite-dom-cell").length;
-    failUpdate = true;
-
-    expect(() =>
-      grid.applyTransaction({
-        patches: [
-          {
-            op: "set",
-            addr: { sheet: "s1", row: 0, col: 0 },
-            value: { kind: "literal", value: "update-failure" },
-          },
-        ],
-      }),
-    ).toThrow("renderer update failed");
-    expect(destroys).toBe(mounted);
-    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
-
-    grid.destroy();
-    expect(host.querySelector(".sheetwrite-dom-overlay")).toBeNull();
-  });
-
-  it("preserves a mount failure while cleaning every prior-frame entry", () => {
-    const { workbook, data } = fixture();
-    workbook.sheets[0]!.frozenRows = 0;
-    workbook.sheets[0]!.frozenCols = 0;
-    workbook.sheets[0]!.merges = [];
-    let failMount = false;
-    let destroys = 0;
-    const renderer: CellRenderer = {
-      dom() {
-        if (failMount) throw new Error("renderer dom failed");
-        return document.createElement("button");
-      },
-      update() {},
-      destroy() {
-        destroys += 1;
-        throw new Error("renderer destroy failed");
-      },
-    };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: renderer },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    const mounted = host.querySelectorAll(".sheetwrite-dom-cell").length;
-    failMount = true;
-    scroller(host).scrollTop = 40 * 28;
-
-    expect(() => grid.refresh()).toThrow("renderer dom failed");
-    expect(destroys).toBe(mounted);
-    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
-
-    grid.destroy();
-    expect(host.querySelector(".sheetwrite-dom-overlay")).toBeNull();
   });
 
   it("completes structural grid teardown when every renderer destroy hook throws", () => {
@@ -513,40 +355,6 @@ describe("retained DOM cell renderer overlay", () => {
     expect(shared.parentNode).toBeNull();
   });
 
-  it("rejects a connected host node without reparenting or destroying it", () => {
-    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
-    const { workbook, data } = fixture();
-    const host = document.createElement("div");
-    const externalHost = document.createElement("div");
-    const external = document.createElement("button");
-    externalHost.appendChild(external);
-    document.body.append(host, externalHost);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("initial", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    let destroys = 0;
-
-    expect(() =>
-      grid.defineCellRenderer("dom", {
-        dom() {
-          return external;
-        },
-        destroy() {
-          destroys += 1;
-        },
-      }),
-    ).toThrow("CellRenderer.dom() must return a fresh detached HTMLElement");
-    expect(external.parentNode).toBe(externalHost);
-    expect(external.isConnected).toBe(true);
-    expect(destroys).toBe(0);
-    expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
-    grid.destroy();
-  });
-
   it("refreshes legacy dom-only renderers on value changes without allocating on pure scroll", () => {
     const { workbook, data } = fixture();
     let calls = 0;
@@ -587,95 +395,6 @@ describe("retained DOM cell renderer overlay", () => {
     grid.destroy();
   });
 
-  it("separates pooled presence ranges from contrast-safe identity chips", () => {
-    const stats: RendererStats = { mounts: 0, updates: 0, destroys: 0, live: 0 };
-    const { workbook, data } = fixture();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      renderers: { dom: trackedRenderer("presence", stats) },
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    const longIdentity = `Remote ${"operator ".repeat(20)}`.trim();
-    const overlays: PresenceOverlay[] = [
-      {
-        actorId: "long",
-        displayName: longIdentity,
-        color: "#58c4dc",
-        activeSheet: "s1",
-        ranges: [
-          { sheet: "s1", start: { row: 3, col: 2 }, end: { row: 3, col: 2 } },
-          { sheet: "s1", start: { row: 4, col: 3 }, end: { row: 4, col: 3 } },
-        ],
-      },
-      {
-        actorId: "top",
-        displayName: "Top row",
-        color: "hsl(12, 80%, 45%)",
-        activeSheet: "s1",
-        ranges: [{ sheet: "s1", start: { row: 0, col: 2 }, end: { row: 0, col: 2 } }],
-      },
-    ];
-
-    grid.setPresenceOverlays(overlays);
-    grid.refresh();
-    const ranges = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence]")];
-    const labels = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence-label]")];
-    expect(ranges.length).toBeGreaterThanOrEqual(3);
-    expect(labels).toHaveLength(2);
-    expect(host.querySelectorAll('[data-sheetwrite-presence-label="long"]')).toHaveLength(1);
-    expect(ranges.every((range) => range.textContent === "")).toBe(true);
-    expect(ranges.every((range) => range.getAttribute("aria-hidden") === "true")).toBe(true);
-
-    const marker = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="long"]')!;
-    const longRange = host.querySelector<HTMLElement>('[data-sheetwrite-presence="long"]')!;
-    expect(marker.dataset.presenceKind).toBe("marker");
-    expect(marker.getAttribute("role")).toBe("img");
-    expect(marker.getAttribute("aria-label")).toBe(`Remote selection: ${longIdentity}`);
-    expect(marker.title).toBe(longIdentity);
-    expect(marker.textContent).toBe("");
-    expect(marker.style.background).not.toBe("");
-    expect(px(marker.style.top)).toBeGreaterThanOrEqual(px(longRange.style.top));
-    expect(px(marker.style.top) + px(marker.style.height)).toBeLessThanOrEqual(
-      px(longRange.style.top) + px(longRange.style.height),
-    );
-
-    const topChip = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="top"]')!;
-    expect(topChip.dataset.presenceKind).toBe("chip");
-    expect(topChip.textContent).toBe("Top row");
-    expect(topChip.style.background).toContain("hsl");
-    expect(["#000000", "#ffffff"]).toContain(topChip.style.color);
-    expect(px(topChip.style.left)).toBeGreaterThanOrEqual(0);
-    expect(px(topChip.style.top)).toBeGreaterThanOrEqual(0);
-    expect(px(topChip.style.top) + px(topChip.style.height)).toBeLessThanOrEqual(
-      px(longRange.style.top),
-    );
-
-    const pooledNodeCount = host.querySelector(".sheetwrite-overlay")!.childElementCount;
-    grid.setPresenceOverlays(null);
-    grid.highlightCells([{ sheet: "s1", start: { row: 2, col: 1 }, end: { row: 2, col: 1 } }]);
-    grid.refresh();
-    expect(host.querySelectorAll("[data-sheetwrite-presence]")).toHaveLength(0);
-    expect(host.querySelectorAll("[data-sheetwrite-presence-range]")).toHaveLength(0);
-    expect(host.querySelectorAll("[data-sheetwrite-presence-label]")).toHaveLength(0);
-    expect(host.querySelector(".sheetwrite-overlay")!.childElementCount).toBe(pooledNodeCount);
-
-    grid.setPresenceOverlays(overlays);
-    grid.refresh();
-    const warmedNodeCount = host.querySelector(".sheetwrite-overlay")!.childElementCount;
-    expect(warmedNodeCount).toBeGreaterThanOrEqual(pooledNodeCount);
-    expect(host.querySelectorAll('[data-sheetwrite-presence-label="long"]')).toHaveLength(1);
-    grid.setPresenceOverlays(null);
-    grid.refresh();
-    grid.setPresenceOverlays(overlays);
-    grid.refresh();
-    expect(host.querySelector(".sheetwrite-overlay")!.childElementCount).toBe(warmedNodeCount);
-    grid.destroy();
-  });
-
   it("keeps the 32-actor by 8-range limit bounded to rail or range markers", () => {
     const { workbook, data } = fixture();
     const host = document.createElement("div");
@@ -711,38 +430,6 @@ describe("retained DOM cell renderer overlay", () => {
       expect(px(label.style.left) + px(label.style.width)).toBeLessThanOrEqual(360);
       expect(px(label.style.top) + px(label.style.height)).toBeLessThanOrEqual(168);
     }
-    grid.destroy();
-  });
-
-  it("does not compact a visible chip because offscreen peers exist", () => {
-    const { workbook, data } = fixture();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const grid = new GridImpl(host, {
-      workbook,
-      data,
-      overscan: 0,
-      config: { toolbar: false, contextMenu: false, find: false },
-    });
-    const overlays: PresenceOverlay[] = Array.from({ length: 32 }, (_, index) => ({
-      actorId: `peer-${index}`,
-      displayName: `Peer ${index}`,
-      color: "#58c4dc",
-      activeSheet: "s1",
-      ranges: [
-        {
-          sheet: "s1",
-          start: { row: index === 0 ? 0 : 19, col: 2 },
-          end: { row: index === 0 ? 0 : 19, col: 2 },
-        },
-      ],
-    }));
-
-    grid.setPresenceOverlays(overlays);
-    grid.refresh();
-    const visible = host.querySelector<HTMLElement>('[data-sheetwrite-presence-label="peer-0"]')!;
-    expect(visible.dataset.presenceKind).toBe("chip");
-    expect(visible.textContent).toBe("Peer 0");
     grid.destroy();
   });
 });

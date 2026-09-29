@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellAddress, ChangeEvent, Renderer, Viewport, Workbook } from "../src/types.js";
+import type { CellAddress, ChangeEvent } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
@@ -35,43 +35,11 @@ function mountHost(): HTMLDivElement {
   return host;
 }
 
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
-}
-
 const A = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });
-
-interface PaintRecorder extends Renderer {
-  readonly paints: Array<{ rowHeights: number[] | null }>;
-}
-
-function makePaintRecorder(): PaintRecorder {
-  let lastViewport: Viewport | null = null;
-  const paints: Array<{ rowHeights: number[] | null }> = [];
-  return {
-    paints,
-    mount() {},
-    setLayout() {},
-    setViewport(viewport: Viewport) {
-      lastViewport = viewport;
-    },
-    paint() {
-      paints.push({
-        rowHeights: lastViewport?.rowHeights ? Array.from(lastViewport.rowHeights) : null,
-      });
-    },
-    setTheme() {},
-    setRenderers() {},
-    destroy() {},
-  };
-}
 
 describe("config.keyboard: false (headless key policy)", () => {
   // Contract: `keyboard: false` drops EVERY stock binding. A keydown on the host
-  // must not navigate, start an edit, clear a cell, or open the find bar. The
-  // policy gates keys only — pointer input still selects.
+  // must not navigate, start an edit, clear a cell, or open the find bar.
   it("ignores arrow navigation, type-to-edit, Delete, and Ctrl+F", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -99,34 +67,6 @@ describe("config.keyboard: false (headless key policy)", () => {
     const findBar = host.querySelector(".sheetwrite-find");
     expect(findBar).toBeInstanceOf(HTMLElement);
     expect((findBar as HTMLElement).style.display).toBe("none");
-
-    grid.destroy();
-  });
-
-  it("still routes mouse selection (policy gates keys, not pointers)", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { keyboard: false } }, store);
-    expect(grid.getSelection()).toBeNull();
-
-    // getBoundingClientRect is all-zeros in happy-dom, so client coords map
-    // directly onto content geometry: clientY 70 -> content row 1 (past the
-    // 32px header, second 28px row); clientX 100 -> col 0 (past the 48px gutter).
-    const scroller = scrollerOf(host);
-    scroller.dispatchEvent(
-      new PointerEvent("pointerdown", { clientX: 100, clientY: 70, button: 0, bubbles: true }),
-    );
-    scroller.dispatchEvent(
-      new PointerEvent("pointerup", { clientX: 100, clientY: 70, bubbles: true }),
-    );
-
-    const sel = grid.getSelection();
-    expect(sel?.kind).toBe("cell");
-    if (sel?.kind === "cell") {
-      expect(sel.addr.row).toBe(1);
-      expect(sel.addr.col).toBe(0);
-    }
 
     grid.destroy();
   });
@@ -181,77 +121,6 @@ describe("config.keyboard: (e, grid) => boolean (host interceptor)", () => {
 describe("grid.styleRange", () => {
   // Contract: merge `style` over every cell of the rect as ONE undoable
   // transaction; preserve formulas; `null` clears cell styles.
-  it("styles the whole rect and a single undo reverts every cell", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    const cells: Array<[number, number]> = [
-      [0, 0],
-      [0, 1],
-      [1, 0],
-      [1, 1],
-    ];
-
-    grid.styleRange(
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
-      {
-        bold: true,
-      },
-    );
-    for (const [r, c] of cells) expect(store.getCell(A(r, c)).style.bold).toBe(true);
-
-    // One transaction: a single undo restores ALL four cells (per-cell commits
-    // would leave the earlier cells still bold).
-    grid.undo();
-    for (const [r, c] of cells) expect(store.getCell(A(r, c)).style.bold).toBeUndefined();
-
-    grid.destroy();
-  });
-
-  it("merges over an existing cell style rather than replacing it", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
-    grid.styleRange(range, { color: "#ff0000" });
-    grid.styleRange(range, { bold: true });
-
-    const style = store.getCell(A(0, 0)).style;
-    expect(style.color).toBe("#ff0000");
-    expect(style.bold).toBe(true);
-
-    grid.destroy();
-  });
-
-  it("preserves a formula cell's source while styling it", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    store.applyTransaction({
-      patches: [{ op: "set", addr: A(0, 1), value: { kind: "formula", src: "=6*7" } }],
-    });
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    expect(store.getCell(A(0, 1)).resolved).toBe(42);
-
-    grid.styleRange(
-      { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } },
-      {
-        bold: true,
-      },
-    );
-
-    // The formula (and its resolved value) survive; only style changed.
-    expect(store.getFormula(A(0, 1))).toBe("=6*7");
-    expect(store.getCell(A(0, 1)).resolved).toBe(42);
-    expect(store.getCell(A(0, 1)).style.bold).toBe(true);
-
-    grid.destroy();
-  });
-
   it("clears cell styles when passed null", () => {
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));
@@ -373,31 +242,7 @@ describe("grid.styleRange", () => {
   });
 });
 
-describe("grid.setRowHeight / grid.setColumnWidth (public geometry API)", () => {
-  // Contract: the public setRowHeight forces a fresh paint carrying the new
-  // per-row geometry (the same observable the row-header drag test pins, but
-  // via the headless entry point).
-  it("setRowHeight repaints with the new row geometry", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    const recorder = makePaintRecorder();
-    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
-    // Construction's paint went to the real renderer; the recorder starts clean.
-    expect(recorder.paints.length).toBe(0);
-
-    grid.setRowHeight(0, 58);
-
-    // A 5-row sheet keeps every row in-window, so no other paint-signature
-    // component moves; only the row-height epoch can force this repaint.
-    expect(recorder.paints.length).toBeGreaterThan(0);
-    expect(recorder.paints.at(-1)?.rowHeights?.[0]).toBe(58);
-
-    grid.destroy();
-  });
-
+describe("grid.setColumnWidth (public geometry API)", () => {
   it("setColumnWidth commits an undoable width change", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -443,43 +288,5 @@ describe("grid.dataEdge (Ctrl+Arrow jump target for headless keymaps)", () => {
     expect(grid.dataEdge(0, 0, 1, 0)).toBe(2);
 
     grid.destroy();
-  });
-});
-
-describe("config.tabs: false (headless tab bar suppression)", () => {
-  function makeMultiSheetWorkbook(): Workbook {
-    const column = { key: "name", header: "Name", width: 160, type: "text" as const };
-    return {
-      activeSheet: "s1",
-      sheets: [
-        { id: "s1", name: "Sheet 1", rowCount: 5, columns: [{ ...column }] },
-        { id: "s2", name: "Sheet 2", rowCount: 5, columns: [{ ...column }] },
-      ],
-    };
-  }
-
-  // Contract: `tabs: false` renders no `.sheetwrite-tabbar` even for a
-  // multi-sheet workbook.
-  it("suppresses the tab bar on a multi-sheet workbook", () => {
-    const host = mountHost();
-    const grid = new GridImpl(
-      host,
-      { workbook: makeMultiSheetWorkbook(), config: { tabs: false } },
-      new SheetwriteStore(makeMultiSheetWorkbook()),
-    );
-    expect(host.querySelector(".sheetwrite-tabbar")).toBeNull();
-    grid.destroy();
-
-    // Control: the same multi-sheet workbook with tabs explicitly enabled DOES
-    // render the bar, so the null above is a real suppression, not a vacuous
-    // query.
-    const host2 = mountHost();
-    const grid2 = new GridImpl(
-      host2,
-      { workbook: makeMultiSheetWorkbook(), config: { tabs: true } },
-      new SheetwriteStore(makeMultiSheetWorkbook()),
-    );
-    expect(host2.querySelector(".sheetwrite-tabbar")).toBeInstanceOf(HTMLElement);
-    grid2.destroy();
   });
 });

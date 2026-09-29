@@ -8,9 +8,70 @@ description: "Stable public facade and the sole transaction, epoch, policy, and 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L103</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L103"><code>packages/core/src/store.ts#L103</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheetwrite-store-constructor"><code>constructor</code></a>
+<a href="#sheetwrite-store-acknowledge-operations"><code>acknowledgeOperations</code></a>
+<a href="#sheetwrite-store-aggregate"><code>aggregate</code></a>
+<a href="#sheetwrite-store-apply-transaction"><code>applyTransaction</code></a>
+<a href="#sheetwrite-store-are-columns-fully-loaded"><code>areColumnsFullyLoaded</code></a>
+<a href="#sheetwrite-store-can-apply-locally"><code>canApplyLocally</code></a>
+<a href="#sheetwrite-store-capture-range-history"><code>captureRangeHistory</code></a>
+<a href="#sheetwrite-store-clear-view"><code>clearView</code></a>
+<a href="#sheetwrite-store-column-filters"><code>columnFilters</code></a>
+<a href="#sheetwrite-store-data-edge"><code>dataEdge</code></a>
+<a href="#sheetwrite-store-data-row-at"><code>dataRowAt</code></a>
+<a href="#sheetwrite-store-dispose"><code>dispose</code></a>
+<a href="#sheetwrite-store-distinct-values"><code>distinctValues</code></a>
+<a href="#sheetwrite-store-ensure-columns"><code>ensureColumns</code></a>
+<a href="#sheetwrite-store-export-snapshot"><code>exportSnapshot</code></a>
+<a href="#sheetwrite-store-filter-by"><code>filterBy</code></a>
+<a href="#sheetwrite-store-get-cell"><code>getCell</code></a>
+<a href="#sheetwrite-store-get-cell-load-state"><code>getCellLoadState</code></a>
+<a href="#sheetwrite-store-get-clipboard-window"><code>getClipboardWindow</code></a>
+<a href="#sheetwrite-store-get-data-window"><code>getDataWindow</code></a>
+<a href="#sheetwrite-store-get-formula"><code>getFormula</code></a>
+<a href="#sheetwrite-store-get-formula-matrix-resource-peak"><code>getFormulaMatrixResourcePeak</code></a>
+<a href="#sheetwrite-store-get-paged-stats"><code>getPagedStats</code></a>
+<a href="#sheetwrite-store-get-range-mutation-allocation-stats"><code>getRangeMutationAllocationStats</code></a>
+<a href="#sheetwrite-store-get-ref-target"><code>getRefTarget</code></a>
+<a href="#sheetwrite-store-get-runtime-resource-snapshot"><code>getRuntimeResourceSnapshot</code></a>
+<a href="#sheetwrite-store-get-spill-anchor"><code>getSpillAnchor</code></a>
+<a href="#sheetwrite-store-get-visible-window"><code>getVisibleWindow</code></a>
+<a href="#sheetwrite-store-get-workbook"><code>getWorkbook</code></a>
+<a href="#sheetwrite-store-group-rows"><code>groupRows</code></a>
+<a href="#sheetwrite-store-has-view"><code>hasView</code></a>
+<a href="#sheetwrite-store-hidden-rows"><code>hiddenRows</code></a>
+<a href="#sheetwrite-store-hide-rows"><code>hideRows</code></a>
+<a href="#sheetwrite-store-is-paged"><code>isPaged</code></a>
+<a href="#sheetwrite-store-is-range-fully-loaded"><code>isRangeFullyLoaded</code></a>
+<a href="#sheetwrite-store-load-page"><code>loadPage</code></a>
+<a href="#sheetwrite-store-on"><code>on</code></a>
+<a href="#sheetwrite-store-query-capability"><code>queryCapability</code></a>
+<a href="#sheetwrite-store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#sheetwrite-store-remove-sheet-formula-identity"><code>removeSheetFormulaIdentity</code></a>
+<a href="#sheetwrite-store-rename-sheet-formula-identity"><code>renameSheetFormulaIdentity</code></a>
+<a href="#sheetwrite-store-reset-formula-matrix-resource-peak"><code>resetFormulaMatrixResourcePeak</code></a>
+<a href="#sheetwrite-store-reset-range-mutation-allocation-stats"><code>resetRangeMutationAllocationStats</code></a>
+<a href="#sheetwrite-store-reset-runtime-resource-accounting"><code>resetRuntimeResourceAccounting</code></a>
+<a href="#sheetwrite-store-row-groups"><code>rowGroups</code></a>
+<a href="#sheetwrite-store-search-cells"><code>searchCells</code></a>
+<a href="#sheetwrite-store-search-cells-flat"><code>searchCellsFlat</code></a>
+<a href="#sheetwrite-store-set-column-filter"><code>setColumnFilter</code></a>
+<a href="#sheetwrite-store-set-detailed-change-capture"><code>setDetailedChangeCapture</code></a>
+<a href="#sheetwrite-store-set-group-collapsed"><code>setGroupCollapsed</code></a>
+<a href="#sheetwrite-store-set-protection-resolver"><code>setProtectionResolver</code></a>
+<a href="#sheetwrite-store-show-rows"><code>showRows</code></a>
+<a href="#sheetwrite-store-sort-by"><code>sortBy</code></a>
+<a href="#sheetwrite-store-sort-by-multi"><code>sortByMulti</code></a>
+<a href="#sheetwrite-store-ungroup-rows"><code>ungroupRows</code></a>
+<a href="#sheetwrite-store-view-row-count"><code>viewRowCount</code></a>
+<a href="#sheetwrite-store-view-row-of"><code>viewRowOf</code></a>
+<a href="#sheetwrite-store-with-resource-operation"><code>withResourceOperation</code></a>
+<a href="#sheetwrite-store-from-snapshot"><code>fromSnapshot</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>59</span>
 
@@ -724,3 +785,24 @@ class SheetwriteStore implements Store {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteStore</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>

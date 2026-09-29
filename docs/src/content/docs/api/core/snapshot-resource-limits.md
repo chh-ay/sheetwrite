@@ -8,9 +8,18 @@ description: "Resource ceilings applied before snapshot normalization or store a
 Resource ceilings applied before snapshot normalization or store allocation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/document-protocol.ts#L150</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L150"><code>packages/core/src/document-protocol.ts#L150</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#snapshot-resource-limits-max-sheets"><code>maxSheets</code></a>
+<a href="#snapshot-resource-limits-max-rows-per-sheet"><code>maxRowsPerSheet</code></a>
+<a href="#snapshot-resource-limits-max-columns-per-sheet"><code>maxColumnsPerSheet</code></a>
+<a href="#snapshot-resource-limits-max-metadata-entries"><code>maxMetadataEntries</code></a>
+<a href="#snapshot-resource-limits-max-serialized-bytes"><code>maxSerializedBytes</code></a>
+<a href="#snapshot-resource-limits-max-logical-cells-per-sheet"><code>maxLogicalCellsPerSheet</code></a>
+<a href="#snapshot-resource-limits-max-dense-cells"><code>maxDenseCells</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -98,3 +107,28 @@ export interface SnapshotResourceLimits {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SnapshotResourceLimits</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/default-snapshot-resource-limits/"><code>DEFAULT_SNAPSHOT_RESOURCE_LIMITS</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sheetwrite-store-options/"><code>SheetwriteStoreOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/snapshot-grid-options/"><code>SnapshotGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/snapshot-resource-error/"><code>SnapshotResourceError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/snapshot-validation-options/"><code>SnapshotValidationOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

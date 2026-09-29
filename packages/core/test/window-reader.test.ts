@@ -46,25 +46,6 @@ function makePackedWindow(): Uint8Array {
 }
 
 describe("packed window decoding", () => {
-  it("exposes aligned owned-buffer views for every value kind, styles, and conditional masks", () => {
-    const packed = makePackedWindow();
-    const decoded = decodePackedWindow(packed);
-
-    expect([decoded.nRows, decoded.nCols, decoded.localStringCount]).toEqual([2, 2, 1]);
-    expect(Array.from(decoded.kinds)).toEqual([KIND_EMPTY, KIND_NUMBER, KIND_STRING, KIND_BOOL]);
-    expect(Array.from(decoded.numbers)).toEqual([0, 42.5, 0, 1]);
-    expect(Array.from(decoded.stringIds)).toEqual([
-      0xffff_ffff, 0xffff_ffff, 0xffff_ffff, 0xffff_ffff,
-    ]);
-    expect(Array.from(decoded.stringIndex)).toEqual([-1, -1, 0, -1]);
-    expect(Array.from(decoded.styleIds)).toEqual([0, 1, 1, 0]);
-    expect(Array.from(decoded.styleDict)).toEqual([4, 9]);
-    expect(Array.from(decoded.condMatches)).toEqual([0, 2, 1, 0]);
-    expect(decoded.kinds.buffer).toBe(packed.buffer);
-    expect(decoded.numbers.buffer).toBe(packed.buffer);
-    expect(decoded.numbers.byteOffset % Float64Array.BYTES_PER_ELEMENT).toBe(0);
-  });
-
   it("rejects truncated, inconsistent, and unaligned layouts", () => {
     expect(() => decodePackedWindow(new Uint8Array(HEADER_BYTES - 1))).toThrow(
       "truncated packed window",

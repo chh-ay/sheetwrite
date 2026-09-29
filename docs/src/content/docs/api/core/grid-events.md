@@ -8,9 +8,24 @@ description: "Payload map for events emitted by a Grid."
 Payload map for events emitted by a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L444</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L444"><code>packages/core/src/types/grid.ts#L444</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-events-change"><code>change</code></a>
+<a href="#grid-events-selection"><code>selection</code></a>
+<a href="#grid-events-scroll"><code>scroll</code></a>
+<a href="#grid-events-edit-begin"><code>edit-begin</code></a>
+<a href="#grid-events-edit-commit"><code>edit-commit</code></a>
+<a href="#grid-events-search"><code>search</code></a>
+<a href="#grid-events-command-state-change"><code>command-state-change</code></a>
+<a href="#grid-events-mutation-rejected"><code>mutation-rejected</code></a>
+<a href="#grid-events-active-sheet"><code>active-sheet</code></a>
+<a href="#grid-events-hyperlink-activate"><code>hyperlink-activate</code></a>
+<a href="#grid-events-renderer-fallback"><code>renderer-fallback</code></a>
+<a href="#grid-events-datasource-error"><code>datasource-error</code></a>
+<a href="#grid-events-export-error"><code>export-error</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>13</span>
 
@@ -185,3 +200,32 @@ export interface GridEvents {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridEvents</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-adapter-event-handlers/"><code>GridAdapterEventHandlers</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-controller-handlers/"><code>GridControllerHandlers</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid-emits/"><code>SheetwriteGridEmits</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

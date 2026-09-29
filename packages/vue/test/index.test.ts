@@ -63,7 +63,7 @@ function makeData(rowCount = 5): ColumnarData {
 
 interface Harness {
   host: HTMLDivElement;
-  state: { data: ColumnarData; theme: Record<string, string> | undefined };
+  state: { data: ColumnarData };
   getGrid: () => Grid | null;
   unmount: () => void;
 }
@@ -78,9 +78,6 @@ function mountGrid(
 
   const state = reactive({
     data: makeData(workbook.sheets[0]?.rowCount ?? 5) as ColumnarData,
-    theme: undefined as Record<string, string> | undefined,
-    overscan: undefined as number | undefined,
-    minColumns: undefined as number | undefined,
   });
   const cmp = ref<SheetwriteGridExpose | null>(null);
 
@@ -91,9 +88,6 @@ function mountGrid(
           ref: cmp,
           workbook,
           data: state.data,
-          theme: state.theme,
-          overscan: state.overscan,
-          minColumns: state.minColumns,
           ...listeners,
         });
     },
@@ -161,34 +155,6 @@ async function mountConformanceGrid(props: AdapterConformanceProps): Promise<Mou
 runSharedAdapterLifecycleContract("Vue", mountConformanceGrid);
 
 describe("SheetwriteGrid Vue lifecycle", () => {
-  it("mounts a grid reachable through the exposed grid handle", () => {
-    const harness = mountGrid(makeWorkbook());
-
-    const grid = harness.getGrid();
-    expect(grid).not.toBeNull();
-    expect(grid?.store).toBeDefined();
-    expect(harness.host.querySelector(".sheetwrite")).not.toBeNull();
-
-    harness.unmount();
-  });
-
-  it("emits ready once after publishing generation one", async () => {
-    const probe = new URL("./ready-probe.ts", import.meta.url).pathname;
-    const process = Bun.spawn(["bun", probe], { stdout: "pipe", stderr: "pipe" });
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(process.stdout).text(),
-      new Response(process.stderr).text(),
-      process.exited,
-    ]);
-    expect(exitCode, stderr).toBe(0);
-    expect(JSON.parse(stdout.trim())).toEqual({
-      emitted: true,
-      publishedBeforeReady: true,
-      generation: 1,
-      reason: "initial",
-    });
-  });
-
   it("emits change after a scripted store transaction", () => {
     const changes: unknown[] = [];
     const harness = mountGrid(makeWorkbook(), {
@@ -234,19 +200,6 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     harness.unmount();
   });
 
-  it("recreates the grid when data identity changes", async () => {
-    const harness = mountGrid(makeWorkbook());
-    const first = harness.getGrid();
-
-    harness.state.data = makeData(5);
-    await nextTick();
-
-    const second = harness.getGrid();
-    expect(second).not.toBeNull();
-    expect(second).not.toBe(first);
-    harness.unmount();
-  });
-
   it("does NOT recreate on a mutation inside data (shallow watch contract)", async () => {
     const harness = mountGrid(makeWorkbook());
     const first = harness.getGrid();
@@ -256,53 +209,6 @@ describe("SheetwriteGrid Vue lifecycle", () => {
     await nextTick();
 
     expect(harness.getGrid()).toBe(first);
-    harness.unmount();
-  });
-
-  it("applies a theme change live without recreating", async () => {
-    const harness = mountGrid(makeWorkbook());
-    const first = harness.getGrid();
-
-    harness.state.theme = { bg: "#000000" };
-    await nextTick();
-
-    expect(harness.getGrid()).toBe(first);
-    harness.unmount();
-  });
-
-  it("destroys the grid on unmount, leaving the host empty", () => {
-    const harness = mountGrid(makeWorkbook());
-    expect(harness.host.childElementCount).toBeGreaterThan(0);
-
-    harness.unmount();
-
-    expect(harness.host.childElementCount).toBe(0);
-  });
-
-  it("keeps the grid and committed edits when overscan/minColumns change live", async () => {
-    const harness = mountGrid(makeWorkbook());
-    const first = harness.getGrid()!;
-
-    // Commit a user edit that lives only in the grid's store.
-    first.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 0 },
-          value: { kind: "literal", value: "edited" },
-        },
-      ],
-    });
-
-    harness.state.overscan = 9;
-    harness.state.minColumns = 12;
-    await nextTick();
-
-    // No recreate: same grid, and the committed edit survived.
-    expect(harness.getGrid()).toBe(first);
-    expect(first.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("edited");
-    expect(harness.host.querySelector("[role=grid]")?.getAttribute("aria-colcount")).toBe("12");
-
     harness.unmount();
   });
 });

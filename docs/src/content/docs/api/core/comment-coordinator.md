@@ -8,9 +8,21 @@ description: "Transport/auth-neutral comment state with server-owned author and 
 Transport/auth-neutral comment state with server-owned author and timestamp fields.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L500</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L500"><code>packages/core/src/collaboration.ts#L500</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#comment-coordinator-constructor"><code>constructor</code></a>
+<a href="#comment-coordinator-comment-threads"><code>commentThreads</code></a>
+<a href="#comment-coordinator-create"><code>create</code></a>
+<a href="#comment-coordinator-destroy"><code>destroy</code></a>
+<a href="#comment-coordinator-load"><code>load</code></a>
+<a href="#comment-coordinator-mutate"><code>mutate</code></a>
+<a href="#comment-coordinator-on"><code>on</code></a>
+<a href="#comment-coordinator-reply"><code>reply</code></a>
+<a href="#comment-coordinator-resolve"><code>resolve</code></a>
+<a href="#comment-coordinator-server-version"><code>serverVersion</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>10</span>
 
@@ -146,3 +158,24 @@ class CommentCoordinator {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>CommentCoordinator</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>

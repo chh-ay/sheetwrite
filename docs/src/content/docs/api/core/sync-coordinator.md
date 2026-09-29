@@ -10,9 +10,29 @@ blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L261</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L261"><code>packages/core/src/sync.ts#L261</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sync-coordinator-constructor"><code>constructor</code></a>
+<a href="#sync-coordinator-apply-versioned-operation"><code>applyVersionedOperation</code></a>
+<a href="#sync-coordinator-destroy"><code>destroy</code></a>
+<a href="#sync-coordinator-flush"><code>flush</code></a>
+<a href="#sync-coordinator-handle-response"><code>handleResponse</code></a>
+<a href="#sync-coordinator-on"><code>on</code></a>
+<a href="#sync-coordinator-pending-commits"><code>pendingCommits</code></a>
+<a href="#sync-coordinator-pending-count"><code>pendingCount</code></a>
+<a href="#sync-coordinator-ready"><code>ready</code></a>
+<a href="#sync-coordinator-resume-after-reload"><code>resumeAfterReload</code></a>
+<a href="#sync-coordinator-retry"><code>retry</code></a>
+<a href="#sync-coordinator-retry-persistence"><code>retryPersistence</code></a>
+<a href="#sync-coordinator-send"><code>send</code></a>
+<a href="#sync-coordinator-send-next"><code>sendNext</code></a>
+<a href="#sync-coordinator-server-version"><code>serverVersion</code></a>
+<a href="#sync-coordinator-set-online"><code>setOnline</code></a>
+<a href="#sync-coordinator-state"><code>state</code></a>
+<a href="#sync-coordinator-subscribe"><code>subscribe</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>18</span>
 
@@ -225,3 +245,24 @@ class SyncCoordinator {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SyncCoordinator</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>

@@ -8,9 +8,30 @@ description: "Columnar workbook storage, query, transaction, and subscription co
 Columnar workbook storage, query, transaction, and subscription contract.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/store.ts#L136</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L136"><code>packages/core/src/types/store.ts#L136</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#store-get-workbook"><code>getWorkbook</code></a>
+<a href="#store-get-cell"><code>getCell</code></a>
+<a href="#store-get-formula"><code>getFormula</code></a>
+<a href="#store-get-spill-anchor"><code>getSpillAnchor</code></a>
+<a href="#store-get-ref-target"><code>getRefTarget</code></a>
+<a href="#store-recalculate-volatile"><code>recalculateVolatile</code></a>
+<a href="#store-get-visible-window"><code>getVisibleWindow</code></a>
+<a href="#store-get-data-window"><code>getDataWindow</code></a>
+<a href="#store-get-clipboard-window"><code>getClipboardWindow</code></a>
+<a href="#store-ensure-columns"><code>ensureColumns</code></a>
+<a href="#store-apply-transaction"><code>applyTransaction</code></a>
+<a href="#store-set-protection-resolver"><code>setProtectionResolver</code></a>
+<a href="#store-on"><code>on</code></a>
+<a href="#store-set-detailed-change-capture"><code>setDetailedChangeCapture</code></a>
+<a href="#store-query-capability"><code>queryCapability</code></a>
+<a href="#store-get-cell-load-state"><code>getCellLoadState</code></a>
+<a href="#store-acknowledge-operations"><code>acknowledgeOperations</code></a>
+<a href="#store-export-snapshot"><code>exportSnapshot</code></a>
+<a href="#store-view-row-count"><code>viewRowCount</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>19</span>
 
@@ -265,3 +286,33 @@ export interface Store {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>Store</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-csv/"><code>toCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-tsv/"><code>toTsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/xlsx/build-xlsx-model/"><code>buildXlsxModel</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
+</ul>
+</div>

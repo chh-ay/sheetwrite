@@ -8,9 +8,18 @@ description: "Coordinates listing and restoring host-owned workbook revisions."
 Coordinates listing and restoring host-owned workbook revisions.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L295</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L295"><code>packages/core/src/collaboration.ts#L295</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#revision-coordinator-constructor"><code>constructor</code></a>
+<a href="#revision-coordinator-destroy"><code>destroy</code></a>
+<a href="#revision-coordinator-list"><code>list</code></a>
+<a href="#revision-coordinator-on"><code>on</code></a>
+<a href="#revision-coordinator-preview"><code>preview</code></a>
+<a href="#revision-coordinator-restore"><code>restore</code></a>
+<a href="#revision-coordinator-server-version"><code>serverVersion</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -105,3 +114,24 @@ class RevisionCoordinator {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>RevisionCoordinator</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>

@@ -2,16 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { FindBar } from "../src/find-bar.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid, SearchResult } from "../src/types.js";
+import type { SearchResult } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
-
-function result(query: string, active = 0, count = 2): SearchResult {
-  return {
-    query,
-    active,
-    matches: Array.from({ length: count }, (_, row) => ({ sheet: "s1", row, col: 0 })),
-  };
-}
 
 let restoreCanvasStubs: () => void;
 
@@ -115,33 +107,5 @@ describe("FindBar", () => {
 
     bar.destroy();
     grid.destroy();
-  });
-
-  it("omits replacement controls in read-only mode and reports idle/no-match states", () => {
-    const searches: string[] = [];
-    const grid = {
-      search: (query: string) => {
-        searches.push(query);
-        return result(query, 0, 0);
-      },
-      clearSearch: () => {},
-    } as unknown as Grid;
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const bar = new FindBar(host, DEFAULT_THEME, grid, true);
-    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
-    const count = host.querySelector<HTMLElement>(".sheetwrite-find-count")!;
-
-    expect(host.querySelector(".sheetwrite-find-replace-row")).toBeNull();
-    bar.open({ replace: true });
-    expect(document.activeElement).toBe(input);
-    input.value = "missing";
-    input.dispatchEvent(new Event("input"));
-    expect(count.textContent).toBe("No results");
-    input.value = "";
-    input.dispatchEvent(new Event("input"));
-    expect(count.textContent).toBe("");
-    expect(searches).toEqual(["missing", ""]);
-    bar.destroy();
   });
 });

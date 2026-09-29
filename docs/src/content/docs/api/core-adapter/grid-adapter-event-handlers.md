@@ -8,9 +8,26 @@ description: "Framework-neutral readiness, change, and error callbacks shared by
 Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/adapter.ts#L106</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L106"><code>packages/core/src/adapter.ts#L106</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-adapter-event-handlers-on-grid-change"><code>onGridChange</code></a>
+<a href="#grid-adapter-event-handlers-on-row-delta"><code>onRowDelta</code></a>
+<a href="#grid-adapter-event-handlers-on-selection-change"><code>onSelectionChange</code></a>
+<a href="#grid-adapter-event-handlers-on-viewport-change"><code>onViewportChange</code></a>
+<a href="#grid-adapter-event-handlers-on-edit-begin"><code>onEditBegin</code></a>
+<a href="#grid-adapter-event-handlers-on-edit-commit"><code>onEditCommit</code></a>
+<a href="#grid-adapter-event-handlers-on-search"><code>onSearch</code></a>
+<a href="#grid-adapter-event-handlers-on-active-sheet-change"><code>onActiveSheetChange</code></a>
+<a href="#grid-adapter-event-handlers-on-command-state-change"><code>onCommandStateChange</code></a>
+<a href="#grid-adapter-event-handlers-on-mutation-rejected"><code>onMutationRejected</code></a>
+<a href="#grid-adapter-event-handlers-on-renderer-fallback"><code>onRendererFallback</code></a>
+<a href="#grid-adapter-event-handlers-on-datasource-error"><code>onDatasourceError</code></a>
+<a href="#grid-adapter-event-handlers-on-export-error"><code>onExportError</code></a>
+<a href="#grid-adapter-event-handlers-on-ready"><code>onReady</code></a>
+<a href="#grid-adapter-event-handlers-on-initialization-error"><code>onInitializationError</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>15</span>
 
@@ -180,3 +197,25 @@ export interface GridAdapterEventHandlers<
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridAdapterEventHandlers</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+</ul>
+</div>

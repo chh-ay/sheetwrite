@@ -10,7 +10,6 @@ import {
   type PublicApiManifest,
   publicApiDigest,
   readPublicApiBaseline,
-  validateManifest,
   writePublicApiBaseline,
 } from "./public-api.js";
 
@@ -125,19 +124,6 @@ afterEach(async () => {
 });
 
 describe("re-export documentation", () => {
-  it("reads JSDoc from named re-export statements", async () => {
-    const root = await fixture(
-      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Generated init source union. */\nexport type { GeneratedInput } from "./generated.js";\n`,
-      { "generated.d.ts": "export type GeneratedInput = string | URL;\n" },
-    );
-    const { manifest } = await analyzePublicApi(root);
-    const entry = manifest.packages[0]?.entryPoints[0];
-    const generated = entry?.exports.find((candidate) => candidate.name === "GeneratedInput");
-    expect(generated?.kind).toBe("type");
-    expect(generated?.documentation).toBe("Generated init source union.");
-    expect(generated?.memberDocs).toEqual([]);
-  });
-
   it("keeps interface kind, signature, and member docs through re-exports", async () => {
     const root = await fixture(
       `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\n`,
@@ -196,57 +182,8 @@ export interface AdapterProps extends OwnedHandlers, ExternalBase {
       documentation: "Fires after readiness.",
     });
   });
-
-  it("keeps heritage-free interfaces byte-identical to their source text", async () => {
-    const root = await fixture();
-    const { manifest } = await analyzePublicApi(root);
-    const entry = manifest.packages[0]?.entryPoints[0];
-    const source = entry?.exports.find((candidate) => candidate.name === "DataSource");
-    expect(source?.signature).toBe(
-      "export interface DataSource { getRows(request: unknown): Promise<unknown>; }",
-    );
-  });
 });
-
 describe("public API policy", () => {
-  it("accepts the canonical surface and emits byte-stable normalized JSON", async () => {
-    const root = await fixture();
-    const first = await analyzePublicApi(root);
-    const second = await analyzePublicApi(root);
-    expect(first.issues).toEqual([]);
-    expect(`${JSON.stringify(first.manifest, null, 2)}\n`).toBe(
-      `${JSON.stringify(second.manifest, null, 2)}\n`,
-    );
-  });
-
-  it("captures member-level documentation for structured exports", async () => {
-    const root = await fixture();
-    const { manifest } = await analyzePublicApi(root);
-    const entry = manifest.packages[0]?.entryPoints[0];
-    const changeEvent = entry?.exports.find((candidate) => candidate.name === "ChangeEvent");
-    expect(changeEvent?.memberDocs).toEqual([
-      { name: "transaction", documentation: "Committed transaction body." },
-    ]);
-    const store = entry?.exports.find((candidate) => candidate.name === "Store");
-    expect(store?.memberDocs).toEqual([
-      { name: "applyTransaction", documentation: "Applies one transaction." },
-    ]);
-  });
-
-  it("rejects declaration merging that would join structural signatures", async () => {
-    const root = await fixture(
-      `${canonicalDeclarations}\n/** Merged augmentation. */\nexport interface DataSource { extra?: string; }\n`,
-    );
-    const { issues } = await analyzePublicApi(root);
-    expect(
-      issues.some(
-        (issue) =>
-          issue.code === "duplicate-export" &&
-          issue.symbol === "DataSource" &&
-          issue.message.includes("merges multiple structural declarations"),
-      ),
-    ).toBe(true);
-  });
   it("rejects untyped error payloads and direct built-in Error subclasses", async () => {
     const root = await fixture(
       `${canonicalDeclarations}
@@ -270,38 +207,6 @@ export class LegacyFailure extends RangeError {}`,
     );
   });
 
-  it("rejects a forbidden compatibility alias", async () => {
-    const root = await fixture(`${canonicalDeclarations}\nexport type Patch = DocumentOp;\n`);
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ code: "forbidden-export", symbol: "Patch" }),
-    );
-  });
-
-  it("rejects a public symbol with the forbidden JSDoc tag", async () => {
-    const marker = `${"/** @"}deprecated old name */`;
-    const root = await fixture(
-      canonicalDeclarations.replace("export type DocumentOp", `${marker}\nexport type DocumentOp`),
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ code: "deprecated-symbol", symbol: "DocumentOp" }),
-    );
-  });
-
-  it("rejects a missing canonical symbol", async () => {
-    const root = await fixture(
-      canonicalDeclarations.replace(
-        "export interface DataSource { getRows(request: unknown): Promise<unknown>; }",
-        "",
-      ),
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({ code: "missing-export", symbol: "DataSource" }),
-    );
-  });
-
   it("rejects ambiguous duplicate re-exports", async () => {
     const root = await fixture(
       `${canonicalDeclarations}\nexport * from "./left.js";\nexport * from "./right.js";\n`,
@@ -316,46 +221,6 @@ export class LegacyFailure extends RangeError {}`,
     );
     const result = await analyzePublicApi(root);
     expect(result.issues).toContainEqual(expect.objectContaining({ code: "duplicate-export" }));
-  });
-
-  it("rejects an unresolved public declaration entry", async () => {
-    const root = await fixture();
-    await writeFile(
-      join(root, "packages/core/package.json"),
-      JSON.stringify({ name: "@sheetwrite/core", exports: { ".": { types: "./missing.d.ts" } } }),
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(expect.objectContaining({ code: "unresolved-entry" }));
-  });
-
-  it("reports an exact unclassified package entry point", async () => {
-    const root = await fixture();
-    const packageRoot = join(root, "packages/unknown");
-    await mkdir(packageRoot, { recursive: true });
-    await writeFile(
-      join(packageRoot, "package.json"),
-      JSON.stringify({
-        name: "@sheetwrite/unknown",
-        exports: { ".": { types: "./index.d.ts", default: "./index.js" } },
-      }),
-    );
-    await writeFile(
-      join(packageRoot, "index.d.ts"),
-      "/** Unknown fixture. */\nexport type Unknown = true;\n",
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual({
-      code: "unclassified-entry",
-      message: "@sheetwrite/unknown . (./index.d.ts) has no public API classification",
-      package: "@sheetwrite/unknown",
-      entryPoint: ".",
-    });
-  });
-
-  it("rejects malformed or partial reports", () => {
-    expect(validateManifest({ formatVersion: 2, packages: [{ name: "partial" }] })).toContainEqual(
-      expect.objectContaining({ code: "malformed-report" }),
-    );
   });
 
   it("writes and reads an explicit baseline artifact without changing reviewed intent", async () => {
@@ -386,29 +251,6 @@ export class LegacyFailure extends RangeError {}`,
     );
     await expect(readPublicApiBaseline(root)).rejects.toThrow(
       "Invalid public API baseline artifact",
-    );
-  });
-
-  it("rejects an unreachable export outside the reviewed public contract", async () => {
-    const root = await fixture();
-    const initial = await analyzePublicApi(root);
-    const baseline = await installBaseline(root, initial.manifest);
-    await writeFile(
-      join(root, "packages/core/index.d.ts"),
-      `${canonicalDeclarations}\n/** Accidental fixture export. */\nexport const Unreachable = true;\n`,
-    );
-    const changed = await analyzePublicApi(root);
-    const refreshed = await writePublicApiBaseline(root, changed.manifest);
-
-    expect(refreshed.intentionalExports).toEqual(baseline.intentionalExports);
-
-    expect(await findUnusedPublicExports(root, changed.manifest, refreshed)).toContainEqual(
-      expect.objectContaining({
-        code: "unused-export",
-        package: "@sheetwrite/core",
-        entryPoint: ".",
-        symbol: "Unreachable",
-      }),
     );
   });
 

@@ -8,9 +8,45 @@ description: "Imperative operations the toolbar and context menu bind to; also e
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L120</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L120"><code>packages/core/src/types/grid.ts#L120</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-actions-toggle-bold"><code>toggleBold</code></a>
+<a href="#grid-actions-toggle-italic"><code>toggleItalic</code></a>
+<a href="#grid-actions-toggle-underline"><code>toggleUnderline</code></a>
+<a href="#grid-actions-toggle-strikethrough"><code>toggleStrikethrough</code></a>
+<a href="#grid-actions-set-align"><code>setAlign</code></a>
+<a href="#grid-actions-set-text-color"><code>setTextColor</code></a>
+<a href="#grid-actions-set-fill-color"><code>setFillColor</code></a>
+<a href="#grid-actions-toggle-border"><code>toggleBorder</code></a>
+<a href="#grid-actions-clear-format"><code>clearFormat</code></a>
+<a href="#grid-actions-merge"><code>merge</code></a>
+<a href="#grid-actions-unmerge"><code>unmerge</code></a>
+<a href="#grid-actions-sort"><code>sort</code></a>
+<a href="#grid-actions-insert-row-above"><code>insertRowAbove</code></a>
+<a href="#grid-actions-insert-row-below"><code>insertRowBelow</code></a>
+<a href="#grid-actions-delete-row"><code>deleteRow</code></a>
+<a href="#grid-actions-insert-column-left"><code>insertColumnLeft</code></a>
+<a href="#grid-actions-insert-column-right"><code>insertColumnRight</code></a>
+<a href="#grid-actions-delete-column"><code>deleteColumn</code></a>
+<a href="#grid-actions-hide-rows"><code>hideRows</code></a>
+<a href="#grid-actions-show-rows"><code>showRows</code></a>
+<a href="#grid-actions-auto-fit-rows"><code>autoFitRows</code></a>
+<a href="#grid-actions-hide-columns"><code>hideColumns</code></a>
+<a href="#grid-actions-show-columns"><code>showColumns</code></a>
+<a href="#grid-actions-auto-fit-columns"><code>autoFitColumns</code></a>
+<a href="#grid-actions-clear-filter"><code>clearFilter</code></a>
+<a href="#grid-actions-copy"><code>copy</code></a>
+<a href="#grid-actions-cut"><code>cut</code></a>
+<a href="#grid-actions-paste"><code>paste</code></a>
+<a href="#grid-actions-paste-values"><code>pasteValues</code></a>
+<a href="#grid-actions-clear-contents"><code>clearContents</code></a>
+<a href="#grid-actions-export-csv"><code>exportCsv</code></a>
+<a href="#grid-actions-export-xlsx"><code>exportXlsx</code></a>
+<a href="#grid-actions-undo"><code>undo</code></a>
+<a href="#grid-actions-redo"><code>redo</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>34</span>
 
@@ -371,3 +407,27 @@ export interface GridActions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridActions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

@@ -9,9 +9,28 @@ Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L278</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L278"><code>packages/core/src/types/grid.ts#L278</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-config-toolbar"><code>toolbar</code></a>
+<a href="#grid-config-bold"><code>bold</code></a>
+<a href="#grid-config-italic"><code>italic</code></a>
+<a href="#grid-config-align"><code>align</code></a>
+<a href="#grid-config-text-color"><code>textColor</code></a>
+<a href="#grid-config-fill-color"><code>fillColor</code></a>
+<a href="#grid-config-border"><code>border</code></a>
+<a href="#grid-config-clear-format"><code>clearFormat</code></a>
+<a href="#grid-config-merge"><code>merge</code></a>
+<a href="#grid-config-sort"><code>sort</code></a>
+<a href="#grid-config-export"><code>export</code></a>
+<a href="#grid-config-icons"><code>icons</code></a>
+<a href="#grid-config-context-menu"><code>contextMenu</code></a>
+<a href="#grid-config-undo"><code>undo</code></a>
+<a href="#grid-config-find"><code>find</code></a>
+<a href="#grid-config-tabs"><code>tabs</code></a>
+<a href="#grid-config-keyboard"><code>keyboard</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>17</span>
 
@@ -206,3 +225,31 @@ export interface GridConfig {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridConfig</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-options/"><code>GridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/grid-controller/"><code>GridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-shell/spreadsheet-shell/"><code>SpreadsheetShell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

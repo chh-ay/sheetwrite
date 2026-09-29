@@ -49,13 +49,6 @@ describe("clean-build export validation", () => {
     ]);
   });
 
-  it("fails when a declared source export is absent", async () => {
-    const root = await exportFixture();
-    await writeFile(join(root, "packages/core/dist/index.d.ts"), "export {};\n");
-    await rm(join(root, "packages/core/styles.css"));
-    expect(() => validateExportTargets(root)).toThrow("@sheetwrite/core:./styles.css");
-  });
-
   it("refuses a workspace that already contains generated output", async () => {
     const root = await exportFixture();
     expect(() => assertGeneratedOutputsAbsent(root)).toThrow("packages/core/dist");

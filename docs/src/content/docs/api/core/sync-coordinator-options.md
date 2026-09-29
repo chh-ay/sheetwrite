@@ -8,9 +8,18 @@ description: "Document, version, durability, and online options for synchronizat
 Document, version, durability, and online options for synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L199</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L199"><code>packages/core/src/sync.ts#L199</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sync-coordinator-options-document-id"><code>documentId</code></a>
+<a href="#sync-coordinator-options-server-version"><code>serverVersion</code></a>
+<a href="#sync-coordinator-options-create-mutation-id"><code>createMutationId</code></a>
+<a href="#sync-coordinator-options-pending-storage"><code>pendingStorage</code></a>
+<a href="#sync-coordinator-options-initial-connection"><code>initialConnection</code></a>
+<a href="#sync-coordinator-options-recover-version-gap"><code>recoverVersionGap</code></a>
+<a href="#sync-coordinator-options-limits"><code>limits</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -103,3 +112,24 @@ export interface SyncCoordinatorOptions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SyncCoordinatorOptions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/sync-coordinator/"><code>SyncCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

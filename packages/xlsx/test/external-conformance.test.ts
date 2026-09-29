@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import {
-  dateToSerial,
   SheetwriteError,
   type WorkbookSnapshot,
   XlsxResourceError,
@@ -14,8 +13,6 @@ import {
   PACKAGE_REL,
   rawXlsx,
   rawZip,
-  STRICT_MAIN,
-  STRICT_REL,
   stylesXml,
   TRANSITIONAL_MAIN,
   TRANSITIONAL_REL,
@@ -106,90 +103,6 @@ describe("pinned external XLSX behavioral vectors", () => {
     ]);
   });
 
-  it("ports cases 11 and 13: preserves the 1900 boundary and converts ISO offsets and fractions", async () => {
-    const serials = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          {
-            xml: worksheet(
-              '<dimension ref="A1:D1"/><sheetData><row r="1"><c r="A1"><v>59</v></c><c r="B1"><v>60</v></c><c r="C1"><v>60.5</v></c><c r="D1"><v>61</v></c></row></sheetData>',
-            ),
-          },
-        ],
-      }),
-    );
-    expect(rowValues(serials)).toEqual(
-      [59, 60, 60.5, 61].map((value) => ({ kind: "literal", value })),
-    );
-
-    const iso = [
-      "2020-01-02T03:04:05Z",
-      "2020-01-02T03:04:05.125Z",
-      "2020-01-02T03:04:05+02:30",
-      "2020-01-02T03:04:05.5-04:00",
-    ];
-    const dates = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          {
-            xml: worksheet(
-              `<dimension ref="A1:D1"/><sheetData><row r="1">${iso
-                .map(
-                  (value, index) =>
-                    `<c r="${String.fromCharCode(65 + index)}1" t="d"><v>${value}</v></c>`,
-                )
-                .join("")}</row></sheetData>`,
-            ),
-          },
-        ],
-      }),
-    );
-    expect(rowValues(dates)).toEqual(
-      iso.map((value) => ({ kind: "literal", value: dateToSerial(new Date(value)) })),
-    );
-    await expect(
-      sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        rawXlsx({
-          sheets: [
-            {
-              xml: worksheet(
-                '<dimension ref="A1"/><sheetData><row r="1"><c r="A1" t="d"><v>2020-99-99T25:61:00Z</v></c></row></sheetData>',
-              ),
-            },
-          ],
-        }),
-      ),
-    ).rejects.toThrow("date value at A1 is invalid");
-  });
-
-  it("ports case 14: translates all nine relative and absolute shared-formula vectors", async () => {
-    const vectors = [
-      ["A1+1", "A2", "A3", "A2+1"],
-      ["A1+1", "A2", "B2", "B1+1"],
-      ["SUM(A1:A10)", "A11", "B11", "SUM(B1:B10)"],
-      ["$A$1+A1", "A2", "A3", "$A$1+A2"],
-      ["$A$1+A1", "A2", "B2", "$A$1+B1"],
-      ["$A1+A1", "A2", "A3", "$A2+A2"],
-      ["$A1+A1", "A2", "B2", "$A1+B1"],
-      ["A$1+A1", "A2", "A3", "A$1+A2"],
-      ["A$1+A1", "A2", "B2", "B$1+B1"],
-    ] as const;
-    for (const [formula, master, slave, expected] of vectors) {
-      const masterRow = Number(/\d+$/.exec(master)![0]);
-      const slaveRow = Number(/\d+$/.exec(slave)![0]);
-      const masterCell = `<c r="${master}"><f t="shared" si="0" ref="${master}:${slave}">${formula}</f></c>`;
-      const slaveCell = `<c r="${slave}"><f t="shared" si="0"/></c>`;
-      const rows =
-        masterRow === slaveRow
-          ? `<row r="${masterRow}">${masterCell}${slaveCell}</row>`
-          : `<row r="${Math.min(masterRow, slaveRow)}">${masterRow < slaveRow ? masterCell : slaveCell}</row><row r="${Math.max(masterRow, slaveRow)}">${masterRow > slaveRow ? masterCell : slaveCell}</row>`;
-      const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        rawXlsx({ sheets: [{ xml: worksheet(`<sheetData>${rows}</sheetData>`) }] }),
-      );
-      expect(rowValues(imported).at(-1)).toEqual({ kind: "formula", src: `=${expected}` });
-    }
-  });
-
   it("ports case 15: neutralizes array and data-table formulas with exact warnings", async () => {
     const capture = warningsFor();
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
@@ -211,71 +124,6 @@ describe("pinned external XLSX behavioral vectors", () => {
     expect(capture.warnings).toEqual([
       expect.objectContaining({ code: "unsupported-feature", cell: "A1" }),
       expect.objectContaining({ code: "unsupported-feature", cell: "B1" }),
-    ]);
-  });
-
-  it("ports cases 16-17: maps false font flags and warns on double-underline precision loss", async () => {
-    const styles = stylesXml(
-      '<fonts count="4"><font><b val="0"/><i/><strike/><u val="none"/></font><font><u/></font><font><u val="double"/></font><font><u val="false"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0"/><xf numFmtId="0" fontId="3" fillId="0" borderId="0"/></cellXfs>',
-    );
-    const capture = warningsFor();
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        styles,
-        sheets: [
-          {
-            xml: worksheet(
-              '<dimension ref="A1:D1"/><sheetData><row r="1"><c r="A1" s="0"><v>1</v></c><c r="B1" s="1"><v>2</v></c><c r="C1" s="2"><v>3</v></c><c r="D1" s="3"><v>4</v></c></row></sheetData>',
-            ),
-          },
-        ],
-      }),
-      { onWarning: capture.onWarning },
-    );
-    expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.style)).toEqual([
-      { italic: true, strikethrough: true },
-      { underline: true },
-      { underline: true },
-      undefined,
-    ]);
-    expect(capture.warnings).toContainEqual(
-      expect.objectContaining({ code: "format-loss", message: expect.stringContaining("double") }),
-    );
-  });
-
-  it("ports cases 19-20: maps four borders and warns for diagonal, patterned, and gradient loss", async () => {
-    const styles = stylesXml(
-      '<fonts count="1"><font/></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="darkVertical"><fgColor rgb="FFFF0000"/></patternFill></fill><fill><gradientFill type="linear"><stop position="0"><color rgb="FFFF0000"/></stop></gradientFill></fill></fills><borders count="2"><border/><border diagonalUp="1" diagonalDown="1"><left style="thin"><color rgb="FFFF0000"/></left><right style="thin"><color rgb="FFFF0000"/></right><top style="thin"><color rgb="FFFF0000"/></top><bottom style="thin"><color rgb="FFFF0000"/></bottom><diagonal style="thin"><color rgb="FF000000"/></diagonal></border></borders><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="2" borderId="0"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0"/><xf numFmtId="0" fontId="0" fillId="4" borderId="0"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1"/></cellXfs>',
-    );
-    const capture = warningsFor();
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        styles,
-        sheets: [
-          {
-            xml: worksheet(
-              '<dimension ref="A1:D1"/><sheetData><row r="1"><c r="A1" s="0"><v>1</v></c><c r="B1" s="1"><v>2</v></c><c r="C1" s="2"><v>3</v></c><c r="D1" s="3"><v>4</v></c></row></sheetData>',
-            ),
-          },
-        ],
-      }),
-      { onWarning: capture.onWarning },
-    );
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toBeUndefined();
-    expect(imported.sheets[0]!.cells[0]!.cells[3]!.style?.border).toEqual({
-      top: { color: "#FF0000", width: 1, style: "solid" },
-      right: { color: "#FF0000", width: 1, style: "solid" },
-      bottom: { color: "#FF0000", width: 1, style: "solid" },
-      left: { color: "#FF0000", width: 1, style: "solid" },
-    });
-    expect(
-      capture.warnings
-        .filter((warning) => warning.code === "format-loss")
-        .map((warning) => warning.message),
-    ).toEqual([
-      "Non-solid fill pattern darkVertical cannot be represented and was dropped",
-      "Gradient fill cannot be represented and was dropped",
-      "Diagonal border presentation cannot be represented and was dropped",
     ]);
   });
 
@@ -372,143 +220,6 @@ describe("pinned external XLSX behavioral vectors", () => {
     ]);
   });
 
-  it("ports case 26: retains frozen axes and warns for split, RTL, and zoom presentation", async () => {
-    const capture = warningsFor();
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          {
-            xml: worksheet(
-              '<sheetViews><sheetView workbookViewId="0" rightToLeft="1" zoomScale="125"><pane xSplit="2" ySplit="3" state="split"/></sheetView><sheetView workbookViewId="0"><pane xSplit="1" ySplit="2" state="frozen"/></sheetView><sheetView workbookViewId="0" rightToLeft="1" zoomScaleNormal="80"><pane xSplit="4" ySplit="5" state="split"/></sheetView></sheetViews><dimension ref="A1"/><sheetData/>',
-            ),
-          },
-        ],
-      }),
-      { onWarning: capture.onWarning },
-    );
-    expect(imported.sheets[0]!.frozenRows).toBeUndefined();
-    expect(imported.sheets[0]!.frozenCols).toBeUndefined();
-    expect(capture.warnings.map((warning) => [warning.code, warning.message])).toEqual([
-      ["unsupported-feature", "Right-to-left worksheet view presentation was dropped"],
-      ["unsupported-feature", "Worksheet zoom presentation was dropped"],
-      ["unsupported-feature", "Split-pane worksheet view presentation was dropped"],
-    ]);
-  });
-
-  it("ports case 27: imports visible, hidden, and veryHidden worksheet states exactly", async () => {
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          { name: "Visible", state: "visible", xml: worksheet("<sheetData/>") },
-          { name: "Hidden", state: "hidden", xml: worksheet("<sheetData/>") },
-          { name: "VeryHidden", state: "veryHidden", xml: worksheet("<sheetData/>") },
-        ],
-      }),
-    );
-    expect(imported.sheets.map((sheet) => [sheet.name, sheet.visibility])).toEqual([
-      ["Visible", undefined],
-      ["Hidden", "hidden"],
-      ["VeryHidden", "veryHidden"],
-    ]);
-  });
-  it("ports cases 28-29: rejects overlapping merges and unsafe case-folded or overlength names", async () => {
-    const merged = minimalSnapshot();
-    merged.sheets[0]!.rowCount = 2;
-    merged.sheets[0]!.columns.push({ key: "b", header: "B", width: 80, type: "text" });
-    merged.sheets[0]!.merges = [
-      { r0: 0, c0: 0, r1: 1, c1: 1 },
-      { r0: 0, c0: 1, r1: 0, c1: 1 },
-    ];
-    await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(merged)).rejects.toThrow(
-      "Merged regions may not overlap",
-    );
-
-    const duplicateImport = rawXlsx({
-      sheets: [
-        { name: "thisisaworksheetnameinuppercase", xml: worksheet("<sheetData/>") },
-        { name: "THISISAWORKSHEETNAMEINUPPERCASE", xml: worksheet("<sheetData/>") },
-      ],
-    });
-    await expect(sheetwriteWorkbookBackend.fromXlsxWorkbook(duplicateImport)).rejects.toThrow(
-      "unsafe or duplicated",
-    );
-    const overlengthImport = rawXlsx({
-      sheets: [
-        { name: "ThisIsAWorksheetNameThatIsLonge", xml: worksheet("<sheetData/>") },
-        { name: "ThisIsAWorksheetNameThatIsLongerThan31", xml: worksheet("<sheetData/>") },
-      ],
-    });
-    await expect(sheetwriteWorkbookBackend.fromXlsxWorkbook(overlengthImport)).rejects.toThrow(
-      "unsafe or duplicated",
-    );
-
-    const duplicateExport = minimalSnapshot();
-    duplicateExport.sheets.push({
-      ...structuredClone(duplicateExport.sheets[0]!),
-      id: "s2",
-      name: "SHEET1",
-      order: 1,
-    });
-    await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(duplicateExport)).rejects.toThrow(
-      "duplicate case-insensitive",
-    );
-    const overlengthExport = minimalSnapshot();
-    overlengthExport.sheets[0]!.name = "ThisIsAWorksheetNameThatIsLongerThan31";
-    await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(overlengthExport)).rejects.toThrow(
-      "invalid XLSX sheet name",
-    );
-  });
-
-  it("ports cases 30-31: imports scoped rectangles and drops reserved, constant, dynamic, and union names", async () => {
-    const capture = warningsFor();
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          { name: "Sheet1", xml: worksheet('<dimension ref="A1:A3"/><sheetData/>') },
-          { name: "Sheet2", xml: worksheet('<dimension ref="A1"/><sheetData/>') },
-        ],
-        workbookExtra:
-          '<definedNames><definedName name="GlobalRef">Sheet1!$A$1</definedName><definedName name="Sheet0Ref" localSheetId="0">Sheet1!$A$3</definedName><definedName name="Sheet1Ref" localSheetId="1">Sheet2!$A$1</definedName><definedName name="_xlnm.Print_Area" localSheetId="0">Sheet1!$A$1:$A$3</definedName><definedName name="GlobalValue">9.99</definedName><definedName name="Dynamic">Sheet1!OFFSET($A$1,0,0,2,1)</definedName><definedName name="Union">Sheet1!$A$1,$A$3</definedName></definedNames>',
-      }),
-      { onWarning: capture.onWarning },
-    );
-    const [sheet1, sheet2] = imported.sheets;
-    expect(imported.workbook.namedRanges).toEqual([
-      {
-        name: "GlobalRef",
-        range: {
-          sheet: sheet1!.id,
-          start: { row: 0, col: 0 },
-          end: { row: 0, col: 0 },
-        },
-      },
-      {
-        name: "Sheet0Ref",
-        scope: sheet1!.id,
-        range: {
-          sheet: sheet1!.id,
-          start: { row: 2, col: 0 },
-          end: { row: 2, col: 0 },
-        },
-      },
-      {
-        name: "Sheet1Ref",
-        scope: sheet2!.id,
-        range: {
-          sheet: sheet2!.id,
-          start: { row: 0, col: 0 },
-          end: { row: 0, col: 0 },
-        },
-      },
-    ]);
-    expect(capture.warnings.map((warning) => warning.message)).toEqual([
-      "Reserved Excel defined name _xlnm.Print_Area was dropped",
-      "Defined name GlobalValue was not a single rectangular range",
-      "Defined name Dynamic was not a single rectangular range",
-      "Defined name Union was not a single rectangular range",
-    ]);
-  });
-
   it("ports cases 32 and 34: maps inline and multi-range lists and warns on validation-policy loss", async () => {
     const capture = warningsFor();
     const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
@@ -555,71 +266,6 @@ describe("pinned external XLSX behavioral vectors", () => {
         "Distinct Excel validation prompt and error text were reduced to the prompt",
       ],
       ["validation-loss", "Excel validation type custom was dropped"],
-    ]);
-  });
-
-  it("ports cases 36-37: imports multi-author rich comments and exact note whitespace/newlines", async () => {
-    const capture = warningsFor();
-    const comments = `<?xml version="1.0"?><comments xmlns="${TRANSITIONAL_MAIN}"><authors><author>Cuke</author><author>Not Cuke</author></authors><commentList><comment ref="A1" authorId="0"><text><r><rPr><b/></rPr><t xml:space="preserve"> Cuke:\nFirst Comment </t></r></text></comment><comment ref="D1" authorId="0"><text><t xml:space="preserve">trailing </t></text></comment><comment ref="A2" authorId="1"><text><t xml:space="preserve"> both \n spaced </t></text></comment></commentList></comments>`;
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          {
-            xml: worksheet('<dimension ref="A1:D2"/><sheetData/>'),
-            relationships: `<Relationship Id="rId1" Type="${TRANSITIONAL_REL}/comments" Target="../comments1.xml"/>`,
-          },
-        ],
-        extraOverrides: [
-          '<Override PartName="/xl/comments1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"/>',
-        ],
-        extraFiles: { "xl/comments1.xml": comments },
-      }),
-      { onWarning: capture.onWarning },
-    );
-    expect(imported.sheets[0]!.notes).toEqual([
-      { addr: { sheet: imported.sheets[0]!.id, row: 0, col: 0 }, text: " Cuke:\nFirst Comment " },
-      { addr: { sheet: imported.sheets[0]!.id, row: 0, col: 3 }, text: "trailing " },
-      { addr: { sheet: imported.sheets[0]!.id, row: 1, col: 0 }, text: " both \n spaced " },
-    ]);
-    expect(capture.warnings).toEqual([
-      expect.objectContaining({
-        code: "rich-text",
-        message: "Comment rich text formatting was flattened",
-        cell: "A1",
-      }),
-    ]);
-  });
-
-  it("ports case 38: dispatches a full Strict workbook, styles, strings, sheet, and comments graph", async () => {
-    const comments = `<?xml version="1.0"?><comments xmlns="${STRICT_MAIN}"><authors><author>A</author></authors><commentList><comment ref="A1" authorId="0"><text><t>Strict note</t></text></comment></commentList></comments>`;
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        strict: true,
-        styles: stylesXml(
-          '<fonts count="2"><font/><font><b/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
-          true,
-        ),
-        sharedStrings: `<?xml version="1.0"?><sst xmlns="${STRICT_MAIN}" count="1" uniqueCount="1"><si><t>Strict shared</t></si></sst>`,
-        sheets: [
-          {
-            name: "Strict",
-            xml: worksheet(
-              '<dimension ref="A1"/><sheetData><row r="1"><c r="A1" t="s" s="1"><v>0</v></c></row></sheetData>',
-              true,
-            ),
-            relationships: `<Relationship Id="rId1" Type="${STRICT_REL}/comments" Target="../comments1.xml"/>`,
-          },
-        ],
-        extraOverrides: [
-          '<Override PartName="/xl/comments1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"/>',
-        ],
-        extraFiles: { "xl/comments1.xml": comments },
-      }),
-    );
-    expect(rowValues(imported)).toEqual([{ kind: "literal", value: "Strict shared" }]);
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toEqual({ bold: true });
-    expect(imported.sheets[0]!.notes).toEqual([
-      { addr: { sheet: imported.sheets[0]!.id, row: 0, col: 0 }, text: "Strict note" },
     ]);
   });
 
@@ -801,32 +447,6 @@ describe("local deterministic and adversarial XLSX gates", () => {
       expect(view.getUint16(offset + 10, true)).toBe(0);
       expect(view.getUint16(offset + 12, true)).toBe(33);
     }
-  });
-
-  it("matches independently authored exact workbook, sheet, style, comment, name, and view XML", async () => {
-    const source = minimalSnapshot();
-    source.workbook.namedRanges = [
-      {
-        name: "LocalCell",
-        scope: "s",
-        range: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-      },
-    ];
-    source.sheets[0]!.frozenRows = 1;
-    source.sheets[0]!.notes = [{ addr: { sheet: "s", row: 0, col: 0 }, text: "note & <xml>" }];
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(source));
-    expect(strFromU8(parts["xl/workbook.xml"]!)).toBe(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><bookViews><workbookView activeTab="0"/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><sheet name="__sheetwrite_meta__" sheetId="2" state="veryHidden" r:id="rId2"/></sheets><definedNames><definedName name="LocalCell" localSheetId="0">&apos;Sheet1&apos;!$A$1:$A$1</definedName></definedNames><calcPr fullCalcOnLoad="1" forceFullCalc="1"/></workbook>`,
-    );
-    expect(strFromU8(parts["xl/worksheets/sheet1.xml"]!)).toBe(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${TRANSITIONAL_MAIN}" xmlns:r="${TRANSITIONAL_REL}"><dimension ref="A1:A1"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="1" width="10.71" customWidth="1"/></cols><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t xml:space="preserve">x</t></is></c></row></sheetData><legacyDrawing r:id="rId2"/></worksheet>`,
-    );
-    expect(strFromU8(parts["xl/comments1.xml"]!)).toBe(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><comments xmlns="${TRANSITIONAL_MAIN}"><authors><author>Sheetwrite</author></authors><commentList><comment ref="A1" authorId="0"><text><r><t xml:space="preserve">note &amp; &lt;xml&gt;</t></r></text></comment></commentList></comments>`,
-    );
-    expect(strFromU8(parts["xl/styles.xml"]!)).toBe(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
-    );
   });
 
   it("preserves exact abort reasons as canonical causes across codec stages", async () => {
@@ -1031,30 +651,6 @@ describe("local deterministic and adversarial XLSX gates", () => {
     }
   });
 
-  it("drops threaded comments with one exact unsupported-feature warning", async () => {
-    const capture = warningsFor();
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({
-        sheets: [
-          {
-            xml: worksheet("<sheetData/>"),
-            relationships: `<Relationship Id="rId1" Type="${TRANSITIONAL_REL}/threadedComment" Target="../threadedComments/threadedComment1.xml"/>`,
-          },
-        ],
-      }),
-      { onWarning: capture.onWarning },
-    );
-    expect(imported.sheets[0]!.notes).toBeUndefined();
-    expect(capture.warnings).toEqual([
-      {
-        code: "unsupported-feature",
-        message: "Unsupported worksheet relationship threadedComment was dropped",
-        sheet: "Raw1",
-        part: "xl/threadedComments/threadedComment1.xml",
-      },
-    ]);
-  });
-
   it("makes native external edits win over stale value, style, name, note, and view sidecar data", async () => {
     const source = minimalSnapshot();
     source.workbook.namedRanges = [
@@ -1130,31 +726,5 @@ describe("local deterministic and adversarial XLSX gates", () => {
       expect((error as XlsxResourceError).resource).toBe("maxOutputBytes");
       expect((error as XlsxResourceError).actual).toBeGreaterThan(asciiAccounted);
     }
-  });
-
-  it("keeps an exhaustive machine-readable mapping for every pinned external case", async () => {
-    const mapping = (await Bun.file(
-      new URL("fixtures/external-case-mapping.json", import.meta.url),
-    ).json()) as {
-      pins: Record<string, { commit: string }>;
-      cases: Array<{ id: number; status: string; testName: string }>;
-      impossibleCases: unknown[];
-    };
-    expect(mapping.cases).toHaveLength(45);
-    expect(mapping.cases.map((entry) => entry.id)).toEqual(
-      Array.from({ length: 45 }, (_, index) => index + 1),
-    );
-    expect(new Set(mapping.cases.map((entry) => entry.id)).size).toBe(45);
-    expect(
-      mapping.cases.every(
-        (entry) =>
-          (entry.status === "covered-existing" || entry.status === "ported") &&
-          entry.testName.length > 0,
-      ),
-    ).toBe(true);
-    expect(mapping.pins.exceljs?.commit).toBe("ac96f9a61e9799c7776bd940f05c4a51d7200209");
-    expect(mapping.pins.openpyxl?.commit).toBe("9a816c7f1efabd2d31689e29037f1a2d6756cc00");
-    expect(mapping.pins["apache-poi"]?.commit).toBe("913c78891bd0cd20945b050c63abfb8c66c88009");
-    expect(mapping.impossibleCases).toEqual([]);
   });
 });

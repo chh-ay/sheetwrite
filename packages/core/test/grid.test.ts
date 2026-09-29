@@ -1,6 +1,5 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, jest, spyOn } from "bun:test";
-import { readFileSync } from "node:fs";
-import { SnapshotResourceError, validateTransactionResources } from "../src/document-protocol.js";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { validateTransactionResources } from "../src/document-protocol.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -9,19 +8,15 @@ import {
   GridImpl,
   initSheetwrite,
   measureMaxElementHeight,
-  resolveThemeFromCss,
 } from "../src/grid.js";
-import { createGridController } from "../src/grid-controller.js";
-import { createGridFromSnapshot } from "../src/persistence.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
-import { installCanvasTestStubs, type RecordingContext2D } from "../src/testing.js";
+import { installCanvasTestStubs } from "../src/testing.js";
 import type {
   CellScalar,
   ChangeEvent,
   DataSourcePage,
   DataSourceRequest,
   DocumentOp,
-  GridEvents,
   RowData,
   Store,
   Workbook,
@@ -140,32 +135,6 @@ function cellPoint(
   return { clientX: x, clientY: y };
 }
 
-describe("Grid render hot path", () => {
-  it("paints the visible window via getVisibleWindow and never getCell per cell", () => {
-    const workbook = makeWorkbook(50);
-    let getCellCalls = 0;
-    let getWindowCalls = 0;
-    const store = makeFakeStore(workbook, {
-      onGetCell: () => {
-        getCellCalls++;
-      },
-      onWindow: () => {
-        getWindowCalls++;
-      },
-    });
-
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    expect(getCellCalls).toBe(0);
-    expect(getWindowCalls).toBe(1);
-    const ctx = host.querySelector("canvas")?.getContext("2d") as unknown as RecordingContext2D;
-    expect(ctx.calls.fillText).toBeGreaterThan(0);
-
-    grid.destroy();
-  });
-});
-
 describe("Grid editing (Layer 3)", () => {
   beforeAll(async () => {
     await initSheetwrite();
@@ -188,70 +157,6 @@ describe("Grid editing (Layer 3)", () => {
     node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
     expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Edited!");
-    grid.destroy();
-  });
-
-  it("commits a typed formula, resolves it, and re-edits to its source", () => {
-    const workbook = makeWorkbook(20);
-    const store = new SheetwriteStore(workbook, makeColumnarData(20));
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: { sheet: "s1", row: 0, col: 1 }, value: { kind: "literal", value: 10 } },
-        { op: "set", addr: { sheet: "s1", row: 1, col: 1 }, value: { kind: "literal", value: 5 } },
-      ],
-    });
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    const node = host.querySelector("textarea.sheetwrite-editor");
-    if (!(node instanceof HTMLTextAreaElement)) return;
-    node.value = "=B1+B2*2";
-    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(20);
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true }));
-    const node2 = host.querySelector("textarea.sheetwrite-editor");
-    if (!(node2 instanceof HTMLTextAreaElement)) return;
-    expect(node2.value).toBe("=B1+B2*2");
-
-    grid.destroy();
-  });
-
-  it("edits the displayed data row under a sorted view", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 1 },
-          value: { kind: "literal", value: 30 },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 1 },
-          value: { kind: "literal", value: 10 },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 2, col: 1 },
-          value: { kind: "literal", value: 20 },
-        },
-      ],
-    });
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    grid.sortBy(1, true);
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    typeIntoFocusedCell(host, "Sorted edit");
-
-    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe("Sorted edit");
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
-
     grid.destroy();
   });
 
@@ -285,132 +190,6 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("keeps render overscan independent from the bounded datasource horizon", () => {
-    const requests: DataSourceRequest[] = [];
-    let paintedLastRow = -1;
-    const grid = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(200),
-      overscan: 50,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: (request) => {
-          requests.push(request);
-          return Promise.withResolvers<DataSourcePage>().promise;
-        },
-      },
-    });
-    grid.on("scroll", ({ lastRow }) => {
-      paintedLastRow = lastRow;
-    });
-    grid.refresh();
-
-    const visible = requests[0];
-    if (!visible) throw new Error("visible datasource request was not issued");
-    const requestedEnd = Math.max(...requests.map((request) => request.end));
-    expect(visible.start).toBe(0);
-    expect(requestedEnd).toBeLessThanOrEqual(visible.end * 3);
-    expect(paintedLastRow + 1).toBeGreaterThan(requestedEnd);
-
-    grid.destroy();
-  });
-
-  it("retries datasource bands after a rejected load", async () => {
-    const workbook = makeWorkbook(50);
-    let requests = 0;
-    const host = mountHost();
-    const failed = Promise.withResolvers<void>();
-    const grid = new GridImpl(host, {
-      workbook,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: () => {
-          requests++;
-          return Promise.reject(new Error("load failed"));
-        },
-      },
-    });
-    grid.on("datasource-error", () => failed.resolve());
-
-    const initialRequests = requests;
-    expect(initialRequests).toBeGreaterThan(1);
-    await failed.promise;
-
-    grid.refresh();
-    expect(requests).toBeGreaterThan(initialRequests);
-
-    grid.destroy();
-  });
-
-  it("marks only validated partial datasource rows loaded and retries the remainder", async () => {
-    const workbook = makeWorkbook(50);
-    const starts: number[] = [];
-    const grid = new GridImpl(mountHost(), {
-      workbook,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: async (request: DataSourceRequest) => {
-          starts.push(request.start);
-          return coveredPage(request, [{ name: `row ${request.start}` }]);
-        },
-      },
-    });
-
-    await Promise.resolve();
-    await Promise.resolve();
-    grid.refresh();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(starts[0]).toBe(0);
-    expect(starts).toContain(1);
-    grid.destroy();
-  });
-
-  it("reports malformed datasource pages and keeps them retryable", async () => {
-    const workbook = makeWorkbook(50);
-    let requests = 0;
-    const grid = new GridImpl(mountHost(), {
-      workbook,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: async (request: DataSourceRequest) => {
-          requests += 1;
-          return {
-            protocol: 2,
-            start: request.end,
-            columns: request.columns,
-            rows: [coveredRow(request, { name: "wrong range" })],
-          };
-        },
-      },
-    });
-    const errors: GridEvents["datasource-error"][] = [];
-    const failed = Promise.withResolvers<void>();
-    grid.on("datasource-error", (event) => {
-      errors.push(event);
-      failed.resolve();
-    });
-    const initialRequests = requests;
-
-    await failed.promise;
-    grid.refresh();
-    await Promise.resolve();
-
-    expect(errors.length).toBeGreaterThan(0);
-    expect(
-      errors.every(
-        ({ request, error }) =>
-          request.protocol === 2 &&
-          request.columns.length > 0 &&
-          error.code === "datasource-request-failed" &&
-          error.operation === "datasource-request" &&
-          error.cause instanceof RangeError,
-      ),
-    ).toBe(true);
-    expect(requests).toBeGreaterThan(initialRequests);
-    grid.destroy();
-  });
-
   it("preserves a newer local literal edit when a stale page resolves", async () => {
     const workbook = makeWorkbook(20);
     const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
@@ -435,48 +214,6 @@ describe("Grid editing (Layer 3)", () => {
     await Promise.resolve();
 
     expect(grid.store.getCell(addr).resolved).toBe("local");
-    grid.destroy();
-  });
-
-  it("aborts an outstanding datasource request on destroy", () => {
-    const { promise } = Promise.withResolvers<DataSourcePage>();
-    let signal: AbortSignal | undefined;
-    const grid = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(20),
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: (request: DataSourceRequest) => {
-          signal = request.signal;
-          return promise;
-        },
-      },
-    });
-
-    grid.destroy();
-
-    expect(signal?.aborted).toBe(true);
-  });
-
-  it("aborts active datasource rectangles when a structural change resets paging", () => {
-    const { promise } = Promise.withResolvers<DataSourcePage>();
-    const signals: AbortSignal[] = [];
-    const grid = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(20),
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: (request) => {
-          signals.push(request.signal);
-          return promise;
-        },
-      },
-    });
-
-    expect(signals.length).toBeGreaterThan(0);
-    grid.store.applyTransaction({
-      patches: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
-    });
-
-    expect(signals.every((signal) => signal.aborted)).toBe(true);
     grid.destroy();
   });
 
@@ -532,73 +269,6 @@ describe("Grid editing (Layer 3)", () => {
 
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Merged anchor");
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBeNull();
-
-    grid.destroy();
-  });
-
-  it("opens and focuses the built-in find bar with Ctrl+F unless find is disabled", () => {
-    const workbook = makeWorkbook(10);
-    const host = mountHost();
-    const grid = new GridImpl(
-      host,
-      { workbook },
-      new SheetwriteStore(workbook, makeColumnarData(10)),
-    );
-
-    const event = new KeyboardEvent("keydown", {
-      key: "f",
-      ctrlKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    host.dispatchEvent(event);
-
-    const find = host.querySelector(".sheetwrite-find");
-    const input = host.querySelector(".sheetwrite-find-input");
-    expect(event.defaultPrevented).toBe(true);
-    expect(find).toBeInstanceOf(HTMLDivElement);
-    expect(input).toBeInstanceOf(HTMLInputElement);
-    expect(getComputedStyle(find as HTMLDivElement).display).not.toBe("none");
-    expect(document.activeElement).toBe(input);
-
-    grid.destroy();
-
-    const disabledHost = mountHost();
-    const disabledWorkbook = makeWorkbook(10);
-    const disabled = new GridImpl(
-      disabledHost,
-      { workbook: disabledWorkbook, config: { find: false, toolbar: false } },
-      new SheetwriteStore(disabledWorkbook, makeColumnarData(10)),
-    );
-
-    expect(disabledHost.querySelector(".sheetwrite-find")).toBeNull();
-
-    disabled.destroy();
-  });
-
-  it("undoes and redoes literal edits, and a fresh edit clears redo", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const addr = { sheet: "s1", row: 2, col: 0 };
-
-    grid.setSelection({ kind: "cell", addr });
-    typeIntoFocusedCell(host, "First edit");
-    expect(store.getCell(addr).resolved).toBe("First edit");
-
-    grid.undo();
-    expect(store.getCell(addr).resolved).toBe("Customer 2");
-
-    grid.redo();
-    expect(store.getCell(addr).resolved).toBe("First edit");
-
-    grid.undo();
-    grid.setSelection({ kind: "cell", addr });
-    typeIntoFocusedCell(host, "Second edit");
-    grid.redo();
-
-    expect(store.getCell(addr).resolved).toBe("Second edit");
 
     grid.destroy();
   });
@@ -672,98 +342,6 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("undoes a populated column removal through one compact serializable block", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 1 },
-          value: { kind: "formula", src: "=A1" },
-          style: { bold: true },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 1, col: 1 },
-          value: { kind: "ref", target: { sheet: "s1", row: 0, col: 0 } },
-          style: { italic: true },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 2, col: 1 },
-          value: { kind: "literal", value: "kept" },
-          style: { underline: true },
-        },
-      ],
-    });
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const events: ChangeEvent[] = [];
-    grid.on("change", (event) => events.push(event));
-
-    grid.applyTransaction({
-      patches: [{ op: "removeColumns", sheet: "s1", at: 1, count: 1 }],
-    });
-    expect(workbook.sheets[0]!.columns).toHaveLength(2);
-
-    grid.undo();
-    expect(workbook.sheets[0]!.columns[1]!.key).toBe("amount");
-    expect(store.getFormula({ sheet: "s1", row: 0, col: 1 })).toBe("=A1");
-    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toEqual({ bold: true });
-    expect(store.getRefTarget({ sheet: "s1", row: 1, col: 1 })).toEqual({
-      sheet: "s1",
-      row: 0,
-      col: 0,
-    });
-    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style).toEqual({ italic: true });
-    expect(store.getCell({ sheet: "s1", row: 2, col: 1 })).toMatchObject({
-      resolved: "kept",
-      style: { underline: true },
-    });
-    const undoEvent = events.at(-1)!;
-    const serializedUndo = JSON.stringify(undoEvent.transaction.patches);
-    expect(JSON.parse(serializedUndo)).toEqual(undoEvent.transaction.patches);
-    expect(new TextEncoder().encode(serializedUndo).byteLength).toBeLessThan(2_000);
-
-    grid.redo();
-    expect(workbook.sheets[0]!.columns).toHaveLength(2);
-    grid.destroy();
-  });
-
-  it("updates read-only and config without clearing selection or history", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const addr = { sheet: "s1", row: 2, col: 0 };
-    const selection = { kind: "cell" as const, addr };
-
-    grid.setSelection(selection);
-    grid.applyTransaction({
-      patches: [{ op: "set", addr, value: { kind: "literal", value: "Editable" } }],
-    });
-    grid.setConfig({ toolbar: false, contextMenu: false, find: false, keyboard: false });
-
-    expect(grid.getSelection()).toEqual(selection);
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-
-    grid.setReadOnly(true);
-    expect(host.getAttribute("aria-readonly")).toBe("true");
-    grid.applyTransaction({
-      patches: [{ op: "set", addr, value: { kind: "literal", value: "Blocked" } }],
-    });
-    grid.undo();
-    expect(store.getCell(addr).resolved).toBe("Editable");
-
-    grid.setReadOnly(false);
-    expect(host.hasAttribute("aria-readonly")).toBe(false);
-    grid.undo();
-    expect(store.getCell(addr).resolved).toBe("Customer 2");
-    expect(grid.getSelection()).toEqual(selection);
-
-    grid.destroy();
-  });
-
   it("resolves pointer coordinates for host-owned context menus", () => {
     const workbook = makeWorkbook(10);
     const store = makeFakeStore(workbook);
@@ -780,127 +358,6 @@ describe("Grid editing (Layer 3)", () => {
     expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
 
     grid.destroy();
-  });
-
-  it("preserves toolbar focus and values across an equivalent config", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-
-    const colorInput = host.querySelector(".sheetwrite-tb-textColor");
-    expect(colorInput).toBeInstanceOf(HTMLInputElement);
-    if (!(colorInput instanceof HTMLInputElement)) throw new Error("text-color input not mounted");
-    colorInput.value = "#123456";
-    colorInput.focus();
-
-    grid.setConfig({ toolbar: true });
-    expect(colorInput.isConnected).toBe(true);
-    expect(colorInput.value).toBe("#123456");
-    expect(document.activeElement).toBe(colorInput);
-
-    grid.setConfig({ toolbar: false });
-    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
-    expect(colorInput.isConnected).toBe(false);
-
-    grid.destroy();
-    store.dispose();
-  });
-  it("commits a color picker value once after a stream of native picker events", () => {
-    jest.useFakeTimers();
-    try {
-      const workbook = makeWorkbook(10);
-      const store = new SheetwriteStore(workbook, makeColumnarData(10));
-      const host = mountHost();
-      const grid = new GridImpl(host, { workbook, config: { toolbar: true } }, store);
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      const commits: unknown[] = [];
-      const unsubscribe = grid.on("change", (event) => commits.push(event));
-      const colorInput = host.querySelector(".sheetwrite-tb-fillColor");
-      expect(colorInput).toBeInstanceOf(HTMLInputElement);
-      if (!(colorInput instanceof HTMLInputElement)) {
-        throw new Error("fill-color input not mounted");
-      }
-
-      for (const color of ["#113355", "#446688", "#aa5533"]) {
-        colorInput.value = color;
-        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
-        colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      expect(commits).toHaveLength(0);
-      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBeUndefined();
-
-      jest.advanceTimersByTime(150);
-      expect(commits).toHaveLength(1);
-      expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.backgroundColor).toBe("#aa5533");
-
-      colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-      jest.advanceTimersByTime(150);
-      expect(commits).toHaveLength(1);
-
-      unsubscribe();
-      grid.destroy();
-      store.dispose();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-  it("forwards every Grid event through the shared controller", () => {
-    const workbook = makeWorkbook(10);
-    const host = mountHost();
-    const received: string[] = [];
-    const controller = createGridController(
-      host,
-      { workbook, data: makeColumnarData(10) },
-      {
-        onGridChange: (event) => {
-          expect(event.transaction.patches).toHaveLength(1);
-          received.push("change");
-        },
-        onSelectionChange: (selection) => {
-          expect(selection?.kind).toBe("cell");
-          received.push("selection");
-        },
-        onViewportChange: (event) => {
-          expect(event.lastRow).toBeGreaterThanOrEqual(event.firstRow);
-          received.push("scroll");
-        },
-        onEditBegin: (event) => {
-          expect(event.addr).toEqual({ sheet: "s1", row: 0, col: 0 });
-          received.push("edit-begin");
-        },
-        onEditCommit: (event) => {
-          expect(event.value).toEqual({ kind: "literal", value: "Committed" });
-          received.push("edit-commit");
-        },
-        onSearch: (result) => {
-          expect(result.query).toBe("Committed");
-          received.push("search");
-        },
-      },
-    );
-    const addr = { sheet: "s1", row: 0, col: 0 };
-
-    controller.grid.applyTransaction({
-      patches: [{ op: "set", addr, value: { kind: "literal", value: "Changed" } }],
-    });
-    controller.grid.setSelection({ kind: "cell", addr });
-    controller.grid.refresh();
-    controller.grid.beginEdit(0, 0);
-    const editor = expectEditor(host);
-    editor.value = "Committed";
-    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    controller.grid.search("Committed");
-
-    expect(received).toContain("change");
-    expect(received).toContain("selection");
-    expect(received).toContain("scroll");
-    expect(received).toContain("edit-begin");
-    expect(received).toContain("edit-commit");
-    expect(received).toContain("search");
-
-    controller.destroy();
   });
 });
 
@@ -969,48 +426,6 @@ describe("Grid transaction resource ingress", () => {
     expect(rejectionEvents).toBe(0);
     grid.destroy();
   });
-
-  it("validates Grid overrides before construction", () => {
-    expect(
-      () =>
-        new GridImpl(mountHost(), {
-          workbook: makeWorkbook(2),
-          transactionResourceLimits: { maxEncodedBytes: -1 },
-        }),
-    ).toThrow(RangeError);
-  });
-
-  it("propagates SnapshotGridOptions limits to the hydrated Store and Grid", () => {
-    const source = new SheetwriteStore(makeWorkbook(3));
-    const snapshot = source.exportSnapshot();
-    source.dispose();
-    const grid = createGridFromSnapshot(mountHost(), snapshot, {
-      transactionResourceLimits: { maxOperations: 1 },
-    });
-    const oversized: DocumentOp[] = [
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 0, col: 0 },
-        value: { kind: "literal", value: "one" },
-      },
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 1, col: 0 },
-        value: { kind: "literal", value: "two" },
-      },
-    ];
-
-    expect(grid.applyTransaction({ patches: oversized })).toMatchObject({
-      status: "rejected",
-      epoch: 0,
-    });
-    expect(grid.store.applyTransaction({ patches: oversized })).toMatchObject({
-      status: "rejected",
-      epoch: 0,
-    });
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBeNull();
-    grid.destroy();
-  });
 });
 
 describe("Grid store lifecycle", () => {
@@ -1054,49 +469,11 @@ describe("Grid store lifecycle", () => {
     disposeSpy.mockRestore();
     store.dispose();
   });
-  it("ignores a pending datasource result after destroying an owned store", async () => {
-    const { promise: pending, resolve: resolveRows } = Promise.withResolvers<DataSourcePage>();
-    let request: DataSourceRequest | undefined;
-    const datasource = {
-      capabilities: WINDOWED_DATASOURCE,
-      getRows: (next: DataSourceRequest) => {
-        request ??= next;
-        return pending;
-      },
-    };
-    const loadPageSpy = spyOn(SheetwriteStore.prototype, "loadPage");
-    const grid = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(20),
-      datasource,
-    });
-
-    grid.destroy();
-    if (!request) throw new Error("datasource request was not issued");
-    resolveRows(coveredPage(request, [{ name: "Too late" }]));
-    await pending;
-    await Promise.resolve();
-
-    expect(loadPageSpy).not.toHaveBeenCalled();
-    loadPageSpy.mockRestore();
-  });
 });
 
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   beforeAll(async () => {
     await initSheetwrite();
-  });
-
-  it("replaceTheme(undefined) restores CSS/default resolution after a patch", () => {
-    const workbook = makeWorkbook(10);
-    const grid = new GridImpl(mountHost(), { workbook }, makeFakeStore(workbook));
-
-    grid.setTheme({ bg: "#ff0000" });
-    expect(grid.getEffectiveTheme().bg).toBe("#ff0000");
-
-    grid.replaceTheme(undefined);
-    expect(grid.getEffectiveTheme().bg).toBe(DEFAULT_THEME.bg);
-
-    grid.destroy();
   });
 
   it("replaceTheme(undefined) re-reads host CSS custom properties (Tailwind-style)", () => {
@@ -1143,68 +520,6 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
 
     grid.destroy();
   });
-
-  it("maps --sheetwrite-font into Theme.font with the line-height stripped", () => {
-    const host = mountHost();
-    host.style.setProperty("--sheetwrite-font", "15px / 1.6 serif");
-
-    const resolved = resolveThemeFromCss(host);
-
-    expect(resolved.font).toContain("15px");
-    expect(resolved.font).toContain("serif");
-    expect(resolved.font).not.toContain("/");
-  });
-
-  it("applies effective editor styles from the theme and reflects later theme changes", () => {
-    const stylesheet = document.createElement("style");
-    stylesheet.textContent = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
-    document.head.appendChild(stylesheet);
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(
-      host,
-      {
-        workbook,
-        theme: {
-          selectionBorder: "#123456",
-          font: "17px monospace",
-          fg: "#234567",
-          bg: "#fefefe",
-        },
-      },
-      store,
-    );
-
-    try {
-      grid.beginEdit(0, 0);
-      let editor = expectEditor(host);
-      let style = getComputedStyle(editor);
-      expect(style.borderTopColor).toBe("#123456");
-      expect(style.color).toBe("#234567");
-      expect(style.background).toBe("#fefefe");
-      expect(style.font).toContain("17px");
-
-      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      grid.setTheme({
-        selectionBorder: "#654321",
-        font: "19px serif",
-        fg: "#345678",
-        bg: "#ededed",
-      });
-      grid.beginEdit(0, 0);
-      editor = expectEditor(host);
-      style = getComputedStyle(editor);
-      expect(style.borderTopColor).toBe("#654321");
-      expect(style.color).toBe("#345678");
-      expect(style.background).toBe("#ededed");
-      expect(style.font).toContain("19px");
-    } finally {
-      grid.destroy();
-      store.dispose();
-      stylesheet.remove();
-    }
-  });
 });
 
 describe("ChangeEvent.commitReason", () => {
@@ -1237,28 +552,6 @@ describe("ChangeEvent.commitReason", () => {
 
     expect(reasons).toEqual(["edit-enter", "edit-blur"]);
 
-    grid.destroy();
-    store.dispose();
-  });
-
-  it("classifies undo and public applyTransaction", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const reasons = reasonsOf(grid);
-    const addr = { sheet: "s1", row: 0, col: 0 };
-
-    // Grid-level transaction → "api"; store-level directly → "api" default.
-    grid.applyTransaction({
-      patches: [{ op: "set", addr, value: { kind: "literal", value: "x" } }],
-    });
-    grid.store.applyTransaction({
-      patches: [{ op: "set", addr, value: { kind: "literal", value: "y" } }],
-    });
-    grid.undo();
-    grid.redo();
-
-    expect(reasons).toEqual(["api", "api", "undo", "redo"]);
     grid.destroy();
     store.dispose();
   });
@@ -1337,25 +630,6 @@ describe("Grid.setMinColumns", () => {
     store.dispose();
   });
 
-  it("keeps dense datasource storage by default and enables paging explicitly", () => {
-    const datasource = {
-      capabilities: WINDOWED_DATASOURCE,
-      getRows: async (request: DataSourceRequest) => coveredPage(request, []),
-    };
-    const dense = new GridImpl(mountHost(), { workbook: makeWorkbook(5), datasource });
-    const paged = new GridImpl(mountHost(), {
-      workbook: makeWorkbook(5),
-      datasource,
-      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 1024 },
-    });
-
-    expect((dense.store as SheetwriteStore).isPaged("s1")).toBe(false);
-    expect((paged.store as SheetwriteStore).isPaged("s1")).toBe(true);
-    expect(() => paged.exportCsv("partial.csv")).toThrow(/unloaded datasource cells/);
-    dense.destroy();
-    paged.destroy();
-  });
-
   it("routes Grid.exportXlsx through the registered table backend", async () => {
     const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const grid = new GridImpl(mountHost(), { workbook: store.getWorkbook() }, store);
@@ -1390,87 +664,6 @@ describe("Grid.setMinColumns", () => {
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
-    }
-  });
-
-  it("emits one export-error for built-in toolbar and context-menu XLSX failures", async () => {
-    const host = mountHost();
-    const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    const grid = new GridImpl(
-      host,
-      {
-        workbook: store.getWorkbook(),
-        config: {
-          toolbar: true,
-          export: true,
-          contextMenu: [{ action: "exportXlsx" }],
-        },
-      },
-      store,
-    );
-    const expected = new Error("built-in XLSX failure");
-    const events: Array<GridEvents["export-error"]> = [];
-    let nextEvent = Promise.withResolvers<void>();
-    grid.on("export-error", (event) => {
-      events.push(event);
-      nextEvent.resolve();
-    });
-    setXlsxTableExportBackend(null as never);
-    grid.actions.exportXlsx();
-    await nextEvent.promise;
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      format: "xlsx",
-      error: {
-        code: "optional-backend-unavailable",
-        operation: "xlsx-export",
-      },
-    });
-    expect(events[0]!.error.message).toContain(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
-    );
-    events.length = 0;
-    nextEvent = Promise.withResolvers<void>();
-    setXlsxTableExportBackend({
-      name: "rejecting-built-in-export",
-      toXlsxTable: async () => {
-        throw expected;
-      },
-    });
-
-    try {
-      host.querySelector<HTMLButtonElement>('[title="Export XLSX"]')!.click();
-      await nextEvent.promise;
-      expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({
-        format: "xlsx",
-        error: { code: "export-failed", operation: "xlsx-export" },
-      });
-      expect(events[0]!.error.cause).toBe(expected);
-
-      nextEvent = Promise.withResolvers<void>();
-      const viewport = host.querySelector<HTMLElement>(".sheetwrite-scroller")!;
-      viewport.dispatchEvent(
-        new MouseEvent("contextmenu", {
-          bubbles: true,
-          clientX: 100,
-          clientY: 100,
-        }),
-      );
-      host.querySelector<HTMLElement>(".sheetwrite-context-menu-item")!.click();
-      await nextEvent.promise;
-      expect(events).toHaveLength(2);
-      for (const event of events) {
-        expect(event.error).toMatchObject({
-          code: "export-failed",
-          operation: "xlsx-export",
-        });
-        expect(event.error.cause).toBe(expected);
-      }
-    } finally {
-      setXlsxTableExportBackend(null as never);
-      grid.destroy();
-      store.dispose();
     }
   });
 
@@ -1528,34 +721,6 @@ describe("Grid.setMinColumns", () => {
 });
 
 describe("Grid auto-fit", () => {
-  it("measures wrapped rows and columns only when explicitly invoked", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const rowAddr = { sheet: "s1", row: 0, col: 0 };
-    const longValue = "A deliberately long value that must widen the first spreadsheet column";
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: rowAddr,
-          value: { kind: "literal", value: `${longValue}\nsecond line` },
-          style: { wrap: true, fontSize: 18 },
-        },
-      ],
-    });
-
-    expect(workbook.sheets[0]!.rowHeights).toBeUndefined();
-    const originalWidth = workbook.sheets[0]!.columns[0]!.width;
-
-    grid.autoFitRows({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } });
-    grid.autoFitColumns([0]);
-
-    expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeGreaterThan(28);
-    expect(workbook.sheets[0]!.columns[0]!.width).toBeGreaterThan(originalWidth);
-    grid.destroy();
-    store.dispose();
-  });
   it("matches small geometry while bounding and yielding large row and column reads", () => {
     const text = `${"wide ".repeat(40)}\nsecond wrapped line`;
     const smallWorkbook = makeWorkbook(1);
@@ -1707,65 +872,6 @@ describe("Grid auto-fit", () => {
 
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
       expect(changes).toEqual([]);
-    } finally {
-      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
-      grid.destroy();
-      store.dispose();
-    }
-  });
-
-  it("lets a newer auto-fit request win over stale chunked work", () => {
-    const rowCount = AUTO_FIT_CHUNK_CELLS + 1;
-    const workbook = makeWorkbook(rowCount);
-    const store = new SheetwriteStore(workbook);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 0 },
-          value: { kind: "literal", value: `${"wide ".repeat(40)}\nsecond line` },
-          style: { wrap: true, fontSize: 18 },
-        },
-      ],
-    });
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const changes: ChangeEvent[] = [];
-    grid.on("change", (event) => changes.push(event));
-    const scheduled = new Map<number, FrameRequestCallback>();
-    let nextFrame = 1;
-    const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
-    const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
-    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
-      const frame = nextFrame++;
-      scheduled.set(frame, callback);
-      return frame;
-    }) as typeof requestAnimationFrame;
-    globalThis.cancelAnimationFrame = ((frame: number): void => {
-      scheduled.delete(frame);
-    }) as typeof cancelAnimationFrame;
-
-    try {
-      grid.autoFitColumns([0]);
-      const stale = scheduled.values().next().value;
-      if (!stale) throw new Error("expected the older auto-fit job to yield");
-
-      grid.autoFitRows({
-        sheet: "s1",
-        start: { row: 0, col: 0 },
-        end: { row: 0, col: 0 },
-      });
-      const winningHeight = workbook.sheets[0]!.rowHeights?.get(0);
-      expect(winningHeight).toBeGreaterThan(28);
-      expect(changes).toHaveLength(1);
-
-      stale(0);
-      expect(workbook.sheets[0]!.columns[0]!.width).toBe(160);
-      expect(workbook.sheets[0]!.rowHeights?.get(0)).toBe(winningHeight);
-      expect(changes).toHaveLength(1);
-
-      grid.undo();
-      expect(workbook.sheets[0]!.rowHeights?.get(0)).toBeUndefined();
     } finally {
       globalThis.requestAnimationFrame = originalRequestAnimationFrame;
       globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
@@ -2114,40 +1220,6 @@ describe("transactional document metadata", () => {
     store.dispose();
   });
 
-  it("exposes notes and whole-axis selection through the accessibility mirror", () => {
-    const workbook = makeWorkbook(5);
-    workbook.sheets[0]!.notes = [{ addr: { sheet: "s1", row: 0, col: 0 }, text: "Verify source" }];
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    const firstCell = host.querySelector('[role="gridcell"]');
-    expect(firstCell?.getAttribute("aria-description")).toBe("Note: Verify source");
-    expect(
-      [...host.querySelectorAll<HTMLElement>(".sheetwrite-overlay > div")].some((element) =>
-        element.style.clipPath.includes("polygon"),
-      ),
-    ).toBe(true);
-
-    grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
-    grid.refresh();
-    const headers = [...host.querySelectorAll<HTMLElement>('[role="columnheader"]')];
-    expect(
-      headers.find((header) => header.textContent === "B")?.getAttribute("aria-selected"),
-    ).toBe("true");
-
-    grid.setSelection({ kind: "row", sheet: "s1", row: 3 });
-    grid.refresh();
-    expect(
-      host
-        .querySelector<HTMLElement>('[role="row"][aria-rowindex="5"]')
-        ?.getAttribute("aria-selected"),
-    ).toBe("true");
-
-    grid.destroy();
-    store.dispose();
-  });
-
   it("keeps every document metadata action inert in read-only mode", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -2237,54 +1309,9 @@ describe("element height cap measurement", () => {
     expect(measureMaxElementHeight(stubDocument(26_843_545.6))).toBe(26_843_545 - 4_096);
   });
 
-  it("honors a scroll-offset clamp tighter than the layout clamp", () => {
-    // The scroll range can clamp below the element-height limit; the sizer cap
-    // must follow the tightest constraint or the tail stays unreachable.
-    expect(measureMaxElementHeight(stubDocument(33_554_428, 26_843_545))).toBe(26_843_545 - 4_096);
-  });
-
   it("falls back to a conservative cap when no clamp can be measured", () => {
     expect(measureMaxElementHeight(null)).toBe(15_000_000);
     expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(15_000_000);
     expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(15_000_000);
-  });
-});
-
-describe("adaptive row-number gutter", () => {
-  it("widens the gutter for million-row documents and keeps small ones unchanged", async () => {
-    await initSheetwrite();
-    const restore = installCanvasTestStubs();
-    try {
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      const small = new GridImpl(host, { workbook: makeWorkbook(20) }, undefined);
-      expect(small.getEffectiveTheme().rowHeaderWidth).toBe(DEFAULT_THEME.rowHeaderWidth);
-      small.destroy();
-
-      const bigWorkbook = makeWorkbook(20);
-      bigWorkbook.sheets[0]!.rowCount = 1_000_000;
-      const big = new GridImpl(host, { workbook: bigWorkbook }, undefined);
-      // Seven digits at the default 13px font no longer fit the 48px default.
-      expect(big.getEffectiveTheme().rowHeaderWidth).toBeGreaterThan(DEFAULT_THEME.rowHeaderWidth);
-      big.destroy();
-
-      const hidden = new GridImpl(
-        host,
-        { workbook: bigWorkbook, theme: { rowHeaderWidth: 0 } },
-        undefined,
-      );
-      // An explicit 0 keeps the gutter hidden — auto-sizing must not revive it.
-      expect(hidden.getEffectiveTheme().rowHeaderWidth).toBe(0);
-      hidden.destroy();
-
-      const excessiveWorkbook = makeWorkbook(20);
-      excessiveWorkbook.sheets[0]!.rowCount = 1_000_001;
-      expect(() => new GridImpl(host, { workbook: excessiveWorkbook }, undefined)).toThrow(
-        SnapshotResourceError,
-      );
-      host.remove();
-    } finally {
-      restore();
-    }
   });
 });

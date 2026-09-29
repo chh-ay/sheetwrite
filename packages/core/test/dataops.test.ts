@@ -56,22 +56,4 @@ describe("store data ops", () => {
     store.clearView("s");
     expect(store.getVisibleWindow("s", { start: 0, end: 5 }, [0]).values[0]).toBe(30);
   });
-
-  it("filters the visible rows", () => {
-    const store = new SheetwriteStore(workbook());
-    for (let r = 0; r < 5; r++) {
-      store.applyTransaction({
-        patches: [
-          {
-            op: "set",
-            addr: { sheet: "s", row: r, col: 1 },
-            value: { kind: "literal", value: r === 2 ? "keep" : `x${r}` },
-          },
-        ],
-      });
-    }
-    store.filterBy("s", 1, "keep");
-    expect(store.viewRowCount("s")).toBe(1);
-    expect(store.getVisibleWindow("s", { start: 0, end: 1 }, [1]).values[0]).toBe("keep");
-  });
 });

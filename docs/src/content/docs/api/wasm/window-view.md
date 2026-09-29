@@ -8,8 +8,7 @@ description: "A bulk window of resolved cells, row-major over nrows x ncols."
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L367</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L367"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L367</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -80,3 +79,21 @@ class WindowView {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>WindowView</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/wasm/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
+</ul>
+</div>

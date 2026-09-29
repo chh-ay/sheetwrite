@@ -8,9 +8,33 @@ description: "Advanced Vue adapter props for workbook data or datasource ownersh
 Advanced Vue adapter props for workbook data or datasource ownership.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L56</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L56"><code>packages/vue/src/index.ts#L56</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheetwrite-grid-props-workbook"><code>workbook</code></a>
+<a href="#sheetwrite-grid-props-data"><code>data</code></a>
+<a href="#sheetwrite-grid-props-datasource"><code>datasource</code></a>
+<a href="#sheetwrite-grid-props-datasource-storage"><code>datasourceStorage</code></a>
+<a href="#sheetwrite-grid-props-row-bridge"><code>rowBridge</code></a>
+<a href="#sheetwrite-grid-props-renderer"><code>renderer</code></a>
+<a href="#sheetwrite-grid-props-worker-url"><code>workerUrl</code></a>
+<a href="#sheetwrite-grid-props-presentation"><code>presentation</code></a>
+<a href="#sheetwrite-grid-props-theme"><code>theme</code></a>
+<a href="#sheetwrite-grid-props-read-only"><code>readOnly</code></a>
+<a href="#sheetwrite-grid-props-protection-resolver"><code>protectionResolver</code></a>
+<a href="#sheetwrite-grid-props-mutation-policy"><code>mutationPolicy</code></a>
+<a href="#sheetwrite-grid-props-transaction-resource-limits"><code>transactionResourceLimits</code></a>
+<a href="#sheetwrite-grid-props-hyperlink-activation"><code>hyperlinkActivation</code></a>
+<a href="#sheetwrite-grid-props-renderers"><code>renderers</code></a>
+<a href="#sheetwrite-grid-props-editors"><code>editors</code></a>
+<a href="#sheetwrite-grid-props-overscan"><code>overscan</code></a>
+<a href="#sheetwrite-grid-props-min-columns"><code>minColumns</code></a>
+<a href="#sheetwrite-grid-props-config"><code>config</code></a>
+<a href="#sheetwrite-grid-props-wasm-source"><code>wasmSource</code></a>
+<a href="#sheetwrite-grid-props-height"><code>height</code></a>
+<a href="#sheetwrite-grid-props-fill"><code>fill</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>22</span>
 
@@ -248,3 +272,24 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/vue</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteGridProps</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/react/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/react/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/vue/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

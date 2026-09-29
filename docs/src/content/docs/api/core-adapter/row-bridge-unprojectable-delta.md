@@ -8,9 +8,20 @@ description: "An explicit projection record for an operation with no row-space m
 An explicit projection record for an operation with no row-space meaning.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L148</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L148"><code>packages/core/src/row-bridge.ts#L148</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#row-bridge-unprojectable-delta-kind"><code>kind</code></a>
+<a href="#row-bridge-unprojectable-delta-reason"><code>reason</code></a>
+<a href="#row-bridge-unprojectable-delta-transaction"><code>transaction</code></a>
+<a href="#row-bridge-unprojectable-delta-transaction-id"><code>transactionId</code></a>
+<a href="#row-bridge-unprojectable-delta-source"><code>source</code></a>
+<a href="#row-bridge-unprojectable-delta-previous"><code>previous</code></a>
+<a href="#row-bridge-unprojectable-delta-next"><code>next</code></a>
+<a href="#row-bridge-unprojectable-delta-operation"><code>operation</code></a>
+<a href="#row-bridge-unprojectable-delta-row-ids"><code>rowIds</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>9</span>
 
@@ -120,3 +131,28 @@ export interface RowBridgeUnprojectableDelta<
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>RowBridgeUnprojectableDelta</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/react/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/row-bridge-delta/"><code>RowBridgeDelta</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

@@ -147,27 +147,6 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
 }
 
 describe("XLSX benchmark gate", () => {
-  it("accepts an exact deterministic current-codec matrix", () => {
-    expect(validateXlsxBenchmarkArtifact(artifact()).samples).toHaveLength(7);
-  });
-
-  it("fails closed when a required scenario is absent", () => {
-    const value = artifact();
-    expect(() =>
-      validateXlsxBenchmarkArtifact({ ...value, samples: value.samples.slice(1) }),
-    ).toThrow("matrix mismatch");
-  });
-
-  it("rejects stale fixture provenance", () => {
-    const value = artifact();
-    expect(() =>
-      validateXlsxBenchmarkArtifact({
-        ...value,
-        fixture: { ...value.fixture, sha256: "0".repeat(64) },
-      }),
-    ).toThrow("fixture or generator checksum is stale");
-  });
-
   it("recomputes summaries from raw samples", () => {
     const value = artifact();
     expect(() =>

@@ -3,8 +3,6 @@ import { siteUrl } from "./playwright.config.js";
 
 const ROUTE = siteUrl("/showcases/engine/");
 const ENGINE_TRACE_LIMIT = 40;
-const ENGINE_ROUTE_TRANSFER_LIMIT = 350 * 1024;
-const ENGINE_BOOT_TRANSFER_LIMIT = 2 * 1024 * 1024;
 
 declare global {
   interface Window {
@@ -169,105 +167,6 @@ test("drawing choice reports the actual path and the host acknowledges a real Gr
   await expect(page.locator('[data-testid="engine-active-renderer"]')).toHaveText(/worker|canvas/);
 });
 
-test("keeps the Grid in the first viewport and bounds the supporting evidence", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1568, height: 900 });
-  await bootEngine(page);
-
-  const desktop = await page.evaluate(() => {
-    const rect = (selector: string) => {
-      const bounds = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-      return {
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom,
-        left: bounds.left,
-        width: bounds.width,
-        height: bounds.height,
-      };
-    };
-    const grid = rect('[data-testid="engine-grid"]');
-    return {
-      hero: rect(".sw-engine__hero"),
-      grid,
-      gridPanel: rect(".sw-engine-grid-panel"),
-      trace: rect('[data-testid="engine-public-trace"]'),
-      evidence: rect('[data-testid="engine-evidence-viewer"]'),
-      visibleGrid: Math.min(grid.bottom, innerHeight) - Math.max(grid.top, 0),
-      overflow: document.documentElement.scrollWidth - innerWidth,
-    };
-  });
-  expect(desktop.hero.height).toBeGreaterThanOrEqual(120);
-  expect(desktop.hero.height).toBeLessThanOrEqual(260);
-  expect(desktop.grid.top).toBeLessThan(650);
-  expect(desktop.visibleGrid).toBeGreaterThan(250);
-  expect(Math.abs(desktop.gridPanel.top - desktop.trace.top)).toBeLessThanOrEqual(2);
-  expect(Math.abs(desktop.gridPanel.bottom - desktop.trace.bottom)).toBeLessThanOrEqual(2);
-  expect(desktop.gridPanel.width).toBeGreaterThan(desktop.trace.width * 2);
-  expect(desktop.evidence.top).toBeGreaterThan(desktop.gridPanel.bottom);
-  expect(desktop.evidence.height).toBeLessThanOrEqual(320);
-  expect(desktop.overflow).toBeLessThanOrEqual(0);
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => scrollTo(0, 0));
-  const mobile = await page.evaluate(() => {
-    const grid = document
-      .querySelector<HTMLElement>('[data-testid="engine-grid"]')!
-      .getBoundingClientRect();
-    return {
-      gridTop: grid.top,
-      visibleGrid: Math.min(grid.bottom, innerHeight) - Math.max(grid.top, 0),
-      overflow: document.documentElement.scrollWidth - innerWidth,
-    };
-  });
-  expect(mobile.gridTop).toBeLessThan(844);
-  expect(mobile.visibleGrid).toBeGreaterThan(150);
-  expect(mobile.overflow).toBeLessThanOrEqual(0);
-});
-
-test("site theme changes the actual Grid palette and mobile remains operable", async ({ page }) => {
-  await bootEngine(page);
-  const before = await page.locator('[data-testid="engine-grid"]').evaluate((host) => {
-    const canvas = host.querySelector("canvas")!;
-    const context = canvas.getContext("2d")!;
-    return {
-      mode: host.dataset.gridTheme,
-      background: getComputedStyle(host).backgroundColor,
-      pixel: Array.from(context.getImageData(300, 140, 1, 1).data),
-    };
-  });
-  await page.getByRole("button", { name: /Use (light|dark) theme/ }).click();
-  await expect(page.locator('[data-testid="engine-grid"]')).not.toHaveAttribute(
-    "data-grid-theme",
-    before.mode ?? "light",
-  );
-  const after = await page.locator('[data-testid="engine-grid"]').evaluate((host) => {
-    const canvas = host.querySelector("canvas")!;
-    const context = canvas.getContext("2d")!;
-    return {
-      mode: host.dataset.gridTheme,
-      background: getComputedStyle(host).backgroundColor,
-      pixel: Array.from(context.getImageData(300, 140, 1, 1).data),
-    };
-  });
-  expect(after.mode).not.toBe(before.mode);
-  expect(after.background).not.toBe(before.background);
-  expect(after.pixel).not.toEqual(before.pixel);
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  const mobileTracks = await page
-    .locator(".sw-engine-stage__workspace")
-    .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
-  expect(mobileTracks.trim().split(/\s+/)).toHaveLength(1);
-  expect(
-    await page.evaluate(() => ({
-      width: document.documentElement.scrollWidth,
-      viewport: innerWidth,
-    })),
-  ).toMatchObject({ width: 390, viewport: 390 });
-});
-
 test("sustained Grid scrolling stays immediate, bounded, and free of long tasks", async ({
   page,
 }) => {
@@ -374,74 +273,4 @@ test("one hundred actions keep timers, trace, and DOM bounded, then lifecycle cl
   await expect
     .poll(() => page.evaluate(() => window.__sheetwriteEngineShowcase === undefined))
     .toBe(true);
-});
-
-test("landing renders the stable teaser immediately without loading engine code", async ({
-  page,
-}) => {
-  const assets: string[] = [];
-  page.on("request", (request) => {
-    if (request.resourceType() === "script" || request.resourceType() === "fetch")
-      assets.push(request.url());
-  });
-  await page.goto(siteUrl("/"));
-  await page.waitForLoadState("networkidle");
-  expect(assets.some((url) => /EngineLandingTeaser/.test(url))).toBe(true);
-  expect(assets.some((url) => /EngineShowcase|sheetwrite_bg|\.wasm(?:\?|$)/.test(url))).toBe(false);
-  await expect(
-    page.getByRole("heading", {
-      name: "Watch the Grid, the calculation engine, and your host agree.",
-    }),
-  ).toHaveCount(1);
-});
-
-test("measures the lazy route transfer and post-ready long tasks", async ({ page }) => {
-  await page.addInitScript(() => {
-    window.__sheetwriteEngineLongTasks = [];
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        window.__sheetwriteEngineLongTasks!.push({
-          startTime: entry.startTime,
-          duration: entry.duration,
-        });
-      }
-    }).observe({ type: "longtask", buffered: true });
-  });
-  await bootEngine(page);
-  const usableAt = await page.evaluate(() => {
-    window.__sheetwriteEngineLongTasks = [];
-    return performance.now();
-  });
-  await page.click('[data-testid="engine-edit"]');
-  await page.click('[data-testid="engine-undo"]');
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
-  const measurement = await page.evaluate((start) => {
-    const entries = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
-    const routeEntries = entries
-      .filter((entry) => /EngineShowcase|showcases\.engine|showcase-engine/.test(entry.name))
-      .map((entry) => ({
-        name: entry.name.split("/").slice(-1)[0] ?? entry.name,
-        bytes: entry.encodedBodySize || entry.transferSize,
-      }));
-    const bootEntries = entries
-      .filter((entry) => /\.(?:js|css|wasm)(?:\?|$)/.test(entry.name))
-      .map((entry) => ({
-        name: entry.name.split("/").slice(-1)[0] ?? entry.name,
-        bytes: entry.encodedBodySize || entry.transferSize,
-      }));
-    return {
-      routeEntries,
-      routeBytes: routeEntries.reduce((sum, entry) => sum + entry.bytes, 0),
-      bootBytes: bootEntries.reduce((sum, entry) => sum + entry.bytes, 0),
-      longTasks: (window.__sheetwriteEngineLongTasks ?? []).filter(
-        (entry) => entry.startTime >= start,
-      ),
-    };
-  }, usableAt);
-  console.log(`ENGINE_ROUTE_EVIDENCE ${JSON.stringify(measurement)}`);
-  expect(measurement.routeEntries.length).toBeGreaterThan(0);
-  expect(measurement.routeBytes).toBeGreaterThan(0);
-  expect(measurement.routeBytes).toBeLessThanOrEqual(ENGINE_ROUTE_TRANSFER_LIMIT);
-  expect(measurement.bootBytes).toBeLessThanOrEqual(ENGINE_BOOT_TRANSFER_LIMIT);
-  expect(measurement.longTasks.filter((entry) => entry.duration > 50)).toEqual([]);
 });

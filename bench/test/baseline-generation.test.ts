@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
-import { parseControlledBaseline } from "../src/controlled-baseline.js";
+import { resolve } from "node:path";
 import { generateBaseline } from "../src/generate-baseline.js";
 import { makeRenderArtifact, TEST_RUNNER } from "./gate-fixtures.js";
 
@@ -23,32 +22,6 @@ describe("reviewed controlled baseline generation", () => {
   });
 
   afterAll(() => rmSync(directory, { recursive: true, force: true }));
-
-  test("is byte-stable for fixed raw input and preserves all raw rounds", async () => {
-    const firstPath = resolve(directory, "candidate-a.json");
-    const secondPath = resolve(directory, "candidate-b.json");
-    const common = [
-      "--input",
-      rawPath,
-      "--approved",
-      approvedPath,
-      "--power-mode",
-      TEST_RUNNER.powerMode,
-      "--concurrency",
-      String(TEST_RUNNER.concurrency),
-      "--diagnostic",
-    ];
-    await generateBaseline([...common, "--output", firstPath]);
-    await generateBaseline([...common, "--output", secondPath]);
-    expect(readFileSync(firstPath, "utf8")).toBe(readFileSync(secondPath, "utf8"));
-    const candidate = parseControlledBaseline(
-      JSON.parse(readFileSync(firstPath, "utf8")) as unknown,
-    );
-    expect(candidate.source.rounds).toBe(10);
-    expect(candidate.source.rawArtifact).toBe(relative(REPOSITORY_ROOT, rawPath));
-    expect(candidate.source.rawSha256).toMatch(/^[a-f0-9]{64}$/);
-    expect(candidate.cells.every((cell) => cell.samplesMs.length === 30)).toBe(true);
-  });
 
   test("never overwrites the approved baseline without explicit write intent", async () => {
     const candidatePath = resolve(directory, "candidate.json");

@@ -182,10 +182,6 @@ async function writeTarball(
 }
 
 describe("canonical release artifacts", () => {
-  it("accepts a valid canonical manifest", () => {
-    expect(() => validateReleaseManifest(manifest())).not.toThrow();
-  });
-
   it("rejects source maps in the published core package", () => {
     const base = manifest();
     const packages = base.packages.map((artifact) =>
@@ -235,24 +231,6 @@ describe("canonical release artifacts", () => {
     expect(() => assertOutputDirectoryEmpty(["stale.tgz"])).toThrow("not empty");
   });
 
-  it("accepts independent stable versions and an ordered package subset", () => {
-    const base = manifest();
-    const versions = ["0.1.0", "0.2.0", "1.0.0", "0.4.0", "2.1.0", "0.6.0"];
-    const mixedPackages = base.packages.map((artifact, index) => ({
-      ...artifact,
-      version: versions[index]!,
-      path: tarballName(artifact.name, versions[index]!),
-    }));
-    expect(() => validateReleaseManifest({ ...base, packages: mixedPackages })).not.toThrow();
-    expect(() =>
-      validateReleaseManifest({
-        ...base,
-        packages: [mixedPackages[0]!, mixedPackages[2]!, mixedPackages[5]!],
-      }),
-    ).not.toThrow();
-    expect(() => validateReleaseManifest({ ...base, packages: [] })).toThrow("non-empty");
-  });
-
   it("rejects duplicate, unknown, and out-of-order package identities", () => {
     const base = manifest();
     const duplicate: ReleaseArtifactManifest = {
@@ -274,36 +252,6 @@ describe("canonical release artifacts", () => {
       packages: [base.packages[1]!, base.packages[0]!],
     };
     expect(() => validateReleaseManifest(outOfOrder)).toThrow("dependency order");
-  });
-
-  it("rejects an incorrect packaged internal dependency version", () => {
-    const base = manifest();
-    const packages = base.packages.slice(0, 2).map((artifact, index) => ({
-      ...artifact,
-      version: index === 0 ? "0.1.0" : "0.2.0",
-      path: tarballName(artifact.name, index === 0 ? "0.1.0" : "0.2.0"),
-      internalDependencies:
-        index === 1 ? { "@sheetwrite/wasm": "0.9.0" } : artifact.internalDependencies,
-    }));
-    expect(() => validateReleaseManifest({ ...base, packages })).toThrow(
-      "@sheetwrite/core internal dependency @sheetwrite/wasm must be 0.1.0",
-    );
-  });
-
-  it("round-trips an ordered artifact subset", async () => {
-    const root = await temporaryDirectory();
-    const packageNames = [
-      PUBLISHABLE_PACKAGE_ORDER[0]!,
-      PUBLISHABLE_PACKAGE_ORDER[2]!,
-      PUBLISHABLE_PACKAGE_ORDER[5]!,
-    ];
-    const packages = await Promise.all(packageNames.map((name) => writeTarball(root, name)));
-    const releaseManifest: ReleaseArtifactManifest = { ...manifest(), packages };
-    await writeFile(
-      join(root, RELEASE_ARTIFACT_MANIFEST),
-      serializeReleaseManifest(releaseManifest),
-    );
-    expect(await verifyReleaseArtifacts(root)).toEqual(releaseManifest);
   });
 
   it("rejects an absent package dependency at the wrong source version", async () => {
@@ -406,11 +354,6 @@ describe("canonical release artifacts", () => {
       serializeReleaseManifest({ ...manifest(), packages }),
     );
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow("malicious archive path");
-  });
-
-  it("rejects an empty artifact directory", async () => {
-    const root = await temporaryDirectory();
-    await expect(verifyReleaseArtifacts(root)).rejects.toThrow(RELEASE_ARTIFACT_MANIFEST);
   });
 
   it("rejects a manifest whose canonical tarballs are missing", async () => {

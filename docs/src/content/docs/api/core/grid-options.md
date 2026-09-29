@@ -8,9 +8,29 @@ description: "Workbook, data, rendering, policy, and built-in UI options used to
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L323</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L323"><code>packages/core/src/types/grid.ts#L323</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#grid-options-workbook"><code>workbook</code></a>
+<a href="#grid-options-data"><code>data</code></a>
+<a href="#grid-options-datasource"><code>datasource</code></a>
+<a href="#grid-options-datasource-storage"><code>datasourceStorage</code></a>
+<a href="#grid-options-renderer"><code>renderer</code></a>
+<a href="#grid-options-worker-url"><code>workerUrl</code></a>
+<a href="#grid-options-presentation"><code>presentation</code></a>
+<a href="#grid-options-theme"><code>theme</code></a>
+<a href="#grid-options-read-only"><code>readOnly</code></a>
+<a href="#grid-options-hyperlink-activation"><code>hyperlinkActivation</code></a>
+<a href="#grid-options-protection-resolver"><code>protectionResolver</code></a>
+<a href="#grid-options-mutation-policy"><code>mutationPolicy</code></a>
+<a href="#grid-options-transaction-resource-limits"><code>transactionResourceLimits</code></a>
+<a href="#grid-options-renderers"><code>renderers</code></a>
+<a href="#grid-options-editors"><code>editors</code></a>
+<a href="#grid-options-overscan"><code>overscan</code></a>
+<a href="#grid-options-min-columns"><code>minColumns</code></a>
+<a href="#grid-options-config"><code>config</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>18</span>
 
@@ -228,3 +248,32 @@ export interface GridOptions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridOptions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/create-grid/"><code>createGrid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/snapshot-grid-options/"><code>SnapshotGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/apply-changed-live-grid-options/"><code>applyChangedLiveGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/create-grid-controller/"><code>createGridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/extract-grid-options/"><code>extractGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/get-grid-reset-reason/"><code>getGridResetReason</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-shell/spreadsheet-shell-options/"><code>SpreadsheetShellOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

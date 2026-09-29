@@ -10,6 +10,9 @@ export interface NavigationSection {
   items: readonly NavigationItem[];
 }
 
+/** The one generated section; reading order and the sidebar both name it. */
+const API_PACKAGES_LABEL = "API packages";
+
 export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Start",
@@ -64,10 +67,41 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
   {
     // Generated from package exports; api-nav.json is emitted by docs:generate.
-    label: "API packages",
+    label: API_PACKAGES_LABEL,
     items: [{ label: "All entry points", href: "/docs/api/" }, ...apiNav],
   },
 ];
+
+/**
+ * Reading order for previous/next links: every authored entry in sidebar
+ * order. Generated API packages are excluded so a reader never gets a "Next"
+ * that hops between hundreds of generated entry points.
+ */
+const READING_ORDER: readonly NavigationItem[] = DOCS_NAVIGATION.filter(
+  (section) => section.label !== API_PACKAGES_LABEL,
+).flatMap((section) => section.items);
+
+export interface DocumentNeighbours {
+  previous?: NavigationItem;
+  next?: NavigationItem;
+}
+
+/**
+ * Neighbours of a page that is itself a sidebar entry. Generated symbol pages
+ * and anything else outside the reading order have none: their neighbours
+ * would be unrelated packages rather than the next step in a guide.
+ */
+export function documentNeighbours(activeHref: string | undefined): DocumentNeighbours {
+  if (activeHref === undefined) return {};
+  const index = READING_ORDER.findIndex((item) => item.href === activeHref);
+  if (index === -1) return {};
+  const neighbours: DocumentNeighbours = {};
+  const previous = READING_ORDER[index - 1];
+  const next = READING_ORDER[index + 1];
+  if (previous !== undefined) neighbours.previous = previous;
+  if (next !== undefined) neighbours.next = next;
+  return neighbours;
+}
 
 /**
  * Framework workbench deep links. The global topbar links to /showcases/

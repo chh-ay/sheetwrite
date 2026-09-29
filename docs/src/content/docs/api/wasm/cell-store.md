@@ -8,9 +8,101 @@ description: "The workbook-wide store: every sheet, one string pool."
 The workbook-wide store: every sheet, one string pool.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L20"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#cell-store-acknowledge-revision"><code>acknowledgeRevision</code></a>
+<a href="#cell-store-add-paged-sheet"><code>addPagedSheet</code></a>
+<a href="#cell-store-add-rows"><code>addRows</code></a>
+<a href="#cell-store-add-sheet"><code>addSheet</code></a>
+<a href="#cell-store-aggregate"><code>aggregate</code></a>
+<a href="#cell-store-begin-mutation"><code>beginMutation</code></a>
+<a href="#cell-store-begin-page-load"><code>beginPageLoad</code></a>
+<a href="#cell-store-can-dirty-cell"><code>canDirtyCell</code></a>
+<a href="#cell-store-capture-range"><code>captureRange</code></a>
+<a href="#cell-store-capture-references"><code>captureReferences</code></a>
+<a href="#cell-store-capture-sources"><code>captureSources</code></a>
+<a href="#cell-store-capture-sources-for-rows"><code>captureSourcesForRows</code></a>
+<a href="#cell-store-cell-state"><code>cellState</code></a>
+<a href="#cell-store-clear-cell"><code>clearCell</code></a>
+<a href="#cell-store-clear-range"><code>clearRange</code></a>
+<a href="#cell-store-col-count"><code>colCount</code></a>
+<a href="#cell-store-columns-fully-loaded"><code>columnsFullyLoaded</code></a>
+<a href="#cell-store-compact-string-storage"><code>compactStringStorage</code></a>
+<a href="#cell-store-data-edge"><code>dataEdge</code></a>
+<a href="#cell-store-data-edge-ordered"><code>dataEdgeOrdered</code></a>
+<a href="#cell-store-dirty-revision"><code>dirtyRevision</code></a>
+<a href="#cell-store-distinct-values"><code>distinctValues</code></a>
+<a href="#cell-store-end-mutation"><code>endMutation</code></a>
+<a href="#cell-store-end-page-load"><code>endPageLoad</code></a>
+<a href="#cell-store-filter-rows"><code>filterRows</code></a>
+<a href="#cell-store-filter-rows-multi"><code>filterRowsMulti</code></a>
+<a href="#cell-store-formula-matrix-resource-stats"><code>formulaMatrixResourceStats</code></a>
+<a href="#cell-store-formula-source"><code>formulaSource</code></a>
+<a href="#cell-store-free"><code>free</code></a>
+<a href="#cell-store-get-cell"><code>getCell</code></a>
+<a href="#cell-store-get-window"><code>getWindow</code></a>
+<a href="#cell-store-get-window-rows"><code>getWindowRows</code></a>
+<a href="#cell-store-hydrate-page-numbers"><code>hydratePageNumbers</code></a>
+<a href="#cell-store-hydrate-page-strings-packed"><code>hydratePageStringsPacked</code></a>
+<a href="#cell-store-insert-cols"><code>insertCols</code></a>
+<a href="#cell-store-is-fully-loaded"><code>isFullyLoaded</code></a>
+<a href="#cell-store-is-paged"><code>isPaged</code></a>
+<a href="#cell-store-is-sheet-alive"><code>isSheetAlive</code></a>
+<a href="#cell-store-mark-cell-clean-revision"><code>markCellCleanRevision</code></a>
+<a href="#cell-store-mark-range-clean"><code>markRangeClean</code></a>
+<a href="#cell-store-memory-stats"><code>memoryStats</code></a>
+<a href="#cell-store-paged-dirty-coordinates"><code>pagedDirtyCoordinates</code></a>
+<a href="#cell-store-paged-stats"><code>pagedStats</code></a>
+<a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
+<a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pool-strings"><code>poolStrings</code></a>
+<a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
+<a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
+<a href="#cell-store-range-style-ids"><code>rangeStyleIds</code></a>
+<a href="#cell-store-recompute"><code>recompute</code></a>
+<a href="#cell-store-recompute-changed"><code>recomputeChanged</code></a>
+<a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
+<a href="#cell-store-reference-target"><code>referenceTarget</code></a>
+<a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
+<a href="#cell-store-remap-range-styles"><code>remapRangeStyles</code></a>
+<a href="#cell-store-remove-cols"><code>removeCols</code></a>
+<a href="#cell-store-remove-named-range"><code>removeNamedRange</code></a>
+<a href="#cell-store-remove-rows"><code>removeRows</code></a>
+<a href="#cell-store-remove-sheet"><code>removeSheet</code></a>
+<a href="#cell-store-remove-table"><code>removeTable</code></a>
+<a href="#cell-store-rename-sheet"><code>renameSheet</code></a>
+<a href="#cell-store-reset-formula-matrix-resource-stats"><code>resetFormulaMatrixResourceStats</code></a>
+<a href="#cell-store-reset-query-resource-stats"><code>resetQueryResourceStats</code></a>
+<a href="#cell-store-restore-range"><code>restoreRange</code></a>
+<a href="#cell-store-row-count"><code>rowCount</code></a>
+<a href="#cell-store-search"><code>search</code></a>
+<a href="#cell-store-set-block"><code>setBlock</code></a>
+<a href="#cell-store-set-bool"><code>setBool</code></a>
+<a href="#cell-store-set-column-numbers"><code>setColumnNumbers</code></a>
+<a href="#cell-store-set-column-strings"><code>setColumnStrings</code></a>
+<a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
+<a href="#cell-store-set-conditional-rules"><code>setConditionalRules</code></a>
+<a href="#cell-store-set-formula"><code>setFormula</code></a>
+<a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
+<a href="#cell-store-set-number"><code>setNumber</code></a>
+<a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
+<a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
+<a href="#cell-store-set-spill-blockers"><code>setSpillBlockers</code></a>
+<a href="#cell-store-set-string"><code>setString</code></a>
+<a href="#cell-store-set-table"><code>setTable</code></a>
+<a href="#cell-store-snapshot-numbers"><code>snapshotNumbers</code></a>
+<a href="#cell-store-snapshot-texts"><code>snapshotTexts</code></a>
+<a href="#cell-store-sort-rows"><code>sortRows</code></a>
+<a href="#cell-store-sort-rows-multi"><code>sortRowsMulti</code></a>
+<a href="#cell-store-spill-anchor-col"><code>spillAnchorCol</code></a>
+<a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
+<a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
+<a href="#cell-store-spill-owner-coordinates"><code>spillOwnerCoordinates</code></a>
+<a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
+<a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>90</span>
 
@@ -1268,3 +1360,21 @@ class CellStore {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>CellStore</code></p>
+
+<ul class="api-consumer-list">
+<li>None.</li>
+</ul>
+</div>

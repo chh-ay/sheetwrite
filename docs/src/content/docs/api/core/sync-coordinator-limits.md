@@ -8,9 +8,22 @@ description: "Resource ceilings applied independently to remote collaboration in
 Resource ceilings applied independently to remote collaboration input and local durability.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/sync.ts#L112</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L112"><code>packages/core/src/sync.ts#L112</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sync-coordinator-limits-max-mutation-id-bytes"><code>maxMutationIdBytes</code></a>
+<a href="#sync-coordinator-limits-max-operations-per-version"><code>maxOperationsPerVersion</code></a>
+<a href="#sync-coordinator-limits-max-version-payload-bytes"><code>maxVersionPayloadBytes</code></a>
+<a href="#sync-coordinator-limits-max-future-version-distance"><code>maxFutureVersionDistance</code></a>
+<a href="#sync-coordinator-limits-max-buffered-versions"><code>maxBufferedVersions</code></a>
+<a href="#sync-coordinator-limits-max-buffered-operations"><code>maxBufferedOperations</code></a>
+<a href="#sync-coordinator-limits-max-buffered-bytes"><code>maxBufferedBytes</code></a>
+<a href="#sync-coordinator-limits-max-recent-acknowledgements"><code>maxRecentAcknowledgements</code></a>
+<a href="#sync-coordinator-limits-max-pending-commits"><code>maxPendingCommits</code></a>
+<a href="#sync-coordinator-limits-max-pending-operations"><code>maxPendingOperations</code></a>
+<a href="#sync-coordinator-limits-max-pending-encoded-bytes"><code>maxPendingEncodedBytes</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>11</span>
 
@@ -141,3 +154,25 @@ export interface SyncCoordinatorLimits {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SyncCoordinatorLimits</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/default-sync-coordinator-limits/"><code>DEFAULT_SYNC_COORDINATOR_LIMITS</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-coordinator-options/"><code>SyncCoordinatorOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

@@ -8,8 +8,7 @@ description: "Simple framework adapter props for columns and default row objects
 Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L68</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/props.ts#L68"><code>packages/svelte/src/props.ts#L68</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -33,4 +32,22 @@ export type SheetwriteProps<
   };
 ```
 
+</div>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/svelte</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteProps</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/react/sheetwrite/"><code>Sheetwrite</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/sheetwrite/"><code>Sheetwrite</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/sheetwrite/"><code>Sheetwrite</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
 </div>

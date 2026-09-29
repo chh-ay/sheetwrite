@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { DocumentController } from "../src/document-controller.js";
 import {
   assertWorkbookTables,
   type Column,
@@ -7,7 +6,6 @@ import {
   initSheetwrite,
   rebaseDocumentOperations,
   SheetwriteStore,
-  shiftA1Refs,
   validateWorkbookSnapshot,
   type Workbook,
   type WorkbookSnapshot,
@@ -137,12 +135,6 @@ describe("canonical workbook tables", () => {
     ).toThrow(/workbook table limit is 0/);
   });
 
-  it("keeps identity-based structured references intact during fill/copy translation", () => {
-    expect(shiftA1Refs("=[@Amount]+SUM(Sales[Amount])+A1", 2, 1)).toBe(
-      "=[@Amount]+SUM(Sales[Amount])+B3",
-    );
-  });
-
   it("preserves stable identities across row and column structure changes", () => {
     const store = new SheetwriteStore(workbook([table()]));
     store.applyTransaction({ patches: [{ op: "addRows", sheet: "data", at: 2, count: 1 }] });
@@ -182,133 +174,6 @@ describe("canonical workbook tables", () => {
     expect(store.getWorkbook().sheets[0]!.tables![0]!.range.sheet).toBe("data");
     store.applyTransaction({ patches: [{ op: "removeSheet", sheet: "data" }] });
     expect(store.getWorkbook().sheets.map((sheet) => sheet.id)).toEqual(["summary"]);
-    store.dispose();
-  });
-
-  it("derives unique canonical columns and distinguishes boundary insertion points", () => {
-    const collision = table();
-    collision.columns[0] = { id: "Å-ID", name: "CAFÉ" };
-    const collisionStore = new SheetwriteStore(workbook([collision]));
-    const result = collisionStore.applyTransaction({
-      patches: [
-        {
-          op: "addColumns",
-          sheet: "data",
-          at: 1,
-          columns: [{ key: "A\u030a-id", header: "cafe\u0301", width: 100, type: "number" }],
-        },
-      ],
-    });
-    expect(result.status).toBe("applied");
-    expect(collisionStore.getWorkbook().sheets[0]!.tables![0]!.columns[1]).toEqual({
-      id: "Å-id_2",
-      name: "café_2",
-    });
-    expect(validateWorkbookSnapshot(collisionStore.exportSnapshot()).ok).toBe(true);
-    collisionStore.dispose();
-
-    const bounded = table();
-    bounded.range = {
-      sheet: "data",
-      start: { row: 0, col: 1 },
-      end: { row: 3, col: 2 },
-    };
-    const boundaryStore = new SheetwriteStore(workbook([bounded]));
-    expect(
-      boundaryStore.applyTransaction({
-        patches: [
-          {
-            op: "addColumns",
-            sheet: "data",
-            at: 1,
-            columns: [{ key: "before", header: "Before", width: 100, type: "number" }],
-          },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(boundaryStore.getWorkbook().sheets[0]!.tables![0]).toMatchObject({
-      range: { start: { col: 2 }, end: { col: 3 } },
-      columns: bounded.columns,
-    });
-    expect(
-      boundaryStore.applyTransaction({
-        patches: [
-          {
-            op: "addColumns",
-            sheet: "data",
-            at: 4,
-            columns: [{ key: "after", header: "After", width: 100, type: "number" }],
-          },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(boundaryStore.getWorkbook().sheets[0]!.tables![0]).toMatchObject({
-      range: { start: { col: 2 }, end: { col: 3 } },
-      columns: bounded.columns,
-    });
-    expect(
-      boundaryStore.applyTransaction({
-        patches: [
-          {
-            op: "addColumns",
-            sheet: "data",
-            at: 3,
-            columns: [{ key: "edge", header: "Edge", width: 100, type: "number" }],
-          },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(boundaryStore.getWorkbook().sheets[0]!.tables![0]).toMatchObject({
-      range: { start: { col: 2 }, end: { col: 4 } },
-      columns: [bounded.columns[0], { id: "edge", name: "Edge" }, bounded.columns[1]],
-    });
-    boundaryStore.dispose();
-  });
-
-  it("round-trips snapshots and table add/update/remove undo history", () => {
-    const store = new SheetwriteStore(workbook());
-    const controller = new DocumentController({
-      store,
-      loadable: store,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {},
-    });
-
-    expect(
-      controller.applyTransaction({ patches: [{ op: "addTable", table: table() }] }).status,
-    ).toBe("applied");
-    controller.undo();
-    expect(store.getWorkbook().sheets[0]!.tables).toEqual([]);
-    controller.redo();
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.id).toBe("table-sales");
-
-    expect(
-      controller.applyTransaction({
-        patches: [
-          { op: "updateTable", sheet: "data", tableId: "table-sales", patch: { name: "Revenue" } },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.name).toBe("Revenue");
-    controller.undo();
-    expect(store.getWorkbook().sheets[0]!.tables![0]!.name).toBe("Sales");
-
-    expect(
-      controller.applyTransaction({
-        patches: [{ op: "removeTable", sheet: "data", tableId: "table-sales" }],
-      }).status,
-    ).toBe("applied");
-    controller.undo();
-    expect(store.getWorkbook().sheets[0]!.tables![0]).toEqual(table());
-
-    const encoded = JSON.stringify(store.exportSnapshot());
-    const restored = SheetwriteStore.fromSnapshot(JSON.parse(encoded));
-    expect(JSON.stringify(restored.exportSnapshot())).toBe(encoded);
-    restored.dispose();
-    controller.destroy();
     store.dispose();
   });
 

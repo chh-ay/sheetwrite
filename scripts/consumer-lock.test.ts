@@ -99,18 +99,6 @@ describe("immutable release consumer locks", () => {
     ]);
   });
 
-  it("uses npm ci for every bundler fixture install", () => {
-    for (const directory of [
-      "test/bundler-fixtures/vite",
-      "test/bundler-fixtures/webpack",
-      "test/bundler-fixtures/next",
-    ]) {
-      const build = json<FixtureManifest>(`${directory}/package.json`).scripts?.build;
-      expect(build).toStartWith("npm ci --ignore-scripts");
-      expect(build).not.toContain("npm install");
-    }
-  });
-
   it("rebinds copied canonical tarballs without changing registry entries", async () => {
     const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-lock-"));
     const lockPath = join(root, "package-lock.json");

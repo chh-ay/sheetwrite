@@ -8,8 +8,7 @@ description: "Host elements and callbacks used to bind a formula bar to a Grid."
 Host elements and callbacks used to bind a formula bar to a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core/shell</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/shell/formula-controls.ts#L116</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/formula-controls.ts#L116"><code>packages/core/src/shell/formula-controls.ts#L116</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -48,3 +47,24 @@ export interface FormulaBarOptions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>FormulaBarOptions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core-shell/create-formula-bar/"><code>createFormulaBar</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

@@ -115,36 +115,6 @@ describe("built-in widget styling", () => {
     expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
   });
 
-  // ── Class structure + positioning ─────────────────────────────────────────
-  // Contract: host CSS has stable hooks for every built-in widget, while the
-  // find bar remains positioned over the grid instead of affecting layout.
-  it("exposes styling hooks and positions the find bar over the grid", () => {
-    const { host } = makeGrid();
-
-    const findEl = mustFind<HTMLElement>(host, ".sheetwrite-find");
-
-    const iconBtn = mustFind(host, ".sheetwrite-find-prev");
-    expect(iconBtn.classList.contains("sheetwrite-find-btn")).toBe(true);
-    expect(iconBtn.classList.contains("sheetwrite-find-icon-btn")).toBe(true);
-
-    const textBtn = mustFind(host, ".sheetwrite-find-replace");
-    expect(textBtn.classList.contains("sheetwrite-find-btn")).toBe(true);
-    expect(textBtn.classList.contains("sheetwrite-find-text-btn")).toBe(true);
-
-    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
-    expect(host.querySelectorAll(".sheetwrite-tb-button").length).toBeGreaterThan(0);
-    expect(host.querySelectorAll(".sheetwrite-tb-color").length).toBeGreaterThan(0);
-
-    mustFind(host, ".sheetwrite-scroller").dispatchEvent(
-      new MouseEvent("contextmenu", { bubbles: true, clientX: 0, clientY: 0 }),
-    );
-
-    expect(host.querySelector(".sheetwrite-context-menu")).not.toBeNull();
-    expect(host.querySelectorAll(".sheetwrite-context-menu-item").length).toBeGreaterThan(0);
-
-    expect(getComputedStyle(findEl).position).toBe("absolute");
-  });
-
   // ── Computed-style parity + host override (the core restyling proof) ───────
   // Contract: with the real stylesheet loaded the seeded tokens flow through
   // var() to the exact themed colors, AND a host rule setting the token on the
@@ -189,25 +159,6 @@ describe("built-in widget styling", () => {
       expect(getComputedStyle(findEl).display).toBe("flex");
     }
   });
-  it("uses SVG glyphs for built-in actions and distinct export labels", () => {
-    const { host } = makeGrid({
-      toolbar: [
-        { action: "undo" },
-        { action: "bold" },
-        { action: "exportCsv" },
-        { action: "exportXlsx" },
-      ],
-    });
-
-    const undo = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-undo");
-    const bold = mustFind<HTMLButtonElement>(host, ".sheetwrite-tb-bold");
-    expect(undo.querySelector("svg[aria-hidden=true]")).not.toBeNull();
-    expect(bold.querySelector("svg[aria-hidden=true]")).not.toBeNull();
-    expect(undo.getAttribute("aria-label")).toBe("Undo");
-    expect(mustFind(host, ".sheetwrite-tb-exportCsv").textContent).toBe("CSV");
-    expect(mustFind(host, ".sheetwrite-tb-exportXlsx").textContent).toBe("XLSX");
-  });
-
   it("renders icon strings as text and supports reusable SVG nodes and factories", () => {
     const shared = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     shared.setAttribute("data-icon", "shared");

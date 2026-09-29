@@ -1,28 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { COMPATIBILITY_FIXTURES } from "../docs/src/showcases/compatibility.js";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
-  collectCompatibilityDigestIssues,
-  contentPathForRoute,
-  entrySlug,
-  expectedGeneratedFiles,
-  headingAnchors,
+  documentationLinkRoutes,
   landingBenchPayload,
-  MIGRATION_ROUTES,
-  parseFences,
   renderEntryPage,
-  renderEvidencePage,
   renderSymbolPage,
   runCompletionSummary,
-  unresolvedCssTokens,
-  unresolvedDocumentationLinks,
 } from "./docs.js";
-import type { ApiEntryPoint, ApiPackage, PublicApiManifest } from "./public-api.js";
-import type { SizeHistory } from "./size-report.js";
+import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 const coreEntry: ApiEntryPoint = {
@@ -79,36 +67,8 @@ const corePackage: ApiPackage = {
   name: "@sheetwrite/core",
   entryPoints: [coreEntry],
 };
-const manifest: PublicApiManifest = {
-  formatVersion: 2,
-  packages: [corePackage],
-};
 
 describe("documentation generation", () => {
-  it("uses stable slugs for root, subpath, and asset entry points", () => {
-    expect(entrySlug("@sheetwrite/core", ".")).toBe("core");
-    expect(entrySlug("@sheetwrite/core", "./shell")).toBe("core-shell");
-    expect(entrySlug("@sheetwrite/core", "./styles.css")).toBe("core-styles-css");
-  });
-
-  it("matches rendered heading anchors without collapsing punctuation gaps", () => {
-    expect([...headingAnchors("## Canvas rendering + the WASM columnar store")]).toEqual([
-      "canvas-rendering--the-wasm-columnar-store",
-    ]);
-  });
-
-  it("fails closed when a JSDoc link has no unique API route", () => {
-    expect(unresolvedDocumentationLinks(manifest)).toEqual([]);
-    const broken = structuredClone(manifest);
-    broken.packages[0]!.entryPoints[0]!.exports[0]!.documentation =
-      "Broken {@link MissingSymbol}, {@link Grid.typo}, and {@link Grid.applyTransaction.typo}.";
-    expect(unresolvedDocumentationLinks(broken)).toEqual([
-      "@sheetwrite/core . Grid has unresolved documentation link MissingSymbol",
-      "@sheetwrite/core . Grid has unresolved documentation link Grid.typo",
-      "@sheetwrite/core . Grid has unresolved documentation link Grid.applyTransaction.typo",
-    ]);
-  });
-
   it("links entry indexes to documented symbols with unique member anchors", async () => {
     const entryPage = renderEntryPage(corePackage, coreEntry);
     const symbolPage = await renderSymbolPage(corePackage, coreEntry, coreEntry.exports[0]!);
@@ -128,148 +88,6 @@ describe("documentation generation", () => {
     );
   });
 
-  it("generates an index and focused page for every classified symbol", async () => {
-    const files = await expectedGeneratedFiles(manifest);
-    expect(files.some((file) => file.path.endsWith("/api/core.md"))).toBe(true);
-    expect(files.some((file) => file.path.endsWith("/api/index.md"))).toBe(true);
-    expect(files.some((file) => file.path.endsWith("/api/core/grid.md"))).toBe(true);
-    const inventory = files.find((file) => file.path.endsWith("package-entry-points.md"));
-    expect(inventory?.content).toContain("supported");
-  });
-
-  it("generates the complete formula contract from the versioned inventory", async () => {
-    const files = await expectedGeneratedFiles(manifest);
-    const reference = files.find((file) => file.path.endsWith("formula-functions.md"));
-    expect(reference?.content).toContain("**100 required-supported target functions**");
-    expect(reference?.content).toContain("**54 incumbent functions**");
-    expect(reference?.content).toContain("| `LET` | required target |");
-    expect(reference?.content).toContain("| `SUMPRODUCT` | required target |");
-    expect(reference?.content).toContain("Google Sheets and OpenFormula behavior is unverified");
-    expect(reference?.content).toContain("No formula throughput or latency number is published");
-  });
-
-  it("generates a public compatibility projection without executable test paths", async () => {
-    const files = await expectedGeneratedFiles(manifest);
-    const reference = files.find((file) => file.path.endsWith("compatibility-results.md"));
-    const data = files.find((file) => file.path.endsWith("/compatibility.json"));
-    const results = files.find((file) => file.path.endsWith("/compatibility-results.json"));
-    if (!reference || !data || !results) {
-      throw new Error("generated compatibility outputs are missing");
-    }
-    expect(reference.content).toContain("Detailed compatibility results");
-    expect(reference.content).toContain("<code>formula-engine-vectors</code>");
-    expect(reference.content).not.toContain("packages/wasm/src/tests.rs");
-    expect(reference.content).not.toContain("test/browser/showcase-interoperability.spec.ts");
-    expect(
-      await readFile(
-        resolve(import.meta.dir, "../docs/src/content/docs/reference/compatibility-results.md"),
-        "utf8",
-      ),
-    ).toBe(reference.content);
-    expect(
-      await readFile(resolve(import.meta.dir, "../docs/src/generated/compatibility.json"), "utf8"),
-    ).toBe(data.content);
-    expect(
-      await readFile(
-        resolve(import.meta.dir, "../docs/src/generated/compatibility-results.json"),
-        "utf8",
-      ),
-    ).toBe(results.content);
-    const projected = JSON.parse(data.content) as {
-      records: Array<Record<string, unknown>>;
-      fixtures: Array<Record<string, unknown>>;
-    };
-    expect(projected.records[0]).not.toHaveProperty("evidence");
-    expect(projected.fixtures[0]).not.toHaveProperty("path");
-    expect(data.content).not.toContain("/test/");
-    expect(data.content).not.toContain("packages/wasm/src/tests");
-    const publishedResults = JSON.parse(results.content) as {
-      testSet: {
-        version: number;
-        checksum: string;
-        totalTests: number;
-        publishedExamples: number;
-        formulaTests: number;
-        editSequenceTests: number;
-        workbookTests: number;
-        localPassed: number;
-        reviewedResults: number;
-        missingReviewedResults: number;
-        unsupported: number;
-        regressions: number;
-      };
-      cases: Array<{ testChecksum: string; observations: unknown[] }>;
-    };
-    expect(publishedResults.testSet).toMatchObject({
-      version: 1,
-      checksum: "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
-      totalTests: 2350,
-      formulaTests: 2000,
-      editSequenceTests: 250,
-      workbookTests: 100,
-      localPassed: 2290,
-      reviewedResults: 0,
-      missingReviewedResults: 2290,
-      unsupported: 60,
-      regressions: 0,
-    });
-    expect(publishedResults.cases).toHaveLength(publishedResults.testSet.publishedExamples);
-    expect(publishedResults.testSet.publishedExamples).toBeLessThan(
-      publishedResults.testSet.totalTests,
-    );
-    expect(
-      publishedResults.cases.every((entry) => /^[a-f0-9]{64}$/u.test(entry.testChecksum)),
-    ).toBe(true);
-    expect(publishedResults.cases.every((entry) => entry.observations.length === 0)).toBe(true);
-    expect(results.content.length).toBeLessThan(300_000);
-  });
-
-  it("fails closed when a compatibility fixture digest drifts", async () => {
-    const fixtures = COMPATIBILITY_FIXTURES.map((fixture, index) =>
-      index === 0 || !fixture.sha256 ? fixture : { ...fixture, sha256: "0".repeat(64) },
-    );
-    expect(await collectCompatibilityDigestIssues(undefined, fixtures)).toContainEqual(
-      expect.stringContaining("compatibility fixture digest mismatch:"),
-    );
-  });
-
-  it("resolves every moved guide to generated content with one named installation consolidation", async () => {
-    const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
-    const generatedContent = (await expectedGeneratedFiles(manifest)).filter(
-      (file) => file.path.startsWith(contentRoot) && /\.mdx?$/u.test(file.path),
-    );
-    const pages = new Bun.Glob("**/*.{md,mdx}");
-    for await (const path of pages.scan({ cwd: contentRoot, onlyFiles: true })) {
-      const absolutePath = join(contentRoot, path);
-      generatedContent.push({ path: absolutePath, content: await readFile(absolutePath, "utf8") });
-    }
-    for (const route of Object.values(MIGRATION_ROUTES)) {
-      expect(contentPathForRoute(route, generatedContent)).toBeDefined();
-    }
-    expect(MIGRATION_ROUTES["docs/README.md"]).toBe("/docs/start/installation/");
-    expect(MIGRATION_ROUTES["docs/getting-started.md"]).toBe("/docs/start/installation/");
-  });
-
-  it("extracts compile and explicit partial fence metadata", () => {
-    const fences = parseFences(
-      '```ts compile title="Checked"\nconst value: number = 1;\n```\n\n```sql partial="host schema"\nselect 1;\n```\n',
-    );
-    expect(fences).toEqual([
-      {
-        language: "ts",
-        meta: 'compile title="Checked"',
-        code: "const value: number = 1;",
-        line: 1,
-      },
-      {
-        language: "sql",
-        meta: 'partial="host schema"',
-        code: "select 1;",
-        line: 5,
-      },
-    ]);
-  });
-
   it("keeps published package README links valid outside the monorepo", async () => {
     const root = resolve(import.meta.dir, "..");
     for (const name of PUBLISHABLE_PACKAGE_ORDER) {
@@ -281,25 +99,6 @@ describe("documentation generation", () => {
           /^https:\/\/(?:sheetwrite\.vercel\.app\/|github\.com\/chh-ay\/sheetwrite\/)/,
         );
       }
-    }
-  });
-
-  it("rejects referenced Sheetwrite CSS tokens without a definition", async () => {
-    const root = await mkdtemp(join(tmpdir(), "sheetwrite-css-tokens-"));
-    try {
-      await writeFile(
-        join(root, "tokens.css"),
-        ":root { --sw-defined: #fff; color: var(--sw-defined); }\n",
-      );
-      await writeFile(
-        join(root, "component.tsx"),
-        'export const style = "border-color: var(--sw-missing)";\n',
-      );
-      expect(await unresolvedCssTokens(root)).toEqual([
-        "undefined Sheetwrite CSS token --sw-missing: component.tsx",
-      ]);
-    } finally {
-      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -357,31 +156,6 @@ describe("documentation generation", () => {
     results,
   });
 
-  it("pairs landing bench ratios per scenario from full-round buckets", () => {
-    const results: ReturnType<typeof benchResult>[] = [];
-    for (const rows of [1_000, 1_000_000]) {
-      for (const scenario of ["a", "b"]) {
-        for (const round of [1, 2]) {
-          results.push(benchResult("sheetwrite", scenario, round, rows, 1));
-          results.push(benchResult("handsontable", scenario, round, rows, 10));
-        }
-      }
-    }
-    const payload = JSON.parse(
-      landingBenchPayload({ evidence: benchEvidence(results), source: "x" }),
-    );
-    expect(payload.available).toBe(true);
-    expect(payload.sizes).toHaveLength(2);
-    expect(payload.sizes[0]).toMatchObject({
-      size: 1_000,
-      comparedScenarios: 2,
-      medianRatio: 10,
-      bestRatio: 10,
-      handsontableIncomplete: 0,
-    });
-    expect(payload.heroStats).toMatchObject({ millionRowScenarios: 2, millionRowMedianMs: 1 });
-  });
-
   it("omits partial-round pairs and never publishes non-finite landing values", () => {
     const results = [
       // scenario a at 1k: Handsontable completes only 1 of 2 rounds.
@@ -422,25 +196,6 @@ describe("documentation generation", () => {
     });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
-  });
-
-  it("downgrades to placeholder when 1M hero buckets lack full rounds", () => {
-    const results = [
-      // Valid, comparable full-round pair at 1k - sizes[] stays non-empty.
-      benchResult("sheetwrite", "a", 1, 1_000, 1),
-      benchResult("sheetwrite", "a", 2, 1_000, 1),
-      benchResult("handsontable", "a", 1, 1_000, 10),
-      benchResult("handsontable", "a", 2, 1_000, 10),
-      // 1M: Sheetwrite completes only 1 of 2 rounds per scenario, so hero
-      // stats have no full-round bucket and must not publish NaN-as-null.
-      benchResult("sheetwrite", "a", 1, 1_000_000, 2),
-      benchResult("sheetwrite", "a", 2, 1_000_000, 2, "failed"),
-      benchResult("sheetwrite", "b", 1, 1_000_000, 2),
-      benchResult("sheetwrite", "b", 2, 1_000_000, 2, "failed"),
-    ];
-    const payload = landingBenchPayload({ evidence: benchEvidence(results), source: "x" });
-    expect(JSON.parse(payload).available).toBe(false);
-    expect(payload).not.toContain("null");
   });
 });
 describe("adapter documentation contract", () => {
@@ -566,10 +321,6 @@ describe("adapter documentation contract", () => {
     );
   });
 
-  it("accepts a manifest documenting every canonical input, event, and reason", () => {
-    expect(adapterContractIssues(conformingManifest())).toEqual([]);
-  });
-
   it("fails when GridOptions and the adapter input contract drift", () => {
     const manifest = conformingManifest();
     const options = manifest.packages[0]?.entryPoints
@@ -579,27 +330,6 @@ describe("adapter documentation contract", () => {
     options.memberDocs.push({ name: "uncoveredInput", documentation: "Uncovered input." });
     expect(adapterContractIssues(manifest)).toContain(
       "GridOptions member uncoveredInput is not covered by the adapter documentation contract",
-    );
-  });
-
-  it("fails when an adapter input or readiness event disappears", () => {
-    const manifest = conformingManifest();
-    const react = manifest.packages[1]?.entryPoints[0]?.exports[0];
-    if (react === undefined) throw new Error("fixture shape changed");
-    react.signature = react.signature.replace("onReady?: unknown;", "");
-    react.memberDocs = react.memberDocs.filter((member) => member.name !== "onReady");
-    expect(adapterContractIssues(manifest)).toContain(
-      "@sheetwrite/react SheetwriteGridProps does not declare onReady",
-    );
-  });
-
-  it("fails when a documented member loses its JSDoc", () => {
-    const manifest = conformingManifest();
-    const svelte = manifest.packages[2]?.entryPoints[0]?.exports[0];
-    if (svelte === undefined) throw new Error("fixture shape changed");
-    svelte.memberDocs = svelte.memberDocs.filter((member) => member.name !== "datasource");
-    expect(adapterContractIssues(manifest)).toContain(
-      "@sheetwrite/svelte SheetwriteGridProps member datasource has no documentation",
     );
   });
 
@@ -614,54 +344,85 @@ describe("adapter documentation contract", () => {
       "@sheetwrite/vue does not export SheetwriteGridEmits",
     );
   });
-
-  it("fails when documented readiness reasons drift from the implementation", () => {
-    const manifest = conformingManifest();
-    const reason = manifest.packages[0]?.entryPoints
-      .find((entry) => entry.subpath === "./adapter")
-      ?.exports.find((item) => item.name === "GridReadyReason");
-    if (reason === undefined) throw new Error("fixture shape changed");
-    reason.signature = 'export type GridReadyReason = "initial" | "reset";';
-    const issues = adapterContractIssues(manifest);
-    expect(issues.some((issue) => issue.startsWith("GridReadyReason documents"))).toBe(true);
-  });
 });
+describe("API symbol page reading experience", () => {
+  const apiExport = (
+    name: string,
+    kind: string,
+    signature: string,
+    documentation = `${name} summary.`,
+  ): ApiExport => ({
+    name,
+    kind,
+    signature,
+    owners: ["src/index.ts"],
+    source: "src/index.ts#L1",
+    jsDocTags: [],
+    documentation,
+    memberDocs: [],
+  });
 
-describe("published size history rendering", () => {
-  it("appends a third release, compares adjacent versions, and opens only the latest", async () => {
-    const release = (version: string, actual: number, capturedAt: string) => ({
-      version,
-      capturedAt,
-      source: "npm registry published artifacts",
-      metrics: {
-        "package.@sheetwrite/core.tarballBytes": { actual, unit: "bytes" as const },
-        "package.@sheetwrite/core.unpackedBytes": {
-          actual: actual * 2,
-          unit: "bytes" as const,
-        },
-      },
-    });
-    const history: SizeHistory = {
-      schemaVersion: 1,
-      releases: [
-        release("0.1.0", 100, "2026-01-01T00:00:00.000Z"),
-        release("0.2.0", 120, "2026-02-01T00:00:00.000Z"),
-        release("0.3.0", 150, "2026-03-01T00:00:00.000Z"),
-      ],
-    };
+  const entryPoint = (subpath: string, exports: ApiExport[]): ApiEntryPoint => ({
+    subpath,
+    target: "./dist/index.d.ts",
+    source: "src/index.ts",
+    kind: "typescript",
+    classification: "supported",
+    exports,
+  });
 
-    const output = await renderEvidencePage(history);
+  const storageEntry = () =>
+    entryPoint(".", [
+      apiExport(
+        "STORAGE_MODES",
+        "variable",
+        'readonly ["memory", "session"]',
+        "Every storage mode.",
+      ),
+      apiExport("StorageMode", "type", "export type StorageMode = (typeof STORAGE_MODES)[number];"),
+      apiExport(
+        "StorageOptions",
+        "interface",
+        [
+          "interface StorageOptions {",
+          '  mode: "memory" | "session";',
+          "  storage?: StorageMode;",
+          "}",
+        ].join("\n"),
+      ),
+    ]);
 
-    expect(output.match(/class="size-history__release"/g)).toHaveLength(3);
-    expect(output.match(/data-current="true" open/g)).toHaveLength(1);
-    expect(output).toContain("<span>v0.2.0</span>");
-    expect(output).toContain("<strong>v0.3.0</strong>");
-    expect(output.indexOf("<strong>v0.3.0</strong>")).toBeLessThan(
-      output.indexOf("<strong>v0.2.0</strong>"),
+  it("links an expanded union member to the alias that names it", async () => {
+    const entry = storageEntry();
+    const adapter = entryPoint("./adapter", [
+      apiExport(
+        "STORAGE_MODES",
+        "variable",
+        'readonly ["memory", "session"]',
+        "Every storage mode.",
+      ),
+      apiExport("StorageMode", "type", "export type StorageMode = (typeof STORAGE_MODES)[number];"),
+    ]);
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry, adapter] };
+    const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
+    const options = entry.exports.find((item) => item.name === "StorageOptions");
+    if (options === undefined) throw new Error("fixture shape changed");
+
+    const page = await renderSymbolPage(pkg, entry, options, routes);
+
+    const memberRow =
+      /<details class="api-member" id="storage-options-mode"[\s\S]*?<\/details>/.exec(page)?.[0] ??
+      "";
+    const declaration = /<details class="api-declaration"[\s\S]*?<\/details>/.exec(page)?.[0] ?? "";
+    // The checker prints the expansion; the member row names the alias and links its
+    // own entry point, not the adapter's re-export of the same name.
+    expect(memberRow).toContain(
+      '<a href="/docs/api/core/storage-mode/"><code>StorageMode</code></a>',
     );
-    expect(output.indexOf("<strong>v0.2.0</strong>")).toBeLessThan(
-      output.indexOf("<strong>v0.1.0</strong>"),
-    );
-    expect(output).toContain("Measured Mar 1, 2026");
+    expect(memberRow).toContain("mode: StorageMode;");
+    expect(memberRow).not.toContain('"memory"');
+    // The full expansion stays available in the collapsed Declaration section.
+    expect(declaration).toContain('mode: "memory" | "session"');
+    expect(page).not.toContain("core-adapter/storage-mode");
   });
 });

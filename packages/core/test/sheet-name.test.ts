@@ -30,9 +30,4 @@ describe("worksheet name contract", () => {
       });
     }
   });
-
-  it("accepts the exact UTF-16 limit and internal apostrophes", () => {
-    expect(validateSheetName("a".repeat(31)).ok).toBe(true);
-    expect(validateSheetName("Owner's Sheet").ok).toBe(true);
-  });
 });

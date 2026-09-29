@@ -8,9 +8,50 @@ description: "Advanced Svelte adapter props with inferred host row identity."
 Advanced Svelte adapter props with inferred host row identity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/svelte</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/svelte/src/props.ts#L15</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/props.ts#L15"><code>packages/svelte/src/props.ts#L15</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheetwrite-grid-props-workbook"><code>workbook</code></a>
+<a href="#sheetwrite-grid-props-data"><code>data</code></a>
+<a href="#sheetwrite-grid-props-row-bridge"><code>rowBridge</code></a>
+<a href="#sheetwrite-grid-props-datasource"><code>datasource</code></a>
+<a href="#sheetwrite-grid-props-datasource-storage"><code>datasourceStorage</code></a>
+<a href="#sheetwrite-grid-props-renderer"><code>renderer</code></a>
+<a href="#sheetwrite-grid-props-worker-url"><code>workerUrl</code></a>
+<a href="#sheetwrite-grid-props-presentation"><code>presentation</code></a>
+<a href="#sheetwrite-grid-props-theme"><code>theme</code></a>
+<a href="#sheetwrite-grid-props-read-only"><code>readOnly</code></a>
+<a href="#sheetwrite-grid-props-protection-resolver"><code>protectionResolver</code></a>
+<a href="#sheetwrite-grid-props-mutation-policy"><code>mutationPolicy</code></a>
+<a href="#sheetwrite-grid-props-transaction-resource-limits"><code>transactionResourceLimits</code></a>
+<a href="#sheetwrite-grid-props-hyperlink-activation"><code>hyperlinkActivation</code></a>
+<a href="#sheetwrite-grid-props-renderers"><code>renderers</code></a>
+<a href="#sheetwrite-grid-props-editors"><code>editors</code></a>
+<a href="#sheetwrite-grid-props-overscan"><code>overscan</code></a>
+<a href="#sheetwrite-grid-props-min-columns"><code>minColumns</code></a>
+<a href="#sheetwrite-grid-props-config"><code>config</code></a>
+<a href="#sheetwrite-grid-props-height"><code>height</code></a>
+<a href="#sheetwrite-grid-props-fill"><code>fill</code></a>
+<a href="#sheetwrite-grid-props-fallback"><code>fallback</code></a>
+<a href="#sheetwrite-grid-props-grid"><code>grid</code></a>
+<a href="#sheetwrite-grid-props-on-grid-change"><code>onGridChange</code></a>
+<a href="#sheetwrite-grid-props-on-row-delta"><code>onRowDelta</code></a>
+<a href="#sheetwrite-grid-props-on-selection-change"><code>onSelectionChange</code></a>
+<a href="#sheetwrite-grid-props-on-viewport-change"><code>onViewportChange</code></a>
+<a href="#sheetwrite-grid-props-on-edit-begin"><code>onEditBegin</code></a>
+<a href="#sheetwrite-grid-props-on-edit-commit"><code>onEditCommit</code></a>
+<a href="#sheetwrite-grid-props-on-search"><code>onSearch</code></a>
+<a href="#sheetwrite-grid-props-on-active-sheet-change"><code>onActiveSheetChange</code></a>
+<a href="#sheetwrite-grid-props-on-command-state-change"><code>onCommandStateChange</code></a>
+<a href="#sheetwrite-grid-props-on-mutation-rejected"><code>onMutationRejected</code></a>
+<a href="#sheetwrite-grid-props-on-renderer-fallback"><code>onRendererFallback</code></a>
+<a href="#sheetwrite-grid-props-on-datasource-error"><code>onDatasourceError</code></a>
+<a href="#sheetwrite-grid-props-on-export-error"><code>onExportError</code></a>
+<a href="#sheetwrite-grid-props-on-ready"><code>onReady</code></a>
+<a href="#sheetwrite-grid-props-on-initialization-error"><code>onInitializationError</code></a>
+<a href="#sheetwrite-grid-props-wasm-source"><code>wasmSource</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>39</span>
 
@@ -423,3 +464,24 @@ export interface SheetwriteGridProps<
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/svelte</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteGridProps</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/react/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/react/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/vue/sheetwrite-props/"><code>SheetwriteProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

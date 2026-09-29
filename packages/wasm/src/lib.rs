@@ -46,10 +46,6 @@ pub use window::WindowView;
 
 // Test-only preludes: `tests.rs` reaches the whole crate through `use super::*`.
 #[cfg(all(test, feature = "formula-engine"))]
-pub(crate) use calc::parse;
-#[cfg(all(test, feature = "formula-engine"))]
-pub(crate) use query::*;
-#[cfg(all(test, feature = "formula-engine"))]
 pub(crate) use sheet::*;
 #[cfg(all(test, feature = "formula-engine"))]
 pub(crate) use types::*;

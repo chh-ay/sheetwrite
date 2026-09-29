@@ -8,9 +8,19 @@ description: "Serializable canonical workbook table."
 Serializable canonical workbook table. Its range includes header/totals rows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/table.ts#L38</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L38"><code>packages/core/src/types/table.ts#L38</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#workbook-table-id"><code>id</code></a>
+<a href="#workbook-table-name"><code>name</code></a>
+<a href="#workbook-table-range"><code>range</code></a>
+<a href="#workbook-table-columns"><code>columns</code></a>
+<a href="#workbook-table-header-row"><code>headerRow</code></a>
+<a href="#workbook-table-totals-row"><code>totalsRow</code></a>
+<a href="#workbook-table-style"><code>style</code></a>
+<a href="#workbook-table-unsupported-features"><code>unsupportedFeatures</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>8</span>
 
@@ -108,3 +118,27 @@ export interface WorkbookTable {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>WorkbookTable</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/document-op/"><code>DocumentOp</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sheet/"><code>Sheet</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sheet-snapshot/"><code>SheetSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/valid-workbook-table/"><code>validWorkbookTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

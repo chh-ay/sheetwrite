@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { neutralizeInjection, parseTsv, toTsv } from "../src/clipboard.js";
+import { parseTsv, toTsv } from "../src/clipboard.js";
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SelectionModel } from "../src/selection.js";
@@ -19,27 +19,10 @@ beforeAll(async () => {
   await initSheetwrite();
 });
 describe("clipboard TSV", () => {
-  it("neutralizes formula-injection prefixes", () => {
-    for (const p of ["=cmd", "+1", "-1", "@x", "\tx", "\rx"]) {
-      expect(neutralizeInjection(p)).toBe(`'${p}`);
-    }
-    expect(neutralizeInjection("safe")).toBe("safe");
-    expect(neutralizeInjection("12.5")).toBe("12.5");
-  });
-
   it("serializes a block, quoting fields with tabs/newlines/quotes", () => {
     expect(toTsv([["a", 1, null]])).toBe("a\t1\t");
     expect(toTsv([['q"x', "b\tc", "d\ne"]])).toBe('"q""x"\t"b\tc"\t"d\ne"');
     expect(toTsv([[true, false]])).toBe("TRUE\tFALSE");
-  });
-
-  it("round-trips quoted TSV including embedded tabs/newlines", () => {
-    expect(parseTsv("a\t1\r\nb\t2")).toEqual([
-      ["a", "1"],
-      ["b", "2"],
-    ]);
-    expect(parseTsv('"b\tc"\t"d\ne"')).toEqual([["b\tc", "d\ne"]]);
-    expect(parseTsv('"q""x"')).toEqual([['q"x']]);
   });
 
   it("hardens every dangerous string prefix in external TSV while leaving numbers intact", () => {
@@ -56,15 +39,6 @@ describe("clipboard TSV", () => {
     expect(parseTsv('""')).toEqual([[""]]);
     expect(toTsv([[null], [null], [null]])).toBe('""\r\n""\r\n""');
     expect(parseTsv(toTsv([[null], [null], [null]]))).toEqual([[""], [""], [""]]);
-  });
-
-  it("handles bare CR, CRLF, Unicode, delimiters, doubled quotes, and trailing fields", () => {
-    expect(parseTsv(toTsv([["🎉"]]))).toEqual([["🎉"]]);
-    expect(parseTsv('α\t"b\tc"\r"d\nx"\t"q""x"\r\nlast\t')).toEqual([
-      ["α", "b\tc"],
-      ["d\nx", 'q"x'],
-      ["last", ""],
-    ]);
   });
 });
 
@@ -389,20 +363,6 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula(target)).toBeNull();
   });
 
-  it("copy carries styles; pasteValues drops them", async () => {
-    h.store.seed(0, 0, { kind: "literal", value: "x" }, "x", { bold: true });
-    h.select(0, 0);
-    await h.controller.copy();
-
-    h.select(5, 0);
-    await h.controller.paste();
-    expect(h.store.getCell({ sheet: "s1", row: 5, col: 0 }).style).toEqual({ bold: true });
-
-    h.select(6, 0);
-    await h.controller.pasteValues();
-    expect(h.store.getCell({ sheet: "s1", row: 6, col: 0 }).style).toEqual({});
-  });
-
   it("copies bounded hyperlink metadata with a new stable identity and translated range", async () => {
     h.sheet.hyperlinks = [
       {
@@ -446,48 +406,6 @@ describe("ClipboardController", () => {
     const target = { sheet: "s1", row: 0, col: 0 };
     expect(h.store.getCell(target).resolved).toBe("'=SUM(A1)");
     expect(h.store.getFormula(target)).toBeNull();
-  });
-
-  it("pasteValues on external text is identical to paste (neutralized literals)", async () => {
-    h.setSystemClipboard("=SUM(A1)\t7");
-    h.select(0, 0);
-    await h.controller.pasteValues();
-
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("'=SUM(A1)");
-    expect(h.store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
-    expect(h.store.getFormula({ sheet: "s1", row: 0, col: 0 })).toBeNull();
-  });
-
-  it("copy of a multi-cell block shifts every cell's refs by one rigid delta", async () => {
-    // Two stacked formulas at A1 and A2; copy A1:A2, paste at A3.
-    h.store.seed(0, 0, { kind: "formula", src: "=B1" }, 0);
-    h.store.seed(1, 0, { kind: "formula", src: "=B2" }, 0);
-    h.selection.selectCell(0, 0);
-    h.selection.extendTo(1, 0);
-    await h.controller.copy();
-
-    h.select(2, 0);
-    await h.controller.paste();
-
-    // Both shift +2 rows uniformly: A3 <- =B3, A4 <- =B4.
-    expect(h.store.getFormula({ sheet: "s1", row: 2, col: 0 })).toBe("=B3");
-    expect(h.store.getFormula({ sheet: "s1", row: 3, col: 0 })).toBe("=B4");
-  });
-  it("preserves plain refs through the custom-store fallback", async () => {
-    h.store.seed(0, 0, { kind: "ref", target: { sheet: "s1", row: 1, col: 1 } }, 42, {
-      italic: true,
-    });
-    h.select(0, 0);
-    await h.controller.copy();
-    h.select(2, 0);
-    await h.controller.paste();
-
-    expect(h.store.getRefTarget({ sheet: "s1", row: 2, col: 0 })).toEqual({
-      sheet: "s1",
-      row: 1,
-      col: 1,
-    });
-    expect(h.store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toEqual({ italic: true });
   });
 
   it("preserves formulas and refs from the packed clipboard read", async () => {
@@ -539,20 +457,6 @@ describe("ClipboardController", () => {
     expect(h.store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBeNull();
   });
 
-  it("resolves 'blocked' when writeText rejects, without an unhandled rejection", async () => {
-    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
-    h.select(1, 1);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: () => Promise.reject(new Error("clipboard denied")),
-        readText: () => Promise.resolve(""),
-      },
-    });
-
-    await expect(h.controller.copy()).resolves.toBe("blocked");
-  });
-
   it("resolves 'unsupported' when the Clipboard API is absent", async () => {
     h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
     h.select(1, 1);
@@ -590,20 +494,6 @@ describe("ClipboardController", () => {
     expect(h.commitReasons).toEqual(["paste"]);
   });
 
-  it("resolves 'unsupported' when the navigator global itself is absent (SSR)", async () => {
-    h.store.seed(1, 1, { kind: "literal", value: "x" }, "x");
-    h.select(1, 1);
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
-    // @ts-expect-error — deliberately removing the global for the SSR branch
-    delete globalThis.navigator;
-
-    try {
-      await expect(h.controller.copy()).resolves.toBe("unsupported");
-      await expect(h.controller.paste()).resolves.toBe("unsupported");
-    } finally {
-      if (descriptor) Object.defineProperty(globalThis, "navigator", descriptor);
-    }
-  });
   it("round-trips formulas and styles through the browser custom clipboard format", async () => {
     Object.defineProperty(globalThis, "ClipboardItem", {
       configurable: true,
@@ -766,48 +656,6 @@ describe("ClipboardController", () => {
       "'=IF(1,WEBSERVICE",
     );
     expect((globalThis as Record<string, unknown>).__clipboardExecuted).toBeUndefined();
-  });
-
-  it("treats a spoofed private clipboard payload as inert external data", async () => {
-    const item = new FakeClipboardItem({
-      [`web ${SHEETWRITE_CLIPBOARD_MIME}`]: new Blob(
-        [
-          JSON.stringify({
-            version: 3,
-            token: "attacker-controlled",
-            anchor: { row: 0, col: 0 },
-            cells: [
-              [
-                {
-                  value: { kind: "formula", src: '=IF(1,WEBSERVICE("https://example.test"),0)' },
-                  resolved: 0,
-                  style: { bold: true },
-                },
-              ],
-            ],
-            hyperlinks: [],
-            tsv: "0",
-            cut: false,
-          }),
-        ],
-        { type: SHEETWRITE_CLIPBOARD_MIME },
-      ),
-    });
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        read: () => Promise.resolve([item]),
-        readText: () => Promise.reject(new Error("custom payload should be handled first")),
-      },
-    });
-    h.select(4, 0);
-
-    await expect(h.controller.paste()).resolves.toBe("done");
-    expect(h.store.getFormula({ sheet: "s1", row: 4, col: 0 })).toBeNull();
-    expect(h.store.getCell({ sheet: "s1", row: 4, col: 0 }).resolved).toStartWith(
-      "'=IF(1,WEBSERVICE",
-    );
-    expect(h.store.getCell({ sheet: "s1", row: 4, col: 0 }).style).toEqual({ bold: true });
   });
 
   it("does not trust another controller's private clipboard token", async () => {

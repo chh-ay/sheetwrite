@@ -8,9 +8,21 @@ description: "Serializable formatting applied to a cell or used as a column defa
 Serializable formatting applied to a cell or used as a column default.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/cell.ts#L27</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/cell.ts#L27"><code>packages/core/src/types/cell.ts#L27</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#cell-style-bold"><code>bold</code></a>
+<a href="#cell-style-italic"><code>italic</code></a>
+<a href="#cell-style-underline"><code>underline</code></a>
+<a href="#cell-style-strikethrough"><code>strikethrough</code></a>
+<a href="#cell-style-font-size"><code>fontSize</code></a>
+<a href="#cell-style-color"><code>color</code></a>
+<a href="#cell-style-background-color"><code>backgroundColor</code></a>
+<a href="#cell-style-align"><code>align</code></a>
+<a href="#cell-style-wrap"><code>wrap</code></a>
+<a href="#cell-style-border"><code>border</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>10</span>
 
@@ -128,3 +140,36 @@ export interface CellStyle {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>CellStyle</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/cell-change/"><code>CellChange</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/cell-hyperlink/"><code>CellHyperlink</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/cell-paint-context/"><code>CellPaintContext</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/column/"><code>Column</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/conditional-format-rule/"><code>ConditionalFormatRule</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/data-cell/"><code>DataCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/document-op/"><code>DocumentOp</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/packed-cell-block/"><code>PackedCellBlock</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/resolved-cell/"><code>ResolvedCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sanitize-hyperlink-style/"><code>sanitizeHyperlinkStyle</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/snapshot-cell/"><code>SnapshotCell</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li class="api-consumer-more">and 9 more</li>
+</ul>
+</div>

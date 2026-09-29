@@ -8,9 +8,20 @@ description: "Storage layout plus snapshot and transaction resource ceilings for
 Storage layout plus snapshot and transaction resource ceilings for one store.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/store.ts#L67</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L67"><code>packages/core/src/store.ts#L67</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheetwrite-store-options-snapshot-resource-limits"><code>snapshotResourceLimits</code></a>
+<a href="#sheetwrite-store-options-transaction-resource-limits"><code>transactionResourceLimits</code></a>
+<a href="#sheetwrite-store-options-storage"><code>storage</code></a>
+<a href="#sheetwrite-store-options-chunk-rows"><code>chunkRows</code></a>
+<a href="#sheetwrite-store-options-cache-bytes"><code>cacheBytes</code></a>
+<a href="#sheetwrite-store-options-dirty-cell-limit"><code>dirtyCellLimit</code></a>
+<a href="#sheetwrite-store-options-reference-simulation-limit"><code>referenceSimulationLimit</code></a>
+<a href="#sheetwrite-store-options-protection-resolver"><code>protectionResolver</code></a>
+<a href="#sheetwrite-store-options-mutation-policy"><code>mutationPolicy</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>9</span>
 
@@ -35,10 +46,10 @@ transactionResourceLimits?: Partial<TransactionResourceLimits>;
 </details>
 
 <details class="api-member" id="sheetwrite-store-options-storage" data-pagefind-weight="1">
-<summary><code>storage</code> <span class="api-member-summary">Storage engine; defaults to eager dense allocation.</span></summary>
+<summary><code>storage</code> <span class="api-member-alias"><a href="/docs/api/core/snapshot-storage-mode/"><code>SnapshotStorageMode</code></a></span> <span class="api-member-summary">Storage engine; defaults to eager dense allocation.</span></summary>
 
 ```ts generated
-storage?: "dense" | "paged";
+storage?: SnapshotStorageMode;
 ```
 
 </details>
@@ -120,3 +131,24 @@ export interface SheetwriteStoreOptions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteStoreOptions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

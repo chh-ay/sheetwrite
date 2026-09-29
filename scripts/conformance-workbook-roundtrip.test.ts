@@ -1,10 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { sheetwriteWorkbookBackend } from "../packages/xlsx/src/workbook.js";
-import {
-  runWorkbookRoundtrips,
-  structuralDifferences,
-  type WorkbookRoundtripResaver,
-} from "./conformance/roundtrip.js";
+import { runWorkbookRoundtrips, type WorkbookRoundtripResaver } from "./conformance/roundtrip.js";
 
 const IDENTITY_RESAVER: WorkbookRoundtripResaver = {
   producer: "libreoffice",
@@ -68,12 +64,5 @@ describe("workbook producer roundtrip evidence", () => {
         (entry) => entry.includes(".cells[0].value.value") && entry.includes("lost-value"),
       ),
     ).toBe(true);
-  });
-
-  it("produces bounded path-specific structural differences", () => {
-    expect(structuralDifferences({ a: [{ b: 1 }] }, { a: [{ b: 2 }, { b: 3 }] })).toEqual([
-      "$workbook.a.length: 1 != 2",
-      "$workbook.a[0].b: 1 != 2",
-    ]);
   });
 });

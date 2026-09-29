@@ -8,8 +8,7 @@ description: "Reason and affected operations for an unsafe document rebase."
 Reason and affected operations for an unsafe document rebase.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/rebase.ts#L16</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L16"><code>packages/core/src/rebase.ts#L16</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -68,3 +67,24 @@ export interface RebaseConflict {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>RebaseConflict</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/document-rebase-result/"><code>DocumentRebaseResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

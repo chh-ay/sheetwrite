@@ -8,9 +8,28 @@ description: "Resource dimensions bounded by every XLSX import and export path."
 Resource dimensions bounded by every XLSX import and export path.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/export.ts#L211</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L211"><code>packages/core/src/export.ts#L211</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#xlsx-resource-limits-max-input-bytes"><code>maxInputBytes</code></a>
+<a href="#xlsx-resource-limits-max-output-bytes"><code>maxOutputBytes</code></a>
+<a href="#xlsx-resource-limits-max-archive-entries"><code>maxArchiveEntries</code></a>
+<a href="#xlsx-resource-limits-max-entry-uncompressed-bytes"><code>maxEntryUncompressedBytes</code></a>
+<a href="#xlsx-resource-limits-max-total-uncompressed-bytes"><code>maxTotalUncompressedBytes</code></a>
+<a href="#xlsx-resource-limits-max-compression-ratio"><code>maxCompressionRatio</code></a>
+<a href="#xlsx-resource-limits-max-sheets"><code>maxSheets</code></a>
+<a href="#xlsx-resource-limits-max-rows-per-sheet"><code>maxRowsPerSheet</code></a>
+<a href="#xlsx-resource-limits-max-columns-per-sheet"><code>maxColumnsPerSheet</code></a>
+<a href="#xlsx-resource-limits-max-cells"><code>maxCells</code></a>
+<a href="#xlsx-resource-limits-max-merges"><code>maxMerges</code></a>
+<a href="#xlsx-resource-limits-max-shared-strings"><code>maxSharedStrings</code></a>
+<a href="#xlsx-resource-limits-max-styles"><code>maxStyles</code></a>
+<a href="#xlsx-resource-limits-max-xml-elements"><code>maxXmlElements</code></a>
+<a href="#xlsx-resource-limits-max-xml-depth"><code>maxXmlDepth</code></a>
+<a href="#xlsx-resource-limits-max-xml-attributes-per-element"><code>maxXmlAttributesPerElement</code></a>
+<a href="#xlsx-resource-limits-max-xml-text-bytes"><code>maxXmlTextBytes</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>17</span>
 
@@ -198,3 +217,26 @@ export interface XlsxResourceLimits {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>XlsxResourceLimits</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/default-xlsx-resource-limits/"><code>DEFAULT_XLSX_RESOURCE_LIMITS</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/xlsx-resource-error/"><code>XlsxResourceError</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/xlsx-workbook-options/"><code>XlsxWorkbookOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

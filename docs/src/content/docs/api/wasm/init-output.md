@@ -8,9 +8,139 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L386</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L386"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L386</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#init-output-memory"><code>memory</code></a>
+<a href="#init-output-wbg-cellout-free"><code>__wbg_cellout_free</code></a>
+<a href="#init-output-wbg-cellstore-free"><code>__wbg_cellstore_free</code></a>
+<a href="#init-output-wbg-distinctcolumn-free"><code>__wbg_distinctcolumn_free</code></a>
+<a href="#init-output-wbg-rangesnapshot-free"><code>__wbg_rangesnapshot_free</code></a>
+<a href="#init-output-wbg-sourcesnapshot-free"><code>__wbg_sourcesnapshot_free</code></a>
+<a href="#init-output-wbg-windowview-free"><code>__wbg_windowview_free</code></a>
+<a href="#init-output-cellout-kind"><code>cellout_kind</code></a>
+<a href="#init-output-cellout-num"><code>cellout_num</code></a>
+<a href="#init-output-cellout-string"><code>cellout_string</code></a>
+<a href="#init-output-cellout-style"><code>cellout_style</code></a>
+<a href="#init-output-cellstore-acknowledge-revision"><code>cellstore_acknowledgeRevision</code></a>
+<a href="#init-output-cellstore-add-paged-sheet"><code>cellstore_addPagedSheet</code></a>
+<a href="#init-output-cellstore-add-rows"><code>cellstore_addRows</code></a>
+<a href="#init-output-cellstore-add-sheet"><code>cellstore_addSheet</code></a>
+<a href="#init-output-cellstore-aggregate"><code>cellstore_aggregate</code></a>
+<a href="#init-output-cellstore-begin-mutation"><code>cellstore_beginMutation</code></a>
+<a href="#init-output-cellstore-begin-page-load"><code>cellstore_beginPageLoad</code></a>
+<a href="#init-output-cellstore-can-dirty-cell"><code>cellstore_canDirtyCell</code></a>
+<a href="#init-output-cellstore-capture-range"><code>cellstore_captureRange</code></a>
+<a href="#init-output-cellstore-capture-references"><code>cellstore_captureReferences</code></a>
+<a href="#init-output-cellstore-capture-sources"><code>cellstore_captureSources</code></a>
+<a href="#init-output-cellstore-capture-sources-for-rows"><code>cellstore_captureSourcesForRows</code></a>
+<a href="#init-output-cellstore-cell-state"><code>cellstore_cellState</code></a>
+<a href="#init-output-cellstore-clear-cell"><code>cellstore_clearCell</code></a>
+<a href="#init-output-cellstore-clear-range"><code>cellstore_clearRange</code></a>
+<a href="#init-output-cellstore-col-count"><code>cellstore_colCount</code></a>
+<a href="#init-output-cellstore-columns-fully-loaded"><code>cellstore_columnsFullyLoaded</code></a>
+<a href="#init-output-cellstore-compact-string-storage"><code>cellstore_compactStringStorage</code></a>
+<a href="#init-output-cellstore-data-edge"><code>cellstore_dataEdge</code></a>
+<a href="#init-output-cellstore-data-edge-ordered"><code>cellstore_dataEdgeOrdered</code></a>
+<a href="#init-output-cellstore-dirty-revision"><code>cellstore_dirtyRevision</code></a>
+<a href="#init-output-cellstore-distinct-values"><code>cellstore_distinctValues</code></a>
+<a href="#init-output-cellstore-end-mutation"><code>cellstore_endMutation</code></a>
+<a href="#init-output-cellstore-end-page-load"><code>cellstore_endPageLoad</code></a>
+<a href="#init-output-cellstore-filter-rows"><code>cellstore_filterRows</code></a>
+<a href="#init-output-cellstore-filter-rows-multi"><code>cellstore_filterRowsMulti</code></a>
+<a href="#init-output-cellstore-formula-matrix-resource-stats"><code>cellstore_formulaMatrixResourceStats</code></a>
+<a href="#init-output-cellstore-formula-source"><code>cellstore_formulaSource</code></a>
+<a href="#init-output-cellstore-get-cell"><code>cellstore_getCell</code></a>
+<a href="#init-output-cellstore-get-window"><code>cellstore_getWindow</code></a>
+<a href="#init-output-cellstore-get-window-rows"><code>cellstore_getWindowRows</code></a>
+<a href="#init-output-cellstore-hydrate-page-numbers"><code>cellstore_hydratePageNumbers</code></a>
+<a href="#init-output-cellstore-hydrate-page-strings-packed"><code>cellstore_hydratePageStringsPacked</code></a>
+<a href="#init-output-cellstore-insert-cols"><code>cellstore_insertCols</code></a>
+<a href="#init-output-cellstore-is-fully-loaded"><code>cellstore_isFullyLoaded</code></a>
+<a href="#init-output-cellstore-is-paged"><code>cellstore_isPaged</code></a>
+<a href="#init-output-cellstore-is-sheet-alive"><code>cellstore_isSheetAlive</code></a>
+<a href="#init-output-cellstore-mark-cell-clean-revision"><code>cellstore_markCellCleanRevision</code></a>
+<a href="#init-output-cellstore-mark-range-clean"><code>cellstore_markRangeClean</code></a>
+<a href="#init-output-cellstore-memory-stats"><code>cellstore_memoryStats</code></a>
+<a href="#init-output-cellstore-new"><code>cellstore_new</code></a>
+<a href="#init-output-cellstore-paged-dirty-coordinates"><code>cellstore_pagedDirtyCoordinates</code></a>
+<a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
+<a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
+<a href="#init-output-cellstore-pin-range"><code>cellstore_pinRange</code></a>
+<a href="#init-output-cellstore-pool-strings"><code>cellstore_poolStrings</code></a>
+<a href="#init-output-cellstore-query-resource-stats"><code>cellstore_queryResourceStats</code></a>
+<a href="#init-output-cellstore-range-fully-loaded"><code>cellstore_rangeFullyLoaded</code></a>
+<a href="#init-output-cellstore-range-style-ids"><code>cellstore_rangeStyleIds</code></a>
+<a href="#init-output-cellstore-recompute"><code>cellstore_recompute</code></a>
+<a href="#init-output-cellstore-recompute-changed"><code>cellstore_recomputeChanged</code></a>
+<a href="#init-output-cellstore-recompute-volatile"><code>cellstore_recomputeVolatile</code></a>
+<a href="#init-output-cellstore-reference-target"><code>cellstore_referenceTarget</code></a>
+<a href="#init-output-cellstore-references-targeting"><code>cellstore_referencesTargeting</code></a>
+<a href="#init-output-cellstore-remap-range-styles"><code>cellstore_remapRangeStyles</code></a>
+<a href="#init-output-cellstore-remove-cols"><code>cellstore_removeCols</code></a>
+<a href="#init-output-cellstore-remove-named-range"><code>cellstore_removeNamedRange</code></a>
+<a href="#init-output-cellstore-remove-rows"><code>cellstore_removeRows</code></a>
+<a href="#init-output-cellstore-remove-sheet"><code>cellstore_removeSheet</code></a>
+<a href="#init-output-cellstore-remove-table"><code>cellstore_removeTable</code></a>
+<a href="#init-output-cellstore-rename-sheet"><code>cellstore_renameSheet</code></a>
+<a href="#init-output-cellstore-reset-formula-matrix-resource-stats"><code>cellstore_resetFormulaMatrixResourceStats</code></a>
+<a href="#init-output-cellstore-reset-query-resource-stats"><code>cellstore_resetQueryResourceStats</code></a>
+<a href="#init-output-cellstore-restore-range"><code>cellstore_restoreRange</code></a>
+<a href="#init-output-cellstore-row-count"><code>cellstore_rowCount</code></a>
+<a href="#init-output-cellstore-search"><code>cellstore_search</code></a>
+<a href="#init-output-cellstore-set-block"><code>cellstore_setBlock</code></a>
+<a href="#init-output-cellstore-set-bool"><code>cellstore_setBool</code></a>
+<a href="#init-output-cellstore-set-column-numbers"><code>cellstore_setColumnNumbers</code></a>
+<a href="#init-output-cellstore-set-column-strings"><code>cellstore_setColumnStrings</code></a>
+<a href="#init-output-cellstore-set-column-strings-packed"><code>cellstore_setColumnStringsPacked</code></a>
+<a href="#init-output-cellstore-set-conditional-rules"><code>cellstore_setConditionalRules</code></a>
+<a href="#init-output-cellstore-set-formula"><code>cellstore_setFormula</code></a>
+<a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
+<a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
+<a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
+<a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
+<a href="#init-output-cellstore-set-spill-blockers"><code>cellstore_setSpillBlockers</code></a>
+<a href="#init-output-cellstore-set-string"><code>cellstore_setString</code></a>
+<a href="#init-output-cellstore-set-table"><code>cellstore_setTable</code></a>
+<a href="#init-output-cellstore-snapshot-numbers"><code>cellstore_snapshotNumbers</code></a>
+<a href="#init-output-cellstore-snapshot-texts"><code>cellstore_snapshotTexts</code></a>
+<a href="#init-output-cellstore-sort-rows"><code>cellstore_sortRows</code></a>
+<a href="#init-output-cellstore-sort-rows-multi"><code>cellstore_sortRowsMulti</code></a>
+<a href="#init-output-cellstore-spill-anchor-col"><code>cellstore_spillAnchorCol</code></a>
+<a href="#init-output-cellstore-spill-anchor-row"><code>cellstore_spillAnchorRow</code></a>
+<a href="#init-output-cellstore-spill-derived-mask"><code>cellstore_spillDerivedMask</code></a>
+<a href="#init-output-cellstore-spill-owner-coordinates"><code>cellstore_spillOwnerCoordinates</code></a>
+<a href="#init-output-cellstore-style-id-at"><code>cellstore_styleIdAt</code></a>
+<a href="#init-output-cellstore-wasm-committed-bytes"><code>cellstore_wasmCommittedBytes</code></a>
+<a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
+<a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
+<a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
+<a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
+<a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
+<a href="#init-output-rangesnapshot-formula-sources"><code>rangesnapshot_formulaSources</code></a>
+<a href="#init-output-rangesnapshot-kinds"><code>rangesnapshot_kinds</code></a>
+<a href="#init-output-rangesnapshot-reference-offsets"><code>rangesnapshot_referenceOffsets</code></a>
+<a href="#init-output-rangesnapshot-reference-targets"><code>rangesnapshot_referenceTargets</code></a>
+<a href="#init-output-rangesnapshot-style-ids"><code>rangesnapshot_styleIds</code></a>
+<a href="#init-output-sourcesnapshot-byte-length"><code>sourcesnapshot_byteLength</code></a>
+<a href="#init-output-sourcesnapshot-formula-offsets"><code>sourcesnapshot_formulaOffsets</code></a>
+<a href="#init-output-sourcesnapshot-formula-sources"><code>sourcesnapshot_formulaSources</code></a>
+<a href="#init-output-sourcesnapshot-reference-offsets"><code>sourcesnapshot_referenceOffsets</code></a>
+<a href="#init-output-sourcesnapshot-reference-targets"><code>sourcesnapshot_referenceTargets</code></a>
+<a href="#init-output-sourcesnapshot-spill-derived"><code>sourcesnapshot_spillDerived</code></a>
+<a href="#init-output-windowview-n-cols"><code>windowview_nCols</code></a>
+<a href="#init-output-windowview-take-strings"><code>windowview_takeStrings</code></a>
+<a href="#init-output-windowview-take-packed"><code>windowview_takePacked</code></a>
+<a href="#init-output-windowview-n-rows"><code>windowview_nRows</code></a>
+<a href="#init-output-wbindgen-malloc"><code>__wbindgen_malloc</code></a>
+<a href="#init-output-wbindgen-realloc"><code>__wbindgen_realloc</code></a>
+<a href="#init-output-wbindgen-externrefs"><code>__wbindgen_externrefs</code></a>
+<a href="#init-output-wbindgen-free"><code>__wbindgen_free</code></a>
+<a href="#init-output-externref-table-alloc"><code>__externref_table_alloc</code></a>
+<a href="#init-output-externref-drop-slice"><code>__externref_drop_slice</code></a>
+<a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>128</span>
 
@@ -1797,3 +1927,21 @@ export interface InitOutput {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>InitOutput</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
+</ul>
+</div>

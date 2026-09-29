@@ -41,6 +41,7 @@ function DocumentRoute() {
     <DocsShell
       activeHref={normalizeDocumentHref(params._splat)}
       description={metadata.description}
+      reserveOutline
       title={metadata.title}
     >
       <Suspense fallback={<p className="sw-document-loading">Loading documentation…</p>}>

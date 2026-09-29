@@ -1,7 +1,7 @@
 import { resolve, sep } from "node:path";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
-const outputRoot = resolve(repositoryRoot, "docs/dist/client");
+const outputRoot = resolve(repositoryRoot, process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client");
 const base = "";
 const port = Number.parseInt(process.env.PORT ?? "4173", 10);
 const LOCAL_VERCEL_SCRIPTS = new Set([
@@ -35,7 +35,7 @@ const server = Bun.serve({
       if (await index.exists()) return new Response(index);
     }
     const notFound = Bun.file(resolve(outputRoot, "404.html"));
-    return new Response(await notFound.arrayBuffer(), {
+    return new Response((await notFound.exists()) ? await notFound.arrayBuffer() : "Not found", {
       status: 404,
       headers: { "content-type": "text/html; charset=utf-8" },
     });

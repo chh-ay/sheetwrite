@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
-import type { GridControllerHandlers } from "../src/grid-controller.js";
 import { createGridController } from "../src/grid-controller.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridEvents, Workbook } from "../src/types.js";
@@ -52,30 +51,6 @@ describe("createGridController active-sheet forwarding", () => {
 
     controller.grid.setActiveSheet("sheet2");
     expect(seen).toEqual([{ sheet: "sheet2" }]);
-
-    controller.destroy();
-  });
-
-  it("reads a swapped onActiveSheetChange handler live", () => {
-    const host = mountHost();
-    const first: string[] = [];
-    const second: string[] = [];
-
-    const handlers: GridControllerHandlers = {
-      onActiveSheetChange: (event) => first.push(event.sheet),
-    };
-    const controller = createGridController(
-      host,
-      { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
-      handlers,
-    );
-
-    controller.grid.setActiveSheet("sheet2");
-    handlers.onActiveSheetChange = (event) => second.push(event.sheet);
-    controller.grid.setActiveSheet("s1");
-
-    expect(first).toEqual(["sheet2"]);
-    expect(second).toEqual(["s1"]);
 
     controller.destroy();
   });

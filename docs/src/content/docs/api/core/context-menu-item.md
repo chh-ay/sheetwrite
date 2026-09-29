@@ -8,9 +8,18 @@ description: "Built-in, separator, or custom callback row in the right-click men
 Built-in, separator, or custom callback row in the right-click menu.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/grid.ts#L252</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L252"><code>packages/core/src/types/grid.ts#L252</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#context-menu-item-id"><code>id</code></a>
+<a href="#context-menu-item-action"><code>action</code></a>
+<a href="#context-menu-item-on-click"><code>onClick</code></a>
+<a href="#context-menu-item-label"><code>label</code></a>
+<a href="#context-menu-item-shortcut"><code>shortcut</code></a>
+<a href="#context-menu-item-visible"><code>visible</code></a>
+<a href="#context-menu-item-disabled"><code>disabled</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -100,3 +109,24 @@ export interface ContextMenuItem {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>ContextMenuItem</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/context-menu-items/"><code>ContextMenuItems</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

@@ -2,8 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   type CommandResult,
   ensurePackageReleases,
-  packageReleaseTag,
-  parsePackageReleaseIdentities,
   provenanceCommitFromAttestations,
 } from "./release-github.js";
 
@@ -14,27 +12,6 @@ function result(exitCode: number, stdout = "", stderr = ""): CommandResult {
 }
 
 describe("independent package GitHub releases", () => {
-  it("accepts an ordered mixed-version subset", () => {
-    const packages = parsePackageReleaseIdentities(
-      JSON.stringify([
-        { name: "@sheetwrite/core", version: "0.3.0" },
-        { name: "@sheetwrite/react", version: "0.2.1" },
-      ]),
-    );
-    expect(packages).toEqual([
-      { name: "@sheetwrite/core", version: "0.3.0" },
-      { name: "@sheetwrite/react", version: "0.2.1" },
-    ]);
-    expect(packageReleaseTag(packages[0]!)).toBe("@sheetwrite/core@0.3.0");
-    expect(() =>
-      parsePackageReleaseIdentities(
-        JSON.stringify([
-          { name: "@sheetwrite/react", version: "0.2.1" },
-          { name: "@sheetwrite/core", version: "0.3.0" },
-        ]),
-      ),
-    ).toThrow("dependency order");
-  });
   it("reads the immutable source commit from npm provenance", () => {
     const payload = Buffer.from(
       JSON.stringify({

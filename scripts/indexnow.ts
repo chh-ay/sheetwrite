@@ -72,13 +72,15 @@ export async function submitIndexNow(
 
 async function submitProductionSitemap(): Promise<void> {
   if (process.env.VERCEL_ENV !== "production") {
-    console.log("IndexNow submission skipped outside a Vercel production build");
+    process.stdout.write("IndexNow submission skipped outside a production deployment\n");
     return;
   }
-  const sitemap = await readFile(
-    resolve(import.meta.dir, "../docs/dist/client/sitemap.xml"),
-    "utf8",
+  const outputRoot = resolve(
+    import.meta.dir,
+    "..",
+    process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client",
   );
+  const sitemap = await readFile(resolve(outputRoot, "sitemap.xml"), "utf8");
   const urls = urlsFromSitemap(sitemap);
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {

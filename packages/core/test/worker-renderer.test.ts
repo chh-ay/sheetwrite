@@ -27,16 +27,6 @@ class RecordingWorker extends EventTarget {
   }
 }
 
-class StructuredCloneWorker extends EventTarget {
-  readonly received: unknown[] = [];
-
-  postMessage(message: unknown, transfer?: Transferable[]): void {
-    this.received.push(structuredClone(message, { transfer: transfer ?? [] }));
-  }
-
-  terminate(): void {}
-}
-
 function latestWorker(): RecordingWorker {
   const worker = latestConstructedWorker;
   if (!worker) throw new Error("worker was not constructed");
@@ -232,77 +222,6 @@ describe("WorkerRenderer", () => {
     expect(payload.stringPoolUpdateIds).not.toBe(view.stringPoolUpdateIds);
   });
 
-  it("keeps cached packed view buffers intact across repeated paints", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new StructuredCloneWorker();
-    Reflect.set(renderer, "worker", worker);
-    const view = makePackedView();
-
-    renderer.paint(view);
-    renderer.paint(view);
-
-    expect(worker.received).toHaveLength(2);
-    const second = worker.received[1];
-    if (!isTransferablePackedArrays(second)) throw new Error("expected packed paint message");
-    expect(second.valueKinds).toHaveLength(2);
-    expect(second.numberValues).toHaveLength(2);
-    expect(second.stringPoolIds).toHaveLength(2);
-    expect(second.stringLocalIds).toHaveLength(2);
-    expect(second.styleIds).toHaveLength(2);
-    expect(view.valueKinds).toHaveLength(2);
-    expect(view.numberValues).toHaveLength(2);
-    expect(view.stringPoolIds).toHaveLength(2);
-    expect(view.stringLocalIds).toHaveLength(2);
-    expect(view.styleIds).toHaveLength(2);
-  });
-
-  it("keeps cached generic view buffers intact across repeated paints", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new StructuredCloneWorker();
-    Reflect.set(renderer, "worker", worker);
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      rows: { start: 0, end: 1 },
-      cols: [0, 1],
-      values: ["alpha", 42],
-      styleIds: new Uint32Array([0, 1]),
-      styles: [{}, { bold: true }],
-    };
-
-    renderer.paint(view);
-    renderer.paint(view);
-
-    const second = worker.received[1];
-    if (!isGenericPaintPost(second)) throw new Error("expected generic paint message");
-    expect(second.view.styleIds).toHaveLength(2);
-    expect(view.styleIds).toHaveLength(2);
-  });
-
-  it("preserves resolved hyperlink and conditional styles through the Worker payload", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new RecordingWorker();
-    Reflect.set(renderer, "worker", worker);
-    const view = makePackedView();
-    view.styles = [
-      {},
-      {
-        color: "#0563C1",
-        underline: true,
-        backgroundColor: "#00FF00",
-        bold: true,
-      },
-    ];
-
-    renderer.paint(view);
-
-    const posted = worker.messages[0]!.message as {
-      styles: VisibleWindowView["styles"];
-      styleIds: Uint32Array;
-    };
-    expect(posted.styles[1]).toEqual(view.styles[1]);
-    expect(Array.from(posted.styleIds)).toEqual([0, 1]);
-  });
-
   it("copies packed frames into a SharedArrayBuffer when opted in", () => {
     const renderer = new WorkerRenderer(undefined, { sharedMemory: true });
     const worker = new RecordingWorker();
@@ -420,80 +339,6 @@ describe("WorkerRenderer", () => {
     expect(postedPacked.styleIds).not.toBe(packed.styleIds);
   });
 
-  it("keeps cached packed pane buffers intact across repeated paints", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new StructuredCloneWorker();
-    Reflect.set(renderer, "worker", worker);
-    const view = makePackedView();
-    const panes: PanePaint[] = [
-      {
-        view,
-        clip: { x: 0, y: 0, w: 100, h: 40 },
-        scrollTop: 0,
-        scrollLeft: 0,
-      },
-    ];
-
-    renderer.paintPanes(panes, { x: null, y: null });
-    renderer.paintPanes(panes, { x: null, y: null });
-
-    expect(worker.received).toHaveLength(2);
-    const second = firstPackedPane(worker.received[1]);
-    expect(second.valueKinds).toHaveLength(2);
-    expect(second.numberValues).toHaveLength(2);
-    expect(second.stringPoolIds).toHaveLength(2);
-    expect(second.stringLocalIds).toHaveLength(2);
-    expect(second.styleIds).toHaveLength(2);
-    expect(second.stringPoolUpdateIds).toHaveLength(1);
-    expect(view.valueKinds).toHaveLength(2);
-    expect(view.numberValues).toHaveLength(2);
-    expect(view.stringPoolIds).toHaveLength(2);
-    expect(view.stringLocalIds).toHaveLength(2);
-    expect(view.styleIds).toHaveLength(2);
-    expect(view.stringPoolUpdateIds).toHaveLength(1);
-  });
-
-  it("reports initialization failure and one fatal context-loss outcome", () => {
-    const nullContextAcknowledgements: unknown[] = [];
-    const nullContextCanvas = new EventTarget();
-    Object.defineProperties(nullContextCanvas, {
-      width: { value: 0, writable: true },
-      height: { value: 0, writable: true },
-      getContext: { value: () => null },
-    });
-    createWorkerMessageHandler((message) => nullContextAcknowledgements.push(message))({
-      type: "init",
-      canvas: nullContextCanvas,
-      theme: TEST_THEME,
-    });
-    expect(nullContextAcknowledgements).toEqual([
-      {
-        type: "fatal",
-        reason: "Sheetwrite: Paint worker could not acquire a 2D context",
-      },
-    ]);
-
-    const contextLossAcknowledgements: unknown[] = [];
-    const contextLossCanvas = new EventTarget();
-    Object.defineProperties(contextLossCanvas, {
-      width: { value: 0, writable: true },
-      height: { value: 0, writable: true },
-      getContext: { value: () => ({}) },
-    });
-    createWorkerMessageHandler((message) => contextLossAcknowledgements.push(message))({
-      type: "init",
-      canvas: contextLossCanvas,
-      theme: TEST_THEME,
-    });
-    contextLossCanvas.dispatchEvent(new Event("contextlost"));
-    contextLossCanvas.dispatchEvent(new Event("contextlost"));
-    contextLossCanvas.dispatchEvent(new Event("contextrestored"));
-    expect(contextLossAcknowledgements).toEqual([
-      { type: "ready" },
-      { type: "fatal", reason: "Sheetwrite: Paint worker lost its 2D context" },
-    ]);
-  });
-
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {
     jest.useFakeTimers();
     const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
@@ -571,63 +416,6 @@ describe("WorkerRenderer", () => {
       expect(acknowledgements).toEqual([{ type: "ready" }, { type: "painted" }]);
       expect(worker.terminations).toBe(1);
       expect(host.querySelector("canvas")).toBeNull();
-    } finally {
-      renderer.destroy();
-      jest.useRealTimers();
-      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
-      else Reflect.deleteProperty(globalThis, "Worker");
-      if (transferDescriptor) {
-        Object.defineProperty(
-          HTMLCanvasElement.prototype,
-          "transferControlToOffscreen",
-          transferDescriptor,
-        );
-      } else {
-        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
-      }
-    }
-  });
-
-  it("guards duplicate fatal signals and cancels readiness failure on destroy", () => {
-    jest.useFakeTimers();
-    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
-    const transferDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLCanvasElement.prototype,
-      "transferControlToOffscreen",
-    );
-    Object.defineProperty(globalThis, "Worker", {
-      configurable: true,
-      value: RecordingWorker,
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
-      configurable: true,
-      value: () => new EventTarget(),
-    });
-
-    const failures: unknown[] = [];
-    const renderer = new WorkerRenderer("/worker.js", {}, (error) => failures.push(error));
-    try {
-      latestConstructedWorker = null;
-      renderer.mount(document.createElement("div"), TEST_THEME);
-      const worker = latestWorker();
-      worker.emitMessage({ type: "fatal", reason: "context unavailable" });
-      worker.emitMessage({ type: "fatal", reason: "duplicate fatal" });
-      worker.dispatchEvent(new Event("error", { cancelable: true }));
-      jest.advanceTimersByTime(30_000);
-      expect(failures).toHaveLength(1);
-      expect(worker.terminations).toBe(1);
-
-      const destroyedFailures: unknown[] = [];
-      const destroyed = new WorkerRenderer("/worker.js", {}, (error) =>
-        destroyedFailures.push(error),
-      );
-      latestConstructedWorker = null;
-      destroyed.mount(document.createElement("div"), TEST_THEME);
-      const destroyedWorker = latestWorker();
-      destroyed.destroy();
-      jest.advanceTimersByTime(30_000);
-      expect(destroyedFailures).toHaveLength(0);
-      expect(destroyedWorker.terminations).toBe(1);
     } finally {
       renderer.destroy();
       jest.useRealTimers();

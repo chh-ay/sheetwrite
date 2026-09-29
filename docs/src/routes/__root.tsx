@@ -6,6 +6,7 @@ import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import showcaseStylesheet from "../styles/showcase.css?url";
 import siteStylesheet from "../styles/site.css?url";
+import siteShellStylesheet from "../styles/site-shell.css?url";
 import tokensStylesheet from "../styles/tokens.css?url";
 
 const THEME_SCRIPT =
@@ -55,6 +56,8 @@ export const Route = createRootRoute({
         // exposed a half-styled SSR frame on full-page route navigation.
         { rel: "stylesheet", href: tokensStylesheet },
         { rel: "stylesheet", href: siteStylesheet },
+        // Shell refinements layer over site.css; link order is the cascade.
+        { rel: "stylesheet", href: siteShellStylesheet },
         { rel: "stylesheet", href: showcaseStylesheet },
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },

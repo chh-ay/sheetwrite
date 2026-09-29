@@ -8,9 +8,18 @@ description: "Identity, privacy, and timing options for presence coordination."
 Identity, privacy, and timing options for presence coordination.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/collaboration.ts#L40</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/collaboration.ts#L40"><code>packages/core/src/collaboration.ts#L40</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#presence-coordinator-options-actor"><code>actor</code></a>
+<a href="#presence-coordinator-options-privacy"><code>privacy</code></a>
+<a href="#presence-coordinator-options-heartbeat-ms"><code>heartbeatMs</code></a>
+<a href="#presence-coordinator-options-timeout-ms"><code>timeoutMs</code></a>
+<a href="#presence-coordinator-options-max-actors"><code>maxActors</code></a>
+<a href="#presence-coordinator-options-max-ranges-per-actor"><code>maxRangesPerActor</code></a>
+<a href="#presence-coordinator-options-now"><code>now</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -99,3 +108,24 @@ export interface PresenceCoordinatorOptions {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>PresenceCoordinatorOptions</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/presence-coordinator/"><code>PresenceCoordinator</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

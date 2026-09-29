@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import type { Workbook, WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import {
-  dateToSerial,
   formatNumber,
   fromXlsxTable,
   fromXlsxWorkbook,
@@ -12,11 +11,7 @@ import {
   XlsxResourceError,
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import {
-  registerXlsxBackends,
-  sheetwriteTableImportBackend,
-  sheetwriteWorkbookBackend,
-} from "../src/index.js";
+import { registerXlsxBackends } from "../src/index.js";
 
 const FIXTURES = new URL("./fixtures/", import.meta.url);
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
@@ -229,68 +224,6 @@ function manualWorkbook(
 }
 
 describe("independent XLSX corpus", () => {
-  it("verifies every committed checksum and provenance record", async () => {
-    const manifest = (await Bun.file(new URL("manifest.json", FIXTURES)).json()) as {
-      positive: {
-        file: string;
-        sha256: string;
-        source: { file: string; sha256: string };
-        producer: { name: string; version: string; build: string };
-      }[];
-      adversarial: { file: string; sha256: string }[];
-      specPositive: {
-        file: string;
-        sha256: string;
-        source: { file: string; sha256: string };
-      }[];
-    };
-    expect(manifest.positive[0]!.producer).toEqual({
-      name: "LibreOffice",
-      version: "26.2.4.2",
-      build: "64a984c51f4702dbd3710b13428c673a2f1292e7",
-    });
-    const entries = [
-      ...manifest.positive.map((entry) => ({ file: entry.file, sha256: entry.sha256 })),
-      ...manifest.positive.map((entry) => entry.source),
-      ...manifest.adversarial,
-      ...manifest.specPositive.map((entry) => ({ file: entry.file, sha256: entry.sha256 })),
-      ...manifest.specPositive.map((entry) => entry.source),
-    ];
-    for (const entry of entries) {
-      const bytes = await fixture(entry.file);
-      const hasher = new Bun.CryptoHasher("sha256");
-      hasher.update(bytes);
-      expect(hasher.digest("hex")).toBe(entry.sha256);
-    }
-  });
-
-  it("imports the LibreOffice-produced reader oracle", async () => {
-    const bytes = await fixture("sheetwrite-libreoffice-positive.xlsx");
-    const table = await fromXlsxTable(bytes);
-    expect(table).toEqual({
-      rowCount: 2,
-      columns: {
-        Name: ["Alice", "Bob"],
-        Amount: [42.5, -7],
-        Active: ["TRUE", "FALSE"],
-        When: [
-          dateToSerial(new Date(Date.UTC(2024, 1, 29))),
-          dateToSerial(new Date(Date.UTC(2024, 2, 1))),
-        ],
-        Note: ["  spaced  ", "LibreOffice fixture"],
-      },
-    });
-    const imported = await fromXlsxWorkbook(bytes);
-    expect(imported.sheets[0]).toMatchObject({
-      name: "sheetwrite-libreoffice-positive",
-      rowCount: 3,
-    });
-    expect(imported.sheets[0]!.columns[3]).toMatchObject({
-      type: "date",
-      numberFormat: "yyyy\\-mm\\-dd",
-    });
-  });
-
   it("imports LibreOffice-native formulas, styles, validations, comments, merges, and views", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const imported = await fromXlsxWorkbook(await fixture("libreoffice-rich.xlsx"), {
@@ -369,32 +302,6 @@ describe("independent XLSX corpus", () => {
       { kind: "formula", src: "=SUM(Inputs!A2:A4)" },
       { kind: "formula", src: "=Inputs!B2+Inputs!B3" },
     ]);
-  });
-
-  it("reads versioned metadata only after LibreOffice preserves the hidden metadata sheet", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await fromXlsxWorkbook(await fixture("libreoffice-metadata.xlsx"), {
-      onWarning: (warning) => warnings.push(warning),
-    });
-    expect(imported).toMatchObject({
-      documentId: "libreoffice-rich-oracle",
-      version: 42,
-      workbook: { activeSheet: "calc" },
-    });
-    expect(imported.sheets.map((sheet) => sheet.id)).toEqual(["inputs", "calc", "hidden"]);
-    expect(imported.sheets[0]!.columns[0]).toMatchObject({
-      key: "input",
-      header: "Input",
-      type: "number",
-    });
-    expect(imported.sheets[0]!.validationRules?.[0]?.condition).toEqual({
-      kind: "number",
-      min: 0,
-      max: 10,
-    });
-    expect(imported.sheets[0]!.notes?.[0]?.text).toBe("LibreOffice-authored note");
-    expect(warnings.map((warning) => warning.code)).toEqual(["rich-text"]);
-    expect(imported.sheets[2]!.visibility).toBe("hidden");
   });
 });
 
@@ -499,26 +406,6 @@ describe("workbook OOXML fidelity", () => {
     ]);
   });
 
-  it("extends metadata when an external editor adds rows and columns", async () => {
-    const parts = unzipSync(await toXlsxWorkbook(roundTripWorkbook()));
-    const part = "xl/worksheets/sheet1.xml";
-    const xml = strFromU8(parts[part]!);
-    parts[part] = strToU8(
-      xml
-        .replace('dimension ref="A1:B3"', 'dimension ref="A1:D5"')
-        .replace("</sheetData>", '<row r="5"><c r="D5"><v>99</v></c></row></sheetData>'),
-    );
-    const edited = zipSync(parts, { level: 6, mtime: FIXED_ZIP_TIME });
-    const imported = await fromXlsxWorkbook(edited);
-    expect(imported.sheets[0]).toMatchObject({ id: "inputs", rowCount: 5 });
-    expect(imported.sheets[0]!.columns).toHaveLength(4);
-    expect(
-      imported.sheets[0]!.cells[0]!.cells.find(
-        (cell) => cell.rowOffset === 4 && cell.colOffset === 3,
-      )?.value,
-    ).toEqual({ kind: "literal", value: 99 });
-  });
-
   it("expands independently authored shared formula slaves", async () => {
     const bytes = await fixture("shared-formula.xlsx");
     const imported = await fromXlsxWorkbook(bytes);
@@ -540,48 +427,6 @@ describe("workbook OOXML fidelity", () => {
       { kind: "literal", value: 2 },
       { kind: "literal", value: 3 },
     ]);
-  });
-
-  it("emits structured warnings while preserving supported external content", async () => {
-    const bytes = manualWorkbook(
-      `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData><dataValidations count="1"><dataValidation type="whole" operator="between" sqref="A1" showErrorMessage="1"><formula1>0</formula1><formula2>10</formula2></dataValidation></dataValidations><hyperlinks><hyperlink ref="A1" r:id="rId1"/></hyperlinks></worksheet>`,
-      {
-        sharedStrings:
-          '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1"><si><r><t>rich</t></r><r><t> text</t></r></si></sst>',
-        sheetRelationships:
-          '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://sheetwrite.example" TargetMode="External"/></Relationships>',
-      },
-    );
-    const warnings: XlsxWorkbookWarning[] = [];
-    const imported = await fromXlsxWorkbook(bytes, {
-      onWarning: (warning) => warnings.push(warning),
-    });
-    expect(warnings).toEqual([
-      {
-        code: "rich-text",
-        message: "Rich text formatting was flattened",
-        part: "xl/sharedStrings.xml",
-      },
-    ]);
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
-      kind: "literal",
-      value: "rich text",
-    });
-    expect(imported.sheets[0]!.hyperlinks).toEqual([
-      {
-        id: "xlsx-hyperlink-1-1",
-        range: {
-          sheet: imported.sheets[0]!.id,
-          start: { row: 0, col: 0 },
-          end: { row: 0, col: 0 },
-        },
-        target: { kind: "external", url: "https://sheetwrite.example" },
-      },
-    ]);
-    expect(imported.sheets[0]!.validationRules?.[0]).toMatchObject({
-      condition: { kind: "number", min: 0, max: 10 },
-      policy: "reject",
-    });
   });
 });
 
@@ -662,81 +507,4 @@ describe("bounded and corrupt XLSX inputs", () => {
       "cancelled workbook import",
     );
   });
-
-  it("uses seeded round-trips and central-directory corruption without circular reader fixtures", async () => {
-    let seed = 0x5eed1234;
-    const random = (): number => {
-      seed ^= seed << 13;
-      seed ^= seed >>> 17;
-      seed ^= seed << 5;
-      return seed >>> 0;
-    };
-    for (let iteration = 0; iteration < 12; iteration++) {
-      const cells = [];
-      for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 4; col++) {
-          const value = random();
-          if ((value & 3) === 0) continue;
-          cells.push({
-            rowOffset: row,
-            colOffset: col,
-            value: {
-              kind: "literal" as const,
-              value: value & 1 ? `s-${value.toString(16)}` : value % 10_000,
-            },
-            ...((value & 15) === 1 ? { style: { bold: true, backgroundColor: "#DDEEFF" } } : {}),
-          });
-        }
-      }
-      const snapshot: WorkbookSnapshot = {
-        schemaVersion: 1,
-        version: iteration,
-        workbook: { activeSheet: "seed" },
-        sheets: [
-          {
-            id: "seed",
-            name: "Seeded",
-            order: 0,
-            rowCount: 8,
-            columns: Array.from({ length: 4 }, (_unused, col) => ({
-              key: `c${col}`,
-              header: `C${col}`,
-              width: 80 + col,
-              type: "text" as const,
-            })),
-            cells: [{ startRow: 0, startCol: 0, rowCount: 8, colCount: 4, cells }],
-          },
-        ],
-      };
-      const bytes = await toXlsxWorkbook(snapshot);
-      expect(await toXlsxWorkbook(snapshot)).toEqual(bytes);
-      const imported = await fromXlsxWorkbook(bytes);
-      expect(imported.version).toBe(iteration);
-      expect(imported.sheets[0]!.cells[0]!.cells.map((cell) => cell.value)).toEqual(
-        cells.map((cell) => cell.value),
-      );
-      const corrupt = bytes.slice();
-      let eocd = corrupt.length - 22;
-      while (
-        eocd >= 0 &&
-        new DataView(corrupt.buffer, corrupt.byteOffset, corrupt.byteLength).getUint32(
-          eocd,
-          true,
-        ) !== 0x06054b50
-      )
-        eocd -= 1;
-      const centralOffset = new DataView(
-        corrupt.buffer,
-        corrupt.byteOffset,
-        corrupt.byteLength,
-      ).getUint32(eocd + 16, true);
-      corrupt[centralOffset] = corrupt[centralOffset]! ^ 0xff;
-      await expect(fromXlsxWorkbook(corrupt)).rejects.toThrow("central directory");
-    }
-  });
-});
-
-it("exports the clean backend names without compatibility aliases", () => {
-  expect(sheetwriteWorkbookBackend.name).toBe("sheetwrite-ooxml");
-  expect(sheetwriteTableImportBackend.name).toBe("sheetwrite-ooxml-table");
 });

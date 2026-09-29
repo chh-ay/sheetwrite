@@ -1,8 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bun run build:docs:production",
-  "installCommand": "bun install --frozen-lockfile",
-  "outputDirectory": "docs/dist/client",
-  "framework": null,
-  "cleanUrls": false
+  "git": {
+    "deploymentEnabled": false
+  },
+  "buildCommand": "echo 'Deploy the tested CI output with vercel deploy --prebuilt.' >&2; exit 1",
+  "installCommand": "",
+  "framework": null
 }

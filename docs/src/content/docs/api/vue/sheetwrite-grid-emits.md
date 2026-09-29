@@ -8,9 +8,26 @@ description: "Event payloads emitted by the Vue components, keyed by template ev
 Event payloads emitted by the Vue components, keyed by template event name.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/vue/src/index.ts#L121</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L121"><code>packages/vue/src/index.ts#L121</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheetwrite-grid-emits-row-delta"><code>row-delta</code></a>
+<a href="#sheetwrite-grid-emits-grid-change"><code>grid-change</code></a>
+<a href="#sheetwrite-grid-emits-selection-change"><code>selection-change</code></a>
+<a href="#sheetwrite-grid-emits-viewport-change"><code>viewport-change</code></a>
+<a href="#sheetwrite-grid-emits-edit-begin"><code>edit-begin</code></a>
+<a href="#sheetwrite-grid-emits-edit-commit"><code>edit-commit</code></a>
+<a href="#sheetwrite-grid-emits-search"><code>search</code></a>
+<a href="#sheetwrite-grid-emits-command-state-change"><code>command-state-change</code></a>
+<a href="#sheetwrite-grid-emits-active-sheet-change"><code>active-sheet-change</code></a>
+<a href="#sheetwrite-grid-emits-mutation-rejected"><code>mutation-rejected</code></a>
+<a href="#sheetwrite-grid-emits-renderer-fallback"><code>renderer-fallback</code></a>
+<a href="#sheetwrite-grid-emits-datasource-error"><code>datasource-error</code></a>
+<a href="#sheetwrite-grid-emits-export-error"><code>export-error</code></a>
+<a href="#sheetwrite-grid-emits-ready"><code>ready</code></a>
+<a href="#sheetwrite-grid-emits-initialization-error"><code>initialization-error</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>15</span>
 
@@ -178,3 +195,20 @@ export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/vue</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetwriteGridEmits</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/vue/sheetwrite/"><code>Sheetwrite</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid/"><code>SheetwriteGrid</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

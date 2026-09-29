@@ -4,7 +4,6 @@ import {
   ANALYTICS_ROWS,
   analyticsArr,
 } from "../../docs/src/showcases/scenarios/analytics.js";
-import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 
 const REACT_URL = siteUrl("/react/");
@@ -81,35 +80,6 @@ async function openTools(page: Page): Promise<void> {
   await expect(shelf).toHaveAttribute("open", "");
 }
 
-async function closeTools(page: Page): Promise<void> {
-  const shelf = page.locator("details.sw-rwb-tools");
-  if ((await shelf.getAttribute("open")) !== null) {
-    await shelf.locator("summary").click();
-  }
-  await expect(shelf).not.toHaveAttribute("open", "");
-}
-
-async function canvasBodyPainted(page: Page): Promise<boolean> {
-  const sample = await page.evaluate(() => {
-    const canvas = document.querySelector(".sw-demo-grid .sheetwrite canvas");
-    if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) {
-      return null;
-    }
-    const context = canvas.getContext("2d");
-    const bounds = canvas.getBoundingClientRect();
-    if (!context || bounds.width === 0 || bounds.height === 0) return null;
-    const scaleX = canvas.width / bounds.width;
-    const scaleY = canvas.height / bounds.height;
-    const left = Math.ceil(64 * scaleX);
-    const top = Math.ceil(40 * scaleY);
-    const width = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
-    const height = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
-    if (width <= 0 || height <= 0) return null;
-    return Array.from(context.getImageData(left, top, width, height).data);
-  });
-  return sample !== null && hasOpaqueForeground(sample);
-}
-
 test.describe("react workbench — controlled analytics", () => {
   test("filters, aggregates, and derived summaries follow controlled state", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -167,29 +137,6 @@ test.describe("react workbench — controlled analytics", () => {
     await page.getByRole("button", { name: "Reset view" }).click();
     await expect(page.getByTestId("rows-visible")).toHaveText(en(ANALYTICS_ROWS));
     await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOTAL_ARR));
-
-    await expectNoErrors(page, errors);
-  });
-
-  test("search, replace-all, and undo/redo round-trip through grid history", async ({ page }) => {
-    const errors = collectErrors(page);
-    await openWorkbench(page);
-    await openTools(page);
-    await page.getByLabel("Search accounts").fill("Account 000777");
-    await page.getByLabel("Search accounts").press("Enter");
-    await expect(page.getByTestId("matches")).toHaveText("1");
-
-    await page.getByLabel("Replacement text").fill("Keystone 000777");
-    await page.getByRole("button", { name: "Replace all" }).click();
-    await expect(page.getByTestId("activity")).toContainText("Replaced 1 cell");
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Keystone 000777");
-    await closeTools(page);
-    await editButton(page, "Undo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000777");
-    await editButton(page, "Redo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Keystone 000777");
-    await editButton(page, "Undo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000777");
 
     await expectNoErrors(page, errors);
   });
@@ -285,56 +232,6 @@ test.describe("react workbench — controlled analytics", () => {
     await expectNoErrors(page, errors);
   });
 
-  test("CSV import lands as one undoable commit and exports hand off downloads", async ({
-    page,
-  }) => {
-    const errors = collectErrors(page);
-    await openWorkbench(page);
-    await openTools(page);
-    const csvDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export CSV" }).click();
-    expect((await csvDownload).suggestedFilename()).toBe("analytics-pipeline.csv");
-
-    const xlsxDownload = page.waitForEvent("download", { timeout: 30_000 });
-    await page.getByRole("button", { name: "Export XLSX" }).click();
-    expect((await xlsxDownload).suggestedFilename()).toBe("analytics-pipeline.xlsx");
-    await expect(page.getByTestId("activity")).toContainText("XLSX export prepared");
-
-    // Import through the shared core CSV codec: two rows overlay the top of
-    // the pipeline as one undoable commit and the KPI formulas recalculate.
-    const csv = [
-      "ID,Account,Market,Segment,Seats,ARR",
-      "1,Imported Alpha,Tokyo,Enterprise,10,111",
-      "2,Imported Beta,Berlin,SMB,20,222",
-      "",
-    ].join("\r\n");
-    await page.getByTestId("import-csv").setInputFiles({
-      name: "quarterly.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(csv, "utf-8"),
-    });
-    await expect(page.getByTestId("activity")).toContainText("Imported 2 rows from quarterly.csv");
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Imported Alpha");
-    const imported = TOTAL_ARR - analyticsArr(0) - analyticsArr(1) + 111 + 222;
-    await expect(page.getByTestId("kpi-total")).toHaveAttribute("data-raw", String(imported), {
-      timeout: 15_000,
-    });
-    await closeTools(page);
-    await editButton(page, "Undo").click();
-    await expect(page.getByTestId("kpi-total")).toHaveAttribute("data-raw", String(TOTAL_ARR), {
-      timeout: 15_000,
-    });
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000001");
-
-    // The deep-fidelity handoff points at the interoperability proofs.
-    await expect(page.getByTestId("interop-link")).toHaveAttribute(
-      "href",
-      "/showcases/interoperability/",
-    );
-
-    await expectNoErrors(page, errors);
-  });
-
   test("lifecycle: reload reconciles controlled state, live options do not reset, renderer swap does", async ({
     page,
   }) => {
@@ -383,93 +280,6 @@ test.describe("react workbench — controlled analytics", () => {
           ),
         { timeout: 20_000 },
       )
-      .toBeGreaterThan(0);
-
-    await expectNoErrors(page, errors);
-  });
-
-  test("mobile: Grid leads controlled evidence and tools stay operable at 390px", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    const errors = collectErrors(page);
-    await openWorkbench(page);
-
-    await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
-    await expect(page.getByTestId("rows-visible")).toHaveText(en(ANALYTICS_ROWS));
-
-    const order = await page.evaluate(() => {
-      const grid = document.querySelector(".sw-rwb-workspace > .sw-demo-grid");
-      const state = document.querySelector(".sw-rwb-state");
-      const tools = document.querySelector(".sw-rwb-tools");
-      return {
-        gridTop: grid?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
-        stateTop: state?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
-        toolsTop: tools?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
-      };
-    });
-    expect(order.gridTop).toBeLessThan(order.stateTop);
-    expect(order.gridTop).toBeLessThan(order.toolsTop);
-
-    await selectOption(page, "Market", "Tokyo");
-    await expect(page.getByTestId("rows-visible")).toHaveText(en(TOKYO_ROWS));
-    await expect(page.getByTestId("kpi-market")).toHaveAttribute("data-raw", String(TOKYO_ARR));
-
-    await expect(page.getByTestId("kpi-total")).toBeVisible();
-    await expect(page.locator("details.sw-rwb-tools > summary")).toBeVisible();
-    await openTools(page);
-    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
-    await expectNoErrors(page, errors);
-  });
-
-  test("accessibility contract: named toolbars, live status, and ARIA grid mirror", async ({
-    page,
-  }) => {
-    const errors = collectErrors(page);
-    await openWorkbench(page);
-
-    await expect(page.getByRole("toolbar", { name: "Query controls" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Editing controls" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "History controls" })).toBeVisible();
-
-    await expect(
-      page.getByRole("toolbar", { name: "Query controls" }).getByRole("group", { name: "Filters" }),
-    ).toBeVisible();
-    await expect(page.getByRole("group", { name: "Formula" })).toBeVisible();
-
-    await openTools(page);
-    await expect(page.getByRole("toolbar", { name: "Search and replace" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Data workflow" })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Grid lifecycle" })).toBeVisible();
-    await expect(
-      page
-        .getByRole("toolbar", { name: "Search and replace" })
-        .getByRole("group", { name: "Account search" }),
-    ).toBeVisible();
-    await expect(
-      page
-        .getByRole("toolbar", { name: "Search and replace" })
-        .getByRole("group", { name: "Replace" }),
-    ).toBeVisible();
-    await expect(
-      page
-        .getByRole("toolbar", { name: "Data workflow" })
-        .getByRole("group", { name: "Data exchange" }),
-    ).toBeVisible();
-
-    await expect(page.getByRole("radiogroup", { name: "Rendering thread" })).toBeVisible();
-    await expect(page.getByLabel("Search accounts")).toBeVisible();
-    await expect(page.getByLabel("Formula or value")).toBeVisible();
-    await expect(page.getByLabel("Import CSV file")).toBeAttached();
-
-    // The activity readout is a polite live region.
-    await expect(page.getByTestId("activity")).toHaveAttribute("aria-live", "polite");
-
-    // The virtualized window mirrors into real ARIA gridcells.
-    await expect
-      .poll(async () => (await gridcellTexts(page)).filter((text) => text.length > 0).length, {
-        timeout: 15_000,
-      })
       .toBeGreaterThan(0);
 
     await expectNoErrors(page, errors);

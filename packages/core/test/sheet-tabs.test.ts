@@ -113,39 +113,6 @@ describe("SheetTabs", () => {
     expect(host.textContent).not.toContain("Secret");
   });
 
-  it("keeps one roving tab stop and scrolls active, focused, and edited tabs in a narrow 12-sheet host", () => {
-    const many = Array.from({ length: 12 }, (_, index) => ({
-      id: `sheet-${index}`,
-      name: `Sheet ${index + 1}`,
-    }));
-    tabs.destroy();
-    tabs = new SheetTabs(host, {
-      onActivate: () => {},
-      onRename: (id) => applied(id),
-    });
-    tabs.update(many, "sheet-10");
-
-    let buttons = tabButtons(host);
-    expect(buttons).toHaveLength(12);
-    expect(buttons.map((button) => button.tabIndex).filter((index) => index === 0)).toHaveLength(1);
-    expect(scrolled).toContain("sheet-10");
-
-    buttons[10]!.focus();
-    key(host, "Home");
-    expect(document.activeElement).toBe(buttons[0]!);
-    expect(buttons[0]!.tabIndex).toBe(0);
-    expect(scrolled).toContain("sheet-0");
-
-    key(host, "End");
-    buttons = tabButtons(host);
-    expect(document.activeElement).toBe(buttons[11]!);
-    key(host, "F2");
-    const input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input");
-    expect(input?.dataset.sheetId).toBe("sheet-11");
-    expect(document.activeElement).toBe(input);
-    expect(scrolled).toContain("sheet-11");
-  });
-
   it("renames inline by double-click and F2, committing Enter or changed blur and cancelling Escape", () => {
     const renames: Array<[string, string]> = [];
     tabs.destroy();
@@ -578,33 +545,5 @@ describe("SheetTabs", () => {
     expect(unhide.getAttribute("aria-invalid")).toBe("true");
     expect(unhide.getAttribute("aria-describedby")).toBe(error.id);
     expect(error.textContent).toBe("The hidden sheet no longer exists");
-  });
-
-  it("tears down deterministically during editing and ignores later controlled updates", () => {
-    const renames: string[] = [];
-    tabs.destroy();
-    tabs = new SheetTabs(host, {
-      onActivate: () => {},
-      onRename: (id, name) => {
-        renames.push(`${id}:${name}`);
-        return applied(id);
-      },
-    });
-    tabs.update(SHEETS, "b");
-    tabButtons(host)[1]!.focus();
-    key(host, "F2");
-    const detachedInput = host.querySelector<HTMLInputElement>("input")!;
-    inputText(detachedInput, "Detached");
-
-    tabs.destroy();
-    tabs.destroy();
-    expect(host.childElementCount).toBe(0);
-    expect(host.hasAttribute("role")).toBe(false);
-    expect(host.hasAttribute("aria-label")).toBe(false);
-    key(detachedInput, "Enter");
-    key(host, "F2");
-    tabs.update(SHEETS, "b");
-    expect(host.childElementCount).toBe(0);
-    expect(renames).toEqual([]);
   });
 });

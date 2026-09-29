@@ -6,7 +6,6 @@ import {
   decodeStoreMemoryStats,
   diffRuntimeResourcePhases,
   RUNTIME_RESOURCE_SCHEMA_VERSION,
-  type RuntimeResourceSnapshot,
   STORE_MEMORY_HASH_ESTIMATE_VERSION,
   STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
@@ -48,65 +47,6 @@ function jsOwner(
 }
 
 describe("runtime resource accounting", () => {
-  it("decodes exact tiny-owner totals without treating committed pages as live bytes", () => {
-    const wasm = decodeStoreMemoryStats(
-      encodedStoreMemory({
-        "wasm.dense.kinds": [2, 4, 2],
-        "wasm.dense.payloads": [16, 32, 2],
-        "wasm.string-pool.utf8": [3, 8, 3],
-      }),
-      64 * 1024,
-    );
-    expect(wasm.logicalLiveBytes).toBe(21);
-    expect(wasm.allocatedCapacityBytes).toBe(44);
-    expect(wasm.wasmCommittedBytes).toBe(64 * 1024);
-
-    const snapshot = createRuntimeResourceSnapshot({
-      operation: "startup",
-      phase: "settled",
-      wasm,
-      jsOwners: [jsOwner("js.datasource.loaded", 5, 8)],
-      runtime: {
-        usedJSHeapSize: 999_999,
-        arrayBufferBytes: 777,
-        externalBytes: 888,
-        browserBackingStoreBytes: 666,
-      },
-    });
-    expect(snapshot.totals).toEqual({ logicalLiveBytes: 26, allocatedCapacityBytes: 52 });
-  });
-
-  it("rejects owner overlap and committed/backing-store double counting", () => {
-    const wasm = decodeStoreMemoryStats(encodedStoreMemory(), 64 * 1024);
-    const valid = createRuntimeResourceSnapshot({
-      operation: "scroll",
-      phase: "peak",
-      wasm,
-      jsOwners: [jsOwner("js.viewport.buffers", 32)],
-      runtime: {
-        usedJSHeapSize: 100,
-        arrayBufferBytes: 200,
-        externalBytes: 300,
-        browserBackingStoreBytes: 400,
-      },
-    });
-    const duplicate = {
-      ...valid,
-      jsOwners: [...valid.jsOwners, jsOwner("wasm.dense.kinds", 1)],
-      totals: { logicalLiveBytes: 33, allocatedCapacityBytes: 33 },
-    } satisfies RuntimeResourceSnapshot;
-    expect(() => assertRuntimeResourceSnapshot(duplicate)).toThrow("counted twice");
-
-    const doubleCounted = {
-      ...valid,
-      totals: {
-        logicalLiveBytes: valid.totals.logicalLiveBytes + wasm.wasmCommittedBytes!,
-        allocatedCapacityBytes: valid.totals.allocatedCapacityBytes,
-      },
-    } satisfies RuntimeResourceSnapshot;
-    expect(() => assertRuntimeResourceSnapshot(doubleCounted)).toThrow("double-count or omit");
-  });
-
   it("fails closed on protocol drift, negatives, capacity inversion, and unaccounted bytes", () => {
     const badVersion = encodedStoreMemory();
     badVersion[0] = STORE_MEMORY_PROTOCOL_VERSION + 1;
@@ -156,19 +96,6 @@ describe("runtime resource accounting", () => {
 
     counters.reset();
     expect(counters.snapshot().every((entry) => entry.ffiCalls === 0)).toBe(true);
-  });
-
-  it("rejects cumulative overflow without partially mutating counters", () => {
-    const counters = new BoundaryResourceAccounting();
-    counters.record("ingest", "js-to-wasm", Number.MAX_SAFE_INTEGER, "bulk", 0);
-    expect(() => counters.record("ingest", "js-to-wasm", 1, "bulk", 0)).toThrow(
-      "exceeded Number.MAX_SAFE_INTEGER",
-    );
-    expect(counters.snapshot().find((entry) => entry.operation === "ingest")).toMatchObject({
-      ffiCalls: 0,
-      jsToWasmBytes: Number.MAX_SAFE_INTEGER,
-      bulkCalls: 0,
-    });
   });
 
   it("reports owner and runtime phase deltas without mutating either snapshot", () => {

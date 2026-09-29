@@ -8,9 +8,31 @@ description: "Serializable complete state for one workbook sheet."
 Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L336</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L336"><code>packages/core/src/types/document.ts#L336</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheet-snapshot-id"><code>id</code></a>
+<a href="#sheet-snapshot-name"><code>name</code></a>
+<a href="#sheet-snapshot-order"><code>order</code></a>
+<a href="#sheet-snapshot-visibility"><code>visibility</code></a>
+<a href="#sheet-snapshot-row-count"><code>rowCount</code></a>
+<a href="#sheet-snapshot-columns"><code>columns</code></a>
+<a href="#sheet-snapshot-frozen-rows"><code>frozenRows</code></a>
+<a href="#sheet-snapshot-frozen-cols"><code>frozenCols</code></a>
+<a href="#sheet-snapshot-row-meta"><code>rowMeta</code></a>
+<a href="#sheet-snapshot-merges"><code>merges</code></a>
+<a href="#sheet-snapshot-conditional-formats"><code>conditionalFormats</code></a>
+<a href="#sheet-snapshot-hyperlinks"><code>hyperlinks</code></a>
+<a href="#sheet-snapshot-validation-rules"><code>validationRules</code></a>
+<a href="#sheet-snapshot-protected-ranges"><code>protectedRanges</code></a>
+<a href="#sheet-snapshot-notes"><code>notes</code></a>
+<a href="#sheet-snapshot-sort-keys"><code>sortKeys</code></a>
+<a href="#sheet-snapshot-filters"><code>filters</code></a>
+<a href="#sheet-snapshot-row-groups"><code>rowGroups</code></a>
+<a href="#sheet-snapshot-tables"><code>tables</code></a>
+<a href="#sheet-snapshot-cells"><code>cells</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>20</span>
 
@@ -228,3 +250,25 @@ export interface SheetSnapshot {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>SheetSnapshot</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/document-op/"><code>DocumentOp</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/workbook-snapshot/"><code>WorkbookSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

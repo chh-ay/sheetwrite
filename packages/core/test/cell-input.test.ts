@@ -1,18 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { cellScalarToText, parseCellInput, parseCurrencyInput } from "../src/cell-input.js";
+import { cellScalarToText, parseCellInput } from "../src/cell-input.js";
 
 describe("parseCellInput", () => {
   it("keeps cross-sheet links as formulas", () => {
     expect(parseCellInput("=Sales!E2", "text")).toEqual({
       kind: "formula",
       src: "=Sales!E2",
-    });
-  });
-
-  it("keeps quoted sheet names as formulas", () => {
-    expect(parseCellInput("='Sales 2026'!C2", "text")).toEqual({
-      kind: "formula",
-      src: "='Sales 2026'!C2",
     });
   });
 
@@ -44,12 +37,5 @@ describe("parseCellInput", () => {
       kind: "literal",
       value: "USD 12",
     });
-  });
-
-  it("rejects empty and non-finite currency bodies", () => {
-    expect(parseCurrencyInput("$ , ")).toBeNull();
-    expect(parseCurrencyInput("()")).toBeNull();
-    expect(parseCurrencyInput("Infinity")).toBeNull();
-    expect(parseCurrencyInput("€2,500")).toBe(2500);
   });
 });

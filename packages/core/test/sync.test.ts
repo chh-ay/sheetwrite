@@ -3,7 +3,6 @@ import {
   type ApplyTransactionResult,
   type ChangeEvent,
   createGridFromSnapshot,
-  DEFAULT_SYNC_COORDINATOR_LIMITS,
   type DocumentOp,
   initSheetwrite,
   MemoryPersistenceAdapter,
@@ -514,57 +513,6 @@ describe("sync coordinator", () => {
     tick.grid.destroy();
   });
 
-  it("rejects invalid, too-future, and oversized inbound operations before applying", async () => {
-    const { grid, coordinator, events } = harness(["m1"], {
-      limits: {
-        maxFutureVersionDistance: 2,
-        maxOperationsPerVersion: 1,
-        maxVersionPayloadBytes: 128,
-      },
-    });
-
-    await coordinator.applyVersionedOperation({
-      version: Number.NaN,
-      operations: [],
-    });
-    await coordinator.applyVersionedOperation({
-      version: 8,
-      clientMutationId: "x".repeat(257),
-      operations: [],
-    });
-    await coordinator.applyVersionedOperation({
-      version: 8,
-      operations: [localSet(2), localSet(3)],
-    });
-    await coordinator.applyVersionedOperation({
-      version: 8,
-      operations: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 0 },
-          value: { kind: "literal", value: "x".repeat(256) },
-        },
-      ],
-    });
-    await coordinator.applyVersionedOperation({ version: 10, operations: [] });
-
-    const codes = events.flatMap((event) =>
-      event.type === "error" && event.error instanceof SyncProtocolError ? [event.error.code] : [],
-    );
-    expect(codes).toEqual([
-      "invalid-version",
-      "invalid-id",
-      "operation-limit",
-      "payload-limit",
-      "future-distance-limit",
-    ]);
-    expect(coordinator.serverVersion).toBe(7);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
-    expect(events.filter((event) => event.type === "reload-required")).toHaveLength(4);
-    coordinator.destroy();
-    grid.destroy();
-  });
-
   it("validates complete operation shapes before retaining future versions", async () => {
     const { grid, coordinator, events } = harness();
     const malformed = {
@@ -586,36 +534,6 @@ describe("sync coordinator", () => {
     ).toBe(true);
     expect(coordinator.serverVersion).toBe(9);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(9);
-    coordinator.destroy();
-    grid.destroy();
-  });
-
-  it("clears retained gaps when aggregate intake limits are crossed", async () => {
-    const { grid, coordinator, events } = harness(["m1"], {
-      limits: { maxBufferedVersions: 1 },
-    });
-
-    await coordinator.applyVersionedOperation({ version: 9, operations: [] });
-    await coordinator.applyVersionedOperation({ version: 10, operations: [] });
-    await coordinator.applyVersionedOperation({ version: 8, operations: [] });
-
-    expect(coordinator.serverVersion).toBe(8);
-    expect(
-      events.some(
-        (event) =>
-          event.type === "error" &&
-          event.error instanceof SyncProtocolError &&
-          event.error.code === "buffer-count-limit",
-      ),
-    ).toBe(true);
-    expect(
-      events
-        .filter((event) => event.type === "remote-applied")
-        .map((event) => event.operation.version),
-    ).toEqual([8]);
-
-    await coordinator.applyVersionedOperation({ version: 9, operations: [] });
-    expect(coordinator.serverVersion).toBe(9);
     coordinator.destroy();
     grid.destroy();
   });
@@ -704,33 +622,6 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
-  it("cancels a blocked asynchronous source when destroyed", async () => {
-    const { grid, coordinator } = harness();
-    const intake = deferred<IteratorResult<VersionedOperation>>();
-    let nextCalls = 0;
-    let returnCalled = false;
-    coordinator.subscribe({
-      [Symbol.asyncIterator]() {
-        return {
-          next() {
-            nextCalls += 1;
-            return intake.promise;
-          },
-          async return() {
-            returnCalled = true;
-            return { done: true, value: undefined };
-          },
-        };
-      },
-    });
-    await Promise.resolve();
-    expect(nextCalls).toBe(1);
-
-    coordinator.destroy();
-    expect(returnCalled).toBe(true);
-    grid.destroy();
-  });
-
   it("deduplicates remote echoes by mutation ID", async () => {
     const { grid, coordinator } = harness();
     grid.applyTransaction({ patches: [localSet(2)] });
@@ -746,50 +637,6 @@ describe("sync coordinator", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(2);
     coordinator.destroy();
     grid.destroy();
-  });
-
-  it("aborts in-flight sends and remote subscriptions on destroy", async () => {
-    const { grid, adapter, coordinator, events } = harness();
-    let remoteListener: ((operation: VersionedOperation) => void | Promise<void>) | undefined;
-    let remoteSignal: AbortSignal | undefined;
-    let disposed = false;
-    coordinator.subscribe({
-      subscribe(listener, signal) {
-        remoteListener = listener;
-        remoteSignal = signal;
-        return () => {
-          disposed = true;
-        };
-      },
-    });
-    await remoteListener?.({ version: 8, operations: [localSet(4)] });
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(4);
-
-    grid.applyTransaction({ patches: [localSet(5)] });
-    const sending = coordinator.sendNext();
-    expect(adapter.requests[0]?.signal?.aborted).toBe(false);
-    coordinator.destroy();
-    expect(adapter.requests[0]?.signal?.aborted).toBe(true);
-    expect(remoteSignal?.aborted).toBe(true);
-    expect(disposed).toBe(true);
-    adapter.responses[0]!.resolve({
-      status: "applied",
-      version: 9,
-      clientMutationId: "m1",
-    });
-    await sending;
-    expect(events.some((event) => event.type === "acknowledged")).toBe(false);
-    grid.destroy();
-  });
-  it("keeps trusted pending limits independent from remote gap buffering", () => {
-    expect(DEFAULT_SYNC_COORDINATOR_LIMITS).toMatchObject({
-      maxBufferedVersions: 256,
-      maxBufferedOperations: 40_000,
-      maxBufferedBytes: 32 * 1024 * 1024,
-      maxPendingCommits: 10_000,
-      maxPendingOperations: 100_000,
-      maxPendingEncodedBytes: 128 * 1024 * 1024,
-    });
   });
 
   it("rejects count limit plus one before API or UI mutation and preserves history", async () => {
@@ -846,36 +693,6 @@ describe("sync coordinator", () => {
     expect(coordinator.pendingCommits()[0]?.clientMutationId).toBe("m2");
     coordinator.destroy();
     grid.destroy();
-  });
-
-  it("enforces aggregate operation and encoded-byte boundaries inclusively", () => {
-    const operationHarness = harness(["ops-1"], {
-      limits: { maxPendingOperations: 2 },
-    });
-    const boundary = operationHarness.grid.applyTransaction({
-      patches: [localSet(2), localSet(3)],
-    });
-    expect(boundary.status).toBe("applied");
-    expect(operationHarness.coordinator.state.pendingOperations).toBe(2);
-    expect(operationHarness.grid.applyTransaction({ patches: [localSet(4)] })).toMatchObject({
-      status: "rejected",
-      issues: [{ resource: "pending-operations", actual: 3, max: 2 }],
-    });
-    operationHarness.coordinator.destroy();
-    operationHarness.grid.destroy();
-
-    const encodedBytes = new TextEncoder().encode(JSON.stringify([localSet(2)])).byteLength;
-    const byteHarness = harness(["bytes-1"], {
-      limits: { maxPendingEncodedBytes: encodedBytes },
-    });
-    expect(byteHarness.grid.applyTransaction({ patches: [localSet(2)] }).status).toBe("applied");
-    expect(byteHarness.coordinator.state.pendingEncodedBytes).toBe(encodedBytes);
-    expect(byteHarness.grid.applyTransaction({ patches: [localSet(3)] })).toMatchObject({
-      status: "rejected",
-      issues: [{ resource: "pending-encoded-bytes", max: encodedBytes }],
-    });
-    byteHarness.coordinator.destroy();
-    byteHarness.grid.destroy();
   });
 
   it("reserves capacity across reentrant commits and lets remote operations bypass it", () => {

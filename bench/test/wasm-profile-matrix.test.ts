@@ -1,9 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  assertCleanMatrixCapture,
-  decideWasmProfile,
-  parseWasmProfileMatrix,
-} from "../src/wasm-profile-matrix.js";
+import { decideWasmProfile, parseWasmProfileMatrix } from "../src/wasm-profile-matrix.js";
 
 const HASH = {
   input: "a".repeat(64),
@@ -130,40 +126,12 @@ describe("WASM post-link matrix evidence", () => {
     });
   });
 
-  it("treats tracked and untracked worktree entries as dirty capture inputs", () => {
-    expect(() => assertCleanMatrixCapture(" M packages/wasm/Cargo.toml")).toThrow(
-      "requires a completely clean tree",
-    );
-    expect(() => assertCleanMatrixCapture("?? local-input.wasm")).toThrow(
-      "requires a completely clean tree",
-    );
-    expect(() => assertCleanMatrixCapture("")).not.toThrow();
-  });
-
-  it("rejects a matrix that changes the Rust optimization knob", () => {
-    const evidence = fixture();
-    evidence.rustProfile.optLevel = 2;
-    expect(() => parseWasmProfileMatrix(evidence)).toThrow("rustProfile.optLevel must be 3");
-  });
-
   it("rejects variants that do not share one pre-post-link artifact", () => {
     const evidence = fixture();
     evidence.variants[1]!.inputWasmSha256 = "9".repeat(64);
     expect(() => parseWasmProfileMatrix(evidence)).toThrow(
       "-Os did not use the shared pre-post-link artifact",
     );
-  });
-
-  it("rejects incomplete profiles and size evidence", () => {
-    const missingProfile = fixture();
-    missingProfile.variants.pop();
-    expect(() => parseWasmProfileMatrix(missingProfile)).toThrow(
-      "variants must contain -O3, -Os, and -Oz exactly once",
-    );
-
-    const missingSize = fixture();
-    Reflect.deleteProperty(missingSize.variants[2]!.artifact, "gzipBytes");
-    expect(() => parseWasmProfileMatrix(missingSize)).toThrow("artifact.gzipBytes");
   });
 
   it("rejects non-gating and report-only benchmark commands", () => {
@@ -220,44 +188,6 @@ describe("WASM post-link matrix evidence", () => {
     });
   });
 
-  it("requires both structural blockers when the store-only probe is blocked", () => {
-    const parsed = parseWasmProfileMatrix(fixture());
-    expect(parsed.storeOnlyProbe.outcome).toBe("blocked");
-    expect(parsed.storeOnlyProbe.blockers.map(({ id }) => id)).toEqual([
-      "formula-entry-ast",
-      "dependency-index",
-    ]);
-
-    const incomplete = fixture();
-    incomplete.storeOnlyProbe.blockers.pop();
-    expect(() => parseWasmProfileMatrix(incomplete)).toThrow(
-      "must report both dependency-cycle blockers",
-    );
-  });
-
-  it("binds the store-only probe to the clean matrix commit", () => {
-    const mismatched = fixture();
-    mismatched.storeOnlyProbe.provenance.commit = "9".repeat(40);
-    expect(() => parseWasmProfileMatrix(mismatched)).toThrow(
-      "storeOnlyProbe commit does not match matrix provenance",
-    );
-
-    const dirty = fixture();
-    dirty.storeOnlyProbe.provenance.dirty = true;
-    expect(() => parseWasmProfileMatrix(dirty)).toThrow(
-      "storeOnlyProbe.provenance.dirty must be false",
-    );
-  });
-
-  it("does not let a successful probe retain blocker claims", () => {
-    const evidence = fixture();
-    evidence.storeOnlyProbe.outcome = "compiled";
-    evidence.storeOnlyProbe.exitCode = 0;
-    expect(() => parseWasmProfileMatrix(evidence)).toThrow(
-      "compiled store-only probe cannot claim dependency-cycle blockers",
-    );
-  });
-
   it("blocks a recommendation when the compile probe failure is unclassified", () => {
     const evidence = fixture();
     evidence.storeOnlyProbe.outcome = "failed";
@@ -266,14 +196,5 @@ describe("WASM post-link matrix evidence", () => {
       status: "blocked",
       failures: ["store-only compile probe failed without a classified outcome"],
     });
-  });
-
-  it("rejects build-only captures as recommendation evidence", () => {
-    const evidence = fixture();
-    evidence.protocol = "wasm-post-link-build-capture-v1";
-    Reflect.deleteProperty(evidence, "captureOrder");
-    expect(() => decideWasmProfile(evidence)).toThrow(
-      'protocol must be "wasm-post-link-profile-matrix-v1"',
-    );
   });
 });

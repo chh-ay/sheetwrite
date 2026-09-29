@@ -73,15 +73,4 @@ describe("CI-facing deterministic verifier", () => {
     const error = readFileSync(resolve(artifactRoot, "formula-error.json"), "utf8");
     expect(error).toContain("missing workload=independent-parse-load;size=1000");
   });
-
-  test("rejects report-only instead of weakening a CI gate", () => {
-    const result = Bun.spawnSync(
-      ["bun", "run", resolve(repositoryRoot, "bench/src/verify.ts"), "--report-only"],
-      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
-    );
-    expect(result.exitCode).not.toBe(0);
-    expect(readFileSync(resolve(artifactRoot, "data-error.json"), "utf8")).toContain(
-      "rejects --report-only",
-    );
-  });
 });

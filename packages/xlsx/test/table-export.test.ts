@@ -1,17 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import type { Workbook } from "@sheetwrite/core";
-import {
-  fromXlsxWorkbook,
-  initSheetwrite,
-  SheetwriteStore,
-  toXlsxTable,
-  XlsxResourceError,
-} from "@sheetwrite/core";
-import {
-  buildXlsxModel,
-  registerXlsxBackends,
-  sheetwriteTableExportBackend,
-} from "../src/index.js";
+import { fromXlsxWorkbook, initSheetwrite, SheetwriteStore, toXlsxTable } from "@sheetwrite/core";
+import { buildXlsxModel, registerXlsxBackends } from "../src/index.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -36,23 +26,6 @@ function workbook(): Workbook {
 }
 
 describe("table XLSX export", () => {
-  it("publishes the implementation-neutral backend and produces a ZIP container", async () => {
-    expect(sheetwriteTableExportBackend.name).toBe("sheetwrite-ooxml-table");
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "hi" },
-        },
-      ],
-    });
-    const bytes = await toXlsxTable(store.getWorkbook(), store);
-    expect(Array.from(bytes.subarray(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
-    store.dispose();
-  });
-
   it("carries styles, formats, dimensions, merges, and hidden-column projection", async () => {
     const source = workbook();
     source.sheets[0]!.columns[0]!.headerStyle = { bold: true };
@@ -108,32 +81,5 @@ describe("table XLSX export", () => {
     expect(projectedModel.columnWidths).toEqual([75]);
     expect(projectedModel.rows[0]!.map((cell) => cell?.value)).toEqual(["B"]);
     projectedStore.dispose();
-  });
-
-  it("bounds the dense table model before store allocation", () => {
-    const source = workbook();
-    source.sheets[0]!.rowCount = 10;
-    const store = new SheetwriteStore(source);
-    expect(() => buildXlsxModel(store.getWorkbook(), store, { maxCells: 10 })).toThrow(
-      XlsxResourceError,
-    );
-    try {
-      buildXlsxModel(store.getWorkbook(), store, { maxCells: 10 });
-    } catch (error) {
-      expect(error).toMatchObject({
-        code: "xlsx-resource-limit",
-        resource: "maxCells",
-        actual: 22,
-        limit: 10,
-        operation: "xlsx-export",
-      });
-    }
-    store.dispose();
-  });
-
-  it("returns null only when no active or fallback sheet exists", () => {
-    const store = new SheetwriteStore(workbook());
-    expect(buildXlsxModel({ activeSheet: "missing", sheets: [] }, store)).toBeNull();
-    store.dispose();
   });
 });

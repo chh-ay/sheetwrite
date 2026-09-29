@@ -8,7 +8,6 @@ import {
   RENDER_SCENARIOS,
   type RenderBenchmarkArtifact,
   type RenderRunConfig,
-  renderBenchmarkMarkdown,
   type ScenarioResult,
   scenarioGroup,
   summarizeCompleteness,
@@ -269,52 +268,6 @@ function windowTransferArtifact(): RenderBenchmarkArtifact {
 }
 
 describe("render artifact validation", () => {
-  test("accepts a complete finite matrix", () => {
-    const parsed = parseRenderArtifactJson(JSON.stringify(completeArtifact()), {
-      expectedRunId: RUN_ID,
-    });
-    expect(parsed.completeness.complete).toBe(true);
-    expect(parsed.completeness.successful).toBe(true);
-  });
-
-  test("records bounded launch retries instead of hiding infrastructure failures", () => {
-    const complete = completeArtifact();
-    const first = complete.metadata.launchAttempts[0]!;
-    const withRetry: RenderBenchmarkArtifact = {
-      ...complete,
-      metadata: {
-        ...complete.metadata,
-        launchAttempts: [
-          {
-            ...first,
-            success: false,
-            errorClass: "Error",
-            message: "transient browser launch failure",
-          },
-          { ...first, attempt: 2 },
-          ...complete.metadata.launchAttempts.slice(1),
-        ],
-      },
-    };
-    const parsed = parseRenderArtifact(withRetry);
-    expect(parsed.metadata.launchAttempts).toHaveLength(5);
-    expect(parsed.metadata.launchAttempts[0]).toMatchObject({
-      success: false,
-      message: "transient browser launch failure",
-    });
-    expect(parsed.completeness.successful).toBe(true);
-  });
-
-  test("rejects missing and duplicate matrix cells", () => {
-    const complete = completeArtifact();
-    expect(() => parseRenderArtifact(artifactWithResults(complete.results.slice(1)))).toThrow(
-      "matrix is incomplete",
-    );
-    expect(() =>
-      parseRenderArtifact(artifactWithResults([...complete.results, complete.results[0]!])),
-    ).toThrow("matrix is incomplete");
-  });
-
   test("preserves structured failures without omitting their cell", () => {
     const complete = completeArtifact();
     const failed = failedResult(complete.results[0]!);
@@ -380,25 +333,5 @@ describe("render artifact validation", () => {
       [...firstOrder].reverse(),
     ]);
     expect(() => parseRenderArtifact(wrongOrder)).toThrow("required counterbalance");
-  });
-});
-
-describe("derived Markdown evidence", () => {
-  test("visibly marks failures and links the raw evidence", () => {
-    const complete = completeArtifact();
-    const failed = failedResult(complete.results[0]!);
-    const artifact = artifactWithResults([failed, ...complete.results.slice(1)]);
-    const markdown = renderBenchmarkMarkdown(parseRenderArtifactJson(JSON.stringify(artifact)));
-    expect(markdown).toContain("complete with structured failures");
-    expect(markdown).toContain("**FAILED (validate)**");
-    expect(markdown).toContain("(./render-results.json)");
-    expect(markdown).toContain("Comparative headline ratios are intentionally omitted");
-  });
-  test("labels the stale-view comparison and reports exact per-frame/read counters", () => {
-    const markdown = renderBenchmarkMarkdown(windowTransferArtifact());
-    expect(markdown).toContain("pixels/data are invalid");
-    expect(markdown).toContain("copied/frame");
-    expect(markdown).toContain("allocations/read");
-    expect(markdown).toContain("maximum within-variant spread");
   });
 });

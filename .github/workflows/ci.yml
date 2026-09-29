@@ -372,13 +372,16 @@ jobs:
           bun run docs:generate
           bun run --filter '@sheetwrite/docs-start' typecheck
           bun run --filter '@sheetwrite/docs-start' build
+      - name: Package prebuilt deployment
+        run: bun run docs:prepare-deployment
       - name: Upload production docs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: production-docs
-          path: docs/dist/client/
+          path: .vercel/output/
           if-no-files-found: error
-          retention-days: 1
+          include-hidden-files: true
+          retention-days: 7
 
   browser-smoke:
     name: Browser Smoke
@@ -400,8 +403,10 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: production-docs
-          path: docs/dist/client
+          path: .vercel/output
       - name: Exercise production site
+        env:
+          DOCS_OUTPUT_DIR: .vercel/output/static
         run: bun run test:browser
       - name: Upload browser evidence on failure
         if: failure()
@@ -456,3 +461,55 @@ jobs:
             test "$DOCS" = skipped
             test "$BROWSER" = skipped
           fi
+
+  docs-deploy:
+    name: Deploy Production Docs
+    needs: [required, docs-build]
+    if: >-
+      success() && github.event_name == 'push' && github.ref == 'refs/heads/develop' &&
+      github.event.repository.fork == false &&
+      needs.required.result == 'success' && needs['docs-build'].result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Production
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Download tested production docs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: production-docs
+          path: .vercel/output
+      - name: Deploy prebuilt production docs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=false
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              printf '::error::Set %s in repository or Production environment secrets before deploying.\n' "$name"
+              missing=true
+            fi
+          done
+          if [ "$missing" = true ]; then
+            exit 1
+          fi
+          npx --yes vercel@59.25.0 deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN"
+      - name: Submit deployed sitemap to IndexNow
+        env:
+          VERCEL_ENV: production
+          DOCS_OUTPUT_DIR: .vercel/output/static
+        run: bun scripts/indexnow.ts

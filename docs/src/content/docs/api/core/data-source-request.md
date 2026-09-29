@@ -8,9 +8,18 @@ description: "Cancellable sheet rectangle requested from a DataSource."
 Cancellable sheet rectangle requested from a DataSource.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/data.ts#L33</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L33"><code>packages/core/src/types/data.ts#L33</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#data-source-request-protocol"><code>protocol</code></a>
+<a href="#data-source-request-sheet"><code>sheet</code></a>
+<a href="#data-source-request-start"><code>start</code></a>
+<a href="#data-source-request-end"><code>end</code></a>
+<a href="#data-source-request-columns"><code>columns</code></a>
+<a href="#data-source-request-signal"><code>signal</code></a>
+<a href="#data-source-request-revision"><code>revision</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>7</span>
 
@@ -98,3 +107,26 @@ export interface DataSourceRequest {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>DataSourceRequest</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/data-source/"><code>DataSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-events/"><code>GridEvents</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/legacy-row-loader/"><code>LegacyRowLoader</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>

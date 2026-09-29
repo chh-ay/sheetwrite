@@ -3,10 +3,10 @@ import { strToU8, zipSync } from "fflate";
 export const FIXED_ZIP_TIME = new Date(1980, 0, 1);
 export const PACKAGE_REL = "http://schemas.openxmlformats.org/package/2006/relationships";
 export const TRANSITIONAL_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-export const STRICT_MAIN = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+const STRICT_MAIN = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 export const TRANSITIONAL_REL =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-export const STRICT_REL = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+const STRICT_REL = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
 interface RawSheet {
   name?: string;

@@ -8,8 +8,7 @@ description: "Grid handle, generation, and reason published after adapter initia
 Grid handle, generation, and reason published after adapter initialization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/vue</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/dist/adapter.d.ts#L34</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/adapter.d.ts#L34"><code>packages/core/dist/adapter.d.ts#L34</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -58,3 +57,21 @@ export interface GridReadyEvent {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/vue</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>GridReadyEvent</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core-adapter/grid-adapter-event-handlers/"><code>GridAdapterEventHandlers</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
+<li><a href="/docs/api/vue/sheetwrite-grid-emits/"><code>SheetwriteGridEmits</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
+</ul>
+</div>

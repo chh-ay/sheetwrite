@@ -135,6 +135,7 @@ export function DocsSearch() {
         <kbd>Ctrl K</kbd>
       </button>
       <dialog
+        aria-label="Search documentation"
         className="sw-search-dialog"
         onClick={(event) => {
           // Clicks on children land on the form; only the backdrop hits the

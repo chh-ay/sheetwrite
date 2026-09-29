@@ -8,8 +8,7 @@ description: "Implementation-neutral first-sheet table export model."
 Implementation-neutral first-sheet table export model.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/xlsx</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/xlsx/src/table-export.ts#L23</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/table-export.ts#L23"><code>packages/xlsx/src/table-export.ts#L23</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -68,3 +67,19 @@ export interface XlsxModel {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/xlsx</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>XlsxModel</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/xlsx/build-xlsx-model/"><code>buildXlsxModel</code></a><span class="api-consumer-kind">@sheetwrite/xlsx</span></li>
+</ul>
+</div>

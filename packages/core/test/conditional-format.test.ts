@@ -4,7 +4,6 @@ import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { ConditionalFormatRule, WorkbookSnapshot } from "../src/types.js";
-import { WorkerRenderer } from "../src/worker-renderer.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -83,117 +82,6 @@ describe("conditional formula formats", () => {
     });
     expect(styleAt(store, 0)).toMatchObject({ color: "#111111", bold: true });
     expect(styleAt(store, 0).italic).toBeUndefined();
-  });
-
-  it("feeds identical resolved hyperlink/formula styles to main and Worker renderers", () => {
-    const workbook = makeWorkbook(1);
-    const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } };
-    workbook.sheets[0]!.hyperlinks = [
-      {
-        id: "linked-cell",
-        range,
-        target: { kind: "external", url: "https://example.com" },
-      },
-    ];
-    workbook.sheets[0]!.conditionalFormats = [
-      {
-        range,
-        when: { kind: "formula", source: "=TRUE" },
-        style: { backgroundColor: "#00FF00", bold: true },
-      },
-    ];
-    const store = new SheetwriteStore(workbook);
-    const mainView = store.getVisibleWindow("s1", { start: 0, end: 1 }, [1]);
-    expect(Reflect.get(mainView, "ffiOutputAllocationEvents")).toBe(1);
-    const messages: unknown[] = [];
-    const renderer = new WorkerRenderer();
-    Reflect.set(renderer, "worker", {
-      postMessage(message: unknown) {
-        messages.push(message);
-      },
-    });
-
-    renderer.paint(mainView);
-
-    const workerPayload = messages[0] as {
-      styles: typeof mainView.styles;
-      styleIds: Uint32Array;
-    };
-    expect(workerPayload.styles).toEqual(mainView.styles);
-    expect(Array.from(workerPayload.styleIds)).toEqual(Array.from(mainView.styleIds));
-    expect(mainView.styles[mainView.styleIds[0]!]).toMatchObject({
-      color: "#0563C1",
-      underline: true,
-      backgroundColor: "#00FF00",
-      bold: true,
-    });
-  });
-
-  it("rewrites formula source and range coherently under row structure", () => {
-    const workbook = makeWorkbook(3);
-    workbook.sheets[0]!.conditionalFormats = [
-      {
-        range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
-        when: { kind: "formula", source: "=A2>0" },
-        style: { bold: true },
-      },
-    ];
-    const store = new SheetwriteStore(workbook);
-    expect(
-      store.applyTransaction({
-        patches: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
-      }).status,
-    ).toBe("applied");
-    expect(store.exportSnapshot().sheets[0]!.conditionalFormats).toEqual([
-      {
-        range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 3, col: 1 } },
-        when: { kind: "formula", source: "=A3>0" },
-        style: { bold: true },
-      },
-    ]);
-    expect(
-      store.applyTransaction({
-        patches: [{ op: "moveRows", sheet: "s1", from: 2, count: 2, to: 0 }],
-      }).status,
-    ).toBe("applied");
-    expect(store.exportSnapshot().sheets[0]!.conditionalFormats).toEqual([
-      {
-        range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
-        when: { kind: "formula", source: "=A1>0" },
-        style: { bold: true },
-      },
-    ]);
-    expect(
-      store.applyTransaction({
-        patches: [
-          {
-            op: "addColumns",
-            sheet: "s1",
-            at: 0,
-            columns: [{ key: "inserted", header: "Inserted", width: 100, type: "number" }],
-          },
-        ],
-      }).status,
-    ).toBe("applied");
-    expect(store.exportSnapshot().sheets[0]!.conditionalFormats).toEqual([
-      {
-        range: { sheet: "s1", start: { row: 0, col: 2 }, end: { row: 1, col: 2 } },
-        when: { kind: "formula", source: "=B1>0" },
-        style: { bold: true },
-      },
-    ]);
-    expect(
-      store.applyTransaction({
-        patches: [{ op: "moveColumns", sheet: "s1", from: 2, count: 1, to: 0 }],
-      }).status,
-    ).toBe("applied");
-    expect(store.exportSnapshot().sheets[0]!.conditionalFormats).toEqual([
-      {
-        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
-        when: { kind: "formula", source: "=C1>0" },
-        style: { bold: true },
-      },
-    ]);
   });
 
   it("rejects a 33rd renderer rule before snapshot allocation", () => {

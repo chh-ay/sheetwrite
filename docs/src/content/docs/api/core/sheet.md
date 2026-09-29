@@ -8,9 +8,30 @@ description: "Workbook sheet schema used when creating a live grid."
 Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/types/document.ts#L41</code></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L41"><code>packages/core/src/types/document.ts#L41</code></a></dd></div>
 </dl>
+
+<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
+<a href="#sheet-id"><code>id</code></a>
+<a href="#sheet-name"><code>name</code></a>
+<a href="#sheet-visibility"><code>visibility</code></a>
+<a href="#sheet-columns"><code>columns</code></a>
+<a href="#sheet-row-count"><code>rowCount</code></a>
+<a href="#sheet-row-heights"><code>rowHeights</code></a>
+<a href="#sheet-hidden-rows"><code>hiddenRows</code></a>
+<a href="#sheet-row-groups"><code>rowGroups</code></a>
+<a href="#sheet-conditional-formats"><code>conditionalFormats</code></a>
+<a href="#sheet-hyperlinks"><code>hyperlinks</code></a>
+<a href="#sheet-validation-rules"><code>validationRules</code></a>
+<a href="#sheet-protected-ranges"><code>protectedRanges</code></a>
+<a href="#sheet-notes"><code>notes</code></a>
+<a href="#sheet-sort-keys"><code>sortKeys</code></a>
+<a href="#sheet-filters"><code>filters</code></a>
+<a href="#sheet-merges"><code>merges</code></a>
+<a href="#sheet-frozen-rows"><code>frozenRows</code></a>
+<a href="#sheet-frozen-cols"><code>frozenCols</code></a>
+<a href="#sheet-tables"><code>tables</code></a>
+</nav>
 
 ## Members <span class="api-count" data-pagefind-ignore>19</span>
 
@@ -218,3 +239,27 @@ export interface Sheet {
 ```
 
 </details>
+
+## Referenced by
+
+<div class="api-consumers" data-pagefind-ignore>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/core</code></p>
+
+<ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/vue</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
+</ul>
+
+<p class="api-consumers-label">Public exports naming <code>Sheet</code></p>
+
+<ul class="api-consumer-list">
+<li><a href="/docs/api/core/assert-workbook-tables/"><code>assertWorkbookTables</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-csv/"><code>toCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/valid-workbook-table/"><code>validWorkbookTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/workbook/"><code>Workbook</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+</ul>
+</div>
