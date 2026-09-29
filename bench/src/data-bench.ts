@@ -34,8 +34,9 @@
 // Side-effecting DOM bootstrap MUST be first so Handsontable boots headlessly.
 import "./dom-setup.js";
 
-import { readFileSync } from "node:fs";
-import type { Column, Workbook } from "@sheetwrite/core";
+import { mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import { CellStore, initSync } from "@sheetwrite/wasm";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
@@ -81,6 +82,8 @@ const WINDOW_ROWS = 50;
 const EDIT_COUNT = 1_000;
 const WINDOW_READ_BATCH = 32;
 const SMALL_AGGREGATE_BATCH = 128;
+/** A sample this slow means the scenario stopped measuring anything useful. */
+const ABSOLUTE_SAMPLE_CEILING_MS = 30_000;
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
 
 export const WORKLOADS = [
@@ -109,13 +112,100 @@ const WORKLOAD_LABELS: Record<Workload, string> = {
   distinctHigh: "Distinct high-cardinality customer values",
 };
 
+/**
+ * Sheetwrite-only query scenarios: multi-key sorts, value-set filters and an
+ * all-numeric ingest. They exercise the Rust query engine and the columnar
+ * ingest path, which no other engine in this bench implements, so they are
+ * reported on their own rather than in the cross-engine head-to-head.
+ */
+export const QUERY_SCENARIOS = [
+  "sort-multi-key",
+  "sort-with-candidates",
+  "filter-value-set-10",
+  "filter-value-set-1000",
+  "filter-value-set-50000",
+  "ingest-numeric-only",
+] as const;
+export type QueryScenario = (typeof QUERY_SCENARIOS)[number];
+/** {@link QUERY_SCENARIOS} as plain strings, for membership tests over observed keys. */
+const QUERY_SCENARIO_NAMES: readonly string[] = QUERY_SCENARIOS;
+
+const VALUE_SET_SCENARIOS = [
+  "filter-value-set-10",
+  "filter-value-set-1000",
+  "filter-value-set-50000",
+] as const;
+type ValueSetScenario = (typeof VALUE_SET_SCENARIOS)[number];
+
+/**
+ * How many `customer` values each value-set scenario picks. The customer column
+ * is unique per row, so a set cannot be larger than the sheet: picks saturate at
+ * the row count, which only affects sheets smaller than the pick count.
+ */
+const VALUE_SET_PICK_COUNTS: Record<ValueSetScenario, number> = {
+  "filter-value-set-10": 10,
+  "filter-value-set-1000": 1_000,
+  "filter-value-set-50000": 50_000,
+};
+
+const QUERY_LABELS: Record<QueryScenario, string> = {
+  "sort-multi-key": "Sort by 3 keys (text, number, date)",
+  "sort-with-candidates": `Sort amount over "${FILTER_NEEDLE}" city candidates`,
+  "filter-value-set-10": "Filter customer by 10 picked values",
+  "filter-value-set-1000": "Filter customer by 1,000 picked values",
+  "filter-value-set-50000": "Filter customer by 50,000 picked values",
+  "ingest-numeric-only": "Ingest N rows (5 numeric columns)",
+};
+
+/**
+ * Row sizes a query scenario is measured at; a scenario without an entry runs at
+ * every size. The 50,000-pick filter covers 100,000 rows only: the value-set
+ * filter still compares every row with every picked value, so a 50,000-value
+ * list over 500k–1M rows would need minutes per sample. Smoke checks every
+ * scenario, all of them at its single small size.
+ */
+const QUERY_SCENARIO_ROWS: Partial<Record<QueryScenario, readonly number[]>> = {
+  "filter-value-set-50000": [100_000],
+};
+
+function measuresQueryScenario(
+  scenario: QueryScenario,
+  rows: number,
+  mode: BenchmarkMode,
+): boolean {
+  if (mode === "smoke") return true;
+  const declared = QUERY_SCENARIO_ROWS[scenario];
+  return declared === undefined || declared.includes(rows);
+}
+
+/** Multi-key sort: customer ascending, amount descending, date ascending. */
+const MULTI_KEY_SORT: readonly SortKey[] = [
+  { col: COL.customer, ascending: true },
+  { col: COL.amount, ascending: false },
+  { col: COL.date, ascending: true },
+];
+/** Column order the order check reads back for {@link MULTI_KEY_SORT}. */
+const MULTI_KEY_VIEW_COLS: readonly number[] = [COL.customer, COL.amount, COL.date];
+/** Leading view rows whose key order is re-checked after each sort scenario. */
+const ORDER_CHECK_ROWS = 256;
+
+/** Column keys of the all-numeric ingest payload; every column holds numbers. */
+const NUMERIC_INGEST_KEYS = ["n1", "n2", "n3", "n4", "n5"] as const;
+const NUMERIC_MONEY_MODULUS = 100_000;
+const NUMERIC_MONEY_SCALE = 100;
+const NUMERIC_STRIDE = 7;
+const NUMERIC_ROWS_PER_UNIT = 1_000;
+const NUMERIC_CYCLE_LENGTH = 97;
+const NUMERIC_COLUMN_WIDTH = 120;
+
 /** Per-workload iteration plan; expensive at-scale ops sample fewer times. */
 type IterationPlan = Pick<MeasureOptions, "warmup" | "iters" | "gcBetween">;
 
-function plan(workload: Workload, rows: number): IterationPlan {
+function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
   const atScale = rows >= 500_000;
   switch (workload) {
     case "ingest":
+    case "ingest-numeric-only":
       return atScale ? { warmup: 1, iters: 3, gcBetween: true } : { warmup: 1, iters: 7 };
     case "windowRead":
       return { warmup: 50, iters: 300 };
@@ -126,9 +216,17 @@ function plan(workload: Workload, rows: number): IterationPlan {
     case "multiFilter":
     case "distinctLow":
     case "distinctHigh":
+    case "sort-multi-key":
+    case "sort-with-candidates":
+    case "filter-value-set-10":
+    case "filter-value-set-1000":
       return atScale
         ? { warmup: 1, iters: 5, gcBetween: true }
         : { warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
+    case "filter-value-set-50000":
+      // Every row is compared with every picked value, so this scenario keeps a
+      // single warm-up and few samples: minutes of run time buy no more signal.
+      return { warmup: 1, iters: 3, gcBetween: true };
     case "aggregate":
       return { warmup: 20, iters: 200 };
   }
@@ -188,6 +286,11 @@ export interface TimedEngineResult {
   readonly stats: Record<Workload, DataStat>;
   readonly notes: Partial<Record<Workload, string>>;
   readonly queryResources: QueryResourceMetrics | null;
+  /**
+   * Sheetwrite-only query scenarios. Engines without a query engine report an
+   * empty record; artifacts recorded before the section existed omit it.
+   */
+  readonly queries?: Readonly<Partial<Record<QueryScenario, DataStat>>>;
 }
 
 /** All measured workloads for one engine at one row count. */
@@ -210,7 +313,11 @@ export interface DataBenchmarkResult extends GateIdentity {
   readonly handsontable: Readonly<Record<string, EngineResult>>;
 }
 
-export function dataMatrixKey(engine: EngineId, rows: number, metric: Workload | "memory"): string {
+export function dataMatrixKey(
+  engine: EngineId,
+  rows: number,
+  metric: Workload | QueryScenario | "memory",
+): string {
   return `engine=${engine};rows=${rows};metric=${metric}`;
 }
 
@@ -230,6 +337,52 @@ export function expectedDataMatrixKeys(mode: BenchmarkMode): string[] {
     }
   }
   return keys;
+}
+
+/**
+ * Query scenarios run on the Sheetwrite engine only, so they are validated per
+ * row instead of through the exact cross-engine matrix: every scenario declared
+ * for that row and mode must carry a finite sample, and an engine without a
+ * query engine must report none. Rows recorded before the section existed omit
+ * it and skip these checks.
+ */
+function validateEngineQueries(
+  engine: EngineId,
+  rows: number,
+  row: EngineResult,
+  mode: BenchmarkMode,
+): void {
+  const queries = row.queries;
+  if (queries === undefined) return;
+  if (engine !== "sheetwrite") {
+    if (Object.keys(queries).length > 0) {
+      throw new Error(`data ${engine} ${rows} must not report query scenarios`);
+    }
+    return;
+  }
+  for (const scenario of Object.keys(queries)) {
+    if (!QUERY_SCENARIO_NAMES.includes(scenario)) {
+      throw new Error(`data sheetwrite ${rows} reported an undeclared query scenario: ${scenario}`);
+    }
+  }
+  for (const scenario of QUERY_SCENARIOS) {
+    const key = dataMatrixKey(engine, rows, scenario);
+    const stat = queries[scenario];
+    if (stat === undefined) {
+      if (measuresQueryScenario(scenario, rows, mode)) throw new Error(`${key} is missing`);
+      continue;
+    }
+    if (!measuresQueryScenario(scenario, rows, mode)) {
+      throw new Error(
+        `data sheetwrite ${rows} reported query scenario ${scenario} outside its declared rows`,
+      );
+    }
+    if (!Array.isArray(stat.samples)) throw new Error(`${key}.samples are missing`);
+    validateRawStat(stat.samples, stat, key);
+    if (stat.p95 >= ABSOLUTE_SAMPLE_CEILING_MS) {
+      throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
+    }
+  }
 }
 
 export function validateDataBenchmark(
@@ -278,7 +431,7 @@ export function validateDataBenchmark(
         const stat = row.stats[workload];
         if (!Array.isArray(stat.samples)) throw new Error(`${key}.samples are missing`);
         validateRawStat(stat.samples, stat, key);
-        if (stat.p95 >= 30_000) {
+        if (stat.p95 >= ABSOLUTE_SAMPLE_CEILING_MS) {
           throw new Error(`${key} exceeded the 30 second absolute safety ceiling`);
         }
       }
@@ -305,6 +458,7 @@ export function validateDataBenchmark(
       } else if (row.queryResources !== null) {
         throw new Error(`${engine} ${rows} queryResources must be null`);
       }
+      validateEngineQueries(engine, rows, row, expectedMode);
       const memoryKey = dataMatrixKey(engine, rows, "memory");
       assertFiniteNonNegative(row.memory.heapDeltaBytes, `${memoryKey}.heapDeltaBytes`);
       if (row.memory.heapDeltaBytes >= 2 * 1024 * 1024 * 1024) {
@@ -335,6 +489,48 @@ function makeWorkbook(rowCount: number): Workbook {
     type: c.type,
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+}
+
+/**
+ * One value of the all-numeric ingest payload. Every column is a plain formula
+ * of the row index, so the read-back check can recompute the expected value at
+ * any row instead of keeping a second copy of the data.
+ */
+function numericIngestValue(column: number, row: number): number {
+  switch (column) {
+    case 0:
+      return row + 1;
+    case 1:
+      return ((row % NUMERIC_MONEY_MODULUS) + 1) / NUMERIC_MONEY_SCALE;
+    case 2:
+      return (row * NUMERIC_STRIDE) % NUMERIC_MONEY_MODULUS;
+    case 3:
+      return row / NUMERIC_ROWS_PER_UNIT;
+    default:
+      return (row % NUMERIC_CYCLE_LENGTH) / NUMERIC_CYCLE_LENGTH;
+  }
+}
+
+/** Workbook for the all-numeric ingest: five number columns, no text at all. */
+function makeNumericIngestWorkbook(rowCount: number): Workbook {
+  const columns: Column[] = NUMERIC_INGEST_KEYS.map((key, index) => ({
+    key,
+    header: `N${index + 1}`,
+    width: NUMERIC_COLUMN_WIDTH,
+    type: "number",
+  }));
+  return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
+}
+
+/** Five dense number columns built from {@link numericIngestValue}. */
+function makeNumericIngestData(rowCount: number): ColumnarData {
+  const columns: Record<string, Float64Array> = {};
+  for (const [index, key] of NUMERIC_INGEST_KEYS.entries()) {
+    const values = new Float64Array(rowCount);
+    for (let row = 0; row < rowCount; row++) values[row] = numericIngestValue(index, row);
+    columns[key] = values;
+  }
+  return { rowCount, columns };
 }
 
 function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
@@ -382,7 +578,11 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   }
 }
 
-function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): TimedEngineResult {
+function benchSheetwrite(
+  ds: ColumnarDataset,
+  columnar: SheetwriteColumnar,
+  mode: BenchmarkMode,
+): TimedEngineResult {
   const rows = ds.rowCount;
   const stats = {} as Record<Workload, DataStat>;
 
@@ -491,8 +691,169 @@ function benchSheetwrite(ds: ColumnarDataset, columnar: SheetwriteColumnar): Tim
   );
   void aggSink;
 
+  // (g) Query scenarios. Each one re-reads its own result through the public
+  // window API afterwards, so a fast answer that is not the right answer fails.
+  // Scenarios without a declared row list run at every size.
+  const queries = {} as Record<QueryScenario, DataStat>;
+  const measures = (scenario: QueryScenario): boolean =>
+    measuresQueryScenario(scenario, rows, mode);
+
+  if (measures("sort-multi-key")) {
+    queries["sort-multi-key"] = measure(() => store.sortByMulti(SHEET, MULTI_KEY_SORT), {
+      ...plan("sort-multi-key", rows),
+      after: () => store.sortByMulti(SHEET, []),
+    });
+    store.sortByMulti(SHEET, MULTI_KEY_SORT);
+    assertViewRowCount(`sort-multi-key ${rows}`, store.viewRowCount(SHEET), rows);
+    assertMultiKeyOrder(
+      `sort-multi-key ${rows}`,
+      readViewPrefix(store, MULTI_KEY_VIEW_COLS, ORDER_CHECK_ROWS),
+    );
+    store.clearView(SHEET);
+  }
+
+  // One key over the candidate rows a city filter leaves behind.
+  if (measures("sort-with-candidates")) {
+    store.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
+    queries["sort-with-candidates"] = measure(() => store.sortBy(SHEET, SORT_COL, true), {
+      ...plan("sort-with-candidates", rows),
+      after: () => store.sortByMulti(SHEET, []),
+    });
+    store.sortBy(SHEET, SORT_COL, true);
+    assertViewRowCount(
+      `sort-with-candidates ${rows}`,
+      store.viewRowCount(SHEET),
+      ds.city.reduce((count, city) => (city === FILTER_NEEDLE ? count + 1 : count), 0),
+    );
+    assertAmountAscending(
+      `sort-with-candidates ${rows}`,
+      readViewPrefix(store, [SORT_COL], ORDER_CHECK_ROWS),
+    );
+    store.clearView(SHEET);
+  }
+
+  for (const scenario of VALUE_SET_SCENARIOS) {
+    if (!measures(scenario)) continue;
+    const pickedCount = Math.min(VALUE_SET_PICK_COUNTS[scenario], rows);
+    // The customer column is unique per row, so each pick matches exactly once.
+    const picked = ds.customer.slice(0, pickedCount);
+    queries[scenario] = measure(
+      () => store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked }),
+      {
+        ...plan(scenario, rows),
+        after: () => store.setColumnFilter(SHEET, COL.customer, null),
+      },
+    );
+    store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked });
+    assertViewRowCount(`filter ${scenario} ${rows}`, store.viewRowCount(SHEET), pickedCount);
+    store.clearView(SHEET);
+  }
+
+  if (measures("ingest-numeric-only")) {
+    const numericData = makeNumericIngestData(rows);
+    let numericSink: SheetwriteStore | undefined;
+    queries["ingest-numeric-only"] = measure(
+      () => {
+        numericSink = new SheetwriteStore(makeNumericIngestWorkbook(rows), numericData);
+      },
+      {
+        ...plan("ingest-numeric-only", rows),
+        before: () => {
+          numericSink?.dispose();
+          numericSink = undefined;
+        },
+      },
+    );
+    if (numericSink) {
+      assertNumericIngest(`ingest-numeric-only ${rows}`, numericSink, rows);
+      numericSink.dispose();
+    }
+  }
+
   store.dispose();
-  return { rows, stats, notes: {}, queryResources };
+  return { rows, stats, notes: {}, queryResources, queries };
+}
+
+function assertViewRowCount(label: string, observed: number, expected: number): void {
+  if (observed !== expected) {
+    throw new Error(`${label}: the view holds ${observed} rows, expected ${expected}`);
+  }
+}
+
+/** Leading view rows, one tuple per row in `cols` order, read via the window API. */
+function readViewPrefix(
+  store: SheetwriteStore,
+  cols: readonly number[],
+  limit: number,
+): CellScalar[][] {
+  const rowCount = Math.min(limit, store.viewRowCount(SHEET));
+  if (rowCount === 0) return [];
+  const view = store.getVisibleWindow(SHEET, { start: 0, end: rowCount }, cols);
+  const rows: CellScalar[][] = [];
+  for (let row = 0; row < rowCount; row++) {
+    const values: CellScalar[] = [];
+    for (let col = 0; col < cols.length; col++)
+      values.push(view.values[row * cols.length + col] ?? null);
+    rows.push(values);
+  }
+  return rows;
+}
+
+/** The order {@link MULTI_KEY_SORT} asks for: customer asc, amount desc, date asc. */
+function assertMultiKeyOrder(label: string, view: readonly (readonly CellScalar[])[]): void {
+  for (let index = 1; index < view.length; index++) {
+    const previous = view[index - 1] ?? [];
+    const current = view[index] ?? [];
+    const previousCustomer = String(previous[0] ?? "");
+    const currentCustomer = String(current[0] ?? "");
+    if (previousCustomer !== currentCustomer) {
+      if (previousCustomer > currentCustomer) {
+        throw new Error(`${label}: customer order breaks at view row ${index}`);
+      }
+      continue;
+    }
+    const previousAmount = Number(previous[1] ?? 0);
+    const currentAmount = Number(current[1] ?? 0);
+    if (previousAmount !== currentAmount) {
+      if (previousAmount < currentAmount) {
+        throw new Error(`${label}: amount order breaks at view row ${index}`);
+      }
+      continue;
+    }
+    if (String(previous[2] ?? "") > String(current[2] ?? "")) {
+      throw new Error(`${label}: date order breaks at view row ${index}`);
+    }
+  }
+}
+
+function assertAmountAscending(label: string, view: readonly (readonly CellScalar[])[]): void {
+  for (let index = 1; index < view.length; index++) {
+    const previous = Number((view[index - 1] ?? [])[0] ?? 0);
+    const current = Number((view[index] ?? [])[0] ?? 0);
+    if (previous > current) throw new Error(`${label}: amount order breaks at view row ${index}`);
+  }
+}
+
+/** Reads the ingested numbers back and compares them with their source formula. */
+function assertNumericIngest(label: string, store: SheetwriteStore, rows: number): void {
+  const lastRow = rows - 1;
+  const middleRow = Math.floor(lastRow / 2);
+  const sampledRows = middleRow > 0 ? [0, middleRow, lastRow] : [0, lastRow];
+  for (const row of sampledRows) {
+    const view = store.getVisibleWindow(SHEET, { start: row, end: row + 1 }, ALL_COLS);
+    if (view.values.length !== NUMERIC_INGEST_KEYS.length) {
+      throw new Error(`${label}: row ${row} read back ${view.values.length} columns`);
+    }
+    for (let col = 0; col < NUMERIC_INGEST_KEYS.length; col++) {
+      const expected = numericIngestValue(col, row);
+      const observed = view.values[col];
+      if (typeof observed !== "number" || observed !== expected) {
+        throw new Error(
+          `${label}: row ${row} column ${col} read back ${String(observed)}, expected ${expected}`,
+        );
+      }
+    }
+  }
 }
 function warmSheetwriteDataPath(): void {
   const rows = 10_000;
@@ -529,7 +890,17 @@ function warmSheetwriteDataPath(): void {
   const smallDs = makeColumnar(smallRows);
   const smallStore = new SheetwriteStore(makeWorkbook(smallRows), toSheetwriteColumnar(smallDs));
   smallStore.sortBy(SHEET, SORT_COL, true);
+  smallStore.sortByMulti(SHEET, MULTI_KEY_SORT);
+  smallStore.setColumnFilter(SHEET, COL.customer, {
+    kind: "values",
+    values: smallDs.customer.slice(0, 8),
+  });
+  smallStore.clearView(SHEET);
   smallStore.dispose();
+  new SheetwriteStore(
+    makeNumericIngestWorkbook(smallRows),
+    makeNumericIngestData(smallRows),
+  ).dispose();
 
   store.filterBy(SHEET, FILTER_COL, FILTER_NEEDLE);
   store.clearView(SHEET);
@@ -720,7 +1091,7 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   void aggSink;
 
   hot.destroy();
-  return { rows, stats, notes, queryResources: null };
+  return { rows, stats, notes, queryResources: null, queries: {} };
 }
 
 // ── Memory probes (isolated subprocess) ──────────────────────────────────────
@@ -857,6 +1228,22 @@ function scalingTable(sw: Map<number, EngineResult>): string {
   return lines.join("\n");
 }
 
+function queryScalingTable(sw: Map<number, EngineResult>): string {
+  const lines: string[] = [];
+  lines.push(`| rows | ${QUERY_SCENARIOS.map((scenario) => QUERY_LABELS[scenario]).join(" | ")} |`);
+  lines.push(`|---:${"|---:".repeat(QUERY_SCENARIOS.length)}|`);
+  for (const rows of SHEETWRITE_ROWS) {
+    const queries = sw.get(rows)?.queries;
+    if (!queries) continue;
+    const cells = QUERY_SCENARIOS.map((scenario) => {
+      const stat = queries[scenario];
+      return stat ? `${ms(stat.median)} (${ms(stat.p95)})` : "—";
+    });
+    lines.push(`| ${N(rows)} | ${cells.join(" | ")} |`);
+  }
+  return lines.join("\n");
+}
+
 function memoryTable(sw: Map<number, EngineResult>): string {
   const lines: string[] = [];
   lines.push("| rows | Sheetwrite data (WASM columnar store) | bytes/row |");
@@ -870,7 +1257,7 @@ function memoryTable(sw: Map<number, EngineResult>): string {
   return lines.join("\n");
 }
 export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string {
-  validateDataBenchmark(result, "full");
+  validateDataBenchmark(result, result.mode);
   const sw = new Map(
     Object.entries(result.sheetwrite).map(([rows, value]) => [Number(rows), value] as const),
   );
@@ -885,15 +1272,17 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
       `median (p95) over warmed-up iterations · lower is better.`,
   );
   out.push("");
-  out.push("### Head-to-head (both engines, headless)");
-  out.push("");
-  out.push(
-    "Both grids run identical workloads at 1k/10k — the sizes Handsontable completes headlessly (it renders every row without a layout engine).",
-  );
-  out.push("");
-  for (const workload of WORKLOADS) {
-    out.push(headToHeadTable(workload, sw, hot));
+  if (hot.size > 0) {
+    out.push("### Head-to-head (both engines, headless)");
     out.push("");
+    out.push(
+      "Both grids run identical workloads at 1k/10k — the sizes Handsontable completes headlessly (it renders every row without a layout engine).",
+    );
+    out.push("");
+    for (const workload of WORKLOADS) {
+      out.push(headToHeadTable(workload, sw, hot));
+      out.push("");
+    }
   }
   out.push("### Sheetwrite data-engine scaling (1k → 1M) — median (p95) ms");
   out.push("");
@@ -903,6 +1292,16 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
   out.push("");
   out.push(scalingTable(sw));
   out.push("");
+  if (SHEETWRITE_ROWS.some((rows) => sw.get(rows)?.queries !== undefined)) {
+    out.push("### Sheetwrite query scenarios — median (p95) ms");
+    out.push("");
+    out.push(
+      "Measured on the Sheetwrite engine only: multi-key sorts, value-set filters and an all-numeric ingest exercise its Rust query engine and its columnar ingest, which no other engine here implements. A pick count larger than the sheet saturates at the row count. The 50,000-pick filter is measured at 100,000 rows only: it compares every row with every picked value today, so a larger sheet would need minutes for a single sample.",
+    );
+    out.push("");
+    out.push(queryScalingTable(sw));
+    out.push("");
+  }
   out.push("### Memory");
   out.push("");
   out.push(
@@ -938,6 +1337,7 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
 
 export async function runSheetwriteDataBench(
   rowsList: readonly number[] = SHEETWRITE_ROWS,
+  mode: BenchmarkMode = "full",
 ): Promise<Map<number, TimedEngineResult>> {
   await initSheetwrite(readFileSync(WASM_PATH));
   warmSheetwriteDataPath();
@@ -946,7 +1346,7 @@ export async function runSheetwriteDataBench(
   for (const rows of rowsList) {
     process.stderr.write(`\n▶ Sheetwrite ${N(rows)} rows …\n`);
     const ds = makeColumnar(rows);
-    results.set(rows, benchSheetwrite(ds, toSheetwriteColumnar(ds)));
+    results.set(rows, benchSheetwrite(ds, toSheetwriteColumnar(ds), mode));
   }
   return results;
 }
@@ -973,18 +1373,45 @@ function dataResult(
   };
 }
 
-async function runSmokeBench(): Promise<void> {
-  const timed = await runSheetwriteDataBench([1_000]);
+async function runSmokeBench(outputPath: string | undefined): Promise<void> {
+  const timed = await runSheetwriteDataBench([1_000], "smoke");
   const sheetwrite = new Map<number, EngineResult>();
   const result = timed.get(1_000);
   if (!result) throw new Error("data smoke omitted the declared 1000-row result");
   sheetwrite.set(1_000, { ...result, memory: probeMemory("sheetwrite", 1_000) });
   const smoke = dataResult("smoke", sheetwrite, new Map());
   validateDataBenchmark(smoke, "smoke");
+  // verify.ts reads this line from stdout; the file copy is only for --output.
   console.log(JSON.stringify(smoke));
+  if (outputPath !== undefined) {
+    await writeDataArtifact(smoke, renderDataBenchmarkMarkdown(smoke), outputPath);
+  }
 }
 
-async function runFullBench(): Promise<void> {
+/**
+ * Writes the JSON artifact plus a markdown report beside it. Without `--output`
+ * both land in the tracked `bench/results/`; with it, only the given path is
+ * touched, which keeps timing runs out of the recorded results.
+ */
+async function writeDataArtifact(
+  result: DataBenchmarkResult,
+  report: string,
+  outputPath?: string,
+): Promise<void> {
+  const jsonPath = outputPath ?? new URL("../results/data-results.json", import.meta.url).pathname;
+  const markdownPath =
+    outputPath === undefined
+      ? new URL("../results/data-results.md", import.meta.url).pathname
+      : jsonPath.endsWith(".json")
+        ? `${jsonPath.slice(0, -".json".length)}.md`
+        : `${jsonPath}.md`;
+  mkdirSync(dirname(jsonPath), { recursive: true });
+  await Bun.write(jsonPath, `${JSON.stringify(result, null, 2)}\n`);
+  await Bun.write(markdownPath, report);
+  process.stderr.write(`\n✔ wrote ${jsonPath} and ${markdownPath}\n`);
+}
+
+async function runFullBench(outputPath: string | undefined): Promise<void> {
   const timedSw = await runSheetwriteDataBench();
 
   const sw = new Map<number, EngineResult>();
@@ -1007,22 +1434,24 @@ async function runFullBench(): Promise<void> {
   validateDataBenchmark(result, "full");
   const report = renderDataBenchmarkMarkdown(result);
   console.log(report.trimEnd());
-  await Bun.write(
-    new URL("../results/data-results.json", import.meta.url).pathname,
-    `${JSON.stringify(result, null, 2)}\n`,
-  );
-  await Bun.write(new URL("../results/data-results.md", import.meta.url).pathname, report);
-  process.stderr.write("\n✔ wrote results/data-results.json and results/data-results.md\n");
+  await writeDataArtifact(result, report, outputPath);
 }
 
 // ── Entry ────────────────────────────────────────────────────────────────────
 
+function argumentValue(args: readonly string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index < 0 ? undefined : args[index + 1];
+}
+
 if (import.meta.main) {
-  if (process.argv.includes("--mem")) {
+  const args = process.argv.slice(2).filter((argument) => argument !== "--");
+  const outputPath = argumentValue(args, "--output");
+  if (args.includes("--mem")) {
     await runMemMode();
-  } else if (process.argv.includes("--smoke")) {
-    await runSmokeBench();
+  } else if (args.includes("--smoke")) {
+    await runSmokeBench(outputPath);
   } else {
-    await runFullBench();
+    await runFullBench(outputPath);
   }
 }
