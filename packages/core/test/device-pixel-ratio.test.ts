@@ -83,11 +83,14 @@ describe("device-pixel-ratio lifecycle", () => {
   let queries: ResolutionQuery[];
 
   beforeEach(() => {
+    // Capture the ambient layout descriptors before the stub patches them: the
+    // stubs default to a fixed 800x400, so capturing afterwards would restore
+    // that stub instead of the environment's own accessors.
+    originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
     restoreCanvas = installCanvasTestStubs();
     originalDpr = Object.getOwnPropertyDescriptor(globalThis, "devicePixelRatio");
     originalMatchMedia = globalThis.matchMedia;
-    originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
-    originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
     originalRequestAnimationFrame = Object.getOwnPropertyDescriptor(
       globalThis,
       "requestAnimationFrame",
