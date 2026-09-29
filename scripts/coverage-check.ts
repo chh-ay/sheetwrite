@@ -1,7 +1,6 @@
 import { relative, resolve, sep } from "node:path";
 
 export type CoverageLanguage = "typescript" | "rust";
-export type CoverageTier = "A" | "B" | "C";
 export type CoverageMetricName = "lines" | "functions" | "regions";
 
 export interface CoverageCounts {
@@ -19,91 +18,29 @@ export interface CoverageRecord {
 }
 
 export interface CoverageFloor {
-  readonly lines?: number;
-  readonly functions?: number;
+  readonly lines: number;
+  readonly functions: number;
   readonly regions?: number;
 }
 
 export interface CoverageExclusion {
-  readonly reason: string;
-  readonly command: string;
-}
-
-export interface CoverageThresholdEntry {
   readonly path: string;
-  readonly members?: readonly string[];
-  readonly language: CoverageLanguage;
-  readonly tier: CoverageTier;
-  readonly metrics: CoverageFloor;
-  readonly owner: string;
-  readonly rationale: string;
-  readonly exclusion?: CoverageExclusion;
+  readonly reason: string;
 }
 
-export interface CoverageThresholdManifest {
+/** Aggregate per-language floors plus the runtime files that are deliberately not scored. */
+export interface CoveragePolicy {
   readonly schemaVersion: number;
-  readonly entries: readonly CoverageThresholdEntry[];
+  readonly floors: Readonly<Record<CoverageLanguage, CoverageFloor>>;
+  readonly exclusions: readonly CoverageExclusion[];
 }
 
 export interface LcovRecord extends CoverageRecord {
   readonly lineCounts: ReadonlyMap<number, number>;
 }
 
-export const COVERAGE_SCHEMA_VERSION = 2;
-export const TIER_MINIMUMS: Readonly<
-  Record<CoverageTier, Readonly<Record<CoverageMetricName, number>>>
-> = {
-  A: { lines: 90, functions: 85, regions: 85 },
-  B: { lines: 80, functions: 75, regions: 75 },
-  C: { lines: 75, functions: 70, regions: 70 },
-};
-
-/** Files whose risk classification must not silently disappear during a move/split. */
-export const REQUIRED_RISK_PATHS = [
-  "packages/core/src/adapter.ts",
-  "packages/core/src/canvas-paint.ts",
-  "packages/core/src/clipboard-controller.ts",
-  "packages/core/src/datasource-controller.ts",
-  "packages/core/src/document-controller.ts",
-  "packages/core/src/document-protocol.ts",
-  "packages/core/src/geometry-layout-controller.ts",
-  "packages/core/src/grid-controller.ts",
-  "packages/core/src/grid.ts",
-  "packages/core/src/history.ts",
-  "packages/core/src/indexeddb.ts",
-  "packages/core/src/input-controller.ts",
-  "packages/core/src/persistence.ts",
-  "packages/core/src/rebase.ts",
-  "packages/core/src/render-coordinator.ts",
-  "packages/core/src/store.ts",
-  "packages/core/src/store/data-engine.ts",
-  "packages/core/src/sync.ts",
-  "packages/core/src/worker-renderer.ts",
-  "packages/core/src/worker.ts",
-  "packages/react/src/index.tsx",
-  "packages/svelte/src/Grid.svelte",
-  "packages/svelte/src/Sheetwrite.svelte",
-  "packages/vue/src/index.ts",
-  "packages/xlsx/src/register.ts",
-  "packages/xlsx/src/registration.ts",
-  "packages/xlsx/src/table-export.ts",
-  "packages/xlsx/src/table-import.ts",
-  "packages/xlsx/src/workbook.ts",
-  "packages/wasm/src/calc.rs",
-  "packages/wasm/src/eval/mod.rs",
-  "packages/wasm/src/eval/criteria.rs",
-  "packages/wasm/src/eval/date.rs",
-  "packages/wasm/src/eval/dependency.rs",
-  "packages/wasm/src/eval/functions.rs",
-  "packages/wasm/src/eval/lookup.rs",
-  "packages/wasm/src/eval/matrix.rs",
-  "packages/wasm/src/eval/value.rs",
-  "packages/wasm/src/query.rs",
-  "packages/wasm/src/sheet.rs",
-  "packages/wasm/src/store.rs",
-  "packages/wasm/src/types.rs",
-  "packages/wasm/src/window.rs",
-] as const;
+export const COVERAGE_SCHEMA_VERSION = 3;
+const COVERAGE_METRICS = ["lines", "functions", "regions"] as const;
 
 const CONTAMINATED_SEGMENTS = new Set(["dist", "test", "tests", "node_modules", "examples"]);
 const INTEGER = /^\d+$/;
@@ -468,23 +405,18 @@ export function filterRuntimeRecords(
   return records.filter((record) => runtimePaths.has(record.path));
 }
 
-const MANIFEST_KEYS: Readonly<Record<string, true>> = { schemaVersion: true, entries: true };
-const ENTRY_KEYS: Readonly<Record<string, true>> = {
-  path: true,
-  members: true,
-  language: true,
-  tier: true,
-  metrics: true,
-  owner: true,
-  rationale: true,
-  exclusion: true,
+const POLICY_KEYS: Readonly<Record<string, true>> = {
+  schemaVersion: true,
+  floors: true,
+  exclusions: true,
 };
+const FLOOR_LANGUAGE_KEYS: Readonly<Record<string, true>> = { typescript: true, rust: true };
 const METRIC_KEYS: Readonly<Record<string, true>> = {
   lines: true,
   functions: true,
   regions: true,
 };
-const EXCLUSION_KEYS: Readonly<Record<string, true>> = { reason: true, command: true };
+const EXCLUSION_KEYS: Readonly<Record<string, true>> = { path: true, reason: true };
 
 function validateKeys(
   value: Record<string, unknown>,
@@ -508,100 +440,69 @@ function validateRepositoryPath(value: unknown, label: string): asserts value is
   }
 }
 
-function entrySourcePaths(entry: CoverageThresholdEntry): readonly string[] {
-  return entry.members ?? [entry.path];
+function parsePercent(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
+    throw new Error(`${label} must be an integer percentage`);
+  }
+  return value;
 }
 
-export function parseCoverageManifest(raw: unknown): CoverageThresholdManifest {
-  assertRecord(raw, "Coverage threshold manifest");
-  validateKeys(raw, MANIFEST_KEYS, "Coverage threshold manifest");
+function parseFloor(raw: unknown, language: CoverageLanguage): CoverageFloor {
+  const label = `Coverage ${language} floor`;
+  assertRecord(raw, label);
+  validateKeys(raw, METRIC_KEYS, label);
+  const lines = parsePercent(raw.lines, `${label} lines`);
+  const functions = parsePercent(raw.functions, `${label} functions`);
+  if (raw.regions === undefined) return { lines, functions };
+  return { lines, functions, regions: parsePercent(raw.regions, `${label} regions`) };
+}
+
+export function parseCoveragePolicy(raw: unknown): CoveragePolicy {
+  assertRecord(raw, "Coverage policy");
+  validateKeys(raw, POLICY_KEYS, "Coverage policy");
   if (raw.schemaVersion !== COVERAGE_SCHEMA_VERSION) {
-    throw new Error(`Unsupported coverage threshold schema version: ${String(raw.schemaVersion)}`);
+    throw new Error(`Unsupported coverage policy schema version: ${String(raw.schemaVersion)}`);
   }
-  if (!Array.isArray(raw.entries))
-    throw new Error("Coverage threshold manifest entries must be an array");
-  const entryIds = new Set<string>();
-  const classifiedPaths = new Set<string>();
-  const entries = raw.entries.map((value, index): CoverageThresholdEntry => {
-    assertRecord(value, `Coverage threshold entry ${index}`);
-    validateKeys(value, ENTRY_KEYS, `Coverage threshold entry ${index}`);
-    validateRepositoryPath(value.path, `Coverage threshold entry ${index} path`);
-    if (entryIds.has(value.path))
-      throw new Error(`Duplicate coverage threshold entry: ${value.path}`);
-    entryIds.add(value.path);
-    let members: string[] | undefined;
-    if (value.members !== undefined) {
-      if (!Array.isArray(value.members) || value.members.length === 0) {
-        throw new Error(`Coverage threshold entry ${value.path} members must be a non-empty array`);
-      }
-      members = value.members.map((member, memberIndex) => {
-        validateRepositoryPath(
-          member,
-          `Coverage threshold entry ${value.path} member ${memberIndex}`,
-        );
-        return member;
-      });
-    }
-    for (const sourcePath of members ?? [value.path]) {
-      if (classifiedPaths.has(sourcePath)) {
-        throw new Error(`Duplicate coverage source classification: ${sourcePath}`);
-      }
-      classifiedPaths.add(sourcePath);
-    }
-    if (value.language !== "typescript" && value.language !== "rust") {
-      throw new Error(`Coverage threshold entry ${value.path} has an invalid language`);
-    }
-    if (value.tier !== "A" && value.tier !== "B" && value.tier !== "C") {
-      throw new Error(`Coverage threshold entry ${value.path} has an invalid tier`);
-    }
-    validateText(value.owner, `Coverage threshold entry ${value.path} owner`);
-    validateText(value.rationale, `Coverage threshold entry ${value.path} rationale`);
-    assertRecord(value.metrics, `Coverage threshold entry ${value.path} metrics`);
-    validateKeys(value.metrics, METRIC_KEYS, `Coverage threshold entry ${value.path} metrics`);
-    const metrics: Record<string, number> = {};
-    for (const metric of ["lines", "functions", "regions"] as const) {
-      const floor = value.metrics[metric];
-      if (floor === undefined) continue;
-      if (typeof floor !== "number" || !Number.isInteger(floor) || floor < 0 || floor > 100) {
-        throw new Error(`Coverage threshold entry ${value.path} has an invalid ${metric} floor`);
-      }
-      metrics[metric] = floor;
-    }
-    let exclusion: CoverageExclusion | undefined;
-    if (value.exclusion !== undefined) {
-      assertRecord(value.exclusion, `Coverage threshold entry ${value.path} exclusion`);
-      validateKeys(
-        value.exclusion,
-        EXCLUSION_KEYS,
-        `Coverage threshold entry ${value.path} exclusion`,
-      );
-      validateText(
-        value.exclusion.reason,
-        `Coverage threshold entry ${value.path} exclusion reason`,
-      );
-      validateText(
-        value.exclusion.command,
-        `Coverage threshold entry ${value.path} exclusion command`,
-      );
-      if (Object.keys(metrics).length !== 0) {
-        throw new Error(`Excluded coverage entry ${value.path} must not define metric floors`);
-      }
-      exclusion = { reason: value.exclusion.reason, command: value.exclusion.command };
-    } else if (metrics.lines === undefined || metrics.functions === undefined) {
-      throw new Error(`Scored coverage entry ${value.path} requires line and function floors`);
-    }
-    return {
-      path: value.path,
-      ...(members ? { members } : {}),
-      language: value.language,
-      tier: value.tier,
-      metrics,
-      owner: value.owner,
-      rationale: value.rationale,
-      ...(exclusion ? { exclusion } : {}),
-    };
+  assertRecord(raw.floors, "Coverage policy floors");
+  validateKeys(raw.floors, FLOOR_LANGUAGE_KEYS, "Coverage policy floors");
+  const floors = {
+    typescript: parseFloor(raw.floors.typescript, "typescript"),
+    rust: parseFloor(raw.floors.rust, "rust"),
+  };
+  if (!Array.isArray(raw.exclusions))
+    throw new Error("Coverage policy exclusions must be an array");
+  const excludedPaths = new Set<string>();
+  const exclusions = raw.exclusions.map((value, index): CoverageExclusion => {
+    const label = `Coverage exclusion ${index}`;
+    assertRecord(value, label);
+    validateKeys(value, EXCLUSION_KEYS, label);
+    validateRepositoryPath(value.path, `${label} path`);
+    validateText(value.reason, `${label} reason`);
+    if (excludedPaths.has(value.path))
+      throw new Error(`Duplicate coverage exclusion: ${value.path}`);
+    excludedPaths.add(value.path);
+    return { path: value.path, reason: value.reason };
   });
-  return { schemaVersion: COVERAGE_SCHEMA_VERSION, entries };
+  return { schemaVersion: COVERAGE_SCHEMA_VERSION, floors, exclusions };
+}
+
+/** Every discovered runtime file is scored unless the policy excludes it with a reason. */
+export function scoredRuntimePaths(
+  policy: CoveragePolicy,
+  language: CoverageLanguage,
+  runtimePaths: readonly string[],
+): ReadonlySet<string> {
+  const discovered = new Set(runtimePaths);
+  const excluded = new Set<string>();
+  for (const exclusion of policy.exclusions) {
+    const exclusionLanguage = exclusion.path.endsWith(".rs") ? "rust" : "typescript";
+    if (exclusionLanguage !== language) continue;
+    if (!discovered.has(exclusion.path)) {
+      throw new Error(`Coverage exclusion has no runtime source file: ${exclusion.path}`);
+    }
+    excluded.add(exclusion.path);
+  }
+  return new Set(runtimePaths.filter((path) => !excluded.has(path)));
 }
 
 function assertCounts(counts: CoverageCounts, label: string): void {
@@ -610,83 +511,16 @@ function assertCounts(counts: CoverageCounts, label: string): void {
   if (counts.covered > counts.total) throw new Error(`${label} covered exceeds total`);
 }
 
-function metricCounts(
-  record: CoverageRecord,
-  metric: CoverageMetricName,
-): CoverageCounts | undefined {
-  return record[metric];
-}
+export type CoverageTotals = Readonly<Partial<Record<CoverageMetricName, CoverageCounts>>>;
 
-function meetsFloor(counts: CoverageCounts, floor: number): boolean {
-  if (counts.total === 0) return floor === 100;
-  return counts.covered * 100 >= floor * counts.total;
-}
-
-function aggregateCoverageRecords(
-  entry: CoverageThresholdEntry,
-  recordByPath: ReadonlyMap<string, CoverageRecord>,
-): CoverageRecord {
-  const records = entrySourcePaths(entry).map((path) => {
-    const record = recordByPath.get(path);
-    if (!record) throw new Error(`Coverage report is missing scored source: ${path}`);
-    return record;
-  });
-  const sum = (metric: CoverageMetricName): CoverageCounts | undefined => {
-    const counts = records.map((record) => metricCounts(record, metric));
-    if (counts.some((value) => value === undefined)) return undefined;
-    return counts.reduce<CoverageCounts>(
-      (total, value) => ({
-        covered: total.covered + (value?.covered ?? 0),
-        total: total.total + (value?.total ?? 0),
-      }),
-      { covered: 0, total: 0 },
-    );
-  };
-  return {
-    path: entry.path,
-    lines: sum("lines") ?? { covered: 0, total: 0 },
-    functions: sum("functions") ?? { covered: 0, total: 0 },
-    ...(sum("regions") ? { regions: sum("regions") } : {}),
-    uncoveredLines: [],
-  };
-}
-
-export interface CoveragePolicyResult {
-  readonly records: readonly CoverageRecord[];
-  readonly entries: readonly CoverageThresholdEntry[];
-}
-
+/** Sum scored records and fail when an aggregate metric falls below the language floor. */
 export function evaluateCoveragePolicy(options: {
-  readonly manifest: CoverageThresholdManifest;
+  readonly policy: CoveragePolicy;
   readonly language: CoverageLanguage;
   readonly records: readonly CoverageRecord[];
-  readonly runtimePaths: readonly string[];
-}): CoveragePolicyResult {
-  const { manifest, language, records } = options;
-  const runtimePaths = new Set(options.runtimePaths);
-  const entries = manifest.entries.filter((entry) => entry.language === language);
-  const manifestPaths = new Set(entries.flatMap((entry) => entrySourcePaths(entry)));
-
-  for (const required of REQUIRED_RISK_PATHS) {
-    const expectedLanguage: CoverageLanguage = required.endsWith(".rs") ? "rust" : "typescript";
-    if (expectedLanguage === language && !manifestPaths.has(required)) {
-      throw new Error(`Missing required risk module classification: ${required}`);
-    }
-  }
-  for (const path of runtimePaths) {
-    if (!manifestPaths.has(path)) throw new Error(`Unclassified runtime source file: ${path}`);
-  }
-  for (const entry of entries) {
-    for (const sourcePath of entrySourcePaths(entry)) {
-      if (!runtimePaths.has(sourcePath)) {
-        throw new Error(`Coverage threshold has no runtime source file: ${sourcePath}`);
-      }
-      if (!entry.exclusion && isCoverageContamination(sourcePath)) {
-        throw new Error(`Generated/test output entered scored coverage: ${sourcePath}`);
-      }
-    }
-  }
-
+  readonly scoredPaths: ReadonlySet<string>;
+}): CoverageTotals {
+  const { policy, language, records, scoredPaths } = options;
   const recordByPath = new Map<string, CoverageRecord>();
   for (const record of records) {
     if (recordByPath.has(record.path))
@@ -699,58 +533,33 @@ export function evaluateCoveragePolicy(options: {
     if (record.regions) assertCounts(record.regions, `${record.path} regions`);
     recordByPath.set(record.path, record);
   }
-
-  const enforceMetric = (
-    path: string,
-    metric: CoverageMetricName,
-    counts: CoverageCounts | undefined,
-    floor: number,
-    policy: string,
-  ): void => {
-    if (!counts) throw new Error(`Coverage report is missing ${metric} data for ${path}`);
-    if (!meetsFloor(counts, floor)) {
-      const actual = counts.total === 0 ? 100 : (counts.covered * 100) / counts.total;
-      throw new Error(
-        `${path} ${metric} coverage ${actual.toFixed(2)}% (${counts.covered}/${counts.total}) is below ${policy}`,
-      );
-    }
-  };
-
-  for (const entry of entries) {
-    if (entry.exclusion) continue;
-    const record = aggregateCoverageRecords(entry, recordByPath);
-    if (entry.members && entry.tier !== "C") {
-      for (const member of entry.members) {
-        const memberRecord = recordByPath.get(member);
-        if (!memberRecord) throw new Error(`Coverage report is missing scored source: ${member}`);
-        for (const metric of ["lines", "functions", "regions"] as const) {
-          if (entry.metrics[metric] === undefined) continue;
-          const minimum = TIER_MINIMUMS[entry.tier][metric];
-          enforceMetric(
-            member,
-            metric,
-            metricCounts(memberRecord, metric),
-            minimum,
-            `inherited Tier ${entry.tier} minimum ${minimum}%`,
-          );
-        }
-      }
-    }
-    for (const metric of ["lines", "functions", "regions"] as const) {
-      const floor = entry.metrics[metric];
-      if (floor === undefined) continue;
-      const counts = metricCounts(record, metric);
-      const minimum = TIER_MINIMUMS[entry.tier][metric];
-      if (floor < minimum) {
-        throw new Error(
-          `${entry.path} ${metric} floor ${floor}% is below Tier ${entry.tier} minimum ${minimum}%`,
-        );
-      }
-      enforceMetric(entry.path, metric, counts, floor, `${floor}%`);
-    }
+  for (const path of scoredPaths) {
+    if (!recordByPath.has(path))
+      throw new Error(`Coverage report is missing scored source: ${path}`);
   }
 
-  return { records, entries };
+  const floor = policy.floors[language];
+  const totals: Partial<Record<CoverageMetricName, CoverageCounts>> = {};
+  for (const metric of COVERAGE_METRICS) {
+    const minimum = floor[metric];
+    if (minimum === undefined) continue;
+    let covered = 0;
+    let total = 0;
+    for (const record of recordByPath.values()) {
+      const counts = record[metric];
+      if (!counts) throw new Error(`Coverage report is missing ${metric} data for ${record.path}`);
+      covered += counts.covered;
+      total += counts.total;
+    }
+    totals[metric] = { covered, total };
+    if (covered * 100 < minimum * total) {
+      const actual = (covered * 100) / total;
+      throw new Error(
+        `${language} ${metric} coverage ${actual.toFixed(2)}% (${covered}/${total}) is below the ${minimum}% floor`,
+      );
+    }
+  }
+  return totals;
 }
 
 export function serialiseNormalizedLcov(records: readonly CoverageRecord[]): string {

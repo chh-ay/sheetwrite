@@ -27,7 +27,7 @@ Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are own
 
 After the initial 0.1.0 release, user-visible package changes require a Changeset created with `bunx changeset`. Private workspaces are excluded.
 
-Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels or coverage thresholds.
+Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
 ## Documentation deployment
 

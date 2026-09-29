@@ -1,61 +1,28 @@
 import { describe, expect, it } from "bun:test";
 import {
   COVERAGE_SCHEMA_VERSION,
-  type CoverageLanguage,
+  type CoveragePolicy,
   type CoverageRecord,
-  type CoverageThresholdEntry,
   evaluateCoveragePolicy,
   filterRuntimeRecords,
   isCoverageContamination,
   mergeLcovRecords,
   normalizeRustCoverage,
-  parseCoverageManifest,
+  parseCoveragePolicy,
   parseLcov,
-  REQUIRED_RISK_PATHS,
-  serialiseNormalizedLcov,
+  scoredRuntimePaths,
 } from "./coverage-check.js";
 
 const ROOT = "/repo";
 
-function exclusion(path: string): CoverageThresholdEntry {
-  return {
-    path,
-    language: path.endsWith(".rs") ? "rust" : "typescript",
-    tier: "A",
-    metrics: {},
-    owner: "runtime-owner",
-    rationale: "Fixture classification",
-    exclusion: { reason: "Fixture-only exclusion", command: "bun test contract.test.ts" },
-  };
-}
-
-function manifestFor(
-  language: CoverageLanguage,
-  replacements: readonly CoverageThresholdEntry[] = [],
-) {
-  const replacementByPath = new Map(replacements.map((entry) => [entry.path, entry]));
-  const entries = REQUIRED_RISK_PATHS.filter(
-    (path) => (path.endsWith(".rs") ? "rust" : "typescript") === language,
-  ).map((path) => replacementByPath.get(path) ?? exclusion(path));
-  for (const replacement of replacements) {
-    if (!entries.some((entry) => entry.path === replacement.path)) entries.push(replacement);
-  }
-  return { schemaVersion: COVERAGE_SCHEMA_VERSION, entries };
-}
-
-function scored(
-  path = "packages/core/src/document-protocol.ts",
-  metrics = { lines: 90, functions: 85 },
-): CoverageThresholdEntry {
-  return {
-    path,
-    language: "typescript",
-    tier: "A",
-    metrics,
-    owner: "core-owner",
-    rationale: "Snapshot input is a trust boundary",
-  };
-}
+const POLICY: CoveragePolicy = {
+  schemaVersion: COVERAGE_SCHEMA_VERSION,
+  floors: {
+    typescript: { lines: 90, functions: 80 },
+    rust: { lines: 80, functions: 80, regions: 80 },
+  },
+  exclusions: [{ path: "packages/core/src/types.ts", reason: "Type-only module" }],
+};
 
 function record(
   path = "packages/core/src/document-protocol.ts",
@@ -67,10 +34,6 @@ function record(
     functions: { covered: 17, total: 20 },
     uncoveredLines: Array.from({ length: lines.total - lines.covered }, (_, index) => index + 1),
   };
-}
-
-function runtimePaths(entries: readonly CoverageThresholdEntry[]): string[] {
-  return entries.flatMap((entry) => entry.members ?? [entry.path]);
 }
 
 describe("LCOV parser", () => {
@@ -95,28 +58,6 @@ describe("LCOV parser", () => {
     expect(() => parseLcov(report.replace("DA:11,0", "DA:11,NaN"), ROOT)).toThrow(
       "finite non-negative integer",
     );
-  });
-
-  it("serializes normalized records as complete parseable LCOV", () => {
-    const source = [
-      "SF:packages/core/src/grid.ts",
-      "FNF:2",
-      "FNH:1",
-      "DA:10,2",
-      "DA:11,0",
-      "LF:2",
-      "LH:1",
-      "end_of_record",
-    ].join("\n");
-    const records = parseLcov(source, ROOT);
-    expect(parseLcov(serialiseNormalizedLcov(records), ROOT)).toMatchObject([
-      {
-        path: "packages/core/src/grid.ts",
-        lines: { covered: 1, total: 2 },
-        functions: { covered: 1, total: 2 },
-        uncoveredLines: [11],
-      },
-    ]);
   });
 
   it("merges sharded line hits while conservatively ratcheting function coverage", () => {
@@ -167,7 +108,7 @@ describe("LCOV parser", () => {
   });
 });
 
-describe("source-only classification", () => {
+describe("scored source selection", () => {
   it("keeps adjacent runtime source while filtering dist/test/generated records", () => {
     const records = [
       record("packages/core/src/grid.ts"),
@@ -183,229 +124,122 @@ describe("source-only classification", () => {
     expect(isCoverageContamination("packages/core/src/grid.ts")).toBe(false);
     expect(isCoverageContamination("packages/core/dist/grid.js")).toBe(true);
   });
-  it("recomputes stale Rust line summaries from DA counters", () => {
+
+  it("scores new runtime files automatically, skips exclusions, and rejects stale exclusions", () => {
+    const scored = scoredRuntimePaths(POLICY, "typescript", [
+      "packages/core/src/grid.ts",
+      "packages/core/src/new-runtime.ts",
+      "packages/core/src/types.ts",
+    ]);
+    expect([...scored]).toEqual(["packages/core/src/grid.ts", "packages/core/src/new-runtime.ts"]);
+    expect(() => scoredRuntimePaths(POLICY, "typescript", ["packages/core/src/grid.ts"])).toThrow(
+      "Coverage exclusion has no runtime source file: packages/core/src/types.ts",
+    );
+    expect([...scoredRuntimePaths(POLICY, "rust", ["packages/wasm/src/calc.rs"])]).toEqual([
+      "packages/wasm/src/calc.rs",
+    ]);
+  });
+});
+
+describe("aggregate floors", () => {
+  const scoredPaths = new Set(["packages/core/src/a.ts", "packages/core/src/b.ts"]);
+
+  it("passes at the floor and fails one line below it, summing across files", () => {
+    const fullyCovered = record("packages/core/src/a.ts", { covered: 100, total: 100 });
+    const atFloor = [fullyCovered, record("packages/core/src/b.ts", { covered: 80, total: 100 })];
     expect(
-      parseLcov(
-        "SF:packages/wasm/src/calc.rs\nFNF:0\nFNH:0\nDA:1,1\nLF:2\nLH:2\nend_of_record",
-        ROOT,
-        "recompute",
-      )[0]?.lines,
-    ).toEqual({ covered: 1, total: 1 });
+      evaluateCoveragePolicy({
+        policy: POLICY,
+        language: "typescript",
+        records: atFloor,
+        scoredPaths,
+      }),
+    ).toEqual({ lines: { covered: 180, total: 200 }, functions: { covered: 34, total: 40 } });
+
+    const belowFloor = [
+      fullyCovered,
+      record("packages/core/src/b.ts", { covered: 79, total: 100 }),
+    ];
+    expect(() =>
+      evaluateCoveragePolicy({
+        policy: POLICY,
+        language: "typescript",
+        records: belowFloor,
+        scoredPaths,
+      }),
+    ).toThrow("typescript lines coverage 89.50% (179/200) is below the 90% floor");
   });
 
-  it("rejects a newly added unclassified runtime source and a stale threshold path", () => {
-    const manifest = manifestFor("typescript");
+  it("fails when a scored source is missing from the report or generated output is scored", () => {
     expect(() =>
       evaluateCoveragePolicy({
-        manifest,
+        policy: POLICY,
         language: "typescript",
-        records: [],
-        runtimePaths: [...runtimePaths(manifest.entries), "packages/core/src/new-runtime.ts"],
+        records: [record("packages/core/src/a.ts", { covered: 100, total: 100 })],
+        scoredPaths,
       }),
-    ).toThrow("Unclassified runtime source file");
-
-    const stale = scored("packages/core/src/moved-away.ts");
-    const staleManifest = manifestFor("typescript", [stale]);
+    ).toThrow("Coverage report is missing scored source: packages/core/src/b.ts");
     expect(() =>
       evaluateCoveragePolicy({
-        manifest: staleManifest,
+        policy: POLICY,
         language: "typescript",
-        records: [record(stale.path)],
-        runtimePaths: runtimePaths(staleManifest.entries).filter((path) => path !== stale.path),
-      }),
-    ).toThrow("has no runtime source file");
-  });
-
-  it("rejects missing Tier A/B risk modules and generated contamination in the scored set", () => {
-    const manifest = manifestFor("typescript");
-    const withoutRebase = {
-      ...manifest,
-      entries: manifest.entries.filter((entry) => entry.path !== "packages/core/src/rebase.ts"),
-    };
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest: withoutRebase,
-        language: "typescript",
-        records: [],
-        runtimePaths: runtimePaths(withoutRebase.entries),
-      }),
-    ).toThrow("Missing required risk module classification");
-
-    const generated = scored("packages/core/dist/grid.js");
-    const contaminated = manifestFor("typescript", [generated]);
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest: contaminated,
-        language: "typescript",
-        records: [record(generated.path)],
-        runtimePaths: runtimePaths(contaminated.entries),
+        records: [record("packages/core/dist/grid.js")],
+        scoredPaths: new Set(),
       }),
     ).toThrow("Generated/test output entered scored coverage");
   });
-});
 
-describe("risk floors", () => {
-  it("passes the approved baseline and higher actual coverage without rewriting policy", () => {
-    const entry = scored();
-    const manifest = manifestFor("typescript", [entry]);
-    const paths = runtimePaths(manifest.entries);
-    expect(
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [record()],
-        runtimePaths: paths,
-      }).records,
-    ).toHaveLength(1);
-    expect(
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [record(entry.path, { covered: 96, total: 100 })],
-        runtimePaths: paths,
-      }).records,
-    ).toHaveLength(1);
-  });
-
-  it("fails on a one-line drop, a missing source record, and a floor below the hard tier minimum", () => {
-    const entry = scored();
-    const manifest = manifestFor("typescript", [entry]);
-    const paths = runtimePaths(manifest.entries);
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [record(entry.path, { covered: 89, total: 100 })],
-        runtimePaths: paths,
-      }),
-    ).toThrow("below 90%");
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [],
-        runtimePaths: paths,
-      }),
-    ).toThrow("missing scored source");
-
-    const low = scored(entry.path, { lines: 89, functions: 85 });
-    const lowManifest = manifestFor("typescript", [low]);
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest: lowManifest,
-        language: "typescript",
-        records: [record()],
-        runtimePaths: runtimePaths(lowManifest.entries),
-      }),
-    ).toThrow("below Tier A minimum");
-  });
-});
-
-describe("aggregate risk floors", () => {
-  it("enforces aggregate floors and inherited per-file Tier A/B minimums", () => {
-    const members = [
-      "packages/core/src/store/facade.ts",
-      "packages/core/src/store/engine.ts",
-    ] as const;
-    const group: CoverageThresholdEntry = {
-      ...scored("packages/core/src/store/**", { lines: 95, functions: 85 }),
-      members,
+  it("enforces Rust region floors", () => {
+    const rustRecord: CoverageRecord = {
+      ...record("packages/wasm/src/calc.rs", { covered: 100, total: 100 }),
+      functions: { covered: 10, total: 10 },
+      regions: { covered: 79, total: 100 },
     };
-    const manifest = manifestFor("typescript", [group]);
-    const paths = runtimePaths(manifest.entries);
-    const records = [
-      record(members[0], { covered: 100, total: 100 }),
-      record(members[1], { covered: 90, total: 100 }),
-    ];
-    expect(
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records,
-        runtimePaths: paths,
-      }).records,
-    ).toHaveLength(2);
-
     expect(() =>
       evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [records[0]!, record(members[1], { covered: 89, total: 100 })],
-        runtimePaths: paths,
+        policy: POLICY,
+        language: "rust",
+        records: [rustRecord],
+        scoredPaths: new Set([rustRecord.path]),
       }),
-    ).toThrow(`${members[1]} lines coverage 89.00% (89/100) is below inherited Tier A minimum 90%`);
-
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [
-          record(members[0], { covered: 99, total: 100 }),
-          record(members[1], { covered: 90, total: 100 }),
-        ],
-        runtimePaths: paths,
-      }),
-    ).toThrow("packages/core/src/store/** lines coverage 94.50% (189/200) is below 95%");
-  });
-
-  it("keeps Tier C aggregate groups exempt from per-file inheritance", () => {
-    const members = ["packages/core/src/types/a.ts", "packages/core/src/types/b.ts"] as const;
-    const group: CoverageThresholdEntry = {
-      ...scored("packages/core/src/types/**", { lines: 75, functions: 70 }),
-      tier: "C",
-      members,
-    };
-    const manifest = manifestFor("typescript", [group]);
-    expect(() =>
-      evaluateCoveragePolicy({
-        manifest,
-        language: "typescript",
-        records: [
-          record(members[0], { covered: 100, total: 100 }),
-          record(members[1], { covered: 50, total: 100 }),
-        ],
-        runtimePaths: runtimePaths(manifest.entries),
-      }),
-    ).not.toThrow();
+    ).toThrow("rust regions coverage 79.00% (79/100) is below the 80% floor");
   });
 });
 
-describe("manifest schema", () => {
-  it("rejects unjustified exclusions, empty ownership, and unsupported schema versions", () => {
-    const base = exclusion("packages/core/src/types.ts");
+describe("policy schema", () => {
+  const valid = {
+    schemaVersion: COVERAGE_SCHEMA_VERSION,
+    floors: { typescript: { lines: 90, functions: 80 }, rust: { lines: 80, functions: 80 } },
+    exclusions: [{ path: "packages/core/src/types.ts", reason: "Type-only module" }],
+  };
+
+  it("rejects unjustified exclusions, missing floors, and unsupported schema versions", () => {
     expect(() =>
-      parseCoverageManifest({
-        schemaVersion: COVERAGE_SCHEMA_VERSION,
-        entries: [{ ...base, exclusion: { reason: "type-only", command: "" } }],
+      parseCoveragePolicy({
+        ...valid,
+        exclusions: [{ path: "packages/core/src/types.ts", reason: "" }],
       }),
-    ).toThrow("command must be non-empty");
+    ).toThrow("reason must be non-empty");
     expect(() =>
-      parseCoverageManifest({
-        schemaVersion: COVERAGE_SCHEMA_VERSION,
-        entries: [{ ...base, owner: "" }],
-      }),
-    ).toThrow("owner must be non-empty");
-    expect(() => parseCoverageManifest({ schemaVersion: 1, entries: [] })).toThrow(
-      "Unsupported coverage threshold schema version",
+      parseCoveragePolicy({ ...valid, floors: { ...valid.floors, rust: { lines: 80 } } }),
+    ).toThrow("Coverage rust floor functions must be an integer percentage");
+    expect(() => parseCoveragePolicy({ ...valid, schemaVersion: 2 })).toThrow(
+      "Unsupported coverage policy schema version",
     );
   });
 
-  it("fails closed on unknown manifest, entry, metrics, and exclusion fields", () => {
-    const base = exclusion("packages/core/src/types.ts");
+  it("fails closed on unknown policy, floor, and exclusion fields", () => {
     const cases = [
-      { schemaVersion: COVERAGE_SCHEMA_VERSION, entries: [], typo: true },
-      { schemaVersion: COVERAGE_SCHEMA_VERSION, entries: [{ ...base, typo: true }] },
+      { ...valid, typo: true },
+      { ...valid, floors: { ...valid.floors, go: { lines: 1, functions: 1 } } },
       {
-        schemaVersion: COVERAGE_SCHEMA_VERSION,
-        entries: [{ ...scored(), metrics: { lines: 90, functions: 85, statements: 90 } }],
+        ...valid,
+        floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
       },
-      {
-        schemaVersion: COVERAGE_SCHEMA_VERSION,
-        entries: [{ ...base, exclusion: { ...base.exclusion, ticket: "SEC-1" } }],
-      },
+      { ...valid, exclusions: [{ ...valid.exclusions[0], ticket: "SEC-1" }] },
     ];
     for (const value of cases) {
-      expect(() => parseCoverageManifest(value)).toThrow("unknown field");
+      expect(() => parseCoveragePolicy(value)).toThrow("unknown field");
     }
   });
 });

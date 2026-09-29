@@ -3,14 +3,15 @@ import { extname, resolve } from "node:path";
 import {
   type CoverageLanguage,
   type CoverageRecord,
-  type CoverageThresholdEntry,
+  type CoverageTotals,
   evaluateCoveragePolicy,
   filterRuntimeRecords,
   type LcovRecord,
   mergeLcovRecords,
   normalizeRustCoverage,
-  parseCoverageManifest,
+  parseCoveragePolicy,
   parseLcov,
+  scoredRuntimePaths,
   serialiseNormalizedLcov,
 } from "./coverage-check.js";
 
@@ -98,31 +99,24 @@ async function outputOf(command: readonly string[], root: string): Promise<strin
   return stdout.trim();
 }
 
-function entrySourcePaths(entry: CoverageThresholdEntry): readonly string[] {
-  return entry.members ?? [entry.path];
-}
-
 function ratio(counts: { covered: number; total: number }): string {
   const percent = counts.total === 0 ? 100 : (counts.covered * 100) / counts.total;
   return `${percent.toFixed(2)}% (${counts.covered}/${counts.total})`;
 }
 
-function printTable(
-  records: readonly CoverageRecord[],
-  entries: readonly CoverageThresholdEntry[],
-): void {
-  const entryByPath = new Map(
-    entries.flatMap((entry) => entrySourcePaths(entry).map((path) => [path, entry] as const)),
-  );
+function printTable(records: readonly CoverageRecord[], totals: CoverageTotals): void {
   console.log(
-    "Tier  Source                                                   Lines              Functions          Regions",
+    "Source                                                   Lines              Functions          Regions",
   );
   for (const record of [...records].sort((left, right) => left.path.localeCompare(right.path))) {
-    const tier = entryByPath.get(record.path)?.tier ?? "?";
     console.log(
-      `${tier.padEnd(5)} ${record.path.padEnd(56)} ${ratio(record.lines).padEnd(18)} ${ratio(record.functions).padEnd(18)} ${record.regions ? ratio(record.regions) : "-"}`,
+      `${record.path.padEnd(56)} ${ratio(record.lines).padEnd(18)} ${ratio(record.functions).padEnd(18)} ${record.regions ? ratio(record.regions) : "-"}`,
     );
   }
+  const regions = totals.regions ? ratio(totals.regions) : "-";
+  console.log(
+    `${"TOTAL".padEnd(56)} ${(totals.lines ? ratio(totals.lines) : "-").padEnd(18)} ${(totals.functions ? ratio(totals.functions) : "-").padEnd(18)} ${regions}`,
+  );
 }
 
 function lineRanges(lines: readonly number[]): string {
@@ -137,20 +131,11 @@ function lineRanges(lines: readonly number[]): string {
     .join(", ");
 }
 
-function uncoveredDiagnostics(
-  records: readonly CoverageRecord[],
-  entries: readonly CoverageThresholdEntry[],
-): string {
-  const recordByPath = new Map(records.map((record) => [record.path, record]));
-  const sections: string[] = [];
-  for (const entry of entries) {
-    if (entry.exclusion || (entry.tier !== "A" && entry.tier !== "B")) continue;
-    const diagnostics = entrySourcePaths(entry).map((path) => {
-      const record = recordByPath.get(path);
-      return `  ${path}: ${record ? lineRanges(record.uncoveredLines) || "none" : "MISSING RECORD"}`;
-    });
-    sections.push(`${entry.tier} ${entry.path}\n${diagnostics.join("\n")}`);
-  }
+function uncoveredDiagnostics(records: readonly CoverageRecord[]): string {
+  const sections = [...records]
+    .filter((record) => record.uncoveredLines.length > 0)
+    .sort((left, right) => left.path.localeCompare(right.path))
+    .map((record) => `${record.path}: ${lineRanges(record.uncoveredLines)}`);
   return `${sections.join("\n")}\n`;
 }
 
@@ -179,10 +164,10 @@ async function loadPolicy(root: string) {
     raw = JSON.parse(text);
   } catch (error) {
     throw new Error(
-      `Coverage threshold manifest is malformed JSON: ${error instanceof Error ? error.message : error}`,
+      `Coverage policy is malformed JSON: ${error instanceof Error ? error.message : error}`,
     );
   }
-  return parseCoverageManifest(raw);
+  return parseCoveragePolicy(raw);
 }
 
 async function writeArtifacts(options: {
@@ -190,18 +175,14 @@ async function writeArtifacts(options: {
   language: CoverageLanguage;
   artifactRoot: string;
   records: readonly CoverageRecord[];
-  entries: readonly CoverageThresholdEntry[];
 }): Promise<void> {
-  const { root, language, artifactRoot, records, entries } = options;
+  const { root, language, artifactRoot, records } = options;
   await writeFile(
     resolve(root, artifactRoot, "normalized.json"),
     normalizedJson(language, records),
   );
   await writeFile(resolve(root, artifactRoot, "lcov.info"), serialiseNormalizedLcov(records));
-  await writeFile(
-    resolve(root, artifactRoot, "uncovered-tier-ab.txt"),
-    uncoveredDiagnostics(records, entries),
-  );
+  await writeFile(resolve(root, artifactRoot, "uncovered.txt"), uncoveredDiagnostics(records));
 }
 
 export async function runTypeScriptCoverage(root = resolve(import.meta.dir, "..")): Promise<void> {
@@ -241,21 +222,16 @@ export async function runTypeScriptCoverage(root = resolve(import.meta.dir, ".."
   }
   const rawRecords = mergeLcovRecords(reports);
   await writeFile(resolve(root, rawRoot, "lcov.info"), serialiseNormalizedLcov(rawRecords));
-  const manifest = await loadPolicy(root);
-  const runtimePaths = await discoverRuntimePaths(root, "typescript");
-  const entries = manifest.entries.filter((entry) => entry.language === "typescript");
-  const scoredPaths = new Set(
-    entries.filter((entry) => !entry.exclusion).flatMap((entry) => entrySourcePaths(entry)),
+  const policy = await loadPolicy(root);
+  const scoredPaths = scoredRuntimePaths(
+    policy,
+    "typescript",
+    await discoverRuntimePaths(root, "typescript"),
   );
   const records = filterRuntimeRecords(rawRecords, scoredPaths);
-  await writeArtifacts({ root, language: "typescript", artifactRoot, records, entries });
-  const result = evaluateCoveragePolicy({
-    manifest,
-    language: "typescript",
-    records,
-    runtimePaths,
-  });
-  printTable(result.records, result.entries);
+  await writeArtifacts({ root, language: "typescript", artifactRoot, records });
+  const totals = evaluateCoveragePolicy({ policy, language: "typescript", records, scoredPaths });
+  printTable(records, totals);
   console.log(`TypeScript source coverage passed for ${records.length} scored runtime files`);
 }
 
@@ -306,12 +282,8 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
     root,
   );
 
-  const manifest = await loadPolicy(root);
-  const runtimePaths = await discoverRuntimePaths(root, "rust");
-  const entries = manifest.entries.filter((entry) => entry.language === "rust");
-  const scoredPaths = new Set(
-    entries.filter((entry) => !entry.exclusion).flatMap((entry) => entrySourcePaths(entry)),
-  );
+  const policy = await loadPolicy(root);
+  const scoredPaths = scoredRuntimePaths(policy, "rust", await discoverRuntimePaths(root, "rust"));
   const lcovText = await readFile(resolve(root, rawRoot, "lcov.info"), "utf8");
   const lcovRecords = parseLcov(lcovText, root, "recompute");
   const llvmJson = JSON.parse(
@@ -319,9 +291,9 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
   ) as unknown;
   const normalized = normalizeRustCoverage(llvmJson, lcovRecords, root);
   const records = filterRuntimeRecords(normalized, scoredPaths);
-  await writeArtifacts({ root, language: "rust", artifactRoot, records, entries });
-  const result = evaluateCoveragePolicy({ manifest, language: "rust", records, runtimePaths });
-  printTable(result.records, result.entries);
+  await writeArtifacts({ root, language: "rust", artifactRoot, records });
+  const totals = evaluateCoveragePolicy({ policy, language: "rust", records, scoredPaths });
+  printTable(records, totals);
   console.log(`Rust source coverage passed for ${records.length} scored runtime files`);
 }
 
