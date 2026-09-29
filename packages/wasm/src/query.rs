@@ -479,7 +479,7 @@ impl CellStore {
         if cols.iter().any(|&col| col as usize >= data.n_cols) {
             return Vec::new();
         }
-        let mut rows: Vec<u32> = if candidates.is_empty() {
+        let rows: Vec<u32> = if candidates.is_empty() {
             (0..data.row_count as u32).collect()
         } else {
             candidates
@@ -488,23 +488,50 @@ impl CellStore {
                 .filter(|&row| (row as usize) < data.row_count)
                 .collect()
         };
-        rows.sort_by(|&left, &right| {
-            for (key, &col) in cols.iter().enumerate() {
-                let base = col as usize * data.row_count;
-                let a = ComparableCell::from_cell(data, &self.strings, base + left as usize);
-                let b = ComparableCell::from_cell(data, &self.strings, base + right as usize);
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
-                    a.cmp(&b)
+        let row_count = rows.len();
+        // Decorate-sort-undecorate per key, the same way the one-key path does:
+        // a comparison sort that rebuilt both operands would reconstruct each
+        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
+        // every time. Keys are stored key-major so the first key — the one that
+        // decides nearly every comparison — stays contiguous.
+        let paged = data.is_paged();
+        let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
+        for &col in cols {
+            let base = col as usize * data.row_count;
+            for &row in &rows {
+                let index = base + row as usize;
+                keys.push(if paged {
+                    ComparableCell::from_cell(data, &self.strings, index)
                 } else {
-                    b.cmp(&a)
+                    // SAFETY: `col < n_cols` and `row < row_count`, so the dense
+                    // column index is in bounds.
+                    unsafe { ComparableCell::from_cell_unchecked(data, &self.strings, index) }
+                });
+            }
+        }
+        let mut positions: Vec<u32> = (0..row_count as u32).collect();
+        // The comparator stays total only when every key is a number or text: a
+        // NaN key compares equal to everything. A stable sort keeps the output
+        // identical to the previous comparator for that case too.
+        positions.sort_by(|&left, &right| {
+            for key in 0..cols.len() {
+                let a = &keys[key * row_count + left as usize];
+                let b = &keys[key * row_count + right as usize];
+                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
+                    a.cmp(b)
+                } else {
+                    b.cmp(a)
                 };
                 if order != Ordering::Equal {
                     return order;
                 }
             }
-            left.cmp(&right)
+            rows[left as usize].cmp(&rows[right as usize])
         });
-        rows
+        positions
+            .into_iter()
+            .map(|position| rows[position as usize])
+            .collect()
     }
 
     #[allow(clippy::too_many_arguments)]

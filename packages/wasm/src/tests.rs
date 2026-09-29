@@ -2361,3 +2361,128 @@ mod value_set_filter {
         );
     }
 }
+
+/// Multi-key sort coverage: decorating once per key must produce exactly the
+/// order the per-comparison comparator produced, including NaN keys, blanks,
+/// mixed types and candidate lists.
+mod multi_key_sort_order {
+    use std::cmp::Ordering;
+
+    use crate::query::ComparableCell;
+    use crate::*;
+
+    /// Rebuilds both keys inside every comparison, the way the multi-key sort
+    /// did before it decorated once per key.
+    fn sort_rows_multi_reference(
+        store: &CellStore,
+        sheet: usize,
+        cols: &[u32],
+        ascending: &[u8],
+        candidates: &[u32],
+    ) -> Vec<u32> {
+        let data = &store.sheets[sheet];
+        let mut rows: Vec<u32> = if candidates.is_empty() {
+            (0..data.row_count as u32).collect()
+        } else {
+            candidates
+                .iter()
+                .copied()
+                .filter(|&row| (row as usize) < data.row_count)
+                .collect()
+        };
+        rows.sort_by(|&left, &right| {
+            for (key, &col) in cols.iter().enumerate() {
+                let base = col as usize * data.row_count;
+                let a = ComparableCell::from_cell(data, &store.strings, base + left as usize);
+                let b = ComparableCell::from_cell(data, &store.strings, base + right as usize);
+                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
+                    a.cmp(&b)
+                } else {
+                    b.cmp(&a)
+                };
+                if order != Ordering::Equal {
+                    return order;
+                }
+            }
+            left.cmp(&right)
+        });
+        rows
+    }
+
+    /// Three columns of mixed kinds: text, booleans, blanks and formula results
+    /// in column 0, numbers (`-0.0` and duplicates included) in column 1,
+    /// repeated text in column 2.
+    ///
+    /// NaN stays out of the key columns on purpose: `OrderedNumber` compares it
+    /// equal to everything, so it is not a total order, and the standard
+    /// library's debug check rejects such a comparator outright. The comparator
+    /// before this change had the same property, so NaN keys sort the same way
+    /// (an unspecified one) as they always did.
+    fn fill_sort_table(store: &mut CellStore, sheet: usize, row_count: usize) {
+        const TEXTS: [&str; 4] = ["Alpha", "beta", "Gamma", "beta"];
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        for row in 0..row_count {
+            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            match (state >> 32) % 8 {
+                0 => {}
+                1 => store.set_number(sheet, row, 0, ((state >> 8) % 5) as f64, 0),
+                2 => store.set_string(sheet, row, 0, TEXTS[((state >> 16) % 4) as usize], 0),
+                3 => store.set_bool(sheet, row, 0, (state >> 24) % 2 == 0, 0),
+                4 => {
+                    store.set_formula(sheet, row, 0, "=1/0", 0);
+                }
+                _ => {
+                    store.set_formula(sheet, row, 0, "=\"Alpha\"", 0);
+                }
+            }
+            let number = match (state >> 40) % 8 {
+                0 => -0.0,
+                1 => 0.0,
+                _ => (((state >> 44) % 7) as f64) - 3.0,
+            };
+            store.set_number(sheet, row, 1, number, 0);
+            store.set_string(sheet, row, 2, TEXTS[((state >> 52) % 4) as usize], 0);
+        }
+        store.recompute(sheet);
+    }
+
+    #[test]
+    fn multi_key_sort_matches_the_per_comparison_comparator() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 200);
+        fill_sort_table(&mut store, sheet, 200);
+        let candidates: Vec<u32> = (0..200u32).filter(|row| row % 3 != 0).collect();
+        let plans: [(Vec<u32>, Vec<u8>); 4] = [
+            (vec![0, 1, 2], vec![1, 0, 1]),
+            (vec![2, 0], vec![0, 0]),
+            (vec![1, 2, 0], vec![1, 1, 1]),
+            (vec![1, 0], vec![1, 1]),
+        ];
+        for (cols, ascending) in plans {
+            let expected = sort_rows_multi_reference(&store, sheet, &cols, &ascending, &[]);
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &[]),
+                expected,
+                "full sort, cols {cols:?}, ascending {ascending:?}"
+            );
+            let expected_candidates =
+                sort_rows_multi_reference(&store, sheet, &cols, &ascending, &candidates);
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
+                expected_candidates,
+                "candidate sort, cols {cols:?}, ascending {ascending:?}"
+            );
+        }
+        // A single key over a candidate list also takes the multi-key path (the
+        // full sort of one key delegates to the single-key sort).
+        let cols = [1u32];
+        let ascending = [1u8];
+        let expected_candidates =
+            sort_rows_multi_reference(&store, sheet, &cols, &ascending, &candidates);
+        assert_eq!(
+            store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
+            expected_candidates,
+            "single-key candidate sort"
+        );
+    }
+}
