@@ -2224,3 +2224,140 @@ fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
         vec!["Value".into()],
     ));
 }
+
+/// "Values" filter coverage: the per-column lookup must answer exactly what the
+/// linear scan answered, including NaN, `-0.0`, blanks, booleans and text.
+mod value_set_filter {
+    use crate::*;
+
+    /// Sentinel the view layer sends for a picked boolean; the `\0` prefix keeps
+    /// it distinct from a cell holding the text `TRUE`.
+    const PICKED_TRUE: &str = "\0TRUE";
+    /// Sentinel for a picked `FALSE`; see [`PICKED_TRUE`].
+    const PICKED_FALSE: &str = "\0FALSE";
+
+    /// One column of 15 rows covering every kind the filter distinguishes:
+    /// numbers (`-0.0` and NaN included), pooled text, a text cell that spells a
+    /// boolean, real booleans, a blank, an error formula and a text formula.
+    fn mixed_column_store() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 15);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 1, 0, -0.0, 0);
+        store.set_number(sheet, 2, 0, 0.0, 0);
+        store.set_number(sheet, 3, 0, f64::NAN, 0);
+        store.set_number(sheet, 4, 0, 2.0, 0);
+        store.set_string(sheet, 5, 0, "Alpha", 0);
+        store.set_string(sheet, 6, 0, "Beta", 0);
+        store.set_string(sheet, 7, 0, "TRUE", 0);
+        store.set_bool(sheet, 8, 0, true, 0);
+        store.set_bool(sheet, 9, 0, false, 0);
+        // Row 10 stays blank.
+        store.set_formula(sheet, 11, 0, "=1/0", 0);
+        store.set_formula(sheet, 12, 0, "=\"Alpha\"", 0);
+        store.set_number(sheet, 13, 0, 3.0, 0);
+        store.set_number(sheet, 14, 0, 7.0, 0);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    /// Runs a "values" filter over column 0; nine or more picks take the lookup
+    /// path, eight or fewer the linear scan.
+    fn filter_values(
+        store: &CellStore,
+        sheet: usize,
+        numbers: &[f64],
+        texts: &[&str],
+        include_blank: bool,
+    ) -> Vec<u32> {
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[0],
+            &[u8::from(include_blank)],
+            &[],
+            &[numbers.len() as u32],
+            &[texts.len() as u32],
+            numbers,
+            texts.iter().map(|text| (*text).to_string()).collect(),
+        )
+    }
+
+    #[test]
+    fn value_lookup_matches_the_linear_scan_for_numbers_with_nan_and_negative_zero() {
+        let (store, sheet) = mixed_column_store();
+        let long = [1.0, 0.0, -0.0, f64::NAN, 2.0, 3.0, 4.0, 5.0, 5.0];
+        let short = [1.0, 0.0, -0.0, f64::NAN, 2.0, 3.0, 4.0, 5.0];
+        // NaN is never equal to anything, and `-0.0` equals `0.0`; the NaN cell
+        // in row 3 and the unpicked 7.0 in row 14 stay out either way.
+        let expected = vec![0, 1, 2, 4, 13];
+        assert_eq!(filter_values(&store, sheet, &long, &[], false), expected);
+        assert_eq!(filter_values(&store, sheet, &short, &[], false), expected);
+    }
+
+    #[test]
+    fn value_lookup_matches_the_linear_scan_for_text_and_error_cells() {
+        let (store, sheet) = mixed_column_store();
+        let long = [
+            PICKED_TRUE,
+            PICKED_FALSE,
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "#DIV/0!",
+            "TRUE",
+            "delta",
+            "delta",
+        ];
+        let short = [
+            PICKED_TRUE,
+            PICKED_FALSE,
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "#DIV/0!",
+            "TRUE",
+            "delta",
+        ];
+        // Rows: both pooled text values, the text cell spelling TRUE, both real
+        // booleans, and the error formula whose sentinel text is a pick.
+        let expected = vec![5, 6, 7, 8, 9, 11, 12];
+        assert_eq!(filter_values(&store, sheet, &[], &long, false), expected);
+        assert_eq!(filter_values(&store, sheet, &[], &short, false), expected);
+    }
+
+    #[test]
+    fn boolean_picks_match_boolean_cells_only() {
+        let (store, sheet) = mixed_column_store();
+        let picks = [
+            PICKED_TRUE,
+            PICKED_FALSE,
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f",
+            "g",
+        ];
+        // The text cell in row 7 spells TRUE but is not a boolean.
+        assert_eq!(filter_values(&store, sheet, &[], &picks, false), vec![8, 9]);
+    }
+
+    #[test]
+    fn value_lookup_includes_blanks_only_when_asked() {
+        let (store, sheet) = mixed_column_store();
+        let picks = [
+            "Alpha", "Beta", "Gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota",
+        ];
+        // Row 12 is the text formula resolving to "Alpha".
+        assert_eq!(
+            filter_values(&store, sheet, &[], &picks, false),
+            vec![5, 6, 12]
+        );
+        assert_eq!(
+            filter_values(&store, sheet, &[], &picks, true),
+            vec![5, 6, 10, 12]
+        );
+    }
+}

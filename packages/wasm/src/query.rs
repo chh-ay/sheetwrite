@@ -60,6 +60,70 @@ thread_local! {
     static QUERY_STATS: Cell<[u64; 2]> = const { Cell::new([0, 0]) };
 }
 
+/// Longest picked-value list still scanned linearly: below this, building a
+/// lookup costs more than the comparisons it saves.
+const VALUE_SET_LINEAR_MAX: usize = 8;
+/// Sentinel the view layer sends for a picked `TRUE`. The `\0` prefix keeps it
+/// distinct from a cell that holds the text `TRUE`.
+const VALUE_SET_TRUE: &str = "\0TRUE";
+/// Sentinel for a picked `FALSE`; see [`VALUE_SET_TRUE`].
+const VALUE_SET_FALSE: &str = "\0FALSE";
+/// [`ValueSet::Lookup::bools`] bit set when `FALSE` was picked.
+const VALUE_SET_FALSE_BIT: u8 = 1;
+/// [`ValueSet::Lookup::bools`] bit set when `TRUE` was picked.
+const VALUE_SET_TRUE_BIT: u8 = 2;
+
+/// Picked values of one "values" filter column, prepared once per scan.
+///
+/// The row loop then answers membership in constant time per cell instead of
+/// comparing the cell with every picked value. `Linear` keeps the original scan
+/// for lists short enough that a lookup costs more than it saves.
+enum ValueSet<'a> {
+    Linear,
+    Lookup {
+        /// Picked numbers as bit patterns, sorted for binary search. `-0.0` is
+        /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
+        /// equality can match.
+        numbers: Vec<u64>,
+        /// Picked text; a cell matches when its resolved text equals an entry.
+        texts: HashSet<&'a str>,
+        /// Picked booleans, as the two bits above.
+        bools: u8,
+    },
+}
+
+impl<'a> ValueSet<'a> {
+    /// Prepares the lookup for one column, or `Linear` when the picked list is
+    /// short enough that a scan beats a table.
+    fn build(picked_numbers: &[f64], picked_texts: &'a [String]) -> Self {
+        if picked_numbers.len() + picked_texts.len() <= VALUE_SET_LINEAR_MAX {
+            return ValueSet::Linear;
+        }
+        let mut numbers: Vec<u64> = picked_numbers
+            .iter()
+            .filter(|value| !value.is_nan())
+            .map(|value| (if *value == 0.0 { 0.0 } else { *value }).to_bits())
+            .collect();
+        numbers.sort_unstable();
+        numbers.dedup();
+        let mut texts = HashSet::with_capacity(picked_texts.len());
+        let mut bools = 0u8;
+        for picked in picked_texts {
+            match picked.as_str() {
+                VALUE_SET_TRUE => bools |= VALUE_SET_TRUE_BIT,
+                VALUE_SET_FALSE => bools |= VALUE_SET_FALSE_BIT,
+                _ => {}
+            }
+            texts.insert(picked.as_str());
+        }
+        ValueSet::Lookup {
+            numbers,
+            texts,
+            bools,
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
@@ -486,6 +550,23 @@ impl CellStore {
             current[0] = current[0].saturating_add(match_caches.len() as u64);
             stats.set(current);
         });
+        // One membership table per "values" column, built once for the scan.
+        let mut value_sets: Vec<ValueSet<'_>> = Vec::with_capacity(kinds.len());
+        for (i, &kind) in kinds.iter().enumerate() {
+            if kind != 0 {
+                value_sets.push(ValueSet::Linear);
+                continue;
+            }
+            let num_count = num_counts.get(i).copied().unwrap_or(0) as usize;
+            let text_count = text_counts.get(i).copied().unwrap_or(0) as usize;
+            let picked_numbers = value_nums
+                .get(num_offsets[i]..num_offsets[i] + num_count)
+                .unwrap_or_default();
+            let picked_texts = value_texts
+                .get(text_offsets[i]..text_offsets[i] + text_count)
+                .unwrap_or_default();
+            value_sets.push(ValueSet::build(picked_numbers, picked_texts));
+        }
         let mut out = Vec::new();
         'rows: for row in 0..data.row_count {
             for i in 0..cols.len() {
@@ -496,29 +577,59 @@ impl CellStore {
                         let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
                         let nc = num_counts.get(i).copied().unwrap_or(0) as usize;
                         let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
-                        if kind == 1 {
-                            if let Some(value) = numeric_cell_value(data, index) {
-                                hit |= value_nums
-                                    .get(num_offsets[i]..num_offsets[i] + nc)
-                                    .unwrap_or(&[])
-                                    .contains(&value);
+                        match &value_sets[i] {
+                            ValueSet::Linear => {
+                                if kind == 1 {
+                                    if let Some(value) = numeric_cell_value(data, index) {
+                                        hit |= value_nums
+                                            .get(num_offsets[i]..num_offsets[i] + nc)
+                                            .unwrap_or(&[])
+                                            .contains(&value);
+                                    }
+                                } else if kind == 2 {
+                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                        hit |= value_texts
+                                            .get(text_offsets[i]..text_offsets[i] + tc)
+                                            .unwrap_or(&[])
+                                            .iter()
+                                            .any(|picked| picked == text);
+                                    }
+                                } else if kind == 3 {
+                                    if let Some(value) = boolean_cell_value(data, index) {
+                                        let expected =
+                                            if value { VALUE_SET_TRUE } else { VALUE_SET_FALSE };
+                                        hit |= value_texts
+                                            .get(text_offsets[i]..text_offsets[i] + tc)
+                                            .unwrap_or(&[])
+                                            .iter()
+                                            .any(|picked| picked == expected);
+                                    }
+                                }
                             }
-                        } else if kind == 2 {
-                            if let Some(text) = resolved_text(data, &self.strings, index) {
-                                hit |= value_texts
-                                    .get(text_offsets[i]..text_offsets[i] + tc)
-                                    .unwrap_or(&[])
-                                    .iter()
-                                    .any(|v| v == text);
-                            }
-                        } else if kind == 3 {
-                            if let Some(value) = boolean_cell_value(data, index) {
-                                let expected = if value { "\0TRUE" } else { "\0FALSE" };
-                                hit |= value_texts
-                                    .get(text_offsets[i]..text_offsets[i] + tc)
-                                    .unwrap_or(&[])
-                                    .iter()
-                                    .any(|candidate| candidate == expected);
+                            ValueSet::Lookup {
+                                numbers,
+                                texts,
+                                bools,
+                            } => {
+                                if kind == 1 {
+                                    if let Some(value) = numeric_cell_value(data, index) {
+                                        let normalized = if value == 0.0 { 0.0 } else { value };
+                                        hit |= numbers.binary_search(&normalized.to_bits()).is_ok();
+                                    }
+                                } else if kind == 2 {
+                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                        hit |= texts.contains(text);
+                                    }
+                                } else if kind == 3 {
+                                    if let Some(value) = boolean_cell_value(data, index) {
+                                        let picked_bit = if value {
+                                            VALUE_SET_TRUE_BIT
+                                        } else {
+                                            VALUE_SET_FALSE_BIT
+                                        };
+                                        hit |= bools & picked_bit != 0;
+                                    }
+                                }
                             }
                         }
                         hit
