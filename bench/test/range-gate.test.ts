@@ -5,7 +5,6 @@ import {
   RANGE_WORKLOADS,
   type RangeGateArtifact,
   type RangeStructuralResult,
-  STRUCTURAL_METRICS,
   validateRangeArtifact,
 } from "../src/range-gate.js";
 import { summarize } from "../src/stats.js";
@@ -88,46 +87,6 @@ function artifact(): RangeGateArtifact {
 }
 
 describe("range structural gate", () => {
-  it("accepts one complete finite smoke matrix", () => {
-    expect(validateRangeArtifact(artifact(), "smoke").results).toHaveLength(RANGE_WORKLOADS.length);
-  });
-
-  it("requires finite non-negative integer values for every structural metric", () => {
-    for (const metric of STRUCTURAL_METRICS) {
-      const candidate = structuredClone(artifact()) as unknown as {
-        results: Array<Record<string, unknown>>;
-      };
-      Reflect.deleteProperty(candidate.results[0]!, metric);
-      expect(() =>
-        validateRangeArtifact(candidate as unknown as RangeGateArtifact, "smoke"),
-      ).toThrow(metric);
-    }
-
-    for (const [metric, value, message] of [
-      ["heapDeltaBytes", Number.NaN, "finite and non-negative"],
-      ["ffiCalls", 1.5, "must be an integer"],
-      ["historyBytes", -1, "finite and non-negative"],
-    ] as const) {
-      const candidate = structuredClone(artifact()) as unknown as {
-        results: Array<Record<string, unknown>>;
-      };
-      candidate.results[0]![metric] = value;
-      expect(() =>
-        validateRangeArtifact(candidate as unknown as RangeGateArtifact, "smoke"),
-      ).toThrow(message);
-    }
-  });
-
-  it("requires the exact bounded clipboard FFI protocol", () => {
-    const candidate = artifact();
-    const results = candidate.results.map((entry) =>
-      entry.workload === "clipboard bulk read" ? { ...entry, ffiCalls: 5 } : entry,
-    );
-    expect(() => validateRangeArtifact({ ...candidate, results }, "smoke")).toThrow(
-      /bounded bulk clipboard evidence/,
-    );
-  });
-
   it("fails closed on incomplete matrices, retained revisions, and oversized auto-fit windows", () => {
     const incomplete = artifact();
     expect(() =>

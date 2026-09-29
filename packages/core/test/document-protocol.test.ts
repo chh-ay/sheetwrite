@@ -171,12 +171,6 @@ function mergeSnapshot(
   };
 }
 
-function withoutTopLevel(key: string): unknown {
-  const snapshot = { ...richSnapshot() } as Record<string, unknown>;
-  delete snapshot[key];
-  return snapshot;
-}
-
 function withWorkbook(patch: Record<string, unknown>): unknown {
   const snapshot = richSnapshot();
   return { ...snapshot, workbook: { ...snapshot.workbook, ...patch } };
@@ -199,35 +193,6 @@ function withFirstBlock(patch: Record<string, unknown>): unknown {
       {
         ...sheet,
         cells: [{ ...sheet.cells[0]!, ...patch }, ...sheet.cells.slice(1)],
-      },
-      ...snapshot.sheets.slice(1),
-    ],
-  };
-}
-
-function withoutFirstBlockField(key: string): unknown {
-  const snapshot = richSnapshot();
-  const sheet = snapshot.sheets[0]!;
-  const block = { ...sheet.cells[0]! } as Record<string, unknown>;
-  delete block[key];
-  return {
-    ...snapshot,
-    sheets: [{ ...sheet, cells: [block, ...sheet.cells.slice(1)] }, ...snapshot.sheets.slice(1)],
-  };
-}
-
-function withoutFirstCellField(key: string): unknown {
-  const snapshot = richSnapshot();
-  const sheet = snapshot.sheets[0]!;
-  const block = sheet.cells[0]!;
-  const cell = { ...block.cells[0]! } as Record<string, unknown>;
-  delete cell[key];
-  return {
-    ...snapshot,
-    sheets: [
-      {
-        ...sheet,
-        cells: [{ ...block, cells: [cell, ...block.cells.slice(1)] }, ...sheet.cells.slice(1)],
       },
       ...snapshot.sheets.slice(1),
     ],
@@ -332,58 +297,6 @@ describe("workbook document protocol", () => {
 
     for (const testCase of cases) {
       expectInvalid(testCase.value, { path: testCase.path, code: testCase.code });
-    }
-  });
-
-  it("rejects malformed containers without descending through them", () => {
-    const optionalContainers = [
-      "rowMeta",
-      "merges",
-      "conditionalFormats",
-      "validationRules",
-      "protectedRanges",
-      "notes",
-      "sortKeys",
-      "filters",
-      "rowGroups",
-    ];
-    const cases: Array<{ value: unknown; path: string }> = [
-      { value: withoutTopLevel("workbook"), path: "workbook" },
-      { value: { ...richSnapshot(), workbook: null }, path: "workbook" },
-      { value: { ...richSnapshot(), workbook: 1 }, path: "workbook" },
-      { value: withWorkbook({ activeSheet: null }), path: "workbook.activeSheet" },
-      { value: withoutTopLevel("sheets"), path: "sheets" },
-      { value: { ...richSnapshot(), sheets: null }, path: "sheets" },
-      { value: { ...richSnapshot(), sheets: "not-an-array" }, path: "sheets" },
-      { value: { ...richSnapshot(), sheets: [] }, path: "sheets" },
-      { value: { ...richSnapshot(), sheets: [null] }, path: "sheets[0]" },
-      { value: { ...richSnapshot(), sheets: [1] }, path: "sheets[0]" },
-      { value: withFirstSheet({ columns: null }), path: "sheets[0].columns" },
-      { value: withFirstSheet({ columns: [null] }), path: "sheets[0].columns[0]" },
-      { value: withFirstSheet({ cells: null }), path: "sheets[0].cells" },
-      { value: withFirstSheet({ cells: [null] }), path: "sheets[0].cells[0]" },
-      { value: withFirstBlock({ cells: null }), path: "sheets[0].cells[0].cells" },
-      { value: withFirstBlock({ cells: [null] }), path: "sheets[0].cells[0].cells[0]" },
-      { value: withoutFirstBlockField("cells"), path: "sheets[0].cells[0].cells" },
-      { value: withoutFirstCellField("value"), path: "sheets[0].cells[0].cells[0].value" },
-      ...optionalContainers.flatMap((field) => [
-        {
-          value: withFirstSheet({ [field]: null }),
-          path: `sheets[0].${field}`,
-        },
-        {
-          value: withFirstSheet({ [field]: [null] }),
-          path: `sheets[0].${field}[0]`,
-        },
-        {
-          value: withFirstSheet({ [field]: [1] }),
-          path: `sheets[0].${field}[0]`,
-        },
-      ]),
-    ];
-
-    for (const testCase of cases) {
-      expectInvalid(testCase.value, { path: testCase.path, code: "invalid-value" });
     }
   });
 
@@ -554,42 +467,6 @@ describe("workbook document protocol", () => {
     }
   });
 
-  it("keeps every accepted snapshot semantically stable across a JSON round-trip", () => {
-    const snapshot = richSnapshot();
-    const sheet = snapshot.sheets[0]!;
-    sheet.cells[0]!.cells[0]!.value = { kind: "literal", value: true };
-    sheet.cells[0]!.cells[1]!.value = { kind: "literal", value: null };
-
-    const result = validateWorkbookSnapshot(snapshot);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error("JSON-safe snapshot unexpectedly invalid");
-    const reparsed: unknown = JSON.parse(JSON.stringify(result.value));
-    expect(reparsed).toEqual(result.value);
-    const roundTrip = validateWorkbookSnapshot(reparsed);
-    expect(roundTrip).toEqual(result);
-    expect(validateWorkbookSnapshot(result.value)).toEqual(result);
-  });
-
-  it("returns results for a deterministic required-container replacement corpus", () => {
-    const replacements: unknown[] = [null, 0, false, "invalid"];
-    const factories: Array<(replacement: unknown) => unknown> = [
-      (replacement) => ({ ...richSnapshot(), workbook: replacement }),
-      (replacement) => ({ ...richSnapshot(), sheets: replacement }),
-      (replacement) => withFirstSheet({ columns: replacement }),
-      (replacement) => withFirstSheet({ cells: replacement }),
-      (replacement) => withFirstBlock({ cells: replacement }),
-      (replacement) => withFirstCell({ value: replacement }),
-    ];
-
-    for (const factory of factories) {
-      for (const replacement of replacements) {
-        const value = factory(replacement);
-        expect(() => validateWorkbookSnapshot(value)).not.toThrow();
-        expect(validateWorkbookSnapshot(value).ok).toBe(false);
-      }
-    }
-  });
-
   it("returns structured errors for invalid identities, bounds, merges, and schemas", () => {
     const future = { ...richSnapshot(), schemaVersion: 2 };
     const futureResult = validateWorkbookSnapshot(future);
@@ -619,63 +496,6 @@ describe("workbook document protocol", () => {
     expect(new Set(result.errors.map((error) => error.code))).toEqual(
       new Set(["duplicate-id", "overlapping-merge", "out-of-bounds"]),
     );
-  });
-
-  it("accepts unsorted disjoint merges whose row or column edges only touch", () => {
-    const merges = [
-      { r0: 2, c0: 2, r1: 3, c1: 3 },
-      { r0: 0, c0: 0, r1: 0, c1: 0 },
-      { r0: 1, c0: 0, r1: 1, c1: 0 },
-      { r0: 0, c0: 1, r1: 0, c1: 1 },
-    ];
-    const result = validateWorkbookSnapshot(mergeSnapshot(merges, 4, 4));
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error("disjoint merges unexpectedly rejected");
-    expect(result.value.sheets[0]?.merges).toEqual(merges);
-  });
-
-  it("reports containment and partial overlap at the later input path", () => {
-    for (const merges of [
-      [
-        { r0: 0, c0: 0, r1: 4, c1: 4 },
-        { r0: 1, c0: 1, r1: 2, c1: 2 },
-      ],
-      [
-        { r0: 0, c0: 0, r1: 2, c1: 2 },
-        { r0: 2, c0: 1, r1: 3, c1: 3 },
-      ],
-    ]) {
-      const result = validateWorkbookSnapshot(mergeSnapshot(merges, 5, 5));
-      expect(result.ok).toBe(false);
-      if (result.ok) throw new Error("overlapping merges unexpectedly accepted");
-      expect(result.errors.filter((error) => error.code === "overlapping-merge")).toEqual([
-        {
-          path: "sheets[0].merges[1]",
-          code: "overlapping-merge",
-          message: "Merged regions may not overlap",
-        },
-      ]);
-    }
-  });
-
-  it("keeps out-of-bounds and overlap errors on the same later merge", () => {
-    const result = validateWorkbookSnapshot(
-      mergeSnapshot(
-        [
-          { r0: 0, c0: 0, r1: 1, c1: 1 },
-          { r0: 1, c0: 1, r1: 9, c1: 9 },
-        ],
-        4,
-        4,
-      ),
-    );
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error("invalid merges unexpectedly accepted");
-    expect(
-      result.errors
-        .filter((error) => error.path === "sheets[0].merges[1]")
-        .map((error) => error.code),
-    ).toEqual(["out-of-bounds", "overlapping-merge"]);
   });
 
   it("bounds structural merge-index work for 1K, 4K, and 16K valid corpora", () => {

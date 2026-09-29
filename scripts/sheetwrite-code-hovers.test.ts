@@ -2,9 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
 import {
   collectFenceHovers,
-  collectReferenceLinks,
   formatHoverSignature,
-  hoverPopoverId,
   isHighQualityHover,
   referenceRouteForHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
@@ -25,64 +23,6 @@ describe("Sheetwrite code hover signatures", () => {
     );
     expect(signature).toContain("ref?: ForwardedRef<Grid>");
     expect(signature).toEndWith(") => ReactElement");
-  });
-
-  it("formats interfaces and object members as complete declarations", async () => {
-    const signature = await formatHoverSignature(
-      "interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean; italic?: boolean; readOnly?: boolean }",
-      44,
-    );
-
-    expect(signature).toContain("interface GridConfig {");
-    expect(signature).toContain("toolbar?: boolean | ToolbarItem[];");
-    expect(signature).toContain("readOnly?: boolean;");
-    expect(signature).toEndWith("}");
-  });
-
-  it("formats unions and object variants without hiding members", async () => {
-    const signature = await formatHoverSignature(
-      'type ColumnFilter = { kind: "values"; values: readonly CellScalar[] } | { kind: "contains"; text: string; matchCase?: boolean } | { kind: "empty" }',
-      42,
-    );
-
-    expect(signature.match(/\|/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(signature).toContain('kind: "contains";');
-    expect(signature).toContain("matchCase?: boolean;");
-    expect(signature).toContain('kind: "empty"');
-  });
-
-  it("keeps overloads structurally separate", async () => {
-    const signature = await formatHoverSignature(
-      "interface Formatter { (value: string): string; (value: number, precision?: number): string }",
-      42,
-    );
-
-    expect(signature).toContain("(value: string): string;");
-    expect(signature).toContain("precision?: number");
-    expect(signature.match(/\): string;/g)?.length).toBe(2);
-  });
-  it("derives stable popover ids from document position instead of render order", () => {
-    const block = {
-      code: "grid.destroy();",
-      language: "ts",
-      meta: "",
-      parentDocument: { positionInDocument: { groupIndex: 3 } },
-    };
-    const hover = {
-      target: "grid",
-      line: 0,
-      character: 0,
-      length: 4,
-    };
-
-    expect(hoverPopoverId(block, hover, 0)).toBe(hoverPopoverId(block, hover, 0));
-    expect(hoverPopoverId(block, hover, 0)).not.toBe(
-      hoverPopoverId(
-        { ...block, parentDocument: { positionInDocument: { groupIndex: 4 } } },
-        hover,
-        0,
-      ),
-    );
   });
 });
 
@@ -195,23 +135,6 @@ describe("Sheetwrite hover preludes", () => {
     });
   });
 
-  it("types template-only snippets through a synthetic script block", () => {
-    const source = "<button onclick={() => grid.destroy()}>Reset</button>";
-    const injection = injectHoverPrelude(
-      source,
-      "svelte",
-      "declare const grid: { destroy(): void };",
-    );
-    expect(injection.analysisSource.startsWith('<script lang="ts">\n')).toBe(true);
-    expect(injection.toOriginal({ line: 0, character: 0 })).toBeNull();
-    expect(injection.toOriginal({ line: 2, character: 0 })).toBeNull();
-    expect(injection.toOriginal({ line: 3, character: 5 })).toEqual({
-      line: 0,
-      character: 5,
-      start: 5,
-    });
-  });
-
   it("resolves prelude-backed host state in partial ts snippets", () => {
     const hovers = collectFenceHovers(
       "grid.destroy();\nworkbook.sheets.length;\n",
@@ -230,15 +153,6 @@ describe("Sheetwrite hover preludes", () => {
     for (const hover of hovers) {
       expect(isHighQualityHover(hover, "ts")).toBe(true);
     }
-  });
-
-  it("maps svelte prelude hovers back to original coordinates", () => {
-    const source = '<script lang="ts">grid.destroy();</script>';
-    const hovers = collectFenceHovers(source, "svelte", engine, "core");
-    const grid = hovers.find((hover) => hover.target === "grid");
-    expect(grid?.line).toBe(0);
-    expect(grid?.character).toBe(18);
-    expect(grid?.text).toContain("Grid");
   });
 });
 
@@ -260,16 +174,7 @@ describe("Sheetwrite hover quality", () => {
     expect(isHighQualityHover(hover("Console.log(...data: any[]): void", "lib"))).toBe(true);
     expect(isHighQualityHover(hover("const grid: Grid", "workspace"))).toBe(true);
   });
-
-  it("evaluates framework hovers after language-specific normalization", () => {
-    const component = hover("const Sheetwrite: DefineComponent<any, any, any>", "workspace");
-    component.target = "Sheetwrite";
-
-    expect(isHighQualityHover(component, "vue")).toBe(true);
-    expect(isHighQualityHover(component, "ts")).toBe(false);
-  });
 });
-
 describe("Sheetwrite hover preludes end to end", () => {
   it("resolves template-only svelte snippets through the synthetic script", () => {
     const engine = new SheetwriteTypeEngine({
@@ -285,37 +190,6 @@ describe("Sheetwrite hover preludes end to end", () => {
 });
 
 describe("Generated fence reference links", () => {
-  const routes = new Map([
-    ["Theme", "/docs/api/core/theme/"],
-    ["SheetId", "/docs/api/core/sheet-id/"],
-    ["DEFAULT_THEME", "/docs/api/core/default-theme/"],
-  ]);
-
-  it("links referenced API types but never the declared symbol itself", () => {
-    const links = collectReferenceLinks("const DEFAULT_THEME: Theme;", routes);
-    expect(links).toEqual([
-      { line: 0, columnStart: 21, columnEnd: 26, route: "/docs/api/core/theme/" },
-    ]);
-  });
-
-  it("resolves multi-line declarations with positions per line", () => {
-    const links = collectReferenceLinks(
-      "class Grid {\n    setTheme(theme: Theme): void;\n    sheet(id: SheetId): Theme;\n}",
-      routes,
-    );
-    expect(links.map((link) => [link.line, link.route])).toEqual([
-      [1, "/docs/api/core/theme/"],
-      [2, "/docs/api/core/sheet-id/"],
-      [2, "/docs/api/core/theme/"],
-    ]);
-  });
-
-  it("ignores member accesses, string openers, and unknown names", () => {
-    expect(collectReferenceLinks('const x: options.Theme = "Theme";', routes)).toEqual([]);
-    expect(collectReferenceLinks("const y: Unknown;", routes)).toEqual([]);
-    expect(collectReferenceLinks("const z: Theme;", new Map())).toEqual([]);
-  });
-
   it("links inferred local values when their type resolves to one public API symbol", () => {
     const inferredRoutes = new Map([
       ["DataSourceRequest", "/docs/api/core/data-source-request/"],

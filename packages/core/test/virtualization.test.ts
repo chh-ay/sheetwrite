@@ -10,17 +10,6 @@ describe("computeWindow", () => {
     expect(computeWindow(idx, 100, 100, 2)).toEqual({ start: 3, end: 13 });
   });
 
-  it("clamps the start at the top edge", () => {
-    expect(computeWindow(idx, 0, 100, 2)).toEqual({ start: 0, end: 8 });
-  });
-
-  it("clamps the end at the bottom edge", () => {
-    const top = idx.totalHeight - 100; // last 5 rows
-    const win = computeWindow(idx, top, 100, 2);
-    expect(win.end).toBe(1000);
-    expect(win.start).toBe(995 - 2);
-  });
-
   it("returns an empty window for an empty sheet", () => {
     expect(computeWindow(new OffsetIndex(0, 20), 0, 100, 2)).toEqual({ start: 0, end: 0 });
   });

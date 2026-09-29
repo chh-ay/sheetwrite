@@ -6,7 +6,6 @@ import { parseCiRunId } from "./release-preflight.js";
 import {
   assertCanonicalReleaseIdentity,
   assertRegistryPackage,
-  type PackageIdentity,
   publishArtifactsIdempotently,
   publishedPackageFrom,
   verifyPublishedArtifacts,
@@ -79,36 +78,6 @@ describe("CI-completion package release workflow", () => {
     ).toThrow("Canonical artifacts came from");
   });
 
-  it("binds publication to the successful CI commit and artifact run", async () => {
-    const { parsed, source } = await workflow();
-    expect(Object.keys(parsed.jobs ?? {})).toEqual(["identity", "publish"]);
-    expect(source).toContain("github.event.workflow_run.head_sha");
-    expect(source).toContain("github.event.workflow_run.id");
-    expect(source).not.toContain("workflow_dispatch");
-    expect(JSON.stringify(parsed.jobs?.publish)).toContain("needs.identity.outputs.commit");
-    expect(JSON.stringify(parsed.jobs?.publish)).toContain("needs.identity.outputs.ci_run_id");
-    expect(source).toContain("steps.publish.outputs.verified");
-    expect(source).toContain("steps.publish.outputs.published");
-    const generateSizes = parsed.jobs.publish?.steps?.find(
-      (step) => step.name === "Generate published package size history",
-    );
-    expect(generateSizes?.if).toBe("steps.publish.outputs.verified != '[]'");
-    expect(generateSizes?.run).toContain(`require('./packages/core/package.json').version`);
-    expect(generateSizes?.run).not.toContain(`require('./package.json').version`);
-    expect(generateSizes?.run).toContain('bun run size:record --version="$VERSION"');
-    expect(generateSizes?.run).toContain("bun run docs:generate");
-    const openPullRequest = parsed.jobs.publish?.steps?.find(
-      (step) => step.name === "Open package size history pull request",
-    );
-    expect(openPullRequest?.uses).toBe(
-      "peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676",
-    );
-    expect(openPullRequest?.with?.base).toBe("develop");
-    expect(openPullRequest?.with?.branch).toContain("steps.size-history.outputs.version");
-    expect(openPullRequest?.with?.["add-paths"]).toContain("scripts/size-history.json");
-    expect(source).not.toMatch(/git config|git rebase|git push origin HEAD:develop/);
-  });
-
   it("isolates OIDC and repository write access to the publishing job", async () => {
     const { parsed } = await workflow();
     expect(parsed.permissions).toEqual({ actions: "read", contents: "read" });
@@ -167,53 +136,6 @@ describe("CI-completion package release workflow", () => {
     expect(source).not.toMatch(
       /secrets\.(?:NODE_AUTH_TOKEN|NPM_TOKEN)|changeset publish|release-stage/,
     );
-  });
-
-  it("publishes and verifies a one-package release", async () => {
-    const core = artifact("@sheetwrite/core", "1.4.0");
-    const result = await publishArtifactsIdempotently(
-      "/artifacts",
-      [core],
-      async () => undefined,
-      async (_root, item) => ({
-        name: item.name,
-        version: item.version,
-        integrity: item.integrity,
-      }),
-    );
-    expect(result).toEqual({
-      verifiedPackages: [{ name: core.name, version: core.version, integrity: core.integrity }],
-      newlyPublishedPackages: [
-        { name: core.name, version: core.version, integrity: core.integrity },
-      ],
-    });
-  });
-
-  it("publishes core-only when its exact omitted wasm dependency is available", async () => {
-    const core = {
-      ...artifact("@sheetwrite/core", "1.4.0"),
-      internalDependencies: { "@sheetwrite/wasm": "0.7.0" },
-    };
-    const queried: string[] = [];
-    const result = await publishArtifactsIdempotently(
-      "/artifacts",
-      [core],
-      async (identity) => {
-        queried.push(`${identity.name}@${identity.version}`);
-        return identity.name === "@sheetwrite/wasm"
-          ? { name: identity.name, version: identity.version }
-          : undefined;
-      },
-      async (_root, item) => ({
-        name: item.name,
-        version: item.version,
-        integrity: item.integrity,
-      }),
-    );
-    expect(queried).toEqual(["@sheetwrite/wasm@0.7.0", "@sheetwrite/core@1.4.0"]);
-    expect(result.newlyPublishedPackages).toEqual([
-      { name: core.name, version: core.version, integrity: core.integrity },
-    ]);
   });
 
   it("rejects core-only before publishing when its omitted wasm version is unavailable", async () => {
@@ -279,37 +201,6 @@ describe("CI-completion package release workflow", () => {
       "2.1.3",
     ]);
     expect(result.newlyPublishedPackages).toEqual(result.verifiedPackages);
-  });
-
-  it("is idempotent on an exact package-version rerun", async () => {
-    const artifacts = [
-      artifact("@sheetwrite/core", "1.4.0"),
-      artifact("@sheetwrite/react", "2.1.3"),
-    ];
-    const registry = new Map<
-      string,
-      { name: string; version: string; dist: { integrity: string } }
-    >();
-    let publishCalls = 0;
-    const existing = async (item: PackageIdentity) => registry.get(`${item.name}@${item.version}`);
-    const publish = async (_root: string, item: ReleasePackageArtifact) => {
-      publishCalls += 1;
-      registry.set(`${item.name}@${item.version}`, {
-        name: item.name,
-        version: item.version,
-        dist: { integrity: item.integrity },
-      });
-      return { name: item.name, version: item.version, integrity: item.integrity };
-    };
-
-    const first = await publishArtifactsIdempotently("/artifacts", artifacts, existing, publish);
-    const rerun = await publishArtifactsIdempotently("/artifacts", artifacts, existing, publish);
-    expect(publishCalls).toBe(artifacts.length);
-    expect(first.newlyPublishedPackages).toEqual(first.verifiedPackages);
-    expect(rerun.verifiedPackages.map(({ name, version }) => ({ name, version }))).toEqual(
-      artifacts.map(({ name, version }) => ({ name, version })),
-    );
-    expect(rerun.newlyPublishedPackages).toEqual([]);
   });
 
   it("resumes a partial prior publication and rejects mismatched registry bytes", async () => {

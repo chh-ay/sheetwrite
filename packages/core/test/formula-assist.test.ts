@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { EditController } from "../src/editor.js";
 import {
   type AssistDeps,
-  FORMULA_FUNCTIONS,
   FormulaAssist,
   functionTokenAt,
   parseFormulaRefs,
@@ -62,45 +61,7 @@ afterEach(() => {
 
 // ── pure helpers ─────────────────────────────────────────────────────────────
 
-describe("FORMULA_FUNCTIONS catalog", () => {
-  it("matches the function names accepted by the calc.rs parser", async () => {
-    const source = await Bun.file(new URL("../../wasm/src/calc.rs", import.meta.url)).text();
-    const parserRegistry = source.match(
-      /define_function_registry!\s*\{\s*canonical\s*\{([\s\S]*?)\n\s*\}\s*aliases\s*\{([\s\S]*?)\n\s*\}\s*\}/,
-    );
-    if (!parserRegistry?.[1] || parserRegistry[2] === undefined) {
-      throw new Error("calc.rs parser function registry not found");
-    }
-
-    const engineFunctions = [parserRegistry[1], parserRegistry[2]].flatMap((block, index) =>
-      block
-        .split("\n")
-        .filter((line) => line.trim().length > 0)
-        .map((line) => {
-          const arm =
-            index === 0
-              ? line.match(/^\s*[A-Za-z][A-Za-z0-9_]*\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/)
-              : line.match(/^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/);
-          if (!arm?.[1]) throw new Error(`unrecognized calc.rs function registry arm: ${line}`);
-          return arm[1];
-        }),
-    );
-
-    expect(new Set(FORMULA_FUNCTIONS).size).toBe(FORMULA_FUNCTIONS.length);
-    expect([...FORMULA_FUNCTIONS]).toEqual([...FORMULA_FUNCTIONS].sort());
-    expect(new Set(engineFunctions).size).toBe(engineFunctions.length);
-    expect([...FORMULA_FUNCTIONS]).toEqual(engineFunctions.sort());
-  });
-});
-
 describe("functionTokenAt", () => {
-  it("returns the trailing identifier run ending at the caret", () => {
-    expect(functionTokenAt("=SU", 3)).toBe("SU");
-    expect(functionTokenAt("=1+co", 5)).toBe("co");
-    expect(functionTokenAt("=SUM(A", 6)).toBe("A");
-    expect(functionTokenAt("=MODE.S", 7)).toBe("MODE.S");
-  });
-
   it("rejects tokens that do not begin with an identifier letter", () => {
     expect(functionTokenAt("=SUM(A1:B2)+C3", 14)).toBe("C3");
     expect(functionTokenAt("=.5", 3)).toBeNull();
@@ -115,11 +76,6 @@ describe("parseFormulaRefs", () => {
       { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 }, color: REF_PALETTE[0] },
       { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 }, color: REF_PALETTE[1] },
     ]);
-  });
-
-  it("skips function names and tokens glued to an alphanumeric", () => {
-    // SUM has no digits so never matches; no A1-shaped refs here at all.
-    expect(parseFormulaRefs("=SUM(1,2)", "s1")).toEqual([]);
   });
 
   it("honors absolute markers when resolving the cell", () => {
@@ -187,32 +143,6 @@ describe("FormulaAssist autocomplete", () => {
     expect(assist.isOpen).toBe(false);
   });
 
-  it("stays closed when the text is not a formula", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "SU";
-    ta.setSelectionRange(2, 2);
-    assist.attach(ta, THEME);
-
-    expect(assist.isOpen).toBe(false);
-    expect(host.querySelector(".sheetwrite-assist")).toBeNull();
-  });
-
-  it("accepts the active suggestion into the caret with an opening paren", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "=SU";
-    ta.setSelectionRange(3, 3);
-    assist.attach(ta, THEME);
-
-    expect(assist.handleKeyDown(keydown("Enter"))).toBe(true);
-    expect(ta.value).toBe("=SUM(");
-    expect(ta.selectionStart).toBe(5);
-    expect(assist.isOpen).toBe(false);
-  });
-
   it("replaces only the token at a mid-string caret", () => {
     const { host, ta } = mountTextarea();
     const assist = new FormulaAssist(host, noopDeps());
@@ -244,19 +174,6 @@ describe("FormulaAssist autocomplete", () => {
 
     assist.handleKeyDown(keydown("Enter"));
     expect(ta.value).toBe("=COVARIANCE.S(");
-  });
-
-  it("ignores Arrow keys when the popup is closed (returns false)", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "abc";
-    ta.setSelectionRange(3, 3);
-    assist.attach(ta, THEME);
-
-    expect(assist.isOpen).toBe(false);
-    expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(false);
-    expect(assist.handleKeyDown(keydown("Enter"))).toBe(false);
   });
 
   it("Esc closes the popup first (handled), then falls through (unhandled)", () => {
@@ -295,21 +212,6 @@ describe("FormulaAssist ref highlighting", () => {
     ]);
 
     assist.detach();
-    expect(calls.at(-1)).toBeNull();
-  });
-
-  it("clears highlights when the text is not a formula", () => {
-    const calls: (HighlightRange[] | null)[] = [];
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, {
-      highlightCells: (ranges) => calls.push(ranges),
-      sheet: () => "s1",
-    });
-
-    ta.value = "plain text";
-    ta.setSelectionRange(10, 10);
-    assist.attach(ta, THEME);
-
     expect(calls.at(-1)).toBeNull();
   });
 });

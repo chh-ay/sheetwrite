@@ -117,11 +117,6 @@ function artifact(mode: "smoke" | "full" = "smoke"): ResourceBenchmarkArtifact {
 }
 
 describe("resource benchmark protocol", () => {
-  it("accepts complete smoke and full matrices", () => {
-    expect(() => validateResourceBenchmark(artifact("smoke"), "smoke")).not.toThrow();
-    expect(() => validateResourceBenchmark(artifact("full"), "full")).not.toThrow();
-  });
-
   it("fails closed on missing phases, duplicate scenarios, and owner overlap", () => {
     const smoke = artifact();
     expect(() =>

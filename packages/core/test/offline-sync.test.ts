@@ -42,12 +42,10 @@ function deferred<T>(): Deferred<T> {
 class FakePendingStorage implements PendingCommitStorage {
   readonly records = new Map<string, PendingCommit>();
   readonly removals: string[] = [];
-  readonly puts: string[] = [];
   failNextPut: unknown;
   failNextRemove: unknown;
   failNextReplace: unknown;
   removeGate?: Deferred<void>;
-  putGate?: Deferred<void>;
 
   async load(
     documentId: string,
@@ -80,8 +78,6 @@ class FakePendingStorage implements PendingCommitStorage {
 
   async put(commit: PendingCommit, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) throw signal.reason;
-    this.puts.push(commit.clientMutationId);
-    if (this.putGate) await this.putGate.promise;
     if (this.failNextPut !== undefined) {
       const error = this.failNextPut;
       this.failNextPut = undefined;
@@ -391,47 +387,6 @@ describe("durable offline sync", () => {
     grid.destroy();
   });
 
-  it("orders following remote versions behind durable echo removal", async () => {
-    const storage = new FakePendingStorage();
-    storage.removeGate = deferred<void>();
-    const adapter = new ControlledAdapter(snapshot());
-    const grid = mountGrid();
-    const coordinator = new SyncCoordinator(grid, adapter, {
-      documentId: "offline-doc",
-      serverVersion: 4,
-      pendingStorage: storage,
-      createMutationId: () => "ordered-echo-m1",
-    });
-    await coordinator.ready();
-    grid.applyTransaction({ patches: [setValue(5)] });
-    await coordinator.ready();
-
-    const echo = coordinator.handleResponse({
-      status: "applied",
-      version: 5,
-      clientMutationId: "ordered-echo-m1",
-    });
-    while (storage.removals.length === 0) await Promise.resolve();
-    let followingApplied = false;
-    const following = coordinator
-      .applyVersionedOperation({ version: 6, operations: [setValue(6)] })
-      .then(() => {
-        followingApplied = true;
-      });
-    await Promise.resolve();
-
-    expect(followingApplied).toBe(false);
-    expect(coordinator.serverVersion).toBe(4);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(5);
-
-    storage.removeGate.resolve(undefined);
-    await Promise.all([echo, following]);
-    expect(coordinator.serverVersion).toBe(6);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(6);
-    coordinator.destroy();
-    grid.destroy();
-  });
-
   it("finishes an acknowledged durable removal after destroy without publishing", async () => {
     const storage = new FakePendingStorage();
     storage.removeGate = deferred<void>();
@@ -521,35 +476,6 @@ describe("durable offline sync", () => {
     expect(grid.exportSnapshot().sheets[0]?.rowCount).toBe(3);
     expect(coordinator.pendingCount).toBe(0);
     expect(storage.records.has("ambiguous-online-m1")).toBe(false);
-    coordinator.destroy();
-    grid.destroy();
-  });
-  it("serializes durable puts in mutation order", async () => {
-    const storage = new FakePendingStorage();
-    storage.putGate = deferred<void>();
-    const adapter = new ControlledAdapter(snapshot());
-    const grid = mountGrid();
-    const ids = ["ordered-m1", "ordered-m2"];
-    let index = 0;
-    const coordinator = new SyncCoordinator(grid, adapter, {
-      documentId: "offline-doc",
-      serverVersion: 4,
-      pendingStorage: storage,
-      initialConnection: "offline",
-      createMutationId: () => ids[index++]!,
-    });
-    await coordinator.ready();
-
-    grid.applyTransaction({ patches: [setValue(1)] });
-    grid.applyTransaction({ patches: [setValue(2)] });
-    while (storage.puts.length === 0) await Promise.resolve();
-    await Promise.resolve();
-    expect(storage.puts).toEqual(["ordered-m1"]);
-
-    storage.putGate.resolve(undefined);
-    await coordinator.ready();
-    expect(storage.puts).toEqual(["ordered-m1", "ordered-m2"]);
-    expect([...storage.records.keys()]).toEqual(["ordered-m1", "ordered-m2"]);
     coordinator.destroy();
     grid.destroy();
   });

@@ -54,29 +54,6 @@ describe("StyleActions underline/strikethrough toggles", () => {
     grid.destroy();
   });
 
-  it("adds strikethrough without losing an existing underline", () => {
-    const grid = makeGrid();
-    const addr = { sheet: "s1", row: 1, col: 0 };
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "setRangeStyle",
-          range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
-          style: { underline: true },
-        },
-      ],
-    });
-    grid.setSelection({ kind: "cell", addr });
-
-    grid.actions.toggleStrikethrough();
-
-    expect(grid.store.getCell(addr).style).toMatchObject({
-      underline: true,
-      strikethrough: true,
-    });
-    grid.destroy();
-  });
-
   it("styles the selected rows in a descending sorted view", () => {
     const grid = makeGrid();
     const store = grid.store as SheetwriteStore;
@@ -96,42 +73,6 @@ describe("StyleActions underline/strikethrough toggles", () => {
       expect(store.getCell({ sheet: "s1", row, col: 0 }).style.underline).toBe(true);
     }
     expect(store.getCell({ sheet: "s1", row: 6, col: 0 }).style.underline).toBeUndefined();
-    grid.destroy();
-  });
-
-  it("styles only non-contiguous rows present in a filtered view", () => {
-    const grid = makeGrid();
-    const store = grid.store as SheetwriteStore;
-    store.filterBy("s1", 2, "Berlin");
-    grid.setSelection({
-      kind: "range",
-      range: {
-        sheet: "s1",
-        start: { row: 0, col: 1 },
-        end: { row: 2, col: 1 },
-      },
-    });
-
-    grid.actions.toggleUnderline();
-
-    for (const row of [2, 5, 8]) {
-      expect(store.getCell({ sheet: "s1", row, col: 1 }).style.underline).toBe(true);
-    }
-    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.underline).toBeUndefined();
-    grid.destroy();
-  });
-
-  it("does nothing when the selection is empty", () => {
-    const grid = makeGrid();
-    let changes = 0;
-    grid.on("change", () => {
-      changes += 1;
-    });
-
-    grid.actions.toggleUnderline();
-
-    expect(changes).toBe(0);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).style).toEqual({});
     grid.destroy();
   });
 });

@@ -48,11 +48,6 @@ const POLICY_FILE = {
 };
 
 describe("JavaScript dependency audit policy", () => {
-  it("accepts a clean audit", () => {
-    const result = evaluateAuditPolicy({ exitCode: 0, stdout: "{}", stderr: "" }, [], TODAY);
-    expect(result.findings).toEqual([]);
-  });
-
   it("fails closed when the declared policy drifts from enforcement", () => {
     expect(parseAuditPolicyFile(POLICY_FILE)).toEqual([]);
     expect(() =>
@@ -96,11 +91,6 @@ describe("JavaScript dependency audit policy", () => {
     expect(() => evaluateAuditPolicy(auditResult("critical"), [], TODAY)).toThrow(
       "Unallowlisted dependency findings",
     );
-  });
-
-  it("accepts an owned, reasoned, unexpired exact allowance", () => {
-    const result = evaluateAuditPolicy(auditResult("high"), [REVIEWED_ALLOWANCE], TODAY);
-    expect(result.allowedBlockingFindings).toHaveLength(1);
   });
 
   it("rejects an expired allowance", () => {

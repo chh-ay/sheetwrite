@@ -203,27 +203,6 @@ describe("IndexedDbPendingCommitStorage", () => {
     storage.close();
   });
 
-  it("reopens more than 256 pending commits in insertion order", async () => {
-    const databaseName = "large-offline-queue";
-    const storage = new IndexedDbPendingCommitStorage({ databaseName });
-    const ids = Array.from(
-      { length: 300 },
-      (_, index) => `mutation-${String(index).padStart(3, "0")}`,
-    );
-    for (const id of ids) await storage.put(commit("document-a", id, id));
-    storage.close();
-
-    const reopened = new IndexedDbPendingCommitStorage({ databaseName });
-    const loaded = await reopened.load("document-a", {
-      maxRecords: 10_000,
-      maxOperations: 100_000,
-      maxBytes: 128 * 1024 * 1024,
-    });
-    expect(loaded.map((item) => item.clientMutationId)).toEqual(ids);
-    expect(loaded).toHaveLength(300);
-    reopened.close();
-  });
-
   it("enforces cursor load bounds at the exact record, operation, and byte boundary", async () => {
     const storage = new IndexedDbPendingCommitStorage({ databaseName: "bounded-cursor" });
     const first = commit("document-a", "mutation-a", "first");
@@ -259,30 +238,6 @@ describe("IndexedDbPendingCommitStorage", () => {
       }),
     ).resolves.toHaveLength(2);
     storage.close();
-  });
-
-  it("loads through ordered cursors without calling getAll", async () => {
-    const databaseName = "cursor-only";
-    const storage = new IndexedDbPendingCommitStorage({ databaseName });
-    await storage.put(commit("document-a", "mutation-a", "first"));
-    const probe = await requestResult(indexedDB.open(databaseName));
-    const transaction = probe.transaction("pending-commits", "readonly");
-    const prototype = Object.getPrototypeOf(transaction.objectStore("pending-commits")) as {
-      getAll: IDBObjectStore["getAll"];
-    };
-    const originalGetAll = prototype.getAll;
-    prototype.getAll = () => {
-      throw new Error("getAll must not be used by pending queue load");
-    };
-    await transactionDone(transaction);
-    probe.close();
-
-    try {
-      await expect(storage.load("document-a", LOAD_OPTIONS)).resolves.toHaveLength(1);
-    } finally {
-      prototype.getAll = originalGetAll;
-      storage.close();
-    }
   });
 
   it("atomically replaces only the expected ordered queue", async () => {

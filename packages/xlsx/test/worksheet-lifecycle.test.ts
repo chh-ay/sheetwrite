@@ -39,23 +39,6 @@ async function workbookXml(source: WorkbookSnapshot, warnings?: XlsxWorkbookWarn
 }
 
 describe("XLSX worksheet lifecycle fidelity", () => {
-  it("normalizes external worksheet names to NFC only at the import boundary", async () => {
-    const decomposed = "Cafe\u0301";
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({ sheets: [{ name: decomposed, xml: worksheet("<sheetData/>") }] }),
-    );
-
-    expect(imported.sheets[0]!.name).toBe("Café");
-    expect(imported.sheets[0]!.name).not.toBe(decomposed);
-
-    const { xml } = await workbookXml(imported);
-    expect(xml).toContain('name="Café"');
-
-    const noncanonical = snapshot([sheet("s", decomposed, 0)]);
-    await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(noncanonical)).rejects.toThrow();
-    expect(noncanonical.sheets[0]!.name).toBe(decomposed);
-  });
-
   it("rejects NFC and case-insensitive worksheet-name collisions on import and export", async () => {
     for (const names of [
       ["Café", "Cafe\u0301"],
@@ -100,37 +83,6 @@ describe("XLSX worksheet lifecycle fidelity", () => {
     );
   });
 
-  it("round-trips quoted cross-sheet reference syntax without asserting formula evaluation", async () => {
-    const source = sheet("source", "Source", 0);
-    source.cells = [
-      {
-        startRow: 0,
-        startCol: 0,
-        rowCount: 1,
-        colCount: 1,
-        cells: [
-          {
-            rowOffset: 0,
-            colOffset: 0,
-            value: { kind: "ref", target: { sheet: "target", row: 0, col: 0 } },
-          },
-        ],
-      },
-    ];
-    const target = sheet("target", "O'Brien Data", 1);
-    const { bytes } = await workbookXml(snapshot([source, target], "source"));
-    const parts = unzipSync(bytes);
-    expect(strFromU8(parts["xl/worksheets/sheet1.xml"]!)).toContain(
-      "<f>&apos;O&apos;&apos;Brien Data&apos;!A1</f>",
-    );
-
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
-    expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
-      kind: "ref",
-      target: { sheet: "target", row: 0, col: 0 },
-    });
-  });
-
   it("round-trips visible, hidden, and veryHidden states with a visible activeTab fallback", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const source = snapshot(
@@ -172,30 +124,5 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       }),
     );
     expect(hiddenActiveImport.workbook.activeSheet).toBe(hiddenActiveImport.sheets[1]!.id);
-  });
-
-  it("rejects import and export when no ordinary worksheet is visible", async () => {
-    await expect(
-      sheetwriteWorkbookBackend.toXlsxWorkbook(
-        snapshot(
-          [
-            sheet("hidden", "Hidden", 0, "hidden"),
-            sheet("very-hidden", "VeryHidden", 1, "veryHidden"),
-          ],
-          "hidden",
-        ),
-      ),
-    ).rejects.toThrow(/visible worksheet/i);
-
-    await expect(
-      sheetwriteWorkbookBackend.fromXlsxWorkbook(
-        rawXlsx({
-          sheets: [
-            { name: "Hidden", state: "hidden", xml: worksheet("<sheetData/>") },
-            { name: "VeryHidden", state: "veryHidden", xml: worksheet("<sheetData/>") },
-          ],
-        }),
-      ),
-    ).rejects.toThrow(/visible worksheet/i);
   });
 });

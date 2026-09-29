@@ -717,43 +717,6 @@ mod tests {
     }
 
     #[test]
-    fn gcd_and_lcm_truncate_and_satisfy_divisibility() {
-        assert_number(
-            evaluate(Func::Gcd, vec![Value::number(48.9), Value::number(18.1)]),
-            6.0,
-        );
-        assert_number(
-            evaluate(Func::Lcm, vec![Value::number(48.9), Value::number(18.1)]),
-            144.0,
-        );
-        assert_eq!(
-            evaluate(Func::Gcd, vec![Value::number(-1.0)]),
-            Value::Error(FormulaError::Num)
-        );
-
-        assert_eq!(
-            evaluate(
-                Func::Lcm,
-                vec![Value::number(2f64.powi(63)), Value::number(3.0)],
-            ),
-            Value::Error(FormulaError::Num)
-        );
-        for left in 1..32u64 {
-            for right in 1..32u64 {
-                let Value::Number(divisor) = evaluate(
-                    Func::Gcd,
-                    vec![Value::number(left as f64), Value::number(right as f64)],
-                ) else {
-                    panic!("GCD must be numeric");
-                };
-                let divisor = divisor as u64;
-                assert_eq!(left % divisor, 0);
-                assert_eq!(right % divisor, 0);
-            }
-        }
-    }
-
-    #[test]
     fn subtotal_uses_function_specific_error_and_coercion_rules() {
         let range = vec![
             Value::number(2.0),

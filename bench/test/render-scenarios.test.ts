@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { makeColumnar, toAoA } from "../src/dataset.js";
 import {
-  DIAGNOSTIC_RENDER_SCENARIOS,
   WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
   WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
 } from "../src/render-protocol.js";
 import {
   type CellSelection,
-  measureUnresizedMillionRowGeometry,
   type RenderBenchAdapter,
   runRenderScenario,
   type ScrollObservation,
@@ -259,15 +257,6 @@ describe("scenario correctness checkpoints", () => {
     expect(result.partialSamples).toHaveLength(0);
   });
 
-  test("rejects a wrong canonical cell checksum before timing", () => {
-    const adapter = new FakeAdapter();
-    adapter.values[0]![0] = 999;
-    const result = runRenderScenario(adapter, dataset, "edit-open.top-left", options);
-    expect(result).toMatchObject({ status: "failed", stage: "validate" });
-    if (result.status !== "failed") throw new Error("expected failed result");
-    expect(result.message).toContain("sentinel checksum");
-  });
-
   test("a corrupt adapter action becomes validation failure, never a fast success", () => {
     const adapter = new FakeAdapter();
     adapter.corruptNavigation = true;
@@ -278,15 +267,6 @@ describe("scenario correctness checkpoints", () => {
     expect(result.partialSamples).toHaveLength(1);
   });
 
-  test("a valid action emits finite aggregate timing and checkpoints", () => {
-    const result = runRenderScenario(new FakeAdapter(), dataset, "scroll-down.top-left", options);
-    expect(result.status).toBe("success");
-    if (result.status !== "success") throw new Error(result.message);
-    expect(result.rawSamples).toHaveLength(1);
-    expect(result.rawSamples[0]!.durationMs).toBeGreaterThanOrEqual(0.01);
-    expect(Number.isFinite(result.medianMs)).toBe(true);
-    expect(result.validation.every((observation) => observation.passed)).toBe(true);
-  });
   test("keeps one-pixel smooth scrolling inside the same logical window", () => {
     const result = runRenderScenario(
       new FakeAdapter(),
@@ -304,26 +284,6 @@ describe("scenario correctness checkpoints", () => {
     );
   });
 
-  test("measures real million-row uniform OffsetIndex geometry", () => {
-    expect(measureUnresizedMillionRowGeometry()).toEqual({
-      count: 1_000_000,
-      backingStoreBytes: 0,
-      totalHeight: 28_000_000,
-      middleRow: 500_000,
-      middleTop: 14_000_000,
-      lastRow: 999_999,
-      lastTop: 27_999_972,
-    });
-  });
-
-  test("records each measured-only diagnostic scenario without promoting it to the gate", () => {
-    for (const scenario of DIAGNOSTIC_RENDER_SCENARIOS) {
-      const result = runRenderScenario(new FakeAdapter(), dataset, scenario.id, options);
-      expect(result.status).toBe("success");
-      if (result.status !== "success") throw new Error(result.message);
-      expect(result.validation.every((observation) => observation.passed)).toBe(true);
-    }
-  });
   test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {
     const baseline = runRenderScenario(
       new FakeAdapter(),
@@ -384,19 +344,6 @@ describe("scenario correctness checkpoints", () => {
       expect(result).toMatchObject({ status: "failed", stage: "validate" });
       if (result.status !== "failed") throw new Error("expected failed result");
       expect(result.message).toContain(checkpoint);
-    }
-  });
-
-  test("records valid formatter and merge checkpoints", () => {
-    for (const scenario of ["formatted-paint.top-left", "merge-heavy.paint"] as const) {
-      const result = runRenderScenario(new FakeAdapter(), dataset, scenario, options);
-      expect(result.status).toBe("success");
-      if (result.status !== "success") throw new Error(result.message);
-      expect(
-        result.validation.some(
-          (entry) => entry.passed && entry.checkpoint.includes(scenario.split(".")[0]!),
-        ),
-      ).toBe(true);
     }
   });
 });

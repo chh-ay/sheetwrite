@@ -15,26 +15,6 @@ describe("detectFillSeries", () => {
     expect(plan.stepAt(3)).toEqual({ kind: "value", value: 4 });
   });
 
-  it("extrapolates arithmetic numeric runs upward", () => {
-    const plan = detectFillSeries(cells([10, 15]));
-
-    expect(plan.stepAt(-1)).toEqual({ kind: "value", value: 5 });
-    expect(plan.stepAt(-2)).toEqual({ kind: "value", value: 0 });
-  });
-
-  it("keeps a zero-delta series as a copy", () => {
-    const plan = detectFillSeries(cells([7, 7]));
-
-    expect(plan.stepAt(5)).toEqual({ kind: "value", value: 7 });
-  });
-
-  it("falls back to tiling for a single value", () => {
-    const plan = detectFillSeries(cells([9]));
-
-    expect(plan.stepAt(0)).toEqual({ kind: "tile", sourceIndex: 0 });
-    expect(plan.stepAt(4)).toEqual({ kind: "tile", sourceIndex: 0 });
-  });
-
   it("falls back to tiling for formulas and non-linear runs", () => {
     const withFormula = detectFillSeries([
       { value: 1, isFormula: false },

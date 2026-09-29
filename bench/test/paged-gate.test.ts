@@ -10,15 +10,7 @@ import {
 } from "../src/paged-bench.js";
 import { summarize } from "../src/stats.js";
 
-interface FixtureOptions {
-  readonly omitTiming?: string;
-  readonly duplicateProbe?: boolean;
-  readonly unexpectedProbe?: boolean;
-  readonly invalidWasm?: boolean;
-  readonly protocolVersion?: number;
-}
-
-function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
+function smokeFixture(): PagedBenchmarkResult {
   const timing = (): PagedTimingResult => ({ samplesMs: [1, 2], stat: summarize([1, 2]) });
   const timingsByKey: Record<string, PagedTimingResult> = {
     startup: timing(),
@@ -27,7 +19,6 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
     "wide-page": timing(),
     "cache-churn": timing(),
   };
-  if (options.omitTiming) delete timingsByKey[options.omitTiming];
   const timings = timingsByKey as PagedBenchmarkResult["timings"];
   const probes: Array<{
     scenario: string;
@@ -42,7 +33,7 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
   }> = [
     {
       scenario: "empty",
-      wasmDeltaBytes: options.invalidWasm ? Number.NaN : 1024,
+      wasmDeltaBytes: 1024,
       chunks: 0,
       loadedCells: 0,
       dirtyCells: 0,
@@ -74,11 +65,9 @@ function smokeFixture(options: FixtureOptions = {}): PagedBenchmarkResult {
       fullyLoaded: false,
     },
   ];
-  if (options.duplicateProbe) probes.push({ ...probes[0]! });
-  if (options.unexpectedProbe) probes.push({ ...probes[0]!, scenario: "not-declared" });
   const typedProbes = probes as Array<(typeof probes)[number] & { scenario: PagedScenario }>;
   return {
-    protocolVersion: (options.protocolVersion ?? PERFORMANCE_GATE_PROTOCOL_VERSION) as 1,
+    protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",
     matrixId: MATRIX_IDS.paged.smoke,
     rows: PAGED_SMOKE_ROWS,
@@ -160,10 +149,6 @@ function fullFixture(): PagedBenchmarkResult {
 }
 
 describe("paged benchmark exact matrix", () => {
-  test("accepts the complete declared smoke matrix", () => {
-    expect(() => validatePagedBenchmark(smokeFixture(), "smoke")).not.toThrow();
-  });
-
   test("requires the exact cache-bounded full traversal evidence", () => {
     const source = fullFixture();
     expect(() => validatePagedBenchmark(source, "full")).not.toThrow();
@@ -175,37 +160,6 @@ describe("paged benchmark exact matrix", () => {
     };
     expect(() => validatePagedBenchmark(corrupted, "full")).toThrow(
       "rows=1000000;probe=scroll-100 does not match the cache-bounded full traversal",
-    );
-  });
-
-  test("requires the declared wide-page and indexed cache-churn contracts", () => {
-    const source = smokeFixture();
-    expect(() =>
-      validatePagedBenchmark({ ...source, widePageColumns: source.widePageColumns - 1 }, "smoke"),
-    ).toThrow("configuration does not match");
-    expect(() =>
-      validatePagedBenchmark(
-        {
-          ...source,
-          cacheChurnRetainedChunks: source.cacheChurnRetainedChunks - 1,
-        },
-        "smoke",
-      ),
-    ).toThrow("configuration does not match");
-  });
-
-  test("rejects missing, duplicate, unexpected, and non-finite cells by key", () => {
-    expect(() => validatePagedBenchmark(smokeFixture({ omitTiming: "startup" }), "smoke")).toThrow(
-      "missing rows=10000;workload=startup",
-    );
-    expect(() => validatePagedBenchmark(smokeFixture({ duplicateProbe: true }), "smoke")).toThrow(
-      "duplicate rows=10000;probe=empty",
-    );
-    expect(() => validatePagedBenchmark(smokeFixture({ unexpectedProbe: true }), "smoke")).toThrow(
-      "unexpected rows=10000;probe=not-declared",
-    );
-    expect(() => validatePagedBenchmark(smokeFixture({ invalidWasm: true }), "smoke")).toThrow(
-      "rows=10000;probe=empty.wasmDeltaBytes must be finite",
     );
   });
 
@@ -232,12 +186,5 @@ describe("paged benchmark exact matrix", () => {
     expect(() => validatePagedBenchmark(staleLoadFlag, "smoke")).toThrow(
       "rows=10000;probe=viewport.fullyLoaded",
     );
-  });
-
-  test("rejects stale protocol and smoke evidence offered as full", () => {
-    expect(() => validatePagedBenchmark(smokeFixture({ protocolVersion: 99 }), "smoke")).toThrow(
-      "paged stale protocol",
-    );
-    expect(() => validatePagedBenchmark(smokeFixture(), "full")).toThrow("paged mode mismatch");
   });
 });

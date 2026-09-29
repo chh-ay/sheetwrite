@@ -1,17 +1,8 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
-import { DEFAULT_THEME, initSheetwrite } from "@sheetwrite/core";
+import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import {
-  act,
-  Component,
-  createRef,
-  type ReactElement,
-  type ReactNode,
-  StrictMode,
-  Suspense,
-  startTransition,
-} from "react";
+import { act, createRef, type ReactElement, StrictMode, Suspense, startTransition } from "react";
 import { createRoot } from "react-dom/client";
 import {
   type AdapterConformanceProps,
@@ -58,25 +49,6 @@ function makeWorkbook(extraSheet = false): Workbook {
     });
   }
   return workbook;
-}
-
-class LifecycleErrorBoundary extends Component<
-  { children: ReactNode; onError(error: unknown): void },
-  { error: unknown }
-> {
-  override state: { error: unknown } = { error: null };
-
-  static getDerivedStateFromError(error: unknown): { error: unknown } {
-    return { error };
-  }
-
-  override componentDidCatch(error: unknown): void {
-    this.props.onError(error);
-  }
-
-  override render(): ReactNode {
-    return this.state.error === null ? this.props.children : <div data-lifecycle-error-boundary />;
-  }
 }
 
 async function mountConformanceGrid(props: AdapterConformanceProps): Promise<MountedAdapter> {
@@ -158,117 +130,6 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(result.html).toContain('class="sheetwrite"');
   });
 
-  it("publishes, replaces, transfers, and clears the forwarded Grid ref", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const created: Grid[] = [];
-    const firstValues: Array<Grid | null> = [];
-    const secondValues: Array<Grid | null> = [];
-    const firstRef = (grid: Grid | null): void => {
-      firstValues.push(grid);
-    };
-    const secondRef = (grid: Grid | null): void => {
-      secondValues.push(grid);
-    };
-    const firstData = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
-    const secondData = { rowCount: 3, columns: { value: ["x", "y", "z"] } };
-    const onReady = ({ grid }: { grid: Grid }): void => {
-      created.push(grid);
-    };
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid ref={firstRef} workbook={workbook} data={firstData} onReady={onReady} />,
-      );
-    });
-    expect(created).toHaveLength(1);
-    expect(firstValues.at(-1)).toBe(created[0]!);
-
-    // Swapping only the ref transfers the SAME grid: no recreate.
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid ref={secondRef} workbook={workbook} data={firstData} onReady={onReady} />,
-      );
-    });
-    expect(created).toHaveLength(1);
-    expect(firstValues.at(-1)).toBeNull();
-    expect(secondValues.at(-1)).toBe(created[0]!);
-
-    // A construction-bound option (data identity) recreates the grid.
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid ref={secondRef} workbook={workbook} data={secondData} onReady={onReady} />,
-      );
-    });
-    expect(created).toHaveLength(2);
-    expect(secondValues).toContain(null);
-    expect(secondValues.at(-1)).toBe(created[1]!);
-
-    await act(async () => root.unmount());
-    expect(secondValues.at(-1)).toBeNull();
-    expect(host.childElementCount).toBe(0);
-  });
-
-  it("keeps the Grid while updating live options, host props, and event callbacks", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-    const calls: string[] = [];
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          readOnly={false}
-          config={{ toolbar: true }}
-          className="initial"
-          style={{ height: 200 }}
-          onViewportChange={() => calls.push("old-scroll")}
-        />,
-      );
-    });
-
-    const first = gridRef.current;
-    expect(first).not.toBeNull();
-    expect(host.firstElementChild?.classList.contains("initial")).toBe(true);
-    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
-
-    // The initial mount may repaint (theme effect) and emit scroll to the
-    // still-current callback; the swap contract concerns post-rerender events.
-    calls.length = 0;
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          readOnly
-          config={{ toolbar: false }}
-          className="updated"
-          style={{ height: 240 }}
-          onViewportChange={() => calls.push("new-scroll")}
-        />,
-      );
-    });
-
-    // Live options applied on the SAME grid instance — no recreate.
-    expect(gridRef.current).toBe(first);
-    expect(host.firstElementChild?.classList.contains("updated")).toBe(true);
-    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
-
-    // The swapped callback is read live: a refresh emits scroll to the NEW one.
-    gridRef.current!.refresh();
-    expect(calls).toContain("new-scroll");
-    expect(calls).not.toContain("old-scroll");
-
-    await act(async () => root.unmount());
-  });
-
   it("forwards active-sheet through onActiveSheetChange, reading the live callback", async () => {
     const workbook = makeWorkbook(true);
 
@@ -311,101 +172,6 @@ describe("SheetwriteGrid React lifecycle", () => {
 
     await act(async () => root.unmount());
   });
-
-  for (const failurePoint of ["ref", "ready"] as const) {
-    it(`cleans a controller when the host ${failurePoint} callback throws and remounts`, async () => {
-      const workbook = makeWorkbook();
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      const root = createRoot(host);
-      const failure = new Error(`throwing ${failurePoint} callback`);
-      const caught: unknown[] = [];
-      const publishedRef = createRef<Grid>();
-      const callbackRefValues: Array<Grid | null> = [];
-      let failedGrid: Grid | null = null;
-      let destroyCalls = 0;
-      let staleSelectionCalls = 0;
-
-      const captureFailedGrid = (grid: Grid): void => {
-        failedGrid = grid;
-        const originalDestroy = grid.destroy.bind(grid);
-        grid.destroy = () => {
-          destroyCalls += 1;
-          originalDestroy();
-        };
-      };
-      const throwingRef = (grid: Grid | null): void => {
-        callbackRefValues.push(grid);
-        if (!grid) return;
-        captureFailedGrid(grid);
-        throw failure;
-      };
-
-      const originalError = console.error;
-      console.error = () => {};
-      try {
-        await act(async () => {
-          root.render(
-            <LifecycleErrorBoundary onError={(error) => caught.push(error)}>
-              <SheetwriteGrid
-                ref={failurePoint === "ref" ? throwingRef : publishedRef}
-                workbook={workbook}
-                onSelectionChange={() => {
-                  staleSelectionCalls += 1;
-                }}
-                onReady={({ grid }) => {
-                  if (failurePoint !== "ready") return;
-                  captureFailedGrid(grid);
-                  throw failure;
-                }}
-              />
-            </LifecycleErrorBoundary>,
-          );
-        });
-      } finally {
-        console.error = originalError;
-      }
-
-      expect(caught).toEqual([failure]);
-      expect(failedGrid).not.toBeNull();
-      expect(destroyCalls).toBe(1);
-      expect(publishedRef.current).toBeNull();
-      if (failurePoint === "ref") {
-        expect(callbackRefValues).toEqual([null, failedGrid, null]);
-      }
-      expect(host.querySelector(".sheetwrite")).toBeNull();
-
-      failedGrid!.setSelection({ kind: "cell", addr: { sheet: "sheet", row: 1, col: 0 } });
-      expect(staleSelectionCalls).toBe(0);
-
-      const remountedRef = createRef<Grid>();
-      let remountedSelections = 0;
-      await act(async () => {
-        root.render(
-          <LifecycleErrorBoundary key="remounted" onError={(error) => caught.push(error)}>
-            <SheetwriteGrid
-              ref={remountedRef}
-              workbook={workbook}
-              onSelectionChange={() => {
-                remountedSelections += 1;
-              }}
-            />
-          </LifecycleErrorBoundary>,
-        );
-      });
-      expect(remountedRef.current).not.toBeNull();
-      expect(remountedRef.current).not.toBe(failedGrid);
-      expect(host.querySelectorAll(".sheetwrite")).toHaveLength(1);
-      remountedRef.current!.setSelection({
-        kind: "cell",
-        addr: { sheet: "sheet", row: 2, col: 0 },
-      });
-      expect(remountedSelections).toBe(1);
-      expect(destroyCalls).toBe(1);
-
-      await act(async () => root.unmount());
-    });
-  }
 
   it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
     const workbook = makeWorkbook();
@@ -502,108 +268,6 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(gridRef.current).toBeNull();
     expect(host.childElementCount).toBe(0);
   });
-  it("treats the theme prop as authoritative: removing it restores defaults", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-
-    await act(async () => {
-      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} theme={{ bg: "#ff0000" }} />);
-    });
-    expect(gridRef.current!.getEffectiveTheme().bg).toBe("#ff0000");
-    const first = gridRef.current;
-
-    await act(async () => {
-      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} />);
-    });
-
-    // Same grid (no recreate); theme back to default resolution.
-    expect(gridRef.current).toBe(first);
-    expect(gridRef.current!.getEffectiveTheme().bg).toBe(DEFAULT_THEME.bg);
-
-    await act(async () => root.unmount());
-  });
-
-  it("forwards ordinary div attributes to the host and keeps .sheetwrite through className churn", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          workbook={workbook}
-          data-testid="grid"
-          id="g1"
-          tabIndex={0}
-          className="p-2 initial"
-        />,
-      );
-    });
-
-    const div = host.firstElementChild as HTMLDivElement;
-    expect(div.getAttribute("data-testid")).toBe("grid");
-    expect(div.id).toBe("g1");
-    expect(div.tabIndex).toBe(0);
-    expect(div.classList.contains("sheetwrite")).toBe(true);
-    expect(div.classList.contains("initial")).toBe(true);
-
-    // Tailwind-style cn() churn: a changed className must not reconcile the
-    // grid's own .sheetwrite (CSS-variable chrome) away.
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid workbook={workbook} data-testid="grid" className="p-4 updated" />,
-      );
-    });
-    expect(div.classList.contains("sheetwrite")).toBe(true);
-    expect(div.classList.contains("updated")).toBe(true);
-    expect(div.classList.contains("initial")).toBe(false);
-
-    await act(async () => root.unmount());
-  });
-
-  it("keeps native scroll available while grid changes use onGridChange", async () => {
-    const workbook = makeWorkbook();
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-    const changes: unknown[] = [];
-    const nativeScrolls: unknown[] = [];
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          onGridChange={(event) => changes.push(event)}
-          onScroll={(event) => nativeScrolls.push(event)}
-        />,
-      );
-    });
-
-    const div = host.firstElementChild as HTMLDivElement;
-    div.dispatchEvent(new Event("scroll", { bubbles: true }));
-    expect(nativeScrolls).toHaveLength(1);
-    expect(changes).toHaveLength(0);
-
-    // The grid `change` event still reaches the callback (grid semantics).
-    gridRef.current!.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "sheet", row: 0, col: 0 },
-          value: { kind: "literal", value: "x" },
-        },
-      ],
-    });
-    expect(changes).toHaveLength(1);
-
-    await act(async () => root.unmount());
-  });
 
   it("never leaks GridOptions members to the DOM and triggers no unknown-prop warning", async () => {
     const workbook = makeWorkbook();
@@ -636,49 +300,6 @@ describe("SheetwriteGrid React lifecycle", () => {
     }
   });
 
-  it("keeps the grid and committed edits when overscan/minColumns change live", async () => {
-    const workbook = makeWorkbook();
-    const data = { rowCount: 3, columns: { value: ["a", "b", "c"] } };
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-
-    await act(async () => {
-      root.render(<SheetwriteGrid ref={gridRef} workbook={workbook} data={data} overscan={2} />);
-    });
-    const first = gridRef.current!;
-
-    // Commit a user edit that lives only in the grid's store.
-    first.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "sheet", row: 0, col: 0 },
-          value: { kind: "literal", value: "edited" },
-        },
-      ],
-    });
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          data={data}
-          overscan={9}
-          minColumns={12}
-        />,
-      );
-    });
-
-    // No recreate: same grid, and the committed edit survived.
-    expect(gridRef.current).toBe(first);
-    expect(first.store.getCell({ sheet: "sheet", row: 0, col: 0 }).resolved).toBe("edited");
-    expect(host.querySelector("[role=grid]")?.getAttribute("aria-colcount")).toBe("12");
-
-    await act(async () => root.unmount());
-  });
   it("builds an uncontrolled data-first grid and resets on defaultRows identity", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

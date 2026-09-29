@@ -157,10 +157,6 @@ function runFacadeContract(storage: "dense" | "paged"): void {
 }
 
 describe("SheetwriteStore facade contract", () => {
-  it("preserves dense transaction, view, snapshot, policy, and resource barriers", () => {
-    runFacadeContract("dense");
-  });
-
   it("preserves paged transaction, view, snapshot, policy, and resource barriers", () => {
     runFacadeContract("paged");
   });

@@ -9,19 +9,12 @@ declare global {
   }
 }
 
-import { examplePages, SITE_BASE, siteUrl } from "./playwright.config.js";
+import { type examplePages, siteUrl } from "./playwright.config.js";
 
-// The intended fixture datasets: vanilla/react show the revenue accounts
-// workbook, vue runs the governed business orders workbook, svelte hydrates
-// the offline dispatch log. First data cell mirrored per page (vue's frozen
-// PO column and svelte's frozen ticket column stay out of the ARIA window,
-// so their first mirrored cells are the supplier and site columns).
-const EXPECTED_CELL_VALUE = {
-  vanilla: "Account 000001",
-  react: "Account 000001",
-  vue: "Mekong Freight",
-  svelte: "Riverside depot",
-} satisfies Record<(typeof examplePages)[number], string>;
+// The framework-free example page boots and paints the revenue accounts
+// workbook. React/Vue/Svelte example routes are booted by their framework
+// workbench specs instead.
+const VANILLA_FIRST_CELL = "Account 000001";
 
 /**
  * Shared boot contract for every production-built example page: it loads
@@ -76,9 +69,9 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
   return sample !== null && hasOpaqueForeground(sample);
 }
 
-for (const name of examplePages) {
+for (const name of ["vanilla"] as const) {
   test(`${name} example boots, initializes WASM, and paints cells`, {
-    tag: name === "vanilla" ? "@portability" : "@chromium-only",
+    tag: "@portability",
   }, async ({ page }) => {
     const errors = collectErrors(page);
 
@@ -89,7 +82,7 @@ for (const name of examplePages) {
         timeout: 15_000,
         message: `${name} grid never exposed its expected cell value`,
       })
-      .toContain(EXPECTED_CELL_VALUE[name]);
+      .toContain(VANILLA_FIRST_CELL);
     await expect
       .poll(() => canvasBodyPainted(page), {
         timeout: 15_000,
@@ -145,21 +138,6 @@ test("offline queue, two-grid sync, and presence converge in a browser", {
   });
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
-});
-
-test("example pages cross-link through the capability hub", async ({ page }) => {
-  await page.goto(urlOf("vanilla"));
-  await page.waitForSelector(".sw-product-nav");
-  const showcasesLink = page.locator(`.sw-product-nav a[href="${SITE_BASE}/showcases/"]`);
-  // On a workbench route the hub link is ancestor-current, not page-current.
-  await expect(showcasesLink).toHaveAttribute("aria-current", "true");
-  await showcasesLink.click();
-  await expect(page).toHaveURL(siteUrl("/showcases/"));
-  await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
-  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
-  // Framework deep links stay reachable from the hub's workbench cards.
-  await page.locator(`main a[href="${SITE_BASE}/react/"]`).first().click();
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
 });
 
 test("vanilla example commits an edit through the formula bar and undoes it", {

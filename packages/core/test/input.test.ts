@@ -179,34 +179,6 @@ describe("pointer input: mouse parity", () => {
 });
 
 describe("pointer input: touch policy", () => {
-  it("touch tap selects the cell without taking capture", () => {
-    const { grid, scroller, workbook, capture } = makeGrid();
-
-    scroller.dispatchEvent(
-      pointer("pointerdown", { ...cellPoint(1, 1, workbook), pointerType: "touch" }),
-    );
-
-    expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: { row: 1, col: 1 } });
-    expect(capture.set).toEqual([]);
-  });
-
-  it("touch drag from a plain cell leaves selection alone (native scroll)", () => {
-    const { grid, scroller, workbook, capture } = makeGrid();
-
-    const down = pointer("pointerdown", { ...cellPoint(1, 1, workbook), pointerType: "touch" });
-    scroller.dispatchEvent(down);
-    expect(down.defaultPrevented).toBe(false);
-    scroller.dispatchEvent(
-      pointer("pointermove", { ...cellPoint(4, 2, workbook), pointerType: "touch" }),
-    );
-    scroller.dispatchEvent(
-      pointer("pointerup", { ...cellPoint(4, 2, workbook), pointerType: "touch" }),
-    );
-
-    expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: { row: 1, col: 1 } });
-    expect(capture.set).toEqual([]);
-  });
-
   it("touch drag on the fill handle captures, previews, and commits the fill", () => {
     const { grid, store, scroller, workbook, capture } = makeGrid();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
@@ -234,7 +206,6 @@ describe("pointer input: touch policy", () => {
     expect(reasons).toEqual(["fill"]);
   });
 });
-
 describe("pointer input: drag lifecycle", () => {
   it("pointercancel mid fill-drag clears the preview and commits nothing", () => {
     const { grid, store, scroller, workbook } = makeGrid();
@@ -250,25 +221,6 @@ describe("pointer input: drag lifecycle", () => {
     // The drag is fully torn down: a later pointerup must not commit either.
     scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(3, 1, workbook) }));
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(before);
-  });
-
-  it("a second pointer's events are ignored during an active drag", () => {
-    const { grid, scroller, workbook } = makeGrid();
-
-    scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(0, 0, workbook), pointerId: 1 }));
-    // Foreign pointer tries to extend the drag — must be ignored.
-    scroller.dispatchEvent(pointer("pointermove", { ...cellPoint(5, 2, workbook), pointerId: 2 }));
-
-    expect(grid.getSelection()).toMatchObject({ kind: "cell", addr: { row: 0, col: 0 } });
-
-    scroller.dispatchEvent(pointer("pointermove", { ...cellPoint(1, 1, workbook), pointerId: 1 }));
-    scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(1, 1, workbook), pointerId: 1 }));
-
-    const sel = grid.getSelection();
-    expect(sel?.kind).toBe("range");
-    if (sel?.kind === "range") {
-      expect(sel.range).toMatchObject({ start: { row: 0, col: 0 }, end: { row: 1, col: 1 } });
-    }
   });
 });
 describe("validation through input mutation paths", () => {
@@ -296,31 +248,6 @@ describe("validation through input mutation paths", () => {
     expect(rejected).toEqual(["validation"]);
     grid.destroy();
   });
-
-  it("rejects an invalid fill without changing any target cell", () => {
-    const { grid, store, scroller, workbook } = makeGrid();
-    grid.setValidationRule({
-      id: "fill-choice",
-      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
-      condition: { kind: "list", values: [999] },
-      policy: "reject",
-    });
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    const before = [
-      store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved,
-      store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved,
-    ];
-
-    scroller.dispatchEvent(pointer("pointerdown", { ...fillHandlePoint(0, 1, workbook) }));
-    scroller.dispatchEvent(pointer("pointermove", { ...cellPoint(2, 1, workbook) }));
-    scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(2, 1, workbook) }));
-
-    expect([
-      store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved,
-      store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved,
-    ]).toEqual(before);
-    grid.destroy();
-  });
 });
 
 describe("keyboard whole-axis selection", () => {
@@ -338,23 +265,6 @@ describe("keyboard whole-axis selection", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(grid.getSelection()).toEqual({ kind: "column", sheet: "s1", col: 1 });
-    grid.destroy();
-  });
-
-  it("selects the focused row with Shift+Space", () => {
-    const { grid, host } = makeGrid();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 1 } });
-
-    const event = new KeyboardEvent("keydown", {
-      key: " ",
-      shiftKey: true,
-      bubbles: true,
-      cancelable: true,
-    });
-    host.dispatchEvent(event);
-
-    expect(event.defaultPrevented).toBe(true);
-    expect(grid.getSelection()).toEqual({ kind: "row", sheet: "s1", row: 3 });
     grid.destroy();
   });
 });

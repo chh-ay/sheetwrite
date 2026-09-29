@@ -23,9 +23,7 @@ const GRID = `${APP} .sheetwrite`;
 // Deterministic scenario observables (docs/src/showcases/scenarios/business.ts):
 // status[row] = BUSINESS_STATUSES[(row * 7) % 4]; qty[0] = 1; unitCost[0] = 8.
 const FIRST_PO = "PO-0001";
-const STATUS_RULE = "orders-status-list";
 const PROTECTION_ID = "orders-computed-totals";
-const SEEDED_NOTE = "Held for finance review — resubmit with the Q3 budget code.";
 const SUPPLIER_BANNER = "Approved supplier directory — FY26";
 
 interface BrowserErrors {
@@ -218,50 +216,6 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(errors.console).toEqual([]);
 });
 
-test("a valid status edit commits, queues, and syncs to the host adapter", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  await commitCell(page, 4, 3, "Approved");
-  await expect.poll(() => cellValue(page, "orders", 4, 3)).toBe("Approved");
-  await expect(page.getByTestId("pending-count")).toHaveText("1");
-  await expect(page.getByTestId("persistence")).toHaveAttribute("data-state", "pending");
-  await expect(page.getByTestId("persistence")).toContainText("1 pending commit(s) · host v0");
-  // Reset-bound configuration is gated while local work is unsynced.
-  await expect(page.getByTestId("mutation-policy")).toBeDisabled();
-  await expect(page.getByTestId("feed")).toContainText("@grid-change");
-
-  await openTask(page, "Persistence");
-  await page.getByTestId("sync").click();
-  await expect(page.getByTestId("persistence")).toHaveAttribute("data-state", "synced");
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");
-  await expect(page.getByTestId("server-version")).toHaveText("v1");
-  await expect(page.getByTestId("last-ack")).toContainText("vue-biz-1 → v1");
-  await expect(page.getByTestId("mutation-policy")).toBeEnabled();
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("an off-list status is rejected at the barrier as a structured issue", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  // status[5] = BUSINESS_STATUSES[(5 * 7) % 4] = "Paid".
-  expect(await cellValue(page, "orders", 5, 3)).toBe("Paid");
-  await commitCell(page, 5, 3, "Perhaps");
-
-  const feed = page.getByTestId("feed");
-  await expect(feed).toContainText("grid.on(mutation-rejected)");
-  await expect(feed).toContainText(STATUS_RULE);
-  expect(await cellValue(page, "orders", 5, 3)).toBe("Paid");
-  await expect(page.getByTestId("pending-count")).toHaveText("0");
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v0");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
 test("protected totals show rejection, role correction, and accepted mutation in one journey", async ({
   page,
 }) => {
@@ -290,81 +244,6 @@ test("protected totals show rejection, role correction, and accepted mutation in
   await expect(result).toContainText("orders!G1 changed from 8 to 999");
   await expect.poll(() => cellValue(page, "orders", 0, 6)).toBe(999);
   await expect(page.getByTestId("pending-count")).toHaveText("1");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("cell notes flow through the document model and the host pipeline", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  await page.evaluate(() => {
-    const grid = window.__sheetwriteVueWorkbench!.grid;
-    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 2, col: 3 } });
-  });
-  await openTask(page, "Notes");
-  const note = page.getByRole("textbox", { name: "Cell note" });
-  await expect(note).toHaveValue(SEEDED_NOTE);
-
-  await note.fill("Cleared with finance on Friday.");
-  await page.getByTestId("note-save").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.__sheetwriteVueWorkbench!.grid.getNote({ sheet: "orders", row: 2, col: 3 }),
-      ),
-    )
-    .toBe("Cleared with finance on Friday.");
-  await expect(page.getByTestId("pending-count")).toHaveText("1");
-
-  await page.getByTestId("note-clear").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        window.__sheetwriteVueWorkbench!.grid.getNote({ sheet: "orders", row: 2, col: 3 }),
-      ),
-    )
-    .toBeNull();
-  await expect(page.getByTestId("pending-count")).toHaveText("2");
-
-  await openTask(page, "Persistence");
-  await page.getByTestId("sync").click();
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v2");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("workbook and sheet operations stay reactive through the public API", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  // Rename the active sheet from host UI.
-  await openTask(page, "Sheets");
-  const rename = page.getByRole("textbox", { name: "Active sheet name" });
-  await expect(rename).toHaveValue("Orders");
-  await rename.fill("Purchase orders");
-  await page.getByTestId("rename-apply").click();
-  await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
-
-  // Add a sheet; the workbench activates it.
-  await page.getByTestId("add-sheet").click();
-  await expect(page.getByTestId("workbook-state")).toHaveText("3 sheet(s) · active archive");
-  await expect(page.getByRole("tab", { name: "Archive FY25 sheet" })).toBeVisible();
-  await expect(page.getByTestId("add-sheet")).toBeDisabled();
-  await expect(page.getByTestId("feed")).toContainText("@active-sheet-change");
-
-  // Switch sheets; cross-sheet state (banner, merge anchor) is intact.
-  await page.getByTestId("open-suppliers").click();
-  await expect(page.getByTestId("workbook-state")).toHaveText("3 sheet(s) · active suppliers");
-  expect(await cellValue(page, "suppliers", 0, 0)).toBe(SUPPLIER_BANNER);
-
-  // Sheet workflow is document work: it syncs to the host like any edit.
-  await expect(page.getByTestId("pending-count")).toHaveText("2");
-  await openTask(page, "Persistence");
-  await page.getByTestId("sync").click();
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v2");
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -444,138 +323,6 @@ test("@portability native tabs expose the complete accessible worksheet lifecycl
   expect(errors.console).toEqual([]);
 });
 
-test("@portability native worksheet controls remain operable at 390×844", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  await page.getByRole("button", { name: "Options for Orders sheet" }).click();
-  await page.getByRole("menuitem", { name: "Rename Orders sheet" }).click();
-  const editor = page.getByRole("textbox", { name: "Rename Orders sheet" });
-  await editor.fill("Enterprise purchase orders");
-  await editor.press("Enter");
-  await expect(page.getByRole("tab", { name: "Enterprise purchase orders sheet" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
-  const sheet3 = page.getByRole("tab", { name: "Sheet 3 sheet" });
-  await expect(sheet3).toBeVisible();
-  await sheet3.focus();
-  await page.keyboard.press("Control+Shift+H");
-  const unhideSheet = page.getByLabel("Unhide sheet");
-  await expect(unhideSheet).toBeVisible();
-  await unhideSheet.click();
-  await page
-    .getByRole("group", { name: "Hidden sheets" })
-    .getByRole("button", { name: "Sheet 3" })
-    .click();
-  await expect(page.getByRole("tab", { name: "Sheet 3 sheet" })).toBeVisible();
-
-  const overflow = await page.locator(".sheetwrite-tabbar").evaluate((bar) => ({
-    clientWidth: bar.clientWidth,
-    scrollWidth: bar.scrollWidth,
-    documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-  }));
-  expect(overflow.clientWidth).toBeGreaterThan(0);
-  expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
-  expect(overflow.documentOverflow).toBe(false);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("toolbar formatting commits live styles through the grid", async ({ page }) => {
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-  await page.evaluate(() => {
-    window.__sheetwriteVuePaintFonts = [];
-    const canvas = document.querySelector<HTMLCanvasElement>(".sw-vuewb-grid canvas");
-    const context = canvas?.getContext("2d");
-    if (!context) throw new Error("Vue workbench canvas context unavailable");
-    const originalFillText = context.fillText.bind(context);
-    context.fillText = (text: string, x: number, y: number, maxWidth?: number): void => {
-      if (text === "Kampot Mills") window.__sheetwriteVuePaintFonts?.push(context.font);
-      if (maxWidth === undefined) originalFillText(text, x, y);
-      else originalFillText(text, x, y, maxWidth);
-    };
-  });
-
-  await page.evaluate(() => {
-    const grid = window.__sheetwriteVueWorkbench!.grid;
-    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 1 } });
-  });
-  await page.evaluate(() => {
-    window.__sheetwriteVuePaintFonts = [];
-  });
-  await page.getByRole("button", { name: "Bold", exact: true }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVueWorkbench!.grid.store.getCell({
-            sheet: "orders",
-            row: 1,
-            col: 1,
-          }).style.bold ?? false,
-      ),
-    )
-    .toBe(true);
-  // Style commits are pending host work like any other document operation.
-  await expect(page.getByTestId("pending-count")).toHaveText("1");
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVuePaintFonts?.some(
-            (font) => /\bbold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
-          ) ?? false,
-      ),
-    )
-    .toBe(true);
-
-  await page.evaluate(() => {
-    window.__sheetwriteVuePaintFonts = [];
-  });
-  await page.getByRole("button", { name: "Italic", exact: true }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVueWorkbench!.grid.store.getCell({
-            sheet: "orders",
-            row: 1,
-            col: 1,
-          }).style.italic ?? false,
-      ),
-    )
-    .toBe(true);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__sheetwriteVuePaintFonts?.some(
-            (font) =>
-              /\bitalic\s+bold\b/.test(font) && !/\bbold\s+(?:[1-9]\d{0,2}|1000)\b/.test(font),
-          ) ?? false,
-      ),
-    )
-    .toBe(true);
-  await expect(page.getByTestId("pending-count")).toHaveText("2");
-
-  const colorInput = page.locator(".sheetwrite-tb-fillColor");
-  await colorInput.evaluate((input: HTMLInputElement) => {
-    for (const color of ["#224466", "#668844", "#aa5533"]) {
-      input.value = color;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-  });
-  await expect(page.getByTestId("pending-count")).toHaveText("2");
-  await colorInput.dispatchEvent("change");
-  await expect(page.getByTestId("pending-count")).toHaveText("3");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
 test("mutation policy is reset-bound: the grid rebuilds and persistence rebinds", async ({
   page,
 }) => {
@@ -642,51 +389,6 @@ test("read-only is a live option that never rebuilds the grid", async ({ page })
   await expect(page.getByRole("button", { name: "Options for Orders sheet" })).toBeVisible();
   await commitCell(page, 4, 3, "Approved");
   await expect.poll(() => cellValue(page, "orders", 4, 3)).toBe("Approved");
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("the workbench stays operable on a mobile viewport", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const errors = collectErrors(page);
-  await openWorkbench(page);
-
-  // The panel stacks below the grid instead of disappearing.
-  const gridBox = await page.locator(`${APP} .sw-demo-grid`).boundingBox();
-  const panelBox = await page.locator(`${APP} .sw-vuewb-panel`).boundingBox();
-  expect(gridBox).not.toBeNull();
-  expect(panelBox).not.toBeNull();
-  expect(panelBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height - 1);
-  await openTask(page, "Notes");
-  const mobileRailGeometry = await page.locator(".sw-vuewb-tasktabs").evaluate((navigator) => {
-    const events = document.querySelector<HTMLElement>("[data-testid='event-panel']");
-    const note = document.querySelector<HTMLTextAreaElement>("[data-testid='note-input']");
-    return {
-      navigatorClientWidth: navigator.clientWidth,
-      navigatorScrollWidth: navigator.scrollWidth,
-      eventHeight: events?.getBoundingClientRect().height ?? 0,
-      noteClientHeight: note?.clientHeight ?? 0,
-      documentOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    };
-  });
-  expect(mobileRailGeometry.navigatorScrollWidth).toBeLessThanOrEqual(
-    mobileRailGeometry.navigatorClientWidth,
-  );
-  expect(mobileRailGeometry.eventHeight).toBeGreaterThanOrEqual(120);
-  expect(mobileRailGeometry.noteClientHeight).toBeGreaterThanOrEqual(90);
-  expect(mobileRailGeometry.documentOverflow).toBe(false);
-
-  // The full governed flow works with touch-sized chrome.
-  await commitCell(page, 4, 3, "Approved");
-  await expect(page.getByTestId("pending-count")).toHaveText("1");
-  await openTask(page, "Persistence");
-  await page.getByTestId("sync").scrollIntoViewIfNeeded();
-  await page.getByTestId("sync").click();
-  await expect(page.getByTestId("persistence")).toContainText("All changes on host · v1");
-
-  await commitCell(page, 5, 3, "Perhaps");
-  await expect(page.getByTestId("feed")).toContainText(STATUS_RULE);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);

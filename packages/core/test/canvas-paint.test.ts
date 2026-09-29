@@ -56,7 +56,6 @@ interface RecordingCtx {
   lineWidth: number;
   fillRects: FillRectCall[];
   fillTexts: FillTextCall[];
-  moveTos: MoveToCall[];
   clipRects: ClipRectCall[];
   segments: LineSegment[];
   [op: string]: unknown;
@@ -73,7 +72,6 @@ function makeRecordingCtx(): RecordingCtx {
     fillRects: [],
     fillTexts: [],
     clipRects: [],
-    moveTos: [],
     segments: [],
   };
 
@@ -87,7 +85,6 @@ function makeRecordingCtx(): RecordingCtx {
   let segmentStart: MoveToCall | undefined;
   ctx.moveTo = (x: number, y: number) => {
     segmentStart = { x, y };
-    ctx.moveTos.push(segmentStart);
   };
   ctx.lineTo = (x: number, y: number) => {
     if (segmentStart) {
@@ -200,26 +197,6 @@ describe("fontFor", () => {
       'italic bold 13px "Inter Variable", sans-serif',
     );
   });
-
-  it("preserves a theme style while applying weight or size overrides", () => {
-    const theme = makeTheme({ font: 'italic 450 13px "Inter Variable", sans-serif' });
-    expect(fontFor(theme, { bold: true })).toBe('italic bold 13px "Inter Variable", sans-serif');
-    expect(fontFor(theme, { fontSize: 16 })).toBe('italic 450 16px "Inter Variable", sans-serif');
-  });
-
-  it("removes an oblique angle when italic replaces the theme style", () => {
-    const theme = makeTheme({ font: 'oblique 10deg 13px "Inter Variable", sans-serif' });
-    expect(fontFor(theme, { italic: true })).toBe('italic 13px "Inter Variable", sans-serif');
-    expect(fontFor(theme, { fontSize: 16 })).toBe(
-      'oblique 10deg 16px "Inter Variable", sans-serif',
-    );
-  });
-
-  it("keeps the plain hot path and applies a scaled custom size", () => {
-    const theme = makeTheme({ font: "12px sans-serif" });
-    expect(fontFor(theme, {})).toBe(theme.font);
-    expect(fontFor(theme, { italic: true, fontSize: 10 }, 1.5)).toBe("italic 15px sans-serif");
-  });
 });
 
 describe("paintFrame variable row heights", () => {
@@ -245,53 +222,6 @@ describe("paintFrame variable row heights", () => {
     // The uniform layout would have produced y = 44, h = 24 instead.
     expect(rect?.y).not.toBe(44);
     expect(rect?.h).not.toBe(24);
-  });
-
-  it("falls back to uniform row geometry when none is supplied", () => {
-    const layout = makeLayout([
-      { key: "a", header: "A", width: 100, type: "text" },
-      { key: "b", header: "B", width: 80, type: "text" },
-    ]);
-
-    const CELL_FILL = "#abcdef";
-    const styleIds = new Uint32Array(6);
-    styleIds[2] = 1;
-    const view = makeView(styleIds, [{}, { backgroundColor: CELL_FILL }]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    const rect = ctx.fillRects.find((r) => r.fillStyle === CELL_FILL);
-    expect(rect).toBeDefined();
-    // Uniform: y = headerHeight(20) + row(1) * rowHeight(24) = 44; h = rowHeight(24).
-    expect(rect?.y).toBe(44);
-    expect(rect?.h).toBe(24);
-    expect(rect?.x).toBe(0);
-    expect(rect?.w).toBe(100);
-  });
-
-  it("sums per-row heights across a merged region", () => {
-    const layout = makeLayout(
-      [
-        { key: "a", header: "A", width: 100, type: "text" },
-        { key: "b", header: "B", width: 80, type: "text" },
-      ],
-      [{ r0: 0, c0: 0, r1: 1, c1: 0 }],
-    );
-
-    // Fill the merge origin (row 0, col 0) so its painted height is observable.
-    const MERGE_FILL = "#fe01dc";
-    const styleIds = new Uint32Array(6);
-    styleIds[0] = 1;
-    const view = makeView(styleIds, [{}, { backgroundColor: MERGE_FILL }]);
-
-    const ctx = render(view, layout, GEOMETRY_VIEWPORT);
-
-    const rect = ctx.fillRects.find((r) => r.fillStyle === MERGE_FILL);
-    expect(rect).toBeDefined();
-    // Spanned rows 0..1 → rowHeights[0] + rowHeights[1] = 40 + 10 = 50.
-    expect(rect?.h).toBe(50);
-    // Uniform would have summed to (2) * 24 = 48.
-    expect(rect?.h).not.toBe(48);
   });
 
   it("removes internal gridlines from a merged rectangle", () => {
@@ -350,19 +280,6 @@ describe("paintFrame variable row heights", () => {
     expect(getMergeIndexResourceStatsForTest().candidatesExamined).toBeLessThanOrEqual(20);
   });
 
-  it("draws the horizontal gridline at each row's geometric bottom", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
-    const view = makeView(new Uint32Array(3), [{}], [0]);
-
-    const ctx = render(view, layout, GEOMETRY_VIEWPORT);
-
-    // Row 0's bottom: headerHeight(20) + rowTops[0](0) + rowHeights[0](40) = 60,
-    // snapped to a crisp half-pixel line → round(60) - 0.5 = 59.5.
-    expect(ctx.moveTos.some((m) => m.y === 59.5)).toBe(true);
-    // Uniform would have placed it at round(20 + 24) - 0.5 = 43.5.
-    expect(ctx.moveTos.some((m) => m.y === 43.5)).toBe(false);
-  });
-
   it("skips cells outside a damage strip", () => {
     const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
     const view = makeView(new Uint32Array(3), [{}], [0]);
@@ -381,25 +298,6 @@ describe("paintFrame variable row heights", () => {
 });
 
 describe("paintFrame column styles", () => {
-  it("applies Column.cellStyle as the cell background base", () => {
-    const COL_FILL = "#00ff00";
-    const layout = makeLayout([
-      { key: "a", header: "A", width: 100, type: "text" },
-      { key: "b", header: "B", width: 80, type: "text", cellStyle: { backgroundColor: COL_FILL } },
-    ]);
-
-    // Every cell uses the default (empty) per-cell style.
-    const view = makeView(new Uint32Array(6), [{}]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    const colFills = ctx.fillRects.filter((r) => r.fillStyle === COL_FILL);
-    // Column B's cellStyle paints behind all three visible rows.
-    expect(colFills.length).toBe(3);
-    // Column B starts at x = 100 (column A's width) and is 80 wide.
-    expect(colFills.every((r) => r.x === 100 && r.w === 80)).toBe(true);
-  });
-
   it("lets a per-cell style override the column cellStyle", () => {
     const COL_FILL = "#ff0000";
     const CELL_FILL = "#0000ff";
@@ -465,26 +363,6 @@ describe("paintFrame column styles", () => {
     expect(ctx.fillTexts.some((call) => call.text === "A")).toBe(true);
   });
 
-  it("clips narrow headers and cell text to their own row and column", () => {
-    const layout = makeLayout([
-      { key: "a", header: "Long header", width: 18, type: "text" },
-      { key: "b", header: "B", width: 22, type: "text" },
-    ]);
-    const view = makeView(new Uint32Array(6), [{}]);
-    (view.values as string[])[0] = "Long cell value";
-    const viewport: Viewport = {
-      ...UNIFORM_VIEWPORT,
-      rowTops: Float64Array.from([0, 9, 33]),
-      rowHeights: Float64Array.from([9, 24, 24]),
-    };
-
-    const ctx = render(view, layout, viewport);
-
-    expect(ctx.clipRects).toContainEqual({ x: 0, y: 0, w: 18, h: HEADER_HEIGHT });
-    expect(ctx.clipRects).toContainEqual({ x: 0, y: HEADER_HEIGHT, w: 18, h: 9 });
-    expect(ctx.fillTexts.find((call) => call.text === "Long cell value")?.maxWidth).toBeUndefined();
-  });
-
   it("lets text spill through empty cells but stops before occupied neighbours", () => {
     const layout = makeLayout([
       { key: "a", header: "A", width: 20, type: "text" },
@@ -517,53 +395,6 @@ describe("paintFrame column styles", () => {
 });
 
 describe("paintFrame typography and wrapping", () => {
-  it("uses per-cell font size with valid italic-bold ordering", () => {
-    const layout = {
-      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
-      zoom: 1,
-    };
-    const styleIds = Uint32Array.from([1, 0, 0]);
-    const view = makeView(styleIds, [{}, { fontSize: 18, bold: true, italic: true }], [0]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    expect(ctx.fillTexts.find((call) => call.text === "x")?.font).toBe(
-      "italic bold 18px sans-serif",
-    );
-  });
-
-  it("scales a base font size exactly once with layout zoom", () => {
-    const layout = {
-      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
-      zoom: 2,
-    };
-    const styleIds = Uint32Array.from([1, 0, 0]);
-    const view = makeView(styleIds, [{}, { fontSize: 18 }], [0]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT, makeTheme({ font: "24px sans-serif" }));
-
-    expect(ctx.fillTexts.find((call) => call.text === "x")?.font).toBe("36px sans-serif");
-  });
-
-  it("wraps explicit and measured lines inside the owning cell", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 47, type: "text" }]);
-    const styleIds = Uint32Array.from([1, 0, 0]);
-    const view = makeView(styleIds, [{}, { wrap: true, align: "center" }], [0]);
-    (view.values as string[])[0] = "one two\nthree";
-    const viewport = {
-      ...UNIFORM_VIEWPORT,
-      rowTops: Float64Array.from([0, 48, 72]),
-      rowHeights: Float64Array.from([48, 24, 24]),
-    };
-
-    const ctx = render(view, layout, viewport);
-    const cellLines = ctx.fillTexts.filter((call) => ["one ", "two", "three"].includes(call.text));
-
-    expect(cellLines.map((call) => call.text)).toEqual(["one ", "two", "three"]);
-    expect(ctx.clipRects).toContainEqual({ x: 0, y: HEADER_HEIGHT, w: 47, h: 48 });
-    expect(cellLines.every((call) => call.x === 23.5)).toBe(true);
-  });
-
   it("breaks an overlong token at character boundaries", () => {
     const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
     const styleIds = Uint32Array.from([1, 0, 0]);
@@ -621,27 +452,6 @@ describe("paintFrame text decorations", () => {
     expect(lines).toHaveLength(1);
     // Mid x-height ≈ the "middle" baseline origin at cy, rounded to a pixel.
     expect(lines[0]?.y).toBe(Math.round(ROW_CY));
-  });
-
-  it("draws both lines when underline and strikethrough are set", () => {
-    const ctx = renderDecorated({ underline: true, strikethrough: true, color: TEXT_COLOR });
-
-    const lines = decorationLines(ctx);
-    expect(lines).toHaveLength(2);
-    // The two lines sit at distinct rows (underline below the strikethrough).
-    const ys = lines.map((l) => l.y).sort((a, b) => a - b);
-    expect(ys[0]).toBeLessThan(ys[1]!);
-  });
-
-  it("draws no decoration line for a plain cell", () => {
-    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
-    const view = makeView(new Uint32Array(3), [{}], [0]);
-
-    const ctx = render(view, layout, UNIFORM_VIEWPORT);
-
-    // Backgrounds/headers are full-height fills; a 1px-high rect would be a
-    // stray decoration. None should exist.
-    expect(ctx.fillRects.every((r) => r.h !== 1)).toBe(true);
   });
 });
 

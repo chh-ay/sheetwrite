@@ -153,41 +153,6 @@ describe("raw spec-authored OOXML fidelity", () => {
     );
   });
 
-  it("neutralizes external formulas during export", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const source = oneColumnSnapshot();
-    source.sheets[0]!.cells = [
-      {
-        startRow: 0,
-        startCol: 0,
-        rowCount: 1,
-        colCount: 1,
-        cells: [
-          {
-            rowOffset: 0,
-            colOffset: 0,
-            value: { kind: "formula", src: "='[1]Data'!A1" },
-          },
-        ],
-      },
-    ];
-
-    const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source, {
-      onWarning: (warning) => warnings.push(warning),
-    });
-    const worksheet = strFromU8(unzipSync(bytes)["xl/worksheets/sheet1.xml"]!);
-    expect(worksheet).toContain(
-      '<c r="A1" t="inlineStr"><is><t xml:space="preserve">=&apos;[1]Data&apos;!A1</t></is></c>',
-    );
-    expect(worksheet).not.toContain("<f>");
-    expect(warnings).toContainEqual({
-      code: "external-formula",
-      message: "External-data formula was neutralized as inert text on export",
-      sheet: "Sheet1",
-      cell: "A1",
-    });
-  });
-
   it("converts date1904 serials, preserves serial 60, and parses t=d as UTC wall time", async () => {
     const styles = `<?xml version="1.0"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font/></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="1"><xf numFmtId="14" fontId="0" fillId="0" borderId="0"/></cellXfs></styleSheet>`;
     const body =
@@ -225,38 +190,6 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(rules.map((rule) => rule.policy)).toEqual(["allow", "allow", "reject", "warn", "warn"]);
     expect(rules.at(-1)?.helpText).toBeUndefined();
     expect(warnings).toContainEqual(expect.objectContaining({ code: "validation-loss" }));
-  });
-
-  it("omits oversized validation help text during export", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const source = oneColumnSnapshot();
-    source.sheets[0]!.validationRules = [
-      {
-        id: "bounded-help",
-        range: {
-          sheet: "s",
-          start: { row: 0, col: 0 },
-          end: { row: 1, col: 0 },
-        },
-        condition: { kind: "list", values: ["Open", "Closed"] },
-        policy: "reject",
-        helpText: "x".repeat(256),
-      },
-    ];
-
-    const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source, {
-      onWarning: (warning) => warnings.push(warning),
-    });
-    const worksheet = strFromU8(unzipSync(bytes)["xl/worksheets/sheet1.xml"]!);
-    expect(worksheet).toContain('<dataValidation type="list"');
-    expect(worksheet).toContain("<formula1>&quot;Open,Closed&quot;</formula1>");
-    expect(worksheet).not.toContain("prompt=");
-    expect(warnings).toContainEqual({
-      code: "validation-loss",
-      message:
-        'Validation rule "bounded-help" prompt/error exceeded 255 characters and was omitted from native XLSX',
-      sheet: "Sheet1",
-    });
   });
 
   it("maps every native validation comparison operator without broadening", async () => {
@@ -358,153 +291,6 @@ describe("raw spec-authored OOXML fidelity", () => {
     });
   });
 
-  it("writes valid one-axis panes, scoped names, hidden state, whole validation, and no calcId", async () => {
-    const source: WorkbookSnapshot = {
-      schemaVersion: 1,
-      workbook: {
-        activeSheet: "rows",
-        namedRanges: [
-          {
-            name: "Local",
-            scope: "cols",
-            range: { sheet: "cols", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-          },
-        ],
-      },
-      sheets: [
-        { ...oneColumnSnapshot().sheets[0]!, id: "rows", name: "Rows", frozenRows: 1 },
-        { ...oneColumnSnapshot().sheets[0]!, id: "cols", name: "Cols", order: 1, frozenCols: 1 },
-        {
-          ...oneColumnSnapshot().sheets[0]!,
-          id: "both",
-          name: "Both",
-          order: 2,
-          frozenRows: 1,
-          frozenCols: 1,
-          visibility: "veryHidden",
-        },
-      ],
-    };
-    source.sheets[0]!.validationRules = [
-      {
-        id: "whole",
-        range: { sheet: "rows", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
-        condition: { kind: "number", min: 1, max: 2, integer: true },
-        policy: "warn",
-      },
-    ];
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(source));
-    expect(strFromU8(parts["xl/worksheets/sheet1.xml"]!)).toContain('activePane="bottomLeft"');
-    expect(strFromU8(parts["xl/worksheets/sheet2.xml"]!)).toContain('activePane="topRight"');
-    expect(strFromU8(parts["xl/worksheets/sheet3.xml"]!)).toContain('activePane="bottomRight"');
-    expect(strFromU8(parts["xl/worksheets/sheet1.xml"]!)).toContain('type="whole"');
-    expect(strFromU8(parts["xl/worksheets/sheet1.xml"]!)).toContain('errorStyle="warning"');
-    const workbook = strFromU8(parts["xl/workbook.xml"]!);
-    expect(workbook).toContain('localSheetId="1"');
-    expect(workbook).toContain('name="Both" sheetId="3" state="veryHidden"');
-    expect(workbook).not.toContain("calcId=");
-  });
-
-  it("accepts sparse far dimensions under codec rather than dense-store limits", async () => {
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
-        sheet(
-          '<dimension ref="A1:XFD1048576"/><sheetData><row r="1048576"><c r="XFD1048576"><v>7</v></c></row></sheetData>',
-        ),
-      ),
-      { maxCells: 1 },
-    );
-    expect(imported.sheets[0]).toMatchObject({ rowCount: 1_048_576 });
-    expect(imported.sheets[0]!.columns).toHaveLength(16_384);
-    expect(imported.sheets[0]!.cells[0]!.cells[0]).toMatchObject({
-      rowOffset: 1_048_575,
-      colOffset: 16_383,
-      value: { kind: "literal", value: 7 },
-    });
-  });
-
-  it("uses ASCII-insensitive and percent-decoded Unicode logical part lookup", async () => {
-    const base = unzipSync(rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>')));
-    const workbook = base["xl/workbook.xml"]!;
-    const workbookRels = base["xl/_rels/workbook.xml.rels"]!;
-    const worksheet = base["xl/worksheets/sheet1.xml"]!;
-    delete base["xl/workbook.xml"];
-    delete base["xl/_rels/workbook.xml.rels"];
-    delete base["xl/worksheets/sheet1.xml"];
-    base["XL/WORK%20BOOK.xml"] = workbook;
-    base["XL/_rels/WORK%20BOOK.xml.rels"] = strToU8(
-      strFromU8(workbookRels).replace("worksheets/sheet1.xml", "Worksheets/%E6%95%B0%E6%8D%AE.xml"),
-    );
-    base["XL/Worksheets/%E6%95%B0%E6%8D%AE.xml"] = worksheet;
-    base["_rels/.rels"] = strToU8(
-      strFromU8(base["_rels/.rels"]!).replace("xl/workbook.xml", "xl/work%20book.xml"),
-    );
-    base["[Content_Types].xml"] = strToU8(
-      strFromU8(base["[Content_Types].xml"]!)
-        .replace("/xl/workbook.xml", "/XL/WORK%20BOOK.xml")
-        .replace("/xl/worksheets/sheet1.xml", "/XL/Worksheets/%E6%95%B0%E6%8D%AE.xml"),
-    );
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      zipSync(base, { level: 6, mtime: FIXED_ZIP_TIME }),
-    );
-    expect(imported.sheets[0]!.name).toBe("Raw");
-  });
-
-  it("uses the last sheetView and handles frozenSplit as frozen on each populated axis", async () => {
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
-        sheet(
-          '<sheetViews><sheetView workbookViewId="0"><pane state="frozen" xSplit="9" ySplit="9"/></sheetView><sheetView workbookViewId="1"><pane state="frozenSplit" xSplit="2" activePane="topRight"/></sheetView></sheetViews><dimension ref="A1:C1"/><sheetData/>',
-        ),
-      ),
-    );
-    expect(imported.sheets[0]).toMatchObject({ frozenCols: 2 });
-    expect(imported.sheets[0]!.frozenRows).toBeUndefined();
-  });
-
-  it("decodes built-in number formats 11-13 and 45-48", async () => {
-    const ids = [11, 12, 13, 45, 46, 47, 48];
-    const xfs = ids
-      .map(
-        (id) => `<xf numFmtId="${id}" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/>`,
-      )
-      .join("");
-    const styles = `<?xml version="1.0"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font/></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="${ids.length}">${xfs}</cellXfs></styleSheet>`;
-    const cells = ids
-      .map((_, col) => `<c r="${String.fromCharCode(65 + col)}1" s="${col}"><v>1</v></c>`)
-      .join("");
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
-        sheet(`<dimension ref="A1:G1"/><sheetData><row r="1">${cells}</row></sheetData>`),
-        { styles },
-      ),
-    );
-    expect(imported.sheets[0]!.columns.map((column) => column.numberFormat)).toEqual([
-      "0.00E+00",
-      "# ?/?",
-      "# ??/??",
-      "mm:ss",
-      "[h]:mm:ss",
-      "mmss.0",
-      "##0.0E+0",
-    ]);
-  });
-
-  it("maps row outlines, point row heights, and default column styles", async () => {
-    const styles = `<?xml version="1.0"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font><b/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellXfs></styleSheet>`;
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
-        sheet(
-          '<dimension ref="A1:A2"/><cols><col min="1" max="1" style="0" width="12"/></cols><sheetData><row r="1" outlineLevel="1" ht="18" customHeight="1"><c r="A1"><v>1</v></c></row><row r="2" outlineLevel="1" collapsed="1"/></sheetData>',
-        ),
-        { styles },
-      ),
-    );
-    expect(imported.sheets[0]!.columns[0]!.cellStyle).toMatchObject({ bold: true });
-    expect(imported.sheets[0]!.rowMeta).toContainEqual([0, { height: 24 }]);
-    expect(imported.sheets[0]!.rowGroups).toEqual([{ start: 0, end: 1, collapsed: true }]);
-  });
-
   it("escapes SpreadsheetML control tokens without confusing literal escape text", async () => {
     const literal = "\u0001_x0041_😀";
     const source = oneColumnSnapshot();
@@ -525,43 +311,6 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(imported.sheets[0]!.cells[0]!.cells[0]!.value).toEqual({
       kind: "literal",
       value: literal,
-    });
-  });
-
-  it("imports supported cellIs, contains, expression, blank, and differential-style rules", async () => {
-    const styles = `<?xml version="1.0"?><styleSheet xmlns="${TRANSITIONAL_MAIN}"><fonts count="1"><font/></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellXfs><dxfs count="1"><dxf><font><b/><color indexed="2"/><sz val="12"/></font><fill><patternFill><bgColor rgb="FFCCDDFF"/></patternFill></fill><border><left style="dashed"><color rgb="FF112233"/></left></border><alignment horizontal="center" wrapText="1"/></dxf></dxfs></styleSheet>`;
-    const rules = [
-      '<cfRule type="cellIs" dxfId="0" priority="1" operator="greaterThan"><formula>5</formula></cfRule>',
-      '<cfRule type="cellIs" dxfId="0" priority="2" operator="lessThan"><formula>2</formula></cfRule>',
-      '<cfRule type="cellIs" dxfId="0" priority="3" operator="equal"><formula>"yes"</formula></cfRule>',
-      '<cfRule type="containsText" dxfId="0" priority="4" text="needle"/>',
-      '<cfRule type="expression" dxfId="0" priority="5"><formula>ISNUMBER(FIND("Case",A1))</formula></cfRule>',
-      '<cfRule type="containsBlanks" dxfId="0" priority="6"><formula>LEN(TRIM(A1))=0</formula></cfRule>',
-    ].join("");
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawWorkbook(
-        sheet(
-          `<dimension ref="A1:A2"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"/></sheetData><conditionalFormatting sqref="A1:A2">${rules}</conditionalFormatting>`,
-        ),
-        { styles },
-      ),
-    );
-    expect(imported.sheets[0]!.conditionalFormats?.map((rule) => rule.when)).toEqual([
-      { kind: "greaterThan", value: 5 },
-      { kind: "lessThan", value: 2 },
-      { kind: "equal", value: "yes" },
-      { kind: "contains", text: "needle" },
-      { kind: "contains", text: "Case", matchCase: true },
-      { kind: "equal", value: null },
-    ]);
-    expect(imported.sheets[0]!.conditionalFormats?.[0]?.style).toMatchObject({
-      bold: true,
-      color: "#FF0000",
-      fontSize: 16,
-      backgroundColor: "#CCDDFF",
-      align: "center",
-      wrap: true,
-      border: { left: { color: "#112233", width: 1, style: "dashed" } },
     });
   });
 

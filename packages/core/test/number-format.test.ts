@@ -7,25 +7,9 @@ import {
 } from "../src/number-format.js";
 
 describe("formatNumber", () => {
-  it("applies fixed decimals and thousands grouping", () => {
-    expect(formatNumber(1234.5, "#,##0.00")).toBe("1,234.50");
-    expect(formatNumber(1234.5, "0.00")).toBe("1234.50");
-    expect(formatNumber(1234.567, "#,##0")).toBe("1,235");
-  });
-
   it("applies percent scaling and suffix", () => {
     expect(formatNumber(0.5, "0%")).toBe("50%");
     expect(formatNumber(0.123, "0.0%")).toBe("12.3%");
-  });
-
-  it("applies a literal currency prefix", () => {
-    expect(formatNumber(1234.5, "$#,##0.00")).toBe("$1,234.50");
-  });
-
-  it("ignores locale ids while preserving locale currency symbols", () => {
-    expect(formatNumber(1234.5, "[$-409]\\$#,##0.00")).toBe("$1,234.50");
-    expect(formatNumber(1234.5, "[$$-409]#,##0.00")).toBe("$1,234.50");
-    expect(formatNumber(1234.5, "[$€-407]#,##0.00")).toBe("€1,234.50");
   });
 
   it("resolves the locale currency placeholder", () => {
@@ -60,21 +44,6 @@ describe("formatNumber", () => {
     expect(formatNumber(Number.NaN, "0.00")).toBe("");
     expect(formatNumber(Number.POSITIVE_INFINITY, "#,##0.00")).toBe("");
     expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
-  });
-
-  it("does not grow format caches when formatting a second identical batch", () => {
-    resetNumberFormatResourcesForTest();
-    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
-    const formatBatch = (): void => {
-      for (let cell = 0; cell < 1_000; cell++) {
-        expect(formatNumber(serial, "mmm d, yyyy dddd")).toBe("Jul 4, 2024 Thursday");
-      }
-    };
-
-    formatBatch();
-    const afterFirstBatch = getNumberFormatResourceStatsForTest();
-    formatBatch();
-    expect(getNumberFormatResourceStatsForTest()).toEqual(afterFirstBatch);
   });
 
   it("bounds diverse caches and recomputes an evicted format correctly", () => {

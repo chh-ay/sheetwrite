@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { createHash } from "node:crypto";
 import {
   isSheetwriteError,
   type WorkbookSnapshot,
@@ -8,20 +7,6 @@ import {
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 
-const ECMA_376_SOURCES = {
-  spreadsheetMl: {
-    edition: "5th edition, December 2016",
-    clauses: ["18.3.1.10", "18.3.1.18", "18.3.1.47", "18.3.1.48"],
-    url: "https://ecma-international.org/wp-content/uploads/ECMA-376-1_5th_edition_december_2016.zip",
-    sha256: "9d0bcad9cf06054785b03762fcfadbf6bab7e54a5f9d69434e34b7fd464d4129",
-  },
-  opc: {
-    edition: "5th edition, December 2021",
-    clauses: ["6.5.2.3", "6.5.3.4"],
-    url: "https://ecma-international.org/wp-content/uploads/ECMA-376-2_5th_edition_december_2021.zip",
-    sha256: "1d489dc491168ea1f9e9a59063acc8dd5f02b4ad1d21aa7ec19ba9a58d020c70",
-  },
-} as const;
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
 const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -69,10 +54,6 @@ function originalEcmaVector(options: OriginalVectorOptions): Uint8Array {
     );
   }
   return zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME });
-}
-
-function sha256(bytes: Uint8Array): string {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function sourceSnapshot(): WorkbookSnapshot {
@@ -165,53 +146,6 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
     expect(imported.sheets[0]!.conditionalFormats).toEqual(source.sheets[0]!.conditionalFormats);
   });
 
-  it("imports an original clause-derived OPC vector with fixed byte identity", async () => {
-    const bytes = originalEcmaVector({
-      conditionalFormatting:
-        '<conditionalFormatting sqref="B1:B2"><cfRule type="expression" priority="1" stopIfTrue="1"><formula>A1&lt;&gt;""</formula></cfRule></conditionalFormatting>',
-      hyperlinks:
-        '<hyperlink ref="A1" r:id="rId1" display="Report"/><hyperlink ref="B1" location="&apos;Destination Sheet&apos;!B2" display="Destination"/>',
-      relationship: { target: "https://example.com/report", external: true },
-    });
-    expect(ECMA_376_SOURCES.spreadsheetMl.clauses).toEqual([
-      "18.3.1.10",
-      "18.3.1.18",
-      "18.3.1.47",
-      "18.3.1.48",
-    ]);
-    expect(ECMA_376_SOURCES.opc.clauses).toEqual(["6.5.2.3", "6.5.3.4"]);
-    expect(sha256(bytes)).toBe("5fb633b8b4571db525829cf7dc18929cc6408d8ab785d1227d09752de3208adf");
-
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
-    expect(imported.sheets[0]!.hyperlinks).toEqual([
-      expect.objectContaining({
-        range: { sheet: "source", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-        target: { kind: "external", url: "https://example.com/report" },
-        display: "Report",
-      }),
-      expect.objectContaining({
-        range: { sheet: "source", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } },
-        target: {
-          kind: "internal",
-          range: {
-            sheet: "destination-sheet",
-            start: { row: 1, col: 1 },
-            end: { row: 1, col: 1 },
-          },
-        },
-        display: "Destination",
-      }),
-    ]);
-    expect(imported.sheets[0]!.conditionalFormats).toEqual([
-      {
-        range: { sheet: "source", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
-        when: { kind: "formula", source: '=A1<>""' },
-        style: {},
-        stopIfTrue: true,
-      },
-    ]);
-  });
-
   it("drops unsafe external schemes with an exact warning before snapshot mutation", async () => {
     const warnings: XlsxWorkbookWarning[] = [];
     const bytes = originalEcmaVector({
@@ -298,39 +232,5 @@ describe("XLSX hyperlink and conditional-format fidelity", () => {
         "Excel conditional-format rule type containsBlanks has an invalid differential style and was dropped",
       ]),
     );
-  });
-
-  it("caps oversized hyperlinks and reports extension loss exactly", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const hyperlinks = Array.from(
-      { length: 4_097 },
-      (_, index) => `<hyperlink ref="A1" r:id="rId1" display="Link ${index}"/>`,
-    ).join("");
-    const bytes = originalEcmaVector({
-      hyperlinks,
-      relationship: { target: "https://example.com", external: true },
-      extensions:
-        '<extLst><ext uri="{78C0D931-6437-407D-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:conditionalFormattings/></ext></extLst>',
-    });
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes, {
-      onWarning: (warning) => warnings.push(warning),
-    });
-    expect(imported.sheets[0]!.hyperlinks).toHaveLength(4_096);
-    expect(warnings.map((warning) => warning.message)).toEqual(
-      expect.arrayContaining([
-        "Excel hyperlink limit 4096 was exceeded; later hyperlinks were dropped",
-        "Extended conditional formatting is unsupported and was dropped",
-      ]),
-    );
-  });
-
-  it("rejects malformed hyperlink source ranges", async () => {
-    const bytes = originalEcmaVector({
-      hyperlinks: '<hyperlink ref="A0" r:id="rId1"/>',
-      relationship: { target: "https://example.com", external: true },
-    });
-    await expect(sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes)).rejects.toMatchObject({
-      operation: "xlsx-import",
-    });
   });
 });

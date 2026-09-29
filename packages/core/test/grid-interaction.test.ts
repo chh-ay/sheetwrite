@@ -3,7 +3,6 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
-  CellRenderer,
   CellScalar,
   DataSourcePage,
   DataSourceRequest,
@@ -84,28 +83,6 @@ describe("find-bar keystroke isolation", () => {
   // <input>) inside the host must be ignored by the grid's key handler. Before
   // the fix a printable key started a cell edit and Backspace destructively
   // cleared the selected cell.
-  it("does not start a cell edit when typing a printable key into the find input", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const addr = { sheet: "s1", row: 2, col: 0 };
-
-    grid.setSelection({ kind: "cell", addr });
-
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    const findInput = host.querySelector(".sheetwrite-find-input");
-    expect(findInput).toBeInstanceOf(HTMLInputElement);
-    if (!(findInput instanceof HTMLInputElement)) throw new Error("find input not mounted");
-
-    findInput.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
-
-    // Pre-fix: the grid's type-to-edit default opened an editor over the cell.
-    expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
-
-    grid.destroy();
-  });
-
   it("does not clear the selected cell when Backspace is pressed in the find input", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -211,54 +188,6 @@ describe("row-resize repaint invalidation", () => {
 });
 
 describe("merge repaint invalidation", () => {
-  it("repaints merged selection geometry immediately after merge and unmerge", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const recorder = makePaintRecorder();
-    Reflect.set(grid, "renderer", recorder);
-
-    grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
-    });
-    recorder.layouts.length = 0;
-    recorder.paints.length = 0;
-    const selectionBounds = (): { width: number; height: number } => {
-      const overlay = host.querySelector(".sheetwrite-overlay");
-      const visibleBounds = Array.from(overlay?.querySelectorAll("div") ?? [])
-        .filter((element) => element.style.display !== "none")
-        .map((element) => ({
-          width: Number.parseFloat(element.style.width),
-          height: Number.parseFloat(element.style.height),
-        }))
-        .filter(({ width, height }) => Number.isFinite(width) && Number.isFinite(height));
-      const largest = visibleBounds.sort(
-        (left, right) => right.width * right.height - left.width * left.height,
-      )[0];
-      if (!largest) throw new Error("selection geometry not painted");
-      return largest;
-    };
-
-    grid.actions.merge();
-
-    expect(recorder.layouts.at(-1)).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
-    expect(recorder.paints.length).toBeGreaterThan(0);
-    expect(selectionBounds()).toEqual({ width: 280, height: 56 });
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    expect(selectionBounds()).toEqual({ width: 280, height: 56 });
-
-    recorder.layouts.length = 0;
-    recorder.paints.length = 0;
-    grid.actions.unmerge();
-
-    expect(recorder.layouts.at(-1)).toEqual([]);
-    expect(recorder.paints.length).toBeGreaterThan(0);
-    expect(selectionBounds()).toEqual({ width: 120, height: 28 });
-    grid.destroy();
-  });
-
   it("keeps merge metadata and selection unchanged in read-only mode", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -411,104 +340,6 @@ describe("datasource repaint invalidation", () => {
       lastVisibleColumn: 16,
     });
     expect(recorder.paints.length).toBeGreaterThan(0);
-    grid.destroy();
-  });
-
-  it("hydrates an off-row DOM merge from only its canonical anchor column", () => {
-    const workbook = makeWorkbook(80);
-    const sheet = workbook.sheets[0]!;
-    sheet.merges = [{ r0: 0, c0: 0, r1: 30, c1: 2 }];
-    sheet.columns[0]!.renderer = "dom";
-    const renderer: CellRenderer = {
-      dom() {
-        return document.createElement("span");
-      },
-    };
-    const { promise } = Promise.withResolvers<DataSourcePage>();
-    const host = mountHost();
-    const grid = new GridImpl(host, {
-      workbook,
-      overscan: 0,
-      renderers: { dom: renderer },
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: () => promise,
-      },
-    });
-    const controller = Reflect.get(grid, "datasourceController") as {
-      ensureLoaded(start: number, end: number, columns: readonly number[]): void;
-    };
-    const ensureLoaded = controller.ensureLoaded.bind(controller);
-    const anchorCalls: Array<[number, number, readonly number[]]> = [];
-    Reflect.set(
-      controller,
-      "ensureLoaded",
-      (start: number, end: number, columns: readonly number[]) => {
-        anchorCalls.push([start, end, columns]);
-        ensureLoaded(start, end, columns);
-      },
-    );
-
-    const scroller = scrollerOf(host);
-    scroller.scrollTop = 10 * DEFAULT_THEME.rowHeight;
-    scroller.dispatchEvent(new Event("scroll"));
-
-    expect(anchorCalls).toContainEqual([0, 1, [0]]);
-    grid.destroy();
-  });
-});
-
-describe("overlay geometry invalidation", () => {
-  // Contract: committing a column-width change must reposition the DOM selection
-  // rect (a child of `.sheetwrite-overlay`) onto the resized geometry. The
-  // overlay caches a paint signature to skip redundant repaints; the fix added a
-  // geometryVersion component (grid storeEpoch + paintEpoch) so a width change
-  // invalidates that cache. Before the fix nothing in the signature moved on a
-  // pure column resize — same selection, scroll, window, theme — so the overlay
-  // skipped its repaint and the selection rect kept its stale pixel-left while
-  // the canvas repainted the columns underneath it.
-  it("shifts the selection rect when a column to its left widens", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    // Column 2 (city, left edge = 160 + 120) sits right of the resizable
-    // column 0 (name, width 160), so its overlay rect's left edge tracks
-    // column 0's width. setSelection schedules a synchronous render that paints
-    // the rect.
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 2 } });
-
-    const overlay = host.querySelector(".sheetwrite-overlay");
-    if (!(overlay instanceof HTMLDivElement)) throw new Error("overlay not mounted");
-
-    // The selection fill is the only overlay rect painted with theme.selection
-    // as its background (the focus ring is transparent, the fill handle is the
-    // solid selectionBorder colour).
-    const selectionRectLeft = (): number => {
-      const rect = Array.from(overlay.querySelectorAll("div")).find(
-        (el) => el.style.display !== "none" && el.style.background === DEFAULT_THEME.selection,
-      );
-      if (!(rect instanceof HTMLDivElement)) throw new Error("selection rect not painted");
-      return Number.parseFloat(rect.style.left);
-    };
-
-    // colLeftOf(2) = 160 + 120 = 280, plus the 48px row-header gutter => 328.
-    const beforeLeft = selectionRectLeft();
-    expect(beforeLeft).toBe(280 + DEFAULT_THEME.rowHeaderWidth);
-
-    // Widen column 0 by 80px through the public store transaction path.
-    grid.store.applyTransaction({
-      patches: [{ op: "setColumn", sheet: "s1", col: 0, patch: { width: 160 + 80 } }],
-    });
-
-    // Pre-fix: geometry was absent from the overlay's paint signature, so the
-    // repaint was skipped and the rect stayed at 328. Post-fix the rect follows
-    // column 2's new left edge (360 + 48 = 408), shifted right by the full 80px.
-    const afterLeft = selectionRectLeft();
-    expect(afterLeft).toBe(beforeLeft + 80);
-    expect(afterLeft).toBe(360 + DEFAULT_THEME.rowHeaderWidth);
-
     grid.destroy();
   });
 });

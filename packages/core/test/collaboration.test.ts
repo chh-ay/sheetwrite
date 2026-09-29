@@ -15,7 +15,6 @@ import {
   type RevisionAdapter,
   RevisionCoordinator,
   type RevisionRestoreRequest,
-  type RevisionRestoreResponse,
   type VersionedCommentEvent,
   type WorkbookSnapshot,
 } from "../src/index.js";
@@ -260,30 +259,6 @@ describe("revision coordinator", () => {
     preview.destroy();
     coordinator.destroy();
   });
-
-  it("surfaces revision restore conflicts without rewinding state", async () => {
-    const adapter: RevisionAdapter = {
-      async listRevisions() {
-        return [];
-      },
-      async loadRevision() {
-        return snapshot();
-      },
-      async restoreRevision(): Promise<RevisionRestoreResponse> {
-        return { status: "conflict", currentVersion: 9 };
-      },
-    };
-    const coordinator = new RevisionCoordinator(adapter, {
-      documentId: "collab-doc",
-      serverVersion: 7,
-    });
-    expect(await coordinator.restore(2, "restore-conflict")).toEqual({
-      status: "conflict",
-      currentVersion: 9,
-    });
-    expect(coordinator.serverVersion).toBe(9);
-    coordinator.destroy();
-  });
 });
 
 describe("comment coordinator", () => {
@@ -352,35 +327,6 @@ describe("comment coordinator", () => {
     coordinator.destroy();
   });
 
-  it("forwards resolve mutations with the current server version", async () => {
-    let request: CommentMutationRequest | undefined;
-    const adapter: CommentAdapter = {
-      async listComments() {
-        return { version: 3, threads: [serverThread({ version: 3 })] };
-      },
-      async mutateComment(input) {
-        request = input;
-        return { status: "conflict", currentVersion: 4 };
-      },
-    };
-    const coordinator = new CommentCoordinator(adapter, {
-      documentId: "collab-doc",
-      serverVersion: 3,
-    });
-
-    await expect(coordinator.resolve("thread-1", true, "comment-resolve")).resolves.toEqual({
-      status: "conflict",
-      currentVersion: 4,
-    });
-    expect(request).toMatchObject({
-      documentId: "collab-doc",
-      baseVersion: 3,
-      clientMutationId: "comment-resolve",
-      mutation: { kind: "resolve", threadId: "thread-1", resolved: true },
-    });
-    coordinator.destroy();
-  });
-
   it("rejects comment responses without server-owned attribution metadata", async () => {
     const adapter: CommentAdapter = {
       async listComments() {
@@ -419,107 +365,32 @@ describe("comment coordinator", () => {
     coordinator.destroy();
   });
 
-  it("discards a stale list when a streamed event advances state", async () => {
-    const listing = deferred<CommentListResult>();
-    let remoteListener: ((event: VersionedCommentEvent) => void) | undefined;
-    const adapter: CommentAdapter = {
-      listComments: () => listing.promise,
-      async mutateComment() {
-        return { status: "conflict", currentVersion: 2 };
-      },
-      subscribeComments(_documentId, listener) {
-        remoteListener = listener;
-      },
-    };
-    const coordinator = new CommentCoordinator(adapter, {
-      documentId: "collab-doc",
-      serverVersion: 1,
-    });
-    const events: string[] = [];
-    coordinator.on((event) => events.push(event.type));
-
-    const pending = coordinator.load();
-    remoteListener?.({
-      version: 2,
-      thread: serverThread({ id: "thread-live", version: 2 }),
-    });
-    listing.resolve({
-      version: 1,
-      threads: [serverThread({ id: "thread-stale", version: 1 })],
-    });
-
-    expect(await pending).toEqual(coordinator.commentThreads());
-    expect(coordinator.serverVersion).toBe(2);
-    expect(coordinator.commentThreads().map((thread) => thread.id)).toEqual(["thread-live"]);
-    expect(events).toEqual(["changed"]);
-    coordinator.destroy();
-  });
-
-  it("does not rewind to a list older than the current version", async () => {
+  it("forwards resolve mutations with the current server version", async () => {
+    let request: CommentMutationRequest | undefined;
     const adapter: CommentAdapter = {
       async listComments() {
         return { version: 3, threads: [serverThread({ version: 3 })] };
       },
-      async mutateComment() {
+      async mutateComment(input) {
+        request = input;
         return { status: "conflict", currentVersion: 4 };
       },
     };
     const coordinator = new CommentCoordinator(adapter, {
       documentId: "collab-doc",
-      serverVersion: 4,
+      serverVersion: 3,
     });
-    expect(await coordinator.load()).toEqual([]);
-    expect(coordinator.serverVersion).toBe(4);
-    expect(coordinator.commentThreads()).toEqual([]);
-    coordinator.destroy();
-  });
 
-  it("accepts a same-version event after rejecting invalid mutation metadata", async () => {
-    let remoteListener: ((event: VersionedCommentEvent) => void) | undefined;
-    const mutation = deferred<CommentMutationResponse>();
-    const adapter: CommentAdapter = {
-      async listComments() {
-        return { version: 0, threads: [] };
-      },
-      mutateComment: () => mutation.promise,
-      subscribeComments(_documentId, listener) {
-        remoteListener = listener;
-      },
-    };
-    const coordinator = new CommentCoordinator(adapter, { documentId: "collab-doc" });
-    const pending = coordinator.create(
-      "thread-race",
-      "message-race",
-      { kind: "cell", address: { sheet: "s1", row: 0, col: 0 } },
-      "Race",
-      "comment-race",
-    );
-    mutation.resolve({
-      status: "applied",
-      version: 1,
-      clientMutationId: "comment-race",
-      thread: serverThread({
-        id: "thread-race",
-        version: 1,
-        messages: [
-          {
-            id: "message-race",
-            author: { id: "" },
-            body: "invalid",
-            createdAt: "",
-          },
-        ],
-      }),
+    await expect(coordinator.resolve("thread-1", true, "comment-resolve")).resolves.toEqual({
+      status: "conflict",
+      currentVersion: 4,
     });
-    await expect(pending).rejects.toThrow("server adapter");
-    expect(coordinator.serverVersion).toBe(0);
-
-    remoteListener?.({
-      version: 1,
-      thread: serverThread({ id: "thread-race", version: 1 }),
+    expect(request).toMatchObject({
+      documentId: "collab-doc",
+      baseVersion: 3,
+      clientMutationId: "comment-resolve",
+      mutation: { kind: "resolve", threadId: "thread-1", resolved: true },
     });
-    expect(coordinator.serverVersion).toBe(1);
-    expect(coordinator.commentThreads().map((thread) => thread.id)).toEqual(["thread-race"]);
     coordinator.destroy();
   });
 

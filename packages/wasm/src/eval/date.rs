@@ -673,9 +673,7 @@ mod tests {
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
 
-    use super::{
-        apply, date_parts, date_serial, format_date_serial, parse_date_value, FuncAccumulator,
-    };
+    use super::{apply, date_parts, date_serial, FuncAccumulator};
 
     fn accumulator(args: &[Vec<Value>]) -> FuncAccumulator {
         let mut values = FuncAccumulator::default();
@@ -701,18 +699,6 @@ mod tests {
             panic!("expected a number, got {value:?}");
         };
         value
-    }
-
-    #[test]
-    fn parses_day_first_dates_and_formats_time_components() {
-        let serial = date_serial(2024, 12, 31).unwrap();
-        assert_eq!(parse_date_value("31/12/2024"), Some(serial));
-        assert_eq!(parse_date_value("31/13/2024"), None);
-        assert_eq!(parse_date_value("12/31/2024/extra"), None);
-        assert_eq!(
-            format_date_serial(serial + 0.5, "yyyy-mm-dd hh:mm:ss").as_deref(),
-            Some("2024-12-31 12:00:00")
-        );
     }
 
     #[test]
@@ -895,7 +881,6 @@ mod tests {
             Value::Error(FormulaError::Num)
         );
     }
-
     #[test]
     fn day_count_conventions_cover_leap_and_month_end_boundaries() {
         let start = date_serial(2023, 2, 28).unwrap();

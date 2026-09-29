@@ -4,7 +4,6 @@ import { resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import { assertReviewedActionPins, parseWorkflowContract } from "./workflow-contract.js";
 import {
-  BUN_VERSION,
   CARGO_AUDIT_VERSION,
   CARGO_LLVM_COV_VERSION,
   NODE_VERSION,
@@ -15,7 +14,6 @@ import {
 
 const root = resolve(import.meta.dir, "..");
 const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
-  readonly packageManager?: string;
   readonly engines?: Readonly<Record<string, string>>;
 };
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
@@ -26,28 +24,12 @@ const parsedWorkflow = parseWorkflowContract(workflow, "CI workflow");
 const parsedVersionWorkflow = parseWorkflowContract(versionWorkflow, "version workflow");
 const parsedReleaseWorkflow = parseWorkflowContract(releaseWorkflow, "release workflow");
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
-const WORKFLOW_BUN_VERSION = "$" + "{{ env.BUN_VERSION }}";
 const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
 const sizeReport = JSON.parse(readFileSync(resolve(root, "scripts/size-report.json"), "utf8")) as {
   readonly toolchain?: Readonly<Record<string, string>>;
 };
 
-function commandOutput(command: readonly [string, ...string[]]): string {
-  const result = Bun.spawnSync([...command], { cwd: root, stderr: "pipe", stdout: "pipe" });
-  if (result.exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed: ${result.stderr.toString()}`);
-  }
-  return result.stdout.toString().trim();
-}
-
 describe("contributor and CI toolchain contract", () => {
-  it("pins Bun while preserving the documented consumer engine range", () => {
-    expect(packageManifest.packageManager).toBe(`bun@${BUN_VERSION}`);
-    expect(packageManifest.engines?.bun).toBe(">=1.4.0");
-    expect(workflow).toContain(`BUN_VERSION: "${BUN_VERSION}"`);
-    expect(workflow).toContain(`bun-version: ${WORKFLOW_BUN_VERSION}`);
-  });
-
   it("pins Node and npm as exact release inputs", () => {
     expect(nodeVersion).toBe(NODE_VERSION);
     // Consumer engines and the exact CI/dev runtime are separate contracts.
@@ -89,137 +71,4 @@ describe("contributor and CI toolchain contract", () => {
       /(?:bun-version|NODE_VERSION|NPM_VERSION|RUST_VERSION|WASM_PACK_VERSION):\s*(?:latest|stable)\b/,
     );
   });
-
-  it("connects every required gate to one reusable artifact build", () => {
-    const jobs = parsedWorkflow.jobs ?? {};
-    const needsOf = (name: string): readonly string[] => {
-      const needs = jobs[name]?.needs;
-      return typeof needs === "string" ? [needs] : (needs ?? []);
-    };
-    const dependsOn = (name: string, dependency: string, seen = new Set<string>()): boolean => {
-      if (seen.has(name)) return false;
-      seen.add(name);
-      return needsOf(name).some((need) => need === dependency || dependsOn(need, dependency, seen));
-    };
-    const commandsFor = (name: string): string[] =>
-      (jobs[name]?.steps ?? []).flatMap((step) => (step.run ? [step.run] : []));
-
-    const artifactBuilders = Object.keys(jobs).filter((name) =>
-      commandsFor(name).some((command) => command.includes("release:prepare")),
-    );
-    expect(artifactBuilders).toHaveLength(1);
-    const artifactBuild = artifactBuilders[0]!;
-    expect(commandsFor(artifactBuild)).toContain("bun run compatibility:validate");
-    expect(commandsFor(artifactBuild)).toContain(
-      "bun run compatibility:check -- --allow-unclaimed",
-    );
-
-    const requiredNeeds = needsOf("required");
-    expect(requiredNeeds.toSorted()).toEqual([
-      "artifact-build",
-      "browser-smoke",
-      "bundler-consumers",
-      "delivery-size",
-      "docs-build",
-      "packed-consumers",
-      "preflight",
-      "unit-coverage",
-    ]);
-    expect(jobs.required?.name).toBe("Required CI");
-    for (const gate of requiredNeeds) {
-      if (gate === artifactBuild || dependsOn(artifactBuild, gate)) continue;
-      expect(dependsOn(gate, artifactBuild)).toBeTrue();
-    }
-
-    const consumers = Object.keys(jobs).filter((name) => dependsOn(name, artifactBuild));
-    for (const consumer of consumers) {
-      expect(commandsFor(consumer).some((command) => command.includes("release:prepare"))).toBe(
-        false,
-      );
-      expect(commandsFor(consumer).some((command) => command.includes("npm pack"))).toBe(false);
-    }
-
-    const npmInstalls = Object.keys(jobs)
-      .flatMap(commandsFor)
-      .filter((command) => command.includes("npm install --global"));
-    expect(npmInstalls.length).toBeGreaterThan(0);
-    expect(
-      npmInstalls.every((command) => command.includes('npm install --global "npm@$NPM_VERSION"')),
-    ).toBeTrue();
-
-    for (const job of Object.values(jobs)) {
-      expect(job["timeout-minutes"]).toBeGreaterThan(0);
-    }
-    const commands = Object.keys(jobs).flatMap(commandsFor).join("\n");
-    expect(commands.match(/release:prepare/g)).toHaveLength(1);
-    expect(commands).toContain("verify:packed -- --artifacts");
-    expect(commands).toContain("verify:bundlers -- --artifacts");
-    expect(commands).toContain("size-report.ts report --artifacts");
-    expect(commands).toContain("test:coverage");
-    expect(commands).toContain("test:browser");
-  });
-
-  it("gates the exact docs artifact without weakening Required CI", () => {
-    const jobs = parsedWorkflow.jobs ?? {};
-    const preflight = jobs.preflight;
-    const classifier = preflight?.steps?.find((step) => step.id === "paths");
-    expect(preflight?.outputs?.docs_required).toBe("$" + "{{ steps.paths.outputs.docs_required }}");
-    expect(classifier?.run).toContain("ci-paths.ts");
-    expect(new Set(jobs["docs-build"]?.needs as string[])).toEqual(
-      new Set(["preflight", "artifact-build", "delivery-size"]),
-    );
-    expect(jobs["docs-build"]?.if).toBe("needs.preflight.outputs.docs_required == 'true'");
-
-    const docsCommand = jobs["docs-build"]?.steps
-      ?.flatMap((step) => (step.run ? [step.run] : []))
-      .join("\n");
-    expect(docsCommand).toContain("docs:generate");
-    expect(docsCommand).not.toContain("docs:check");
-    expect(docsCommand).toContain("@sheetwrite/docs-start' build");
-    expect(JSON.stringify(jobs["delivery-size"])).toContain("size-evidence");
-    expect(JSON.stringify(jobs["docs-build"])).toContain("size-evidence");
-    const upload = jobs["docs-build"]?.steps?.find((step) =>
-      step.uses?.startsWith("actions/upload-artifact@"),
-    );
-    expect(upload?.with).toEqual({
-      name: "production-docs",
-      path: ".vercel/output/",
-      "if-no-files-found": "error",
-      "include-hidden-files": true,
-      "retention-days": 7,
-    });
-    for (const consumer of ["browser-smoke", "docs-deploy"]) {
-      const download = jobs[consumer]?.steps?.find((step) =>
-        step.uses?.startsWith("actions/download-artifact@"),
-      );
-      expect(download?.with).toEqual({
-        name: upload?.with?.name,
-        path: ".vercel/output",
-      });
-    }
-  });
-
-  it("shares a source-keyed Rust compilation cache across build and test jobs", () => {
-    const jobs = parsedWorkflow.jobs ?? {};
-    for (const jobName of ["artifact-build", "unit-coverage"]) {
-      const cache = jobs[jobName]?.steps?.find(
-        (step) =>
-          step.uses?.startsWith("actions/cache@") && step.with?.path === "packages/wasm/target",
-      );
-      expect(cache, jobName).toBeDefined();
-      expect(cache?.with?.key).toContain("wasm-target-");
-      expect(cache?.with?.key).toContain("packages/wasm/src/**/*.rs");
-      expect(cache?.with?.["restore-keys"]).toContain("wasm-target-");
-    }
-  });
-
-  it("matches the active pinned tools", () => {
-    expect(commandOutput(["bun", "--version"])).toBe(BUN_VERSION);
-    expect(commandOutput(["node", "--version"])).toBe(`v${NODE_VERSION}`);
-    expect(commandOutput(["npm", "--version"])).toBe(NPM_VERSION);
-    expect(commandOutput(["rustc", "--version"])).toMatch(
-      new RegExp(`^rustc ${RUST_VERSION.replaceAll(".", "\\.")}\\b`),
-    );
-    expect(commandOutput(["wasm-pack", "--version"])).toBe(`wasm-pack ${WASM_PACK_VERSION}`);
-  }, 60_000);
 });

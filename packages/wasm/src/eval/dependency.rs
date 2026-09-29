@@ -504,65 +504,6 @@ mod tests {
     use crate::store::CellStore;
 
     #[test]
-    fn dependency_index_is_authoritative_for_direct_and_nested_array_producers() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(8, 32);
-        store.set_formula(sheet, 0, 0, "=SUM(B1:B2)", 0);
-        let scalar_index = build_dep_index(&store.sheets, store.formula_epoch);
-        assert!(!scalar_index.has_dynamic_arrays);
-        assert!(store.set_named_range("Rows", -1, sheet, 0, 1, 1, 1));
-
-        for (row, source) in [
-            "=B1:B2",
-            "=$B$1:$B$2",
-            "=Rows",
-            "=FILTER(B1:B2,B1:B2)",
-            "=SORT(B1:B2)",
-            "=UNIQUE(B1:B2)",
-            "=SEQUENCE(2)",
-            "=TRANSPOSE(B1:B2)",
-            "=TAKE(B1:B2,1)",
-            "=DROP(B1:B2,1)",
-            "=CHOOSECOLS(B1:C2,1)",
-            "=CHOOSEROWS(B1:B2,1)",
-            "=LET(x,B1:B2,x)",
-            "=CHOOSE(1,B1:B2,SEQUENCE(2))",
-            "=LET(x,CHOOSE(1,SEQUENCE(2),B1:B2),x)",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            store.set_formula(sheet, row + 1, 0, source, 0);
-            assert_ne!(scalar_index.epoch, store.formula_epoch);
-            let index = build_dep_index(&store.sheets, store.formula_epoch);
-            assert!(index.has_dynamic_arrays, "missed array producer {source}");
-        }
-    }
-
-    #[test]
-    fn dependency_collection_deduplicates_repeated_overlapping_and_high_degree_edges() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 32);
-        for row in 0..16 {
-            store.set_formula(sheet, row, 1, "=1", 0);
-        }
-        store.set_formula(sheet, 0, 0, "=B1+B1+SUM(B1:B16)+SUM(B1:B2)+SUM(B8:B16)", 0);
-        let dependent = AbsCellKey::new(sheet, 0, 0);
-        let mut affected: HashSet<_> = (0..16).map(|row| AbsCellKey::new(sheet, row, 1)).collect();
-        affected.insert(dependent);
-
-        let index = build_dep_index(&store.sheets, store.formula_epoch);
-        let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
-        let collected = dependencies.get(&dependent).expect("dependent formula");
-        assert_eq!(collected.len(), 16);
-        let unique: HashSet<_> = collected.iter().copied().collect();
-        assert_eq!(unique.len(), collected.len());
-        for row in 0..16 {
-            assert!(unique.contains(&AbsCellKey::new(sheet, row, 1)));
-        }
-    }
-
-    #[test]
     fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(4, 4);

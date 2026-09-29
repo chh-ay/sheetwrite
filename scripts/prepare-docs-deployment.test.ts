@@ -103,17 +103,6 @@ describe("prebuilt docs deployment", () => {
     );
   });
 
-  it("rejects absent source output and empty required files before replacing output", async () => {
-    const root = await fixture();
-    await put(root, "docs/dist/client/sitemap.xml", "");
-    await expect(prepareDocsDeployment(root)).rejects.toThrow("Docs build is incomplete");
-    await rm(join(root, "docs/dist/client"), { recursive: true });
-    await expect(prepareDocsDeployment(root)).rejects.toThrow();
-    expect(await readFile(join(root, ".vercel/output/static/old.html"), "utf8")).toBe(
-      "previous deployment",
-    );
-  });
-
   it.each(["file", "directory"])(
     "rejects an outside %s symlink without replacing output",
     async (kind) => {

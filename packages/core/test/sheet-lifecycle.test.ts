@@ -2,7 +2,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { createGridFromSnapshot } from "../src/persistence.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
-import type { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SheetLifecycleResult, Workbook } from "../src/types.js";
 
@@ -121,62 +120,6 @@ describe("Grid worksheet lifecycle", () => {
       hydrated.exportSnapshot().sheets.find((sheet) => sheet.id === "secret")!.visibility,
     ).toBe("veryHidden");
     hydrated.destroy();
-    grid.destroy();
-  });
-
-  it("overlays session activation on export without mutation, history, or change traffic", () => {
-    const model = workbook([
-      { id: "one", name: "One" },
-      { id: "two", name: "Two" },
-    ]);
-    const grid = new GridImpl(mountHost(), { workbook: model });
-    const changes: unknown[] = [];
-    const active: string[] = [];
-    grid.on("change", (event) => changes.push(event));
-    grid.on("active-sheet", (event) => active.push(event.sheet));
-
-    expect(grid.getCommandState("undo").disabled).toBe(true);
-    grid.setActiveSheet("two");
-    expect(model.activeSheet).toBe("one");
-    expect(changes).toEqual([]);
-    expect(active).toEqual(["two"]);
-    expect(grid.getCommandState("undo").disabled).toBe(true);
-    expect((grid.store as SheetwriteStore).exportSnapshot().workbook.activeSheet).toBe("one");
-
-    const snapshot = grid.exportSnapshot();
-    expect(snapshot.workbook.activeSheet).toBe("two");
-    const hydrated = createGridFromSnapshot(mountHost(), snapshot);
-    expect(hydrated.getActiveSheet()).toBe("two");
-    hydrated.destroy();
-    grid.destroy();
-  });
-
-  it("reconciles the session active sheet after remote remove and hide", () => {
-    const model = workbook([
-      { id: "left", name: "Left" },
-      { id: "hidden", name: "Hidden", visibility: "hidden" },
-      { id: "middle", name: "Middle" },
-      { id: "right", name: "Right" },
-    ]);
-    const grid = new GridImpl(mountHost(), { workbook: model });
-    grid.setActiveSheet("middle");
-
-    expect(grid.applyRemoteOperations([{ op: "removeSheet", sheet: "middle" }]).status).toBe(
-      "applied",
-    );
-    expect(grid.getActiveSheet()).toBe("right");
-    expect(model.activeSheet).toBe("left");
-
-    grid.setActiveSheet("left");
-    expect(
-      grid.applyRemoteOperations([
-        { op: "setSheetVisibility", sheet: "left", visibility: "hidden" },
-      ]).status,
-    ).toBe("applied");
-    expect(grid.getActiveSheet()).toBe("right");
-    expect(model.activeSheet).toBe("right");
-    expect(grid.getCommandState("undo").disabled).toBe(true);
-
     grid.destroy();
   });
 

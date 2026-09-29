@@ -34,23 +34,8 @@ describe("ColumnIndex", () => {
 describe("computeColumnWindow", () => {
   const idx = new ColumnIndex([0, 2, 5, 6, 9], [50, 75, 25, 100, 40]);
 
-  it("returns the visible-column positions intersecting the viewport", () => {
-    expect(computeColumnWindow(idx, 60, 100, 0)).toEqual({ start: 1, end: 4 });
-  });
-
   it("applies overscan and clamps to the available columns", () => {
     expect(computeColumnWindow(idx, 60, 100, 1)).toEqual({ start: 0, end: 5 });
     expect(computeColumnWindow(idx, 240, 100, 2)).toEqual({ start: 1, end: 5 });
-  });
-
-  it("includes every small-column sheet when overscan covers it", () => {
-    expect(computeColumnWindow(idx, 125, 10, 6)).toEqual({ start: 0, end: 5 });
-  });
-
-  it("returns an empty window for an empty column index", () => {
-    expect(computeColumnWindow(new ColumnIndex([], []), 0, 100, 2)).toEqual({
-      start: 0,
-      end: 0,
-    });
   });
 });

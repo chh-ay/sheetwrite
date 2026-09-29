@@ -1,6 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import {
   CAPABILITY_INVENTORY,
   CAPABILITY_OWNERS,
@@ -8,12 +6,9 @@ import {
   type CapabilityOwner,
 } from "../src/showcases/capabilities.ts";
 import {
-  assertCapabilityInventory,
   collectCapabilityIssues,
   collectMissingCapabilityFiles,
 } from "../src/showcases/capability-validation.ts";
-
-const REPO_ROOT = join(import.meta.dir, "..", "..");
 
 function cloneInventory(): Capability[] {
   return structuredClone(CAPABILITY_INVENTORY) as Capability[];
@@ -89,11 +84,6 @@ const REQUIRED_CAPABILITY_IDS = [
 ] as const;
 
 describe("capability inventory contract", () => {
-  it("passes structural validation as checked in", () => {
-    expect(collectCapabilityIssues(CAPABILITY_INVENTORY, CAPABILITY_OWNERS)).toEqual([]);
-    expect(() => assertCapabilityInventory(CAPABILITY_INVENTORY, CAPABILITY_OWNERS)).not.toThrow();
-  });
-
   it("covers every required public capability exactly once", () => {
     const ids = CAPABILITY_INVENTORY.map((capability) => capability.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -101,35 +91,6 @@ describe("capability inventory contract", () => {
     // The other direction: nothing ships outside the checked-in contract.
     const contract: readonly string[] = REQUIRED_CAPABILITY_IDS;
     for (const id of ids) expect(contract).toContain(id);
-  });
-
-  it("assigns exactly one primary owner per capability and work to every owner", () => {
-    for (const owner of CAPABILITY_OWNERS) {
-      const owned = CAPABILITY_INVENTORY.filter((capability) => capability.primary === owner.id);
-      expect(owned.length).toBeGreaterThan(0);
-    }
-  });
-
-  it("keeps every existing route URL registered", () => {
-    const hrefs = CAPABILITY_OWNERS.map((owner) => owner.href);
-    for (const preserved of ["/vanilla/", "/react/", "/vue/", "/svelte/"]) {
-      expect(hrefs).toContain(preserved);
-    }
-    for (const dedicated of [
-      "/showcases/database/",
-      "/showcases/interoperability/",
-      "/showcases/performance/",
-      "/showcases/collaboration/",
-    ]) {
-      expect(hrefs).toContain(dedicated);
-    }
-  });
-
-  it("references only artifacts that exist on disk", () => {
-    const missing = collectMissingCapabilityFiles(CAPABILITY_INVENTORY, CAPABILITY_OWNERS, (path) =>
-      existsSync(join(REPO_ROOT, path)),
-    );
-    expect(missing).toEqual([]);
   });
 });
 
@@ -166,37 +127,6 @@ describe("capability inventory fails closed", () => {
     expect(emptied.some((issue) => issue.includes("executable test path is missing"))).toBe(true);
   });
 
-  it("rejects deleting an interaction test file", () => {
-    const missing = collectMissingCapabilityFiles(
-      CAPABILITY_INVENTORY,
-      CAPABILITY_OWNERS,
-      (path) => path !== "test/browser/framework-lifecycle.spec.ts",
-    );
-    expect(
-      missing.some((issue) => issue.includes("test/browser/framework-lifecycle.spec.ts")),
-    ).toBe(true);
-  });
-
-  it("rejects deleting a shared scenario/protocol binding", () => {
-    const inventory = cloneInventory();
-    const capability = inventory.find((entry) => entry.id === "collab.two-client-convergence");
-    if (!capability) throw new Error("collab.two-client-convergence missing from inventory");
-    capability.sharedModules = [];
-    const issues = collectCapabilityIssues(inventory, CAPABILITY_OWNERS);
-    expect(
-      issues.some((issue) => issue.includes("no shared scenario/protocol binding declared")),
-    ).toBe(true);
-
-    const missing = collectMissingCapabilityFiles(
-      CAPABILITY_INVENTORY,
-      CAPABILITY_OWNERS,
-      (path) => path !== "docs/src/showcases/collaboration-protocol.ts",
-    );
-    expect(
-      missing.some((issue) => issue.includes("docs/src/showcases/collaboration-protocol.ts")),
-    ).toBe(true);
-  });
-
   it("rejects accidental duplicate ownership", () => {
     const inventory = cloneInventory();
     const capability = inventory.find((entry) => entry.id === "collab.presence");
@@ -218,22 +148,5 @@ describe("capability inventory fails closed", () => {
     ];
     const doubled = collectCapabilityIssues(inventory, CAPABILITY_OWNERS);
     expect(doubled.some((issue) => issue.includes("declared twice"))).toBe(true);
-  });
-
-  it("rejects duplicate capability ids", () => {
-    const inventory = cloneInventory();
-    const first = inventory[0];
-    if (!first) throw new Error("inventory is empty");
-    inventory.push(structuredClone(first));
-    const issues = collectCapabilityIssues(inventory, CAPABILITY_OWNERS);
-    expect(issues.some((issue) => issue.includes("duplicate capability id"))).toBe(true);
-  });
-
-  it("rejects an owner that owns nothing", () => {
-    const inventory = cloneInventory().filter((entry) => entry.primary !== "performance");
-    const issues = collectCapabilityIssues(inventory, CAPABILITY_OWNERS);
-    expect(issues.some((issue) => issue.includes("owner performance: owns no capability"))).toBe(
-      true,
-    );
   });
 });

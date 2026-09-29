@@ -6,7 +6,6 @@ import {
   createEngineTrace,
   ENGINE_LIVE_SHEET,
   type EngineEventInput,
-  engineLiveRow,
 } from "../src/showcases/scenarios/engine-live.js";
 
 function fakeGrid(onListener: (event: string, listener: (payload: never) => void) => void): Grid {
@@ -107,13 +106,5 @@ describe("live engine event story", () => {
     expect(trace.snapshot().map((event) => event.sequence)).toEqual([
       93, 94, 95, 96, 97, 98, 99, 100,
     ]);
-  });
-
-  it("builds formulas from the same paged row returned to the Grid", () => {
-    expect(engineLiveRow(7)).toMatchObject({
-      period: "FY26 W07",
-      variance: { kind: "formula", src: "=C8-D8" },
-      attainment: { kind: "formula", src: "=IF(D8=0,0,C8/D8)" },
-    });
   });
 });

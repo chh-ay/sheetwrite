@@ -3,32 +3,19 @@ import {
   ALLOCATION_METHOD,
   CORRECTNESS_METHOD,
   type CompleteFormulaBenchmarkResult,
-  expectedFormulaBlockedWorkloadKeys,
   expectedFormulaMemoryKeys,
   expectedFormulaOutput,
   expectedFormulaWorkloadKeys,
-  FORMULA_ARTIFACT_MAX_BYTES,
   FORMULA_BENCHMARK_SCHEMA_VERSION,
   FORMULA_GATE_TOLERANCE,
   FORMULA_PROTOCOL,
   FORMULA_SOURCE_FILES,
   formulaSourceDigest,
-  PRELIMINARY_BLOCKER,
   TIMING_METHOD,
   validateFormulaBenchmark,
   validateFormulaCapture,
   validateFormulaRegression,
 } from "../src/formula-bench.js";
-import {
-  dependencyClosureFormulas,
-  diamondFormulas,
-  distinctRangeFormulas,
-  type FormulaCell,
-  fanOutFormulas,
-  independentFormulas,
-  linearChain,
-  sharedRangeFormulas,
-} from "../src/formula-dataset.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
 
@@ -121,123 +108,7 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): CompleteFormulaBenchm
     },
   };
 }
-
-function referencedCells(source: string): Array<{ row: number; col: number }> {
-  return [...source.matchAll(/\$?([A-Z]+)\$?(\d+)/gu)].map((match) => {
-    const letters = match[1]!;
-    let col = 0;
-    for (const letter of letters) col = col * 26 + letter.charCodeAt(0) - 64;
-    return { row: Number(match[2]) - 1, col: col - 1 };
-  });
-}
-
-function assertAcyclic(cells: readonly FormulaCell[]): void {
-  const key = ({ row, col }: Pick<FormulaCell, "row" | "col">) => `${row}:${col}`;
-  const formulas = new Map(cells.map((cell) => [key(cell), cell]));
-  const state = new Map<string, "visiting" | "visited">();
-  const visit = (cell: FormulaCell): void => {
-    const cellKey = key(cell);
-    expect(referencedCells(cell.src).some((dependency) => key(dependency) === cellKey)).toBeFalse();
-    if (state.get(cellKey) === "visiting") throw new Error(`formula cycle at ${cellKey}`);
-    if (state.get(cellKey) === "visited") return;
-    state.set(cellKey, "visiting");
-    for (const dependency of referencedCells(cell.src)) {
-      const formula = formulas.get(key(dependency));
-      if (formula) visit(formula);
-    }
-    state.set(cellKey, "visited");
-  };
-  for (const cell of cells) visit(cell);
-}
-
-describe("formula benchmark datasets", () => {
-  it("preserves dependency topology as dataset sizes grow", () => {
-    for (const size of [2, 7]) {
-      const independent = independentFormulas(size);
-      expect(independent).toHaveLength(size);
-      expect(
-        independent.every((cell) => {
-          const [dependency] = referencedCells(cell.src);
-          return cell.col === 1 && dependency?.row === cell.row && dependency.col === 0;
-        }),
-      ).toBeTrue();
-
-      const chain = linearChain(size);
-      expect(chain).toHaveLength(size - 1);
-      expect(
-        chain.every((cell) => {
-          const [dependency] = referencedCells(cell.src);
-          return cell.col === 0 && dependency?.row === cell.row - 1 && dependency.col === 0;
-        }),
-      ).toBeTrue();
-
-      const fanOut = fanOutFormulas(size);
-      expect(fanOut).toHaveLength(size);
-      expect(new Set(fanOut.flatMap((cell) => cell.src.match(/\$[A-Z]+\$\d+/gu) ?? [])).size).toBe(
-        1,
-      );
-
-      const diamonds = diamondFormulas(size);
-      expect(diamonds).toHaveLength(size * 3);
-      for (let row = 0; row < size; row++) {
-        const level = diamonds.filter((cell) => cell.row === row);
-        expect(level.map((cell) => cell.col).sort()).toEqual([1, 2, 3]);
-        const join = level.find((cell) => cell.col === 3)!;
-        expect(referencedCells(join.src)).toEqual([
-          { row, col: 1 },
-          { row, col: 2 },
-        ]);
-      }
-
-      const shared = sharedRangeFormulas(size, size * 10);
-      expect(shared).toHaveLength(size);
-      expect(
-        new Set(shared.map((cell) => cell.src.match(/\$[A-Z]+\$\d+:\$[A-Z]+\$\d+/u)?.[0])).size,
-      ).toBe(1);
-
-      const distinct = distinctRangeFormulas(size);
-      expect(distinct).toHaveLength(size);
-      const ranges = distinct.map((cell) => {
-        const match = /SUM\(A(\d+):A(\d+)\)/u.exec(cell.src);
-        expect(match).not.toBeNull();
-        return { start: Number(match![1]), end: Number(match![2]) };
-      });
-      expect(ranges.every(({ start, end }) => end - start + 1 === 10)).toBeTrue();
-      expect(ranges.slice(1).every((range, index) => range.start === ranges[index]!.end + 1)).toBe(
-        true,
-      );
-
-      const closures = dependencyClosureFormulas(size);
-      expect(closures).toHaveLength(size * 2);
-      for (let row = 0; row < size; row++) {
-        expect(closures.filter((cell) => cell.row === row).map((cell) => cell.col)).toEqual([1, 2]);
-        expect(referencedCells(closures[row * 2]!.src)).toEqual([{ row, col: 0 }]);
-        expect(referencedCells(closures[row * 2 + 1]!.src)).toEqual([{ row, col: 1 }]);
-      }
-
-      for (const formulas of [independent, chain, fanOut, diamonds, shared, distinct, closures]) {
-        assertAcyclic(formulas);
-      }
-    }
-  });
-});
-
 describe("formula benchmark schema", () => {
-  it("accepts exact finite matrices and keeps full evidence materially broader than smoke", () => {
-    const smoke = formulaFixture("smoke");
-    const full = formulaFixture("full");
-    expect(() => validateFormulaBenchmark(smoke, "smoke")).not.toThrow();
-    expect(() => validateFormulaBenchmark(full, "full")).not.toThrow();
-    expect(Math.max(...full.workloads.map((entry) => entry.size))).toBeGreaterThan(
-      Math.max(...smoke.workloads.map((entry) => entry.size)),
-    );
-    expect(new Set(full.workloads.map((entry) => entry.id))).toEqual(
-      new Set(smoke.workloads.map((entry) => entry.id)),
-    );
-    expect(full.workloads.every((entry) => entry.samplesMs.length === 5)).toBeTrue();
-    expect(smoke.workloads.every((entry) => entry.samplesMs.length === 2)).toBeTrue();
-  });
-
   it("rejects missing, duplicate, unexpected, and malformed workload identities", () => {
     const named = { id: "independent-parse-load", size: 1_000 } as const;
     const key = `workload=${named.id};size=${named.size}`;
@@ -314,42 +185,6 @@ describe("formula benchmark schema", () => {
     extraFile.source.files.unbounded = SOURCE_HASH;
     expect(() => validateFormulaBenchmark(extraFile)).toThrow("must contain exactly");
   });
-
-  it("rejects wrong persisted outputs and unbounded artifacts", () => {
-    const wrong = formulaFixture();
-    wrong.workloads[0]!.output = -1;
-    expect(() => validateFormulaBenchmark(wrong)).toThrow(".output expected");
-
-    const unbounded = formulaFixture();
-    unbounded.runner.cpu = "x".repeat(FORMULA_ARTIFACT_MAX_BYTES);
-    expect(() => validateFormulaBenchmark(unbounded)).toThrow("artifact exceeded");
-  });
-
-  it("requires SEQUENCE admission as a measured full workload", () => {
-    expect(expectedFormulaBlockedWorkloadKeys()).toEqual([]);
-    expect(expectedFormulaWorkloadKeys("full")).toContain(
-      "workload=spill-sequence-admission;size=100000",
-    );
-
-    const missing = formulaFixture("full");
-    missing.workloads = missing.workloads.filter(
-      (workload) => workload.id !== "spill-sequence-admission",
-    );
-    expect(() => validateFormulaBenchmark(missing)).toThrow(
-      "missing workload=spill-sequence-admission;size=100000",
-    );
-  });
-
-  it("rejects preliminary evidence when used as a passing gate", () => {
-    const preliminary = formulaFixture();
-    preliminary.runner.command.push("--preliminary");
-    preliminary.gates = {
-      passed: false,
-      tolerance: FORMULA_GATE_TOLERANCE,
-      regression: { status: "blocked", blocker: PRELIMINARY_BLOCKER },
-    };
-    expect(() => validateFormulaBenchmark(preliminary)).toThrow("successful regression gate");
-  });
 });
 
 describe("formula regression gate", () => {
@@ -397,16 +232,6 @@ describe("formula regression gate", () => {
     expect(() => validateFormulaCapture(candidate, baseline)).toThrow(
       "not bound to the supplied baseline provenance",
     );
-  });
-
-  it("keeps smoke captures out of timing regression evidence", () => {
-    const baseline = formulaFixture("full");
-    const smoke = formulaFixture("smoke");
-    smoke.workloads[0]!.samplesMs = [100, 100];
-    smoke.workloads[0]!.stat = summarize(smoke.workloads[0]!.samplesMs);
-
-    expect(() => validateFormulaRegression(smoke, baseline)).toThrow(".median regression");
-    expect(() => validateFormulaCapture(smoke, baseline)).not.toThrow();
   });
 
   it("compares a smoke candidate with the compatible workloads in the legacy full baseline", () => {

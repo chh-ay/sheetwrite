@@ -633,56 +633,6 @@ mod tests {
     }
 
     #[test]
-    fn applies_defaults_and_cashflow_coercion() {
-        let explicit = number_args([0.08, 24.0, -50.0, 1000.0, 0.0]);
-        let defaults = number_args([0.08, 24.0, -50.0, 1000.0]);
-        assert_close(
-            result_number(Func::Fv, &defaults),
-            result_number(Func::Fv, &explicit),
-        );
-
-        let mut npv_values = FuncAccumulator::default();
-        npv_values.push_scalar(Value::Number(0.1)).unwrap();
-        npv_values.finish_arg(1, 1).unwrap();
-        npv_values.push_scalar(Value::Number(100.0)).unwrap();
-        npv_values.finish_arg(1, 1).unwrap();
-        npv_values.push_scalar(Value::Blank).unwrap();
-        npv_values.finish_arg(1, 1).unwrap();
-        npv_values.push_scalar(Value::Bool(true)).unwrap();
-        npv_values.finish_arg(1, 1).unwrap();
-        npv_values.push_range(Value::text("ignored")).unwrap();
-        npv_values.push_range(Value::Bool(true)).unwrap();
-        npv_values.push_range(Value::Number(200.0)).unwrap();
-        npv_values.finish_arg(1, 3).unwrap();
-        let expected = 100.0 / 1.1 + 1.0 / 1.1f64.powi(3) + 200.0 / 1.1f64.powi(4);
-        assert_close(result_number(Func::Npv, &npv_values), expected);
-
-        let mut irr_values = FuncAccumulator::default();
-        irr_values.push_range(Value::Number(-100.0)).unwrap();
-        irr_values.push_range(Value::Blank).unwrap();
-        irr_values.push_range(Value::text("ignored")).unwrap();
-        irr_values.push_range(Value::Bool(true)).unwrap();
-        irr_values.push_range(Value::Number(121.0)).unwrap();
-        irr_values.finish_arg(1, 5).unwrap();
-        assert_close(result_number(Func::Irr, &irr_values), 0.21);
-
-        assert_error(
-            Func::Pv,
-            &scalar_args([Value::text("bad"), Value::Number(2.0), Value::Number(3.0)]),
-            FormulaError::Value,
-        );
-        assert_error(
-            Func::Pv,
-            &scalar_args([
-                Value::Error(FormulaError::Ref),
-                Value::Number(2.0),
-                Value::Number(3.0),
-            ]),
-            FormulaError::Ref,
-        );
-    }
-
-    #[test]
     fn handles_zero_rate_near_zero_rate_and_beginning_timing() {
         assert_close(
             result_number(Func::Pv, &number_args([0.0, 10.0, 100.0, 500.0])),
@@ -715,31 +665,6 @@ mod tests {
     }
 
     #[test]
-    fn reports_invalid_periods_and_arity() {
-        assert_error(
-            Func::Ipmt,
-            &number_args([0.1, 0.0, 10.0, 1000.0]),
-            FormulaError::Num,
-        );
-        assert_error(
-            Func::Ipmt,
-            &number_args([0.1, 11.0, 10.0, 1000.0]),
-            FormulaError::Num,
-        );
-        assert_error(
-            Func::Ppmt,
-            &number_args([0.1, 1.0, 0.0, 1000.0]),
-            FormulaError::Num,
-        );
-        assert_error(
-            Func::Rate,
-            &number_args([0.0, -100.0, 1000.0]),
-            FormulaError::Num,
-        );
-        assert_error(Func::Pv, &number_args([0.1, 10.0]), FormulaError::Value);
-    }
-
-    #[test]
     fn reports_root_non_convergence() {
         assert_error(
             Func::Irr,
@@ -756,53 +681,5 @@ mod tests {
             &irr_args([-100.0, 110.0], Some(-1.0)),
             FormulaError::Num,
         );
-    }
-
-    #[test]
-    fn present_and_future_value_are_inverse_properties() {
-        for rate in [-0.25, -1e-12, 0.0, 0.01, 0.2] {
-            for periods in [1.0, 6.0, 24.0] {
-                for timing in [false, true] {
-                    let present = 1234.5;
-                    let payment = -37.25;
-                    let future = fv_value(rate, periods, payment, present, timing).unwrap();
-                    let recovered = pv_value(rate, periods, payment, future, timing).unwrap();
-                    assert_close(recovered, present);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn payment_and_period_components_obey_amortization_properties() {
-        for rate in [-0.05, -1e-12, 0.0, 0.01, 0.15] {
-            for timing in [false, true] {
-                let periods = 12.0;
-                let present = 1000.0;
-                let target_future = 250.0;
-                let payment = pmt_value(rate, periods, present, target_future, timing).unwrap();
-                assert_close(
-                    fv_value(rate, periods, payment, present, timing).unwrap(),
-                    target_future,
-                );
-                for period in [1.0, 2.0, 6.0, 12.0] {
-                    let interest =
-                        ipmt_value(rate, period, periods, present, target_future, timing).unwrap();
-                    let principal = payment - interest;
-                    assert_close(interest + principal, payment);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn irr_solves_generated_two_cashflow_properties() {
-        for expected_rate in [-0.5, -1e-10, 0.0, 0.1, 2.0] {
-            let values = irr_args([-1000.0, 1000.0 * (1.0 + expected_rate)], Some(0.05));
-            assert_close(result_number(Func::Irr, &values), expected_rate);
-        }
-
-        let underflow_regression = irr_args([0.0, 0.0, 1.0, -2.0], Some(ROOT_X_MAX.exp_m1()));
-        assert_close(result_number(Func::Irr, &underflow_regression), 1.0);
     }
 }

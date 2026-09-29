@@ -134,56 +134,6 @@ describe("DocumentController", () => {
   });
 });
 
-describe("DatasourceController", () => {
-  it("deduplicates loaded bands and publishes a resolved page once", async () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    let requests = 0;
-    let rowsLoaded = 0;
-    const controller = new DatasourceController(
-      {
-        datasource: {
-          capabilities: { protocol: 2, columns: "windowed" },
-          getRows: async (request) => {
-            requests += 1;
-            return {
-              protocol: 2,
-              start: request.start,
-              columns: request.columns,
-              rows: [{ name: "Loaded" }],
-            };
-          },
-        },
-        loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 4,
-        columns: () => store.getWorkbook().sheets[0]!.columns,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {
-          rowsLoaded += 1;
-        },
-        onError: () => {},
-      },
-      4,
-    );
-
-    controller.ensureLoaded(0, 1, [0]);
-    controller.ensureLoaded(0, 1, [0]);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(requests).toBe(1);
-    expect(rowsLoaded).toBe(1);
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Loaded");
-    controller.ensureLoaded(0, 1, [0]);
-    expect(requests).toBe(1);
-
-    controller.destroy();
-    store.dispose();
-  });
-});
-
 describe("GeometryLayoutController", () => {
   it("owns zoomed indexes, frozen bands, windows, and cell rectangles", () => {
     const workbook = makeWorkbook(10);

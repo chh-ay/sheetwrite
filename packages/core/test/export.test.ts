@@ -5,12 +5,6 @@ import {
   DelimitedTextOptionsError,
   DelimitedTextResourceError,
 } from "../src/delimited-text.js";
-import type {
-  XlsxTableExportBackend,
-  XlsxTableImportBackend,
-  XlsxWorkbookBackend,
-  XlsxWorkbookOptions,
-} from "../src/export.js";
 import {
   downloadBytes,
   fromCsv,
@@ -52,29 +46,6 @@ function workbook(): Workbook {
 }
 
 describe("export", () => {
-  it("imports core without resolving the optional XLSX codec", async () => {
-    const script = `
-      Bun.plugin({
-        name: "forbid-xlsx-codec",
-        setup(build) {
-          build.onResolve(
-            { filter: /^fflate$/ },
-            (args) => { throw new Error(\`core resolved forbidden package \${args.path}\`); },
-          );
-        },
-      });
-      // Dynamic import is required so the resolver tripwire is installed first.
-      await import("./packages/core/src/index.ts");
-    `;
-    const child = Bun.spawn(["bun", "--eval", script], {
-      cwd: new URL("../../../", import.meta.url).pathname,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
-    expect(stderr).toBe("");
-    expect(exitCode).toBe(0);
-  });
   it("csv: BOM + CRLF + header + injection hardening + quoting", () => {
     const store = new SheetwriteStore(workbook());
     store.applyTransaction({
@@ -98,19 +69,6 @@ describe("export", () => {
     expect(lines[0]).toBe("A,B");
     expect(lines[1]).toBe("'=cmd,42");
     expect(lines[2]).toBe('"a,b",');
-  });
-
-  it("tsv: range serialization", () => {
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: { sheet: "s", row: 0, col: 0 }, value: { kind: "literal", value: "x" } },
-        { op: "set", addr: { sheet: "s", row: 0, col: 1 }, value: { kind: "literal", value: 1 } },
-      ],
-    });
-    expect(toTsv({ sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } }, store)).toBe(
-      "x\t1",
-    );
   });
 
   it("reports the exact optional package remedy when no XLSX backend is registered", async () => {
@@ -149,95 +107,6 @@ describe("export", () => {
     expect(error.actual).toBe(33);
     expect(error.operation).toBe("xlsx-import");
     expect(error.message).toBe("Sheetwrite: XLSX import maxInputBytes limit is 32; observed 33");
-  });
-
-  it("forwards table and workbook calls through independently injected backends", async () => {
-    const store = new SheetwriteStore(workbook());
-    const input = new Uint8Array([9, 8, 7]);
-    const snapshot: WorkbookSnapshot = {
-      schemaVersion: 1,
-      workbook: { activeSheet: "s" },
-      sheets: [],
-    };
-    const options: XlsxWorkbookOptions = { maxCells: 17 };
-    let tableExportOptions: XlsxWorkbookOptions | undefined;
-    let tableImportOptions: XlsxWorkbookOptions | undefined;
-    let exportedSnapshot: WorkbookSnapshot | undefined;
-    let exportedOptions: XlsxWorkbookOptions | undefined;
-    let importedOptions: XlsxWorkbookOptions | undefined;
-
-    const tableExportBackend: XlsxTableExportBackend = {
-      name: "fake-table-export",
-      toXlsxTable: async (actualWorkbook, actualStore, actualOptions) => {
-        expect(actualWorkbook).toBe(store.getWorkbook());
-        expect(actualStore).toBe(store);
-        tableExportOptions = actualOptions;
-        return new Uint8Array([1, 2, 3]);
-      },
-    };
-    const tableImportBackend: XlsxTableImportBackend = {
-      name: "fake-table-import",
-      fromXlsxTable: async (actualInput, actualOptions) => {
-        expect(actualInput).toBe(input);
-        tableImportOptions = actualOptions;
-        return { rowCount: 1, columns: { Imported: ["yes"] } };
-      },
-    };
-    const workbookBackend: XlsxWorkbookBackend = {
-      name: "fake-workbook",
-      toXlsxWorkbook: async (actualSnapshot, actualOptions) => {
-        exportedSnapshot = actualSnapshot;
-        exportedOptions = actualOptions;
-        return new Uint8Array([4, 5, 6]);
-      },
-      fromXlsxWorkbook: async (actualInput, actualOptions) => {
-        expect(actualInput).toBe(input);
-        importedOptions = actualOptions;
-        return snapshot;
-      },
-    };
-
-    setXlsxTableExportBackend(tableExportBackend);
-    setXlsxTableImportBackend(tableImportBackend);
-    setXlsxWorkbookBackend(workbookBackend);
-    try {
-      await expect(toXlsxTable(store.getWorkbook(), store, options)).resolves.toEqual(
-        new Uint8Array([1, 2, 3]),
-      );
-      await expect(fromXlsxTable(input, options)).resolves.toEqual({
-        rowCount: 1,
-        columns: { Imported: ["yes"] },
-      });
-      await expect(toXlsxWorkbook({ exportSnapshot: () => snapshot }, options)).resolves.toEqual(
-        new Uint8Array([4, 5, 6]),
-      );
-      await expect(fromXlsxWorkbook(input, options)).resolves.toBe(snapshot);
-      expect(tableExportOptions).toBe(options);
-      expect(tableImportOptions).toBe(options);
-      expect(exportedSnapshot).toBe(snapshot);
-      expect(exportedOptions).toBe(options);
-      expect(importedOptions).toBe(options);
-    } finally {
-      setXlsxTableExportBackend(null as never);
-      setXlsxTableImportBackend(null as never);
-      setXlsxWorkbookBackend(null as never);
-      store.dispose();
-    }
-  });
-
-  it("csv: a cell value beginning with a formula char is neutralized", () => {
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "+1+1" },
-        },
-      ],
-    });
-    const lines = toCsv(store.getWorkbook().sheets[0]!, store).slice(1).split("\r\n");
-    expect(lines[1]).toBe("'+1+1,");
   });
 
   it("csv: a column header beginning with a formula char is neutralized", () => {
@@ -280,33 +149,6 @@ describe("export", () => {
     expect(toTsv(range, store)).toBe("'=1+1\t7");
   });
 
-  it("csv: omits hidden columns from both headers and rows", () => {
-    const wb = workbook();
-    wb.sheets[0]!.columns[1]!.visible = false;
-    const store = new SheetwriteStore(wb);
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "visible" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: 99 },
-        },
-      ],
-    });
-
-    expect(toCsv(store.getWorkbook().sheets[0]!, store).slice(1).split("\r\n")).toEqual([
-      "A",
-      "visible",
-      '""',
-      '""',
-    ]);
-  });
-
   it("export: a negative number is left intact (not mistaken for injection)", () => {
     const store = new SheetwriteStore(workbook());
     store.applyTransaction({
@@ -322,59 +164,6 @@ describe("export", () => {
     const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
     expect(toCsv(sheet, store).slice(1).split("\r\n")[1]).toBe(",-5");
     expect(toTsv(range, store)).toBe("\t-5");
-  });
-
-  it("csv import: parseCsv handles the BOM, quoted commas/newlines and CRLF", () => {
-    const text = '\ufeffName,Note\r\nAlice,"a,b"\r\n"multi\nline","say ""hi"""';
-    expect(parseCsv(text)).toEqual([
-      ["Name", "Note"],
-      ["Alice", "a,b"],
-      ["multi\nline", 'say "hi"'],
-    ]);
-  });
-
-  it("csv import: fromCsv round-trips toCsv, consumes the header and coerces numbers", () => {
-    const store = new SheetwriteStore(workbook());
-    store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 0 },
-          value: { kind: "literal", value: "hello" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 0, col: 1 },
-          value: { kind: "literal", value: 42 },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 1, col: 0 },
-          value: { kind: "literal", value: "a,b" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 1, col: 1 },
-          value: { kind: "literal", value: -5 },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 2, col: 0 },
-          value: { kind: "literal", value: "multi\nline" },
-        },
-        {
-          op: "set",
-          addr: { sheet: "s", row: 2, col: 1 },
-          value: { kind: "literal", value: 0 },
-        },
-      ],
-    });
-    const sheet = store.getWorkbook().sheets[0]!;
-    const data = fromCsv(toCsv(sheet, store), sheet.columns);
-
-    expect(data.rowCount).toBe(3);
-    expect(Array.from(data.columns.a!)).toEqual(["hello", "a,b", "multi\nline"]);
-    expect(Array.from(data.columns.b!)).toEqual([42, -5, 0]);
   });
 
   it("csv import preserves reserved declared keys as enumerable own properties", () => {

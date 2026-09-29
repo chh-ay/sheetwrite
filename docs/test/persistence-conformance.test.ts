@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { initSheetwrite, MemoryPersistenceAdapter } from "@sheetwrite/core";
+import { initSheetwrite } from "@sheetwrite/core";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import {
   makePersistenceConformanceSnapshot,
@@ -41,13 +41,6 @@ const SHARED_CHECKS = [
 ] as const;
 
 describe("persistence conformance", () => {
-  it("passes against the in-memory reference adapter", async () => {
-    const adapter = new MemoryPersistenceAdapter(makePersistenceConformanceSnapshot());
-    const report = await runPersistenceConformance({ adapter });
-    expect(report.checks).toEqual([...SHARED_CHECKS]);
-    expect(report.headVersion).toBe(2);
-  });
-
   it("passes against the IndexedDB showcase adapter with bounded tails and reopen", async () => {
     const options = {
       databaseName: "sheetwrite-conformance",

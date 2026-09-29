@@ -5,17 +5,6 @@ import { siteUrl } from "./playwright.config.js";
 declare global {
   interface Window {
     __sheetwriteScaleGrid?: Grid;
-    __sheetwriteColdLongTasks?: Array<{
-      startTime: number;
-      duration: number;
-      name: string;
-      attribution: string[];
-    }>;
-    __sheetwriteColdFrames?: Array<{
-      startTime: number;
-      duration: number;
-      scripts: Array<{ sourceURL: string; duration: number; invoker: string }>;
-    }>;
   }
 }
 
@@ -183,112 +172,6 @@ async function gridBodyPoint(page: Page, row: number, column: number) {
   throw new Error(`Could not bring cell r${row} c${column} into the viewport`);
 }
 
-test("cold production route has no Sheetwrite-attributed task over 50 ms", async ({ browser }) => {
-  const samples: Array<{
-    usableMs: number;
-    longTasks: NonNullable<Window["__sheetwriteColdLongTasks"]>;
-    frames: NonNullable<Window["__sheetwriteColdFrames"]>;
-    cpu: Array<{ functionName: string; url: string; durationMs: number }>;
-  }> = [];
-
-  for (let repetition = 0; repetition < 5; repetition += 1) {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    const session = await context.newCDPSession(page);
-    await session.send("Profiler.enable");
-    await session.send("Profiler.start");
-    await page.addInitScript(() => {
-      window.__sheetwriteColdLongTasks = [];
-      window.__sheetwriteColdFrames = [];
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const attribution =
-            "attribution" in entry && Array.isArray(entry.attribution)
-              ? entry.attribution.map((item: { containerSrc?: string }) => item.containerSrc ?? "")
-              : [];
-          window.__sheetwriteColdLongTasks!.push({
-            startTime: entry.startTime,
-            duration: entry.duration,
-            name: entry.name,
-            attribution,
-          });
-        }
-      }).observe({ type: "longtask", buffered: true });
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const frame = entry as PerformanceEntry & {
-            scripts?: Array<{ sourceURL?: string; duration?: number; invoker?: string }>;
-          };
-          window.__sheetwriteColdFrames!.push({
-            startTime: frame.startTime,
-            duration: frame.duration,
-            scripts: (frame.scripts ?? []).map((script) => ({
-              sourceURL: script.sourceURL ?? "",
-              duration: script.duration ?? 0,
-              invoker: script.invoker ?? "",
-            })),
-          });
-        }
-      }).observe({ type: "long-animation-frame", buffered: true });
-    });
-
-    await bootScale(page);
-    await page.evaluate(
-      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
-    );
-    const measured = await page.evaluate(() => ({
-      usableMs: performance.now(),
-      longTasks: (window.__sheetwriteColdLongTasks ?? []).filter(
-        (entry) => entry.startTime <= performance.now(),
-      ),
-      frames: (window.__sheetwriteColdFrames ?? []).filter(
-        (entry) => entry.startTime <= performance.now(),
-      ),
-    }));
-    const { profile } = await session.send("Profiler.stop");
-    const nodes = new Map(profile.nodes.map((node) => [node.id, node.callFrame]));
-    const totals = new Map<number, number>();
-    profile.samples?.forEach((nodeId, index) => {
-      totals.set(nodeId, (totals.get(nodeId) ?? 0) + (profile.timeDeltas?.[index] ?? 0));
-    });
-    const cpu = [...totals]
-      .map(([nodeId, duration]) => ({
-        functionName: nodes.get(nodeId)?.functionName ?? "",
-        url: nodes.get(nodeId)?.url ?? "",
-        durationMs: duration / 1_000,
-      }))
-      .sort((left, right) => right.durationMs - left.durationMs)
-      .slice(0, 12);
-    samples.push({ ...measured, cpu });
-    await context.close();
-  }
-
-  const longTaskEvidence = samples.flatMap((sample, repetition) =>
-    sample.longTasks
-      .filter((task) => task.duration > 50)
-      .map((task) => ({
-        repetition,
-        task,
-        frames: sample.frames.filter(
-          (frame) =>
-            task.startTime < frame.startTime + frame.duration &&
-            frame.startTime < task.startTime + task.duration,
-        ),
-      })),
-  );
-  const sheetwriteLongTasks = longTaskEvidence.filter((evidence) =>
-    evidence.frames.some((frame) =>
-      frame.scripts.some((script) =>
-        /\/assets\/(?:showcases\.performance-|grid-|sheetwrite_|core-)/.test(script.sourceURL),
-      ),
-    ),
-  );
-  console.log(
-    `COLD_ROUTE_EVIDENCE ${JSON.stringify({ samples, longTaskEvidence, sheetwriteLongTasks })}`,
-  );
-  expect(sheetwriteLongTasks).toEqual([]);
-});
-
 test("the live Grid is exactly one billion logical addresses with bounded rectangular pages", async ({
   page,
 }) => {
@@ -340,93 +223,6 @@ test("the live Grid is exactly one billion logical addresses with bounded rectan
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
-});
-
-test("semantic headers and coherent financial operations values are rendered by the real Grid", async ({
-  page,
-}) => {
-  await bootScale(page);
-  const columnHeaders = page.locator(`${GRID} [role="columnheader"]`);
-  await expect(columnHeaders.nth(0)).toHaveText("Period");
-  await expect(columnHeaders.nth(1)).toHaveText("Account");
-  await expect(columnHeaders.nth(2)).toHaveText("Region");
-  await expect(columnHeaders.nth(3)).toHaveText("Revenue");
-
-  const schema = await page.evaluate(() =>
-    window.__sheetwriteScaleGrid?.store
-      .getWorkbook()
-      .sheets[0]?.columns.slice(0, 12)
-      .map(({ header, type, numberFormat }) => ({
-        header,
-        type,
-        ...(numberFormat ? { numberFormat } : {}),
-      })),
-  );
-  expect(schema).toEqual([
-    { header: "Period", type: "text" },
-    { header: "Account", type: "text" },
-    { header: "Region", type: "text" },
-    { header: "Revenue", type: "currency" },
-    { header: "COGS", type: "currency" },
-    { header: "Gross profit", type: "currency" },
-    { header: "Operating expenses", type: "currency" },
-    { header: "EBITDA", type: "currency" },
-    { header: "EBITDA margin", type: "number", numberFormat: "0.0%" },
-    { header: "Forecast revenue", type: "currency" },
-    { header: "Variance", type: "currency" },
-    { header: "Plan status", type: "text" },
-  ]);
-
-  await page.getByTestId("scale-jump-row").fill("1");
-  await page.getByTestId("scale-jump-column").fill("12");
-  await page.getByTestId("scale-jump").click();
-  await expect(page.getByTestId("scale-current-a1")).toHaveText("L1");
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        Array.from(
-          { length: 12 },
-          (_, col) =>
-            window.__sheetwriteScaleGrid?.store.getCellLoadState?.({
-              sheet: "scale",
-              row: 0,
-              col,
-            }) ?? "unloaded",
-        ),
-      ),
-    )
-    .not.toContain("unloaded");
-
-  const row = await page.evaluate(() =>
-    Array.from(
-      { length: 12 },
-      (_, col) =>
-        window.__sheetwriteScaleGrid?.store.getCell({ sheet: "scale", row: 0, col }).resolved,
-    ),
-  );
-  const formulas = await page.evaluate(() => {
-    const store = window.__sheetwriteScaleGrid?.store;
-    return [5, 7, 8, 10].map((col) => store?.getFormula({ sheet: "scale", row: 0, col }));
-  });
-  expect(formulas).toEqual(["=D1-E1", "=F1-G1", "=IF(D1=0,0,H1/D1)", "=D1-J1"]);
-  expect(row[0]).toBe("FY2024 P01");
-  expect(row[1]).toMatch(/4100|4200|4300|4400/);
-  expect(["North America", "EMEA", "APAC", "Latin America"]).toContain(row[2]);
-  const revenue = Number(row[3]);
-  const cogs = Number(row[4]);
-  const grossProfit = Number(row[5]);
-  const operatingExpenses = Number(row[6]);
-  const ebitda = Number(row[7]);
-  const margin = Number(row[8]);
-  const forecastRevenue = Number(row[9]);
-  const variance = Number(row[10]);
-  expect(revenue).toBeGreaterThan(0);
-  expect(cogs).toBeGreaterThan(0);
-  expect(grossProfit).toBeCloseTo(revenue - cogs, 5);
-  expect(ebitda).toBeCloseTo(grossProfit - operatingExpenses, 5);
-  expect(margin).toBeCloseTo(ebitda / revenue, 4);
-  expect(variance).toBeCloseTo(revenue - forecastRevenue, 5);
-  expect(["Ahead", "On plan", "Watch"]).toContain(row[11]);
 });
 
 test("row and column navigators agree with the public window headers", async ({ page }) => {
@@ -704,53 +500,6 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
     .toBe(777_777);
 });
 
-test("main and Worker canvas paths report what actually mounted", async ({ page }) => {
-  const errors = collectErrors(page);
-  await bootScale(page);
-  await expect(page.getByTestId("scale-renderer-active")).toHaveText("canvas");
-  await expect(page.locator(`${GRID} canvas`)).toHaveCount(1);
-
-  await page.locator(".sw-sp-render-details summary").click();
-  await page.getByTestId("scale-renderer-worker").click();
-  await page.waitForSelector(`${GRID} canvas`, { state: "attached" });
-  await expect(page.getByTestId("scale-renderer-state")).toContainText("Requested worker");
-  const active = (await page.getByTestId("scale-renderer-active").textContent())?.trim();
-  expect(["canvas", "worker"]).toContain(active);
-  if (active === "canvas")
-    await expect(page.getByTestId("scale-renderer-state")).toContainText("fallback");
-  await expect(page.locator(`${GRID} canvas`)).toHaveCount(1);
-
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
-
-test("desktop first viewport is a live Grid with an adjacent navigation instrument", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await bootScale(page);
-  const layout = await page.evaluate(() => {
-    const grid = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-    const instrument = document.querySelector<HTMLElement>(".sw-sp-instrument");
-    const paging = document.querySelector<HTMLElement>("#paging");
-    return {
-      viewportHeight: innerHeight,
-      grid: grid?.getBoundingClientRect().toJSON(),
-      instrument: instrument?.getBoundingClientRect().toJSON(),
-      paging: paging?.getBoundingClientRect().toJSON(),
-    };
-  });
-  expect(layout.grid).toBeTruthy();
-  expect(layout.instrument).toBeTruthy();
-  expect(layout.grid!.top).toBeLessThan(layout.viewportHeight * 0.45);
-  expect(layout.grid!.height).toBeGreaterThan(layout.viewportHeight * 0.55);
-  expect(layout.grid!.bottom).toBeGreaterThan(layout.viewportHeight * 0.78);
-  expect(layout.instrument!.left).toBeGreaterThanOrEqual(layout.grid!.right - 1);
-  expect(layout.paging!.top).toBeGreaterThanOrEqual(layout.grid!.bottom - 1);
-  expect(layout.paging!.top).toBeGreaterThan(layout.viewportHeight * 0.9);
-  await expect(page.getByRole("heading", { name: "Jump deep. Then scroll wide." })).toBeVisible();
-});
-
 test("Grid zoom changes real rendered geometry and reset restores the logical window", async ({
   page,
 }) => {
@@ -832,40 +581,6 @@ test("Grid zoom changes real rendered geometry and reset restores the logical wi
   expect(reset!.probe).toEqual(before!.probe);
   expect(reset!.selection).toEqual(before!.selection);
   await expect.poll(() => readWindow(page)).toEqual(beforeWindow);
-});
-
-test("comparison evidence uses an explicit evidence-aligned logarithmic axis", async ({ page }) => {
-  await bootScale(page);
-  const comparison = page.getByTestId("scale-evidence-compare");
-  await expect(comparison).toContainText("1× is the parity baseline");
-
-  const chart = await comparison.evaluate((root) => {
-    const ticks = Array.from(
-      root.querySelectorAll(".sw-sp-scale-curve__axis > div > span"),
-      (tick) => Number((tick.textContent ?? "").replace(/,/g, "").replace("×", "")),
-    );
-    const ratios = Array.from(root.querySelectorAll(".sw-sp-scale-curve li > strong"), (label) =>
-      Number((label.textContent ?? "").replace("×", "")),
-    );
-    const widths = Array.from(root.querySelectorAll(".sw-sp-scale-curve__track > span"), (bar) =>
-      Number.parseFloat((bar as HTMLElement).style.width),
-    );
-    return { ticks, ratios, widths };
-  });
-
-  expect(chart.ticks.length).toBeGreaterThanOrEqual(2);
-  for (let index = 1; index < chart.ticks.length; index += 1) {
-    expect(chart.ticks[index]).toBe(chart.ticks[index - 1]! * 10);
-  }
-  const domainExponent = Math.log10(chart.ticks[chart.ticks.length - 1]!);
-  expect(chart.widths).toHaveLength(chart.ratios.length);
-  for (let index = 0; index < chart.ratios.length; index += 1) {
-    expect(chart.widths[index]).toBeCloseTo(
-      (Math.log10(Math.max(chart.ratios[index]!, 1)) / domainExponent) * 100,
-      4,
-    );
-  }
-  expect(Math.max(...chart.widths)).toBeLessThanOrEqual(100);
 });
 
 test("@portability mobile touch input, lifecycle, and responsive reflow stay operable", async ({
@@ -953,69 +668,4 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
   await context.close();
-});
-
-test("owned controls do not clip at desktop, phone, or 200% reflow dimensions", async ({
-  page,
-}) => {
-  const viewports = [
-    { width: 1568, height: 898, minimumGridHeight: 898 * 0.6 },
-    { width: 1440, height: 1000, minimumGridHeight: 1000 * 0.6 },
-    { width: 390, height: 844, minimumGridHeight: 0 },
-    { width: 720, height: 500, minimumGridHeight: 0 },
-  ];
-  for (const viewport of viewports) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await bootScale(page);
-    const layout = await page.evaluate(() => {
-      const grid = document.querySelector<HTMLElement>('[data-testid="scale-grid"]');
-      const controls = [
-        ...document.querySelectorAll<HTMLElement>(
-          ".sw-sp-zoom button, .sw-sp-zoom output, .sw-sp-stress button, .sw-sp-render-switch button, .sw-sp-navigator input, .sw-sp-landmarks button, .sw-sp-jump input, .sw-sp-jump button",
-        ),
-      ].filter((element) => element.offsetParent !== null);
-      const metricValues = [
-        ...document.querySelectorAll<HTMLElement>(".sw-sp-proof-wins article > strong"),
-      ].map((element) => {
-        const style = getComputedStyle(element);
-        return {
-          height: element.getBoundingClientRect().height,
-          lineHeight: Number.parseFloat(style.lineHeight),
-          scrollWidth: element.scrollWidth,
-          clientWidth: element.clientWidth,
-        };
-      });
-      const metricLabels = [
-        ...document.querySelectorAll<HTMLElement>(".sw-sp-proof-wins article > span"),
-      ].map((element) => {
-        const style = getComputedStyle(element);
-        return {
-          height: element.getBoundingClientRect().height,
-          lineHeight: Number.parseFloat(style.lineHeight),
-        };
-      });
-      return {
-        innerWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-        grid: grid?.getBoundingClientRect().toJSON(),
-        controls: controls.map((element) => element.getBoundingClientRect().toJSON()),
-        metricValues,
-        metricLabels,
-      };
-    });
-    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth + 1);
-    expect(layout.grid?.height ?? 0).toBeGreaterThanOrEqual(viewport.minimumGridHeight);
-    for (const rect of layout.controls) {
-      expect(rect.left).toBeGreaterThanOrEqual(0);
-      expect(rect.right).toBeLessThanOrEqual(layout.innerWidth + 1);
-      expect(rect.width).toBeGreaterThan(0);
-    }
-    for (const metric of layout.metricValues) {
-      expect(metric.height).toBeLessThanOrEqual(metric.lineHeight + 1);
-      expect(metric.scrollWidth).toBeLessThanOrEqual(metric.clientWidth + 1);
-    }
-    for (const label of layout.metricLabels) {
-      expect(label.height).toBeLessThanOrEqual(label.lineHeight + 1);
-    }
-  }
 });

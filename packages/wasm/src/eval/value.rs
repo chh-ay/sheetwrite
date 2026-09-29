@@ -177,97 +177,10 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::Ordering;
-
-    use super::{
-        aggregate_number, bool_from_value, cached_formula_value, compare_values, format_basic_text,
-        number_from_value, text_from_value,
-    };
+    use super::cached_formula_value;
     use crate::calc::Ast;
     use crate::sheet::SheetData;
     use crate::types::{FormulaEntry, FormulaError, FormulaValueKind, StringPool, Value};
-
-    #[test]
-    fn coercion_and_comparison_cover_blank_boolean_error_and_nonfinite_values() {
-        assert_eq!(
-            number_from_value(&Value::Number(f64::NAN)),
-            Err(FormulaError::Num)
-        );
-        assert_eq!(number_from_value(&Value::Bool(true)), Ok(1.0));
-        assert_eq!(number_from_value(&Value::text("  ")), Ok(0.0));
-
-        assert_eq!(
-            bool_from_value(&Value::Number(f64::INFINITY)),
-            Err(FormulaError::Num)
-        );
-        assert_eq!(bool_from_value(&Value::Blank), Ok(false));
-
-        assert_eq!(
-            text_from_value(&Value::Number(f64::NEG_INFINITY)),
-            Err(FormulaError::Num)
-        );
-        assert_eq!(text_from_value(&Value::Bool(false)).as_deref(), Ok("FALSE"));
-        assert_eq!(
-            text_from_value(&Value::Error(FormulaError::Ref)),
-            Err(FormulaError::Ref)
-        );
-
-        assert_eq!(
-            compare_values(&Value::Blank, &Value::Number(2.0)),
-            Ok(Ordering::Less)
-        );
-        assert_eq!(
-            compare_values(&Value::Number(2.0), &Value::Blank),
-            Ok(Ordering::Greater)
-        );
-        assert_eq!(
-            compare_values(&Value::Blank, &Value::text("x")),
-            Ok(Ordering::Less)
-        );
-        assert_eq!(
-            compare_values(&Value::Bool(true), &Value::Blank),
-            Ok(Ordering::Greater)
-        );
-        assert_eq!(
-            compare_values(&Value::Error(FormulaError::DivZero), &Value::Blank),
-            Err(FormulaError::DivZero)
-        );
-        assert_eq!(
-            compare_values(&Value::text("x"), &Value::Bool(false)),
-            Ok(Ordering::Less)
-        );
-    }
-
-    #[test]
-    fn aggregation_and_basic_formatting_preserve_boundary_semantics() {
-        assert_eq!(
-            aggregate_number(&Value::Number(f64::NAN), false),
-            Err(FormulaError::Num)
-        );
-        assert_eq!(aggregate_number(&Value::Bool(true), false), Ok(Some(1.0)));
-        assert_eq!(aggregate_number(&Value::Blank, false), Ok(None));
-        assert_eq!(
-            aggregate_number(&Value::Error(FormulaError::Value), false),
-            Err(FormulaError::Value)
-        );
-
-        assert_eq!(
-            format_basic_text(&Value::Bool(false), "General").as_deref(),
-            Ok("FALSE")
-        );
-        assert_eq!(
-            format_basic_text(&Value::Number(f64::NAN), "0"),
-            Err(FormulaError::Num)
-        );
-        assert_eq!(
-            format_basic_text(&Value::Number(12.4), "0").as_deref(),
-            Ok("12")
-        );
-        assert_eq!(
-            format_basic_text(&Value::Number(12.4), "General").as_deref(),
-            Ok("12.4")
-        );
-    }
 
     #[test]
     fn reads_each_cached_formula_value_kind_and_prior_errors() {

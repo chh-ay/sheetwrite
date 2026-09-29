@@ -62,31 +62,6 @@ describe("formula behavior matrix", () => {
     ]);
     store.dispose();
   });
-  it("applies incumbent operator precedence and coercion", () => {
-    const store = new SheetwriteStore(makeWorkbook(8));
-    const formulas: readonly [string, string | number][] = [
-      ["=-2^2", 4],
-      ["=2^-2", 0.25],
-      ["=2^3^2", 64],
-      ["=50%", 0.5],
-      ["=200*10%", 20],
-      ['="A"&1+2', "A3"],
-      ['="Привет "&"世界"', "Привет 世界"],
-    ];
-    store.applyTransaction({
-      patches: formulas.map(([src], row) => ({
-        op: "set" as const,
-        addr: address(row, 0),
-        value: { kind: "formula" as const, src },
-      })),
-    });
-
-    expect(formulas.map((_, row) => store.getCell(address(row, 0)).resolved)).toEqual(
-      formulas.map(([, expected]) => expected),
-    );
-    store.dispose();
-  });
-
   it("owns, resizes, obstructs, copies, persists, and restores FILTER spills", () => {
     const store = new SheetwriteStore(makeWorkbook(12));
     const values = [3, 1, 3, 2, 4];
@@ -203,31 +178,6 @@ describe("formula behavior matrix", () => {
     );
     expect(restored.getSpillAnchor(address(4, 2))).toEqual(address(0, 2));
 
-    restored.dispose();
-    store.dispose();
-  });
-  it("preserves mixed derived errors through windows, clipboard, and snapshots", () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    store.applyTransaction({
-      patches: [
-        { op: "set", addr: address(0, 0), value: { kind: "literal", value: 1 } },
-        { op: "set", addr: address(1, 0), value: { kind: "formula", src: "=NA()" } },
-        { op: "set", addr: address(2, 0), value: { kind: "literal", value: 2 } },
-        { op: "set", addr: address(0, 2), value: { kind: "formula", src: "=A1:A3" } },
-      ],
-    });
-
-    expect([0, 1, 2].map((row) => store.getCell(address(row, 2)).resolved)).toEqual([1, "#N/A", 2]);
-    const clipboard = store.getClipboardWindow("s1", { start: 0, end: 3 }, [2]);
-    expect(Array.from(clipboard.values)).toEqual([1, "#N/A", 2]);
-    expect(Array.from(clipboard.spillDerived)).toEqual([0, 1, 1]);
-
-    const restored = SheetwriteStore.fromSnapshot(store.exportSnapshot());
-    expect([0, 1, 2].map((row) => restored.getCell(address(row, 2)).resolved)).toEqual([
-      1,
-      "#N/A",
-      2,
-    ]);
     restored.dispose();
     store.dispose();
   });

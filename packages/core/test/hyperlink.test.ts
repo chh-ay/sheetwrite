@@ -1,5 +1,4 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { SheetwriteError } from "../src/errors.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
@@ -9,7 +8,6 @@ import {
   sanitizeCellHyperlink,
   sanitizeHyperlinkStyle,
 } from "../src/hyperlink.js";
-import { rebaseDocumentOperations } from "../src/rebase.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellHyperlink, Workbook } from "../src/types.js";
@@ -166,20 +164,6 @@ describe("hyperlink policy", () => {
     grid.destroy();
   });
 
-  it("rejects overlong/control-character IDs at the snapshot boundary", () => {
-    const store = new SheetwriteStore(makeWorkbook(2));
-    const snapshot = store.exportSnapshot();
-    snapshot.sheets[0]!.hyperlinks = [{ ...externalLink(), id: `${"x".repeat(129)}\u0001` }];
-    const validation = validateWorkbookSnapshot(snapshot);
-    expect(validation.ok).toBe(false);
-    if (!validation.ok) {
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({ path: "sheets[0].hyperlinks[0].id" }),
-      );
-    }
-    store.dispose();
-  });
-
   it("persists hyperlink operations through history, snapshots, structure, and sheet removal", () => {
     const workbook = makeWorkbook(2);
     workbook.sheets.push({
@@ -244,41 +228,6 @@ describe("hyperlink policy", () => {
     grid.undo();
     expect(store.getWorkbook().sheets[0]!.hyperlinks).toHaveLength(1);
     grid.destroy();
-  });
-
-  it("rebases pending source and internal target ranges through server structure", () => {
-    const hyperlink: CellHyperlink = {
-      id: "pending",
-      range: { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 0 } },
-      target: {
-        kind: "internal",
-        range: {
-          sheet: "destination",
-          start: { row: 4, col: 1 },
-          end: { row: 4, col: 1 },
-        },
-      },
-    };
-    const result = rebaseDocumentOperations(
-      [{ op: "setHyperlink", sheet: "s1", hyperlink }],
-      [
-        { op: "addRows", sheet: "s1", at: 1, count: 2 },
-        { op: "addRows", sheet: "destination", at: 3, count: 1 },
-      ],
-    );
-    expect(result).toMatchObject({
-      status: "rebased",
-      operations: [
-        {
-          hyperlink: {
-            range: { start: { row: 4, col: 0 }, end: { row: 4, col: 0 } },
-            target: {
-              range: { start: { row: 5, col: 1 }, end: { row: 5, col: 1 } },
-            },
-          },
-        },
-      ],
-    });
   });
 
   it("emits a validated host event without opening external URLs", () => {

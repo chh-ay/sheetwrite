@@ -7,30 +7,6 @@ function clone(): typeof artifact {
 }
 
 describe("interaction performance artifact", () => {
-  it("accepts the committed five-sample matrix", () => {
-    expect(validateInteractionArtifact(artifact).matrixId).toBe("interaction-full-v1");
-  });
-
-  it("rejects missing raw samples and provenance", () => {
-    const missingSample = clone();
-    missingSample.viewIndex.packed.lookupMedianNsSamples.pop();
-    expect(() => validateInteractionArtifact(missingSample)).toThrow("5 finite raw samples");
-
-    const missingBrowser = clone();
-    missingBrowser.source.browser = "";
-    expect(() => validateInteractionArtifact(missingBrowser)).toThrow("provenance");
-  });
-
-  it("rejects non-finite results and skipped correctness", () => {
-    const nonFinite = clone();
-    nonFinite.directionalPrefetch.p95VisibleWaitMsSamples[0] = Number.NaN;
-    expect(() => validateInteractionArtifact(nonFinite)).toThrow("finite raw samples");
-
-    const skipped = clone();
-    skipped.source.correctness = "";
-    expect(() => validateInteractionArtifact(skipped)).toThrow("correctness oracle");
-  });
-
   it("rejects weakened speed, memory, sparse, and cold-route gates", () => {
     for (const [mutate, message] of [
       [

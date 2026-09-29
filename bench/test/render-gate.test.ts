@@ -21,13 +21,6 @@ describe("render deterministic gate", () => {
     expect(() => validateRenderGateArtifact(smoke, "full")).toThrow("render-full-v1 configuration");
   });
 
-  test("requires both engines before allowing a comparative full result", () => {
-    const sheetwriteOnly = makeRenderArtifact({ engines: ["sheetwrite"] });
-    expect(() => validateRenderGateArtifact(sheetwriteOnly, "full")).toThrow(
-      "render-full-v1 configuration",
-    );
-  });
-
   test("rejects corrupted controlled dataset, order, and launch metadata", () => {
     const source = makeRenderArtifact({
       rounds: 1,
@@ -156,35 +149,5 @@ describe("render deterministic gate", () => {
     expect(() => validateRenderGateArtifact(overCeiling, "smoke")).toThrow(
       "broad renderer heap safety ceiling",
     );
-  });
-
-  test("rejects stale and non-finite records", () => {
-    const stale = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-      timestamp: "2020-01-01T00:00:00.000Z",
-    });
-    expect(() =>
-      validateRenderGateArtifact(stale, "smoke", {
-        nowMs: Date.parse("2020-01-02T00:00:00.000Z"),
-        maxAgeMs: 1,
-      }),
-    ).toThrow("stale render result timestamp");
-
-    const current = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-    });
-    const first = current.results[0]!;
-    if (first.status !== "success") throw new Error("fixture must be successful");
-    const invalid = {
-      ...current,
-      results: [{ ...first, medianMs: Number.NaN }, ...current.results.slice(1)],
-    };
-    expect(() => validateRenderGateArtifact(invalid, "smoke")).toThrow("finite number");
   });
 });

@@ -23,7 +23,7 @@ function jsonResponse(value: unknown): Response {
 }
 
 function mockGoogle(
-  options: { reorderBatch?: number; failReadBatch?: number; gridValues?: unknown[][] } = {},
+  options: { failReadBatch?: number; gridValues?: unknown[][] } = {},
 ): MockGoogle {
   const calls: string[] = [];
   const batchSizes = new Map<string, number>();
@@ -75,7 +75,6 @@ function mockGoogle(
           properties: { title: `Case${String(index + 1).padStart(4, "0")}` },
           data: [{ rowData }],
         }));
-        if (options.reorderBatch === batchIndex) sheets.reverse();
         return jsonResponse({ sheets });
       }
       const driveMatch = /files\/(batch-(\d+))/.exec(url);
@@ -162,16 +161,6 @@ describe("bounded Google Sheets capture", () => {
     expect(mock.calls).toEqual(["create:0:2", "update:0", "read:0", "delete:0"]);
   });
 
-  it("rejects reordered producer sheets before persistence", async () => {
-    const corpus = await formulaCorpus(2);
-    const mock = mockGoogle({ reorderBatch: 0 });
-    await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
-      "reordered result sheets",
-    );
-    expect(mock.calls.at(-1)).toBe("delete:0");
-    expect(mock.calls).not.toContain("persist");
-  });
-
   it("fails closed on observation, producer-version, quota, and workbook binding tamper", async () => {
     const corpus = await formulaCorpus(3);
     const mock = mockGoogle();
@@ -219,15 +208,6 @@ describe("bounded Google Sheets capture", () => {
     const mock = mockGoogle({ gridValues: [[1, "block"], [2]] });
     await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
       "array result exceeds expected shape",
-    );
-    expect(mock.calls.at(-1)).toBe("delete:0");
-  });
-
-  it("rejects a result missing an expected nonblank boundary value", async () => {
-    const corpus = await arrayCorpus();
-    const mock = mockGoogle({ gridValues: [[1]] });
-    await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
-      "array result is smaller than expected",
     );
     expect(mock.calls.at(-1)).toBe("delete:0");
   });

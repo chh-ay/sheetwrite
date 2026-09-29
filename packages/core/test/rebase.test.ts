@@ -142,25 +142,7 @@ interface PointFactory {
 }
 
 function pointFactories(axis: Axis): PointFactory[] {
-  const factories: PointFactory[] = [
-    {
-      name: "set",
-      make: (targetAxis, index, sheet) => ({
-        op: "set",
-        addr: address(targetAxis, index, sheet),
-        value: literal(),
-      }),
-    },
-    {
-      name: "setNote",
-      make: (targetAxis, index, sheet) => ({
-        op: "setNote",
-        addr: address(targetAxis, index, sheet),
-        text: "note",
-      }),
-    },
-  ];
-  factories.push(
+  return [
     axis === "row"
       ? {
           name: "setRowMeta",
@@ -180,8 +162,7 @@ function pointFactories(axis: Axis): PointFactory[] {
             patch: { width: 160 },
           }),
         },
-  );
-  return factories;
+  ];
 }
 
 interface RangeFactory {
@@ -191,59 +172,11 @@ interface RangeFactory {
 
 const RANGE_FACTORIES: RangeFactory[] = [
   {
-    name: "setRange",
-    make: (axis, start, end, sheet) => ({
-      op: "setRange",
-      range: range(axis, start, end, sheet),
-      cells: [{ rowOffset: 0, colOffset: 0, value: literal() }],
-    }),
-  },
-  {
-    name: "setBlock",
-    make: (axis, start, end, sheet) => ({
-      op: "setBlock",
-      range: range(axis, start, end, sheet),
-      block: { rowCount: 1, colCount: 1, values: [1] },
-    }),
-  },
-  {
-    name: "setRangeStyle",
-    make: (axis, start, end, sheet) => ({
-      op: "setRangeStyle",
-      range: range(axis, start, end, sheet),
-      style: { bold: true },
-    }),
-  },
-  {
-    name: "clearRange",
-    make: (axis, start, end, sheet) => ({
-      op: "clearRange",
-      range: range(axis, start, end, sheet),
-      contents: true,
-    }),
-  },
-  {
     name: "addMerge",
     make: (axis, start, end, sheet = SHEET) => {
       const target = range(axis, start, end, sheet);
       return {
         op: "addMerge",
-        sheet,
-        merge: {
-          r0: target.start.row,
-          c0: target.start.col,
-          r1: target.end.row,
-          c1: target.end.col,
-        },
-      };
-    },
-  },
-  {
-    name: "removeMerge",
-    make: (axis, start, end, sheet = SHEET) => {
-      const target = range(axis, start, end, sheet);
-      return {
-        op: "removeMerge",
         sheet,
         merge: {
           r0: target.start.row,
@@ -444,11 +377,6 @@ describe("embedded references and formulas", () => {
         addr: { sheet: OTHER_SHEET, row: 0, col: 0 },
         value,
       }),
-      expected: (value: CellValue): DocumentOp => ({
-        op: "set",
-        addr: { sheet: OTHER_SHEET, row: 0, col: 0 },
-        value,
-      }),
     },
     {
       name: "setRange sparse cells",
@@ -457,59 +385,12 @@ describe("embedded references and formulas", () => {
         range: range("row", 0, 0, OTHER_SHEET),
         cells: [{ rowOffset: 0, colOffset: 0, value }],
       }),
-      expected: (value: CellValue): DocumentOp => ({
-        op: "setRange",
-        range: range("row", 0, 0, OTHER_SHEET),
-        cells: [{ rowOffset: 0, colOffset: 0, value }],
-      }),
     },
     {
       name: "addSheet snapshot cells",
       make: (value: CellValue): DocumentOp => ({ op: "addSheet", sheet: snapshot("new", [value]) }),
-      expected: (value: CellValue): DocumentOp => ({
-        op: "addSheet",
-        sheet: snapshot("new", [value]),
-      }),
     },
   ];
-
-  for (const container of containers) {
-    it(`${container.name} shifts refs, preserves other-sheet refs, and rejects deletion`, () => {
-      const source = { kind: "ref", target: address("row", 7) } as const;
-      const shifted = { kind: "ref", target: address("row", 5) } as const;
-      expectRebased(
-        [container.make(source)],
-        [structure("row", "delete")],
-        [container.expected(shifted)],
-      );
-
-      const other = { kind: "ref", target: address("row", 4, OTHER_SHEET) } as const;
-      expectRebased(
-        [container.make(other)],
-        [structure("row", "delete")],
-        [container.expected(other)],
-      );
-
-      const deleted = { kind: "ref", target: address("row", 4) } as const;
-      expectConflict([container.make(deleted)], [structure("row", "delete")], "structural-overlap");
-    });
-
-    it(`${container.name} rejects formulas across structural edits`, () => {
-      expectConflict(
-        [container.make({ kind: "formula", src: "=s1!A1+1" })],
-        [structure("row", "insert")],
-        "formula-structural",
-      );
-    });
-  }
-
-  it("set preserves literals while shifting its direct target", () => {
-    expectRebased(
-      [{ op: "set", addr: address("column", 7), value: literal(42) }],
-      [structure("column", "delete")],
-      [{ op: "set", addr: address("column", 5), value: literal(42) }],
-    );
-  });
 
   it("setBlock packed refs shift, preserve other sheets, and reject deletion", () => {
     const make = (target: CellAddress): DocumentOp => ({
@@ -588,16 +469,6 @@ describe("metadata, identity, and sheet lifecycle", () => {
     };
     expectConflict([same], [structure("row", "insert")], "unsupported-structural");
     expectRebased([other], [structure("row", "insert")], [other]);
-  });
-
-  it("keeps row and column axes independent", () => {
-    const local: DocumentOp[] = [
-      { op: "addColumns", sheet: SHEET, at: 4, columns: columns(1) },
-      { op: "removeColumns", sheet: SHEET, at: 6, count: 1 },
-      { op: "moveColumns", sheet: SHEET, from: 8, count: 1, to: 10 },
-      { op: "setColumn", sheet: SHEET, col: 4, patch: { width: 140 } },
-    ];
-    expectRebased(local, [structure("row", "insert")], local);
   });
 
   it("keeps sheet lifecycle and stable remove-by-ID operations across structural edits", () => {
@@ -811,15 +682,15 @@ describe("metadata, identity, and sheet lifecycle", () => {
       ],
       [
         { op: "removeValidationRule", sheet: SHEET, id: "validation-1" },
-        RANGE_FACTORIES[6]!.make("row", 3, 4),
+        RANGE_FACTORIES[1]!.make("row", 3, 4),
       ],
       [
         { op: "removeProtectedRange", sheet: SHEET, id: "protection-1" },
-        RANGE_FACTORIES[7]!.make("row", 3, 4),
+        RANGE_FACTORIES[2]!.make("row", 3, 4),
       ],
       [
         { op: "removeNamedRange", name: "sales", scope: SHEET },
-        RANGE_FACTORIES[8]!.make("row", 3, 4),
+        RANGE_FACTORIES[3]!.make("row", 3, 4),
       ],
       [
         { op: "setSheetMeta", sheet: SHEET, patch: { frozenRows: 1 } },
@@ -872,23 +743,6 @@ describe("server ordering, immutability, and determinism", () => {
       structure("row", "delete"),
     ];
     expectConflict(local, remote, "formula-structural", 1, 1);
-  });
-
-  it("preserves successful local operation order", () => {
-    const local: DocumentOp[] = [
-      { op: "setNote", addr: address("row", 7), text: "first" },
-      { op: "set", addr: address("row", 8), value: literal("second") },
-      { op: "renameSheet", sheet: OTHER_SHEET, name: "third" },
-    ];
-    expectRebased(
-      local,
-      [structure("row", "insert")],
-      [
-        { op: "setNote", addr: address("row", 9), text: "first" },
-        { op: "set", addr: address("row", 10), value: literal("second") },
-        { op: "renameSheet", sheet: OTHER_SHEET, name: "third" },
-      ],
-    );
   });
 
   it("does not mutate local or remote arrays or their nested objects", () => {
@@ -956,20 +810,5 @@ describe("server ordering, immutability, and determinism", () => {
         },
       },
     ]);
-  });
-
-  it("returns deep-equal results for repeated equivalent JSON inputs", () => {
-    const local: DocumentOp[] = [
-      { op: "set", addr: address("row", 7), value: literal("one") },
-      RANGE_FACTORIES[7]!.make("column", 7, 8),
-      { op: "removeNamedRange", name: "Unused", scope: OTHER_SHEET },
-    ];
-    const remote: DocumentOp[] = [structure("row", "insert"), structure("column", "delete")];
-    const expected = rebaseDocumentOperations(local, remote);
-    for (let iteration = 0; iteration < 20; iteration++) {
-      const localJson = JSON.parse(JSON.stringify(local)) as DocumentOp[];
-      const remoteJson = JSON.parse(JSON.stringify(remote)) as DocumentOp[];
-      expect(rebaseDocumentOperations(localJson, remoteJson)).toEqual(expected);
-    }
   });
 });

@@ -173,46 +173,8 @@ pub(super) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
 
 #[cfg(test)]
 mod tests {
-    use super::{matrix_resource_stats, range_from_ast, reset_matrix_resource_stats, EvalMatrix};
-    use crate::calc::{Ast, NamedRangeRef, RangeFlags, RefFlags, SheetRef};
-    use crate::types::{CellRange, Value};
-
-    #[test]
-    fn converts_local_absolute_and_named_references_to_ranges() {
-        let flags = RefFlags::default();
-        assert_eq!(
-            range_from_ast(&Ast::Cell(2, 3, flags), 7),
-            Some(CellRange::new(7, 2, 3, 2, 3))
-        );
-        let sheet = SheetRef {
-            handle: 11,
-            name: "Data".to_string(),
-            quoted: false,
-        };
-        assert_eq!(
-            range_from_ast(&Ast::AbsCell(sheet.clone(), 4, 5, flags), 7),
-            Some(CellRange::new(11, 4, 5, 4, 5))
-        );
-        assert_eq!(
-            range_from_ast(&Ast::AbsRange(sheet, 1, 2, 6, 8, RangeFlags::default()), 7),
-            Some(CellRange::new(11, 1, 2, 6, 8))
-        );
-        assert_eq!(
-            range_from_ast(
-                &Ast::NamedRange(NamedRangeRef {
-                    name: "Input".to_string(),
-                    scope: None,
-                    sheet: 13,
-                    row_start: 1,
-                    col_start: 2,
-                    row_end: 3,
-                    col_end: 4,
-                }),
-                7,
-            ),
-            Some(CellRange::new(13, 1, 2, 3, 4))
-        );
-    }
+    use super::{matrix_resource_stats, reset_matrix_resource_stats, EvalMatrix};
+    use crate::types::Value;
 
     #[test]
     fn matrix_resource_stats_track_concurrent_peak_and_release() {

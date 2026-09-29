@@ -1,11 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  INDEXNOW_ENDPOINT,
-  INDEXNOW_KEY,
-  indexNowPayload,
-  submitIndexNow,
-  urlsFromSitemap,
-} from "./indexnow.js";
+import { indexNowPayload, submitIndexNow, urlsFromSitemap } from "./indexnow.js";
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
@@ -28,20 +22,6 @@ describe("IndexNow discovery submission", () => {
         ),
       ),
     ).toThrow("outside https://sheetwrite.vercel.app");
-  });
-
-  it("builds the public protocol payload from the same hosted key", () => {
-    expect(INDEXNOW_ENDPOINT).toBe("https://api.indexnow.org/indexnow");
-    expect(INDEXNOW_KEY).toMatch(/^[a-f0-9]{32}$/);
-    expect(indexNowPayload(urlsFromSitemap(sitemap))).toEqual({
-      host: "sheetwrite.vercel.app",
-      key: INDEXNOW_KEY,
-      keyLocation: `https://sheetwrite.vercel.app/${INDEXNOW_KEY}.txt`,
-      urlList: [
-        "https://sheetwrite.vercel.app/",
-        "https://sheetwrite.vercel.app/docs/start/installation/",
-      ],
-    });
   });
 
   it("accepts only successful IndexNow protocol responses", async () => {

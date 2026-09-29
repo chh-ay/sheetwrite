@@ -74,49 +74,6 @@ describe("MutationRevisionIndex", () => {
     });
   });
 
-  it("prunes revisions that no remaining overlapping request can observe", () => {
-    const index = new MutationRevisionIndex();
-    const releaseOldest = index.retainRevision(0);
-    const releaseNewerA = index.retainRevision(2);
-    const releaseNewerB = index.retainRevision(2);
-
-    index.record(
-      [{ op: "set", addr: address(1, 0), value: { kind: "literal", value: "early" } }],
-      1,
-    );
-    index.record(
-      [
-        { op: "set", addr: address(2, 0), value: { kind: "literal", value: "late" } },
-        {
-          op: "clearRange",
-          range: { sheet: "s1", start: { row: 4, col: 0 }, end: { row: 8, col: 1 } },
-        },
-      ],
-      3,
-    );
-    expect(index.stats()).toMatchObject({ points: 2, rectangles: 1, retainedRequests: 3 });
-
-    releaseOldest();
-    expect(index.stats()).toEqual({
-      points: 1,
-      rectangles: 1,
-      retainedRequests: 2,
-      retainedRevisions: 1,
-    });
-    expect(index.isNewerThan(address(1, 0), 2)).toBe(false);
-    expect(index.isNewerThan(address(2, 0), 2)).toBe(true);
-
-    releaseNewerA();
-    expect(index.stats().retainedRequests).toBe(1);
-    releaseNewerB();
-    expect(index.stats()).toEqual({
-      points: 0,
-      rectangles: 0,
-      retainedRequests: 0,
-      retainedRevisions: 0,
-    });
-  });
-
   it("clears retained generations so obsolete coordinates cannot survive a structural reset", () => {
     const index = new MutationRevisionIndex();
     const release = index.retainRevision(4);

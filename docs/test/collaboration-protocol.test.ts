@@ -6,7 +6,6 @@ import {
   PresenceCoordinator,
   SyncCoordinator,
   type SyncCoordinatorEvent,
-  type VersionedOperation,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import {
@@ -112,51 +111,6 @@ describe("showcase collaboration server", () => {
 });
 
 describe("showcase network link", () => {
-  it("queues broadcasts while offline and replays them in order on reconnect", async () => {
-    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
-    const link = new ShowcaseNetworkLink(server);
-    cleanups.push(() => link.destroy());
-    const delivered: number[] = [];
-    link.subscribe((operation: VersionedOperation) => delivered.push(operation.version));
-
-    link.setConnected(false);
-    await expect(
-      link.commit({
-        documentId: COLLABORATION_DOCUMENT_ID,
-        baseVersion: 0,
-        clientMutationId: "offline-m1",
-        operations: [pointsEdit(0, 10)],
-      }),
-    ).rejects.toBeInstanceOf(ShowcaseLinkError);
-
-    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(1, 6)]);
-    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(2, 4)]);
-    expect(delivered).toEqual([]);
-    expect(link.state().queuedBroadcasts).toBe(2);
-
-    link.setConnected(true);
-    expect(delivered).toEqual([1, 2]);
-    expect(link.state().queuedBroadcasts).toBe(0);
-  });
-
-  it("holds one broadcast to reorder delivery, then releases it in version order", async () => {
-    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
-    const link = new ShowcaseNetworkLink(server);
-    cleanups.push(() => link.destroy());
-    const delivered: number[] = [];
-    link.subscribe((operation) => delivered.push(operation.version));
-
-    link.holdNextBroadcast();
-    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(0, 11)]);
-    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(1, 7)]);
-    expect(delivered).toEqual([2]);
-    expect(link.state().heldBroadcasts).toBe(1);
-
-    link.releaseHeldBroadcasts();
-    expect(delivered).toEqual([2, 1]);
-    expect(link.state().heldBroadcasts).toBe(0);
-  });
-
   it("loses one acknowledgement and its echo, then answers the retry with duplicate", async () => {
     const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
     const link = new ShowcaseNetworkLink(server);

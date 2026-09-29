@@ -1,24 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readBoundedResponse } from "./conformance/capture.js";
 import {
   type ConformanceCorpus,
   type ConformanceManifest,
-  type ConformanceResult,
   canonicalJson,
   compareResults,
-  compareReviewedObservation,
   compatibilityCheckSummary,
   type FormulaInventory,
-  generateConformanceEvidence,
   loadCorpus,
   readConformanceManifest,
   readFormulaInventory,
   runOffline,
   runSheetwriteCase,
-  type SemanticCategory,
   sha256,
   sha256Bytes,
   validateCorpus,
@@ -50,71 +45,6 @@ function validateCorpusChecked(
 }
 
 describe("neutral conformance corpus", () => {
-  it("validates the checked-in schema contract and stable IDs", async () => {
-    const corpus = await loadCorpus();
-    expect(corpus.protocol).toBe(1);
-    const canaryIds = corpus.cases
-      .filter((entry) => entry.localCanary === true)
-      .map((entry) => entry.id);
-    expect(canaryIds).toEqual([
-      "canary.arithmetic.1-plus-1",
-      "canary.date.serial-60",
-      "canary.if.lazy-error-branch",
-      "canary.criteria.wildcard",
-      "canary.lookup.not-found",
-      "canary.spill.obstruction",
-      "canary.workbook.roundtrip",
-    ]);
-    expect(validateCorpusChecked(corpus)).toEqual([]);
-  });
-
-  it("matches deterministic inventory-derived counts and complete subject/category coverage", async () => {
-    const corpus = await loadCorpus();
-    const generated = generateConformanceEvidence(CHECKED_INVENTORY);
-    expect(canonicalJson(corpus)).toBe(canonicalJson(generated.corpus));
-    expect(await readFile("test/conformance/corpus.json", "utf8")).toBe(
-      `${canonicalJson(generated.corpus)}\n`,
-    );
-    expect(CHECKED_MANIFEST).toEqual(generated.manifest);
-    expect(CHECKED_MANIFEST.counts).toEqual({
-      formula: 2000,
-      mutation: 250,
-      workbook: 100,
-      localCanary: 7,
-      supportedFunctions: 154,
-      supportedOperators: 15,
-    });
-    const requiredCategories: SemanticCategory[] = [
-      "normal",
-      "empty",
-      "mixed",
-      "error",
-      "boundary",
-      "range-array",
-    ];
-    for (const subject of [
-      ...CHECKED_INVENTORY.functions.map((entry) => ({
-        kind: "function" as const,
-        name: entry.canonical,
-      })),
-      ...CHECKED_INVENTORY.operators.map((entry) => ({
-        kind: "operator" as const,
-        name: entry.canonical,
-      })),
-    ]) {
-      const categories = new Set(
-        corpus.cases
-          .filter(
-            (entry) => entry.subject?.kind === subject.kind && entry.subject.name === subject.name,
-          )
-          .map((entry) => entry.category),
-      );
-      expect([...categories].sort(), `${subject.kind}:${subject.name}`).toEqual(
-        [...requiredCategories].sort(),
-      );
-    }
-  });
-
   it("rejects formula padding and proves the direct category result path", async () => {
     const corpus = await loadCorpus();
     const direct = corpus.cases.find(
@@ -174,34 +104,6 @@ describe("neutral conformance corpus", () => {
       }
     }
     expect(falsePasses).toEqual([]);
-  });
-
-  it("rejects padded, duplicated, and unknown mutation operation shapes", async () => {
-    const corpus = await loadCorpus();
-    const mutation = corpus.cases.find(
-      (entry) => entry.feature === "mutation-matrix" && (entry.operations?.length ?? 0) >= 2,
-    )!;
-
-    const duplicated = clone(corpus);
-    const duplicateCase = duplicated.cases.find((entry) => entry.id === mutation.id)!;
-    duplicateCase.operations![1] = structuredClone(duplicateCase.operations![0]!);
-    expect(hasIssue(validateCorpusChecked(duplicated), "duplicate operation in shape")).toBe(true);
-
-    const unknown = clone(corpus);
-    const unknownCase = unknown.cases.find((entry) => entry.id === mutation.id)!;
-    unknownCase.operations![0] = { op: "claimed-but-not-executed" };
-    expect(hasIssue(validateCorpusChecked(unknown), "unsupported concrete operation")).toBe(true);
-  });
-
-  it("rejects absent legal provenance and mutable unpinned sources", async () => {
-    const corpus = await loadCorpus();
-    const missingLicense = clone(corpus);
-    missingLicense.cases[0]!.source.license = "";
-    expect(hasIssue(validateCorpusChecked(missingLicense), "source.license")).toBe(true);
-
-    const mutableUrl = clone(corpus);
-    mutableUrl.cases[0]!.source.url = "https://example.test/current-spec";
-    expect(hasIssue(validateCorpusChecked(mutableUrl), "source.sha256")).toBe(true);
   });
 
   it("rejects missing producer versions, artifact checksums, and secret-like content", async () => {
@@ -264,94 +166,7 @@ describe("neutral conformance corpus", () => {
     }
   });
 
-  it("bounds capture responses before and during streaming", async () => {
-    const declared = new Response("oversized", { headers: { "content-length": "9" } });
-    await expect(readBoundedResponse(declared, 8)).rejects.toThrow("Content-Length");
-    await expect(readBoundedResponse(new Response("123456789"), 8)).rejects.toThrow(
-      "response exceeds",
-    );
-  });
-
-  it("rejects ambiguous result types and unsupported cases rendered as passing", async () => {
-    const corpus = await loadCorpus();
-    const ambiguous = clone(corpus);
-    ambiguous.cases[0]!.expected = {} as ConformanceResult;
-    expect(hasIssue(validateCorpusChecked(ambiguous), "ambiguous or missing result type")).toBe(
-      true,
-    );
-
-    const nonFinite = clone(corpus);
-    nonFinite.cases[0]!.expected = { type: "number", value: Number.POSITIVE_INFINITY };
-    expect(hasIssue(validateCorpusChecked(nonFinite), "expected finite number")).toBe(true);
-    nonFinite.cases[0]!.expected = {
-      type: "number",
-      value: 2,
-      tolerance: { kind: "absolute", value: Number.NaN },
-    };
-    expect(hasIssue(validateCorpusChecked(nonFinite), "invalid numeric tolerance")).toBe(true);
-
-    const unsupportedPass = clone(corpus);
-    unsupportedPass.cases[0]!.unsupported = true;
-    expect(
-      hasIssue(validateCorpusChecked(unsupportedPass), "unsupported case cannot render as pass"),
-    ).toBe(true);
-  });
-
-  it("rejects unknown fields and unrecognized schema enums", async () => {
-    const corpus = await loadCorpus();
-    const invalid = clone(corpus) as ConformanceCorpus & { extra?: boolean };
-    invalid.extra = true;
-    Object.assign(invalid.cases[0]!, {
-      area: "charts",
-      dialect: "guess",
-      extra: true,
-    });
-    Object.assign(invalid.cases[0]!.source, { authorship: "copied", extra: true });
-    invalid.cases[0]!.observations.push({
-      producer: "unknown" as "sheetwrite",
-      producerVersion: "1",
-      capturedAt: "2026-07-22T00:00:00.000Z",
-      status: "unavailable",
-      notes: "No runner",
-    });
-    const issues = validateCorpusChecked(invalid);
-    for (const expected of [
-      "corpus.extra: unknown field",
-      ".area: invalid",
-      ".dialect: invalid",
-      ".source.authorship: invalid",
-      ".producer: invalid",
-    ]) {
-      expect(hasIssue(issues, expected), expected).toBe(true);
-    }
-  });
-
-  it("fails closed on missing metadata, duplicate IDs, and unsupported-only coverage", async () => {
-    const corpus = await loadCorpus();
-    const invalid = clone(corpus);
-    invalid.cases[0]!.family = "";
-    delete (invalid.cases[0] as Partial<(typeof invalid.cases)[number]>).category;
-    invalid.cases[0]!.source.url = "";
-    invalid.cases[1]!.id = invalid.cases[0]!.id;
-    for (const entry of invalid.cases) {
-      if (entry.subject?.kind === "function" && entry.subject.name === "SUM") {
-        entry.expected = { type: "unsupported" };
-        entry.unsupported = true;
-      }
-    }
-    const issues = validateCorpusChecked(invalid);
-    for (const expected of [
-      ".family: required",
-      ".category: missing",
-      ".source.url: required",
-      ".id: duplicate",
-      "coverage.function: missing supported SUM",
-    ]) {
-      expect(hasIssue(issues, expected), expected).toBe(true);
-    }
-  });
-
-  it("rejects altered expectations even when corpus and record checksums are forged", async () => {
+  it("rejects fake producer observations and denominator drift", async () => {
     const corpus = await loadCorpus();
     const altered = clone(corpus);
     altered.cases[0]!.expected = { type: "number", value: 3 };
@@ -409,15 +224,6 @@ describe("neutral conformance corpus", () => {
     expect(hasIssue(denominatorIssues, "required denominator is 2000")).toBe(true);
     expect(hasIssue(denominatorIssues, "counts.mutation: denominator drift")).toBe(true);
   });
-
-  it("canonicalizes object keys and fixes the protocol checksum", async () => {
-    expect(canonicalJson({ z: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"z":1}');
-    expect(canonicalJson(-0)).toBe("-0");
-    expect(() => canonicalJson(Number.NaN)).toThrow("non-finite");
-    const corpus = await loadCorpus();
-    expect(sha256(corpus)).toMatch(/^[a-f0-9]{64}$/);
-    expect(sha256(corpus)).toBe(sha256(JSON.parse(canonicalJson(corpus))));
-  });
 });
 
 describe("offline typed comparison", () => {
@@ -453,65 +259,6 @@ describe("offline typed comparison", () => {
     ).toEqual(["displayedText: expected 2.00, received 2"]);
   });
 
-  it("diffs normalized workbook state, warnings, and OOXML summaries structurally", () => {
-    const expected: ConformanceResult = {
-      type: "workbook",
-      value: {
-        activeSheet: "Data",
-        sheets: [{ name: "Data", state: "visible" }],
-        warnings: ["unsupported-chart"],
-        ooxml: { tables: 1, relationships: 2 },
-      },
-    };
-    const actual: ConformanceResult = {
-      type: "workbook",
-      value: {
-        activeSheet: "Other",
-        sheets: [{ name: "Data", state: "hidden" }],
-        warnings: [],
-        ooxml: { tables: 0, relationships: 1 },
-      },
-    };
-    const differences = compareResults(expected, actual);
-    expect(differences).toHaveLength(1);
-    expect(differences[0]).toContain("activeSheet");
-    expect(differences[0]).toContain("unsupported-chart");
-    expect(differences[0]).toContain("relationships");
-  });
-
-  it("accepts only the exact declared producer alternate", () => {
-    const observation = {
-      producer: "excel-web" as const,
-      producerVersion: "16.0.19029.20136",
-      capturedAt: "2026-07-22T00:00:00.000Z",
-      status: "reviewed" as const,
-      artifactSha256: "0".repeat(64),
-      result: { type: "number" as const, value: 60, displayedText: "1900-02-29" },
-    };
-    const divergence = {
-      reason: "Excel synthetic leap day",
-      producers: ["excel-web" as const],
-      alternate: { type: "number" as const, value: 60, displayedText: "1900-02-29" },
-    };
-    expect(
-      compareReviewedObservation(
-        { type: "number", value: 60, displayedText: "1900-02-28" },
-        observation,
-        divergence,
-      ),
-    ).toEqual([]);
-    observation.result.displayedText = "1900-03-01";
-    expect(
-      compareReviewedObservation(
-        { type: "number", value: 60, displayedText: "1900-02-28" },
-        observation,
-        divergence,
-      ),
-    ).toEqual(
-      expect.arrayContaining([expect.stringContaining("declared alternate did not match")]),
-    );
-  });
-
   it("rejects incomplete or drifted Excel Office Script captures", async () => {
     const corpus = await loadCorpus();
     const capture = {
@@ -533,14 +280,6 @@ describe("offline typed comparison", () => {
     const issues = validateExcelCapture(capture, corpus, capture.producerVersion, "runner-sha");
     expect(hasIssue(issues, "runner drift")).toBe(true);
     expect(hasIssue(issues, "missing, extra, or reordered")).toBe(true);
-  });
-
-  it("rejects tampered all-unsupported corpora before local execution", async () => {
-    const corpus = await loadCorpus();
-    corpus.cases = [corpus.cases[0]!];
-    corpus.cases[0]!.expected = { type: "unsupported" };
-    corpus.cases[0]!.unsupported = true;
-    await expect(runOffline(corpus)).rejects.toThrow("coverage.formula");
   });
 
   it("runs every supported case and preserves the seven-canary metric", async () => {

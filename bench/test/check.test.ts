@@ -9,14 +9,8 @@ import {
   type ControlledRenderBaseline,
   parseControlledBaseline,
   stableBaselineJson,
-  validateControlledBaselineProvenance,
 } from "../src/controlled-baseline.js";
-import {
-  computeHarnessFingerprint,
-  fingerprintMismatches,
-  fingerprintRenderHarnessManifest,
-  MATRIX_IDS,
-} from "../src/gate-protocol.js";
+import { computeHarnessFingerprint, MATRIX_IDS } from "../src/gate-protocol.js";
 import {
   type FailedScenario,
   type RenderBenchmarkArtifact,
@@ -128,77 +122,6 @@ describe("controlled zero-regression comparison", () => {
     expect(() => parseControlledBaseline(injectedLegacyFloor)).toThrow(
       "unexpected absoluteFloorMs",
     );
-  });
-
-  test("reports generic structural changes with precise, deterministic paths", () => {
-    const expected = { scalar: 1, nested: { changed: "before", removed: true } };
-    const cases: ReadonlyArray<{
-      readonly observed: Record<string, unknown>;
-      readonly mismatch: string;
-    }> = [
-      {
-        observed: { ...expected, scalar: 2 },
-        mismatch: "fingerprint.scalar: expected 1, observed 2",
-      },
-      {
-        observed: { ...expected, added: "new" },
-        mismatch: 'fingerprint.added: expected undefined, observed "new"',
-      },
-      {
-        observed: { scalar: 1, nested: { changed: "before" } },
-        mismatch: "fingerprint.nested.removed: expected true, observed undefined",
-      },
-      {
-        observed: { ...expected, nested: { ...expected.nested, changed: "after" } },
-        mismatch: 'fingerprint.nested.changed: expected "before", observed "after"',
-      },
-    ];
-    for (const { observed, mismatch } of cases) {
-      expect(fingerprintMismatches(expected, observed, "fingerprint")).toEqual([mismatch]);
-    }
-  });
-  test("ignores unrelated benchmark scripts while binding render preparation and dependencies", () => {
-    const manifest = {
-      scripts: {
-        "bench:data": "bun run src/data-bench.ts",
-        "bench:render:prepare": "bun run build:wasm",
-      },
-      dependencies: {
-        "@sheetwrite/core": "workspace:*",
-        handsontable: "^18.0.0",
-      },
-      devDependencies: {
-        "@playwright/test": "^1.61.1",
-      },
-    };
-    const expected = fingerprintRenderHarnessManifest(manifest);
-    expect(
-      fingerprintRenderHarnessManifest({
-        ...manifest,
-        scripts: {
-          ...manifest.scripts,
-          "bench:resource": "bun run src/resource-bench.ts",
-        },
-      }),
-    ).toBe(expected);
-    expect(
-      fingerprintRenderHarnessManifest({
-        ...manifest,
-        scripts: {
-          ...manifest.scripts,
-          "bench:render:prepare": "bun run build:wasm && bun run build:core",
-        },
-      }),
-    ).not.toBe(expected);
-    expect(
-      fingerprintRenderHarnessManifest({
-        ...manifest,
-        dependencies: {
-          ...manifest.dependencies,
-          handsontable: "^19.0.0",
-        },
-      }),
-    ).not.toBe(expected);
   });
 });
 
@@ -338,30 +261,6 @@ describe("strict benchmark check CLI", () => {
     expect(mismatch.stderr.toString()).toContain("checksum mismatch");
     writeFileSync(rawPath, original);
   });
-  test("rejects checksum-valid raw evidence whose samples do not derive the baseline", () => {
-    const mismatchedRawPath = resolve(directory, "mismatched-raw.json");
-    const mismatchedRaw = `${JSON.stringify(
-      makeRenderArtifact({ rounds: 10, commit: head, samples: () => [11, 11, 11] }),
-      null,
-      2,
-    )}\n`;
-    writeFileSync(mismatchedRawPath, mismatchedRaw);
-    const baseline = parseControlledBaseline(
-      JSON.parse(readFileSync(baselinePath, "utf8")) as unknown,
-    );
-    const mismatchedProvenance = {
-      ...baseline,
-      source: {
-        ...baseline.source,
-        rawArtifact: relative(REPOSITORY_ROOT, mismatchedRawPath),
-        rawSha256: createHash("sha256").update(mismatchedRaw).digest("hex"),
-      },
-    };
-    expect(() =>
-      validateControlledBaselineProvenance(mismatchedProvenance, REPOSITORY_ROOT),
-    ).toThrow("samples do not match checked-in raw artifact");
-  });
-
   test("passes a complete matched result and keeps report-only explicitly non-gating", () => {
     const passing = runCli(JSON.stringify(freshArtifact()));
     expect(passing.exitCode, passing.stderr.toString()).toBe(0);

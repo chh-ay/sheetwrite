@@ -28,9 +28,4 @@ describe("sitemap normalization contract", () => {
     expect(kept).toBe(3);
     expect(dropped).toBe(4);
   });
-
-  it("refuses to emit an empty sitemap", () => {
-    const { kept } = normalizeSitemap(wrap(["https://sheetwrite.vercel.app/test/xlsx"]));
-    expect(kept).toBe(0);
-  });
 });

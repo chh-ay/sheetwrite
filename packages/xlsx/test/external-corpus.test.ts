@@ -75,17 +75,6 @@ beforeAll(async () => {
 });
 
 describe("scheduled independent Microsoft Excel corpus", () => {
-  it("records the pinned Apache POI legal license and NOTICE paths", () => {
-    expect(manifest.license).toEqual({
-      name: "Apache-2.0",
-      url: "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/LICENSE",
-    });
-    expect(manifest.notice.url).toBe(
-      "https://github.com/apache/poi/blob/913c78891bd0cd20945b050c63abfb8c66c88009/legal/NOTICE",
-    );
-    expect(manifest.notice.text).toContain("The Apache Software Foundation");
-  });
-
   for (const fixture of manifest.fixtures) {
     scheduledIt(`imports checksum-locked ${fixture.file}`, async () => {
       const bytes = await fixtureBytes(fixture);

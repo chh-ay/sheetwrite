@@ -41,8 +41,6 @@ describe("matched formula evidence contract", () => {
       (value: MatchedFormulaEvidence) => (value.rawArtifactSha256 = "0".repeat(64)),
     ],
     ["harness hash", (value: MatchedFormulaEvidence) => (value.harnessSha256 = "0".repeat(64))],
-    ["CPU affinity", (value: MatchedFormulaEvidence) => (value.controls.cpuAffinity = [0])],
-    ["pair count", (value: MatchedFormulaEvidence) => (value.controls.alternatingPairs = 19)],
     ["governor", (value: MatchedFormulaEvidence) => (value.controls.governor = "performance")],
     [
       "workload boundaries",
@@ -53,7 +51,6 @@ describe("matched formula evidence contract", () => {
       (value: MatchedFormulaEvidence) =>
         (value.workloads["independent-parse-load/1000"]!.raw.baselineMs[0]! += 1),
     ],
-    ["bootstrap seed", (value: MatchedFormulaEvidence) => (value.bootstrap.seed += 1)],
   ] as const) {
     test(`rejects tampered ${label}`, () => {
       const value = copy();

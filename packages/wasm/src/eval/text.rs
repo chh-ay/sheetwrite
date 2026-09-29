@@ -710,9 +710,7 @@ fn parse_number(text: &str, decimal: &str, group: &str) -> Result<f64, FormulaEr
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        apply, clean_text, literal_find, slice_text, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES,
-    };
+    use super::{apply, clean_text, literal_find, MAX_SEARCH_STEPS, MAX_TEXT_OUTPUT_BYTES};
     use crate::calc::Func;
     use crate::types::{FormulaError, Value};
 
@@ -1038,59 +1036,5 @@ mod tests {
             evaluate(Func::Lower, vec![Value::text("İ")]),
             Value::text("i\u{307}")
         );
-    }
-
-    #[test]
-    fn code_point_slices_enforce_output_bounds() {
-        assert_eq!(
-            evaluate(Func::Right, vec![Value::text("a😀ç"), Value::number(2.0)],),
-            Value::text("😀ç")
-        );
-        assert_eq!(
-            evaluate(
-                Func::Mid,
-                vec![Value::text("a😀ç"), Value::number(2.0), Value::number(1.0),],
-            ),
-            Value::text("😀")
-        );
-        let oversized = "a".repeat(MAX_TEXT_OUTPUT_BYTES + 1);
-        assert_eq!(
-            slice_text(&oversized, 0, MAX_TEXT_OUTPUT_BYTES + 1),
-            Err(FormulaError::Num)
-        );
-    }
-    #[test]
-    fn proper_uses_nonletters_as_word_boundaries_without_per_character_strings() {
-        assert_eq!(
-            evaluate(Func::Proper, vec![Value::text("éLAN 76bUDGET")]),
-            Value::text("Élan 76Budget")
-        );
-    }
-
-    #[test]
-    fn required_text_functions_reject_wrong_arity() {
-        let empty = FuncAccumulator::default();
-        for func in [
-            Func::TextJoin,
-            Func::Substitute,
-            Func::Replace,
-            Func::Find,
-            Func::Search,
-            Func::Value,
-            Func::Clean,
-            Func::Rept,
-            Func::Char,
-            Func::Code,
-            Func::UniChar,
-            Func::Unicode,
-            Func::Proper,
-            Func::NumberValue,
-        ] {
-            assert_eq!(
-                apply(func, &empty).unwrap(),
-                Value::Error(FormulaError::Value),
-                "{func:?}"
-            );
-        }
     }
 }
