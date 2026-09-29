@@ -1,9 +1,11 @@
 import {
+  type CellStyle,
   type Column,
   createGrid,
   type DocumentOp,
   type Grid,
   initSheetwrite,
+  parseDateInput,
   type Workbook,
 } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
@@ -20,9 +22,17 @@ import {
   resetNumberFormatResourcesForTest,
 } from "../../packages/core/src/number-format.js";
 import type { InstrumentedVisibleWindowView } from "../../packages/core/src/store/window-reader.js";
+import type { PanePaint } from "../../packages/core/src/types/render.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
-import { COLUMNS, type ColumnarDataset, datasetChecksum, makeColumnar, toAoA } from "./dataset.js";
+import {
+  COL,
+  COLUMNS,
+  type ColumnarDataset,
+  datasetChecksum,
+  makeColumnar,
+  toAoA,
+} from "./dataset.js";
 import { createHandsontable } from "./handsontable-runtime.js";
 import {
   ALL_RENDER_SCENARIOS,
@@ -41,13 +51,24 @@ import {
 } from "./render-protocol.js";
 import {
   type CellSelection,
+  CONDITIONAL_AMOUNT_THRESHOLD,
+  CONDITIONAL_HIGH_BACKGROUND,
+  CONDITIONAL_LOW_COLOR,
+  CURRENCY_NUMBER_FORMAT,
+  type FrozenPaneProbe,
   type GeometryObservation,
   measureUnresizedMillionRowGeometry,
   type RenderBenchAdapter,
+  type RenderBenchDiagnosticAdapter,
+  type ResolvedStyleProbe,
   runRenderScenario,
   type ScrollObservation,
+  SEARCH_MATCH_PREFIX,
+  type SearchProbe,
   type WindowReadDiagnosticMode,
   type WindowTransferCounters,
+  WRAP_HEAVY_TEXT_LENGTH,
+  WRAP_HEAVY_TEXT_PREFIX,
 } from "./render-scenarios.js";
 
 const SHEET = "bench";
@@ -56,6 +77,9 @@ const HANDSONTABLE_ROW_HEIGHT = 23;
 const FORMULA_DENSE_ROWS = 64;
 const TRANSACTION_CHUNK_SIZE = 8_000;
 const LONG_TEXT_SUFFIX = "x".repeat(192);
+const AMOUNT_NUMBER_FORMAT = "#,##0.00";
+const DATE_NUMBER_FORMAT = "mmm d, yyyy";
+const NUMBER_LOCALE = "en-US";
 
 interface PageConfiguration {
   readonly engine: EngineId;
@@ -101,8 +125,12 @@ function makeWorkbook(rowCount: number): Workbook {
     width: column.width,
     type: column.key === "date" ? "date" : column.type,
     numberFormat:
-      column.key === "amount" ? "#,##0.00" : column.key === "date" ? "mmm d, yyyy" : undefined,
-    numberLocale: "en-US",
+      column.key === "amount"
+        ? AMOUNT_NUMBER_FORMAT
+        : column.key === "date"
+          ? DATE_NUMBER_FORMAT
+          : undefined,
+    numberLocale: NUMBER_LOCALE,
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
 }
@@ -114,7 +142,26 @@ function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): str
   return dataset.amount[row]!;
 }
 
-class SheetwriteAdapter implements RenderBenchAdapter {
+/** Signature of the built-in renderer's frozen-pane paint hook. */
+type PanePaintFn = (
+  panes: readonly PanePaint[],
+  divider: { x: number | null; y: number | null },
+) => void;
+
+function emptyFrozenPaneProbe(): FrozenPaneProbe {
+  return {
+    paneFrames: 0,
+    paneCount: 0,
+    pinnedRows: null,
+    pinnedColumns: [],
+    pinnedScrollTop: null,
+    bodyRows: null,
+    bodyScrollTop: null,
+    bodyScrollLeft: null,
+  };
+}
+
+class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   readonly id = "sheetwrite" as const;
   readonly initialRowCount: number;
   readonly colCount = COLUMNS.length;
@@ -124,6 +171,12 @@ class SheetwriteAdapter implements RenderBenchAdapter {
   private readonly dataset: ColumnarDataset;
   private formulaDenseRows = 0;
   private textHeavyRows = 0;
+  private wrapHeavyRows = 0;
+  private searchMatchRows = 0;
+  private dateSerialRows = 0;
+  private conditionalFormatRows = 0;
+  private frozenPaneProbeArmed = false;
+  private frozenPaneProbeState: FrozenPaneProbe = emptyFrozenPaneProbe();
   private windowReadDiagnosticMode: WindowReadDiagnosticMode = "baseline";
   private priorDecodedView: InstrumentedVisibleWindowView | undefined;
   private windowTransferCountersState = {
@@ -406,6 +459,281 @@ class SheetwriteAdapter implements RenderBenchAdapter {
     }
     this.textHeavyRows = 0;
     this.applyPatches(patches);
+  }
+
+  installWrapHeavy(rowCount: number): void {
+    this.wrapHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.wrapHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        const prefix = `${WRAP_HEAVY_TEXT_PREFIX}${row}-${col}-`;
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: {
+            kind: "literal",
+            value: `${prefix}${"w".repeat(WRAP_HEAVY_TEXT_LENGTH)}`.slice(
+              0,
+              WRAP_HEAVY_TEXT_LENGTH,
+            ),
+          },
+          style: { wrap: true },
+        });
+      }
+    }
+    this.applyPatches(patches);
+  }
+
+  clearWrapHeavy(): void {
+    if (this.wrapHeavyRows === 0) return;
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.wrapHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+        });
+      }
+    }
+    this.wrapHeavyRows = 0;
+    this.applyPatches(patches);
+  }
+
+  installSearchMatches(rowCount: number): void {
+    this.searchMatchRows = Math.min(rowCount, this.initialRowCount - 1);
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.searchMatchRows; row++) {
+      patches.push({
+        op: "set",
+        addr: { sheet: SHEET, row, col: COL.customer },
+        value: { kind: "literal", value: `${SEARCH_MATCH_PREFIX}${row}` },
+      });
+    }
+    this.applyPatches(patches);
+  }
+
+  clearSearchMatches(): void {
+    if (this.searchMatchRows === 0) return;
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.searchMatchRows; row++) {
+      patches.push({
+        op: "set",
+        addr: { sheet: SHEET, row, col: COL.customer },
+        value: { kind: "literal", value: this.dataset.customer[row] ?? "" },
+      });
+    }
+    this.searchMatchRows = 0;
+    this.applyPatches(patches);
+  }
+
+  beginSearch(query: string): void {
+    this.grid.search(query);
+  }
+
+  /**
+   * Live find state without re-scanning the sheet, so a corrupt or cleared match
+   * set cannot pass by recomputing the expected answer.
+   */
+  searchState(): SearchProbe {
+    const controller = Reflect.get(this.grid, "searchController") as
+      | {
+          matches: { length: number; at(index: number): { row: number; col: number } | null };
+          active: number;
+          searchQuery: string;
+        }
+      | undefined;
+    if (!controller) throw new Error("search probe requires the grid search controller");
+    const describe = (index: number): string | null => {
+      const match = controller.matches.at(index);
+      return match ? `${match.row},${match.col}` : null;
+    };
+    return {
+      query: controller.searchQuery,
+      matches: controller.matches.length,
+      active: controller.active,
+      first: describe(0),
+      last: describe(controller.matches.length - 1),
+    };
+  }
+
+  endSearch(): void {
+    this.grid.clearSearch();
+  }
+
+  installFrozenPanes(rows: number, cols: number): void {
+    this.grid.setFrozen(rows, cols);
+  }
+
+  clearFrozenPanes(): void {
+    this.grid.setFrozen(0, 0);
+  }
+
+  armFrozenPaneProbe(): void {
+    const renderer = Reflect.get(this.grid, "renderer") as
+      | {
+          paintPanes?: PanePaintFn;
+        }
+      | undefined;
+    if (!renderer || typeof renderer.paintPanes !== "function") {
+      throw new Error("frozen-pane probe requires a pane-capable renderer");
+    }
+    if (!this.frozenPaneProbeArmed) {
+      const paintOriginal = renderer.paintPanes.bind(renderer);
+      renderer.paintPanes = (panes, divider) => {
+        this.recordFrozenPaneFrame(panes);
+        paintOriginal(panes, divider);
+      };
+      this.frozenPaneProbeArmed = true;
+    }
+    this.frozenPaneProbeState = emptyFrozenPaneProbe();
+  }
+
+  frozenPaneProbe(): FrozenPaneProbe {
+    return this.frozenPaneProbeState;
+  }
+
+  /** The coordinator pushes the corner, top, left, and body panes in that order. */
+  private recordFrozenPaneFrame(panes: readonly PanePaint[]): void {
+    const pinned = panes[0];
+    const body = panes[panes.length - 1];
+    this.frozenPaneProbeState = {
+      paneFrames: this.frozenPaneProbeState.paneFrames + 1,
+      paneCount: panes.length,
+      pinnedRows: pinned ? { start: pinned.view.rows.start, end: pinned.view.rows.end } : null,
+      pinnedColumns: pinned ? [...pinned.view.cols] : [],
+      pinnedScrollTop: pinned ? pinned.scrollTop : null,
+      bodyRows: body ? { start: body.view.rows.start, end: body.view.rows.end } : null,
+      bodyScrollTop: body ? body.scrollTop : null,
+      bodyScrollLeft: body ? body.scrollLeft : null,
+    };
+  }
+
+  installConditionalFormats(rowCount: number): void {
+    this.conditionalFormatRows = Math.min(rowCount, this.initialRowCount - 1);
+    if (this.conditionalFormatRows < 1) {
+      throw new RangeError("conditional formats need at least one body row");
+    }
+    const range = {
+      sheet: SHEET,
+      start: { row: 1, col: 0 },
+      end: { row: this.conditionalFormatRows, col: this.colCount - 1 },
+    };
+    const amountColumn = String.fromCharCode("A".charCodeAt(0) + COL.amount);
+    this.grid.setConditionalFormats([
+      {
+        range,
+        when: { kind: "formula", source: `=$${amountColumn}1>${CONDITIONAL_AMOUNT_THRESHOLD}` },
+        style: { backgroundColor: CONDITIONAL_HIGH_BACKGROUND },
+      },
+      {
+        range,
+        when: { kind: "formula", source: `=$${amountColumn}1<=${CONDITIONAL_AMOUNT_THRESHOLD}` },
+        style: { color: CONDITIONAL_LOW_COLOR },
+      },
+      {
+        range,
+        when: { kind: "formula", source: "=$A1>0" },
+        style: { underline: true },
+      },
+    ]);
+  }
+
+  clearConditionalFormats(): void {
+    if (this.conditionalFormatRows === 0) return;
+    this.conditionalFormatRows = 0;
+    this.grid.setConditionalFormats([]);
+  }
+
+  installCurrencyFormat(): void {
+    const column = this.sheet().columns[COL.amount];
+    if (!column) throw new RangeError("benchmark sheet is missing the amount column");
+    this.applyAmountColumnFormat(
+      { type: "currency", numberFormat: CURRENCY_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
+      column.width,
+    );
+  }
+
+  clearCurrencyFormat(): void {
+    const column = this.sheet().columns[COL.amount];
+    if (!column) throw new RangeError("benchmark sheet is missing the amount column");
+    this.applyAmountColumnFormat(
+      { type: "number", numberFormat: AMOUNT_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
+      column.width,
+    );
+  }
+
+  /**
+   * Write the date column back as UTC serials. Earlier fixture restores leave the
+   * ingested ISO text in those cells, which the paint path prints verbatim; the
+   * serial is what the store's own column-aware ingest produces.
+   */
+  installDateSerials(rowCount: number): void {
+    this.dateSerialRows = Math.min(rowCount, this.initialRowCount - 1);
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.dateSerialRows; row++) {
+      const text = this.dataset.date[row];
+      const serial = typeof text === "string" ? parseDateInput(text) : null;
+      if (serial === null) continue;
+      patches.push({
+        op: "set",
+        addr: { sheet: SHEET, row, col: COL.date },
+        value: { kind: "literal", value: serial },
+      });
+    }
+    this.applyPatches(patches);
+  }
+
+  clearDateSerials(): void {
+    if (this.dateSerialRows === 0) return;
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.dateSerialRows; row++) {
+      const text = this.dataset.date[row];
+      if (text === undefined) continue;
+      patches.push({
+        op: "set",
+        addr: { sheet: SHEET, row, col: COL.date },
+        value: { kind: "literal", value: text },
+      });
+    }
+    this.dateSerialRows = 0;
+    this.applyPatches(patches);
+  }
+
+  /**
+   * Paint reads a layout snapshot taken from the sheet, so the unchanged width is
+   * re-applied to rebuild that snapshot for the new format.
+   */
+  private applyAmountColumnFormat(patch: Partial<Column>, width: number): void {
+    this.grid.store.applyTransaction({
+      patches: [{ op: "setColumn", sheet: SHEET, col: COL.amount, patch }],
+    });
+    this.grid.setColumnWidth(COL.amount, width);
+    this.grid.refresh();
+  }
+
+  resolvedStyle(row: number, col: number): ResolvedStyleProbe {
+    const view = this.grid.store.getVisibleWindow(SHEET, { start: row, end: row + 1 }, [col]);
+    const style: CellStyle = view.styles[view.styleIds[0] ?? 0] ?? {};
+    return {
+      wrap: style.wrap === true,
+      underline: style.underline === true,
+      background: style.backgroundColor ?? null,
+      color: style.color ?? null,
+    };
+  }
+
+  formattedText(row: number, col: number): string {
+    const value = this.cellValue(row, col);
+    const column = this.sheet().columns[col];
+    if (typeof value !== "number" || !column) return String(value ?? "");
+    return formatNumber(value, column.numberFormat, column.numberLocale);
+  }
+
+  private sheet() {
+    const sheet = this.grid.store.getWorkbook().sheets.find((candidate) => candidate.id === SHEET);
+    if (!sheet) throw new Error("benchmark sheet is missing");
+    return sheet;
   }
 
   measureUnresizedMillionRowGeometry(): GeometryObservation {
