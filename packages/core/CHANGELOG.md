@@ -1,5 +1,12 @@
 # @sheetwrite/core
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [5bdff6a]
+  - @sheetwrite/wasm@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
