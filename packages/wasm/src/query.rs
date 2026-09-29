@@ -21,6 +21,41 @@ enum DistinctKey<'a> {
     Text(&'a str),
 }
 
+/// Bits per word in [`PoolIdStamps`].
+const STAMP_WORD_BITS: usize = 64;
+/// Words in a fresh [`PoolIdStamps`]; growth doubles from here.
+const STAMP_WORDS_INITIAL: usize = 64;
+
+/// One bit per string-pool id, so text that is already dictionary-encoded
+/// dedupes without hashing or comparing a single character.
+///
+/// Words are zero-filled when the marks grow, and capacity doubles, so a column
+/// whose ids span the whole pool allocates O(log ids) times and never exceeds
+/// twice the words its highest id needs.
+struct PoolIdStamps {
+    words: Vec<u64>,
+}
+
+impl PoolIdStamps {
+    fn new() -> Self {
+        Self { words: Vec::new() }
+    }
+
+    /// Marks `id` and reports whether it had not been marked before.
+    fn insert(&mut self, id: u32) -> bool {
+        let index = id as usize;
+        let word = index / STAMP_WORD_BITS;
+        if word >= self.words.len() {
+            let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
+            self.words.resize(doubled.max(word + 1), 0);
+        }
+        let mask = 1u64 << (index % STAMP_WORD_BITS);
+        let fresh = self.words[word] & mask == 0;
+        self.words[word] |= mask;
+        fresh
+    }
+}
+
 thread_local! {
     static QUERY_STATS: Cell<[u64; 2]> = const { Cell::new([0, 0]) };
 }
@@ -535,47 +570,70 @@ impl CellStore {
         if col >= data.n_cols {
             return out;
         }
-        let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
-        for row in 0..data.row_count {
-            let index = col * data.row_count + row;
-            let kind = resolved_kind(data, index);
-            let text = if kind == 2 {
-                resolved_text(data, &self.strings, index).unwrap_or("")
-            } else {
-                ""
-            };
-            let key = match kind {
-                1 => DistinctKey::Number(numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
-                2 => DistinctKey::Text(text),
-                3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
-                _ => DistinctKey::Blank,
-            };
-            if !seen.insert(key) {
-                continue;
+        let text_at = |index: usize| resolved_text(data, &self.strings, index).unwrap_or("");
+        // Stored text carries a pool id that stands for its value, so the scan
+        // dedupes it through one bit per id instead of hashing the characters.
+        // Text without an id — the sentinel a formula error reports reads back as
+        // plain text — still has to meet pooled text by content, so the first
+        // such cell restarts the scan on content hashing. The restart is rare and
+        // keeps equal text a single entry, in first-seen order, either way.
+        let mut pooled = true;
+        loop {
+            out = DistinctColumn::default();
+            let mut stamps = PoolIdStamps::new();
+            let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+            let mut needs_content = false;
+            for row in 0..data.row_count {
+                let index = col * data.row_count + row;
+                let kind = resolved_kind(data, index);
+                let fresh = match kind {
+                    1 => seen.insert(DistinctKey::Number(
+                        numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
+                    )),
+                    2 if pooled => match data.str_id_at(index) {
+                        NO_STRING => {
+                            needs_content = true;
+                            break;
+                        }
+                        id => stamps.insert(id),
+                    },
+                    2 => seen.insert(DistinctKey::Text(text_at(index))),
+                    3 => seen.insert(DistinctKey::Bool(
+                        boolean_cell_value(data, index).unwrap_or(false),
+                    )),
+                    _ => seen.insert(DistinctKey::Blank),
+                };
+                if !fresh {
+                    continue;
+                }
+                out.kinds.push(kind);
+                if kind == 1 {
+                    out.numbers
+                        .push(numeric_cell_value(data, index).unwrap_or(0.0));
+                } else if kind == 3 {
+                    out.numbers
+                        .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                            1.0
+                        } else {
+                            0.0
+                        });
+                } else if kind == 2 {
+                    out.texts.push(text_at(index).to_owned());
+                }
+                if limit != 0 && out.kinds.len() >= limit {
+                    break;
+                }
             }
-            out.kinds.push(kind);
-            if kind == 1 {
-                out.numbers
-                    .push(numeric_cell_value(data, index).unwrap_or(0.0));
-            } else if kind == 3 {
-                out.numbers
-                    .push(if boolean_cell_value(data, index).unwrap_or(false) {
-                        1.0
-                    } else {
-                        0.0
-                    });
-            } else if kind == 2 {
-                out.texts.push(text.to_owned());
-                QUERY_STATS.with(|stats| {
-                    let mut current = stats.get();
-                    current[1] = current[1].saturating_add(1);
-                    stats.set(current);
-                });
-            }
-            if limit != 0 && out.kinds.len() >= limit {
+            if !needs_content {
                 break;
             }
+            pooled = false;
         }
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[1] = current[1].saturating_add(out.texts.len() as u64);
+            stats.set(current);
+        });
         out
     }
 
@@ -606,6 +664,55 @@ impl CellStore {
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
     }
+}
+
+/// Distinct scan that keys every value by content, hashing strings. The pool-id
+/// path replaced it; the randomized equivalence test compares the two.
+#[cfg(test)]
+pub(crate) fn distinct_values_by_content(
+    strings: &StringPool,
+    data: &SheetData,
+    col: usize,
+    limit: usize,
+) -> DistinctColumn {
+    let mut out = DistinctColumn::default();
+    let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+    for row in 0..data.row_count {
+        let index = col * data.row_count + row;
+        let kind = resolved_kind(data, index);
+        let text = if kind == 2 {
+            resolved_text(data, strings, index).unwrap_or("")
+        } else {
+            ""
+        };
+        let key = match kind {
+            1 => DistinctKey::Number(numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
+            2 => DistinctKey::Text(text),
+            3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
+            _ => DistinctKey::Blank,
+        };
+        if !seen.insert(key) {
+            continue;
+        }
+        out.kinds.push(kind);
+        if kind == 1 {
+            out.numbers
+                .push(numeric_cell_value(data, index).unwrap_or(0.0));
+        } else if kind == 3 {
+            out.numbers
+                .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                    1.0
+                } else {
+                    0.0
+                });
+        } else if kind == 2 {
+            out.texts.push(text.to_owned());
+        }
+        if limit != 0 && out.kinds.len() >= limit {
+            break;
+        }
+    }
+    out
 }
 
 fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {

@@ -1559,6 +1559,92 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }
 
+/// Fixed-seed generator for a mixed-type column: repeated pooled text, numbers
+/// (including `-0.0` and `NaN`), booleans, blanks, an error formula and a text
+/// formula, so every branch of the distinct scan runs on both paths.
+fn fill_mixed_query_column(store: &mut CellStore, sheet: usize, col: usize, rows: usize, seed: &mut u64) {
+    const TEXTS: [&str; 4] = ["Alpha", "Beta", "Gamma", ""];
+    for row in 0..rows {
+        *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        match (*seed >> 32) % 12 {
+            0..=3 => {
+                *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+                let text = TEXTS[((*seed >> 32) % TEXTS.len() as u64) as usize];
+                store.set_string(sheet, row, col, text, 0);
+            }
+            4 => store.set_number(sheet, row, col, 1.5, 0),
+            5 => store.set_number(sheet, row, col, -0.0, 0),
+            6 => store.set_number(sheet, row, col, 0.0, 0),
+            7 => store.set_number(sheet, row, col, f64::NAN, 0),
+            8 => store.set_bool(sheet, row, col, (*seed >> 32) % 2 == 0, 0),
+            9 => {}
+            10 => {
+                store.set_formula(sheet, row, col, "=1/0", 0);
+            }
+            _ => {
+                store.set_formula(sheet, row, col, "=\"Alpha\"", 0);
+            }
+        }
+    }
+    store.recompute(sheet);
+}
+
+/// Bit-exact comparison of the pool-id scan against the content-hashing scan.
+fn assert_distinct_matches_content_scan(store: &CellStore, sheet: usize, col: usize, limit: usize) {
+    let mut pool_id_scan = store.distinct_values(sheet, col, limit);
+    let mut content_scan =
+        crate::query::distinct_values_by_content(&store.strings, &store.sheets[sheet], col, limit);
+    let bits = |values: Vec<f64>| values.into_iter().map(f64::to_bits).collect::<Vec<_>>();
+    assert_eq!(
+        pool_id_scan.take_kinds(),
+        content_scan.take_kinds(),
+        "kinds differ at limit {limit}"
+    );
+    assert_eq!(
+        bits(pool_id_scan.take_numbers()),
+        bits(content_scan.take_numbers()),
+        "numbers differ at limit {limit}"
+    );
+    assert_eq!(
+        pool_id_scan.take_texts(),
+        content_scan.take_texts(),
+        "texts differ at limit {limit}"
+    );
+}
+
+#[test]
+fn distinct_values_match_the_content_scan_on_random_mixed_columns() {
+    let mut seed = 0x5EED_1234_ABCD_0001u64;
+    for _ in 0..8 {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 512);
+        fill_mixed_query_column(&mut store, sheet, 0, 512, &mut seed);
+        for limit in [0usize, 1, 7, 64, 4096] {
+            assert_distinct_matches_content_scan(&store, sheet, 0, limit);
+        }
+    }
+}
+
+#[test]
+fn distinct_values_keep_first_seen_order_across_pooled_text_numbers_and_errors() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 8);
+    store.set_string(sheet, 0, 0, "Beta", 0);
+    store.set_string(sheet, 1, 0, "Alpha", 0);
+    store.set_number(sheet, 2, 0, 2.0, 0);
+    store.set_string(sheet, 3, 0, "Beta", 0);
+    store.set_number(sheet, 4, 0, 2.0, 0);
+    store.set_bool(sheet, 5, 0, true, 0);
+    store.set_formula(sheet, 6, 0, "=1/0", 0);
+    store.set_string(sheet, 7, 0, "Alpha", 0);
+    store.recompute(sheet);
+
+    let mut column = store.distinct_values(sheet, 0, 0);
+    assert_eq!(column.take_kinds(), vec![2, 2, 1, 3, 2]);
+    assert_eq!(column.take_numbers(), vec![2.0, 1.0]);
+    assert_eq!(column.take_texts(), vec!["Beta", "Alpha", "#DIV/0!"]);
+}
+
 #[test]
 fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let mut store = CellStore::new();
