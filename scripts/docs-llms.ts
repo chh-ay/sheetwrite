@@ -150,7 +150,7 @@ function absoluteUrl(url: string): string {
 
 function unquote(value: string): string {
   const match = /^(["'])(.*)\1$/.exec(value);
-  return match === null ? value : match[2];
+  return match?.[2] ?? value;
 }
 
 function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; body: string } {
@@ -160,7 +160,9 @@ function parseFrontmatter(source: string): { data: ReadonlyMap<string, string>; 
   const data = new Map<string, string>();
   for (const line of source.slice(4, end).split("\n")) {
     const match = /^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/.exec(line);
-    if (match !== null) data.set(match[1], unquote(match[2].trim()));
+    if (match === null) continue;
+    const [, key, rawValue] = match;
+    if (key !== undefined && rawValue !== undefined) data.set(key, unquote(rawValue.trim()));
   }
   return { data, body: source.slice(end + 4).replace(/^\n/, "") };
 }
@@ -482,14 +484,23 @@ function convertDocumentBody(body: string): string {
         output.push(convertProseLine(line));
         continue;
       }
-      fence = match[1];
-      const language = match[2].trim().split(/\s+/)[0] ?? "";
-      output.push(`${match[1]}${LANGUAGE_PATTERN.test(language) ? language : ""}`);
+      const [, opener, info] = match;
+      if (opener === undefined) throw new Error("Fence line is missing its marker");
+      fence = opener;
+      const language = info?.trim().split(/\s+/)[0] ?? "";
+      output.push(`${opener}${LANGUAGE_PATTERN.test(language) ? language : ""}`);
       continue;
     }
-    if (match?.[1].startsWith(fence[0]) && match[2].trim() === "") {
+    const closer = match?.[1];
+    const closerInfo = match?.[2];
+    if (
+      closer !== undefined &&
+      closerInfo !== undefined &&
+      closer.startsWith(fence.charAt(0)) &&
+      closerInfo.trim() === ""
+    ) {
       fence = undefined;
-      output.push(match[1]);
+      output.push(closer);
       continue;
     }
     output.push(line);
