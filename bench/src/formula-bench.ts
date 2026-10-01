@@ -223,12 +223,10 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "error-propagation", size: 1_000 }),
     formulaWorkloadKey({ id: "criteria-range-edit", size: range }),
     formulaWorkloadKey({ id: "lookup-range-edit", size: range }),
-    formulaWorkloadKey({ id: "vlookup-many", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "vlookup-many-sorted", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "xlookup-many", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "xlookup-many-sorted", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "text-lookup-many", size: lookupFormulas }),
-    formulaWorkloadKey({ id: "text-lookup-many-sorted", size: lookupFormulas }),
+    ...LOOKUP_VARIANTS.flatMap((variant) => [
+      formulaWorkloadKey({ id: variant.id, size: lookupFormulas }),
+      formulaWorkloadKey({ id: `${variant.id}${LOOKUP_EDIT_SUFFIX}`, size: lookupFormulas }),
+    ]),
     formulaWorkloadKey({ id: "spill-filter-resize", size: range }),
     formulaWorkloadKey({ id: "sumproduct-vector-edit", size: range }),
     formulaWorkloadKey({ id: "sumproduct-matrix-edit", size: range }),
@@ -250,11 +248,17 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "formula-constant-edit",
   "vlookup-many",
+  "vlookup-many-edit",
   "vlookup-many-sorted",
+  "vlookup-many-sorted-edit",
   "xlookup-many",
+  "xlookup-many-edit",
   "xlookup-many-sorted",
+  "xlookup-many-sorted-edit",
   "text-lookup-many",
+  "text-lookup-many-edit",
   "text-lookup-many-sorted",
+  "text-lookup-many-sorted-edit",
   "sum-multi-range",
   "sumifs-3-criteria",
   "countif-100k",
@@ -294,6 +298,8 @@ function diamondOutput(levels: number): number {
 }
 
 export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
+  const lookup = lookupVariantOutput(id);
+  if (lookup !== undefined) return lookup;
   switch (id) {
     case "independent-parse-load":
     case "independent-first-recompute":
@@ -328,16 +334,6 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return size - Math.floor(size / 2) + 1;
     case "lookup-range-edit":
       return (size - 1) * 2;
-    case "vlookup-many":
-    case "xlookup-many":
-      return `${NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR}:${NUMERIC_LOOKUP_EDITED_KEY}`;
-    case "vlookup-many-sorted":
-    case "xlookup-many-sorted":
-      return `${Math.floor(NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY) * LOOKUP_RESULT_FACTOR}:${NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY}`;
-    case "text-lookup-many":
-      return `${(TEXT_LOOKUP_EDITED_ROW + 1) * LOOKUP_RESULT_FACTOR}:${textLookupQueryKey(TEXT_LOOKUP_EDITED_ROW)}`;
-    case "text-lookup-many-sorted":
-      return `${(TEXT_LOOKUP_APPROXIMATE_ROW + 1) * LOOKUP_RESULT_FACTOR}:${textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_ROW)}`;
     case "spill-filter-resize":
       return `${size - 1}:0`;
     case "sumproduct-vector-edit":
@@ -347,7 +343,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "criteria-multi-range-edit":
       return size * 0.75 - 1;
     case "sum-multi-range":
-      return (size * (size - 1)) / 2 + size * SUM_MULTI_RANGE_FILL;
+      // Compared as text: the relative tolerance would hide a small error in a 5-billion total.
+      return `${(size * (size - 1)) / 2 + size * SUM_MULTI_RANGE_FILL}`;
     case "sumifs-3-criteria":
       return sumifsCriteriaTotal(size);
     case "countif-100k":
@@ -853,7 +850,7 @@ const TEXT_LOOKUP_EDITED_ROW = 37;
 const TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW = 11;
 const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
 
-/** Ascending key column plus a result column that scales with the key. */
+/** Ascending numeric key column plus a result column that scales with the key. */
 function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
@@ -874,33 +871,6 @@ function lookupTableStore(tableRows: number): { store: CellStore; sheet: number 
   return { store, sheet };
 }
 
-/**
- * One shared key cell in C1 drives every lookup formula. Each timed sample covers the first
- * recalculation of all lookup formulas and then one key edit with its recalculation.
- */
-function lookupManyFixture(
-  count: number,
-  formula: (tableRows: number) => string,
-  initialKey: number,
-  editedKey: number,
-): TimedFixture {
-  const tableRows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
-  const { store, sheet } = lookupTableStore(tableRows);
-  store.setNumber(sheet, 0, 2, initialKey, 0);
-  const source = formula(tableRows);
-  for (let row = 0; row < count; row++) store.setFormula(sheet, row, 3, source, 0);
-  return {
-    store,
-    run: () => {
-      store.recompute(sheet);
-      store.setNumber(sheet, 0, 2, editedKey, 0);
-      store.recompute(sheet);
-    },
-    check: () => `${numberAt(store, sheet, count - 1, 3)}:${numberAt(store, sheet, 0, 2)}`,
-    dispose: () => store.free(),
-  };
-}
-
 /** Zero-padded text keys stay ascending under the case-insensitive lookup comparison. */
 function textLookupKeyAt(row: number): string {
   return `${TEXT_LOOKUP_KEY_PREFIX}${String(row).padStart(TEXT_LOOKUP_KEY_PADDING, "0")}`;
@@ -916,13 +886,8 @@ function textLookupBetweenQueryKey(row: number): string {
   return `${textLookupQueryKey(row)}5`;
 }
 
-function textLookupFixture(
-  count: number,
-  formula: (tableRows: number) => string,
-  initialKey: string,
-  editedKey: string,
-): TimedFixture {
-  const tableRows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
+/** Ascending text key column plus the same result column as the numeric table. */
+function textLookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
   for (let row = 0; row < tableRows; row++) {
@@ -935,17 +900,131 @@ function textLookupFixture(
     numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
     0,
   );
-  store.setString(sheet, 0, 2, initialKey, 0);
-  const source = formula(tableRows);
+  return { store, sheet };
+}
+
+/** The shared key cell takes a number for numeric tables and text for text tables. */
+function writeLookupKey(store: CellStore, sheet: number, key: number | string): void {
+  if (typeof key === "number") store.setNumber(sheet, 0, 2, key, 0);
+  else store.setString(sheet, 0, 2, key, 0);
+}
+
+interface LookupVariant {
+  readonly id: string;
+  readonly table: (tableRows: number) => { store: CellStore; sheet: number };
+  readonly formula: (tableRows: number) => string;
+  readonly initialKey: number | string;
+  readonly editedKey: number | string;
+  readonly initialValue: number;
+  readonly editedValue: number;
+}
+
+/** Each lookup function runs once as a first-recalculation workload and once as a key-edit one. */
+const LOOKUP_EDIT_SUFFIX = "-edit";
+
+const LOOKUP_VARIANTS: readonly LookupVariant[] = [
+  {
+    id: "vlookup-many",
+    table: lookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "vlookup-many-sorted",
+    table: lookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
+    initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
+    initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
+    editedValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "xlookup-many",
+    table: lookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "xlookup-many-sorted",
+    table: lookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows},,-1,2)`,
+    initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
+    initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
+    editedValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "text-lookup-many",
+    table: textLookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    initialKey: textLookupQueryKey(TEXT_LOOKUP_INITIAL_ROW),
+    editedKey: textLookupQueryKey(TEXT_LOOKUP_EDITED_ROW),
+    initialValue: (TEXT_LOOKUP_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
+    editedValue: (TEXT_LOOKUP_EDITED_ROW + 1) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "text-lookup-many-sorted",
+    table: textLookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
+    initialKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW),
+    editedKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_ROW),
+    initialValue: (TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
+    editedValue: (TEXT_LOOKUP_APPROXIMATE_ROW + 1) * LOOKUP_RESULT_FACTOR,
+  },
+];
+
+/** Every lookup workload reports the shared result plus the key its formulas were last queried with. */
+function lookupVariantOutput(id: string): FormulaOutput | undefined {
+  const editsKey = id.endsWith(LOOKUP_EDIT_SUFFIX);
+  const baseId = editsKey ? id.slice(0, -LOOKUP_EDIT_SUFFIX.length) : id;
+  const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === baseId);
+  if (variant === undefined) return undefined;
+  return editsKey
+    ? `${variant.editedValue}:${variant.editedKey}`
+    : `${variant.initialValue}:${variant.initialKey}`;
+}
+
+/** The two timed units of a lookup workload; each one has its own workload id. */
+type LookupPhase = "first-recompute" | "key-edit";
+
+/**
+ * One shared key cell in C1 drives every lookup formula. The timed unit is either the first
+ * recalculation of all formulas or one key edit with its recalculation; afterwards every formula
+ * is read outside the timed interval and compared with the value computed here.
+ */
+function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant): TimedFixture {
+  const tableRows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
+  const { store, sheet } = variant.table(tableRows);
+  writeLookupKey(store, sheet, variant.initialKey);
+  const source = variant.formula(tableRows);
   for (let row = 0; row < count; row++) store.setFormula(sheet, row, 3, source, 0);
+  const editsKey = phase === "key-edit";
+  const expectedValue = editsKey ? variant.editedValue : variant.initialValue;
+  const expectedKey = editsKey ? variant.editedKey : variant.initialKey;
+  // The edit phase starts from computed values, so its timed unit is the key edit alone.
+  if (editsKey) store.recompute(sheet);
   return {
     store,
     run: () => {
-      store.recompute(sheet);
-      store.setString(sheet, 0, 2, editedKey, 0);
+      if (editsKey) writeLookupKey(store, sheet, variant.editedKey);
       store.recompute(sheet);
     },
-    check: () => `${numberAt(store, sheet, count - 1, 3)}:${textAt(store, sheet, 0, 2)}`,
+    check: () => {
+      for (let row = 0; row < count; row++) {
+        const value = numberAt(store, sheet, row, 3);
+        assert(
+          value === expectedValue,
+          `${variant.id} row ${row} expected ${expectedValue}, observed ${value}`,
+        );
+      }
+      return `${expectedValue}:${expectedKey}`;
+    },
     dispose: () => store.free(),
   };
 }
@@ -1122,7 +1201,7 @@ function sumMultiRangeFixture(count: number): TimedFixture {
   return {
     store,
     run: () => store.recompute(sheet),
-    check: () => numberAt(store, sheet, 0, 2),
+    check: () => `${numberAt(store, sheet, 0, 2)}`,
     dispose: () => store.free(),
   };
 }
@@ -1408,78 +1487,24 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
     collectFixture("error-propagation", 1_000, () => errorPropagationFixture(1_000), samples),
     collectFixture("criteria-range-edit", range, () => criteriaRangeFixture(range), samples),
     collectFixture("lookup-range-edit", range, () => lookupRangeFixture(range), samples),
-    collectFixture(
-      "vlookup-many",
-      lookupFormulas,
-      () =>
-        lookupManyFixture(
-          lookupFormulas,
-          (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
-          NUMERIC_LOOKUP_INITIAL_KEY,
-          NUMERIC_LOOKUP_EDITED_KEY,
-        ),
-      samples,
-    ),
-    collectFixture(
-      "vlookup-many-sorted",
-      lookupFormulas,
-      () =>
-        lookupManyFixture(
-          lookupFormulas,
-          (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
-          NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
-          NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
-        ),
-      samples,
-    ),
-    collectFixture(
-      "xlookup-many",
-      lookupFormulas,
-      () =>
-        lookupManyFixture(
-          lookupFormulas,
-          (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
-          NUMERIC_LOOKUP_INITIAL_KEY,
-          NUMERIC_LOOKUP_EDITED_KEY,
-        ),
-      samples,
-    ),
-    collectFixture(
-      "xlookup-many-sorted",
-      lookupFormulas,
-      () =>
-        lookupManyFixture(
-          lookupFormulas,
-          (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows},,-1,2)`,
-          NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
-          NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
-        ),
-      samples,
-    ),
-    collectFixture(
-      "text-lookup-many",
-      lookupFormulas,
-      () =>
-        textLookupFixture(
-          lookupFormulas,
-          (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
-          textLookupQueryKey(TEXT_LOOKUP_INITIAL_ROW),
-          textLookupQueryKey(TEXT_LOOKUP_EDITED_ROW),
-        ),
-      samples,
-    ),
-    collectFixture(
-      "text-lookup-many-sorted",
-      lookupFormulas,
-      () =>
-        textLookupFixture(
-          lookupFormulas,
-          (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
-          textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW),
-          textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_ROW),
-        ),
-      samples,
-    ),
+  );
+  for (const variant of LOOKUP_VARIANTS) {
+    results.push(
+      collectFixture(
+        variant.id,
+        lookupFormulas,
+        () => lookupFixture(lookupFormulas, "first-recompute", variant),
+        samples,
+      ),
+      collectFixture(
+        `${variant.id}${LOOKUP_EDIT_SUFFIX}`,
+        lookupFormulas,
+        () => lookupFixture(lookupFormulas, "key-edit", variant),
+        samples,
+      ),
+    );
+  }
+  results.push(
     collectFixture("spill-filter-resize", range, () => spillFilterResizeFixture(range), samples),
     collectFixture("sumproduct-vector-edit", range, () => sumProductVectorFixture(range), samples),
     collectFixture("sumproduct-matrix-edit", range, () => sumProductMatrixFixture(range), samples),
@@ -1592,23 +1617,44 @@ function currentFormulaSourceProvenance(commit: string): FormulaSourceProvenance
   };
 }
 
-function runnerCommand(mode: BenchmarkMode, capture: FormulaCaptureKind): string[] {
+function runnerCommand(
+  mode: BenchmarkMode,
+  capture: FormulaCaptureKind,
+  outputPath?: string,
+): string[] {
   return [
     "bun",
     "run",
     "src/formula-bench.ts",
     ...(mode === "smoke" ? ["--smoke"] : []),
     ...(capture === "preliminary" ? ["--preliminary"] : []),
-    ...(capture === "output" ? ["--output"] : []),
+    ...(capture === "output" && outputPath !== undefined ? ["--output", outputPath] : []),
   ];
+}
+
+/** An output capture records the path it was written to, so validation checks its shape. */
+function runnerCommandMatches(
+  mode: BenchmarkMode,
+  capture: FormulaCaptureKind,
+  command: readonly string[],
+): boolean {
+  if (capture !== "output") {
+    return JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture));
+  }
+  const outputPath = command.at(-1) ?? "";
+  return (
+    outputPath.length > 0 &&
+    JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture, outputPath))
+  );
 }
 
 function currentRunnerProvenance(
   mode: BenchmarkMode,
   capture: FormulaCaptureKind,
+  outputPath?: string,
 ): FormulaRunnerProvenance {
   return {
-    command: runnerCommand(mode, capture),
+    command: runnerCommand(mode, capture, outputPath),
     bun: Bun.version,
     node: process.versions.node,
     platform: process.platform,
@@ -1706,7 +1752,7 @@ function validateProvenance(
   if (
     !Array.isArray(result.runner.command) ||
     result.runner.command.some((part) => typeof part !== "string") ||
-    JSON.stringify(result.runner.command) !== JSON.stringify(runnerCommand(result.mode, capture))
+    !runnerCommandMatches(result.mode, capture, result.runner.command)
   ) {
     throw new Error("formula runner provenance.command does not match the declared capture mode");
   }
@@ -2202,12 +2248,13 @@ export function validateFormulaCapture(
 function validateCurrentCaptureProvenance(
   result: CompleteFormulaBenchmarkResult,
   capture: FormulaCaptureKind,
+  outputPath?: string,
 ): void {
   const currentSource = currentFormulaSourceProvenance(result.meta.commit);
   if (JSON.stringify(result.source) !== JSON.stringify(currentSource)) {
     throw new Error("formula capture source provenance does not match current source bytes");
   }
-  const currentRunner = currentRunnerProvenance(result.mode, capture);
+  const currentRunner = currentRunnerProvenance(result.mode, capture, outputPath);
   if (JSON.stringify(result.runner) !== JSON.stringify(currentRunner)) {
     throw new Error("formula capture runner provenance does not match the current runner");
   }
@@ -2254,6 +2301,9 @@ async function runBenchmark(
   captureKind: FormulaCaptureKind,
   outputPath?: string,
 ): Promise<void> {
+  if (captureKind === "output" && outputPath === undefined) {
+    throw new Error("an output capture requires a path");
+  }
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
   if (captureKind === "gated") {
@@ -2307,7 +2357,7 @@ async function runBenchmark(
       arch: process.arch,
       ...capture,
     },
-    runner: currentRunnerProvenance(mode, captureKind),
+    runner: currentRunnerProvenance(mode, captureKind, outputPath),
     source: currentFormulaSourceProvenance(capture.commit),
     methodology: {
       warmupSamples: 1,
@@ -2325,7 +2375,7 @@ async function runBenchmark(
       regression,
     },
   };
-  validateCurrentCaptureProvenance(result, captureKind);
+  validateCurrentCaptureProvenance(result, captureKind, outputPath);
   validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   if (outputPath !== undefined) {
