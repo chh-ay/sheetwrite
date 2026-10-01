@@ -163,7 +163,8 @@ const QUERY_LABELS: Record<QueryScenario, string> = {
  * changes the seeded rows; everything else reads the shared seeded dataset.
  */
 export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
-  "sort-multi-key": "grouped-customer-v1 (97 repeated customer keys over the seeded rows)",
+  "sort-multi-key":
+    "grouped-customer-v2 (97 repeated customers, 8 amount buckets, dates reversed against row order)",
   "sort-with-candidates": "seeded-dataset-v1",
   "filter-value-set-10": "seeded-dataset-v1",
   "filter-value-set-1000": "seeded-dataset-v1",
@@ -207,6 +208,14 @@ const CANDIDATE_CHECK_COLS: readonly number[] = [COL.amount, COL.city];
  * second and third sort keys decide the order inside every group.
  */
 const MULTI_KEY_GROUP_COUNT = 97;
+/** Amount buckets inside each customer group: ties reach the third key. */
+const MULTI_KEY_AMOUNT_BUCKETS = 8;
+/** Step between amount buckets; the fixture only needs distinct ordered keys. */
+const MULTI_KEY_AMOUNT_STEP = 12.5;
+/** Days the fixture date cycles through, like the seeded day pool. */
+const MULTI_KEY_DAY_COUNT = 1_000;
+const MULTI_KEY_DAY_EPOCH_UTC = Date.UTC(2020, 0, 1);
+const MULTI_KEY_DAY_MS = 86_400_000;
 /** Digits the grouped customer key pads to, matching the seeded customer text. */
 const CUSTOMER_KEY_DIGITS = 6;
 /** Rows per window when a check walks a whole view outside timing. */
@@ -561,28 +570,50 @@ function makeNumericIngestData(rowCount: number): ColumnarData {
 }
 
 /**
- * The seeded rows with a repeating customer key. Only the customer column
- * changes, so a multi-key sort must fall through to the amount and date keys
- * inside each group; every other scenario keeps the shared seeded dataset with
- * its unique customers.
+ * Columns of the multi-key sort fixture. Every key is derived from the row
+ * index, so all of them decide part of the order at every sheet size:
+ * customers repeat every 97 rows, the amount cycles through 8 buckets inside a
+ * customer group, and the date runs opposite to row order (so a comparator that
+ * skips the date key cannot score the same order). The shared seeded dataset is
+ * never changed; `id` and `city` stay seeded.
  */
-function groupedCustomerColumn(ds: ColumnarDataset): string[] {
-  const customer = new Array<string>(ds.rowCount);
-  for (let row = 0; row < ds.rowCount; row++) {
-    const group = (row % MULTI_KEY_GROUP_COUNT) + 1;
-    customer[row] = `Customer ${String(group).padStart(CUSTOMER_KEY_DIGITS, "0")}`;
-  }
-  return customer;
+interface GroupedCustomerFixture {
+  readonly customer: string[];
+  readonly amount: Float64Array;
+  readonly date: string[];
 }
 
-/** Store over the grouped-customer fixture, with the seeded id/date/city/amount. */
+function makeGroupedCustomerFixture(rowCount: number): GroupedCustomerFixture {
+  const customer = new Array<string>(rowCount);
+  const amount = new Float64Array(rowCount);
+  const date = new Array<string>(rowCount);
+  for (let row = 0; row < rowCount; row++) {
+    const occurrence = Math.floor(row / MULTI_KEY_GROUP_COUNT);
+    const group = (row % MULTI_KEY_GROUP_COUNT) + 1;
+    customer[row] = `Customer ${String(group).padStart(CUSTOMER_KEY_DIGITS, "0")}`;
+    amount[row] = ((occurrence % MULTI_KEY_AMOUNT_BUCKETS) + 1) * MULTI_KEY_AMOUNT_STEP;
+    const day = MULTI_KEY_DAY_COUNT - 1 - (occurrence % MULTI_KEY_DAY_COUNT);
+    date[row] = new Date(MULTI_KEY_DAY_EPOCH_UTC + day * MULTI_KEY_DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+  }
+  return { customer, amount, date };
+}
+
+/** Store over the grouped-customer fixture, with the seeded id and city. */
 function makeGroupedCustomerStore(
   ds: ColumnarDataset,
-  customer: readonly string[],
+  fixture: GroupedCustomerFixture,
 ): SheetwriteStore {
   return new SheetwriteStore(makeWorkbook(ds.rowCount), {
     rowCount: ds.rowCount,
-    columns: { id: ds.id, date: ds.date, customer, city: ds.city, amount: ds.amount },
+    columns: {
+      id: ds.id,
+      date: fixture.date,
+      customer: fixture.customer,
+      city: ds.city,
+      amount: fixture.amount,
+    },
   });
 }
 
@@ -766,8 +797,8 @@ function benchSheetwrite(
   if (measures("sort-multi-key")) {
     // The seeded rows have unique customers, so their order never reaches the
     // second sort key. The grouped fixture repeats the leading key on purpose.
-    const groupedCustomer = groupedCustomerColumn(ds);
-    const groupedStore = makeGroupedCustomerStore(ds, groupedCustomer);
+    const fixture = makeGroupedCustomerFixture(rows);
+    const groupedStore = makeGroupedCustomerStore(ds, fixture);
     queries["sort-multi-key"] = measure(() => groupedStore.sortByMulti(SHEET, MULTI_KEY_SORT), {
       ...plan("sort-multi-key", rows),
       after: () => groupedStore.sortByMulti(SHEET, []),
@@ -777,8 +808,8 @@ function benchSheetwrite(
       `sort-multi-key ${rows}`,
       groupedStore,
       MULTI_KEY_VIEW_COLS,
-      expectedGroupedSortOrder(ds, groupedCustomer),
-      groupedRowSource(ds, groupedCustomer),
+      expectedGroupedSortOrder(ds, fixture),
+      groupedRowSource(ds, fixture),
     );
     groupedStore.dispose();
   }
@@ -872,11 +903,21 @@ function seededRowSource(ds: ColumnarDataset): RowSource {
   };
 }
 
-/** Seeded rows with the customer column replaced by the grouped fixture keys. */
-function groupedRowSource(ds: ColumnarDataset, customer: readonly string[]): RowSource {
+/** Seeded rows with the fixture's customer, amount and date columns. */
+function groupedRowSource(ds: ColumnarDataset, fixture: GroupedCustomerFixture): RowSource {
   const seeded = seededRowSource(ds);
-  return (column, dataRow) =>
-    column === COL.customer ? (customer[dataRow] ?? null) : seeded(column, dataRow);
+  return (column, dataRow) => {
+    switch (column) {
+      case COL.customer:
+        return fixture.customer[dataRow] ?? null;
+      case COL.amount:
+        return fixture.amount[dataRow] ?? null;
+      case COL.date:
+        return fixture.date[dataRow] ?? null;
+      default:
+        return seeded(column, dataRow);
+    }
+  };
 }
 
 /**
@@ -884,17 +925,17 @@ function groupedRowSource(ds: ColumnarDataset, customer: readonly string[]): Row
  * by the engine under test: customer ascending, amount descending, date
  * ascending, then row id.
  */
-function expectedGroupedSortOrder(ds: ColumnarDataset, customer: readonly string[]): number[] {
+function expectedGroupedSortOrder(ds: ColumnarDataset, fixture: GroupedCustomerFixture): number[] {
   const rows = Array.from({ length: ds.rowCount }, (_, row) => row);
   rows.sort((left, right) => {
-    const leftCustomer = customer[left] ?? "";
-    const rightCustomer = customer[right] ?? "";
+    const leftCustomer = fixture.customer[left] ?? "";
+    const rightCustomer = fixture.customer[right] ?? "";
     if (leftCustomer !== rightCustomer) return leftCustomer < rightCustomer ? -1 : 1;
-    const leftAmount = ds.amount[left] ?? 0;
-    const rightAmount = ds.amount[right] ?? 0;
+    const leftAmount = fixture.amount[left] ?? 0;
+    const rightAmount = fixture.amount[right] ?? 0;
     if (leftAmount !== rightAmount) return rightAmount < leftAmount ? -1 : 1;
-    const leftDate = ds.date[left] ?? "";
-    const rightDate = ds.date[right] ?? "";
+    const leftDate = fixture.date[left] ?? "";
+    const rightDate = fixture.date[right] ?? "";
     if (leftDate !== rightDate) return leftDate < rightDate ? -1 : 1;
     return left - right;
   });
