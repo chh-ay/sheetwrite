@@ -2716,3 +2716,329 @@ mod formula_dependency_epoch {
         }
     }
 }
+
+/// Lookups that share a range reuse one decode; the reuse must not survive
+/// the recalculation, so an edit to the table has to show up.
+mod lookup_reuse {
+    use super::{assert_close, number};
+    use crate::CellStore;
+
+    #[test]
+    fn reused_lookups_notice_table_edits() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for row in 0..6 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+            store.set_number(sheet, row, 1, (row as f64 + 1.0) * 10.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=MATCH(4,A1:A6,0)", 0);
+        store.set_formula(sheet, 3, 2, "=XLOOKUP(4,A1:A6,B1:B6)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 40.0);
+        assert_close(number(&store, sheet, 1, 2), 40.0);
+        assert_close(number(&store, sheet, 2, 2), 4.0);
+        assert_close(number(&store, sheet, 3, 2), 40.0);
+
+        store.set_number(sheet, 3, 1, 400.0, 0);
+        store.set_number(sheet, 0, 0, 9.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 400.0);
+        assert_close(number(&store, sheet, 1, 2), 400.0);
+        assert_close(number(&store, sheet, 2, 2), 4.0);
+        assert_close(number(&store, sheet, 3, 2), 400.0);
+    }
+
+    /// A table that holds formulas changes during the pass, so it keeps the
+    /// plain materialization path and still answers with the fresh values.
+    #[test]
+    fn lookup_tables_holding_formulas_stay_correct() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for row in 0..6 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_number(sheet, 7, 7, 4.0, 0);
+        store.set_formula(sheet, 3, 1, "=H8*10", 0);
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 40.0);
+
+        store.set_number(sheet, 7, 7, 8.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 80.0);
+    }
+}
+
+/// Lookup results through the public formula surface: duplicates, sorted-mode
+/// validation, the blank/zero/empty/`FALSE` equivalences, case folding and
+/// error precedence.
+mod lookup_results {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn duplicates_and_sorted_modes_follow_the_lookup_rules() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for (row, (key, result)) in [
+            (1.0, 10.0),
+            (2.0, 20.0),
+            (2.0, 200.0),
+            (3.0, 30.0),
+            (4.0, 40.0),
+        ]
+        .iter()
+        .enumerate()
+        {
+            store.set_number(sheet, row, 0, *key, 0);
+            store.set_number(sheet, row, 1, *result, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(2,A1:B5,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(2.5,A1:B5,2,TRUE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(0,A1:B5,2,TRUE)", 0);
+        store.set_formula(sheet, 3, 2, "=MATCH(2,A1:A5,0)", 0);
+        store.set_formula(sheet, 4, 2, "=XMATCH(2,A1:A5,0,-1)", 0);
+        store.set_formula(sheet, 5, 2, "=XLOOKUP(2,A1:A5,B1:B5,,-1,-1)", 0);
+        store.set_formula(sheet, 6, 2, "=XLOOKUP(9,A1:A5,B1:B5,,0)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 20.0);
+        assert_close(number(&store, sheet, 1, 2), 20.0);
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#N/A"));
+        assert_close(number(&store, sheet, 3, 2), 2.0);
+        assert_close(number(&store, sheet, 4, 2), 3.0);
+        assert_close(number(&store, sheet, 5, 2), 200.0);
+        assert_eq!(string(&store, sheet, 6, 2).as_deref(), Some("#N/A"));
+    }
+
+    #[test]
+    fn sorted_lookup_modes_refuse_an_unsorted_key_column() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for (row, key) in [3.0, 1.0, 2.0, 4.0].iter().enumerate() {
+            store.set_number(sheet, row, 0, *key, 0);
+            store.set_number(sheet, row, 1, *key * 10.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(3,A1:B4,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(3,A1:B4,2,TRUE)", 0);
+        store.set_formula(sheet, 2, 2, "=MATCH(3,A1:A4,1)", 0);
+        store.set_formula(sheet, 3, 2, "=XLOOKUP(3,A1:A4,B1:B4,,0,2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 30.0);
+        assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("#N/A"));
+    }
+
+    #[test]
+    fn keys_compare_like_the_engine_for_blank_zero_empty_and_case() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 0.0, 0);
+        store.set_string(sheet, 2, 0, "", 0);
+        store.set_bool(sheet, 3, 0, false, 0);
+        store.set_string(sheet, 4, 0, "café", 0);
+        store.set_string(sheet, 5, 0, "Key", 0);
+        for row in 0..6 {
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(0,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(\"\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(FALSE,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 3, 2, "=VLOOKUP(\"CAFÉ\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 4, 2, "=VLOOKUP(\"key\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 5, 2, "=XMATCH(\"k*\",A1:A6,2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+        assert_close(number(&store, sheet, 1, 2), 2.0);
+        assert_close(number(&store, sheet, 2, 2), 2.0);
+        assert_close(number(&store, sheet, 3, 2), 5.0);
+        assert_close(number(&store, sheet, 4, 2), 6.0);
+        assert_close(number(&store, sheet, 5, 2), 6.0);
+    }
+
+    #[test]
+    fn lookup_error_cells_keep_their_precedence() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_formula(sheet, 1, 0, "=1/0", 0);
+        store.set_number(sheet, 2, 0, 3.0, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_number(sheet, 1, 1, 20.0, 0);
+        store.set_number(sheet, 2, 1, 30.0, 0);
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(1,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(3,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(99,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 3, 2, "=VLOOKUP(1,A1:B3,9,FALSE)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 10.0);
+        assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("#REF!"));
+    }
+}
+
+/// Reductions and criteria functions over their ranges, through the public
+/// formula surface: multi-range folds, matching rows and error precedence.
+mod streamed_reductions {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn multi_range_reductions_fold_every_argument() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 1, 0, 2.0, 0);
+        store.set_string(sheet, 2, 0, "text", 0);
+        store.set_bool(sheet, 3, 0, true, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_number(sheet, 1, 1, 20.0, 0);
+        store.set_number(sheet, 2, 1, 30.0, 0);
+        store.set_number(sheet, 3, 1, 40.0, 0);
+        store.set_formula(sheet, 0, 2, "=SUM(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 1, 2, "=AVERAGE(A1:A4)", 0);
+        store.set_formula(sheet, 2, 2, "=COUNT(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 3, 2, "=COUNTA(A1:A4)", 0);
+        store.set_formula(sheet, 4, 2, "=MIN(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 5, 2, "=MAX(A1:A4,B1:B4)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 103.0);
+        assert_close(number(&store, sheet, 1, 2), 1.5);
+        assert_close(number(&store, sheet, 2, 2), 6.0);
+        assert_close(number(&store, sheet, 3, 2), 4.0);
+        assert_close(number(&store, sheet, 4, 2), 1.0);
+        assert_close(number(&store, sheet, 5, 2), 40.0);
+    }
+
+    #[test]
+    fn streamed_reductions_keep_argument_error_order() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_formula(sheet, 1, 0, "=1/0", 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_formula(sheet, 1, 1, "=NA()", 0);
+        store.set_number(sheet, 0, 2, 5.0, 0);
+        store.set_formula(sheet, 0, 3, "=SUM(A1:A3,B1:B3)", 0);
+        store.set_formula(sheet, 1, 3, "=SUM(B1:B3,A1:A3)", 0);
+        store.set_formula(sheet, 2, 3, "=AVERAGE(A1:A3)", 0);
+        store.set_formula(sheet, 3, 3, "=COUNT(C1:C3)", 0);
+        store.set_formula(sheet, 4, 3, "=COUNTA(C1:C3)", 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 2, 3).as_deref(), Some("#DIV/0!"));
+        assert_close(number(&store, sheet, 3, 3), 1.0);
+        assert_close(number(&store, sheet, 4, 3), 1.0);
+    }
+
+    #[test]
+    fn criteria_functions_walk_matching_rows() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for row in 0..5 {
+            store.set_string(sheet, row, 0, ["a", "b", "a", "b", "a"][row], 0);
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+            store.set_number(sheet, row, 2, ((row + 1) * 10) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 3, "=COUNTIF(A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 1, 3, "=SUMIF(A1:A5,\"a\",B1:B5)", 0);
+        store.set_formula(sheet, 2, 3, "=SUMIFS(B1:B5,A1:A5,\"b\",C1:C5,\">20\")", 0);
+        store.set_formula(sheet, 3, 3, "=COUNTIFS(A1:A5,\"b\",B1:B5,\">1\")", 0);
+        store.set_formula(sheet, 4, 3, "=AVERAGEIF(A1:A5,\"b\",B1:B5)", 0);
+        store.set_formula(sheet, 5, 3, "=MAXIFS(B1:B5,A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 6, 3, "=MINIFS(B1:B5,A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 7, 3, "=SUMIF(A1:A5,\"z\",B1:B5)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 3), 3.0);
+        assert_close(number(&store, sheet, 1, 3), 9.0);
+        assert_close(number(&store, sheet, 2, 3), 4.0);
+        assert_close(number(&store, sheet, 3, 3), 2.0);
+        assert_close(number(&store, sheet, 4, 3), 3.0);
+        assert_close(number(&store, sheet, 5, 3), 5.0);
+        assert_close(number(&store, sheet, 6, 3), 1.0);
+        assert_close(number(&store, sheet, 7, 3), 0.0);
+    }
+
+    #[test]
+    fn criteria_wildcards_and_empty_matches_keep_their_results() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..4 {
+            store.set_string(sheet, row, 0, ["Key", "key", "Other", "Key"][row], 0);
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=COUNTIF(A1:A4,\"k*\")", 0);
+        store.set_formula(sheet, 1, 2, "=SUMIF(A1:A4,\"k?y\",B1:B4)", 0);
+        store.set_formula(sheet, 2, 2, "=AVERAGEIF(A1:A4,\"z\",B1:B4)", 0);
+        store.set_formula(sheet, 3, 2, "=MAXIFS(B1:B4,A1:A4,\"z\")", 0);
+        store.set_formula(sheet, 4, 2, "=COUNTIFS(A1:A4,\"k*\",B1:B4,\">1\")", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 3.0);
+        assert_close(number(&store, sheet, 1, 2), 1.0 + 2.0 + 4.0);
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#DIV/0!"));
+        assert_close(number(&store, sheet, 3, 2), 0.0);
+        assert_close(number(&store, sheet, 4, 2), 2.0);
+    }
+}
+
+/// LET bindings through the public formula surface: unused bindings stay
+/// unevaluated, errors and shadowing behave as before, and range and array
+/// bindings keep their value shape.
+mod let_bindings {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn unused_bindings_are_not_evaluated_and_used_errors_propagate() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1/0,5)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1/0,x+1)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,y,1/0,x+y)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 5.0);
+        assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#DIV/0!"));
+    }
+
+    #[test]
+    fn bindings_keep_shadowing_and_visibility_rules() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1,x,2,x+10)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1,y,x+1,x+y)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,LET(y,3,x*y))", 0);
+        store.set_formula(sheet, 3, 0, "=LET(x,2,LET(x,3,x*2))", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 12.0);
+        assert_close(number(&store, sheet, 1, 0), 3.0);
+        assert_close(number(&store, sheet, 2, 0), 6.0);
+        assert_close(number(&store, sheet, 3, 0), 6.0);
+    }
+
+    #[test]
+    fn range_and_array_bindings_keep_their_value_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=LET(x,A1:A3,SUM(x))", 0);
+        store.set_formula(sheet, 1, 1, "=LET(x,A1:A3,SUM(x)+SUM(x))", 0);
+        store.set_formula(sheet, 2, 1, "=LET(x,A1:A3,MATCH(2,x,0))", 0);
+        store.set_formula(sheet, 3, 1, "=LET(x,SEQUENCE(3),SUM(x))", 0);
+        store.set_formula(sheet, 0, 3, "=LET(x,SEQUENCE(3),x)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 1), 6.0);
+        assert_close(number(&store, sheet, 1, 1), 12.0);
+        assert_close(number(&store, sheet, 2, 1), 2.0);
+        assert_close(number(&store, sheet, 3, 1), 6.0);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_close(number(&store, sheet, 2, 3), 3.0);
+    }
+}

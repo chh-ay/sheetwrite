@@ -511,6 +511,15 @@ pub enum Ast {
     Neg(Box<Ast>),
     Pos(Box<Ast>),
     Percent(Box<Ast>),
+    /// One use of a LET binding in an expanded tree. `slot` identifies the
+    /// binding for the evaluation in progress, so its expression is evaluated
+    /// at most once however many uses the expansion has; `expression` stays
+    /// in the tree so dependency, volatility and array analysis of the
+    /// expansion still see the reads and the arrays.
+    LetSlot {
+        slot: u32,
+        expression: Box<Ast>,
+    },
 }
 impl Ast {
     /// Heap payload owned below an inline AST root. The root itself is already
@@ -551,6 +560,7 @@ impl Ast {
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 add_boxed_ast_memory(inner, out);
             }
+            Ast::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
             Ast::Num(_)
             | Ast::Bool(_)
             | Ast::Missing
@@ -1497,6 +1507,9 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
             }
             true
         }
+        Ast::LetSlot { expression, .. } => {
+            translate_relative_refs_inner(expression, row_delta, col_delta)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             if !translate_relative_refs_inner(left, row_delta, col_delta) {
                 **left = Ast::InvalidRef;
@@ -1881,6 +1894,7 @@ fn write_ast(ast: &Ast, out: &mut String) {
         }
         Ast::Missing => {}
         Ast::InvalidRef => out.push_str("#REF!"),
+        Ast::LetSlot { expression, .. } => write_ast(expression, out),
         Ast::Func(func, args) => {
             out.push_str(func_name(*func));
             out.push('(');

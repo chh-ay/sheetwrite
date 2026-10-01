@@ -9,6 +9,7 @@ mod functions;
 mod lookup;
 mod math;
 mod matrix;
+mod range_reader;
 mod statistics;
 mod text;
 mod value;
@@ -16,6 +17,7 @@ mod value;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use crate::calc::{Ast, CmpOp, Func, Op};
 use crate::sheet::{spill_ownership_within_budget, SpillRange};
@@ -27,13 +29,18 @@ use crate::types::{
 };
 
 use array::{ast_produces_array, dynamic_recompute_within_limit};
-use criteria::{aggregate_if, extreme_if, Criterion};
+use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 pub(crate) use dependency::DepIndex;
 use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};
-use functions::{apply_func, treats_cell_as_reference, FuncAccumulator};
-use lookup::{find_match_index, integer_arg, positive_index};
+use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
+use lookup::{
+    clear_cached_lookups, find_match_index_indexed, integer_arg, list_reuse, positive_index,
+    remember_list, remember_result, remember_table, result_reuse, table_reuse, CachedList,
+    CachedResult, CachedTable, LookupPassGuard, ReuseEntry, TablePart,
+};
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+use range_reader::RangeReader;
 use value::{
     aggregate_number, bool_from_value, cached_formula_value, compare_values, number_from_value,
     text_from_value,
@@ -46,6 +53,34 @@ thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
     static RANGE_SUM_CACHE: RefCell<HashMap<CellRange, EvalResult>> =
         RefCell::new(HashMap::new());
+    /// Values of the LET bindings of the evaluation in progress, indexed by
+    /// the slots of its expanded expression. Empty while no LET is running,
+    /// which leaves a slot use to evaluate its expression directly.
+    static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Runs `evaluate` with one empty slot per binding of a LET expansion and
+/// restores the slots of the enclosing evaluation afterwards.
+pub(super) fn with_let_slots<Output>(slots: u32, evaluate: impl FnOnce() -> Output) -> Output {
+    let previous = LET_SLOT_VALUES
+        .with(|values| std::mem::replace(&mut *values.borrow_mut(), vec![None; slots as usize]));
+    let result = evaluate();
+    LET_SLOT_VALUES.with(|values| *values.borrow_mut() = previous);
+    result
+}
+
+/// The value a binding slot already produced in this evaluation.
+fn cached_let_slot(slot: u32) -> Option<EvalResult> {
+    LET_SLOT_VALUES.with(|values| values.borrow().get(slot as usize).cloned().flatten())
+}
+
+/// Keeps a binding's value for the rest of the evaluation.
+fn remember_let_slot(slot: u32, value: EvalResult) {
+    LET_SLOT_VALUES.with(|values| {
+        if let Some(entry) = values.borrow_mut().get_mut(slot as usize) {
+            *entry = Some(value);
+        }
+    });
 }
 
 struct FormulaOriginGuard;
@@ -69,28 +104,38 @@ fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
 }
 
-type LetBinding<'a> = (&'a str, &'a Ast, usize);
+/// One LET binding: its name, its expression, how many earlier bindings its
+/// expression can see, and the slot its value is kept in.
+type LetBinding<'a> = (&'a str, &'a Ast, usize, u32);
 
-pub(super) fn expand_let_ast(args: &[Ast]) -> Result<Ast, FormulaError> {
+/// Expands a LET call into an expression tree where every binding use carries
+/// the slot its value is kept in, and reports how many slots the tree holds.
+pub(super) fn expand_let_ast(args: &[Ast]) -> Result<(Ast, u32), FormulaError> {
     let mut bindings = Vec::new();
     bindings
         .try_reserve(args.len() / 2)
         .map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
-    expand_let_args(args, &mut bindings, &mut nodes)
+    let mut next_slot = 0u32;
+    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot)?;
+    Ok((expanded, next_slot))
 }
 
+/// Expands every LET reachable from `ast`, for the analysis passes that read
+/// the expansion: dependency collection, volatility and array bounds.
 pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     let mut bindings = Vec::new();
     bindings.try_reserve(4).map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
-    expand_let_node(ast, &mut bindings, &mut nodes)
+    let mut next_slot = 0u32;
+    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot)
 }
 
 fn expand_let_args<'a>(
     args: &'a [Ast],
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
+    next_slot: &mut u32,
 ) -> Result<Ast, FormulaError> {
     if args.len() < 3 || args.len().is_multiple_of(2) || args.len() / 2 > LET_BINDING_LIMIT {
         return Err(FormulaError::Value);
@@ -106,9 +151,11 @@ fn expand_let_args<'a>(
             return Err(FormulaError::Value);
         }
         let visible = bindings.len();
-        bindings.push((name.as_str(), &pair[1], visible));
+        let slot = *next_slot;
+        *next_slot = next_slot.checked_add(1).ok_or(FormulaError::Num)?;
+        bindings.push((name.as_str(), &pair[1], visible, slot));
     }
-    let result = expand_let_node(&args[args.len() - 1], bindings, nodes);
+    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot);
     bindings.truncate(original_len);
     result
 }
@@ -134,48 +181,58 @@ fn expand_let_node<'a>(
     ast: &'a Ast,
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
+    next_slot: &mut u32,
 ) -> Result<Ast, FormulaError> {
     if let Ast::Name(name) = ast {
-        if let Some((_, expression, visible)) = bindings
+        if let Some((_, expression, visible, slot)) = bindings
             .iter()
             .rev()
-            .find(|(binding, _, _)| binding.eq_ignore_ascii_case(name))
+            .find(|(binding, _, _, _)| binding.eq_ignore_ascii_case(name))
             .copied()
         {
             let hidden = bindings.split_off(visible);
-            let result = expand_let_node(expression, bindings, nodes);
+            let result = expand_let_node(expression, bindings, nodes, next_slot);
             bindings.extend(hidden);
-            return result;
+            return Ok(Ast::LetSlot {
+                slot,
+                expression: Box::new(result?),
+            });
         }
     }
     count_let_node(nodes)?;
     Ok(match ast {
-        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes),
+        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
         Ast::Func(func, args) => Ast::Func(
             *func,
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes))
+                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
             name.clone(),
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes))
+                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::Bin(op, left, right) => Ast::Bin(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes)?),
-            Box::new(expand_let_node(right, bindings, nodes)?),
+            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
+            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
         ),
         Ast::Cmp(op, left, right) => Ast::Cmp(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes)?),
-            Box::new(expand_let_node(right, bindings, nodes)?),
+            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
+            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(inner, bindings, nodes)?)),
-        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(inner, bindings, nodes)?)),
-        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(inner, bindings, nodes)?)),
+        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
+        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
+        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
         other => other.clone(),
     })
 }
@@ -261,6 +318,8 @@ impl CellStore {
             return;
         }
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
+        clear_cached_lookups();
+        let _lookup_pass = LookupPassGuard::begin();
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
@@ -814,6 +873,14 @@ impl CellStore {
                 depth + 1,
             ),
             Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
+            Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
+                Some(value) => value,
+                None => {
+                    let value = self.eval_ast(expression, sheet, affected, memo, visiting, depth);
+                    remember_let_slot(*slot, value.clone());
+                    value
+                }
+            },
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
                 Value::Error(FormulaError::Name)
             }
@@ -980,9 +1047,9 @@ impl CellStore {
 
         if func == Func::Let {
             return match expand_let_ast(args) {
-                Ok(expanded) => {
+                Ok((expanded, slots)) => with_let_slots(slots, || {
                     self.eval_ast(&expanded, sheet, affected, memo, visiting, depth + 1)
-                }
+                }),
                 Err(error) => Value::Error(error),
             };
         }
@@ -1322,6 +1389,12 @@ impl CellStore {
             }
         }
 
+        if let Some(result) =
+            self.streamed_reduction(func, args, sheet, affected, memo, visiting, depth + 1)
+        {
+            return result;
+        }
+
         let mut values = FuncAccumulator::default();
         for arg in args {
             let range = match arg {
@@ -1509,6 +1582,302 @@ impl CellStore {
         Ok(Criterion::parse(value))
     }
 
+    /// Folds the reduction functions straight from their ranges instead of
+    /// materializing every cell first. `None` keeps the accumulator path,
+    /// which also handles computed arguments, missing arguments and the
+    /// functions that need their whole input.
+    fn streamed_reduction(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        let mut fold = ReductionFold::new(func)?;
+        let mut ranges = Vec::with_capacity(args.len());
+        for arg in args {
+            ranges.push(range_from_ast(arg, sheet)?);
+        }
+        for range in ranges {
+            let mut reader = match RangeReader::new(self, range, depth) {
+                Ok(reader) => reader,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            loop {
+                match reader.next(affected, memo, visiting) {
+                    Ok(Some(value)) => {
+                        if let Err(error) = fold.push(&value) {
+                            return Some(Value::Error(error));
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(error) => return Some(Value::Error(error)),
+                }
+            }
+        }
+        Some(fold.finish())
+    }
+
+    /// Walks the criteria functions over their ranges instead of
+    /// materializing them. `None` keeps the materialized path, which also
+    /// handles computed arguments, missing arguments and dynamic arrays.
+    fn streamed_criteria(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        match func {
+            Func::CountIf => self.streamed_count_if(args, sheet, affected, memo, visiting, depth),
+            Func::CountIfs => self.streamed_count_ifs(args, sheet, affected, memo, visiting, depth),
+            Func::SumIf | Func::AverageIf => {
+                self.streamed_sum_if(func, args, sheet, affected, memo, visiting, depth)
+            }
+            Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
+                self.streamed_sum_ifs_or_extreme(func, args, sheet, affected, memo, visiting, depth)
+            }
+            _ => None,
+        }
+    }
+
+    fn streamed_count_if(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.len() != 2 {
+            return None;
+        }
+        let range = range_from_ast(&args[0], sheet)?;
+        let mut reader = match RangeReader::new(self, range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let criterion =
+            match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
+        let mut matches = 0.0;
+        loop {
+            match reader.next_allow_errors(affected, memo, visiting) {
+                Ok(Some(value)) => {
+                    if criterion.matches(&value) {
+                        matches += 1.0;
+                    }
+                }
+                Ok(None) => break,
+                Err(error) => return Some(Value::Error(error)),
+            }
+        }
+        Some(Value::number(matches))
+    }
+
+    fn streamed_count_ifs(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.is_empty() || !args.len().is_multiple_of(2) {
+            return None;
+        }
+        let mut readers = Vec::with_capacity(args.len() / 2);
+        let mut criteria = Vec::with_capacity(args.len() / 2);
+        for pair in args.as_chunks::<2>().0 {
+            let range = range_from_ast(&pair[0], sheet)?;
+            let reader = match RangeReader::new(self, range, depth + 1) {
+                Ok(reader) => reader,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            if readers
+                .first()
+                .is_some_and(|first: &RangeReader<'_>| first.shape() != reader.shape())
+            {
+                return Some(Value::Error(FormulaError::Value));
+            }
+            let criterion =
+                match self.eval_criterion(&pair[1], sheet, affected, memo, visiting, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Some(Value::Error(error)),
+                };
+            readers.push(reader);
+            criteria.push(criterion);
+        }
+        let mut matches = 0.0;
+        loop {
+            let first = match readers[0].next_allow_errors(affected, memo, visiting) {
+                Ok(Some(value)) => value,
+                Ok(None) => break,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            let mut row_matches = criteria[0].matches(&first);
+            for index in 1..readers.len() {
+                let candidate = match readers[index].next_allow_errors(affected, memo, visiting) {
+                    Ok(Some(value)) => value,
+                    // The shapes are checked equal, so every reader ends on
+                    // the same row.
+                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
+                    Err(error) => return Some(Value::Error(error)),
+                };
+                if !criteria[index].matches(&candidate) {
+                    row_matches = false;
+                }
+            }
+            if row_matches {
+                matches += 1.0;
+            }
+        }
+        Some(Value::number(matches))
+    }
+
+    fn streamed_sum_if(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if !(2..=3).contains(&args.len()) {
+            return None;
+        }
+        let criteria_range = range_from_ast(&args[0], sheet)?;
+        let mut criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let criterion =
+            match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
+        let value_range = match args.get(2) {
+            Some(ast) => range_from_ast(ast, sheet)?,
+            None => criteria_range,
+        };
+        let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        if criteria_reader.shape() != value_reader.shape() {
+            return Some(Value::Error(FormulaError::Value));
+        }
+        let mut fold = IfSum::new();
+        loop {
+            let candidate = match criteria_reader.next_allow_errors(affected, memo, visiting) {
+                Ok(Some(value)) => value,
+                Ok(None) => break,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            let value = match value_reader.next_allow_errors(affected, memo, visiting) {
+                Ok(Some(value)) => value,
+                // The shapes are checked equal, so both readers end together.
+                Ok(None) => return Some(Value::Error(FormulaError::Value)),
+                Err(error) => return Some(Value::Error(error)),
+            };
+            if criterion.matches(&candidate) {
+                if let Err(error) = fold.add(&value) {
+                    return Some(Value::Error(error));
+                }
+            }
+        }
+        Some(fold.finish(func == Func::AverageIf))
+    }
+
+    fn streamed_sum_ifs_or_extreme(
+        &self,
+        func: Func,
+        args: &[Ast],
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Option<EvalResult> {
+        if args.len() < 3 || args.len().is_multiple_of(2) {
+            return None;
+        }
+        let value_range = range_from_ast(&args[0], sheet)?;
+        let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
+            Ok(reader) => reader,
+            Err(error) => return Some(Value::Error(error)),
+        };
+        let mut readers = Vec::with_capacity((args.len() - 1) / 2);
+        let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
+        for pair in args[1..].as_chunks::<2>().0 {
+            let range = range_from_ast(&pair[0], sheet)?;
+            let reader = match RangeReader::new(self, range, depth + 1) {
+                Ok(reader) => reader,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            if value_reader.shape() != reader.shape() {
+                return Some(Value::Error(FormulaError::Value));
+            }
+            let criterion =
+                match self.eval_criterion(&pair[1], sheet, affected, memo, visiting, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Some(Value::Error(error)),
+                };
+            readers.push(reader);
+            criteria.push(criterion);
+        }
+        let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
+        let mut sums = IfSum::new();
+        let mut extremes = IfExtreme::new(func == Func::MaxIfs);
+        loop {
+            let value = match value_reader.next_allow_errors(affected, memo, visiting) {
+                Ok(Some(value)) => value,
+                Ok(None) => break,
+                Err(error) => return Some(Value::Error(error)),
+            };
+            let mut row_matches = true;
+            for index in 0..readers.len() {
+                let candidate = match readers[index].next_allow_errors(affected, memo, visiting) {
+                    Ok(Some(value)) => value,
+                    // The shapes are checked equal, so every reader ends on
+                    // the same row.
+                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
+                    Err(error) => return Some(Value::Error(error)),
+                };
+                if !criteria[index].matches(&candidate) {
+                    row_matches = false;
+                }
+            }
+            if row_matches {
+                let folded = if extreme {
+                    extremes.add(&value)
+                } else {
+                    sums.add(&value)
+                };
+                if let Err(error) = folded {
+                    return Some(Value::Error(error));
+                }
+            }
+        }
+        Some(if extreme {
+            extremes.finish()
+        } else {
+            sums.finish(func == Func::AverageIfs)
+        })
+    }
+
     fn eval_criteria_func(
         &self,
         func: Func,
@@ -1519,6 +1888,11 @@ impl CellStore {
         visiting: &mut HashSet<AbsCellKey>,
         depth: usize,
     ) -> EvalResult {
+        if let Some(result) =
+            self.streamed_criteria(func, args, sheet, affected, memo, visiting, depth)
+        {
+            return result;
+        }
         let result = match func {
             Func::CountIf => {
                 if args.len() != 2 {
@@ -1707,6 +2081,176 @@ impl CellStore {
         }
     }
 
+    /// The table for a `VLOOKUP`/`HLOOKUP` argument.
+    fn lookup_table_argument(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        part: TablePart,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Result<Rc<CachedTable>, FormulaError> {
+        let range = range_from_ast(ast, sheet);
+        let previous = range.and_then(|range| table_reuse(range, part));
+        self.reused_lookup_range(
+            ast,
+            sheet,
+            range,
+            previous,
+            |rows, cols, values| match part {
+                TablePart::FirstColumn => CachedTable::from_column(rows, cols, values),
+                TablePart::FirstRow => CachedTable::from_row(rows, cols, values),
+            },
+            |range, state| remember_table(range, part, state),
+            affected,
+            memo,
+            visiting,
+            depth,
+        )
+    }
+
+    /// The search list for a `MATCH`, `XMATCH` or `XLOOKUP` argument.
+    fn lookup_list_argument(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Result<Rc<CachedList>, FormulaError> {
+        let range = range_from_ast(ast, sheet);
+        let previous = range.and_then(list_reuse);
+        self.reused_lookup_range(
+            ast,
+            sheet,
+            range,
+            previous,
+            CachedList::new,
+            remember_list,
+            affected,
+            memo,
+            visiting,
+            depth,
+        )
+    }
+
+    /// The result range for an `XLOOKUP` argument.
+    fn lookup_result_argument(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Result<Rc<CachedResult>, FormulaError> {
+        let range = range_from_ast(ast, sheet);
+        let previous = range.and_then(result_reuse);
+        self.reused_lookup_range(
+            ast,
+            sheet,
+            range,
+            previous,
+            |_, _, values| CachedResult::new(values),
+            remember_result,
+            affected,
+            memo,
+            visiting,
+            depth,
+        )
+    }
+
+    /// Materializes a lookup range and records what this pass may reuse.
+    ///
+    /// A range is materialized once per pass. The first lookup only records
+    /// that the range was seen; the second pays one reusability scan and,
+    /// when nothing in the range can change mid-pass, every later lookup
+    /// reuses the entry. A range searched once therefore costs exactly what
+    /// it did before.
+    fn reused_lookup_range<Materialized>(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        range: Option<CellRange>,
+        previous: Option<ReuseEntry<Materialized>>,
+        build: impl FnOnce(usize, usize, Vec<Value>) -> Materialized,
+        remember: impl FnOnce(CellRange, ReuseEntry<Materialized>),
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Result<Rc<Materialized>, FormulaError> {
+        if let Some(ReuseEntry::Reusable(entry)) = &previous {
+            return Ok(Rc::clone(entry));
+        }
+        let (rows, cols, values) =
+            self.eval_matrix_values(ast, sheet, affected, memo, visiting, depth)?;
+        let entry = Rc::new(build(rows, cols, values));
+        if let Some(range) = range {
+            match previous {
+                None => remember(range, ReuseEntry::Seen),
+                Some(ReuseEntry::Seen) => {
+                    let state = if self.range_is_reusable(range) {
+                        ReuseEntry::Reusable(Rc::clone(&entry))
+                    } else {
+                        ReuseEntry::Blocked
+                    };
+                    remember(range, state);
+                }
+                Some(ReuseEntry::Blocked) | Some(ReuseEntry::Reusable(_)) => {}
+            }
+        }
+        Ok(entry)
+    }
+
+    /// Materializes a range into its shape and row-major values, exactly as
+    /// `eval_matrix_arg` returns them.
+    fn eval_matrix_values(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        affected: &HashSet<AbsCellKey>,
+        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        visiting: &mut HashSet<AbsCellKey>,
+        depth: usize,
+    ) -> Result<(usize, usize, Vec<Value>), FormulaError> {
+        let mut matrix = self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth)?;
+        let rows = matrix.rows;
+        let cols = matrix.cols;
+        let values = std::mem::take(&mut matrix.values);
+        Ok((rows, cols, values))
+    }
+
+    /// True when a lookup may keep a range's decoded cells for the rest of
+    /// the pass: the sheet is fully resident, and no cell of the range is a
+    /// formula or a spilled value, so nothing in it can change mid-pass.
+    fn range_is_reusable(&self, range: CellRange) -> bool {
+        let Some(data) = self.sheets.get(range.sheet as usize) else {
+            return false;
+        };
+        if data.is_paged() {
+            return false;
+        }
+        let has_spills = !data.spill_owners.is_empty();
+        let row_end = (range.row_end as usize).min(data.row_count.saturating_sub(1));
+        let col_end = (range.col_end as usize).min(data.n_cols.saturating_sub(1));
+        for col in range.col_start as usize..=col_end {
+            for row in range.row_start as usize..=row_end {
+                let index = data.idx(row, col);
+                if data.kind_at(index) == KIND_FORMULA {
+                    return false;
+                }
+                if has_spills && data.spill_owner((row as u32, col as u32)).is_some() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     fn eval_lookup_func(
         &self,
         func: Func,
@@ -1771,7 +2315,7 @@ impl CellStore {
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let matrix = match self.eval_matrix_arg(
+                let lookup = match self.lookup_list_argument(
                     &args[1],
                     sheet,
                     affected,
@@ -1779,10 +2323,11 @@ impl CellStore {
                     visiting,
                     depth + 1,
                 ) {
-                    Ok(matrix) => matrix,
+                    Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
-                if matrix.rows != 1 && matrix.cols != 1 {
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup_rows != 1 && lookup_cols != 1 {
                     return Value::Error(FormulaError::Na);
                 }
                 let mode = optional_ast(args, 2)
@@ -1797,7 +2342,7 @@ impl CellStore {
                     -1 => (1, -2),
                     _ => (0, 1),
                 };
-                match find_match_index(&matrix.values, &key, match_mode, search_mode) {
+                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
                     Ok(Some(index)) => Value::number((index + 1) as f64),
                     Ok(None) => Value::Error(FormulaError::Na),
                     Err(error) => Value::Error(error),
@@ -1811,7 +2356,7 @@ impl CellStore {
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let matrix = match self.eval_matrix_arg(
+                let lookup = match self.lookup_list_argument(
                     &args[1],
                     sheet,
                     affected,
@@ -1819,10 +2364,11 @@ impl CellStore {
                     visiting,
                     depth + 1,
                 ) {
-                    Ok(matrix) => matrix,
+                    Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
-                if matrix.rows != 1 && matrix.cols != 1 {
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup_rows != 1 && lookup_cols != 1 {
                     return Value::Error(FormulaError::Value);
                 }
                 let match_mode = match optional_ast(args, 2) {
@@ -1839,7 +2385,7 @@ impl CellStore {
                     },
                     None => 1,
                 };
-                match find_match_index(&matrix.values, &key, match_mode, search_mode) {
+                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
                     Ok(Some(index)) => Value::number((index + 1) as f64),
                     Ok(None) => Value::Error(FormulaError::Na),
                     Err(error) => Value::Error(error),
@@ -1853,15 +2399,21 @@ impl CellStore {
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let matrix = match self.eval_matrix_arg(
+                let part = if func == Func::VLookup {
+                    TablePart::FirstColumn
+                } else {
+                    TablePart::FirstRow
+                };
+                let table = match self.lookup_table_argument(
                     &args[1],
                     sheet,
+                    part,
                     affected,
                     memo,
                     visiting,
                     depth + 1,
                 ) {
-                    Ok(matrix) => matrix,
+                    Ok(table) => table,
                     Err(error) => return Value::Error(error),
                 };
                 let result_index = match positive_index(&scalar(&args[2], memo, visiting)) {
@@ -1875,17 +2427,8 @@ impl CellStore {
                     },
                     None => true,
                 };
-                let lookup_values: Vec<_> = if func == Func::VLookup {
-                    (0..matrix.rows)
-                        .filter_map(|row| matrix.get(row, 0).cloned())
-                        .collect()
-                } else {
-                    (0..matrix.cols)
-                        .filter_map(|col| matrix.get(0, col).cloned())
-                        .collect()
-                };
-                let found = match find_match_index(
-                    &lookup_values,
+                let found = match find_match_index_indexed(
+                    table.search(),
                     &key,
                     if sorted { -1 } else { 0 },
                     if sorted { 2 } else { 1 },
@@ -1895,9 +2438,9 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 };
                 let value = if func == Func::VLookup {
-                    matrix.get(found, result_index)
+                    table.cell(found, result_index)
                 } else {
-                    matrix.get(result_index, found)
+                    table.cell(result_index, found)
                 };
                 value.cloned().unwrap_or(Value::Error(FormulaError::Ref))
             }
@@ -1909,7 +2452,7 @@ impl CellStore {
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let lookup = match self.eval_matrix_arg(
+                let lookup = match self.lookup_list_argument(
                     &args[1],
                     sheet,
                     affected,
@@ -1917,10 +2460,10 @@ impl CellStore {
                     visiting,
                     depth + 1,
                 ) {
-                    Ok(matrix) => matrix,
+                    Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
-                let result = match self.eval_matrix_arg(
+                let result = match self.lookup_result_argument(
                     &args[2],
                     sheet,
                     affected,
@@ -1928,11 +2471,12 @@ impl CellStore {
                     visiting,
                     depth + 1,
                 ) {
-                    Ok(matrix) => matrix,
+                    Ok(range) => range,
                     Err(error) => return Value::Error(error),
                 };
-                if lookup.values.len() != result.values.len()
-                    || (lookup.rows != 1 && lookup.cols != 1)
+                let (lookup_rows, lookup_cols) = lookup.shape();
+                if lookup.search().values().len() != result.len()
+                    || (lookup_rows != 1 && lookup_cols != 1)
                 {
                     return Value::Error(FormulaError::Value);
                 }
@@ -1950,8 +2494,11 @@ impl CellStore {
                     },
                     None => 1,
                 };
-                match find_match_index(&lookup.values, &key, match_mode, search_mode) {
-                    Ok(Some(index)) => result.values[index].clone(),
+                match find_match_index_indexed(lookup.search(), &key, match_mode, search_mode) {
+                    Ok(Some(index)) => result
+                        .value(index)
+                        .cloned()
+                        .unwrap_or(Value::Error(FormulaError::Ref)),
                     Ok(None) => optional_ast(args, 3)
                         .map_or(Value::Error(FormulaError::Na), |arg| {
                             scalar(arg, memo, visiting)
