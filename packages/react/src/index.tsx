@@ -12,6 +12,7 @@ import {
   createSimpleRowBridge,
   type GridAdapterEventHandlers,
   type GridController,
+  type GridControllerHandlers,
   type GridReadyReason,
   type GridSizeProps,
   getGridResetReason,
@@ -278,6 +279,11 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
         generationRef.current === 0
           ? "initial"
           : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
+      const forwardCommandStateChange: NonNullable<
+        GridControllerHandlers["onCommandStateChange"]
+      > = (event) => {
+        handlers.current?.onCommandStateChange?.(event);
+      };
       const controller = createGridController(
         host,
         options,
@@ -289,7 +295,13 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
           onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
           onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
           onSearch: (result) => handlers.current?.onSearch?.(result),
-          onCommandStateChange: (event) => handlers.current?.onCommandStateChange?.(event),
+          // The controller only subscribes to command state while this is
+          // defined, so absence must be visible instead of an always-present wrapper.
+          get onCommandStateChange() {
+            return handlers.current?.onCommandStateChange === undefined
+              ? undefined
+              : forwardCommandStateChange;
+          },
           onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
           onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
           onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
