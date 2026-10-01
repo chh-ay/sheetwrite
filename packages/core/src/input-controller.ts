@@ -32,6 +32,8 @@ export interface InputControllerDeps {
   firstCol: () => number;
   lastCol: () => number;
   nextVisibleCol: (col: number, dir: 1 | -1) => number;
+  /** Visible column before `col`, or -1 when `col` is hidden or the first one. */
+  previousVisibleColumn: (col: number) => number;
   colAtX: (contentX: number) => number;
   rowAtOffset: (contentY: number) => number;
   /**
@@ -333,9 +335,7 @@ export class InputController {
       const col = this.deps.colAtX(Math.max(0, contentX));
       if (col === -1) return null;
 
-      const cols = this.deps.colIndices();
-      const pos = cols.indexOf(col);
-      const prev = pos > 0 ? (cols[pos - 1] ?? -1) : -1;
+      const prev = this.deps.previousVisibleColumn(col);
       const start = this.deps.colLeftOf(col);
       const width = (this.deps.sheet().columns[col]?.width ?? MIN_COLUMN_WIDTH) * this.deps.zoom();
       const target = resizeTargetAt(contentX, col, start, width, prev);
