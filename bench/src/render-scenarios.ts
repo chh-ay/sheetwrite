@@ -1,6 +1,6 @@
 import { OffsetIndex } from "../../packages/core/src/fenwick.js";
 import type { ColumnarDataset } from "./dataset.js";
-import { logicalValueChecksum } from "./dataset.js";
+import { COL, COLUMNS, logicalValueChecksum } from "./dataset.js";
 import {
   ALL_RENDER_SCENARIOS,
   createWindowTransferMetrics,
@@ -28,6 +28,27 @@ const FRACTIONAL_SCROLL_STEP = 1;
 const LONG_SCROLL_STEP_PX = 448;
 const LONG_SCROLL_ROW_STRIDE = 16;
 const LONG_SCROLL_MAX_STEPS = 1_100;
+/** Sheetwrite's default row height, shared with the unscaled million-row geometry. */
+const ROW_HEIGHT_PX = 28;
+const HSCROLL_SMALL_STEP_PX = 8;
+const HSCROLL_SMALL_STEPS = 16;
+const FROZEN_SCROLL_ROWS = 200;
+const FROZEN_ROW_COUNT = 1;
+const FROZEN_COLUMN_COUNT = 1;
+/** Corner, pinned row, pinned column, and body panes. */
+const FROZEN_PANE_COUNT = 4;
+/** Wrapped body text length installed by `wrap-heavy.scroll`. */
+export const WRAP_HEAVY_TEXT_LENGTH = 200;
+/** Marker prefix of the wrapped body text installed by `wrap-heavy.scroll`. */
+export const WRAP_HEAVY_TEXT_PREFIX = "diagnostic-wrap-";
+/** Marker prefix of the searchable body text installed by `search-many.scroll`. */
+export const SEARCH_MATCH_PREFIX = "diagnostic-search-";
+/** Amount that separates the two conditional-format style rules. */
+export const CONDITIONAL_AMOUNT_THRESHOLD = 1_000;
+export const CONDITIONAL_HIGH_BACKGROUND = "#fde9d9";
+export const CONDITIONAL_LOW_COLOR = "#b45309";
+/** Currency format installed on the amount column by `number-format.hscroll`. */
+export const CURRENCY_NUMBER_FORMAT = "$#,##0.00";
 
 export interface CellSelection {
   readonly row: number;
@@ -115,6 +136,71 @@ export interface RenderBenchAdapter {
   resetWindowTransferCounters(): void;
   windowTransferCounters(): WindowTransferCounters;
   destroy(): void;
+}
+
+/** Style evidence the engine resolves for one cell before painting it. */
+export interface ResolvedStyleProbe {
+  readonly wrap: boolean;
+  readonly underline: boolean;
+  readonly background: string | null;
+  readonly color: string | null;
+}
+
+/** Find state reported after a diagnostic search scan. */
+export interface SearchProbe {
+  readonly query: string;
+  readonly matches: number;
+  readonly active: number;
+  readonly first: string | null;
+  readonly last: string | null;
+}
+
+/** Frozen-pane paint recorded from the most recent pane frame. */
+export interface FrozenPaneProbe {
+  readonly paneFrames: number;
+  readonly paneCount: number;
+  readonly pinnedRows: { readonly start: number; readonly end: number } | null;
+  readonly pinnedColumns: readonly number[];
+  readonly pinnedScrollTop: number | null;
+  readonly bodyRows: { readonly start: number; readonly end: number } | null;
+  readonly bodyScrollTop: number | null;
+  readonly bodyScrollLeft: number | null;
+}
+
+/**
+ * Sheetwrite-only surface for diagnostic scenarios that install their own
+ * fixture data and read back what the engine resolved for a frame. The gate
+ * scenario set never calls these members.
+ */
+export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
+  installWrapHeavy(rowCount: number): void;
+  clearWrapHeavy(): void;
+  installSearchMatches(rowCount: number): void;
+  clearSearchMatches(): void;
+  beginSearch(query: string): void;
+  searchState(): SearchProbe;
+  endSearch(): void;
+  installFrozenPanes(rows: number, cols: number): void;
+  clearFrozenPanes(): void;
+  armFrozenPaneProbe(): void;
+  frozenPaneProbe(): FrozenPaneProbe;
+  installConditionalFormats(rowCount: number): void;
+  clearConditionalFormats(): void;
+  installCurrencyFormat(): void;
+  clearCurrencyFormat(): void;
+  installDateSerials(rowCount: number): void;
+  clearDateSerials(): void;
+  resolvedStyle(row: number, col: number): ResolvedStyleProbe;
+  formattedText(row: number, col: number): string;
+}
+
+function diagnosticAdapter(adapter: RenderBenchAdapter): RenderBenchDiagnosticAdapter {
+  if (adapter.id !== "sheetwrite") {
+    throw new ScenarioValidationError(
+      `${adapter.id} does not implement the diagnostic scenario surface`,
+    );
+  }
+  return adapter as RenderBenchDiagnosticAdapter;
 }
 
 export interface ScenarioRunOptions {
@@ -252,6 +338,25 @@ function withEffectCleanup(action: () => void, cleanup: () => void, validate: ()
   } finally {
     cleanup();
   }
+}
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** Reach of the long-scroll action, matching `text-heavy.long-scroll`. */
+function longScrollSteps(dataset: ColumnarDataset): number {
+  return Math.min(
+    LONG_SCROLL_MAX_STEPS,
+    Math.max(1, Math.floor(dataset.rowCount / LONG_SCROLL_ROW_STRIDE) - 1),
+  );
 }
 
 function scenarioActions(
@@ -402,6 +507,372 @@ function scenarioActions(
           );
         } finally {
           adapter.clearTextHeavy();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "wrap-heavy.scroll") {
+    const steps = longScrollSteps(dataset);
+    const installedRows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
+    const diagnostics = diagnosticAdapter(adapter);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < steps; step++) {
+        adapter.scrollBy("top", LONG_SCROLL_STEP_PX);
+      }
+    };
+    return {
+      setup: () => diagnostics.installWrapHeavy(installedRows),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        let observedRow = 0;
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "wrap-heavy.scroll advances through multiple row windows",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          observedRow = Math.min(installedRows, Math.max(1, after.firstVisibleRow));
+          const text = adapter.cellValue(observedRow, 2);
+          checkpoint(
+            observations,
+            "wrap-heavy.scroll keeps full-length body text",
+            true,
+            typeof text === "string" &&
+              text.length === WRAP_HEAVY_TEXT_LENGTH &&
+              text.startsWith(WRAP_HEAVY_TEXT_PREFIX),
+          );
+          checkpoint(
+            observations,
+            "wrap-heavy.scroll keeps the wrap flag on painted cells",
+            true,
+            diagnostics.resolvedStyle(observedRow, 2).wrap,
+          );
+        } finally {
+          diagnostics.clearWrapHeavy();
+        }
+        checkpoint(
+          observations,
+          "wrap-heavy.scroll restores unwrapped body cells",
+          false,
+          diagnostics.resolvedStyle(observedRow, 2).wrap,
+        );
+      },
+    };
+  }
+
+  if (scenarioId === "search-many.scroll") {
+    const steps = longScrollSteps(dataset);
+    const matchedRows = dataset.rowCount - 1;
+    const diagnostics = diagnosticAdapter(adapter);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < steps; step++) {
+        adapter.scrollBy("top", LONG_SCROLL_STEP_PX);
+      }
+    };
+    return {
+      setup: () => {
+        diagnostics.installSearchMatches(matchedRows);
+        diagnostics.beginSearch(SEARCH_MATCH_PREFIX);
+      },
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "search-many.scroll advances through multiple row windows",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          const search = diagnostics.searchState();
+          checkpoint(
+            observations,
+            "search-many.scroll keeps the query active",
+            SEARCH_MATCH_PREFIX,
+            search.query,
+          );
+          checkpoint(
+            observations,
+            "search-many.scroll keeps every body match",
+            matchedRows,
+            search.matches,
+          );
+          checkpoint(
+            observations,
+            "search-many.scroll keeps the contiguous match run",
+            `1,${COL.customer}..${matchedRows},${COL.customer}`,
+            `${search.first ?? "none"}..${search.last ?? "none"}`,
+          );
+          checkpoint(
+            observations,
+            "search-many.scroll keeps an active match",
+            true,
+            search.active >= 0 && search.active < search.matches,
+          );
+        } finally {
+          diagnostics.endSearch();
+          diagnostics.clearSearchMatches();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "frozen.scroll") {
+    const diagnostics = diagnosticAdapter(adapter);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < FROZEN_SCROLL_ROWS; step++) {
+        adapter.scrollBy("top", ROW_HEIGHT_PX);
+      }
+    };
+    return {
+      setup: () => {
+        diagnostics.installFrozenPanes(FROZEN_ROW_COUNT, FROZEN_COLUMN_COUNT);
+        diagnostics.armFrozenPaneProbe();
+      },
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          const panes = diagnostics.frozenPaneProbe();
+          checkpoint(
+            observations,
+            "frozen.scroll advances the scrolling band",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          checkpoint(
+            observations,
+            "frozen.scroll paints the four clipped panes",
+            true,
+            panes.paneFrames > 0 && panes.paneCount === FROZEN_PANE_COUNT,
+          );
+          checkpoint(
+            observations,
+            "frozen.scroll pins the leading row and column",
+            JSON.stringify({
+              rows: { start: 0, end: FROZEN_ROW_COUNT },
+              columns: [0],
+              scrollTop: 0,
+            }),
+            JSON.stringify({
+              rows: panes.pinnedRows,
+              columns: panes.pinnedColumns,
+              scrollTop: panes.pinnedScrollTop,
+            }),
+          );
+          checkpoint(
+            observations,
+            "frozen.scroll scrolls the body pane",
+            JSON.stringify({ scrollTop: after.top, scrollLeft: after.left }),
+            JSON.stringify({ scrollTop: panes.bodyScrollTop, scrollLeft: panes.bodyScrollLeft }),
+          );
+          checkpoint(
+            observations,
+            "frozen.scroll moves the body window past the pinned band",
+            true,
+            (panes.bodyRows?.start ?? 0) > FROZEN_ROW_COUNT,
+          );
+        } finally {
+          diagnostics.clearFrozenPanes();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "hscroll-small") {
+    const prepare = (): void => adapter.prepareScroll("left", false);
+    const action = (): void => {
+      for (let step = 0; step < HSCROLL_SMALL_STEPS; step++) {
+        adapter.scrollBy("left", HSCROLL_SMALL_STEP_PX);
+      }
+    };
+    return {
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        prepare();
+        const before = adapter.scrollObservation();
+        action();
+        const after = adapter.scrollObservation();
+        checkpoint(
+          observations,
+          "hscroll-small has a scrollable column range",
+          true,
+          before.maximumLeft > 0,
+        );
+        checkpoint(
+          observations,
+          "hscroll-small moves eight pixels per step",
+          Math.min(before.maximumLeft, before.left + HSCROLL_SMALL_STEPS * HSCROLL_SMALL_STEP_PX),
+          after.left,
+        );
+        checkpoint(
+          observations,
+          "hscroll-small keeps the logical row window",
+          before.firstVisibleRow,
+          after.firstVisibleRow,
+        );
+        checkpoint(
+          observations,
+          "hscroll-small preserves painted-value sentinels",
+          JSON.stringify([dataset.id[0], dataset.customer[0]]),
+          JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 2)]),
+        );
+      },
+    };
+  }
+
+  if (scenarioId === "cond-format.scroll") {
+    const steps = longScrollSteps(dataset);
+    const diagnostics = diagnosticAdapter(adapter);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < steps; step++) {
+        adapter.scrollBy("top", LONG_SCROLL_STEP_PX);
+      }
+    };
+    return {
+      setup: () => diagnostics.installConditionalFormats(dataset.rowCount - 1),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "cond-format.scroll advances through multiple row windows",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          const observedRow = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
+          const observedAmount = dataset.amount[observedRow];
+          const style = diagnostics.resolvedStyle(observedRow, COL.amount);
+          checkpoint(
+            observations,
+            "cond-format.scroll applies the amount threshold rule",
+            observedAmount === undefined
+              ? "missing-amount"
+              : observedAmount > CONDITIONAL_AMOUNT_THRESHOLD
+                ? CONDITIONAL_HIGH_BACKGROUND
+                : null,
+            style.background,
+          );
+          checkpoint(
+            observations,
+            "cond-format.scroll applies the complementary amount rule",
+            observedAmount === undefined
+              ? "missing-amount"
+              : observedAmount <= CONDITIONAL_AMOUNT_THRESHOLD
+                ? CONDITIONAL_LOW_COLOR
+                : null,
+            style.color,
+          );
+          checkpoint(
+            observations,
+            "cond-format.scroll applies the whole-body formula rule",
+            true,
+            style.underline,
+          );
+          const outsideRules = diagnostics.resolvedStyle(0, 0);
+          checkpoint(
+            observations,
+            "cond-format.scroll leaves rows outside the rule range unstyled",
+            JSON.stringify({ background: null, color: null, underline: false }),
+            JSON.stringify({
+              background: outsideRules.background,
+              color: outsideRules.color,
+              underline: outsideRules.underline,
+            }),
+          );
+        } finally {
+          diagnostics.clearConditionalFormats();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "number-format.hscroll") {
+    const diagnostics = diagnosticAdapter(adapter);
+    const columnSteps = COLUMNS.slice(0, COLUMNS.length - 1).map((column) => column.width);
+    const totalStepPx = columnSteps.reduce((total, width) => total + width, 0);
+    const prepare = (): void => adapter.prepareScroll("left", false);
+    const action = (): void => {
+      for (const width of columnSteps) adapter.scrollBy("left", width);
+    };
+    return {
+      setup: () => {
+        diagnostics.installCurrencyFormat();
+        diagnostics.installDateSerials(dataset.rowCount - 1);
+      },
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "number-format.hscroll has a scrollable column range",
+            true,
+            before.maximumLeft > 0,
+          );
+          checkpoint(
+            observations,
+            "number-format.hscroll advances one column per step",
+            Math.min(before.maximumLeft, before.left + totalStepPx),
+            after.left,
+          );
+          const observedRow = Math.max(1, Math.min(dataset.rowCount - 1, after.firstVisibleRow));
+          const observedAmount = dataset.amount[observedRow];
+          checkpoint(
+            observations,
+            "number-format.hscroll keeps the currency column formatted",
+            observedAmount === undefined
+              ? "missing-amount"
+              : CURRENCY_FORMATTER.format(observedAmount),
+            diagnostics.formattedText(observedRow, COL.amount),
+          );
+          const observedDate = dataset.date[observedRow];
+          checkpoint(
+            observations,
+            "number-format.hscroll keeps the date column formatted",
+            typeof observedDate === "string"
+              ? DATE_FORMATTER.format(new Date(`${observedDate}T00:00:00Z`))
+              : "missing-date",
+            diagnostics.formattedText(observedRow, COL.date),
+          );
+        } finally {
+          diagnostics.clearCurrencyFormat();
+          diagnostics.clearDateSerials();
         }
       },
     };
