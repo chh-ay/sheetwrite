@@ -623,8 +623,11 @@ impl CellStore {
                                     }
                                 } else if kind == 3 {
                                     if let Some(value) = boolean_cell_value(data, index) {
-                                        let expected =
-                                            if value { VALUE_SET_TRUE } else { VALUE_SET_FALSE };
+                                        let expected = if value {
+                                            VALUE_SET_TRUE
+                                        } else {
+                                            VALUE_SET_FALSE
+                                        };
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
                                             .unwrap_or(&[])

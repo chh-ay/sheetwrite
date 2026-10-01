@@ -1562,7 +1562,13 @@ fn multi_filter_kinds_match_resolved_cell_values() {
 /// Fixed-seed generator for a mixed-type column: repeated pooled text, numbers
 /// (including `-0.0` and `NaN`), booleans, blanks, an error formula and a text
 /// formula, so every branch of the distinct scan runs on both paths.
-fn fill_mixed_query_column(store: &mut CellStore, sheet: usize, col: usize, rows: usize, seed: &mut u64) {
+fn fill_mixed_query_column(
+    store: &mut CellStore,
+    sheet: usize,
+    col: usize,
+    rows: usize,
+    seed: &mut u64,
+) {
     const TEXTS: [&str; 4] = ["Alpha", "Beta", "Gamma", ""];
     for row in 0..rows {
         *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
@@ -2329,17 +2335,7 @@ mod value_set_filter {
     #[test]
     fn boolean_picks_match_boolean_cells_only() {
         let (store, sheet) = mixed_column_store();
-        let picks = [
-            PICKED_TRUE,
-            PICKED_FALSE,
-            "a",
-            "b",
-            "c",
-            "d",
-            "e",
-            "f",
-            "g",
-        ];
+        let picks = [PICKED_TRUE, PICKED_FALSE, "a", "b", "c", "d", "e", "f", "g"];
         // The text cell in row 7 spells TRUE but is not a boolean.
         assert_eq!(filter_values(&store, sheet, &[], &picks, false), vec![8, 9]);
     }
@@ -2422,7 +2418,9 @@ mod multi_key_sort_order {
         const TEXTS: [&str; 4] = ["Alpha", "beta", "Gamma", "beta"];
         let mut state = 0x2545_F491_4F6C_DD1Du64;
         for row in 0..row_count {
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1);
             match (state >> 32) % 8 {
                 0 => {}
                 1 => store.set_number(sheet, row, 0, ((state >> 8) % 5) as f64, 0),
