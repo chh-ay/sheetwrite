@@ -3,6 +3,7 @@ import {
   blitVerticalScroll,
   fontFor,
   getMergeIndexResourceStatsForTest,
+  layoutTextLines,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
@@ -411,6 +412,41 @@ describe("paintFrame typography and wrapping", () => {
       .filter((call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48 && call.x === 6)
       .map((call) => call.text);
     expect(painted).toEqual(["ab", "cd", "ef"]);
+  });
+
+  it("draws the same wrapped lines when layout stops at the cell height", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const styles = [{}, { wrap: true }];
+    // Two characters per line under the recording metrics: 18 lines for a 48px
+    // row whose line height is 14.4px, so the bound engages.
+    const text = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const view = makeView(styleIds, styles, [0]);
+    (view.values as string[])[0] = text;
+    const viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 48, 72]),
+      rowHeights: Float64Array.from([48, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+    const painted = ctx.fillTexts.filter(
+      (call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48 && call.x === 6,
+    );
+    const full = layoutTextLines(
+      makeRecordingCtx() as unknown as CanvasRenderingContext2D,
+      text,
+      26 - 12,
+    );
+
+    expect(full.length).toBeGreaterThan(painted.length);
+    expect(painted.map((call) => call.text)).toEqual(full.slice(0, painted.length));
+    // A block taller than the cell is top-anchored, so every drawn line keeps
+    // the y position the full layout would have given it.
+    const lineHeight = 12 * 1.2;
+    expect(painted.map((call) => call.y)).toEqual(
+      painted.map((_call, index) => HEADER_HEIGHT + lineHeight / 2 + index * lineHeight),
+    );
   });
 });
 
