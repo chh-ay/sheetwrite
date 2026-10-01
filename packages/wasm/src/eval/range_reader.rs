@@ -281,7 +281,10 @@ mod tests {
         let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
         store.hydrate_page_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0, &[]);
         let loaded = range(sheet, 0, 0, 3, 0);
-        assert_eq!(streamed_values(&store, loaded), listed_values(&store, loaded));
+        assert_eq!(
+            streamed_values(&store, loaded),
+            listed_values(&store, loaded)
+        );
         assert_eq!(
             streamed_values(&store, range(sheet, 0, 0, 7, 0)),
             Err(FormulaError::Loading)

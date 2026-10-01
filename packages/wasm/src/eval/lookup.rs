@@ -764,4 +764,3 @@ pub(super) fn remember_result(range: CellRange, state: ReuseEntry<CachedResult>)
         results.borrow_mut().insert(range, state);
     });
 }
-

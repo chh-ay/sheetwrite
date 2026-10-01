@@ -193,9 +193,7 @@ fn criterion_compare(left: &Value, right: &Value) -> Option<Ordering> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => left.partial_cmp(right),
         (Value::Bool(left), Value::Bool(right)) => Some(left.cmp(right)),
-        (Value::Text(left), Value::Text(right)) => {
-            Some(compare_text_case_insensitive(left, right))
-        }
+        (Value::Text(left), Value::Text(right)) => Some(compare_text_case_insensitive(left, right)),
         (Value::Blank, Value::Blank) => Some(Ordering::Equal),
         (Value::Blank, Value::Text(right)) if right.is_empty() => Some(Ordering::Equal),
         (Value::Text(left), Value::Blank) if left.is_empty() => Some(Ordering::Equal),
@@ -227,10 +225,7 @@ pub(super) struct IfSum {
 
 impl IfSum {
     pub(super) fn new() -> Self {
-        Self {
-            sum: 0.0,
-            count: 0,
-        }
+        Self { sum: 0.0, count: 0 }
     }
 
     /// Folds one matched row: a matched error stops the walk, and only

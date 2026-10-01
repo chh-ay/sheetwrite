@@ -53,6 +53,34 @@ thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
     static RANGE_SUM_CACHE: RefCell<HashMap<CellRange, EvalResult>> =
         RefCell::new(HashMap::new());
+    /// Values of the LET bindings of the evaluation in progress, indexed by
+    /// the slots of its expanded expression. Empty while no LET is running,
+    /// which leaves a slot use to evaluate its expression directly.
+    static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Runs `evaluate` with one empty slot per binding of a LET expansion and
+/// restores the slots of the enclosing evaluation afterwards.
+pub(super) fn with_let_slots<Output>(slots: u32, evaluate: impl FnOnce() -> Output) -> Output {
+    let previous = LET_SLOT_VALUES
+        .with(|values| std::mem::replace(&mut *values.borrow_mut(), vec![None; slots as usize]));
+    let result = evaluate();
+    LET_SLOT_VALUES.with(|values| *values.borrow_mut() = previous);
+    result
+}
+
+/// The value a binding slot already produced in this evaluation.
+fn cached_let_slot(slot: u32) -> Option<EvalResult> {
+    LET_SLOT_VALUES.with(|values| values.borrow().get(slot as usize).cloned().flatten())
+}
+
+/// Keeps a binding's value for the rest of the evaluation.
+fn remember_let_slot(slot: u32, value: EvalResult) {
+    LET_SLOT_VALUES.with(|values| {
+        if let Some(entry) = values.borrow_mut().get_mut(slot as usize) {
+            *entry = Some(value);
+        }
+    });
 }
 
 struct FormulaOriginGuard;
@@ -76,28 +104,38 @@ fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
 }
 
-type LetBinding<'a> = (&'a str, &'a Ast, usize);
+/// One LET binding: its name, its expression, how many earlier bindings its
+/// expression can see, and the slot its value is kept in.
+type LetBinding<'a> = (&'a str, &'a Ast, usize, u32);
 
-pub(super) fn expand_let_ast(args: &[Ast]) -> Result<Ast, FormulaError> {
+/// Expands a LET call into an expression tree where every binding use carries
+/// the slot its value is kept in, and reports how many slots the tree holds.
+pub(super) fn expand_let_ast(args: &[Ast]) -> Result<(Ast, u32), FormulaError> {
     let mut bindings = Vec::new();
     bindings
         .try_reserve(args.len() / 2)
         .map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
-    expand_let_args(args, &mut bindings, &mut nodes)
+    let mut next_slot = 0u32;
+    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot)?;
+    Ok((expanded, next_slot))
 }
 
+/// Expands every LET reachable from `ast`, for the analysis passes that read
+/// the expansion: dependency collection, volatility and array bounds.
 pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     let mut bindings = Vec::new();
     bindings.try_reserve(4).map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
-    expand_let_node(ast, &mut bindings, &mut nodes)
+    let mut next_slot = 0u32;
+    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot)
 }
 
 fn expand_let_args<'a>(
     args: &'a [Ast],
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
+    next_slot: &mut u32,
 ) -> Result<Ast, FormulaError> {
     if args.len() < 3 || args.len().is_multiple_of(2) || args.len() / 2 > LET_BINDING_LIMIT {
         return Err(FormulaError::Value);
@@ -113,9 +151,11 @@ fn expand_let_args<'a>(
             return Err(FormulaError::Value);
         }
         let visible = bindings.len();
-        bindings.push((name.as_str(), &pair[1], visible));
+        let slot = *next_slot;
+        *next_slot = next_slot.checked_add(1).ok_or(FormulaError::Num)?;
+        bindings.push((name.as_str(), &pair[1], visible, slot));
     }
-    let result = expand_let_node(&args[args.len() - 1], bindings, nodes);
+    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot);
     bindings.truncate(original_len);
     result
 }
@@ -141,48 +181,58 @@ fn expand_let_node<'a>(
     ast: &'a Ast,
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
+    next_slot: &mut u32,
 ) -> Result<Ast, FormulaError> {
     if let Ast::Name(name) = ast {
-        if let Some((_, expression, visible)) = bindings
+        if let Some((_, expression, visible, slot)) = bindings
             .iter()
             .rev()
-            .find(|(binding, _, _)| binding.eq_ignore_ascii_case(name))
+            .find(|(binding, _, _, _)| binding.eq_ignore_ascii_case(name))
             .copied()
         {
             let hidden = bindings.split_off(visible);
-            let result = expand_let_node(expression, bindings, nodes);
+            let result = expand_let_node(expression, bindings, nodes, next_slot);
             bindings.extend(hidden);
-            return result;
+            return Ok(Ast::LetSlot {
+                slot,
+                expression: Box::new(result?),
+            });
         }
     }
     count_let_node(nodes)?;
     Ok(match ast {
-        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes),
+        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
         Ast::Func(func, args) => Ast::Func(
             *func,
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes))
+                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
             name.clone(),
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes))
+                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::Bin(op, left, right) => Ast::Bin(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes)?),
-            Box::new(expand_let_node(right, bindings, nodes)?),
+            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
+            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
         ),
         Ast::Cmp(op, left, right) => Ast::Cmp(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes)?),
-            Box::new(expand_let_node(right, bindings, nodes)?),
+            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
+            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(inner, bindings, nodes)?)),
-        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(inner, bindings, nodes)?)),
-        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(inner, bindings, nodes)?)),
+        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
+        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
+        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(
+            inner, bindings, nodes, next_slot,
+        )?)),
         other => other.clone(),
     })
 }
@@ -798,6 +848,14 @@ impl CellStore {
                 depth + 1,
             ),
             Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
+            Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
+                Some(value) => value,
+                None => {
+                    let value = self.eval_ast(expression, sheet, affected, memo, visiting, depth);
+                    remember_let_slot(*slot, value.clone());
+                    value
+                }
+            },
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
                 Value::Error(FormulaError::Name)
             }
@@ -964,9 +1022,9 @@ impl CellStore {
 
         if func == Func::Let {
             return match expand_let_ast(args) {
-                Ok(expanded) => {
+                Ok((expanded, slots)) => with_let_slots(slots, || {
                     self.eval_ast(&expanded, sheet, affected, memo, visiting, depth + 1)
-                }
+                }),
                 Err(error) => Value::Error(error),
             };
         }
@@ -1680,10 +1738,11 @@ impl CellStore {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
-        let criterion = match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
-            Ok(criterion) => criterion,
-            Err(error) => return Some(Value::Error(error)),
-        };
+        let criterion =
+            match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
         let value_range = match args.get(2) {
             Some(ast) => range_from_ast(ast, sheet)?,
             None => criteria_range,

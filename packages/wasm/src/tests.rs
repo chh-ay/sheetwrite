@@ -2139,7 +2139,6 @@ fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
     ));
 }
 
-
 /// Lookups that share a range reuse one decode; the reuse must not survive
 /// the recalculation, so an edit to the table has to show up.
 mod lookup_reuse {
@@ -2205,9 +2204,15 @@ mod lookup_results {
     fn duplicates_and_sorted_modes_follow_the_lookup_rules() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(4, 8);
-        for (row, (key, result)) in [(1.0, 10.0), (2.0, 20.0), (2.0, 200.0), (3.0, 30.0), (4.0, 40.0)]
-            .iter()
-            .enumerate()
+        for (row, (key, result)) in [
+            (1.0, 10.0),
+            (2.0, 20.0),
+            (2.0, 200.0),
+            (3.0, 30.0),
+            (4.0, 40.0),
+        ]
+        .iter()
+        .enumerate()
         {
             store.set_number(sheet, row, 0, *key, 0);
             store.set_number(sheet, row, 1, *result, 0);
@@ -2399,5 +2404,63 @@ mod streamed_reductions {
         assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#DIV/0!"));
         assert_close(number(&store, sheet, 3, 2), 0.0);
         assert_close(number(&store, sheet, 4, 2), 2.0);
+    }
+}
+
+/// LET bindings through the public formula surface: unused bindings stay
+/// unevaluated, errors and shadowing behave as before, and range and array
+/// bindings keep their value shape.
+mod let_bindings {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn unused_bindings_are_not_evaluated_and_used_errors_propagate() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1/0,5)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1/0,x+1)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,y,1/0,x+y)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 5.0);
+        assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#DIV/0!"));
+    }
+
+    #[test]
+    fn bindings_keep_shadowing_and_visibility_rules() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1,x,2,x+10)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1,y,x+1,x+y)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,LET(y,3,x*y))", 0);
+        store.set_formula(sheet, 3, 0, "=LET(x,2,LET(x,3,x*2))", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 12.0);
+        assert_close(number(&store, sheet, 1, 0), 3.0);
+        assert_close(number(&store, sheet, 2, 0), 6.0);
+        assert_close(number(&store, sheet, 3, 0), 6.0);
+    }
+
+    #[test]
+    fn range_and_array_bindings_keep_their_value_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=LET(x,A1:A3,SUM(x))", 0);
+        store.set_formula(sheet, 1, 1, "=LET(x,A1:A3,SUM(x)+SUM(x))", 0);
+        store.set_formula(sheet, 2, 1, "=LET(x,A1:A3,MATCH(2,x,0))", 0);
+        store.set_formula(sheet, 3, 1, "=LET(x,SEQUENCE(3),SUM(x))", 0);
+        store.set_formula(sheet, 0, 3, "=LET(x,SEQUENCE(3),x)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 1), 6.0);
+        assert_close(number(&store, sheet, 1, 1), 12.0);
+        assert_close(number(&store, sheet, 2, 1), 2.0);
+        assert_close(number(&store, sheet, 3, 1), 6.0);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_close(number(&store, sheet, 2, 3), 3.0);
     }
 }
