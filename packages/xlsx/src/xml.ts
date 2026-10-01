@@ -19,6 +19,26 @@ interface MutableXmlElement {
   textBytes: number;
 }
 
+/**
+ * Streams the children of one element instead of retaining them in the tree.
+ * Used for the part elements whose child count dominates import memory; every
+ * other element keeps the tree reader.
+ */
+export interface XmlChildStream {
+  /** Local name of the element whose children are streamed. */
+  readonly parent: string;
+  /** Whether the streamed parent is the document root or a direct child of it. */
+  readonly parentIsRoot: boolean;
+  /**
+   * Called before the streamed parent's children are parsed, with the decoded
+   * document text, the offset just after its start tag, and the root element
+   * built so far. Returning false keeps the children in the tree instead.
+   */
+  readonly shouldStream?: (xml: string, startOffset: number, root: XmlElement) => boolean;
+  /** Receives each direct child instead of retaining it, in document order. */
+  readonly child: (element: XmlElement, root: XmlElement) => void;
+}
+
 function xmlFailure(part: string, message: string): never {
   throw new TypeError(`Sheetwrite: invalid XLSX XML in ${part}: ${message}`);
 }
@@ -144,7 +164,12 @@ function parseStartTag(
 }
 
 /** Parse a bounded XML part without DTDs, custom entities, or network-capable constructs. */
-export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecContext): XmlElement {
+export function parseXml(
+  bytes: Uint8Array,
+  part: string,
+  context: XlsxCodecContext,
+  stream?: XmlChildStream,
+): XmlElement {
   assertResource(context, "maxEntryUncompressedBytes", bytes.byteLength);
   let xml: string;
   try {
@@ -155,8 +180,12 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
   if (/<!DOCTYPE|<!ENTITY/i.test(xml)) return xmlFailure(part, "DTDs and entities are forbidden");
   const roots: MutableXmlElement[] = [];
   const stack: MutableXmlElement[] = [];
+  const childStream = stream;
   let elementCount = 0;
   let cursor = 0;
+  let streamedParent: MutableXmlElement | undefined;
+  let streamedChild: MutableXmlElement | undefined;
+  let streamedParentSeen = false;
   const appendText = (raw: string, cdata = false): void => {
     if (raw.length === 0) return;
     const current = stack.at(-1);
@@ -169,6 +198,12 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
     current.textBytes += decodedBytes;
     assertResource(context, "maxXmlTextBytes", current.textBytes);
     current.text += decoded;
+  };
+
+  const deliverStreamedChild = (element: MutableXmlElement, sink: XmlChildStream): void => {
+    const root = roots[0];
+    if (root === undefined) xmlFailure(part, "expected one root element, found 0");
+    sink.child(element, root);
   };
 
   while (cursor < xml.length) {
@@ -206,6 +241,11 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
       const current = stack.pop();
       if (!current || current.name !== name)
         return xmlFailure(part, `closing tag ${name} does not match`);
+      if (streamedChild === current) {
+        streamedChild = undefined;
+        if (childStream) deliverStreamedChild(current, childStream);
+      }
+      if (streamedParent === current) streamedParent = undefined;
       cursor = end + 1;
       continue;
     }
@@ -222,18 +262,49 @@ export function parseXml(bytes: Uint8Array, part: string, context: XlsxCodecCont
       textBytes: 0,
     };
     const parent = stack.at(-1);
-    if (parent) parent.children.push(element);
-    else roots.push(element);
+    const depth = stack.length + 1;
+    if (parent) {
+      if (streamedParent === parent) {
+        if (parsed.selfClosing) {
+          if (childStream) deliverStreamedChild(element, childStream);
+        } else {
+          streamedChild = element;
+        }
+      } else {
+        parent.children.push(element);
+      }
+    } else {
+      roots.push(element);
+    }
     if (!parsed.selfClosing) {
       stack.push(element);
       assertResource(context, "maxXmlDepth", stack.length);
     }
+    if (childStream && !streamedParentSeen) {
+      const expectedDepth = childStream.parentIsRoot ? 1 : 2;
+      if (depth === expectedDepth && xmlLocalName(element.name) === childStream.parent) {
+        // Only the first matching element streams: it is the one the tree reader
+        // would consume, so a later sibling keeps the tree path's behavior.
+        streamedParentSeen = true;
+        const root = roots[0];
+        if (
+          root !== undefined &&
+          !parsed.selfClosing &&
+          (childStream.shouldStream?.(xml, end + 1, root) ?? true)
+        ) {
+          streamedParent = element;
+        }
+      }
+    }
     cursor = end + 1;
   }
-  if (stack.length > 0) return xmlFailure(part, `element ${stack.at(-1)!.name} is unclosed`);
-  if (roots.length !== 1)
+  const unclosed = stack.at(-1);
+  if (unclosed) return xmlFailure(part, `element ${unclosed.name} is unclosed`);
+  const root = roots[0];
+  if (roots.length !== 1 || root === undefined) {
     return xmlFailure(part, `expected one root element, found ${roots.length}`);
-  return roots[0]!;
+  }
+  return root;
 }
 
 export function xmlLocalName(name: string): string {
@@ -315,6 +386,22 @@ export function encodeXstring(value: string): string {
   return output;
 }
 
+/** True when the element is the expected OOXML root in an allowed namespace. */
+export function xmlRootMatches(
+  root: XmlElement,
+  localName: string,
+  namespaces: readonly string[],
+): boolean {
+  const colon = root.name.indexOf(":");
+  const namespace =
+    colon < 0 ? root.attributes.xmlns : root.attributes[`xmlns:${root.name.slice(0, colon)}`];
+  return (
+    xmlLocalName(root.name) === localName &&
+    namespace !== undefined &&
+    namespaces.includes(namespace)
+  );
+}
+
 /** Require an expected OOXML root and one allowed Strict/Transitional namespace. */
 export function assertXmlRoot(
   root: XmlElement,
@@ -322,10 +409,7 @@ export function assertXmlRoot(
   namespaces: readonly string[],
   part: string,
 ): void {
-  const colon = root.name.indexOf(":");
-  const namespace =
-    colon < 0 ? root.attributes.xmlns : root.attributes[`xmlns:${root.name.slice(0, colon)}`];
-  if (xmlLocalName(root.name) !== localName || !namespace || !namespaces.includes(namespace)) {
+  if (!xmlRootMatches(root, localName, namespaces)) {
     xmlFailure(part, `expected ${localName} in an allowed OOXML namespace`);
   }
 }
