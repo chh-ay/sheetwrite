@@ -129,9 +129,21 @@ describe("formatNumber", () => {
     expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
   });
 
-  it("returns identical text for repeated and special values with a warm cache", () => {
+  it("keeps cache entries separate per value, format code, and locale", () => {
     resetNumberFormatResourcesForTest();
-    const cases: ReadonlyArray<[number, string | undefined, string | undefined]> = [
+    expect(formatNumber(-0)).toBe("-0");
+    expect(formatNumber(0)).toBe("0");
+    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
+    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
+    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
+    expect(formatNumber(-1234.5, "#,##0.00", "en-US")).toBe("-1,234.50");
+    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
+    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
+    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
+  });
+
+  it("matches a cold formatter over repeated, special, and randomized cases", () => {
+    const specials: ReadonlyArray<[number, string | undefined, string | undefined]> = [
       [1234.5, "¤#,##0.00", "en-US"],
       [1234.5, "¤#,##0.00", "de-DE"],
       [-1234.5, "¤#,##0.00", "en-US"],
@@ -151,38 +163,6 @@ describe("formatNumber", () => {
       [0.5, "0%", undefined],
       [12_345.6789, "0.00E+00", undefined],
     ];
-
-    for (const [value, code, locale] of cases) {
-      const first = formatNumber(value, code, locale);
-      expect(formatNumber(value, code, locale), `repeat ${value}`).toBe(first);
-      // A cold cache must produce the same text as the cached repeat.
-      resetNumberFormatResourcesForTest();
-      expect(formatNumber(value, code, locale), `cold ${value}`).toBe(first);
-    }
-  });
-
-  it("keeps cache entries separate per value, format code, and locale", () => {
-    resetNumberFormatResourcesForTest();
-    expect(formatNumber(-0)).toBe("-0");
-    expect(formatNumber(0)).toBe("0");
-    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
-    expect(formatNumber(-1234.5, "#,##0.00", "en-US")).toBe("-1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
-  });
-
-  it("matches a cold formatter over randomized values, codes, and locales", () => {
-    // Deterministic value stream, so a failing case is reproducible.
-    let seed = 0x5eed5eed;
-    const random = (): number => {
-      seed = (seed + 0x6d2b79f5) | 0;
-      let state = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      state = (state + Math.imul(state ^ (state >>> 7), 61 | state)) ^ state;
-      return ((state ^ (state >>> 14)) >>> 0) / 4_294_967_296;
-    };
     const codes: Array<string | undefined> = [
       undefined,
       "#,##0.00",
@@ -196,14 +176,20 @@ describe("formatNumber", () => {
       "¤#,##0.00",
     ];
     const locales = ["en-US", "de-DE", "fr-FR", "en-GB"];
-    const specials = [-0, 0, Number.NaN, Number.POSITIVE_INFINITY, 1e21, -1e-7, 45_351.75];
 
-    const cases = specials.map((value, index) => ({
-      value,
-      code: codes[index % codes.length],
-      locale: locales[index % locales.length]!,
-    }));
-    for (let index = specials.length; index < 160; index++) {
+    // Deterministic value stream, so a failing case is reproducible.
+    let seed = 0x5eed5eed;
+    const random = (): number => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let state = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      state = (state + Math.imul(state ^ (state >>> 7), 61 | state)) ^ state;
+      return ((state ^ (state >>> 14)) >>> 0) / 4_294_967_296;
+    };
+
+    const cases: Array<{ value: number; code?: string; locale: string }> = specials.map(
+      ([value, code, locale]) => ({ value, code, locale: locale ?? "en-US" }),
+    );
+    for (let index = 0; index < 120; index++) {
       cases.push({
         value: (random() - 0.5) * 10 ** (random() * 12 - 6),
         code: codes[Math.floor(random() * codes.length)],

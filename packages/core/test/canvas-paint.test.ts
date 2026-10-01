@@ -3,7 +3,6 @@ import {
   blitVerticalScroll,
   fontFor,
   getMergeIndexResourceStatsForTest,
-  layoutTextLines,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
@@ -414,15 +413,18 @@ describe("paintFrame typography and wrapping", () => {
     expect(painted).toEqual(["ab", "cd", "ef"]);
   });
 
-  it("draws the same wrapped lines when layout stops at the cell height", () => {
+  it("draws only the wrapped lines that fit, in the top-anchored positions", () => {
     const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
     const styleIds = Uint32Array.from([1, 0, 0]);
     const styles = [{}, { wrap: true }];
-    // Two characters per line under the recording metrics: 18 lines for a 48px
-    // row whose line height is 14.4px, so the bound engages.
+    // Two characters per line under the recording metrics, so the full layout
+    // has 18 lines while a 48px row fits four 14.4px lines.
     const text = "abcdefghijklmnopqrstuvwxyz0123456789";
     const view = makeView(styleIds, styles, [0]);
     (view.values as string[])[0] = text;
+    // Empty neighbours keep the recorded run free of unrelated body text.
+    (view.values as string[])[1] = "";
+    (view.values as string[])[2] = "";
     const viewport = {
       ...UNIFORM_VIEWPORT,
       rowTops: Float64Array.from([0, 48, 72]),
@@ -430,19 +432,11 @@ describe("paintFrame typography and wrapping", () => {
     };
 
     const ctx = render(view, layout, viewport);
-    const painted = ctx.fillTexts.filter(
-      (call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48 && call.x === 6,
-    );
-    const full = layoutTextLines(
-      makeRecordingCtx() as unknown as CanvasRenderingContext2D,
-      text,
-      26 - 12,
-    );
+    const painted = ctx.fillTexts.filter((call) => call.y >= HEADER_HEIGHT && call.x === 6);
 
-    expect(full.length).toBeGreaterThan(painted.length);
-    expect(painted.map((call) => call.text)).toEqual(full.slice(0, painted.length));
-    // A block taller than the cell is top-anchored, so every drawn line keeps
-    // the y position the full layout would have given it.
+    expect(painted.map((call) => call.text)).toEqual(["ab", "cd", "ef", "gh"]);
+    // A block taller than the cell is top-anchored, so the lines keep the y
+    // positions the full layout would have given them.
     const lineHeight = 12 * 1.2;
     expect(painted.map((call) => call.y)).toEqual(
       painted.map((_call, index) => HEADER_HEIGHT + lineHeight / 2 + index * lineHeight),
