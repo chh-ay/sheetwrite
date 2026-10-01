@@ -828,55 +828,6 @@ impl CellStore {
     }
 }
 
-/// Distinct scan that keys every value by content, hashing strings. The pool-id
-/// path replaced it; the randomized equivalence test compares the two.
-#[cfg(test)]
-pub(crate) fn distinct_values_by_content(
-    strings: &StringPool,
-    data: &SheetData,
-    col: usize,
-    limit: usize,
-) -> DistinctColumn {
-    let mut out = DistinctColumn::default();
-    let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
-    for row in 0..data.row_count {
-        let index = col * data.row_count + row;
-        let kind = resolved_kind(data, index);
-        let text = if kind == 2 {
-            resolved_text(data, strings, index).unwrap_or("")
-        } else {
-            ""
-        };
-        let key = match kind {
-            1 => DistinctKey::Number(numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
-            2 => DistinctKey::Text(text),
-            3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
-            _ => DistinctKey::Blank,
-        };
-        if !seen.insert(key) {
-            continue;
-        }
-        out.kinds.push(kind);
-        if kind == 1 {
-            out.numbers
-                .push(numeric_cell_value(data, index).unwrap_or(0.0));
-        } else if kind == 3 {
-            out.numbers
-                .push(if boolean_cell_value(data, index).unwrap_or(false) {
-                    1.0
-                } else {
-                    0.0
-                });
-        } else if kind == 2 {
-            out.texts.push(text.to_owned());
-        }
-        if limit != 0 && out.kinds.len() >= limit {
-            break;
-        }
-    }
-    out
-}
-
 fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
     match sheet.kind_at(index) {
         KIND_NUMBER => 1,

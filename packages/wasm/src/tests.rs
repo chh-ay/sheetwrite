@@ -1559,96 +1559,95 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }
 
-/// Fixed-seed generator for a mixed-type column: repeated pooled text, numbers
-/// (including `-0.0` and `NaN`), booleans, blanks, an error formula and a text
-/// formula, so every branch of the distinct scan runs on both paths.
-fn fill_mixed_query_column(
-    store: &mut CellStore,
-    sheet: usize,
-    col: usize,
-    rows: usize,
-    seed: &mut u64,
-) {
-    const TEXTS: [&str; 4] = ["Alpha", "Beta", "Gamma", ""];
-    for row in 0..rows {
-        *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-        match (*seed >> 32) % 12 {
-            0..=3 => {
-                *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-                let text = TEXTS[((*seed >> 32) % TEXTS.len() as u64) as usize];
-                store.set_string(sheet, row, col, text, 0);
-            }
-            4 => store.set_number(sheet, row, col, 1.5, 0),
-            5 => store.set_number(sheet, row, col, -0.0, 0),
-            6 => store.set_number(sheet, row, col, 0.0, 0),
-            7 => store.set_number(sheet, row, col, f64::NAN, 0),
-            8 => store.set_bool(sheet, row, col, (*seed >> 32) % 2 == 0, 0),
-            9 => {}
-            10 => {
-                store.set_formula(sheet, row, col, "=1/0", 0);
-            }
-            _ => {
-                store.set_formula(sheet, row, col, "=\"Alpha\"", 0);
-            }
-        }
-    }
-    store.recompute(sheet);
-}
-
-/// Bit-exact comparison of the pool-id scan against the content-hashing scan.
-fn assert_distinct_matches_content_scan(store: &CellStore, sheet: usize, col: usize, limit: usize) {
-    let mut pool_id_scan = store.distinct_values(sheet, col, limit);
-    let mut content_scan =
-        crate::query::distinct_values_by_content(&store.strings, &store.sheets[sheet], col, limit);
-    let bits = |values: Vec<f64>| values.into_iter().map(f64::to_bits).collect::<Vec<_>>();
-    assert_eq!(
-        pool_id_scan.take_kinds(),
-        content_scan.take_kinds(),
-        "kinds differ at limit {limit}"
-    );
-    assert_eq!(
-        bits(pool_id_scan.take_numbers()),
-        bits(content_scan.take_numbers()),
-        "numbers differ at limit {limit}"
-    );
-    assert_eq!(
-        pool_id_scan.take_texts(),
-        content_scan.take_texts(),
-        "texts differ at limit {limit}"
-    );
-}
-
-#[test]
-fn distinct_values_match_the_content_scan_on_random_mixed_columns() {
-    let mut seed = 0x5EED_1234_ABCD_0001u64;
-    for _ in 0..8 {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(1, 512);
-        fill_mixed_query_column(&mut store, sheet, 0, 512, &mut seed);
-        for limit in [0usize, 1, 7, 64, 4096] {
-            assert_distinct_matches_content_scan(&store, sheet, 0, limit);
-        }
-    }
-}
-
-#[test]
-fn distinct_values_keep_first_seen_order_across_pooled_text_numbers_and_errors() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(1, 8);
+/// Column 0 of 16 rows covering every kind the distinct scan distinguishes:
+/// numbers (`-0.0`, `0.0` and NaN included), pooled text with repeats, a blank,
+/// booleans, an error formula whose text carries no pool id, and a text formula
+/// whose result equals a stored string.
+fn fill_mixed_distinct_column(store: &mut CellStore, sheet: usize) {
     store.set_string(sheet, 0, 0, "Beta", 0);
-    store.set_string(sheet, 1, 0, "Alpha", 0);
-    store.set_number(sheet, 2, 0, 2.0, 0);
-    store.set_string(sheet, 3, 0, "Beta", 0);
+    store.set_number(sheet, 1, 0, 2.0, 0);
+    store.set_string(sheet, 2, 0, "Beta", 0);
+    store.set_formula(sheet, 3, 0, "=1/0", 0);
     store.set_number(sheet, 4, 0, 2.0, 0);
     store.set_bool(sheet, 5, 0, true, 0);
-    store.set_formula(sheet, 6, 0, "=1/0", 0);
-    store.set_string(sheet, 7, 0, "Alpha", 0);
+    store.set_number(sheet, 6, 0, -0.0, 0);
+    store.set_number(sheet, 7, 0, 0.0, 0);
+    store.set_number(sheet, 8, 0, f64::NAN, 0);
+    store.set_number(sheet, 9, 0, f64::NAN, 0);
+    // Row 10 stays blank.
+    store.set_string(sheet, 11, 0, "Alpha", 0);
+    store.set_formula(sheet, 12, 0, "=\"Alpha\"", 0);
+    store.set_string(sheet, 13, 0, "Beta", 0);
+    store.set_bool(sheet, 14, 0, false, 0);
+    store.set_formula(sheet, 15, 0, "=1+0", 0);
     store.recompute(sheet);
+}
+
+fn distinct_number_bits(column: &mut crate::query::DistinctColumn) -> Vec<u64> {
+    column
+        .take_numbers()
+        .into_iter()
+        .map(f64::to_bits)
+        .collect()
+}
+
+#[test]
+fn distinct_values_keep_first_seen_order_across_mixed_kinds() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 16);
+    fill_mixed_distinct_column(&mut store, sheet);
 
     let mut column = store.distinct_values(sheet, 0, 0);
-    assert_eq!(column.take_kinds(), vec![2, 2, 1, 3, 2]);
-    assert_eq!(column.take_numbers(), vec![2.0, 1.0]);
-    assert_eq!(column.take_texts(), vec!["Beta", "Alpha", "#DIV/0!"]);
+    // Text, number, error text, boolean, `-0.0`, `0.0`, NaN, blank, the pooled
+    // "Alpha" a formula also returns, false, then the numeric formula result.
+    assert_eq!(column.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0, 2, 3, 1]);
+    assert_eq!(
+        distinct_number_bits(&mut column),
+        vec![
+            2.0f64.to_bits(),
+            1.0f64.to_bits(),
+            (-0.0f64).to_bits(),
+            0.0f64.to_bits(),
+            f64::NAN.to_bits(),
+            0.0f64.to_bits(),
+            1.0f64.to_bits(),
+        ]
+    );
+    assert_eq!(column.take_texts(), vec!["Beta", "#DIV/0!", "Alpha"]);
+}
+
+#[test]
+fn distinct_values_limit_stops_the_first_seen_scan() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 16);
+    fill_mixed_distinct_column(&mut store, sheet);
+
+    // The error formula at row 3 restarts the scan on content hashing, so a
+    // limit that lands past it still returns identical values.
+    let mut three = store.distinct_values(sheet, 0, 3);
+    assert_eq!(three.take_kinds(), vec![2, 1, 2]);
+    assert_eq!(distinct_number_bits(&mut three), vec![2.0f64.to_bits()]);
+    assert_eq!(three.take_texts(), vec!["Beta", "#DIV/0!"]);
+
+    // Eight entries include the blank, the `-0.0`/`0.0` pair and NaN.
+    let mut eight = store.distinct_values(sheet, 0, 8);
+    assert_eq!(eight.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0]);
+    assert_eq!(
+        distinct_number_bits(&mut eight),
+        vec![
+            2.0f64.to_bits(),
+            1.0f64.to_bits(),
+            (-0.0f64).to_bits(),
+            0.0f64.to_bits(),
+            f64::NAN.to_bits(),
+        ]
+    );
+    assert_eq!(eight.take_texts(), vec!["Beta", "#DIV/0!"]);
+
+    // A limit past the distinct count returns the whole list.
+    let mut all = store.distinct_values(sheet, 0, 64);
+    assert_eq!(all.take_kinds().len(), 11);
+    assert_eq!(all.take_texts(), vec!["Beta", "#DIV/0!", "Alpha"]);
 }
 
 #[test]
@@ -2358,129 +2357,120 @@ mod value_set_filter {
     }
 }
 
-/// Multi-key sort coverage: decorating once per key must produce exactly the
-/// order the per-comparison comparator produced, including NaN keys, blanks,
-/// mixed types and candidate lists.
-mod multi_key_sort_order {
-    use std::cmp::Ordering;
+/// Multi-key sort coverage over hand-written fixtures: ties keep the row id,
+/// keys can descend, candidate lists drop out-of-range rows, kinds order as
+/// numbers, text, booleans, blanks, and `-0.0` compares equal to `0.0`.
+mod multi_key_sort_fixtures {
+    use super::*;
 
-    use crate::query::ComparableCell;
-    use crate::*;
-
-    /// Rebuilds both keys inside every comparison, the way the multi-key sort
-    /// did before it decorated once per key.
-    fn sort_rows_multi_reference(
-        store: &CellStore,
-        sheet: usize,
-        cols: &[u32],
-        ascending: &[u8],
-        candidates: &[u32],
-    ) -> Vec<u32> {
-        let data = &store.sheets[sheet];
-        let mut rows: Vec<u32> = if candidates.is_empty() {
-            (0..data.row_count as u32).collect()
-        } else {
-            candidates
-                .iter()
-                .copied()
-                .filter(|&row| (row as usize) < data.row_count)
-                .collect()
-        };
-        rows.sort_by(|&left, &right| {
-            for (key, &col) in cols.iter().enumerate() {
-                let base = col as usize * data.row_count;
-                let a = ComparableCell::from_cell(data, &store.strings, base + left as usize);
-                let b = ComparableCell::from_cell(data, &store.strings, base + right as usize);
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
-                    a.cmp(&b)
-                } else {
-                    b.cmp(&a)
-                };
-                if order != Ordering::Equal {
-                    return order;
-                }
-            }
-            left.cmp(&right)
-        });
-        rows
-    }
-
-    /// Three columns of mixed kinds: text, booleans, blanks and formula results
-    /// in column 0, numbers (`-0.0` and duplicates included) in column 1,
-    /// repeated text in column 2.
-    ///
-    /// NaN stays out of the key columns on purpose: `OrderedNumber` compares it
-    /// equal to everything, so it is not a total order, and the standard
-    /// library's debug check rejects such a comparator outright. The comparator
-    /// before this change had the same property, so NaN keys sort the same way
-    /// (an unspecified one) as they always did.
-    fn fill_sort_table(store: &mut CellStore, sheet: usize, row_count: usize) {
-        const TEXTS: [&str; 4] = ["Alpha", "beta", "Gamma", "beta"];
-        let mut state = 0x2545_F491_4F6C_DD1Du64;
-        for row in 0..row_count {
-            state = state
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1);
-            match (state >> 32) % 8 {
-                0 => {}
-                1 => store.set_number(sheet, row, 0, ((state >> 8) % 5) as f64, 0),
-                2 => store.set_string(sheet, row, 0, TEXTS[((state >> 16) % 4) as usize], 0),
-                3 => store.set_bool(sheet, row, 0, (state >> 24) % 2 == 0, 0),
-                4 => {
-                    store.set_formula(sheet, row, 0, "=1/0", 0);
-                }
-                _ => {
-                    store.set_formula(sheet, row, 0, "=\"Alpha\"", 0);
-                }
-            }
-            let number = match (state >> 40) % 8 {
-                0 => -0.0,
-                1 => 0.0,
-                _ => (((state >> 44) % 7) as f64) - 3.0,
-            };
-            store.set_number(sheet, row, 1, number, 0);
-            store.set_string(sheet, row, 2, TEXTS[((state >> 52) % 4) as usize], 0);
-        }
-        store.recompute(sheet);
+    /// Two keys of five rows: (col0 text, col1 number).
+    fn text_number_fixture() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 5);
+        store.set_string(sheet, 0, 0, "b", 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_string(sheet, 1, 0, "a", 0);
+        store.set_number(sheet, 1, 1, 5.0, 0);
+        store.set_string(sheet, 2, 0, "b", 0);
+        store.set_number(sheet, 2, 1, 1.0, 0);
+        store.set_string(sheet, 3, 0, "a", 0);
+        store.set_number(sheet, 3, 1, 5.0, 0);
+        store.set_string(sheet, 4, 0, "c", 0);
+        store.set_number(sheet, 4, 1, 3.0, 0);
+        (store, sheet)
     }
 
     #[test]
-    fn multi_key_sort_matches_the_per_comparison_comparator() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(3, 200);
-        fill_sort_table(&mut store, sheet, 200);
-        let candidates: Vec<u32> = (0..200u32).filter(|row| row % 3 != 0).collect();
-        let plans: [(Vec<u32>, Vec<u8>); 4] = [
-            (vec![0, 1, 2], vec![1, 0, 1]),
-            (vec![2, 0], vec![0, 0]),
-            (vec![1, 2, 0], vec![1, 1, 1]),
-            (vec![1, 0], vec![1, 1]),
-        ];
-        for (cols, ascending) in plans {
-            let expected = sort_rows_multi_reference(&store, sheet, &cols, &ascending, &[]);
-            assert_eq!(
-                store.sort_rows_multi(sheet, &cols, &ascending, &[]),
-                expected,
-                "full sort, cols {cols:?}, ascending {ascending:?}"
-            );
-            let expected_candidates =
-                sort_rows_multi_reference(&store, sheet, &cols, &ascending, &candidates);
-            assert_eq!(
-                store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
-                expected_candidates,
-                "candidate sort, cols {cols:?}, ascending {ascending:?}"
-            );
-        }
-        // A single key over a candidate list also takes the multi-key path (the
-        // full sort of one key delegates to the single-key sort).
-        let cols = [1u32];
-        let ascending = [1u8];
-        let expected_candidates =
-            sort_rows_multi_reference(&store, sheet, &cols, &ascending, &candidates);
+    fn multi_key_sort_ties_keep_the_row_id() {
+        let (store, sheet) = text_number_fixture();
+        // Rows 1 and 3 share both keys, so the row id keeps them in order.
         assert_eq!(
-            store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
-            expected_candidates,
-            "single-key candidate sort"
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![1, 3, 2, 0, 4]
+        );
+        // Descending leading key, ascending second key.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
+            vec![4, 2, 0, 1, 3]
+        );
+        // Both keys descending.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 0], &[]),
+            vec![4, 0, 2, 1, 3]
+        );
+    }
+
+    #[test]
+    fn multi_key_sort_filters_candidates_and_keeps_their_order() {
+        let (store, sheet) = text_number_fixture();
+        // 99 is out of range and drops out; the rest sort as the full list does.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[0, 2, 3, 99]),
+            vec![3, 2, 0]
+        );
+        // One key over a candidate list takes the multi-key path too.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[1], &[0], &[0, 2, 3]),
+            vec![3, 0, 2]
+        );
+    }
+
+    /// Column 0 mixes a number, text, a blank, booleans, an error formula and a
+    /// numeric formula; column 1 is constant so equal keys fall to the row id.
+    fn mixed_kind_fixture() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 9);
+        store.set_number(sheet, 0, 0, 2.0, 0);
+        store.set_string(sheet, 1, 0, "a", 0);
+        // Row 2 stays blank.
+        store.set_bool(sheet, 3, 0, true, 0);
+        store.set_number(sheet, 4, 0, 1.0, 0);
+        store.set_string(sheet, 5, 0, "b", 0);
+        store.set_bool(sheet, 6, 0, false, 0);
+        store.set_formula(sheet, 7, 0, "=1/0", 0);
+        store.set_formula(sheet, 8, 0, "=2+1", 0);
+        for row in 0..9 {
+            store.set_string(sheet, row, 1, "const", 0);
+        }
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn multi_key_sort_orders_kinds_numbers_text_booleans_blanks() {
+        let (store, sheet) = mixed_kind_fixture();
+        // Ascending: numbers 1.0, 2.0, 3.0; then error text, "a", "b"; then
+        // false, true; the blank sorts last. Descending reverses each group.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![4, 0, 8, 7, 1, 5, 6, 3, 2]
+        );
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
+            vec![2, 3, 6, 5, 1, 7, 8, 0, 4]
+        );
+        // Candidates restrict the same order to the picked rows.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[1, 3, 8, 12]),
+            vec![8, 1, 3]
+        );
+    }
+
+    #[test]
+    fn multi_key_sort_compares_negative_zero_as_equal_to_zero() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 4);
+        store.set_number(sheet, 0, 0, 0.0, 0);
+        store.set_number(sheet, 1, 0, -0.0, 0);
+        store.set_number(sheet, 2, 0, 1.0, 0);
+        store.set_number(sheet, 3, 0, -0.0, 0);
+        for row in 0..4 {
+            store.set_string(sheet, row, 1, "k", 0);
+        }
+        // `-0.0 == 0.0`, so the three equal keys keep row-id order.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![0, 1, 3, 2]
         );
     }
 }
