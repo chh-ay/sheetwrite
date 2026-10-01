@@ -2472,6 +2472,8 @@ mod multi_key_sort_fixtures {
             store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
             vec![0, 1, 3, 2]
         );
+    }
+}
 
 mod formula_dependency_epoch {
     use super::*;
