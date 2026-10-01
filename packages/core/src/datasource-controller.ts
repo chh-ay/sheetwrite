@@ -1,3 +1,4 @@
+import { storeEngine } from "./store/engine-registry.js";
 import type { SheetwriteStore } from "./store.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type {
@@ -1573,6 +1574,15 @@ export class DatasourceController {
     return Math.max(0, this.speculativeRowHorizon(columnCount) - active.length);
   }
 
+  /**
+   * Align the known loaded bands with what the paged store actually holds.
+   *
+   * A row band the store holds in full is added outright. Otherwise one span
+   * call per column returns the loaded runs, and every band row outside a run is
+   * dropped — one call per column instead of a call per probed row band. A store
+   * that exposes no engine (a stand-in implementing the public surface only)
+   * keeps the row-band probe.
+   */
   private refreshPagedResidency(
     loadable: SheetwriteStore | null,
     start: number,
@@ -1586,36 +1596,66 @@ export class DatasourceController {
       this.loaded.add(columns, start, end);
       return;
     }
-    const schema = this.schema();
+    const engine = storeEngine(loadable);
     for (const column of columns) {
       const resident = this.loaded.rows(column);
       if (!resident) continue;
-      let singleton = schema.singletonIndices.get(column);
-      if (!singleton) {
-        singleton = Object.freeze([column]);
-        schema.singletonIndices.set(column, singleton);
-      }
+      const spans = engine?.loadedSpans(sheet, start, end, column);
       for (const band of resident.intersections(start, end)) {
-        this.reconcileLoadedResidency(loadable, sheet, singleton, band.start, band.end);
+        if (spans === undefined)
+          this.probeLoadedResidency(loadable, sheet, column, band.start, band.end);
+        else this.retainLoadedRuns(column, band.start, band.end, spans);
       }
     }
   }
 
-  private reconcileLoadedResidency(
+  /**
+   * Drop the rows of `[start, end)` the store does not hold, by asking it about
+   * one row band at a time. Used when no engine is registered.
+   */
+  private probeLoadedResidency(
     loadable: SheetwriteStore,
     sheet: SheetId,
-    columns: readonly number[],
+    column: number,
     start: number,
     end: number,
   ): void {
-    if (loadable.areColumnsFullyLoaded(sheet, start, end, columns)) return;
+    if (loadable.areColumnsFullyLoaded(sheet, start, end, this.singletonColumns(column))) return;
     if (end - start === 1) {
-      this.loaded.removeColumn(columns[0]!, start, end);
+      this.loaded.removeColumn(column, start, end);
       return;
     }
     const middle = start + Math.floor((end - start) / 2);
-    this.reconcileLoadedResidency(loadable, sheet, columns, start, middle);
-    this.reconcileLoadedResidency(loadable, sheet, columns, middle, end);
+    this.probeLoadedResidency(loadable, sheet, column, start, middle);
+    this.probeLoadedResidency(loadable, sheet, column, middle, end);
+  }
+
+  private singletonColumns(column: number): readonly number[] {
+    const schema = this.schema();
+    let singleton = schema.singletonIndices.get(column);
+    if (!singleton) {
+      singleton = Object.freeze([column]);
+      schema.singletonIndices.set(column, singleton);
+    }
+    return singleton;
+  }
+
+  /** Drop every row of `[start, end)` that the ascending `spans` pairs miss. */
+  private retainLoadedRuns(column: number, start: number, end: number, spans: Uint32Array): void {
+    let cursor = start;
+    for (let index = 0; index < spans.length; index += 2) {
+      const spanStart = spans[index];
+      const spanEnd = spans[index + 1];
+      if (spanStart === undefined || spanEnd === undefined) {
+        throw new Error("Sheetwrite: loaded row spans are not a pair sequence");
+      }
+      if (spanEnd <= cursor) continue;
+      if (spanStart >= end) break;
+      if (spanStart > cursor) this.loaded.removeColumn(column, cursor, Math.min(spanStart, end));
+      cursor = Math.min(spanEnd, end);
+      if (cursor >= end) return;
+    }
+    if (cursor < end) this.loaded.removeColumn(column, cursor, end);
   }
 
   private cancelObsoleteSpeculation(

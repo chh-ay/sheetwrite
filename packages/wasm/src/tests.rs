@@ -902,7 +902,7 @@ fn public_api_bounds_checks_do_not_panic() {
         assert_eq!(store.style_id_at(99, 0, 0), 0);
         assert_eq!(store.style_id_at(sheet, 9, 9), 0);
         assert_ne!(
-            store.set_block(
+            store.set_block_packed(
                 99,
                 0,
                 0,
@@ -910,7 +910,8 @@ fn public_api_bounds_checks_do_not_panic() {
                 1,
                 &[KIND_EMPTY],
                 &[0.0],
-                vec![String::new()],
+                &[],
+                &[0],
                 &[0],
                 &[],
                 Vec::new(),
@@ -1566,7 +1567,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let sheet = store.add_sheet(2, 2);
     store.set_sheet_name(sheet, "s1", "Sheet 1");
     assert_eq!(
-        store.set_block(
+        store.set_block_packed(
             sheet,
             0,
             0,
@@ -1574,12 +1575,8 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
             2,
             &[KIND_NUMBER, KIND_EMPTY, KIND_EMPTY, KIND_STRING],
             &[2.0, 0.0, 0.0, 0.0],
-            vec![
-                String::new(),
-                String::new(),
-                String::new(),
-                "tail".to_string(),
-            ],
+            b"tail",
+            &[0, 4],
             &[1, 2, 3, 4],
             &[1],
             vec!["=A1*3".to_string()],
@@ -2137,4 +2134,338 @@ fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
         vec!["value".into()],
         vec!["Value".into()],
     ));
+}
+
+/// One cell of the input-order equivalence probe, described in row-major order.
+struct ProbeCell {
+    kind: u8,
+    number: f64,
+    text: &'static str,
+    style: u32,
+    formula_source: Option<String>,
+    is_reference: bool,
+}
+
+/// Append the probe's string cells to a packed text payload in the given order.
+fn push_probe_text(
+    cells: &[ProbeCell],
+    order: impl Iterator<Item = usize>,
+    text: &mut Vec<u8>,
+    offsets: &mut Vec<u32>,
+) {
+    for index in order {
+        let cell = &cells[index];
+        if cell.kind == KIND_STRING {
+            text.extend_from_slice(cell.text.as_bytes());
+            offsets.push(text.len() as u32);
+        }
+    }
+}
+
+#[test]
+fn column_major_block_input_matches_row_major_for_mixed_cells() {
+    const ROWS: usize = 6;
+    const COLS: usize = 4;
+    const TEXT_POOL: [&str; 4] = ["", "alpha", "雪😀", "omega"];
+    let mut cells = Vec::with_capacity(ROWS * COLS);
+    for index in 0..ROWS * COLS {
+        let formula_source = (index % 7 == 3).then(|| format!("=A1+{index}"));
+        let is_reference = formula_source.is_none() && index % 11 == 5;
+        // Formula cells carry a string kind and text so the packed payload has
+        // to consume their slot without interning it.
+        let kind = if formula_source.is_some() {
+            KIND_STRING
+        } else {
+            match index % 5 {
+                0 => KIND_EMPTY,
+                1 | 4 => KIND_NUMBER,
+                2 => KIND_BOOL,
+                _ => KIND_STRING,
+            }
+        };
+        cells.push(ProbeCell {
+            kind,
+            number: index as f64 + 0.5,
+            text: TEXT_POOL[index % TEXT_POOL.len()],
+            style: index as u32 % 3 + 1,
+            formula_source,
+            is_reference,
+        });
+    }
+
+    let mut row_kinds = Vec::with_capacity(cells.len());
+    let mut row_numbers = Vec::with_capacity(cells.len());
+    let mut row_styles = Vec::with_capacity(cells.len());
+    let mut column_kinds = vec![KIND_EMPTY; cells.len()];
+    let mut column_numbers = vec![0.0; cells.len()];
+    let mut column_styles = vec![0u32; cells.len()];
+    for (index, cell) in cells.iter().enumerate() {
+        row_kinds.push(cell.kind);
+        row_numbers.push(cell.number);
+        row_styles.push(cell.style);
+        let column_index = (index % COLS) * ROWS + index / COLS;
+        column_kinds[column_index] = cell.kind;
+        column_numbers[column_index] = cell.number;
+        column_styles[column_index] = cell.style;
+    }
+
+    let mut row_text = Vec::new();
+    let mut row_text_offsets = vec![0u32];
+    let mut column_text = Vec::new();
+    let mut column_text_offsets = vec![0u32];
+    push_probe_text(&cells, 0..cells.len(), &mut row_text, &mut row_text_offsets);
+    push_probe_text(
+        &cells,
+        (0..COLS).flat_map(|col| (0..ROWS).map(move |row| row * COLS + col)),
+        &mut column_text,
+        &mut column_text_offsets,
+    );
+    assert_ne!(
+        row_text, column_text,
+        "the probe must exercise both text orders"
+    );
+
+    let mut row_formula_offsets = Vec::new();
+    let mut row_formula_sources = Vec::new();
+    for (index, cell) in cells.iter().enumerate() {
+        if let Some(source) = &cell.formula_source {
+            row_formula_offsets.push(index as u32);
+            row_formula_sources.push(source.clone());
+        }
+    }
+    let mut column_formula_offsets = Vec::new();
+    let mut column_formula_sources = Vec::new();
+    for col in 0..COLS {
+        for row in 0..ROWS {
+            let index = row * COLS + col;
+            if let Some(source) = &cells[index].formula_source {
+                column_formula_offsets.push((col * ROWS + row) as u32);
+                column_formula_sources.push(source.clone());
+            }
+        }
+    }
+    let mut row_reference_offsets = Vec::new();
+    let mut column_reference_offsets = Vec::new();
+    for (index, cell) in cells.iter().enumerate() {
+        if cell.is_reference {
+            row_reference_offsets.push(index as u32);
+            column_reference_offsets.push(((index % COLS) * ROWS + index / COLS) as u32);
+        }
+    }
+
+    let mut row_major = CellStore::new();
+    let row_sheet = row_major.add_sheet(COLS, ROWS);
+    let row_targets: Vec<u32> = row_reference_offsets
+        .iter()
+        .flat_map(|_| [row_sheet as u32, 0, 0])
+        .collect();
+    assert_eq!(
+        row_major.set_block_packed(
+            row_sheet,
+            0,
+            0,
+            ROWS,
+            COLS,
+            &row_kinds,
+            &row_numbers,
+            &row_text,
+            &row_text_offsets,
+            &row_styles,
+            &row_formula_offsets,
+            row_formula_sources,
+            &row_reference_offsets,
+            &row_targets,
+        ),
+        0
+    );
+
+    let mut column_major = CellStore::new();
+    let column_sheet = column_major.add_sheet(COLS, ROWS);
+    let column_targets: Vec<u32> = column_reference_offsets
+        .iter()
+        .flat_map(|_| [column_sheet as u32, 0, 0])
+        .collect();
+    assert_eq!(
+        column_major.set_column_block_packed(
+            column_sheet,
+            0,
+            0,
+            ROWS,
+            COLS,
+            &column_kinds,
+            &column_numbers,
+            &column_text,
+            &column_text_offsets,
+            &column_styles,
+            &column_formula_offsets,
+            column_formula_sources,
+            &column_reference_offsets,
+            &column_targets,
+        ),
+        0
+    );
+
+    row_major.recompute_changed_sources();
+    column_major.recompute_changed_sources();
+    for row in 0..ROWS {
+        for col in 0..COLS {
+            let expected = row_major.get_cell(row_sheet, row, col);
+            let actual = column_major.get_cell(column_sheet, row, col);
+            assert_eq!(actual.kind(), expected.kind(), "kind at {row}:{col}");
+            assert_close(actual.num(), expected.num());
+            assert_eq!(actual.string(), expected.string(), "text at {row}:{col}");
+            assert_eq!(actual.style(), expected.style(), "style at {row}:{col}");
+        }
+    }
+
+    let row_sources = row_major
+        .capture_sources(row_sheet, 0, 0, ROWS, COLS)
+        .expect("row-major sources");
+    let column_sources = column_major
+        .capture_sources(column_sheet, 0, 0, ROWS, COLS)
+        .expect("column-major sources");
+    assert_eq!(
+        row_sources.formula_offsets(),
+        column_sources.formula_offsets()
+    );
+    assert_eq!(
+        row_sources.formula_sources(),
+        column_sources.formula_sources()
+    );
+    assert_eq!(
+        row_sources.reference_offsets(),
+        column_sources.reference_offsets()
+    );
+    assert_eq!(
+        row_sources.reference_targets(),
+        column_sources.reference_targets()
+    );
+}
+
+/// Compact status the store returns for invalid or duplicate source metadata.
+const INVALID_SOURCE_STATUS: u32 = 2;
+
+#[test]
+fn column_major_block_input_rejects_metadata_that_row_major_rejects() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    // Two string cells but only one text boundary.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            2,
+            1,
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            b"x",
+            &[0, 1],
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+    // Out-of-bounds formula offset.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            1,
+            1,
+            &[KIND_EMPTY],
+            &[0.0],
+            &[],
+            &[0],
+            &[0],
+            &[4],
+            vec!["=A1".to_string()],
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+    // Duplicate source offset.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            2,
+            1,
+            &[KIND_EMPTY, KIND_EMPTY],
+            &[0.0, 0.0],
+            &[],
+            &[0],
+            &[0, 0],
+            &[0, 0],
+            vec!["=A1".to_string(), "=A2".to_string()],
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+}
+
+#[test]
+fn loaded_spans_match_per_row_loaded_probes() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+    store.set_column_numbers(sheet, 1, 2, &[1.0, 2.0, 3.0, 4.0], 0);
+    store.end_page_load();
+    // A local edit is loaded but dirty; both states belong in a run.
+    store.set_number(sheet, 7, 0, 9.0, 0);
+
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 0), vec![0, 4, 7, 8]);
+    assert_eq!(store.loaded_spans(sheet, 1, 6, 0), vec![1, 4]);
+    assert_eq!(store.loaded_spans(sheet, 4, 8, 0), vec![7, 8]);
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 1), vec![2, 6]);
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 2), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(sheet, 3, 1, 0), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 9), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(usize::MAX, 0, 8, 0), Vec::<u32>::new());
+    // Rows past the sheet never join a run.
+    assert_eq!(store.loaded_spans(sheet, 0, 20, 0), vec![0, 4, 7, 8]);
+
+    let mut brute = CellStore::new();
+    let brute_sheet = brute.add_paged_sheet(1, 64, 8, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let mut state = 12_345u32;
+    let mut loaded = Vec::with_capacity(64);
+    for row in 0..64 {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let is_loaded = state % 3 != 0;
+        loaded.push(is_loaded);
+        if is_loaded {
+            brute.set_number(brute_sheet, row, 0, row as f64, 0);
+        }
+    }
+    for band_start in [0usize, 5, 17, 33] {
+        for band_end in [band_start + 1, band_start + 9, 64] {
+            let mut expected = Vec::new();
+            let mut run: Option<usize> = None;
+            for row in band_start..band_end {
+                if loaded[row] {
+                    run = run.or(Some(row));
+                } else if let Some(start) = run.take() {
+                    expected.push(start as u32);
+                    expected.push(row as u32);
+                }
+            }
+            if let Some(start) = run {
+                expected.push(start as u32);
+                expected.push(band_end as u32);
+            }
+            assert_eq!(
+                brute.loaded_spans(brute_sheet, band_start, band_end, 0),
+                expected,
+                "band {band_start}..{band_end}"
+            );
+        }
+    }
 }
