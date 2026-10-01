@@ -57,6 +57,58 @@ const DATE_TIME_FORMATTER_CACHE_LIMIT = 64;
 const formatCache = new Map<string, CompiledFormat>();
 const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Rendered-text cache for numbers and dates. `Intl` formatting and date token
+ * rendering dominate a repaint of formatted columns, and a scrolled frame
+ * re-renders the same values repeatedly. The outer map is keyed by the format
+ * code, then the locale, then the value, so a lookup never builds a composite
+ * key string. Both levels are bounded: each format/locale group keeps at most
+ * `NUMBER_TEXT_CACHE_LIMIT` recently used values, and only
+ * `NUMBER_TEXT_CACHE_GROUP_LIMIT` groups are kept, oldest first.
+ */
+const NUMBER_TEXT_CACHE_LIMIT = 2048;
+const NUMBER_TEXT_CACHE_GROUP_LIMIT = 8;
+const numberTextCache = new Map<string, Map<string, Map<number, string>>>();
+
+function lookupNumberText(code: string, locale: string, value: number): string | undefined {
+  const byLocale = numberTextCache.get(code);
+  if (byLocale === undefined) return undefined;
+  const texts = byLocale.get(locale);
+  if (texts === undefined) return undefined;
+  const cached = texts.get(value);
+  if (cached === undefined) return undefined;
+  // Refresh recency so a scrolling window keeps the values it re-reads.
+  texts.delete(value);
+  texts.set(value, cached);
+  return cached;
+}
+
+function rememberNumberText(code: string, locale: string, value: number, text: string): string {
+  let byLocale = numberTextCache.get(code);
+  if (byLocale === undefined) {
+    if (numberTextCache.size >= NUMBER_TEXT_CACHE_GROUP_LIMIT) {
+      const oldest = numberTextCache.keys().next();
+      if (!oldest.done) numberTextCache.delete(oldest.value);
+    }
+    byLocale = new Map();
+    numberTextCache.set(code, byLocale);
+  }
+  let texts = byLocale.get(locale);
+  if (texts === undefined) {
+    texts = new Map();
+    byLocale.set(locale, texts);
+  }
+  if (texts.delete(value)) texts.set(value, text);
+  else {
+    texts.set(value, text);
+    if (texts.size > NUMBER_TEXT_CACHE_LIMIT) {
+      const oldest = texts.keys().next();
+      if (!oldest.done) texts.delete(oldest.value);
+    }
+  }
+  return text;
+}
 let compiledFormats = 0;
 let numberFormatters = 0;
 let dateTimeFormatters = 0;
@@ -125,6 +177,7 @@ export function resetNumberFormatResourcesForTest(): void {
   formatCache.clear();
   numberFormatterCache.clear();
   dateTimeFormatterCache.clear();
+  numberTextCache.clear();
   compiledFormats = 0;
   numberFormatters = 0;
   dateTimeFormatters = 0;
@@ -464,6 +517,22 @@ export function formatNumber(value: number | string, code?: string, locale = "en
     return textSection === undefined ? value : textSection.literal.replaceAll("@", value);
   }
   if (!Number.isFinite(value)) return "";
+
+  // `-0` and `0` share one Map key under SameValueZero but can render
+  // differently (a one-section code keeps the raw negative magnitude), so
+  // negative zero never enters the cache.
+  const cacheable = !Object.is(value, -0);
+  const formatCode = code ?? "";
+  if (cacheable) {
+    const cached = lookupNumberText(formatCode, locale, value);
+    if (cached !== undefined) return cached;
+  }
+  const text = renderNumberText(value, code, locale);
+  return cacheable ? rememberNumberText(formatCode, locale, value, text) : text;
+}
+
+/** Uncached format core; `formatNumber` owns the shared text cache. */
+function renderNumberText(value: number, code: string | undefined, locale: string): string {
   if (!code) return defaultFormatter(locale).format(value);
 
   const { section, magnitude } = sectionFor(value, compileFormat(code));
