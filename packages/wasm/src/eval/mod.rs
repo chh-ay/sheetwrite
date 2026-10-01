@@ -284,14 +284,39 @@ impl CellStore {
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
             let data = &self.sheets[sheet];
-            affected.extend(
-                data.spill_ranges
-                    .iter()
-                    .filter(|&(&_anchor, &range)| {
-                        data.all_dirty || data.dirty_cells.iter().any(|&cell| range.contains(cell))
-                    })
-                    .map(|(&anchor, &_range)| AbsCellKey::from_local(sheet, anchor)),
-            );
+            if data.spill_ranges.is_empty() {
+                continue;
+            }
+            if data.all_dirty {
+                affected.extend(
+                    data.spill_ranges
+                        .keys()
+                        .map(|&anchor| AbsCellKey::from_local(sheet, anchor)),
+                );
+                continue;
+            }
+            // A dirty cell that lands inside a spilled range invalidates that
+            // anchor, so scan the dirty cells once and mark every range they
+            // fall inside, rather than rescanning the whole dirty set for each
+            // range. Stop as soon as every range has been hit.
+            let mut hit = vec![false; data.spill_ranges.len()];
+            let mut unhit_ranges = hit.len();
+            for &cell in &data.dirty_cells {
+                for (range_index, (_, range)) in data.spill_ranges.iter().enumerate() {
+                    if !hit[range_index] && range.contains(cell) {
+                        hit[range_index] = true;
+                        unhit_ranges -= 1;
+                    }
+                }
+                if unhit_ranges == 0 {
+                    break;
+                }
+            }
+            for (range_index, (&anchor, _)) in data.spill_ranges.iter().enumerate() {
+                if hit[range_index] {
+                    affected.insert(AbsCellKey::from_local(sheet, anchor));
+                }
+            }
         }
         if affected.is_empty() {
             for &sheet in seeds {
