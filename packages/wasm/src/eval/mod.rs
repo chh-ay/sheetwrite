@@ -20,12 +20,12 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::calc::{Ast, CmpOp, Func, Op};
-use crate::sheet::{spill_ownership_within_budget, SpillRange};
+use crate::sheet::{spill_ownership_within_budget, SheetData, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError,
-    FormulaValueKind, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
-    KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
+    FormulaValueKind, StringPool, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
+    KIND_FORMULA, KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
 use array::{ast_produces_array, dynamic_recompute_within_limit};
@@ -102,6 +102,18 @@ impl Drop for FormulaOriginGuard {
 
 fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
+}
+
+/// The value of a cell whose stored kind is not `KIND_FORMULA`.
+fn literal_cell_value(data: &SheetData, strings: &StringPool, index: usize, kind: u8) -> Value {
+    match kind {
+        KIND_NUMBER => Value::number(data.num_at(index)),
+        KIND_STRING => string_from_pool_ref(strings, data.str_id_at(index))
+            .map(Value::text)
+            .unwrap_or(Value::Error(FormulaError::Ref)),
+        KIND_BOOL => Value::Bool(data.num_at(index) != 0.0),
+        _ => Value::Blank,
+    }
 }
 
 /// One LET binding: its name, its expression, how many earlier bindings its
@@ -759,6 +771,17 @@ impl CellStore {
         // 2026-06 release harness: unchecked cell access was 1.13x here,
         // below the 2x threshold; keep the safe indexing.
         let i = s.idx(row, col);
+        let kind = s.kind_at(i);
+        // Formula, reference and spill-error cells are always stored as
+        // `KIND_FORMULA`, so any other kind is a plain value and needs neither
+        // the formula-map nor the spill-error lookup. Range reads hit this for
+        // every literal cell.
+        if kind != KIND_FORMULA {
+            debug_assert!(cell_key(row, col).is_none_or(|key| {
+                !s.formulas.contains_key(&key) && !s.spill_errors.contains_key(&key)
+            }));
+            return literal_cell_value(s, &self.strings, i, kind);
+        }
         if let Some(key) = cell_key(row, col) {
             let abs_key = AbsCellKey::from_local(sheet, key);
             if let Some(entry) = s.formulas.get(&key) {
@@ -772,15 +795,8 @@ impl CellStore {
             }
         }
 
-        match s.kind_at(i) {
-            KIND_NUMBER => Value::number(s.num_at(i)),
-            KIND_STRING => string_from_pool_ref(&self.strings, s.str_id_at(i))
-                .map(Value::text)
-                .unwrap_or(Value::Error(FormulaError::Ref)),
-            KIND_BOOL => Value::Bool(s.num_at(i) != 0.0),
-            KIND_FORMULA => Value::number(s.num_at(i)),
-            _ => Value::Blank,
-        }
+        // A `KIND_FORMULA` cell without a formula entry keeps its last number.
+        Value::number(s.num_at(i))
     }
 
     pub(crate) fn eval_formula_cell(
@@ -2546,17 +2562,25 @@ impl CellStore {
 
         let mut sum: f64 = 0.0;
         let mut cacheable = true;
+        let has_spill_cells = !data.spill_owners.is_empty();
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                let cell = (row as u32, col as u32);
-                if data.formulas.contains_key(&cell) || data.spill_owner(cell).is_some() {
-                    cacheable = false;
-                }
                 if !data.is_loaded(row, col) {
                     return Value::Error(FormulaError::Loading);
                 }
                 let index = data.idx(row, col);
-                let value = if data.kind_at(index) == KIND_EMPTY {
+                let kind = data.kind_at(index);
+                // A sum over formula cells or spilled output can change without a
+                // write to this range, so only plain values are cached. Formula
+                // cells are exactly the `KIND_FORMULA` ones.
+                if cacheable
+                    && (kind == KIND_FORMULA
+                        || (has_spill_cells
+                            && data.spill_owner((row as u32, col as u32)).is_some()))
+                {
+                    cacheable = false;
+                }
+                let value = if kind == KIND_EMPTY {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
