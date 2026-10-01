@@ -153,16 +153,20 @@ function structuralChange(operation: DocumentOp): AxisChange | null {
   }
 }
 
+/**
+ * Transforms one caller-owned operation in place. `rebaseDocumentOperations`
+ * already works on its own deep clone of the caller's operations, so no copy
+ * is needed here; the original array the caller passed in is never touched.
+ */
 function transformForAxis(
   input: DocumentOp,
   change: AxisChange,
 ): { operation: DocumentOp } | TransformFailure {
   if (change.kind === "move") return { operation: input };
-  const operation = cloneJsonValue(input);
-  const direct = transformDirectTarget(operation, change);
+  const direct = transformDirectTarget(input, change);
   if (direct) return direct;
-  const embedded = transformEmbeddedReferences(operation, change);
-  return embedded ? embedded : { operation };
+  const embedded = transformEmbeddedReferences(input, change);
+  return embedded ? embedded : { operation: input };
 }
 
 function transformDirectTarget(
