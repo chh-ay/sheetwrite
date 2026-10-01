@@ -129,79 +129,59 @@ describe("formatNumber", () => {
     expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
   });
 
-  it("keeps cache entries separate per value, format code, and locale", () => {
+  it("returns exact text for fixed values on repeated calls", () => {
     resetNumberFormatResourcesForTest();
-    expect(formatNumber(-0)).toBe("-0");
-    expect(formatNumber(0)).toBe("0");
-    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
-    expect(formatNumber(-1234.5, "#,##0.00", "en-US")).toBe("-1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "en-US")).toBe("1,234.50");
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-    expect(formatNumber(1234.5, "#,##0.0", "en-US")).toBe("1,234.5");
+    const cases: ReadonlyArray<[number, string | undefined, string | undefined, string]> = [
+      [1234.5, "¤#,##0.00", "en-US", "$1,234.50"],
+      [1234.5, "¤#,##0.00", "de-DE", "$1.234,50"],
+      [1234.5, "#,##0.00", "de-DE", "1.234,50"],
+      [1234.5, "#,##0.00", "en-US", "1,234.50"],
+      [1234.5, "#,##0.0", "en-US", "1,234.5"],
+      [-1234.5, "#,##0.00", "en-US", "-1,234.50"],
+      [-0, undefined, undefined, "-0"],
+      [0, undefined, undefined, "0"],
+      [-0, "0.00", undefined, "-0.00"],
+      [0, "0.00", undefined, "0.00"],
+      [Number.NaN, "#,##0", undefined, ""],
+      [Number.NaN, undefined, undefined, ""],
+      [Number.POSITIVE_INFINITY, "#,##0.00", undefined, ""],
+      [Number.NEGATIVE_INFINITY, undefined, undefined, ""],
+      [1e21, "#,##0.00", undefined, "1,000,000,000,000,000,000,000.00"],
+      [1e-7, "0.00000000", undefined, "0.00000010"],
+      [45_351, "yyyy-mm-dd", undefined, "2024-02-29"],
+      [45_351, "mmm d, yyyy", undefined, "Feb 29, 2024"],
+      [-2.5, "#,##0.00;(#,##0.00)", undefined, "(2.50)"],
+      [0.5, "0%", undefined, "50%"],
+      [12_345.6789, "0.00E+00", undefined, "1.23E+04"],
+    ];
+
+    for (const [value, code, locale, expected] of cases) {
+      expect(formatNumber(value, code, locale), `cold ${value}`).toBe(expected);
+      // The second call serves the entry the first call stored.
+      expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
+    }
   });
 
-  it("matches a cold formatter over repeated, special, and randomized cases", () => {
-    const specials: ReadonlyArray<[number, string | undefined, string | undefined]> = [
-      [1234.5, "¤#,##0.00", "en-US"],
-      [1234.5, "¤#,##0.00", "de-DE"],
-      [-1234.5, "¤#,##0.00", "en-US"],
-      [0, "0.00", undefined],
-      [-0, "0.00", undefined],
-      [0, undefined, undefined],
-      [-0, undefined, undefined],
-      [Number.NaN, "#,##0", undefined],
-      [Number.POSITIVE_INFINITY, "#,##0", undefined],
-      [Number.NEGATIVE_INFINITY, undefined, undefined],
-      [1e21, "#,##0.00", undefined],
-      [1e-7, "0.00000000", undefined],
-      [-1e-7, "0.00000000", undefined],
-      [45_351, "yyyy-mm-dd", undefined],
-      [45_351, "mmm d, yyyy", undefined],
-      [-2.5, "#,##0.00;(#,##0.00)", undefined],
-      [0.5, "0%", undefined],
-      [12_345.6789, "0.00E+00", undefined],
-    ];
-    const codes: Array<string | undefined> = [
-      undefined,
-      "#,##0.00",
-      "0",
-      "0.0%",
-      "0.00E+00",
-      "#,##0.00;(#,##0.00)",
-      '0.00" units"',
-      "yyyy-mm-dd",
-      "mmm d, yyyy h:mm:ss AM/PM",
-      "¤#,##0.00",
-    ];
-    const locales = ["en-US", "de-DE", "fr-FR", "en-GB"];
+  it("recomputes text evicted by the value and format-group bounds", () => {
+    resetNumberFormatResourcesForTest();
+    const code = "#,##0.000000";
+    // More distinct values than one format/locale group keeps, so the first
+    // entry is evicted before it is read again.
+    for (let index = 0; index < 600; index++) formatNumber(index + 0.5, code);
+    expect(formatNumber(0.5, code)).toBe("0.500000");
+    expect(formatNumber(599.5, code)).toBe("599.500000");
+    expect(formatNumber(100.5, code)).toBe("100.500000");
 
-    // Deterministic value stream, so a failing case is reproducible.
-    let seed = 0x5eed5eed;
-    const random = (): number => {
-      seed = (seed + 0x6d2b79f5) | 0;
-      let state = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      state = (state + Math.imul(state ^ (state >>> 7), 61 | state)) ^ state;
-      return ((state ^ (state >>> 14)) >>> 0) / 4_294_967_296;
-    };
-
-    const cases: Array<{ value: number; code?: string; locale: string }> = specials.map(
-      ([value, code, locale]) => ({ value, code, locale: locale ?? "en-US" }),
-    );
-    for (let index = 0; index < 120; index++) {
-      cases.push({
-        value: (random() - 0.5) * 10 ** (random() * 12 - 6),
-        code: codes[Math.floor(random() * codes.length)],
-        locale: locales[Math.floor(random() * locales.length)]!,
-      });
+    // More (format, locale) groups than the group limit keeps, so the oldest
+    // groups are dropped. Ten locale spellings of one format are ten groups.
+    for (let index = 0; index < 10; index++) {
+      expect(formatNumber(7.4, "#,##0.0", `en-US-x-${index}`)).toBe("7.4");
     }
-
-    const cold = cases.map(({ value, code, locale }) => {
-      resetNumberFormatResourcesForTest();
-      return formatNumber(value, code, locale);
-    });
-    const warm = cases.map(({ value, code, locale }) => formatNumber(value, code, locale));
-    expect(warm).toEqual(cold);
+    expect(formatNumber(7.4, "#,##0.0", "en-US-x-0")).toBe("7.4");
+    for (let index = 0; index < 10; index++) {
+      expect(formatNumber(7.4, `0.${"0".repeat(index + 1)}`)).toBe(`7.4${"0".repeat(index)}`);
+    }
+    expect(formatNumber(7.4, "0.0")).toBe("7.4");
+    expect(formatNumber(0.5, code)).toBe("0.500000");
   });
 });

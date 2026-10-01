@@ -63,13 +63,36 @@ const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
  * rendering dominate a repaint of formatted columns, and a scrolled frame
  * re-renders the same values repeatedly. The outer map is keyed by the format
  * code, then the locale, then the value, so a lookup never builds a composite
- * key string. Both levels are bounded: each format/locale group keeps at most
- * `NUMBER_TEXT_CACHE_LIMIT` recently used values, and only
- * `NUMBER_TEXT_CACHE_GROUP_LIMIT` groups are kept, oldest first.
+ * key string.
+ *
+ * Three bounds keep the cache small: at most `NUMBER_TEXT_GROUP_LIMIT`
+ * (format, locale) groups, at most `NUMBER_TEXT_PER_GROUP_LIMIT` values in each
+ * group, and nothing longer than `NUMBER_TEXT_MAX_TEXT_LENGTH` characters. The
+ * worst case is therefore 8 × 512 = 4096 strings of at most 128 characters
+ * (about one MiB of text), and the group keys are references to strings the
+ * caller already holds.
  */
-const NUMBER_TEXT_CACHE_LIMIT = 2048;
-const NUMBER_TEXT_CACHE_GROUP_LIMIT = 8;
+const NUMBER_TEXT_GROUP_LIMIT = 8;
+const NUMBER_TEXT_PER_GROUP_LIMIT = 512;
+const NUMBER_TEXT_MAX_TEXT_LENGTH = 128;
 const numberTextCache = new Map<string, Map<string, Map<number, string>>>();
+let numberTextGroups = 0;
+
+/** Drop the least recently added (format, locale) group. */
+function dropOldestNumberTextGroup(): void {
+  const oldestCode = numberTextCache.keys().next();
+  if (oldestCode.done) return;
+  const byLocale = numberTextCache.get(oldestCode.value);
+  if (byLocale === undefined) return;
+  const oldestLocale = byLocale.keys().next();
+  if (oldestLocale.done) {
+    numberTextCache.delete(oldestCode.value);
+    return;
+  }
+  byLocale.delete(oldestLocale.value);
+  numberTextGroups -= 1;
+  if (byLocale.size === 0) numberTextCache.delete(oldestCode.value);
+}
 
 function lookupNumberText(code: string, locale: string, value: number): string | undefined {
   const byLocale = numberTextCache.get(code);
@@ -85,24 +108,24 @@ function lookupNumberText(code: string, locale: string, value: number): string |
 }
 
 function rememberNumberText(code: string, locale: string, value: number, text: string): string {
+  // Long output is rare and would make the retained text unbounded.
+  if (text.length > NUMBER_TEXT_MAX_TEXT_LENGTH) return text;
   let byLocale = numberTextCache.get(code);
   if (byLocale === undefined) {
-    if (numberTextCache.size >= NUMBER_TEXT_CACHE_GROUP_LIMIT) {
-      const oldest = numberTextCache.keys().next();
-      if (!oldest.done) numberTextCache.delete(oldest.value);
-    }
     byLocale = new Map();
     numberTextCache.set(code, byLocale);
   }
   let texts = byLocale.get(locale);
   if (texts === undefined) {
+    if (numberTextGroups >= NUMBER_TEXT_GROUP_LIMIT) dropOldestNumberTextGroup();
     texts = new Map();
     byLocale.set(locale, texts);
+    numberTextGroups += 1;
   }
   if (texts.delete(value)) texts.set(value, text);
   else {
     texts.set(value, text);
-    if (texts.size > NUMBER_TEXT_CACHE_LIMIT) {
+    if (texts.size > NUMBER_TEXT_PER_GROUP_LIMIT) {
       const oldest = texts.keys().next();
       if (!oldest.done) texts.delete(oldest.value);
     }
@@ -178,6 +201,7 @@ export function resetNumberFormatResourcesForTest(): void {
   numberFormatterCache.clear();
   dateTimeFormatterCache.clear();
   numberTextCache.clear();
+  numberTextGroups = 0;
   compiledFormats = 0;
   numberFormatters = 0;
   dateTimeFormatters = 0;
