@@ -147,52 +147,17 @@ impl CellStore {
         }
 
         let base = col * s.row_count;
-        let mut sum = 0.0;
-        let mut count = 0u32;
-        let mut min = f64::INFINITY;
-        let mut max = f64::NEG_INFINITY;
-        if s.is_paged() {
-            for row in 0..s.row_count {
-                if let Some(value) = numeric_cell_value(s, base + row) {
-                    sum += value;
-                    count += 1;
-                    min = min.min(value);
-                    max = max.max(value);
-                }
-            }
-        } else {
-            // The dense aggregate keeps its proven unchecked contiguous loop.
-            for row in 0..s.row_count {
-                let i = base + row;
-                // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
-                // vectors have the same `n_cols * row_count` length.
-                let stored_kind = unsafe { *s.kind.get_unchecked(i) };
-                let value = match stored_kind {
-                    KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
-                    KIND_FORMULA => {
-                        let bits = unsafe { s.payload_unchecked(i) };
-                        if !payload_is_str(bits)
-                            && key_for_index(s, i)
-                                .is_some_and(|key| formula_error_at(s, key).is_none())
-                        {
-                            Some(f64::from_bits(bits))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                };
-                if let Some(value) = value {
-                    sum += value;
-                    count += 1;
-                    min = min.min(value);
-                    max = max.max(value);
-                }
-            }
-        }
+        // The op is known before the scan, so each one folds only the
+        // accumulator it needs instead of updating sum, count, min and max for
+        // every cell. Folds stay in row order, so the float addition order —
+        // and every result bit — is unchanged.
         match op {
-            0 => sum,
+            0 => fold_numeric_cells(s, base, 0.0, |sum, value| sum + value),
             1 => {
+                let (count, sum) =
+                    fold_numeric_cells(s, base, (0u32, 0.0), |(count, sum), value| {
+                        (count + 1, sum + value)
+                    });
                 if count > 0 {
                     sum / f64::from(count)
                 } else {
@@ -200,6 +165,10 @@ impl CellStore {
                 }
             }
             2 => {
+                let (count, min) =
+                    fold_numeric_cells(s, base, (0u32, f64::INFINITY), |(count, min), value| {
+                        (count + 1, min.min(value))
+                    });
                 if count > 0 {
                     min
                 } else {
@@ -207,13 +176,22 @@ impl CellStore {
                 }
             }
             3 => {
+                let (count, max) = fold_numeric_cells(
+                    s,
+                    base,
+                    (0u32, f64::NEG_INFINITY),
+                    |(count, max), value| (count + 1, max.max(value)),
+                );
                 if count > 0 {
                     max
                 } else {
                     0.0
                 }
             }
-            _ => f64::from(count),
+            _ => {
+                let count = fold_numeric_cells(s, base, 0u32, |count, _value| count + 1);
+                f64::from(count)
+            }
         }
     }
 
@@ -451,6 +429,49 @@ impl CellStore {
         }
         out
     }
+}
+
+/// Folds every numeric cell of a column, in row order, into an accumulator.
+///
+/// The dense branch keeps the unchecked contiguous reads the aggregate has
+/// always used; the paged branch reads through [`numeric_cell_value`]. Row
+/// order is preserved so a sum's float addition order does not change.
+fn fold_numeric_cells<A, F>(s: &SheetData, base: usize, mut acc: A, mut step: F) -> A
+where
+    F: FnMut(A, f64) -> A,
+{
+    if s.is_paged() {
+        for row in 0..s.row_count {
+            if let Some(value) = numeric_cell_value(s, base + row) {
+                acc = step(acc, value);
+            }
+        }
+    } else {
+        for row in 0..s.row_count {
+            let i = base + row;
+            // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
+            // vectors have the same `n_cols * row_count` length.
+            let stored_kind = unsafe { *s.kind.get_unchecked(i) };
+            let value = match stored_kind {
+                KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
+                KIND_FORMULA => {
+                    let bits = unsafe { s.payload_unchecked(i) };
+                    if !payload_is_str(bits)
+                        && key_for_index(s, i).is_some_and(|key| formula_error_at(s, key).is_none())
+                    {
+                        Some(f64::from_bits(bits))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            if let Some(value) = value {
+                acc = step(acc, value);
+            }
+        }
+    }
+    acc
 }
 
 #[wasm_bindgen]
