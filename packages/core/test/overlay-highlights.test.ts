@@ -3,15 +3,17 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { ColumnarData, Workbook } from "../src/types.js";
 
-// A small sheet whose odd data rows match "hit" and whose rank column reverses
-// the view order when sorted ascending. Every assertion below reads the pixel
-// state the overlay actually published, so a repaint that maps a data row to
-// the wrong view row (stale index, missed rebuild) fails here.
+// A 40-row sheet whose odd data rows match "hit" and whose rank column reverses
+// the view order when sorted ascending. The expectations below are derived from
+// the fixture alone: a match on data row r sits at y = headerHeight + r *
+// rowHeight - scrollTop, and the paint order is match order.
 const ROW_COUNT = 40;
 const COL_WIDTH = 120;
 const ROW_HEIGHT = DEFAULT_THEME.rowHeight;
 const HEADER_HEIGHT = DEFAULT_THEME.headerHeight;
 const ROW_HEADER_WIDTH = DEFAULT_THEME.rowHeaderWidth;
+/** Data rows 1, 3, ..., 13 are on screen at the top of the sheet. */
+const TOP_MATCH_TOPS = [60, 116, 172, 228, 284, 340, 396];
 
 let restoreStubs: () => void;
 
@@ -93,6 +95,11 @@ function paintedRects(host: HTMLElement): PaintedRect[] {
   return rects;
 }
 
+/** Screen top of data row `row` for a uniform 28px row grid. */
+function bodyTop(row: number, contentTop: number): number {
+  return HEADER_HEIGHT + row * ROW_HEIGHT - contentTop;
+}
+
 function mountGrid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivElement } {
   const { workbook, data } = fixture();
   const host = document.createElement("div");
@@ -110,22 +117,25 @@ function mountGrid(): { grid: GridImpl; host: HTMLDivElement; scroller: HTMLDivE
   return { grid, host, scroller };
 }
 
-/** Body row `row`'s top edge on screen at the given scroll offset. */
-function bodyTop(row: number, contentTop: number): number {
-  return HEADER_HEIGHT + row * ROW_HEIGHT - contentTop;
+function topsOf(host: HTMLElement): number[] {
+  return paintedRects(host).map((rect) => rect.top);
 }
 
-const MATCH_TOPS_AT_TOP = [60, 88, 116, 144, 172, 200, 228];
+function activeOutlineTops(host: HTMLElement): number[] {
+  return paintedRects(host)
+    .filter((rect) => rect.outlineColor === DEFAULT_THEME.searchActiveMatch)
+    .map((rect) => rect.top);
+}
 
 describe("search highlights follow the active view", () => {
-  it("paints only the visible matches and keeps match cells at their first-row pixels", () => {
+  it("paints only the visible matches with the match fill", () => {
     const { grid, host } = mountGrid();
 
     grid.search("hit");
     grid.refresh();
 
     const rects = paintedRects(host);
-    expect(rects.map((rect) => rect.top)).toEqual(MATCH_TOPS_AT_TOP);
+    expect(rects.map((rect) => rect.top)).toEqual(TOP_MATCH_TOPS);
     expect(rects.every((rect) => rect.left === ROW_HEADER_WIDTH)).toBe(true);
     expect(rects.every((rect) => rect.width === COL_WIDTH)).toBe(true);
     expect(rects.every((rect) => rect.height === ROW_HEIGHT)).toBe(true);
@@ -133,7 +143,7 @@ describe("search highlights follow the active view", () => {
     grid.destroy();
   });
 
-  it("moves highlights with the scroll offset without repainting offscreen rows", () => {
+  it("moves highlights with the scroll offset", () => {
     const { grid, host, scroller } = mountGrid();
     grid.search("hit");
 
@@ -141,7 +151,7 @@ describe("search highlights follow the active view", () => {
     grid.refresh();
 
     // View rows 7..20: the odd ones are data rows 7, 9, ..., 19.
-    expect(paintedRects(host).map((rect) => rect.top)).toEqual(
+    expect(topsOf(host)).toEqual(
       [7, 9, 11, 13, 15, 17, 19].map((row) => bodyTop(row, 7 * ROW_HEIGHT)),
     );
     grid.destroy();
@@ -152,29 +162,46 @@ describe("search highlights follow the active view", () => {
     grid.search("hit");
     grid.refresh();
 
-    // rank is ROW_COUNT - row, so ascending view order is data row 39 first.
+    // rank is ROW_COUNT - row, so ascending view order starts at data row 39:
+    // view row v holds data row 39 - v, and every even view row is a match.
+    // Match order is data-row order, which the reversed view paints last-first.
     grid.sortBy(2, true);
     grid.refresh();
+    expect(topsOf(host)).toEqual([368, 312, 256, 200, 144, 88, 32]);
 
-    // Data rows 27 and 29 land on view rows 12 and 10 -> tops 368 and 312.
-    expect(paintedRects(host).map((rect) => rect.top)).toEqual([312, 368]);
+    // A second sort of the same length restores the identity view.
+    grid.sortBy(2, false);
+    grid.refresh();
+    expect(topsOf(host)).toEqual(TOP_MATCH_TOPS);
     grid.destroy();
   });
 
-  it("drops highlights the filter hides and restores them when the view is cleared", () => {
+  it("re-maps every highlight when a filter replaces the previous one", () => {
     const { grid, host } = mountGrid();
     grid.search("hit");
     grid.refresh();
-    expect(paintedRects(host)).toHaveLength(MATCH_TOPS_AT_TOP.length);
 
     // Every "keep" row is even, so no match survives the filter.
     grid.filterBy(1, "keep");
     grid.refresh();
     expect(paintedRects(host)).toEqual([]);
 
+    // "drop" keeps all but the multiples of four, so data row 1 is view row 0,
+    // row 3 view row 2, row 5 view row 3, and so on up to view row 13.
+    grid.filterBy(1, "drop");
+    grid.refresh();
+    expect(topsOf(host)).toEqual([32, 88, 116, 172, 200, 256, 284, 340, 368]);
+
+    // Filtering by the match text leaves only odd rows, one per view row.
+    grid.filterBy(0, "hit");
+    grid.refresh();
+    expect(topsOf(host)).toEqual([
+      32, 60, 88, 116, 144, 172, 200, 228, 256, 284, 312, 340, 368, 396,
+    ]);
+
     grid.clearView();
     grid.refresh();
-    expect(paintedRects(host).map((rect) => rect.top)).toEqual(MATCH_TOPS_AT_TOP);
+    expect(topsOf(host)).toEqual(TOP_MATCH_TOPS);
     grid.destroy();
   });
 
@@ -187,9 +214,7 @@ describe("search highlights follow the active view", () => {
     grid.refresh();
 
     // Frozen view row 0 is even (no match); the body paints view rows 6..18.
-    expect(paintedRects(host).map((rect) => rect.top)).toEqual(
-      [7, 9, 11, 13, 15, 17].map((row) => bodyTop(row, 5 * ROW_HEIGHT)),
-    );
+    expect(topsOf(host)).toEqual([7, 9, 11, 13, 15, 17].map((row) => bodyTop(row, 5 * ROW_HEIGHT)));
     grid.destroy();
   });
 
@@ -201,11 +226,12 @@ describe("search highlights follow the active view", () => {
     grid.setRowHeight(1, 56);
     grid.refresh();
 
+    // Row 1 grows by 28px, so every later match sits 28px lower.
     const rects = paintedRects(host);
-    expect(rects[0]?.top).toBe(HEADER_HEIGHT);
+    expect(rects[0]?.top).toBe(bodyTop(1, 0));
     expect(rects[0]?.height).toBe(56);
-    // Row 1 grew by 28px, so the next match (row 3) starts 28px lower.
-    expect(rects[1]?.top).toBe(HEADER_HEIGHT + 2 * ROW_HEIGHT + 56);
+    expect(rects[1]?.top).toBe(144);
+    expect(rects[2]?.top).toBe(200);
     grid.destroy();
   });
 
@@ -214,19 +240,16 @@ describe("search highlights follow the active view", () => {
     grid.search("hit");
     grid.refresh();
 
-    const activeMatchTops = (): number[] =>
-      paintedRects(host)
-        .filter((rect) => rect.outlineColor === DEFAULT_THEME.searchActiveMatch)
-        .map((rect) => rect.top);
-    expect(activeMatchTops()).toEqual([60]);
+    // The first match at or below the viewport is data row 1.
+    expect(activeOutlineTops(host)).toEqual([bodyTop(1, 0)]);
 
     grid.findNext();
     grid.refresh();
-    expect(activeMatchTops()).toEqual([88]);
+    expect(activeOutlineTops(host)).toEqual([bodyTop(3, 0)]);
 
     grid.findPrev();
     grid.refresh();
-    expect(activeMatchTops()).toEqual([60]);
+    expect(activeOutlineTops(host)).toEqual([bodyTop(1, 0)]);
     grid.destroy();
   });
 });
@@ -250,6 +273,19 @@ describe("note indicators follow the active view", () => {
     grid.destroy();
   });
 
+  it("moves a note marker when the note is re-added on another row", () => {
+    const { grid, host } = mountGrid();
+    grid.setNote({ sheet: "s1", row: 5, col: 0 }, "check");
+    grid.refresh();
+    expect(topsOf(host)).toEqual([bodyTop(5, 0)]);
+
+    grid.setNote({ sheet: "s1", row: 5, col: 0 }, null);
+    grid.setNote({ sheet: "s1", row: 9, col: 0 }, "moved");
+    grid.refresh();
+    expect(topsOf(host)).toEqual([bodyTop(9, 0)]);
+    grid.destroy();
+  });
+
   it("keeps a pinned-row note marker on its row while the body scrolls", () => {
     const { grid, host, scroller } = mountGrid();
     grid.setFrozen(1, 0);
@@ -259,8 +295,7 @@ describe("note indicators follow the active view", () => {
     scroller.scrollTop = 19 * ROW_HEIGHT;
     grid.refresh();
 
-    const rects = paintedRects(host);
-    expect(rects.map((rect) => rect.top)).toEqual([HEADER_HEIGHT, bodyTop(20, 19 * ROW_HEIGHT)]);
+    expect(topsOf(host)).toEqual([HEADER_HEIGHT, bodyTop(20, 19 * ROW_HEIGHT)]);
     grid.destroy();
   });
 });
