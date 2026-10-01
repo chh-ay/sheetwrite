@@ -9,6 +9,7 @@ mod functions;
 mod lookup;
 mod math;
 mod matrix;
+mod range_reader;
 mod statistics;
 mod text;
 mod value;
