@@ -2138,3 +2138,245 @@ fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
         vec!["Value".into()],
     ));
 }
+
+mod formula_dependency_epoch {
+    use super::*;
+
+    #[test]
+    fn constant_only_formula_rewrite_keeps_the_dependency_index() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 4);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_formula(sheet, 0, 2, "=A1+B1+1", 0);
+        store.set_formula(sheet, 1, 2, "=C1*2", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 12.0);
+        assert_close(number(&store, sheet, 1, 2), 24.0);
+
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=A1+B1+2", 0);
+        assert_eq!(
+            store.formula_epoch, epoch_before,
+            "a constant-only rewrite must keep the cached dependency index"
+        );
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 13.0);
+        assert_close(number(&store, sheet, 1, 2), 26.0);
+
+        // The cached index still routes read-cell edits to the rewritten cell
+        // and onward to its dependents.
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 17.0);
+        assert_close(number(&store, sheet, 1, 2), 34.0);
+    }
+
+    #[test]
+    fn formula_rewrite_with_new_reads_rebuilds_dependents() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 2);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_formula(sheet, 0, 2, "=A1", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=B1", 0);
+        assert!(
+            store.formula_epoch > epoch_before,
+            "a changed read set must invalidate the dependency index"
+        );
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 2.0);
+
+        store.set_number(sheet, 0, 0, 9.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 2.0);
+        store.set_number(sheet, 0, 1, 7.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 7.0);
+    }
+
+    #[test]
+    fn formula_rewrite_across_scalar_and_array_shapes_keeps_spills_consistent() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 3);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=A1", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+        assert_eq!(store.get_cell(sheet, 1, 2).kind(), KIND_EMPTY);
+
+        // Scalar to array: the spill arrives.
+        store.set_formula(sheet, 0, 2, "=A1:A3", 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0]
+        );
+
+        // Array to a different array with the same reads and shape: the index
+        // survives the rewrite and the spill is re-materialized.
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=SORT(A1:A3)", 0);
+        assert_eq!(store.formula_epoch, epoch_before);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0]
+        );
+
+        // Array back to scalar: the spill is released.
+        store.set_formula(sheet, 0, 2, "=A1+A2+A3", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 6.0);
+        assert_eq!(store.get_cell(sheet, 1, 2).kind(), KIND_EMPTY);
+        assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+    }
+
+    #[test]
+    fn batch_edits_refresh_spill_anchors_only_when_they_hit_the_range() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..4 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=A1:A4", 0);
+        store.set_formula(sheet, 0, 3, "=A1:A4", 0);
+        store.set_formula(sheet, 6, 2, "=C3*10", 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 3)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+        assert_close(number(&store, sheet, 6, 2), 30.0);
+
+        // Dirty cells outside every spilled range leave the spills as they are.
+        for row in 0..4 {
+            store.set_number(sheet, row, 5, 100.0 + row as f64, 0);
+        }
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+
+        // A read-cell edit inside both spilled source ranges refreshes every
+        // dependent, including the formula that reads a spill cell whose value
+        // changed.
+        store.set_number(sheet, 2, 0, 30.0, 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 30.0, 4.0]
+        );
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 3)),
+            [1.0, 2.0, 30.0, 4.0]
+        );
+        assert_close(number(&store, sheet, 6, 2), 300.0);
+    }
+
+    fn next_rand(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        *state >> 33
+    }
+
+    fn snapshot_cells(store: &CellStore, sheet: usize, rows: usize, cols: usize) -> Vec<(u8, f64)> {
+        let mut cells = Vec::with_capacity(rows * cols);
+        for row in 0..rows {
+            for col in 0..cols {
+                let cell = store.get_cell(sheet, row, col);
+                cells.push((cell.kind(), cell.num()));
+            }
+        }
+        cells
+    }
+
+    /// A randomized edit sequence must land on exactly the values a rebuild
+    /// produces. A dependency index that survives an edit it should not, or a
+    /// spill anchor the dirty scan misses, would leave stale cells behind and
+    /// fail the comparison.
+    #[test]
+    fn random_edit_sequences_match_a_full_rebuild() {
+        const ROWS: usize = 10;
+        const COLS: usize = 5;
+        const EDITS: usize = 60;
+        let array_sources = ["=A1:A5", "=A1:A3", "=A1:A5+1", "=SUM(A1:A5)", "=SUM(A1:B5)"];
+        let dependent_sources = ["=C3*2", "=C4*2", "=SUM(A1:B5)"];
+        for seed in [1_u64, 7, 99] {
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(COLS, ROWS);
+            let mut state = seed;
+            for row in 0..ROWS {
+                for col in 0..2 {
+                    let value = (next_rand(&mut state) % 100) as f64;
+                    store.set_number(sheet, row, col, value, 0);
+                }
+            }
+            store.set_formula(sheet, 0, 2, array_sources[0], 0);
+            store.set_formula(sheet, 0, 3, "=SUM(A1:A5)", 0);
+            store.set_formula(sheet, 5, 4, dependent_sources[0], 0);
+            store.recompute(sheet);
+            for edit in 0..EDITS {
+                match next_rand(&mut state) % 5 {
+                    // Rewrite the spilled formula between shapes that read the
+                    // same cells and shapes that do not.
+                    0 => {
+                        let source = array_sources[(next_rand(&mut state) % 5) as usize];
+                        store.set_formula(sheet, 0, 2, source, 0);
+                    }
+                    // Edit a source cell of the spilled range.
+                    1 => {
+                        let row = (next_rand(&mut state) % ROWS as u64) as usize;
+                        let col = (next_rand(&mut state) % 2) as usize;
+                        let value = (next_rand(&mut state) % 1000) as f64;
+                        store.set_number(sheet, row, col, value, 0);
+                    }
+                    // Overwrite a cell inside a spilled block.
+                    2 => {
+                        let row = (next_rand(&mut state) % 5) as usize;
+                        let col = 2 + (next_rand(&mut state) % 2) as usize;
+                        let value = (next_rand(&mut state) % 1000) as f64;
+                        store.set_number(sheet, row, col, value, 0);
+                    }
+                    // Edit an unrelated cell.
+                    3 => {
+                        let row = (next_rand(&mut state) % ROWS as u64) as usize;
+                        if row != 5 {
+                            let value = (next_rand(&mut state) % 1000) as f64;
+                            store.set_number(sheet, row, 4, value, 0);
+                        }
+                    }
+                    // Rewrite a formula that reads a cell of the spilled block.
+                    _ => {
+                        let source = dependent_sources[(next_rand(&mut state) % 3) as usize];
+                        store.set_formula(sheet, 5, 4, source, 0);
+                    }
+                }
+                store.recompute(sheet);
+                let incremental = snapshot_cells(&store, sheet, ROWS, COLS);
+                // Drop every cache and dirty the whole sheet: the next pass
+                // must produce the same values from scratch.
+                store.dep_index = None;
+                store.sheets[sheet].all_dirty = true;
+                store.recompute(sheet);
+                assert_eq!(
+                    snapshot_cells(&store, sheet, ROWS, COLS),
+                    incremental,
+                    "seed={seed} edit={edit}"
+                );
+            }
+        }
+    }
+}
