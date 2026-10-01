@@ -2,11 +2,12 @@ import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   resolveTransactionResourceLimits,
+  resolveTransactionResourceValidation,
   SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
+  takeAdmittedTransactionResources,
   validateDocumentOperationShape,
-  validateTransactionResources,
 } from "./document-protocol.js";
 import type {
   RuntimeMemoryObservation,
@@ -483,10 +484,13 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
-    const resourceValidation = validateTransactionResources(
+    // A transaction built and measured by an engine layer carries its resource
+    // record; without one, direct callers pay the full payload walk.
+    const resourceValidation = resolveTransactionResourceValidation(
       tx.patches,
       this.transactionResourceLimits,
-    );
+      takeAdmittedTransactionResources(tx),
+    ).result;
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }

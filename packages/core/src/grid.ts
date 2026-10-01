@@ -16,6 +16,7 @@ import { CustomEditorController } from "./custom-editor.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
+  admitTransactionResources,
   assertWorkbookAllocationLimits,
   resolveTransactionResourceLimits,
   validateTransactionResources,
@@ -2249,7 +2250,17 @@ export class GridImpl implements Grid {
         issues: [resourceValidation.issue],
       };
     }
-    return this.document.commit(transaction.patches.slice(), "api");
+    // The controller receives a private copy of the caller's operations. The
+    // copy is verified against the measured payload, so the controller and the
+    // store reuse this measurement instead of walking it again.
+    const patches = transaction.patches.slice();
+    const admitted = admitTransactionResources(
+      patches,
+      this.transactionResourceLimits,
+      resourceValidation,
+      transaction.patches,
+    );
+    return this.document.commit(patches, "api", admitted);
   }
 
   exportSnapshot(): WorkbookSnapshot {

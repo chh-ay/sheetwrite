@@ -8,7 +8,16 @@ export interface GridTransactionAdmissionReservation {
 }
 
 export type GridTransactionAdmissionDecision =
-  | { ok: true; reservation: GridTransactionAdmissionReservation }
+  | {
+      ok: true;
+      reservation: GridTransactionAdmissionReservation;
+      /**
+       * True when at least one guard received the operations. The caller must
+       * treat the operations as caller-visible afterwards and re-measure them
+       * before the store applies them.
+       */
+      inspectedOperations?: boolean;
+    }
   | { ok: false; issue: MutationIssue };
 
 export interface GridTransactionAdmissionGuard {
@@ -76,11 +85,12 @@ export function beginGridTransactionAdmission(
   }
 
   if (reservations.length === 1) {
-    return { ok: true, reservation: reservations[0]! };
+    return { ok: true, reservation: reservations[0]!, inspectedOperations: true };
   }
   let finished = false;
   return {
     ok: true,
+    inspectedOperations: true,
     reservation: {
       cancel() {
         if (finished) return;
