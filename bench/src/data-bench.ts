@@ -158,6 +158,21 @@ const QUERY_LABELS: Record<QueryScenario, string> = {
 };
 
 /**
+ * Fixture each query scenario measures, versioned so a number recorded against
+ * a different fixture is never compared with a new one. Only the sort scenario
+ * changes the seeded rows; everything else reads the shared seeded dataset.
+ */
+export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
+  "sort-multi-key":
+    "grouped-customer-v2 (97 repeated customers, 8 amount buckets, dates reversed against row order)",
+  "sort-with-candidates": "seeded-dataset-v1",
+  "filter-value-set-10": "seeded-dataset-v1",
+  "filter-value-set-1000": "seeded-dataset-v1",
+  "filter-value-set-50000": "seeded-dataset-v1",
+  "ingest-numeric-only": "numeric-five-column-v1",
+};
+
+/**
  * Row sizes a query scenario is measured at; a scenario without an entry runs at
  * every size. The 50,000-pick filter covers 100,000 rows only: the value-set
  * filter still compares every row with every picked value, so a 50,000-value
@@ -184,10 +199,27 @@ const MULTI_KEY_SORT: readonly SortKey[] = [
   { col: COL.amount, ascending: false },
   { col: COL.date, ascending: true },
 ];
-/** Column order the order check reads back for {@link MULTI_KEY_SORT}. */
+/** Column order the view check reads back for {@link MULTI_KEY_SORT}. */
 const MULTI_KEY_VIEW_COLS: readonly number[] = [COL.customer, COL.amount, COL.date];
-/** Leading view rows whose key order is re-checked after each sort scenario. */
-const ORDER_CHECK_ROWS = 256;
+/** Column order the view check reads back for the candidate sort. */
+const CANDIDATE_CHECK_COLS: readonly number[] = [COL.amount, COL.city];
+/**
+ * Leading-key groups of the multi-key sort fixture: enough repeats that the
+ * second and third sort keys decide the order inside every group.
+ */
+const MULTI_KEY_GROUP_COUNT = 97;
+/** Amount buckets inside each customer group: ties reach the third key. */
+const MULTI_KEY_AMOUNT_BUCKETS = 8;
+/** Step between amount buckets; the fixture only needs distinct ordered keys. */
+const MULTI_KEY_AMOUNT_STEP = 12.5;
+/** Days the fixture date cycles through, like the seeded day pool. */
+const MULTI_KEY_DAY_COUNT = 1_000;
+const MULTI_KEY_DAY_EPOCH_UTC = Date.UTC(2020, 0, 1);
+const MULTI_KEY_DAY_MS = 86_400_000;
+/** Digits the grouped customer key pads to, matching the seeded customer text. */
+const CUSTOMER_KEY_DIGITS = 6;
+/** Rows per window when a check walks a whole view outside timing. */
+const VIEW_CHECK_WINDOW_ROWS = 4_096;
 
 /** Column keys of the all-numeric ingest payload; every column holds numbers. */
 const NUMERIC_INGEST_KEYS = ["n1", "n2", "n3", "n4", "n5"] as const;
@@ -308,6 +340,8 @@ export interface DataBenchmarkResult extends GateIdentity {
     readonly timestamp: string;
     readonly sheetwriteRows: readonly number[];
     readonly handsontableRows: readonly number[];
+    /** Fixture, versioned, behind every query scenario in this artifact. */
+    readonly queryFixtures?: Readonly<Record<QueryScenario, string>>;
   };
   readonly sheetwrite: Readonly<Record<string, EngineResult>>;
   readonly handsontable: Readonly<Record<string, EngineResult>>;
@@ -353,12 +387,14 @@ function validateEngineQueries(
   mode: BenchmarkMode,
 ): void {
   const queries = row.queries;
-  if (queries === undefined) return;
   if (engine !== "sheetwrite") {
-    if (Object.keys(queries).length > 0) {
+    if (queries !== undefined && Object.keys(queries).length > 0) {
       throw new Error(`data ${engine} ${rows} must not report query scenarios`);
     }
     return;
+  }
+  if (queries === undefined) {
+    throw new Error(`data sheetwrite ${rows} is missing its query scenarios`);
   }
   for (const scenario of Object.keys(queries)) {
     if (!QUERY_SCENARIO_NAMES.includes(scenario)) {
@@ -533,6 +569,63 @@ function makeNumericIngestData(rowCount: number): ColumnarData {
   return { rowCount, columns };
 }
 
+/**
+ * Columns of the multi-key sort fixture. Every key is derived from the row
+ * index, so all of them decide part of the order at every sheet size:
+ * customers repeat every 97 rows, the amount cycles through 8 buckets inside a
+ * customer group, and the date runs opposite to row order (so a comparator that
+ * skips the date key cannot score the same order). The shared seeded dataset is
+ * never changed; `id` and `city` stay seeded.
+ */
+interface GroupedCustomerFixture {
+  readonly customer: string[];
+  readonly amount: Float64Array;
+  readonly date: string[];
+}
+
+function makeGroupedCustomerFixture(rowCount: number): GroupedCustomerFixture {
+  const customer = new Array<string>(rowCount);
+  const amount = new Float64Array(rowCount);
+  const date = new Array<string>(rowCount);
+  for (let row = 0; row < rowCount; row++) {
+    const occurrence = Math.floor(row / MULTI_KEY_GROUP_COUNT);
+    const group = (row % MULTI_KEY_GROUP_COUNT) + 1;
+    customer[row] = `Customer ${String(group).padStart(CUSTOMER_KEY_DIGITS, "0")}`;
+    amount[row] = ((occurrence % MULTI_KEY_AMOUNT_BUCKETS) + 1) * MULTI_KEY_AMOUNT_STEP;
+    const day = MULTI_KEY_DAY_COUNT - 1 - (occurrence % MULTI_KEY_DAY_COUNT);
+    date[row] = new Date(MULTI_KEY_DAY_EPOCH_UTC + day * MULTI_KEY_DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+  }
+  return { customer, amount, date };
+}
+
+/** Store over the grouped-customer fixture, with the seeded id and city. */
+function makeGroupedCustomerStore(
+  ds: ColumnarDataset,
+  fixture: GroupedCustomerFixture,
+): SheetwriteStore {
+  return new SheetwriteStore(makeWorkbook(ds.rowCount), {
+    rowCount: ds.rowCount,
+    columns: {
+      id: ds.id,
+      date: fixture.date,
+      customer: fixture.customer,
+      city: ds.city,
+      amount: fixture.amount,
+    },
+  });
+}
+
+/**
+ * Store over the pristine seeded rows for the query scenarios. The shared store
+ * has its amount cells rewritten by the edit workload, so an expectation read
+ * from the dataset would no longer describe it.
+ */
+function makeSeededQueryStore(ds: ColumnarDataset): SheetwriteStore {
+  return new SheetwriteStore(makeWorkbook(ds.rowCount), toSheetwriteColumnar(ds));
+}
+
 function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   const store = new CellStore();
   try {
@@ -691,45 +784,52 @@ function benchSheetwrite(
   );
   void aggSink;
 
-  // (g) Query scenarios. Each one re-reads its own result through the public
-  // window API afterwards, so a fast answer that is not the right answer fails.
+  // (g) Query scenarios. Each one measures a fixture store built from the
+  // pristine seeded rows and re-reads its complete result through the public
+  // window API, comparing it with an independently computed row-id order, so a
+  // fast answer that is not the right answer fails.
   // Scenarios without a declared row list run at every size.
   const queries = {} as Record<QueryScenario, DataStat>;
   const measures = (scenario: QueryScenario): boolean =>
     measuresQueryScenario(scenario, rows, mode);
+  const queryStore = makeSeededQueryStore(ds);
 
   if (measures("sort-multi-key")) {
-    queries["sort-multi-key"] = measure(() => store.sortByMulti(SHEET, MULTI_KEY_SORT), {
+    // The seeded rows have unique customers, so their order never reaches the
+    // second sort key. The grouped fixture repeats the leading key on purpose.
+    const fixture = makeGroupedCustomerFixture(rows);
+    const groupedStore = makeGroupedCustomerStore(ds, fixture);
+    queries["sort-multi-key"] = measure(() => groupedStore.sortByMulti(SHEET, MULTI_KEY_SORT), {
       ...plan("sort-multi-key", rows),
-      after: () => store.sortByMulti(SHEET, []),
+      after: () => groupedStore.sortByMulti(SHEET, []),
     });
-    store.sortByMulti(SHEET, MULTI_KEY_SORT);
-    assertViewRowCount(`sort-multi-key ${rows}`, store.viewRowCount(SHEET), rows);
-    assertMultiKeyOrder(
+    groupedStore.sortByMulti(SHEET, MULTI_KEY_SORT);
+    assertViewMatchesRows(
       `sort-multi-key ${rows}`,
-      readViewPrefix(store, MULTI_KEY_VIEW_COLS, ORDER_CHECK_ROWS),
+      groupedStore,
+      MULTI_KEY_VIEW_COLS,
+      expectedGroupedSortOrder(ds, fixture),
+      groupedRowSource(ds, fixture),
     );
-    store.clearView(SHEET);
+    groupedStore.dispose();
   }
 
   // One key over the candidate rows a city filter leaves behind.
   if (measures("sort-with-candidates")) {
-    store.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
-    queries["sort-with-candidates"] = measure(() => store.sortBy(SHEET, SORT_COL, true), {
+    queryStore.setColumnFilter(SHEET, FILTER_COL, { kind: "contains", text: FILTER_NEEDLE });
+    queries["sort-with-candidates"] = measure(() => queryStore.sortBy(SHEET, SORT_COL, true), {
       ...plan("sort-with-candidates", rows),
-      after: () => store.sortByMulti(SHEET, []),
+      after: () => queryStore.sortByMulti(SHEET, []),
     });
-    store.sortBy(SHEET, SORT_COL, true);
-    assertViewRowCount(
+    queryStore.sortBy(SHEET, SORT_COL, true);
+    assertViewMatchesRows(
       `sort-with-candidates ${rows}`,
-      store.viewRowCount(SHEET),
-      ds.city.reduce((count, city) => (city === FILTER_NEEDLE ? count + 1 : count), 0),
+      queryStore,
+      CANDIDATE_CHECK_COLS,
+      expectedCandidateSortOrder(ds),
+      seededRowSource(ds),
     );
-    assertAmountAscending(
-      `sort-with-candidates ${rows}`,
-      readViewPrefix(store, [SORT_COL], ORDER_CHECK_ROWS),
-    );
-    store.clearView(SHEET);
+    queryStore.clearView(SHEET);
   }
 
   for (const scenario of VALUE_SET_SCENARIOS) {
@@ -738,15 +838,21 @@ function benchSheetwrite(
     // The customer column is unique per row, so each pick matches exactly once.
     const picked = ds.customer.slice(0, pickedCount);
     queries[scenario] = measure(
-      () => store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked }),
+      () => queryStore.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked }),
       {
         ...plan(scenario, rows),
-        after: () => store.setColumnFilter(SHEET, COL.customer, null),
+        after: () => queryStore.setColumnFilter(SHEET, COL.customer, null),
       },
     );
-    store.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked });
-    assertViewRowCount(`filter ${scenario} ${rows}`, store.viewRowCount(SHEET), pickedCount);
-    store.clearView(SHEET);
+    queryStore.setColumnFilter(SHEET, COL.customer, { kind: "values", values: picked });
+    assertViewMatchesRows(
+      `filter ${scenario} ${rows}`,
+      queryStore,
+      [COL.customer],
+      expectedPickedRowIds(pickedCount),
+      seededRowSource(ds),
+    );
+    queryStore.clearView(SHEET);
   }
 
   if (measures("ingest-numeric-only")) {
@@ -770,67 +876,139 @@ function benchSheetwrite(
     }
   }
 
+  queryStore.dispose();
   store.dispose();
   return { rows, stats, notes: {}, queryResources, queries };
 }
 
-function assertViewRowCount(label: string, observed: number, expected: number): void {
-  if (observed !== expected) {
-    throw new Error(`${label}: the view holds ${observed} rows, expected ${expected}`);
-  }
+/** Source value of one fixture cell, addressed by workbook column and data row. */
+type RowSource = (column: number, dataRow: number) => CellScalar;
+
+function seededRowSource(ds: ColumnarDataset): RowSource {
+  return (column, dataRow) => {
+    switch (column) {
+      case COL.id:
+        return dataRow + 1;
+      case COL.date:
+        return ds.date[dataRow] ?? null;
+      case COL.customer:
+        return ds.customer[dataRow] ?? null;
+      case COL.city:
+        return ds.city[dataRow] ?? null;
+      case COL.amount:
+        return ds.amount[dataRow] ?? null;
+      default:
+        throw new Error(`no seeded source value for column ${column}`);
+    }
+  };
 }
 
-/** Leading view rows, one tuple per row in `cols` order, read via the window API. */
-function readViewPrefix(
+/** Seeded rows with the fixture's customer, amount and date columns. */
+function groupedRowSource(ds: ColumnarDataset, fixture: GroupedCustomerFixture): RowSource {
+  const seeded = seededRowSource(ds);
+  return (column, dataRow) => {
+    switch (column) {
+      case COL.customer:
+        return fixture.customer[dataRow] ?? null;
+      case COL.amount:
+        return fixture.amount[dataRow] ?? null;
+      case COL.date:
+        return fixture.date[dataRow] ?? null;
+      default:
+        return seeded(column, dataRow);
+    }
+  };
+}
+
+/**
+ * Expected multi-key sort order, computed here from the fixture columns and not
+ * by the engine under test: customer ascending, amount descending, date
+ * ascending, then row id.
+ */
+function expectedGroupedSortOrder(ds: ColumnarDataset, fixture: GroupedCustomerFixture): number[] {
+  const rows = Array.from({ length: ds.rowCount }, (_, row) => row);
+  rows.sort((left, right) => {
+    const leftCustomer = fixture.customer[left] ?? "";
+    const rightCustomer = fixture.customer[right] ?? "";
+    if (leftCustomer !== rightCustomer) return leftCustomer < rightCustomer ? -1 : 1;
+    const leftAmount = fixture.amount[left] ?? 0;
+    const rightAmount = fixture.amount[right] ?? 0;
+    if (leftAmount !== rightAmount) return rightAmount < leftAmount ? -1 : 1;
+    const leftDate = fixture.date[left] ?? "";
+    const rightDate = fixture.date[right] ?? "";
+    if (leftDate !== rightDate) return leftDate < rightDate ? -1 : 1;
+    return left - right;
+  });
+  return rows.map((row) => row + 1);
+}
+
+/**
+ * Expected candidate sort order: the city-filter rows by amount ascending, then
+ * row id — again computed here, not by the engine under test.
+ */
+function expectedCandidateSortOrder(ds: ColumnarDataset): number[] {
+  const rows = Array.from({ length: ds.rowCount }, (_, row) => row).filter(
+    (row) => ds.city[row] === FILTER_NEEDLE,
+  );
+  rows.sort((left, right) => {
+    const leftAmount = ds.amount[left] ?? 0;
+    const rightAmount = ds.amount[right] ?? 0;
+    if (leftAmount !== rightAmount) return leftAmount < rightAmount ? -1 : 1;
+    return left - right;
+  });
+  return rows.map((row) => row + 1);
+}
+
+/**
+ * The value-set filter picks the first rows' customers, one distinct value per
+ * row, so exactly those rows must survive, in ascending row order.
+ */
+function expectedPickedRowIds(pickedCount: number): number[] {
+  return Array.from({ length: pickedCount }, (_, row) => row + 1);
+}
+
+/**
+ * Checks the whole current view, outside timing, against an independently
+ * computed row-id order: bounded windows of the id plus the scenario's key
+ * columns must match both the expected ids and the source row values. A wrong
+ * subset, a wrong order, or a wrong value therefore fails. The seeded `id`
+ * column doubles as the data-row identity (`id = row + 1`).
+ */
+function assertViewMatchesRows(
+  label: string,
   store: SheetwriteStore,
-  cols: readonly number[],
-  limit: number,
-): CellScalar[][] {
-  const rowCount = Math.min(limit, store.viewRowCount(SHEET));
-  if (rowCount === 0) return [];
-  const view = store.getVisibleWindow(SHEET, { start: 0, end: rowCount }, cols);
-  const rows: CellScalar[][] = [];
-  for (let row = 0; row < rowCount; row++) {
-    const values: CellScalar[] = [];
-    for (let col = 0; col < cols.length; col++)
-      values.push(view.values[row * cols.length + col] ?? null);
-    rows.push(values);
+  checkCols: readonly number[],
+  expectedIds: readonly number[],
+  sourceValue: RowSource,
+): void {
+  const total = store.viewRowCount(SHEET);
+  if (total !== expectedIds.length) {
+    throw new Error(`${label}: the view holds ${total} rows, expected ${expectedIds.length}`);
   }
-  return rows;
-}
-
-/** The order {@link MULTI_KEY_SORT} asks for: customer asc, amount desc, date asc. */
-function assertMultiKeyOrder(label: string, view: readonly (readonly CellScalar[])[]): void {
-  for (let index = 1; index < view.length; index++) {
-    const previous = view[index - 1] ?? [];
-    const current = view[index] ?? [];
-    const previousCustomer = String(previous[0] ?? "");
-    const currentCustomer = String(current[0] ?? "");
-    if (previousCustomer !== currentCustomer) {
-      if (previousCustomer > currentCustomer) {
-        throw new Error(`${label}: customer order breaks at view row ${index}`);
+  const cols = [COL.id, ...checkCols];
+  for (let start = 0; start < total; start += VIEW_CHECK_WINDOW_ROWS) {
+    const end = Math.min(start + VIEW_CHECK_WINDOW_ROWS, total);
+    const view = store.getVisibleWindow(SHEET, { start, end }, cols);
+    for (let position = start; position < end; position++) {
+      const base = (position - start) * cols.length;
+      const observedId = Number(view.values[base] ?? Number.NaN);
+      const expectedId = expectedIds[position] ?? Number.NaN;
+      if (observedId !== expectedId) {
+        throw new Error(
+          `${label}: view row ${position} holds id ${observedId}, expected ${expectedId}`,
+        );
       }
-      continue;
-    }
-    const previousAmount = Number(previous[1] ?? 0);
-    const currentAmount = Number(current[1] ?? 0);
-    if (previousAmount !== currentAmount) {
-      if (previousAmount < currentAmount) {
-        throw new Error(`${label}: amount order breaks at view row ${index}`);
+      const dataRow = observedId - 1;
+      for (const [offset, column] of checkCols.entries()) {
+        const observed = view.values[base + offset + 1] ?? null;
+        const expected = sourceValue(column, dataRow);
+        if (observed !== expected) {
+          throw new Error(
+            `${label}: view row ${position} column ${column} holds ${String(observed)}, expected ${String(expected)}`,
+          );
+        }
       }
-      continue;
     }
-    if (String(previous[2] ?? "") > String(current[2] ?? "")) {
-      throw new Error(`${label}: date order breaks at view row ${index}`);
-    }
-  }
-}
-
-function assertAmountAscending(label: string, view: readonly (readonly CellScalar[])[]): void {
-  for (let index = 1; index < view.length; index++) {
-    const previous = Number((view[index - 1] ?? [])[0] ?? 0);
-    const current = Number((view[index] ?? [])[0] ?? 0);
-    if (previous > current) throw new Error(`${label}: amount order breaks at view row ${index}`);
   }
 }
 
@@ -1301,6 +1479,13 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
     out.push("");
     out.push(queryScalingTable(sw));
     out.push("");
+    const fixtures = result.meta.queryFixtures;
+    if (fixtures) {
+      out.push(
+        `Fixtures: ${QUERY_SCENARIOS.map((scenario) => `${scenario} — ${fixtures[scenario]}`).join("; ")}.`,
+      );
+      out.push("");
+    }
   }
   out.push("### Memory");
   out.push("");
@@ -1367,6 +1552,7 @@ function dataResult(
       ...protocolCaptureMeta(),
       sheetwriteRows: [...sheetwrite.keys()],
       handsontableRows: [...handsontable.keys()],
+      queryFixtures: QUERY_FIXTURES,
     },
     sheetwrite: Object.fromEntries(sheetwrite),
     handsontable: Object.fromEntries(handsontable),
