@@ -476,6 +476,56 @@ describe("Grid transaction resource ingress", () => {
     disposeGuard();
     grid.destroy();
   });
+
+  it("reports an undo whose restore payload exceeds the limit and still undoes older edits", () => {
+    const rows = 200;
+    // The forward clear is one small range operation; its undo restores every
+    // cleared value, which is well above this limit.
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(rows),
+      data: makeColumnarData(rows),
+      transactionResourceLimits: { maxEncodedBytes: 4_096 },
+    });
+    const rejections: Array<{ kind: string; resource?: string }> = [];
+    grid.on("mutation-rejected", ({ issues }) => {
+      for (const issue of issues) {
+        rejections.push({
+          kind: issue.kind,
+          resource: "resource" in issue ? issue.resource : undefined,
+        });
+      }
+    });
+    const edited = { sheet: "s1", row: 0, col: 1 };
+    const cleared = { sheet: "s1", row: 5, col: 0 };
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "set", addr: edited, value: { kind: "literal", value: 7 } }],
+      }).status,
+    ).toBe("applied");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 2 } },
+            contents: true,
+            style: false,
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+
+    grid.undo();
+    expect(rejections).toEqual([{ kind: "resource-limit", resource: "encoded-bytes" }]);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+
+    grid.undo();
+    expect(grid.store.getCell(edited).resolved).toBe(0.5);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+    expect(rejections).toHaveLength(1);
+    grid.destroy();
+  });
 });
 
 describe("Grid store lifecycle", () => {
