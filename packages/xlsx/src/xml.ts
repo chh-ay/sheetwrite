@@ -2,7 +2,6 @@ import { assertResource, checkAbort, type XlsxCodecContext } from "./resources.j
 
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const ENCODER = new TextEncoder();
-const XML_NAME = /^[A-Za-z_][A-Za-z\d_.:-]*/;
 
 export interface XmlElement {
   readonly name: string;
@@ -101,14 +100,57 @@ function decodeXmlEntities(value: string, part: string): string {
   return output;
 }
 
+/** Characters matched by `/\s/` beyond the ASCII ones checked inline. */
+const NON_ASCII_SPACE = /\s/;
+const ASCII_SPACE = 0x20;
+const ASCII_TAB = 0x09;
+const ASCII_CARRIAGE_RETURN = 0x0d;
+const ASCII_MAX = 0x7f;
+const CODE_QUOTE = 0x22;
+const CODE_APOSTROPHE = 0x27;
+const CODE_GREATER_THAN = 0x3e;
+const CODE_SLASH = 0x2f;
+const CODE_EQUALS = 0x3d;
+
+/** Same set as `/\s/.test(char)`; NaN (past the end) is not space. */
+function isXmlSpace(code: number): boolean {
+  if (code === ASCII_SPACE || (code >= ASCII_TAB && code <= ASCII_CARRIAGE_RETURN)) return true;
+  return code > ASCII_MAX && NON_ASCII_SPACE.test(String.fromCharCode(code));
+}
+
+/**
+ * End offset of the name starting at `start`, or `start` when there is none.
+ * Same grammar as `XML_NAME`: `[A-Za-z_][A-Za-z0-9_.:-]*`.
+ */
+function scanXmlName(source: string, start: number): number {
+  const first = source.charCodeAt(start) | 0x20;
+  const firstIsLetter = first >= 0x61 && first <= 0x7a;
+  if (!firstIsLetter && source.charCodeAt(start) !== 0x5f) return start;
+  let index = start + 1;
+  while (index < source.length) {
+    const code = source.charCodeAt(index);
+    const lower = code | 0x20;
+    const isNameChar =
+      (lower >= 0x61 && lower <= 0x7a) ||
+      (code >= 0x30 && code <= 0x39) ||
+      code === 0x5f ||
+      code === 0x2e ||
+      code === 0x3a ||
+      code === 0x2d;
+    if (!isNameChar) break;
+    index += 1;
+  }
+  return index;
+}
+
 function findTagEnd(xml: string, start: number, part: string): number {
-  let quote = "";
+  let quote = 0;
   for (let index = start; index < xml.length; index++) {
-    const char = xml[index]!;
-    if (quote) {
-      if (char === quote) quote = "";
-    } else if (char === '"' || char === "'") quote = char;
-    else if (char === ">") return index;
+    const code = xml.charCodeAt(index);
+    if (quote !== 0) {
+      if (code === quote) quote = 0;
+    } else if (code === CODE_QUOTE || code === CODE_APOSTROPHE) quote = code;
+    else if (code === CODE_GREATER_THAN) return index;
   }
   return xmlFailure(part, "unterminated tag");
 }
@@ -119,37 +161,39 @@ function parseStartTag(
   context: XlsxCodecContext,
 ): { name: string; attributes: Record<string, string>; selfClosing: boolean } {
   let offset = 0;
-  while (/\s/.test(source[offset] ?? "")) offset += 1;
-  const nameMatch = XML_NAME.exec(source.slice(offset));
-  if (!nameMatch) return xmlFailure(part, "element name is invalid");
-  const name = nameMatch[0];
-  offset += name.length;
+  while (isXmlSpace(source.charCodeAt(offset))) offset += 1;
+  const nameEnd = scanXmlName(source, offset);
+  if (nameEnd === offset) return xmlFailure(part, "element name is invalid");
+  const name = source.slice(offset, nameEnd);
+  offset = nameEnd;
   const attributes: Record<string, string> = Object.create(null);
   let attributeCount = 0;
   let selfClosing = false;
   while (offset < source.length) {
-    while (/\s/.test(source[offset] ?? "")) offset += 1;
-    if (source[offset] === "/") {
+    while (isXmlSpace(source.charCodeAt(offset))) offset += 1;
+    if (source.charCodeAt(offset) === CODE_SLASH) {
       selfClosing = true;
       offset += 1;
-      while (/\s/.test(source[offset] ?? "")) offset += 1;
+      while (isXmlSpace(source.charCodeAt(offset))) offset += 1;
       if (offset !== source.length)
         return xmlFailure(part, "unexpected content after self-closing slash");
       break;
     }
     if (offset === source.length) break;
-    const attributeMatch = XML_NAME.exec(source.slice(offset));
-    if (!attributeMatch) return xmlFailure(part, `attribute on ${name} is invalid`);
-    const attributeName = attributeMatch[0];
-    offset += attributeName.length;
-    while (/\s/.test(source[offset] ?? "")) offset += 1;
-    if (source[offset] !== "=") return xmlFailure(part, `attribute ${attributeName} has no value`);
+    const attributeEnd = scanXmlName(source, offset);
+    if (attributeEnd === offset) return xmlFailure(part, `attribute on ${name} is invalid`);
+    const attributeName = source.slice(offset, attributeEnd);
+    offset = attributeEnd;
+    while (isXmlSpace(source.charCodeAt(offset))) offset += 1;
+    if (source.charCodeAt(offset) !== CODE_EQUALS) {
+      return xmlFailure(part, `attribute ${attributeName} has no value`);
+    }
     offset += 1;
-    while (/\s/.test(source[offset] ?? "")) offset += 1;
-    const quote = source[offset];
-    if (quote !== '"' && quote !== "'")
+    while (isXmlSpace(source.charCodeAt(offset))) offset += 1;
+    const quote = source.charCodeAt(offset);
+    if (quote !== CODE_QUOTE && quote !== CODE_APOSTROPHE)
       return xmlFailure(part, `attribute ${attributeName} is unquoted`);
-    const end = source.indexOf(quote, offset + 1);
+    const end = source.indexOf(quote === CODE_QUOTE ? '"' : "'", offset + 1);
     if (end < 0) return xmlFailure(part, `attribute ${attributeName} is unterminated`);
     if (Object.hasOwn(attributes, attributeName))
       return xmlFailure(part, `attribute ${attributeName} is duplicated`);
@@ -321,8 +365,16 @@ export function xmlChild(element: XmlElement, localName: string): XmlElement | u
 }
 
 export function xmlAttribute(element: XmlElement, localName: string): string | undefined {
-  for (const [name, value] of Object.entries(element.attributes)) {
-    if (xmlLocalName(name) === localName) return value;
+  // Same first-match order as walking the attribute entries, but without
+  // allocating an entry array or slicing each name: cell attributes are read
+  // several times per cell.
+  for (const name in element.attributes) {
+    const colon = name.indexOf(":");
+    const matches =
+      colon < 0
+        ? name === localName
+        : name.length - colon - 1 === localName.length && name.startsWith(localName, colon + 1);
+    if (matches) return element.attributes[name];
   }
   return undefined;
 }

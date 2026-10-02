@@ -77,6 +77,10 @@ interface ParsedCell {
   readonly row: number;
   readonly col: number;
   value: CellValue | null;
+  /**
+   * Shared with every cell of the same style record and never mutated; the
+   * snapshot builder gives each output cell its own copy.
+   */
   readonly style?: CellStyle;
   readonly styleRecord: ParsedCellStyle;
   readonly address: string;
@@ -151,6 +155,21 @@ interface ReaderResourceUsage {
 
 function readerFailure(message: string): never {
   throw new TypeError(`Sheetwrite: invalid XLSX workbook: ${message}`);
+}
+
+/**
+ * Deep copy of parser-built style data: plain objects and arrays of strings,
+ * numbers and booleans. Every styled output cell needs its own copy, and this
+ * is much cheaper than `structuredClone` for such small records.
+ */
+function copyStyleData(source: unknown): unknown {
+  if (source === null || typeof source !== "object") return source;
+  if (Array.isArray(source)) return source.map(copyStyleData);
+  const copy: Record<string, unknown> = {};
+  for (const key in source) {
+    if (Object.hasOwn(source, key)) copy[key] = copyStyleData(Reflect.get(source, key));
+  }
+  return copy;
 }
 
 function displayText(element: XmlElement): string {
@@ -1230,7 +1249,7 @@ function parseSheet(
         cells.push({
           ...address,
           value,
-          style: styleRecord.style ? structuredClone(styleRecord.style) : undefined,
+          style: styleRecord.style,
           styleRecord,
           address: addressText,
           sharedFormula,
@@ -1973,7 +1992,8 @@ export function readWorkbook(
       rowOffset: cell.row,
       colOffset: cell.col,
       value: cell.value ?? { kind: "literal", value: null },
-      ...(cell.style ? { style: structuredClone(cell.style) } : {}),
+      // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
+      ...(cell.style ? { style: copyStyleData(cell.style) as CellStyle } : {}),
     }));
     const nativeValidations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
