@@ -365,7 +365,9 @@ export function scanDelimitedText(
     }
     fieldBytes += runEnd - index;
     if (fieldBytes > limits.maxFieldBytes) {
-      failResource("maxFieldBytes", limits.maxFieldBytes, fieldBytes, "parse");
+      // The field was within the ceiling before this run of one-byte units, so a
+      // unit-by-unit count first exceeds it at exactly one byte over.
+      failResource("maxFieldBytes", limits.maxFieldBytes, limits.maxFieldBytes + 1, "parse");
     }
     fieldPresent = true;
     index = runEnd;

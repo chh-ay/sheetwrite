@@ -304,7 +304,10 @@ function parseSharedStrings(
     parentIsRoot: true,
     shouldStream: (_xml, _startOffset, rootElement) =>
       xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
-    child: processItem,
+    // The tree path reads only `si` children; other children are skipped alike.
+    child: (item) => {
+      if (xmlLocalName(item.name) === "si") processItem(item);
+    },
   });
   assertXmlRoot(root, "sst", MAIN_NAMESPACES, part);
   return strings;
@@ -1243,7 +1246,10 @@ function parseSheet(
     shouldStream: (xml, startOffset, rootElement) =>
       xmlRootMatches(rootElement, "worksheet", MAIN_NAMESPACES) &&
       !hasColumnStylesAfter(xml, startOffset),
-    child: processRow,
+    // The tree path reads only `row` children; other children are skipped alike.
+    child: (rowElement, rootElement) => {
+      if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
+    },
   });
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
   const sheetData = xmlChild(root, "sheetData");
