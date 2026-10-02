@@ -729,6 +729,7 @@ export class GridImpl implements Grid {
       firstCol: () => this.firstCol(),
       lastCol: () => this.lastCol(),
       nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
+      previousVisibleColumn: (col) => this.geometry.previousVisibleColumn(col),
       colAtX: (contentX) => this.colAtX(contentX),
       rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
       rowCount: () => this.geometry.rowCount,

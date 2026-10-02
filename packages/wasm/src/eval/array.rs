@@ -15,6 +15,7 @@ use super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
 };
 use super::value::{bool_from_value, compare_values, number_from_value};
+use super::with_let_slots;
 
 fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
@@ -32,6 +33,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
+        Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -96,8 +98,9 @@ impl CellStore {
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
             ),
+            Ast::LetSlot { expression, .. } => self.dynamic_array_bound(expression, formula_sheet),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
-                Ok(expanded) => self.dynamic_array_bound(&expanded, formula_sheet),
+                Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet),
                 Err(_) => None,
             },
             Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
@@ -184,19 +187,17 @@ impl CellStore {
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
+            Ast::LetSlot { expression, .. } => {
+                return self.eval_dynamic_array(expression, sheet, affected, memo, visiting, depth)
+            }
             Ast::Func(Func::Let, args) => {
-                let expanded = match expand_let_ast(args) {
+                let (expanded, slots) = match expand_let_ast(args) {
                     Ok(expanded) => expanded,
                     Err(error) => return Some(Err(error)),
                 };
-                return self.eval_dynamic_array(
-                    &expanded,
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                );
+                return with_let_slots(slots, || {
+                    self.eval_dynamic_array(&expanded, sheet, affected, memo, visiting, depth + 1)
+                });
             }
             Ast::Func(Func::Filter, args) => {
                 self.eval_filter(args, sheet, affected, memo, visiting, depth + 1)
@@ -260,10 +261,14 @@ impl CellStore {
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
             Ast::Func(Func::Let, args) => {
-                return self.matrix_shape(&expand_let_ast(args)?, formula_sheet);
+                let (expanded, _) = expand_let_ast(args)?;
+                return self.matrix_shape(&expanded, formula_sheet);
             }
             Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
                 return self.matrix_shape(args.first().ok_or(FormulaError::Value)?, formula_sheet);
+            }
+            Ast::LetSlot { expression, .. } => {
+                return self.matrix_shape(expression, formula_sheet);
             }
             Ast::Func(Func::Transpose, args) => {
                 let (rows, cols, cells) =
