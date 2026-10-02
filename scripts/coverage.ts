@@ -16,7 +16,7 @@ import {
 } from "./coverage-check.js";
 
 const CARGO_LLVM_COV_VERSION = "0.8.7";
-const RUST_VERSION = "1.98.1";
+const RUST_VERSION = "1.99.0";
 const TYPESCRIPT_ROOTS = [
   "packages/core/src",
   "packages/react/src",
