@@ -228,7 +228,9 @@ export function scanDelimitedText(
   const fieldLimit = sink.fieldLimit;
   let rowCount = 0;
   let rowFields = 0;
-  let fieldParts: string[] = [];
+  // Pieces of the current field; only quoted fields with doubled quotes need
+  // more than one. Reused across fields to avoid an array per field.
+  const fieldParts: string[] = [];
   let fieldBytes = 0;
   let cells = 0;
   let fieldPresent = false;
@@ -249,14 +251,18 @@ export function scanDelimitedText(
     if (nextCells > limits.maxCells) {
       failResource("maxCells", limits.maxCells, nextCells, "parse");
     }
-    appendSegment(end);
     if (rowFields < fieldLimit) {
       let value = "";
-      if (fieldParts.length === 1) value = fieldParts[0] ?? "";
-      else if (fieldParts.length > 1) value = fieldParts.join("");
+      if (fieldParts.length === 0) {
+        // Plain field: one slice of the input, no intermediate pieces.
+        if (end > segmentStart) value = text.slice(segmentStart, end);
+      } else {
+        appendSegment(end);
+        value = fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join("");
+      }
       sink.field(rowCount, rowFields, value);
     }
-    fieldParts = [];
+    fieldParts.length = 0;
     fieldBytes = 0;
     fieldPresent = false;
     cells = nextCells;

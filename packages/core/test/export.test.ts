@@ -371,6 +371,18 @@ describe("export", () => {
     store.dispose();
   });
 
+  it("keeps non-ASCII boolean look-alikes and formula-like dates as text", () => {
+    const columns: Column[] = [
+      { key: "flag", header: "Flag", width: 80, type: "number" },
+      { key: "when", header: "When", width: 80, type: "date" },
+    ];
+    // `ſ` upper-cases to `S`, but spreadsheet booleans are ASCII only.
+    expect(fromCsv("Flag,When\nfalſe,=2026-07-18\nFaLsE,2026-07-18", columns).columns).toEqual({
+      flag: ["falſe", false],
+      when: ["=2026-07-18", parseDateInput("2026-07-18")],
+    });
+  });
+
   it("enforces exact defaults and limit+1 before oversized delimited allocations", () => {
     expect(DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS).toEqual({
       maxInputBytes: 32 * 1024 * 1024,
