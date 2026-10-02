@@ -23,6 +23,7 @@ import {
   StoreDataEngine,
   type SheetwriteStoreOptions as StoreDataEngineOptions,
 } from "./store/data-engine.js";
+import { registerStoreEngine } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { patchSheetId } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
@@ -141,6 +142,7 @@ export class SheetwriteStore implements Store {
     this.policy = new StoreMutationPolicy(workbook);
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
+    registerStoreEngine(this, this.engine);
   }
 
   static fromSnapshot(input: unknown, options: SheetwriteStoreOptions = {}): SheetwriteStore {

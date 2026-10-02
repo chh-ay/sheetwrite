@@ -1,4 +1,10 @@
-import type { CellStore, RangeSnapshot, SourceSnapshot, WindowView } from "@sheetwrite/wasm";
+import type {
+  CellSnapshot,
+  CellStore,
+  RangeSnapshot,
+  SourceSnapshot,
+  WindowView,
+} from "@sheetwrite/wasm";
 
 /** Internal typed subset added by the generated WASM store at runtime. */
 export type RecomputingCellStore = CellStore & {
@@ -66,7 +72,7 @@ export type RecomputingCellStore = CellStore & {
     strs: string[],
     flags: Uint8Array,
   ): void;
-  setBlock(
+  setBlockPacked(
     sheet: number,
     startRow: number,
     startCol: number,
@@ -74,7 +80,24 @@ export type RecomputingCellStore = CellStore & {
     cols: number,
     kinds: Uint8Array,
     numbers: Float64Array,
-    texts: string[],
+    textBuf: Uint8Array,
+    textOffsets: Uint32Array,
+    styles: Uint32Array,
+    formulaOffsets: Uint32Array,
+    formulaSources: string[],
+    referenceOffsets: Uint32Array,
+    referenceTargets: Uint32Array,
+  ): number;
+  setColumnBlockPacked(
+    sheet: number,
+    startRow: number,
+    startCol: number,
+    rows: number,
+    cols: number,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    textBuf: Uint8Array,
+    textOffsets: Uint32Array,
     styles: Uint32Array,
     formulaOffsets: Uint32Array,
     formulaSources: string[],
@@ -165,6 +188,8 @@ export type RecomputingCellStore = CellStore & {
   isFullyLoaded(sheet: number): boolean;
   rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
   columnsFullyLoaded(sheet: number, startRow: number, endRow: number, cols: Uint32Array): boolean;
+  loadedSpans(sheet: number, startRow: number, endRow: number, col: number): Uint32Array;
+  cellSnapshots(sheet: number, rows: Uint32Array, cols: Uint32Array): CellSnapshot | undefined;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
   beginPageLoad(): void;
   endPageLoad(): void;
