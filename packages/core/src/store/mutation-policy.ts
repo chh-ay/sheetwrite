@@ -285,6 +285,25 @@ export class StoreMutationPolicy {
 
     if (patch.op === "setRange") {
       const range = normalizedRange(patch.range);
+      // Cell offsets are only required to be non-negative, so the furthest
+      // offset bounds the written area rather than the declared range end.
+      let maxRowOffset = 0;
+      let maxColOffset = 0;
+      for (const cell of patch.cells) {
+        if (cell.rowOffset > maxRowOffset) maxRowOffset = cell.rowOffset;
+        if (cell.colOffset > maxColOffset) maxColOffset = cell.colOffset;
+      }
+      const written: Range = {
+        sheet: range.sheet,
+        start: range.start,
+        end: { row: range.end.row + maxRowOffset, col: range.end.col + maxColOffset },
+      };
+      // A rule can only produce an issue for a cell inside its own range, so
+      // rules that miss the written area are dropped before the cell loop.
+      const candidates = rules.filter(
+        (rule) => rule.policy !== "allow" && rangesIntersect(rule.range, written),
+      );
+      if (candidates.length === 0) return issues;
       for (const cell of patch.cells) {
         if (cell.value.kind !== "literal") continue;
         const addr = {
@@ -292,12 +311,8 @@ export class StoreMutationPolicy {
           row: range.start.row + cell.rowOffset,
           col: range.start.col + cell.colOffset,
         };
-        for (const rule of rules) {
-          if (
-            rule.policy === "allow" ||
-            !rangeContains(rule.range, addr) ||
-            validationAccepts(rule, cell.value.value)
-          ) {
+        for (const rule of candidates) {
+          if (!rangeContains(rule.range, addr) || validationAccepts(rule, cell.value.value)) {
             continue;
           }
           issues.push({

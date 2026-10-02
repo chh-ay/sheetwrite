@@ -268,3 +268,30 @@ describe("keyboard whole-axis selection", () => {
     grid.destroy();
   });
 });
+
+describe("pointer input: header resize hit-testing", () => {
+  it("skips the leading edge of the first visible column and still grabs its trailing edge", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("expected fixture sheet");
+
+    // Hidden column 0 disappears from the band list, so column 1 opens the view.
+    grid.hideColumns([0]);
+    grid.refresh();
+
+    scroller.dispatchEvent(
+      pointer("pointermove", { clientX: DEFAULT_THEME.rowHeaderWidth + 2, clientY: 10 }),
+    );
+    expect(scroller.style.cursor).toBe("");
+
+    const boundaryX = DEFAULT_THEME.rowHeaderWidth + (sheet.columns[1]?.width ?? 0);
+    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX - 1, clientY: 10 }));
+    expect(scroller.style.cursor).toBe("col-resize");
+
+    scroller.dispatchEvent(pointer("pointerdown", { clientX: boundaryX - 1, clientY: 10 }));
+    scroller.dispatchEvent(pointer("pointermove", { clientX: boundaryX + 29, clientY: 10 }));
+    scroller.dispatchEvent(pointer("pointerup", { clientX: boundaryX + 29, clientY: 10 }));
+    expect(store.getWorkbook().sheets[0]?.columns[1]?.width).toBe(150);
+    grid.destroy();
+  });
+});

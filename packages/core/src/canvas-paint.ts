@@ -142,16 +142,29 @@ export function fontFor(
   return font;
 }
 
-/** Wrapped-only line layout; the ordinary single-line path never calls this. */
-export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
-  const lines: string[] = [];
+/**
+ * Wrapped-only line layout; the ordinary single-line path never calls this.
+ * `maxLines` bounds the work for cells whose block cannot fit: the caller only
+ * draws lines that fit the cell height, so generating more than
+ * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
+ * whose length reaches `maxLines` therefore means "more lines exist".
+ */
+function layoutTextLinesInto(
+  ctx: Ctx,
+  text: string,
+  width: number,
+  maxLines: number,
+  lines: string[],
+): string[] {
+  const limit = Math.max(1, maxLines);
   for (const paragraph of text.split("\n")) {
+    if (lines.length >= limit) break;
     if (paragraph === "") {
       lines.push("");
       continue;
     }
     let start = 0;
-    while (start < paragraph.length) {
+    while (start < paragraph.length && lines.length < limit) {
       let end = start;
       let lastBreak = -1;
       while (end < paragraph.length) {
@@ -169,6 +182,11 @@ export function layoutTextLines(ctx: Ctx, text: string, width: number): string[]
     }
   }
   return lines;
+}
+
+/** Full wrapped layout for callers that need every line, such as auto row height. */
+export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
+  return layoutTextLinesInto(ctx, text, width, Number.POSITIVE_INFINITY, []);
 }
 
 /**
@@ -733,8 +751,12 @@ function paintCell(
   ctx.save();
   if (effective.wrap && !numeric) {
     clipCell(ctx, x, y, w, h);
-    const lines = layoutTextLines(ctx, text, availableTextWidth);
     const lineHeight = fontPx * 1.2;
+    // The draw loop below never paints a line whose band starts past the cell,
+    // and a block taller than the cell is top-anchored either way, so laying
+    // out one line past the last drawable one changes no pixel.
+    const maxLines = Math.floor(h / lineHeight) + 1;
+    const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
     const blockHeight = lines.length * lineHeight;
     const firstCy = y + (h - Math.min(h, blockHeight)) / 2 + lineHeight / 2;
     for (let line = 0; line < lines.length; line++) {
