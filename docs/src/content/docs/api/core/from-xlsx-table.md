@@ -11,7 +11,7 @@ Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L369"><code>packages/core/src/export.ts#L369</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L393"><code>packages/core/src/export.ts#L393</code></a></dd></div>
 </dl>
 
 ## Declaration

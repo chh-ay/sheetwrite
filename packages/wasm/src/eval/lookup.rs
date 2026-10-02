@@ -233,8 +233,8 @@ impl LookupIndex {
                 }
             }
         } else {
-            for position in 0..values.len() {
-                if lookup_compare(&values[position], key)? == Ordering::Equal {
+            for (position, value) in values.iter().enumerate() {
+                if lookup_compare(value, key)? == Ordering::Equal {
                     return Ok(Some(position));
                 }
             }

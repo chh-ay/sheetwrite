@@ -10,7 +10,7 @@ removed and its object URL is scheduled for revocation even when DOM append or
 click throws.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L181"><code>packages/core/src/export.ts#L181</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L205"><code>packages/core/src/export.ts#L205</code></a></dd></div>
 </dl>
 
 ## Declaration

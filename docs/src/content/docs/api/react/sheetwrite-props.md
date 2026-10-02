@@ -8,7 +8,7 @@ description: "Simple framework adapter props for columns and default row objects
 Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L396"><code>packages/react/src/index.tsx#L396</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L408"><code>packages/react/src/index.tsx#L408</code></a></dd></div>
 </dl>
 
 ## Declaration

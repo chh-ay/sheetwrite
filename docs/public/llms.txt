@@ -62,7 +62,7 @@ Sheetwrite packages are released together at version 0.4.0. This index is genera
 - [`@sheetwrite/react`](https://sheetwrite.vercel.app/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://sheetwrite.vercel.app/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://sheetwrite.vercel.app/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/wasm`](https://sheetwrite.vercel.app/docs/api/wasm/): 12 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/wasm`](https://sheetwrite.vercel.app/docs/api/wasm/): 13 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/xlsx`](https://sheetwrite.vercel.app/docs/api/xlsx/): 7 exports across 2 entry points (primary entry point: supported).
 - [Public API declarations](https://sheetwrite.vercel.app/llms-full.txt): every export signature grouped by package and entry point. Do not invent symbols absent from it.
 

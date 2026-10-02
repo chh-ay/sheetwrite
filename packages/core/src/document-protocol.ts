@@ -498,84 +498,120 @@ function serializedLimitIssue(path: string, maxBytes: number): JsonSafetyIssue {
   };
 }
 
+/**
+ * Keys from the snapshot root to the value being inspected: numbers are array
+ * indexes, strings are object keys. Large snapshots have millions of values and
+ * almost never fail, so the text path is only built when an issue is reported.
+ */
+type JsonPathSegments = Array<string | number>;
+
+function jsonPath(segments: JsonPathSegments): string {
+  let path = "$";
+  for (const segment of segments) {
+    path = typeof segment === "number" ? `${path}[${segment}]` : childPath(path, segment);
+  }
+  return path;
+}
+
 function findJsonSafetyIssue(
   value: unknown,
-  path: string,
+  segments: JsonPathSegments,
   ancestors: Set<object>,
   state: JsonInspectionState,
 ): JsonSafetyIssue | undefined {
   if (value === undefined) {
-    return { path, code: "non-serializable", message: "undefined is not JSON-safe" };
+    return {
+      path: jsonPath(segments),
+      code: "non-serializable",
+      message: "undefined is not JSON-safe",
+    };
   }
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
-      return { path, code: "non-serializable", message: "Numbers must be finite" };
+      return {
+        path: jsonPath(segments),
+        code: "non-serializable",
+        message: "Numbers must be finite",
+      };
     }
     const serialized = Object.is(value, -0) ? "0" : String(value);
     return consumeBytes(state, serialized.length)
       ? undefined
-      : serializedLimitIssue(path, state.maxBytes);
+      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
   if (typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
     return {
-      path,
+      path: jsonPath(segments),
       code: "non-serializable",
       message: `${typeof value} values are not JSON-safe`,
     };
   }
   if (value === null) {
-    return consumeBytes(state, 4) ? undefined : serializedLimitIssue(path, state.maxBytes);
+    return consumeBytes(state, 4)
+      ? undefined
+      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
   if (typeof value === "boolean") {
     return consumeBytes(state, value ? 4 : 5)
       ? undefined
-      : serializedLimitIssue(path, state.maxBytes);
+      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
   if (typeof value === "string") {
-    return consumeJsonString(state, value) ? undefined : serializedLimitIssue(path, state.maxBytes);
+    return consumeJsonString(state, value)
+      ? undefined
+      : serializedLimitIssue(jsonPath(segments), state.maxBytes);
   }
   if (typeof value !== "object") {
-    return { path, code: "non-serializable", message: "Value is not JSON-safe" };
+    return {
+      path: jsonPath(segments),
+      code: "non-serializable",
+      message: "Value is not JSON-safe",
+    };
   }
   if (ancestors.has(value)) {
-    return { path, code: "non-serializable", message: "Cyclic values are not JSON-safe" };
+    return {
+      path: jsonPath(segments),
+      code: "non-serializable",
+      message: "Cyclic values are not JSON-safe",
+    };
   }
 
   if (Array.isArray(value)) {
     if (Object.getPrototypeOf(value) !== Array.prototype) {
       return {
-        path,
+        path: jsonPath(segments),
         code: "non-serializable",
         message: "Arrays with custom prototypes are not JSON-safe",
       };
     }
     if (!consumeBytes(state, 2 + Math.max(0, value.length - 1))) {
-      return serializedLimitIssue(path, state.maxBytes);
+      return serializedLimitIssue(jsonPath(segments), state.maxBytes);
     }
     ancestors.add(value);
     for (let index = 0; index < value.length; index++) {
-      const itemPath = `${path}[${index}]`;
+      segments.push(index);
       const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
       if (!descriptor?.enumerable || !("value" in descriptor)) {
         ancestors.delete(value);
         return {
-          path: itemPath,
+          path: jsonPath(segments),
           code: "non-serializable",
           message: "Array entries must be enumerable data properties",
         };
       }
-      const issue = findJsonSafetyIssue(descriptor.value, itemPath, ancestors, state);
+      const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
       if (issue) {
         ancestors.delete(value);
         return issue;
       }
+      segments.pop();
     }
     for (const key in value) {
       if (!Object.hasOwn(value, key)) continue;
       if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length) {
         ancestors.delete(value);
         return {
-          path: childPath(path, key),
+          path: childPath(jsonPath(segments), key),
           code: "non-serializable",
           message: "Arrays may contain only indexed data properties",
         };
@@ -584,7 +620,7 @@ function findJsonSafetyIssue(
     if (Object.getOwnPropertySymbols(value).length > 0) {
       ancestors.delete(value);
       return {
-        path,
+        path: jsonPath(segments),
         code: "non-serializable",
         message: "Symbol-keyed properties are not JSON-safe",
       };
@@ -594,19 +630,23 @@ function findJsonSafetyIssue(
   }
 
   if (!isPlainRecord(value)) {
-    return { path, code: "non-serializable", message: "Only plain objects are JSON-safe" };
+    return {
+      path: jsonPath(segments),
+      code: "non-serializable",
+      message: "Only plain objects are JSON-safe",
+    };
   }
-  if (!consumeBytes(state, 2)) return serializedLimitIssue(path, state.maxBytes);
+  if (!consumeBytes(state, 2)) return serializedLimitIssue(jsonPath(segments), state.maxBytes);
   ancestors.add(value);
   let propertyCount = 0;
   for (const key in value) {
     if (!Object.hasOwn(value, key)) continue;
-    const propertyPath = childPath(path, key);
+    segments.push(key);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor?.enumerable || !("value" in descriptor)) {
       ancestors.delete(value);
       return {
-        path: propertyPath,
+        path: jsonPath(segments),
         code: "non-serializable",
         message: "Object properties must be enumerable data properties",
       };
@@ -617,19 +657,20 @@ function findJsonSafetyIssue(
       !consumeBytes(state, 1)
     ) {
       ancestors.delete(value);
-      return serializedLimitIssue(propertyPath, state.maxBytes);
+      return serializedLimitIssue(jsonPath(segments), state.maxBytes);
     }
     propertyCount += 1;
-    const issue = findJsonSafetyIssue(descriptor.value, propertyPath, ancestors, state);
+    const issue = findJsonSafetyIssue(descriptor.value, segments, ancestors, state);
     if (issue) {
       ancestors.delete(value);
       return issue;
     }
+    segments.pop();
   }
   if (Object.getOwnPropertySymbols(value).length > 0) {
     ancestors.delete(value);
     return {
-      path,
+      path: jsonPath(segments),
       code: "non-serializable",
       message: "Symbol-keyed properties are not JSON-safe",
     };
@@ -2838,7 +2879,7 @@ export function validateWorkbookSnapshot(
     if ("code" in resolved) return { ok: false, errors: [resolved] };
     const resourceIssue = preflightSnapshotResources(input, resolved);
     if (resourceIssue) return { ok: false, errors: [resourceIssue] };
-    const issue = findJsonSafetyIssue(input, "$", new Set<object>(), {
+    const issue = findJsonSafetyIssue(input, [], new Set<object>(), {
       bytes: 0,
       maxBytes: resolved.limits.maxSerializedBytes,
     });

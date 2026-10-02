@@ -175,7 +175,7 @@ finishes before package-specific tags and GitHub Releases such as
 
 ## Development
 
-Contributor and CI tooling is pinned to Bun 1.4.2, Rust 1.98.1 with the
+Contributor and CI tooling is pinned to Bun 1.4.2, Rust 1.99.0 with the
 `wasm32-unknown-unknown` target, wasm-pack 0.15.0, and cargo-audit 0.22.2.
 The Bun engine range in `package.json` describes supported consumers; the
 `packageManager` field and `rust-toolchain.toml` define the exact contributor

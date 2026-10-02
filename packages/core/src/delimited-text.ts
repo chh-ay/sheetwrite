@@ -118,9 +118,20 @@ export function resolveDelimitedTextResourceLimits(
   return limits;
 }
 
+/** Highest code unit that UTF-8 encodes as a single byte. */
+const ASCII_MAX_CODE_UNIT = 0x7f;
+/** UTF-16 code unit of a double quote. */
+const QUOTE_CODE_UNIT = 0x22;
+/** UTF-16 code unit of a carriage return. */
+const CARRIAGE_RETURN_CODE_UNIT = 0x0d;
+/** UTF-16 code unit of a line feed. */
+const LINE_FEED_CODE_UNIT = 0x0a;
+/** UTF-16 code unit of a leading byte-order mark. */
+const BOM_CODE_UNIT = 0xfeff;
+
 function utf8WidthAt(text: string, index: number): { bytes: number; advance: number } {
   const first = text.charCodeAt(index);
-  if (first <= 0x7f) return { bytes: 1, advance: 1 };
+  if (first <= ASCII_MAX_CODE_UNIT) return { bytes: 1, advance: 1 };
   if (first <= 0x7ff) return { bytes: 2, advance: 1 };
   if (first >= 0xd800 && first <= 0xdbff) {
     const second = text.charCodeAt(index + 1);
@@ -132,6 +143,17 @@ function utf8WidthAt(text: string, index: number): { bytes: number; advance: num
 function boundedUtf8InputBytes(text: string, limit: number): number {
   let bytes = 0;
   for (let index = 0; index < text.length; ) {
+    const code = text.charCodeAt(index);
+    if (code <= ASCII_MAX_CODE_UNIT) {
+      // A run of ASCII code units is one byte each, so it can cross the ceiling
+      // by at most one; report the same first-exceeded value as a per-unit loop.
+      let end = index + 1;
+      while (end < text.length && text.charCodeAt(end) <= ASCII_MAX_CODE_UNIT) end += 1;
+      bytes += end - index;
+      if (bytes > limit) return limit + 1;
+      index = end;
+      continue;
+    }
     const width = utf8WidthAt(text, index);
     bytes += width.bytes;
     if (bytes > limit) return bytes;
@@ -172,29 +194,48 @@ export function assertDelimitedTextDimensions(
 }
 
 /**
- * Parse a fixed comma or tab dialect into raw strings. The input is already an
+ * Receives materialized fields from the delimited-text scanner. A sink that only
+ * needs the leading columns of each record caps `fieldLimit`; the scanner still
+ * counts every field, row, and byte toward the resource ceilings.
+ */
+export interface DelimitedTextScanSink {
+  /** Exclusive upper bound on the column index that receives a value. */
+  readonly fieldLimit: number;
+  /** Called once per materialized field, in column order within its record. */
+  field(row: number, column: number, value: string): void;
+  /** Called once per completed record with its field count. */
+  row(row: number, fieldCount: number): void;
+}
+
+/**
+ * Scan a fixed comma or tab dialect into a sink. The input is already an
  * in-memory string; scanning is incremental and checks UTF-8 byte, field, row,
  * column, and cell ceilings before materializing the next oversized value.
+ * Fields at or past `sink.fieldLimit` are counted but not built into strings.
  */
-export function parseDelimitedText(
+export function scanDelimitedText(
   text: string,
   delimiter: "," | "\t",
-  options: DelimitedTextOptions = {},
-): string[][] {
-  const limits = resolveDelimitedTextResourceLimits(options);
+  limits: Readonly<DelimitedTextResourceLimits>,
+  sink: DelimitedTextScanSink,
+): void {
   const inputBytes = boundedUtf8InputBytes(text, limits.maxInputBytes);
   if (inputBytes > limits.maxInputBytes) {
     failResource("maxInputBytes", limits.maxInputBytes, inputBytes, "parse");
   }
 
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let fieldParts: string[] = [];
+  const delimiterCode = delimiter.charCodeAt(0);
+  const fieldLimit = sink.fieldLimit;
+  let rowCount = 0;
+  let rowFields = 0;
+  // Pieces of the current field; only quoted fields with doubled quotes need
+  // more than one. Reused across fields to avoid an array per field.
+  const fieldParts: string[] = [];
   let fieldBytes = 0;
   let cells = 0;
   let fieldPresent = false;
   let quoted = false;
-  let index = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+  let index = text.charCodeAt(0) === BOM_CODE_UNIT ? 1 : 0;
   let segmentStart = index;
 
   const appendSegment = (end: number): void => {
@@ -202,7 +243,7 @@ export function parseDelimitedText(
   };
 
   const materializeField = (end: number): void => {
-    const nextColumn = row.length + 1;
+    const nextColumn = rowFields + 1;
     if (nextColumn > limits.maxColumns) {
       failResource("maxColumns", limits.maxColumns, nextColumn, "parse");
     }
@@ -210,24 +251,33 @@ export function parseDelimitedText(
     if (nextCells > limits.maxCells) {
       failResource("maxCells", limits.maxCells, nextCells, "parse");
     }
-    appendSegment(end);
-    row.push(
-      fieldParts.length === 0 ? "" : fieldParts.length === 1 ? fieldParts[0]! : fieldParts.join(""),
-    );
-    fieldParts = [];
+    if (rowFields < fieldLimit) {
+      let value = "";
+      if (fieldParts.length === 0) {
+        // Plain field: one slice of the input, no intermediate pieces.
+        if (end > segmentStart) value = text.slice(segmentStart, end);
+      } else {
+        appendSegment(end);
+        value = fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join("");
+      }
+      sink.field(rowCount, rowFields, value);
+    }
+    fieldParts.length = 0;
     fieldBytes = 0;
     fieldPresent = false;
     cells = nextCells;
+    rowFields = nextColumn;
   };
 
   const materializeRow = (end: number): void => {
     materializeField(end);
-    const nextRows = rows.length + 1;
+    const nextRows = rowCount + 1;
     if (nextRows > limits.maxRows) {
       failResource("maxRows", limits.maxRows, nextRows, "parse");
     }
-    rows.push(row);
-    row = [];
+    sink.row(rowCount, rowFields);
+    rowCount = nextRows;
+    rowFields = 0;
   };
 
   const countFieldCodePoint = (): void => {
@@ -241,13 +291,13 @@ export function parseDelimitedText(
   };
 
   while (index < text.length) {
-    const ch = text[index]!;
+    const code = text.charCodeAt(index);
     if (quoted) {
-      if (ch !== '"') {
+      if (code !== QUOTE_CODE_UNIT) {
         countFieldCodePoint();
         continue;
       }
-      if (text[index + 1] === '"') {
+      if (text.charCodeAt(index + 1) === QUOTE_CODE_UNIT) {
         appendSegment(index);
         fieldBytes++;
         if (fieldBytes > limits.maxFieldBytes) {
@@ -265,16 +315,16 @@ export function parseDelimitedText(
       continue;
     }
 
-    if (ch === '"' && !fieldPresent && fieldParts.length === 0) {
+    if (code === QUOTE_CODE_UNIT && !fieldPresent && fieldParts.length === 0) {
       quoted = true;
       fieldPresent = true;
       index++;
       segmentStart = index;
       continue;
     }
-    if (ch === delimiter) {
+    if (code === delimiterCode) {
       materializeField(index);
-      if (row.length >= limits.maxColumns) {
+      if (rowFields >= limits.maxColumns) {
         failResource("maxColumns", limits.maxColumns, limits.maxColumns + 1, "parse");
       }
       if (cells >= limits.maxCells) {
@@ -284,20 +334,73 @@ export function parseDelimitedText(
       segmentStart = index;
       continue;
     }
-    if (ch === "\r" || ch === "\n") {
+    if (code === CARRIAGE_RETURN_CODE_UNIT || code === LINE_FEED_CODE_UNIT) {
       materializeRow(index);
-      if (ch === "\r" && text[index + 1] === "\n") index++;
+      if (
+        code === CARRIAGE_RETURN_CODE_UNIT &&
+        text.charCodeAt(index + 1) === LINE_FEED_CODE_UNIT
+      ) {
+        index++;
+      }
       index++;
       segmentStart = index;
-      if (index < text.length && rows.length >= limits.maxRows) {
+      if (index < text.length && rowCount >= limits.maxRows) {
         failResource("maxRows", limits.maxRows, limits.maxRows + 1, "parse");
       }
       continue;
     }
-    countFieldCodePoint();
+    if (code > ASCII_MAX_CODE_UNIT) {
+      countFieldCodePoint();
+      continue;
+    }
+    // Unquoted ASCII text: take a whole run, stopping at anything the branches
+    // above must inspect (quote, delimiter, record break, or non-ASCII).
+    let runEnd = index + 1;
+    while (runEnd < text.length) {
+      const next = text.charCodeAt(runEnd);
+      if (
+        next > ASCII_MAX_CODE_UNIT ||
+        next === QUOTE_CODE_UNIT ||
+        next === delimiterCode ||
+        next === CARRIAGE_RETURN_CODE_UNIT ||
+        next === LINE_FEED_CODE_UNIT
+      ) {
+        break;
+      }
+      runEnd += 1;
+    }
+    fieldBytes += runEnd - index;
+    if (fieldBytes > limits.maxFieldBytes) {
+      // The field was within the ceiling before this run of one-byte units, so a
+      // unit-by-unit count first exceeds it at exactly one byte over.
+      failResource("maxFieldBytes", limits.maxFieldBytes, limits.maxFieldBytes + 1, "parse");
+    }
+    fieldPresent = true;
+    index = runEnd;
   }
 
-  if (fieldPresent || row.length > 0 || fieldParts.length > 0) materializeRow(index);
+  if (fieldPresent || rowFields > 0 || fieldParts.length > 0) materializeRow(index);
+}
+
+/** Parse a fixed comma or tab dialect into raw string rows. */
+export function parseDelimitedText(
+  text: string,
+  delimiter: "," | "\t",
+  options: DelimitedTextOptions = {},
+): string[][] {
+  const limits = resolveDelimitedTextResourceLimits(options);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  scanDelimitedText(text, delimiter, limits, {
+    fieldLimit: Number.POSITIVE_INFINITY,
+    field: (_row, _column, value) => {
+      row.push(value);
+    },
+    row: () => {
+      rows.push(row);
+      row = [];
+    },
+  });
   return rows;
 }
 
