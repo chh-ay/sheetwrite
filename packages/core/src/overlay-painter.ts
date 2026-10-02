@@ -141,6 +141,16 @@ class ViewRowIndex {
     }
     return low;
   }
+
+  /**
+   * First position whose row can still be visible at `contentOffset`: the
+   * first item of the row that starts before the offset (that row may be
+   * partly visible), so every item on it is kept, not only the last one.
+   */
+  bandStart(contentOffset: number, offsetOf: (viewRow: number) => number): number {
+    const reached = this.lowerBoundOffset(contentOffset, offsetOf);
+    return reached === 0 ? 0 : this.lowerBoundRow(this.rowAt(reached - 1));
+  }
 }
 
 interface PresenceColor {
@@ -562,10 +572,7 @@ export class OverlayPainter {
     const { fr, frozenH } = this.deps.freeze();
     const offsetOf = this.deps.rowOffsetOf;
     const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
-    const bodyStart = Math.max(
-      frozenEnd,
-      index.lowerBoundOffset(contentTop + frozenH, offsetOf) - 1,
-    );
+    const bodyStart = Math.max(frozenEnd, index.bandStart(contentTop + frozenH, offsetOf));
     const bodyEnd = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
 
     if (index.isOrdered) {
@@ -1032,10 +1039,7 @@ export class OverlayPainter {
     const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
     // Indicators draw over the header band, so the upper edge of the searched
     // range sits one header height above the scroll offset.
-    const start = Math.max(
-      frozenEnd,
-      index.lowerBoundOffset(contentTop - theme.headerHeight, offsetOf) - 1,
-    );
+    const start = Math.max(frozenEnd, index.bandStart(contentTop - theme.headerHeight, offsetOf));
     const end = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
 
     if (index.isOrdered) {

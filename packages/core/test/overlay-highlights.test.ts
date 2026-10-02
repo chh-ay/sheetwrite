@@ -252,6 +252,35 @@ describe("search highlights follow the active view", () => {
     expect(activeOutlineTops(host)).toEqual([bodyTop(1, 0)]);
     grid.destroy();
   });
+
+  it("keeps every search match on a partly scrolled-off top row", () => {
+    const { grid, host, scroller } = mountGrid();
+    // Data row 5 already matches in its first column; add a second match beside it.
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 5, col: 1 },
+          value: { kind: "literal", value: "hit-b" },
+        },
+      ],
+    });
+    grid.search("hit");
+
+    // Row 5 is still half visible at the top of the body.
+    const scrollTop = 5 * ROW_HEIGHT + ROW_HEIGHT / 2;
+    scroller.scrollTop = scrollTop;
+    grid.refresh();
+
+    // Both rects of row 5 are clipped to the top of the body: half a row tall.
+    const clipped = paintedRects(host).filter((rect) => rect.top === HEADER_HEIGHT);
+    expect(clipped.map((rect) => rect.height)).toEqual([ROW_HEIGHT / 2, ROW_HEIGHT / 2]);
+    expect(clipped.map((rect) => rect.left)).toEqual([
+      ROW_HEADER_WIDTH,
+      ROW_HEADER_WIDTH + COL_WIDTH,
+    ]);
+    grid.destroy();
+  });
 });
 
 describe("note indicators follow the active view", () => {
