@@ -114,19 +114,62 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   const grid = createGrid(host, options);
   grid.store.setDetailedChangeCapture?.(rowBridge !== undefined);
 
+  // A command-state snapshot reads up to `COMMAND_STATE_CELL_LIMIT` selected
+  // cells, so the grid must only compute one while a host handler can consume
+  // it. Presence is read from `handlers` at each point that runs just before an
+  // emission, so a host that adds or drops the handler later is picked up by the
+  // next such call without rebuilding the grid.
+  let destroyed = false;
+  let commandStateUnsubscribe: (() => void) | undefined;
+  const syncCommandStateSubscription = (): void => {
+    if (destroyed) return;
+    const wanted = handlers.onCommandStateChange !== undefined;
+    if (wanted === (commandStateUnsubscribe !== undefined)) return;
+    if (!wanted) {
+      commandStateUnsubscribe?.();
+      commandStateUnsubscribe = undefined;
+      return;
+    }
+    commandStateUnsubscribe = grid.on("command-state-change", (event) =>
+      handlers.onCommandStateChange?.(event),
+    );
+  };
+
+  // `setSelection` and store changes reach the controller through the
+  // subscriptions below, but these Grid calls emit command state without
+  // passing through a controller method, so a direct call must refresh too.
+  const gridSetReadOnly = grid.setReadOnly.bind(grid);
+  const gridUndo = grid.undo.bind(grid);
+  const gridRedo = grid.redo.bind(grid);
+  grid.setReadOnly = (readOnly) => {
+    syncCommandStateSubscription();
+    gridSetReadOnly(readOnly);
+  };
+  grid.undo = () => {
+    syncCommandStateSubscription();
+    gridUndo();
+  };
+  grid.redo = () => {
+    syncCommandStateSubscription();
+    gridRedo();
+  };
+
   // Each closure reads `handlers.*` lazily, so mutating a field on the passed
   const unsubscribes: Array<() => void> = [
     grid.on("change", (event) => {
+      syncCommandStateSubscription();
       handlers.onGridChange?.(event);
       const projection = rowBridge?.project(event);
       if (projection) handlers.onRowDelta?.(projection);
     }),
-    grid.on("selection", (event) => handlers.onSelectionChange?.(event.selection)),
+    grid.on("selection", (event) => {
+      syncCommandStateSubscription();
+      handlers.onSelectionChange?.(event.selection);
+    }),
     grid.on("scroll", (event) => handlers.onViewportChange?.(event)),
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),
     grid.on("edit-commit", (event) => handlers.onEditCommit?.(event)),
     grid.on("search", (result) => handlers.onSearch?.(result)),
-    grid.on("command-state-change", (event) => handlers.onCommandStateChange?.(event)),
     grid.on("active-sheet", (event) => handlers.onActiveSheetChange?.(event)),
     grid.on("mutation-rejected", (event) => handlers.onMutationRejected?.(event)),
     grid.on("renderer-fallback", (event) => handlers.onRendererFallback?.(event)),
@@ -134,7 +177,7 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     grid.on("export-error", (event) => handlers.onExportError?.(event)),
   ];
 
-  let destroyed = false;
+  syncCommandStateSubscription();
 
   const destroy = (): void => {
     if (destroyed) return;
@@ -142,6 +185,8 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     for (const unsubscribe of unsubscribes) {
       unsubscribe();
     }
+    commandStateUnsubscribe?.();
+    commandStateUnsubscribe = undefined;
 
     grid.store.setDetailedChangeCapture?.(false);
     grid.destroy();

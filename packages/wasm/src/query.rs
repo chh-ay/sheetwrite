@@ -21,8 +21,107 @@ enum DistinctKey<'a> {
     Text(&'a str),
 }
 
+/// Bits per word in [`PoolIdStamps`].
+const STAMP_WORD_BITS: usize = 64;
+/// Words in a fresh [`PoolIdStamps`]; growth doubles from here.
+const STAMP_WORDS_INITIAL: usize = 64;
+
+/// One bit per string-pool id, so text that is already dictionary-encoded
+/// dedupes without hashing or comparing a single character.
+///
+/// Words are zero-filled when the marks grow, and capacity doubles, so a column
+/// whose ids span the whole pool allocates O(log ids) times and never exceeds
+/// twice the words its highest id needs.
+struct PoolIdStamps {
+    words: Vec<u64>,
+}
+
+impl PoolIdStamps {
+    fn new() -> Self {
+        Self { words: Vec::new() }
+    }
+
+    /// Marks `id` and reports whether it had not been marked before.
+    fn insert(&mut self, id: u32) -> bool {
+        let index = id as usize;
+        let word = index / STAMP_WORD_BITS;
+        if word >= self.words.len() {
+            let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
+            self.words.resize(doubled.max(word + 1), 0);
+        }
+        let mask = 1u64 << (index % STAMP_WORD_BITS);
+        let fresh = self.words[word] & mask == 0;
+        self.words[word] |= mask;
+        fresh
+    }
+}
+
 thread_local! {
     static QUERY_STATS: Cell<[u64; 2]> = const { Cell::new([0, 0]) };
+}
+
+/// Longest picked-value list still scanned linearly: below this, building a
+/// lookup costs more than the comparisons it saves.
+const VALUE_SET_LINEAR_MAX: usize = 8;
+/// Sentinel the view layer sends for a picked `TRUE`. The `\0` prefix keeps it
+/// distinct from a cell that holds the text `TRUE`.
+const VALUE_SET_TRUE: &str = "\0TRUE";
+/// Sentinel for a picked `FALSE`; see [`VALUE_SET_TRUE`].
+const VALUE_SET_FALSE: &str = "\0FALSE";
+/// [`ValueSet::Lookup::bools`] bit set when `FALSE` was picked.
+const VALUE_SET_FALSE_BIT: u8 = 1;
+/// [`ValueSet::Lookup::bools`] bit set when `TRUE` was picked.
+const VALUE_SET_TRUE_BIT: u8 = 2;
+
+/// Picked values of one "values" filter column, prepared once per scan.
+///
+/// The row loop then answers membership in constant time per cell instead of
+/// comparing the cell with every picked value. `Linear` keeps the original scan
+/// for lists short enough that a lookup costs more than it saves.
+enum ValueSet<'a> {
+    Linear,
+    Lookup {
+        /// Picked numbers as bit patterns, sorted for binary search. `-0.0` is
+        /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
+        /// equality can match.
+        numbers: Vec<u64>,
+        /// Picked text; a cell matches when its resolved text equals an entry.
+        texts: HashSet<&'a str>,
+        /// Picked booleans, as the two bits above.
+        bools: u8,
+    },
+}
+
+impl<'a> ValueSet<'a> {
+    /// Prepares the lookup for one column, or `Linear` when the picked list is
+    /// short enough that a scan beats a table.
+    fn build(picked_numbers: &[f64], picked_texts: &'a [String]) -> Self {
+        if picked_numbers.len() + picked_texts.len() <= VALUE_SET_LINEAR_MAX {
+            return ValueSet::Linear;
+        }
+        let mut numbers: Vec<u64> = picked_numbers
+            .iter()
+            .filter(|value| !value.is_nan())
+            .map(|value| (if *value == 0.0 { 0.0 } else { *value }).to_bits())
+            .collect();
+        numbers.sort_unstable();
+        numbers.dedup();
+        let mut texts = HashSet::with_capacity(picked_texts.len());
+        let mut bools = 0u8;
+        for picked in picked_texts {
+            match picked.as_str() {
+                VALUE_SET_TRUE => bools |= VALUE_SET_TRUE_BIT,
+                VALUE_SET_FALSE => bools |= VALUE_SET_FALSE_BIT,
+                _ => {}
+            }
+            texts.insert(picked.as_str());
+        }
+        ValueSet::Lookup {
+            numbers,
+            texts,
+            bools,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -380,7 +479,7 @@ impl CellStore {
         if cols.iter().any(|&col| col as usize >= data.n_cols) {
             return Vec::new();
         }
-        let mut rows: Vec<u32> = if candidates.is_empty() {
+        let rows: Vec<u32> = if candidates.is_empty() {
             (0..data.row_count as u32).collect()
         } else {
             candidates
@@ -389,23 +488,50 @@ impl CellStore {
                 .filter(|&row| (row as usize) < data.row_count)
                 .collect()
         };
-        rows.sort_by(|&left, &right| {
-            for (key, &col) in cols.iter().enumerate() {
-                let base = col as usize * data.row_count;
-                let a = ComparableCell::from_cell(data, &self.strings, base + left as usize);
-                let b = ComparableCell::from_cell(data, &self.strings, base + right as usize);
-                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
-                    a.cmp(&b)
+        let row_count = rows.len();
+        // Decorate-sort-undecorate per key, the same way the one-key path does:
+        // a comparison sort that rebuilt both operands would reconstruct each
+        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
+        // every time. Keys are stored key-major so the first key — the one that
+        // decides nearly every comparison — stays contiguous.
+        let paged = data.is_paged();
+        let mut keys: Vec<ComparableCell<'_>> = Vec::with_capacity(row_count * cols.len());
+        for &col in cols {
+            let base = col as usize * data.row_count;
+            for &row in &rows {
+                let index = base + row as usize;
+                keys.push(if paged {
+                    ComparableCell::from_cell(data, &self.strings, index)
                 } else {
-                    b.cmp(&a)
+                    // SAFETY: `col < n_cols` and `row < row_count`, so the dense
+                    // column index is in bounds.
+                    unsafe { ComparableCell::from_cell_unchecked(data, &self.strings, index) }
+                });
+            }
+        }
+        let mut positions: Vec<u32> = (0..row_count as u32).collect();
+        // The comparator stays total only when every key is a number or text: a
+        // NaN key compares equal to everything. A stable sort keeps the output
+        // identical to the previous comparator for that case too.
+        positions.sort_by(|&left, &right| {
+            for key in 0..cols.len() {
+                let a = &keys[key * row_count + left as usize];
+                let b = &keys[key * row_count + right as usize];
+                let order = if ascending.get(key).copied().unwrap_or(1) != 0 {
+                    a.cmp(b)
+                } else {
+                    b.cmp(a)
                 };
                 if order != Ordering::Equal {
                     return order;
                 }
             }
-            left.cmp(&right)
+            rows[left as usize].cmp(&rows[right as usize])
         });
-        rows
+        positions
+            .into_iter()
+            .map(|position| rows[position as usize])
+            .collect()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -451,6 +577,23 @@ impl CellStore {
             current[0] = current[0].saturating_add(match_caches.len() as u64);
             stats.set(current);
         });
+        // One membership table per "values" column, built once for the scan.
+        let mut value_sets: Vec<ValueSet<'_>> = Vec::with_capacity(kinds.len());
+        for (i, &kind) in kinds.iter().enumerate() {
+            if kind != 0 {
+                value_sets.push(ValueSet::Linear);
+                continue;
+            }
+            let num_count = num_counts.get(i).copied().unwrap_or(0) as usize;
+            let text_count = text_counts.get(i).copied().unwrap_or(0) as usize;
+            let picked_numbers = value_nums
+                .get(num_offsets[i]..num_offsets[i] + num_count)
+                .unwrap_or_default();
+            let picked_texts = value_texts
+                .get(text_offsets[i]..text_offsets[i] + text_count)
+                .unwrap_or_default();
+            value_sets.push(ValueSet::build(picked_numbers, picked_texts));
+        }
         let mut out = Vec::new();
         'rows: for row in 0..data.row_count {
             for i in 0..cols.len() {
@@ -461,29 +604,62 @@ impl CellStore {
                         let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
                         let nc = num_counts.get(i).copied().unwrap_or(0) as usize;
                         let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
-                        if kind == 1 {
-                            if let Some(value) = numeric_cell_value(data, index) {
-                                hit |= value_nums
-                                    .get(num_offsets[i]..num_offsets[i] + nc)
-                                    .unwrap_or(&[])
-                                    .contains(&value);
+                        match &value_sets[i] {
+                            ValueSet::Linear => {
+                                if kind == 1 {
+                                    if let Some(value) = numeric_cell_value(data, index) {
+                                        hit |= value_nums
+                                            .get(num_offsets[i]..num_offsets[i] + nc)
+                                            .unwrap_or(&[])
+                                            .contains(&value);
+                                    }
+                                } else if kind == 2 {
+                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                        hit |= value_texts
+                                            .get(text_offsets[i]..text_offsets[i] + tc)
+                                            .unwrap_or(&[])
+                                            .iter()
+                                            .any(|picked| picked == text);
+                                    }
+                                } else if kind == 3 {
+                                    if let Some(value) = boolean_cell_value(data, index) {
+                                        let expected = if value {
+                                            VALUE_SET_TRUE
+                                        } else {
+                                            VALUE_SET_FALSE
+                                        };
+                                        hit |= value_texts
+                                            .get(text_offsets[i]..text_offsets[i] + tc)
+                                            .unwrap_or(&[])
+                                            .iter()
+                                            .any(|picked| picked == expected);
+                                    }
+                                }
                             }
-                        } else if kind == 2 {
-                            if let Some(text) = resolved_text(data, &self.strings, index) {
-                                hit |= value_texts
-                                    .get(text_offsets[i]..text_offsets[i] + tc)
-                                    .unwrap_or(&[])
-                                    .iter()
-                                    .any(|v| v == text);
-                            }
-                        } else if kind == 3 {
-                            if let Some(value) = boolean_cell_value(data, index) {
-                                let expected = if value { "\0TRUE" } else { "\0FALSE" };
-                                hit |= value_texts
-                                    .get(text_offsets[i]..text_offsets[i] + tc)
-                                    .unwrap_or(&[])
-                                    .iter()
-                                    .any(|candidate| candidate == expected);
+                            ValueSet::Lookup {
+                                numbers,
+                                texts,
+                                bools,
+                            } => {
+                                if kind == 1 {
+                                    if let Some(value) = numeric_cell_value(data, index) {
+                                        let normalized = if value == 0.0 { 0.0 } else { value };
+                                        hit |= numbers.binary_search(&normalized.to_bits()).is_ok();
+                                    }
+                                } else if kind == 2 {
+                                    if let Some(text) = resolved_text(data, &self.strings, index) {
+                                        hit |= texts.contains(text);
+                                    }
+                                } else if kind == 3 {
+                                    if let Some(value) = boolean_cell_value(data, index) {
+                                        let picked_bit = if value {
+                                            VALUE_SET_TRUE_BIT
+                                        } else {
+                                            VALUE_SET_FALSE_BIT
+                                        };
+                                        hit |= bools & picked_bit != 0;
+                                    }
+                                }
                             }
                         }
                         hit
@@ -535,47 +711,70 @@ impl CellStore {
         if col >= data.n_cols {
             return out;
         }
-        let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
-        for row in 0..data.row_count {
-            let index = col * data.row_count + row;
-            let kind = resolved_kind(data, index);
-            let text = if kind == 2 {
-                resolved_text(data, &self.strings, index).unwrap_or("")
-            } else {
-                ""
-            };
-            let key = match kind {
-                1 => DistinctKey::Number(numeric_cell_value(data, index).unwrap_or(0.0).to_bits()),
-                2 => DistinctKey::Text(text),
-                3 => DistinctKey::Bool(boolean_cell_value(data, index).unwrap_or(false)),
-                _ => DistinctKey::Blank,
-            };
-            if !seen.insert(key) {
-                continue;
+        let text_at = |index: usize| resolved_text(data, &self.strings, index).unwrap_or("");
+        // Stored text carries a pool id that stands for its value, so the scan
+        // dedupes it through one bit per id instead of hashing the characters.
+        // Text without an id — the sentinel a formula error reports reads back as
+        // plain text — still has to meet pooled text by content, so the first
+        // such cell restarts the scan on content hashing. The restart is rare and
+        // keeps equal text a single entry, in first-seen order, either way.
+        let mut pooled = true;
+        loop {
+            out = DistinctColumn::default();
+            let mut stamps = PoolIdStamps::new();
+            let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+            let mut needs_content = false;
+            for row in 0..data.row_count {
+                let index = col * data.row_count + row;
+                let kind = resolved_kind(data, index);
+                let fresh = match kind {
+                    1 => seen.insert(DistinctKey::Number(
+                        numeric_cell_value(data, index).unwrap_or(0.0).to_bits(),
+                    )),
+                    2 if pooled => match data.str_id_at(index) {
+                        NO_STRING => {
+                            needs_content = true;
+                            break;
+                        }
+                        id => stamps.insert(id),
+                    },
+                    2 => seen.insert(DistinctKey::Text(text_at(index))),
+                    3 => seen.insert(DistinctKey::Bool(
+                        boolean_cell_value(data, index).unwrap_or(false),
+                    )),
+                    _ => seen.insert(DistinctKey::Blank),
+                };
+                if !fresh {
+                    continue;
+                }
+                out.kinds.push(kind);
+                if kind == 1 {
+                    out.numbers
+                        .push(numeric_cell_value(data, index).unwrap_or(0.0));
+                } else if kind == 3 {
+                    out.numbers
+                        .push(if boolean_cell_value(data, index).unwrap_or(false) {
+                            1.0
+                        } else {
+                            0.0
+                        });
+                } else if kind == 2 {
+                    out.texts.push(text_at(index).to_owned());
+                }
+                if limit != 0 && out.kinds.len() >= limit {
+                    break;
+                }
             }
-            out.kinds.push(kind);
-            if kind == 1 {
-                out.numbers
-                    .push(numeric_cell_value(data, index).unwrap_or(0.0));
-            } else if kind == 3 {
-                out.numbers
-                    .push(if boolean_cell_value(data, index).unwrap_or(false) {
-                        1.0
-                    } else {
-                        0.0
-                    });
-            } else if kind == 2 {
-                out.texts.push(text.to_owned());
-                QUERY_STATS.with(|stats| {
-                    let mut current = stats.get();
-                    current[1] = current[1].saturating_add(1);
-                    stats.set(current);
-                });
-            }
-            if limit != 0 && out.kinds.len() >= limit {
+            if !needs_content {
                 break;
             }
+            pooled = false;
         }
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[1] = current[1].saturating_add(out.texts.len() as u64);
+            stats.set(current);
+        });
         out
     }
 

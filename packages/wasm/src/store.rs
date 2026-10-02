@@ -2310,6 +2310,11 @@ impl CellStore {
     /// edit performs one dependency-scoped pass instead of one full-sheet pass
     /// per setter. The returned value is the previous cached value until that
     /// barrier recompute runs, and the store facade ignores it for batched edits.
+    ///
+    /// The dependency index is invalidated only when the rewrite changes what
+    /// the formula reads or whether it produces an array. A constant-only edit
+    /// keeps the cached index, so its next recompute visits just the edited
+    /// formula and its dependents instead of every formula in the workbook.
     #[wasm_bindgen(js_name = setFormula)]
     pub fn set_formula(
         &mut self,
@@ -2331,6 +2336,10 @@ impl CellStore {
         }
 
         let entry = self.parse_formula_entry(src, sheet as u32, key.0, key.1);
+        let can_reuse_dependency_index = self.sheets[sheet]
+            .formulas
+            .get(&key)
+            .is_some_and(|previous| DepIndex::dependency_graph_unchanged(previous, &entry));
         let cached_value = {
             let s = &mut self.sheets[sheet];
 
@@ -2353,7 +2362,9 @@ impl CellStore {
             s.dirty_cells.insert(key);
             carried
         };
-        self.bump_formula_epoch();
+        if !can_reuse_dependency_index {
+            self.bump_formula_epoch();
+        }
         cached_value
     }
 

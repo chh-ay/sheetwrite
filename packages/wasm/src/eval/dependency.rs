@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
 
 use super::array::ast_produces_array;
@@ -93,6 +93,27 @@ impl DepIndex {
         }
         (nodes, edges)
     }
+
+    /// Whether rewriting one formula entry leaves every field
+    /// [`build_dep_index`] reads unchanged.
+    ///
+    /// When this holds, the cached index still describes the rewritten
+    /// formula, so `set_formula` keeps the current formula epoch and the next
+    /// recompute skips the whole-workbook rebuild. The formula cell itself is
+    /// still marked dirty, so it is always re-evaluated.
+    ///
+    /// An entry with a parse or resolution error carries no reads and no AST,
+    /// so both sides must be error-free for the comparison to be meaningful; a
+    /// cell that gains its first formula changes the formula-cell set, so the
+    /// caller only compares entries when one already existed.
+    pub(crate) fn dependency_graph_unchanged(previous: &FormulaEntry, next: &FormulaEntry) -> bool {
+        previous.error.is_none()
+            && next.error.is_none()
+            && previous.reads.cells == next.reads.cells
+            && previous.reads.ranges == next.reads.ranges
+            && previous.ast.as_ref().is_some_and(ast_produces_array)
+                == next.ast.as_ref().is_some_and(ast_produces_array)
+    }
 }
 
 struct RangeGroup {
@@ -132,6 +153,14 @@ impl RangeInterval {
     }
 }
 
+/// Build the whole-workbook dependency index for `epoch`.
+///
+/// The fields this function reads from each formula entry -- the read cells,
+/// the read ranges and whether the AST produces an array -- are also compared
+/// by [`DepIndex::dependency_graph_unchanged`], which lets a formula rewrite
+/// keep the cached index when none of them changed. A new dependency-relevant
+/// field must be added to that comparison too, or the epoch will not advance
+/// when it changes.
 pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
     let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
