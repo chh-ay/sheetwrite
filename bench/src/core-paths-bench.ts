@@ -1250,12 +1250,16 @@ const ticks = [];
 const heartbeat = setInterval(() => { ticks.push(performance.now()); }, ${NODE_HEARTBEAT_MS});
 const startedAt = performance.now();
 await wasm.load();
-const loadMs = performance.now() - startedAt;
+const endedAt = performance.now();
+const loadMs = endedAt - startedAt;
 clearInterval(heartbeat);
+let previousTick = startedAt;
 let largestGapMs = 0;
-for (let index = 1; index < ticks.length; index += 1) {
-  largestGapMs = Math.max(largestGapMs, ticks[index] - ticks[index - 1]);
+for (const tick of ticks) {
+  largestGapMs = Math.max(largestGapMs, tick - previousTick);
+  previousTick = tick;
 }
+largestGapMs = Math.max(largestGapMs, endedAt - previousTick);
 const { SheetwriteStore } = await import("@sheetwrite/core");
 const workbook = {
   activeSheet: "s1",
