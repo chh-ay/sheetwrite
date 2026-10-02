@@ -43,16 +43,31 @@ import { type ParsedCellStyle, ParsedStyles } from "./styles.js";
 import {
   assertXmlRoot,
   decodeXstring,
+  parseXml,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
   xmlChild,
   xmlChildren,
   xmlLocalName,
+  xmlRootMatches,
 } from "./xml.js";
+import { normalizePartName } from "./zip.js";
 
 const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
+/** Matches a `cols` start tag with an optional namespace prefix. */
+const COLUMN_STYLES_TAG = /<(?:[\w.-]+:)?cols[\s/>]/g;
+
+/**
+ * True when a worksheet-level `cols` element follows the streamed sheet data.
+ * The tree reader applies such styles to rows already read, so the streaming
+ * path steps aside and keeps the tree for that document.
+ */
+function hasColumnStylesAfter(xml: string, startOffset: number): boolean {
+  COLUMN_STYLES_TAG.lastIndex = startOffset;
+  return COLUMN_STYLES_TAG.test(xml);
+}
 const MAIN_NAMESPACES = [
   "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
   "http://purl.oclc.org/ooxml/spreadsheetml/main",
@@ -259,12 +274,10 @@ function parseSharedStrings(
   context: XlsxCodecContext,
 ): string[] {
   if (!part) return [];
-  const root = packageFile.readXml(part);
-  assertXmlRoot(root, "sst", MAIN_NAMESPACES, part);
   const strings: string[] = [];
   let warnedRichText = false;
   let warnedPhonetic = false;
-  for (const item of xmlChildren(root, "si")) {
+  const processItem = (item: XmlElement): void => {
     assertResource(context, "maxSharedStrings", strings.length + 1);
     const richRuns = xmlChildren(item, "r");
     if (richRuns.length > 0 && !warnedRichText) {
@@ -284,7 +297,19 @@ function parseSharedStrings(
       });
     }
     strings.push(displayText(item));
-  }
+  };
+  const name = normalizePartName(part);
+  const root = parseXml(packageFile.read(name), name, context, {
+    parent: "sst",
+    parentIsRoot: true,
+    shouldStream: (_xml, _startOffset, rootElement) =>
+      xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
+    // The tree path reads only `si` children; other children are skipped alike.
+    child: (item) => {
+      if (xmlLocalName(item.name) === "si") processItem(item);
+    },
+  });
+  assertXmlRoot(root, "sst", MAIN_NAMESPACES, part);
   return strings;
 }
 
@@ -1063,20 +1088,7 @@ function parseSheet(
   usage: ReaderResourceUsage,
   date1904: boolean,
 ): ParsedSheet {
-  const root = packageFile.readXml(reference.relationship.target);
-  assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, reference.relationship.target);
-  const sheetData = xmlChild(root, "sheetData");
-  const inheritedColumnStyles = new Map<number, string>();
-  const columnCollection = xmlChild(root, "cols");
-  for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
-    const style = xmlAttribute(columnElement, "style");
-    if (style === undefined) continue;
-    const min = parseUnsigned(xmlAttribute(columnElement, "min"), "column minimum");
-    const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
-    if (min < 1 || max < min) return readerFailure("column range is invalid");
-    assertResource(context, "maxColumnsPerSheet", max);
-    for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
-  }
+  const target = reference.relationship.target;
   const cells: ParsedCell[] = [];
   const sharedMasters = new Map<
     string,
@@ -1089,12 +1101,31 @@ function parseSheet(
   const outlineLevels = new Map<number, number>();
   const collapsedRows = new Set<number>();
   let internalMetadata = false;
-  for (const rowElement of sheetData ? xmlChildren(sheetData, "row") : []) {
+  const inheritedColumnStyles = new Map<number, string>();
+  let columnStylesRead = false;
+
+  const readColumnStyles = (root: XmlElement): void => {
+    if (columnStylesRead) return;
+    columnStylesRead = true;
+    const columnCollection = xmlChild(root, "cols");
+    for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
+      const style = xmlAttribute(columnElement, "style");
+      if (style === undefined) continue;
+      const min = parseUnsigned(xmlAttribute(columnElement, "min"), "column minimum");
+      const max = parseUnsigned(xmlAttribute(columnElement, "max"), "column maximum");
+      if (min < 1 || max < min) readerFailure("column range is invalid");
+      assertResource(context, "maxColumnsPerSheet", max);
+      for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
+    }
+  };
+
+  const processRow = (rowElement: XmlElement, root: XmlElement): void => {
+    readColumnStyles(root);
     const row =
       xmlAttribute(rowElement, "r") === undefined
         ? inferredRow
         : parseUnsigned(xmlAttribute(rowElement, "r"), "row number") - 1;
-    if (row < 0) return readerFailure(`row number in ${reference.name} is invalid`);
+    if (row < 0) readerFailure(`row number in ${reference.name} is invalid`);
     assertResource(context, "maxRowsPerSheet", row + 1);
     inferredRow = row + 1;
     maxRow = Math.max(maxRow, row);
@@ -1102,7 +1133,7 @@ function parseSheet(
     const hidden = xmlBoolean(xmlAttribute(rowElement, "hidden"));
     const outlineLevel = Number(xmlAttribute(rowElement, "outlineLevel") ?? 0);
     if (!Number.isInteger(outlineLevel) || outlineLevel < 0 || outlineLevel > 7) {
-      return readerFailure(`row outline level in ${reference.name} is invalid`);
+      readerFailure(`row outline level in ${reference.name} is invalid`);
     }
     if (outlineLevel > 0) outlineLevels.set(row, outlineLevel);
     if (xmlBoolean(xmlAttribute(rowElement, "collapsed"))) collapsedRows.add(row);
@@ -1124,7 +1155,7 @@ function parseSheet(
     for (const cellElement of xmlChildren(rowElement, "c")) {
       const addressText = xmlAttribute(cellElement, "r") ?? `${colToA1(inferredCol)}${row + 1}`;
       const address = parseCellAddress(addressText);
-      if (address.row !== row) return readerFailure(`cell ${addressText} is outside its row`);
+      if (address.row !== row) readerFailure(`cell ${addressText} is outside its row`);
       inferredCol = address.col + 1;
       assertResource(context, "maxColumnsPerSheet", address.col + 1);
       maxCol = Math.max(maxCol, address.col);
@@ -1141,7 +1172,7 @@ function parseSheet(
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
-          if (!sharedFormula) return readerFailure(`shared formula at ${addressText} has no index`);
+          if (!sharedFormula) readerFailure(`shared formula at ${addressText} has no index`);
           if (formulaText) {
             const authoritative = xmlAttribute(formulaElement, "ref") !== undefined;
             const existing = sharedMasters.get(sharedFormula);
@@ -1206,7 +1237,26 @@ function parseSheet(
         });
       }
     }
+  };
+
+  const part = normalizePartName(target);
+  const root = parseXml(packageFile.read(part), part, context, {
+    parent: "sheetData",
+    parentIsRoot: false,
+    shouldStream: (xml, startOffset, rootElement) =>
+      xmlRootMatches(rootElement, "worksheet", MAIN_NAMESPACES) &&
+      !hasColumnStylesAfter(xml, startOffset),
+    // The tree path reads only `row` children; other children are skipped alike.
+    child: (rowElement, rootElement) => {
+      if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
+    },
+  });
+  assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
+  const sheetData = xmlChild(root, "sheetData");
+  for (const rowElement of sheetData ? xmlChildren(sheetData, "row") : []) {
+    processRow(rowElement, root);
   }
+  readColumnStyles(root);
   for (const cell of cells) {
     if (!cell.sharedFormula) continue;
     const master = sharedMasters.get(cell.sharedFormula);

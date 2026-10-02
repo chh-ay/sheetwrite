@@ -312,6 +312,23 @@ describe("export", () => {
     store.dispose();
   });
 
+  it("drops extra CSV fields from the projection but still counts them toward ceilings", () => {
+    const columns: Column[] = [
+      { key: "a", header: "A", width: 80, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text" },
+    ];
+    expect(fromCsv("A,B,C\r\n1,2,3\r\n4", columns)).toEqual({
+      rowCount: 2,
+      columns: { a: ["1", "4"], b: ["2", null] },
+    });
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxColumns: 2 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxCells: 5 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+  });
+
   it("coerces declared types canonically and loads booleans and dates without type loss", () => {
     const columns: Column[] = [
       { key: "bool", header: "Bool", width: 80, type: "text" },
