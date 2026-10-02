@@ -161,10 +161,14 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
       handlers.onGridChange?.(event);
       const projection = rowBridge?.project(event);
       if (projection) handlers.onRowDelta?.(projection);
+      // A host callback may add or drop the handler just before the queued
+      // command-state emission, so reconcile again after calling it.
+      syncCommandStateSubscription();
     }),
     grid.on("selection", (event) => {
       syncCommandStateSubscription();
       handlers.onSelectionChange?.(event.selection);
+      syncCommandStateSubscription();
     }),
     grid.on("scroll", (event) => handlers.onViewportChange?.(event)),
     grid.on("edit-begin", (event) => handlers.onEditBegin?.(event)),

@@ -182,4 +182,22 @@ describe("createGridController command-state subscriptions", () => {
 
     controller.destroy();
   });
+
+  it("delivers the command state that follows a selection callback installing the handler", () => {
+    const host = mountHost();
+    const handlers: GridControllerHandlers = {};
+    const controller = createGridController(host, { workbook: wideWorkbook(4, 2) }, handlers);
+    const events: Array<GridEvents["command-state-change"]> = [];
+    handlers.onSelectionChange = () => {
+      handlers.onCommandStateChange = (event) => events.push(event);
+    };
+
+    controller.grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    });
+    expect(events).toHaveLength(1);
+
+    controller.destroy();
+  });
 });
