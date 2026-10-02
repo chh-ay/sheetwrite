@@ -584,7 +584,11 @@ export interface Grid {
   rowGroups(): readonly RowGroup[];
   /** Clear any active sort/filter view. */
   clearView(): void;
-  /** Undo the last recorded cell edit. */
+  /**
+   * Undo the last recorded cell edit. If the restored data is above the
+   * transaction resource limits, nothing changes: the Grid emits
+   * `mutation-rejected` and removes that entry, so older edits stay undoable.
+   */
   undo(): void;
   /** Redo the last undone cell edit. */
   redo(): void;

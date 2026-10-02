@@ -73,6 +73,15 @@ export class UndoManager {
     if (entry) this.undoStack.push(entry);
   }
 
+  /**
+   * Drop the most recently moved undo entry after a rejection that can never
+   * pass, such as a restore payload above the transaction resource limits.
+   */
+  discardUndone(): void {
+    const entry = this.redoStack.pop();
+    if (entry) disposeEntry(entry);
+  }
+
   redo(): HistoryAction | null {
     const entry = this.redoStack.pop();
     if (!entry) return null;

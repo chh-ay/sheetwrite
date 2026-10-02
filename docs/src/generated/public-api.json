@@ -1677,7 +1677,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
                 },
                 {
                   "name": "ungroupRows",
@@ -6918,7 +6918,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
                 },
                 {
                   "name": "ungroupRows",
@@ -7848,7 +7848,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
                 },
                 {
                   "name": "ungroupRows",
@@ -8770,7 +8770,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
                 },
                 {
                   "name": "ungroupRows",

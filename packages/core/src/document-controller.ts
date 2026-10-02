@@ -89,13 +89,7 @@ export class DocumentController {
 
   commit(input: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
     const inputResources = validateTransactionResources(input, this.transactionResourceLimits);
-    if (!inputResources.ok) {
-      return {
-        status: "rejected",
-        epoch: this.options.epoch(),
-        issues: [inputResources.issue],
-      };
-    }
+    if (!inputResources.ok) return this.rejectResources(inputResources.issue);
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
     }
@@ -108,13 +102,7 @@ export class DocumentController {
         patches,
         this.transactionResourceLimits,
       );
-      if (!materializedResources.ok) {
-        return {
-          status: "rejected",
-          epoch: this.options.epoch(),
-          issues: [materializedResources.issue],
-        };
-      }
+      if (!materializedResources.ok) return this.rejectResources(materializedResources.issue);
     }
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
       return { status: "noop", epoch: this.options.epoch(), reason: "incomplete-data" };
@@ -200,11 +188,22 @@ export class DocumentController {
   undo(): void {
     const action = this.history.undo();
     if (!action) return;
+    let outcome: ApplyTransactionResult | null;
     try {
-      if (!this.applyHistoryPatches(action, "undo")) this.history.restoreUndo();
+      outcome = this.applyHistoryPatches(action, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
+    }
+    if (outcome?.status === "applied") return;
+    // The restore payload and the transaction limits never change, so these
+    // rejections repeat on every retry; keeping the entry would block every
+    // older undo behind it. Other rejections, such as a full sync queue, can
+    // pass later, so those entries stay.
+    if (outcome?.status === "rejected" && outcome.issues.some(exceedsTransactionLimit)) {
+      this.history.discardUndone();
+    } else {
+      this.history.restoreUndo();
     }
   }
 
@@ -212,7 +211,8 @@ export class DocumentController {
     const action = this.history.redo();
     if (!action) return;
     try {
-      if (!this.applyHistoryPatches(action, "redo")) this.history.restoreRedo();
+      if (this.applyHistoryPatches(action, "redo")?.status !== "applied")
+        this.history.restoreRedo();
     } catch (error) {
       this.history.restoreRedo();
       throw error;
@@ -791,9 +791,12 @@ export class DocumentController {
     }
   }
 
-  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): boolean {
+  private applyHistoryPatches(
+    action: HistoryAction,
+    reason: "undo" | "redo",
+  ): ApplyTransactionResult | null {
     const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return false;
+    if (patches.length === 0) return null;
 
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
@@ -802,15 +805,33 @@ export class DocumentController {
     } finally {
       this.applyingHistory = false;
     }
-    if (outcome.status !== "applied") return false;
+    if (outcome.status !== "applied") return outcome;
     for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
     this.options.onHistoryApplied();
-    return true;
+    return outcome;
+  }
+
+  /**
+   * A host transaction returns this rejection to its caller. Undo and redo have
+   * no caller to read it, so they report it through `mutation-rejected`, as the
+   * admission and store rejections already do.
+   */
+  private rejectResources(issue: MutationIssue): ApplyTransactionResult {
+    if (this.applyingHistory) this.options.onMutationRejected([issue]);
+    return { status: "rejected", epoch: this.options.epoch(), issues: [issue] };
   }
 
   private sheetById(id: SheetId): Sheet | null {
     return this.options.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
+}
+
+/** Rejections by the fixed per-transaction limits, which no retry can pass. */
+function exceedsTransactionLimit(issue: MutationIssue): boolean {
+  return (
+    issue.kind === "resource-limit" &&
+    (issue.resource === "operations" || issue.resource === "encoded-bytes")
+  );
 }
 
 function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {
