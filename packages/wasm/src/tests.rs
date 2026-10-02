@@ -3372,3 +3372,39 @@ mod let_bindings {
         assert_close(number(&store, sheet, 2, 3), 3.0);
     }
 }
+
+#[test]
+fn rejected_packed_text_adds_nothing_to_the_string_pool() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let write = |store: &mut CellStore, text: &str, offsets: &[u32]| {
+        store.set_block_packed(
+            sheet,
+            0,
+            0,
+            1,
+            2,
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            text.as_bytes(),
+            offsets,
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        )
+    };
+    // Two string cells but one packed string.
+    assert_eq!(write(&mut store, "ab", &[0, 2]), 2);
+    // A bound inside the two-byte `é`.
+    assert_eq!(write(&mut store, "éa", &[0, 1, 3]), 2);
+    assert!(
+        store.strings.get(0).is_none(),
+        "a rejected block interned text"
+    );
+
+    assert_eq!(write(&mut store, "éa", &[0, 2, 3]), 0);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("é"));
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("a"));
+}

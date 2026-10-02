@@ -2757,36 +2757,38 @@ impl CellStore {
             ));
         }
 
+        // Check every text slice before reserving dirty capacity or interning,
+        // so a rejected block adds no strings to the append-only pool.
+        let text_count = text_offsets.len() - 1;
+        let string_cells = kinds.iter().filter(|&&kind| kind == KIND_STRING).count();
+        if string_cells != text_count
+            || text_offsets
+                .iter()
+                .any(|&bound| !text_buf.is_char_boundary(bound as usize))
+        {
+            return BLOCK_SOURCE_INVALID;
+        }
+
         if let Some(revision) = dirty_revision {
             if !self.sheets[sheet].prepare_dirty_rect(start_row, start_col, rows, cols, revision) {
                 return BLOCK_RESOURCE_LIMIT;
             }
         }
 
-        let text_count = text_offsets.len() - 1;
         let mut string_ids = vec![NO_STRING; cell_count];
-        let mut text_index = 0usize;
+        let mut text_bounds = text_offsets.windows(2);
         for (offset, &kind) in kinds.iter().enumerate() {
             if kind != KIND_STRING {
                 continue;
             }
-            let (Some(&start), Some(&end)) = (
-                text_offsets.get(text_index),
-                text_offsets.get(text_index + 1),
-            ) else {
+            // Bounds were validated above: ascending, on char boundaries, one per string cell.
+            let Some(&[start, end]) = text_bounds.next() else {
                 return BLOCK_SOURCE_INVALID;
             };
-            text_index += 1;
             if source_kinds[offset] != 0 {
                 continue;
             }
-            let Some(text) = text_buf.get(start as usize..end as usize) else {
-                return BLOCK_SOURCE_INVALID;
-            };
-            string_ids[offset] = self.intern(text);
-        }
-        if text_index != text_count {
-            return BLOCK_SOURCE_INVALID;
+            string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
         }
 
         let s = &mut self.sheets[sheet];
