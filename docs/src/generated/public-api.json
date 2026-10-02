@@ -864,7 +864,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L341",
+              "source": "src/grid.ts#L342",
               "jsDocTags": [],
               "documentation": "Creates and mounts an imperative Grid in the supplied host element.",
               "memberDocs": []
@@ -1133,7 +1133,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L168",
+              "source": "src/document-protocol.ts#L294",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1157,7 +1157,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L254",
+              "source": "src/grid.ts#L255",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1323,7 +1323,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2785",
+              "source": "src/document-protocol.ts#L2911",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1347,7 +1347,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L215",
+              "source": "src/document-protocol.ts#L341",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1359,7 +1359,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L230",
+              "source": "src/document-protocol.ts#L356",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -2029,7 +2029,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L285",
+              "source": "src/grid.ts#L286",
               "jsDocTags": [],
               "documentation": "Load the WASM data engine once. Must be awaited before `createGrid`.",
               "memberDocs": []
@@ -2065,7 +2065,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L296",
+              "source": "src/grid.ts#L297",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -2832,7 +2832,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L301",
+              "source": "src/grid.ts#L302",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -3818,7 +3818,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L104",
+              "source": "src/store.ts#L105",
               "jsDocTags": [],
               "documentation": "Stable public facade and the sole transaction, epoch, policy, and event barrier.",
               "memberDocs": [
@@ -3899,7 +3899,7 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L68",
+              "source": "src/store.ts#L69",
               "jsDocTags": [],
               "documentation": "Storage layout plus snapshot and transaction resource ceilings for one store.",
               "memberDocs": [
@@ -3976,7 +3976,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L194",
+              "source": "src/document-protocol.ts#L320",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -3988,7 +3988,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L150",
+              "source": "src/document-protocol.ts#L276",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -4029,7 +4029,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L147",
+              "source": "src/document-protocol.ts#L273",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -4041,7 +4041,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L235",
+              "source": "src/document-protocol.ts#L361",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -4053,7 +4053,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L186",
+              "source": "src/document-protocol.ts#L312",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -4792,7 +4792,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2747",
+              "source": "src/document-protocol.ts#L2873",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []

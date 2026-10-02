@@ -8,7 +8,7 @@ description: "Load the WASM data engine once."
 Load the WASM data engine once. Must be awaited before `createGrid`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L285"><code>packages/core/src/grid.ts#L285</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L286"><code>packages/core/src/grid.ts#L286</code></a></dd></div>
 </dl>
 
 ## Declaration

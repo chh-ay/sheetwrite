@@ -8,7 +8,7 @@ description: "Exhaustive stable target identity used by persistence/logging laye
 Exhaustive stable target identity used by persistence/logging layers.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L2785"><code>packages/core/src/document-protocol.ts#L2785</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L2911"><code>packages/core/src/document-protocol.ts#L2911</code></a></dd></div>
 </dl>
 
 ## Declaration
