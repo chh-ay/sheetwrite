@@ -549,6 +549,7 @@ export class GridImpl implements Grid {
       },
       transactionResourceLimits: this.transactionResourceLimits,
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
+      trustedResourceCallbacks: true,
     });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at

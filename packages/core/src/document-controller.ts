@@ -45,6 +45,8 @@ export interface DocumentControllerOptions {
   onHistoryApplied: () => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
+  /** Only engine-owned callbacks may preserve payload measurements by identity. */
+  trustedResourceCallbacks?: true;
 }
 
 /**
@@ -123,13 +125,11 @@ export class DocumentController {
     if (input.length === 0) {
       return { status: "noop", epoch: this.options.epoch(), reason: "empty" };
     }
-    // The measurement stays valid across the read-only stages below:
-    // virtual-column materialization returns the input array unchanged when it
-    // adds nothing and only reads operations otherwise, sheet locality is a
-    // query on the store instance that performs the write, and the inverse
-    // capture only reads. Admission guards receive the operations themselves,
-    // so any inspection drops the record and the store measures again.
-    let admittedPatches = inputResources.admitted;
+    // Custom callbacks may mutate nested operations while retaining identity.
+    // Grid's engine-owned materializer only returns the input when unchanged.
+    let admittedPatches = this.options.trustedResourceCallbacks
+      ? inputResources.admitted
+      : undefined;
     const patches = this.options.materializeVirtualColumns(input);
     if (patches !== input) {
       const materializedResources = resolveTransactionResourceValidation(
@@ -159,7 +159,9 @@ export class DocumentController {
         issues: [admission.issue],
       };
     }
-    if (admission?.inspectedOperations) admittedPatches = undefined;
+    if (admission && (!this.options.trustedResourceCallbacks || admission.inspectedOperations)) {
+      admittedPatches = undefined;
+    }
     const reservation = admission?.reservation;
 
     if (this.applyingHistory) {

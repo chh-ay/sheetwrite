@@ -1807,6 +1807,40 @@ describe("validation, protection, and notes metadata", () => {
     partial.dispose();
   });
 
+  it("revalidates resource and address limits after permission callbacks mutate live operations", () => {
+    const maxEncodedBytes = 256;
+    for (const mutation of ["payload", "address"] as const) {
+      const workbook = makeWorkbook(3);
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("fixture is missing its sheet");
+      sheet.protectedRanges = [
+        {
+          id: "locked",
+          range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+        },
+      ];
+      const store = new SheetwriteStore(workbook, undefined, {
+        transactionResourceLimits: { maxEncodedBytes },
+      });
+      store.setProtectionResolver(({ operation }) => {
+        if (operation.op === "set" && operation.value.kind === "literal") {
+          if (mutation === "payload") operation.value.value = "x".repeat(maxEncodedBytes * 2);
+          else operation.addr.sheet = "missing-sheet";
+        }
+        return "allow";
+      });
+      try {
+        const result = store.applyTransaction({
+          patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "small" } }],
+        });
+        expect(result.status).toBe("rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
   it("denies protected local mutations by default and delegates permission to the host", () => {
     const workbook = makeWorkbook(3);
     workbook.sheets[0]!.protectedRanges = [

@@ -11,11 +11,7 @@ export type GridTransactionAdmissionDecision =
   | {
       ok: true;
       reservation: GridTransactionAdmissionReservation;
-      /**
-       * True when at least one guard received the operations. The caller must
-       * treat the operations as caller-visible afterwards and re-measure them
-       * before the store applies them.
-       */
+      /** Receiving operations permits nested mutation, so measurements must be dropped. */
       inspectedOperations?: boolean;
     }
   | { ok: false; issue: MutationIssue };
@@ -84,8 +80,9 @@ export function beginGridTransactionAdmission(
     throw error;
   }
 
-  if (reservations.length === 1) {
-    return { ok: true, reservation: reservations[0]!, inspectedOperations: true };
+  const soleReservation = reservations[0];
+  if (reservations.length === 1 && soleReservation) {
+    return { ok: true, reservation: soleReservation, inspectedOperations: true };
   }
   let finished = false;
   return {
