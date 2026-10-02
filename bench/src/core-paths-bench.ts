@@ -153,8 +153,11 @@ const FULL_SCALE: CorePathScale = {
   validationRules: 100,
   csvRows: 200_000,
   csvColumns: 10,
+  // Undo restores the cleared numbers as one transaction. 500,000 cells stay
+  // under the default 8 MiB payload limit; 1,000,000 cells are just above it,
+  // and the Grid then rejects that undo by design.
   clearRows: 1_000,
-  clearColumns: 1_000,
+  clearColumns: 500,
   pagedRows: 200_000,
 };
 
