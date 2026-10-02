@@ -8,7 +8,7 @@ description: "Registers the optional workbook XLSX implementation used by core."
 Registers the optional workbook XLSX implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L430"><code>packages/core/src/export.ts#L430</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L454"><code>packages/core/src/export.ts#L454</code></a></dd></div>
 </dl>
 
 ## Declaration

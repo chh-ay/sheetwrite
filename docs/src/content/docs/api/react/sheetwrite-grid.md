@@ -8,7 +8,7 @@ description: "Advanced framework component with inferred row-bridge identity."
 Advanced framework component with inferred row-bridge identity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L391"><code>packages/react/src/index.tsx#L391</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L403"><code>packages/react/src/index.tsx#L403</code></a></dd></div>
 </dl>
 
 ## Declaration

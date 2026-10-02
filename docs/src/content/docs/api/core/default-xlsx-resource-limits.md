@@ -9,7 +9,7 @@ Codec defaults combine SpreadsheetML worksheet dimensions with independent
 ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L252"><code>packages/core/src/export.ts#L252</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L276"><code>packages/core/src/export.ts#L276</code></a></dd></div>
 </dl>
 
 ## Declaration

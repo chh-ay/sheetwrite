@@ -10,7 +10,7 @@ separators, percent/scientific notation, UTC date/time tokens, four-section
 positive/negative/zero/text codes, quoted literals, and backslash escapes.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/number-format.ts#L460"><code>packages/core/src/number-format.ts#L460</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/number-format.ts#L537"><code>packages/core/src/number-format.ts#L537</code></a></dd></div>
 </dl>
 
 ## Declaration
