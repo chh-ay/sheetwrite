@@ -8,7 +8,12 @@ export interface GridTransactionAdmissionReservation {
 }
 
 export type GridTransactionAdmissionDecision =
-  | { ok: true; reservation: GridTransactionAdmissionReservation }
+  | {
+      ok: true;
+      reservation: GridTransactionAdmissionReservation;
+      /** Receiving operations permits nested mutation, so measurements must be dropped. */
+      inspectedOperations?: boolean;
+    }
   | { ok: false; issue: MutationIssue };
 
 export interface GridTransactionAdmissionGuard {
@@ -75,12 +80,14 @@ export function beginGridTransactionAdmission(
     throw error;
   }
 
-  if (reservations.length === 1) {
-    return { ok: true, reservation: reservations[0]! };
+  const soleReservation = reservations[0];
+  if (reservations.length === 1 && soleReservation) {
+    return { ok: true, reservation: soleReservation, inspectedOperations: true };
   }
   let finished = false;
   return {
     ok: true,
+    inspectedOperations: true,
     reservation: {
       cancel() {
         if (finished) return;

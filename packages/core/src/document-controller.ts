@@ -1,6 +1,10 @@
 import {
+  type AdmittedTransactionResources,
+  admitTransactionResources,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  resolveTransactionResourceValidation,
   validateTransactionResources,
+  withAdmittedTransactionResources,
 } from "./document-protocol.js";
 import {
   type HistoryAction,
@@ -41,6 +45,8 @@ export interface DocumentControllerOptions {
   onHistoryApplied: () => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
+  /** Only engine-owned callbacks may preserve payload measurements by identity. */
+  trustedResourceCallbacks?: true;
 }
 
 /**
@@ -77,8 +83,17 @@ export class DocumentController {
         issues: [resourceValidation.issue],
       };
     }
+    // The store receives a private copy of the caller's operations; the copy is
+    // verified to hold the measured operations before its record is handed over.
+    const patches = operations.slice();
+    const admitted = admitTransactionResources(
+      patches,
+      this.transactionResourceLimits,
+      resourceValidation,
+      operations,
+    );
     return this.options.store.applyTransaction(
-      { patches: operations.slice() },
+      withAdmittedTransactionResources({ patches }, admitted),
       {
         source: "remote",
         commitReason: options.commitReason ?? "api",
@@ -87,13 +102,21 @@ export class DocumentController {
     );
   }
 
-  commit(input: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
-    const inputResources = validateTransactionResources(input, this.transactionResourceLimits);
-    if (!inputResources.ok) {
+  commit(
+    input: DocumentOp[],
+    reason: CommitReason,
+    admitted?: AdmittedTransactionResources,
+  ): ApplyTransactionResult {
+    const inputResources = resolveTransactionResourceValidation(
+      input,
+      this.transactionResourceLimits,
+      admitted,
+    );
+    if (!inputResources.result.ok) {
       return {
         status: "rejected",
         epoch: this.options.epoch(),
-        issues: [inputResources.issue],
+        issues: [inputResources.result.issue],
       };
     }
     if (this.options.readOnly()) {
@@ -102,19 +125,26 @@ export class DocumentController {
     if (input.length === 0) {
       return { status: "noop", epoch: this.options.epoch(), reason: "empty" };
     }
+    // Custom callbacks may mutate nested operations while retaining identity.
+    // Grid's engine-owned materializer only returns the input when unchanged.
+    let admittedPatches = this.options.trustedResourceCallbacks
+      ? inputResources.admitted
+      : undefined;
     const patches = this.options.materializeVirtualColumns(input);
     if (patches !== input) {
-      const materializedResources = validateTransactionResources(
+      const materializedResources = resolveTransactionResourceValidation(
         patches,
         this.transactionResourceLimits,
       );
-      if (!materializedResources.ok) {
+      if (!materializedResources.result.ok) {
         return {
           status: "rejected",
           epoch: this.options.epoch(),
-          issues: [materializedResources.issue],
+          issues: [materializedResources.result.issue],
         };
       }
+      // Materialization replaced the operations, so they carry a new record.
+      admittedPatches = materializedResources.admitted;
     }
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
       return { status: "noop", epoch: this.options.epoch(), reason: "incomplete-data" };
@@ -129,12 +159,15 @@ export class DocumentController {
         issues: [admission.issue],
       };
     }
+    if (admission && (!this.options.trustedResourceCallbacks || admission.inspectedOperations)) {
+      admittedPatches = undefined;
+    }
     const reservation = admission?.reservation;
 
     if (this.applyingHistory) {
       let outcome: ApplyTransactionResult;
       try {
-        outcome = this.storeApply(patches, reason);
+        outcome = this.storeApply(patches, reason, admittedPatches);
       } catch (error) {
         reservation?.cancel();
         throw error;
@@ -148,7 +181,7 @@ export class DocumentController {
     let outcome: ApplyTransactionResult;
     try {
       for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
-      outcome = this.storeApply(patches, reason);
+      outcome = this.storeApply(patches, reason, admittedPatches);
     } catch (error) {
       reservation?.cancel();
       for (const inverse of inverseByPatch.values()) {
@@ -227,8 +260,15 @@ export class DocumentController {
     this.history.clear();
   }
 
-  private storeApply(patches: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
-    return this.options.store.applyTransaction({ patches }, { commitReason: reason });
+  private storeApply(
+    patches: DocumentOp[],
+    reason: CommitReason,
+    admitted: AdmittedTransactionResources | undefined,
+  ): ApplyTransactionResult {
+    return this.options.store.applyTransaction(
+      withAdmittedTransactionResources({ patches }, admitted),
+      { commitReason: reason },
+    );
   }
 
   private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {

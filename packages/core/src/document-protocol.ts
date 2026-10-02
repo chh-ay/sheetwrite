@@ -143,6 +143,132 @@ export function validateTransactionResources(
   }
 }
 
+/**
+ * Measurement of one operations array, handed between synchronous engine
+ * layers so a large payload is encoded once instead of at every layer. A
+ * record only describes the exact array instance it measured, under the exact
+ * limits it was checked against. It stops being valid as soon as the
+ * operations are replaced or rewritten, so layers drop it when a step changes
+ * the operations or hands them to code that may do so.
+ */
+export interface AdmittedTransactionResources {
+  readonly operations: readonly DocumentOp[];
+  readonly operationCount: number;
+  readonly encodedBytes: number;
+  readonly limits: Readonly<TransactionResourceLimits>;
+}
+
+/**
+ * Record a measurement for `operations`. `measuredOperations` names the array
+ * the measurement was actually taken from; when it differs (a defensive copy
+ * was made), the copy must hold the same operations in the same order or no
+ * record is produced.
+ */
+export function admitTransactionResources(
+  operations: readonly DocumentOp[],
+  limits: Readonly<TransactionResourceLimits>,
+  measurement: { readonly operationCount: number; readonly encodedBytes: number },
+  measuredOperations: readonly DocumentOp[] = operations,
+): AdmittedTransactionResources | undefined {
+  if (measurement.operationCount !== operations.length) return undefined;
+  if (!sameOperations(measuredOperations, operations)) return undefined;
+  return {
+    operations,
+    operationCount: measurement.operationCount,
+    encodedBytes: measurement.encodedBytes,
+    limits,
+  };
+}
+
+/**
+ * Validate the operation count and encoded byte size of `operations`, reusing
+ * `admitted` when it measured this exact array under these exact limits. The
+ * matching record is returned so callers can pass it on unchanged; otherwise
+ * the payload is walked and a fresh record is returned on success.
+ */
+export function resolveTransactionResourceValidation(
+  operations: readonly DocumentOp[],
+  limits: Readonly<TransactionResourceLimits> = DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  admitted?: AdmittedTransactionResources,
+): {
+  readonly result: TransactionResourceValidationResult;
+  readonly admitted?: AdmittedTransactionResources;
+} {
+  if (admitted !== undefined && admittedCovers(admitted, operations, limits)) {
+    return {
+      result: {
+        ok: true,
+        operationCount: admitted.operationCount,
+        encodedBytes: admitted.encodedBytes,
+      },
+      admitted,
+    };
+  }
+  const result = validateTransactionResources(operations, limits);
+  if (!result.ok) return { result };
+  return { result, admitted: admitTransactionResources(operations, limits, result) };
+}
+
+const admittedResourcesByTransaction = new WeakMap<object, AdmittedTransactionResources>();
+
+/**
+ * Attach one measurement to the engine-built transaction that is about to be
+ * applied, so the store can reuse it. Only this module can create a record, so
+ * a caller-built transaction can never claim one.
+ */
+export function withAdmittedTransactionResources<T extends object>(
+  transaction: T,
+  admitted: AdmittedTransactionResources | undefined,
+): T {
+  if (admitted !== undefined) admittedResourcesByTransaction.set(transaction, admitted);
+  return transaction;
+}
+
+/**
+ * Take the measurement attached to an engine-built transaction. Single-use:
+ * the entry is removed so a retained transaction object cannot reuse it after
+ * later payload edits.
+ */
+export function takeAdmittedTransactionResources(
+  transaction: object,
+): AdmittedTransactionResources | undefined {
+  const admitted = admittedResourcesByTransaction.get(transaction);
+  if (admitted !== undefined) admittedResourcesByTransaction.delete(transaction);
+  return admitted;
+}
+
+function admittedCovers(
+  admitted: AdmittedTransactionResources,
+  operations: readonly DocumentOp[],
+  limits: Readonly<TransactionResourceLimits>,
+): boolean {
+  return (
+    admitted.operations === operations &&
+    admitted.operationCount === operations.length &&
+    sameTransactionResourceLimits(admitted.limits, limits)
+  );
+}
+
+function sameTransactionResourceLimits(
+  left: Readonly<TransactionResourceLimits>,
+  right: Readonly<TransactionResourceLimits>,
+): boolean {
+  return (
+    left === right ||
+    (left.maxOperations === right.maxOperations && left.maxEncodedBytes === right.maxEncodedBytes)
+  );
+}
+
+/** True when both arrays reference the same operations in the same order. */
+function sameOperations(left: readonly DocumentOp[], right: readonly DocumentOp[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
 /** Allocation mode used when enforcing snapshot construction capacity. */
 export type SnapshotStorageMode = "dense" | "paged";
 

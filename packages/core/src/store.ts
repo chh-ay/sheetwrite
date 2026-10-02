@@ -2,11 +2,12 @@ import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   resolveTransactionResourceLimits,
+  resolveTransactionResourceValidation,
   SnapshotResourceError,
   type SnapshotResourceLimits,
   SnapshotValidationError,
+  takeAdmittedTransactionResources,
   validateDocumentOperationShape,
-  validateTransactionResources,
 } from "./document-protocol.js";
 import type {
   RuntimeMemoryObservation,
@@ -485,129 +486,18 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
-    const resourceValidation = validateTransactionResources(
+    // A transaction built and measured by an engine layer carries its resource
+    // record; without one, direct callers pay the full payload walk.
+    const resourceValidation = resolveTransactionResourceValidation(
       tx.patches,
       this.transactionResourceLimits,
-    );
+      takeAdmittedTransactionResources(tx),
+    ).result;
     if (!resourceValidation.ok) {
       return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
     }
-    const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
-    for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
-      const operationPath = `transaction.patches[${operationIndex}]`;
-      const unsafeError = validateDocumentOperationShape(
-        tx.patches[operationIndex],
-        operationPath,
-      ).find((error) => error.code !== "out-of-bounds");
-      if (unsafeError) {
-        return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "invalid-operation",
-              severity: "error",
-              operationIndex,
-              message: unsafeError.message,
-            },
-          ],
-        };
-      }
-      const operation = tx.patches[operationIndex]!;
-      const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
-      if (lifecycle && !lifecycle.ok) {
-        return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "sheet-lifecycle",
-              severity: "error",
-              code: lifecycle.code,
-              sheet:
-                operation.op === "addSheet"
-                  ? operation.sheet.id
-                  : (patchSheetId(operation) ?? undefined),
-              operationIndex,
-              message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
-            },
-          ],
-        };
-      }
-      const requiredSheets: SheetId[] = [];
-      if (operation.op === "addSheet") {
-        for (const block of operation.sheet.cells) {
-          for (const cell of block.cells) {
-            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
-          }
-        }
-        for (const rule of operation.sheet.conditionalFormats ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-        for (const hyperlink of operation.sheet.hyperlinks ?? []) {
-          requiredSheets.push(hyperlink.range.sheet);
-          if (hyperlink.target.kind === "internal") {
-            requiredSheets.push(hyperlink.target.range.sheet);
-          }
-        }
-        for (const rule of operation.sheet.validationRules ?? []) {
-          requiredSheets.push(rule.range.sheet);
-        }
-        for (const entry of operation.sheet.protectedRanges ?? []) {
-          requiredSheets.push(entry.range.sheet);
-        }
-        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
-      } else {
-        const primarySheet = patchSheetId(operation);
-        if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
-        if (operation.op === "set" && operation.value.kind === "ref") {
-          requiredSheets.push(operation.value.target.sheet);
-        } else if (operation.op === "setRange") {
-          for (const cell of operation.cells) {
-            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
-          }
-        } else if (operation.op === "setBlock") {
-          for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
-        } else if (operation.op === "setNamedRange") {
-          requiredSheets.push(operation.namedRange.range.sheet);
-          if (operation.namedRange.scope !== undefined) {
-            requiredSheets.push(operation.namedRange.scope);
-          }
-        } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
-          requiredSheets.push(operation.scope);
-        } else if (operation.op === "setHyperlink") {
-          requiredSheets.push(operation.hyperlink.range.sheet);
-          if (operation.hyperlink.target.kind === "internal") {
-            requiredSheets.push(operation.hyperlink.target.range.sheet);
-          }
-        } else if (operation.op === "setValidationRule") {
-          requiredSheets.push(operation.rule.range.sheet);
-        } else if (operation.op === "setProtectedRange") {
-          requiredSheets.push(operation.protectedRange.range.sheet);
-        } else if (operation.op === "setSheetMeta") {
-          for (const rule of operation.patch.conditionalFormats ?? []) {
-            requiredSheets.push(rule.range.sheet);
-          }
-        }
-      }
-      const missingSheet = requiredSheets.find(
-        (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
-      );
-      if (missingSheet !== undefined) {
-        return {
-          status: "rejected",
-          epoch: this.epoch,
-          issues: [
-            {
-              kind: "invalid-operation",
-              severity: "error",
-              operationIndex,
-              message: `Sheet ${missingSheet} does not exist`,
-            },
-          ],
-        };
-      }
-    }
+    const invalidOperations = this.validateTransactionOperations(tx);
+    if (invalidOperations) return invalidOperations;
     const options =
       typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
     const commitReason = options.commitReason ?? "api";
@@ -633,6 +523,19 @@ export class SheetwriteStore implements Store {
       }
       if (policy.patches.length !== tx.patches.length) {
         effectiveTx = { ...tx, patches: policy.patches };
+      }
+      if (this.protectionResolver) {
+        // Permission callbacks receive live operations and may edit nested
+        // payloads after ingress validation. Do not reuse their measurements.
+        const callbackResources = resolveTransactionResourceValidation(
+          effectiveTx.patches,
+          this.transactionResourceLimits,
+        ).result;
+        if (!callbackResources.ok) {
+          return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
+        }
+        const callbackOperations = this.validateTransactionOperations(effectiveTx);
+        if (callbackOperations) return callbackOperations;
       }
     }
 
@@ -733,6 +636,125 @@ export class SheetwriteStore implements Store {
 
   dispose(): void {
     this.engine.dispose();
+  }
+
+  private validateTransactionOperations(tx: Transaction): ApplyTransactionResult | undefined {
+    const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
+    for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
+      const operationPath = `transaction.patches[${operationIndex}]`;
+      const operation = tx.patches[operationIndex];
+      const unsafeError = validateDocumentOperationShape(operation, operationPath).find(
+        (error) => error.code !== "out-of-bounds",
+      );
+      if (unsafeError || !operation) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: unsafeError?.message ?? "Operation is missing",
+            },
+          ],
+        };
+      }
+      const lifecycle = applySheetLifecycleOperation(sheetLifecycle, operation);
+      if (lifecycle && !lifecycle.ok) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "sheet-lifecycle",
+              severity: "error",
+              code: lifecycle.code,
+              sheet:
+                operation.op === "addSheet"
+                  ? operation.sheet.id
+                  : (patchSheetId(operation) ?? undefined),
+              operationIndex,
+              message: SHEET_LIFECYCLE_MESSAGES[lifecycle.code],
+            },
+          ],
+        };
+      }
+      const requiredSheets: SheetId[] = [];
+      if (operation.op === "addSheet") {
+        for (const block of operation.sheet.cells) {
+          for (const cell of block.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        }
+        for (const rule of operation.sheet.conditionalFormats ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const hyperlink of operation.sheet.hyperlinks ?? []) {
+          requiredSheets.push(hyperlink.range.sheet);
+          if (hyperlink.target.kind === "internal") {
+            requiredSheets.push(hyperlink.target.range.sheet);
+          }
+        }
+        for (const rule of operation.sheet.validationRules ?? []) {
+          requiredSheets.push(rule.range.sheet);
+        }
+        for (const entry of operation.sheet.protectedRanges ?? []) {
+          requiredSheets.push(entry.range.sheet);
+        }
+        for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+      } else {
+        const primarySheet = patchSheetId(operation);
+        if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
+        if (operation.op === "set" && operation.value.kind === "ref") {
+          requiredSheets.push(operation.value.target.sheet);
+        } else if (operation.op === "setRange") {
+          for (const cell of operation.cells) {
+            if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
+          }
+        } else if (operation.op === "setBlock") {
+          for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+        } else if (operation.op === "setNamedRange") {
+          requiredSheets.push(operation.namedRange.range.sheet);
+          if (operation.namedRange.scope !== undefined) {
+            requiredSheets.push(operation.namedRange.scope);
+          }
+        } else if (operation.op === "removeNamedRange" && operation.scope !== undefined) {
+          requiredSheets.push(operation.scope);
+        } else if (operation.op === "setHyperlink") {
+          requiredSheets.push(operation.hyperlink.range.sheet);
+          if (operation.hyperlink.target.kind === "internal") {
+            requiredSheets.push(operation.hyperlink.target.range.sheet);
+          }
+        } else if (operation.op === "setValidationRule") {
+          requiredSheets.push(operation.rule.range.sheet);
+        } else if (operation.op === "setProtectedRange") {
+          requiredSheets.push(operation.protectedRange.range.sheet);
+        } else if (operation.op === "setSheetMeta") {
+          for (const rule of operation.patch.conditionalFormats ?? []) {
+            requiredSheets.push(rule.range.sheet);
+          }
+        }
+      }
+      const missingSheet = requiredSheets.find(
+        (sheet) => !sheetLifecycle.sheets.some((candidate) => candidate.id === sheet),
+      );
+      if (missingSheet !== undefined) {
+        return {
+          status: "rejected",
+          epoch: this.epoch,
+          issues: [
+            {
+              kind: "invalid-operation",
+              severity: "error",
+              operationIndex,
+              message: `Sheet ${missingSheet} does not exist`,
+            },
+          ],
+        };
+      }
+    }
+    return undefined;
   }
 
   private requireCompleteQuery(sheet: SheetId): void {

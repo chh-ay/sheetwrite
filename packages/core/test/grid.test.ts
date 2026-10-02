@@ -11,6 +11,7 @@ import {
 } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
   CellScalar,
   ChangeEvent,
@@ -424,6 +425,55 @@ describe("Grid transaction resource ingress", () => {
     expect(grid.store.getCell(first).resolved).toBeNull();
     expect(changes).toHaveLength(2);
     expect(rejectionEvents).toBe(0);
+    grid.destroy();
+  });
+
+  it("re-measures payloads that admission guards rewrote before the store applies them", () => {
+    const workbook = makeWorkbook(4);
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxEncodedBytes: 128 },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejectionEvents = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejectionEvents += 1;
+    });
+    const address = { sheet: "s1", row: 0, col: 0 };
+    let rewritePayload = false;
+    const disposeGuard = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        if (rewritePayload) {
+          const patch = operations[0];
+          if (patch?.op === "set") {
+            patch.value = { kind: "literal", value: "x".repeat(200) };
+          }
+        }
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+
+    const accepted = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(accepted.status).toBe("applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+
+    rewritePayload = true;
+    const rejected = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      issues: [{ kind: "resource-limit", resource: "encoded-bytes", max: 128 }],
+    });
+    if (rejected.status !== "rejected") throw new Error("rewritten payload unexpectedly applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+    expect(changes).toHaveLength(1);
+    expect(rejectionEvents).toBe(1);
+
+    disposeGuard();
     grid.destroy();
   });
 });
