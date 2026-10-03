@@ -158,6 +158,16 @@ describe("neutral conformance corpus", () => {
       expect(hasIssue(verifiedIssues, "no verified immutable capture binding")).toBe(false);
       expect(hasIssue(verifiedIssues, "deterministic generator output drift")).toBe(true);
 
+      // Different bytes stored under the bound hash name are not verified.
+      const tampered = new TextEncoder().encode(
+        `${canonicalJson({ ...artifact, producerVersion: "16.0.0.0" })}\n`,
+      );
+      await writeFile(join(directory, `${hash}.json`), tampered);
+      const forged = await verifyCaptureArtifacts(corpus, directory);
+      expect(forged.issues.length).toBeGreaterThan(0);
+      expect(forged.verified.size).toBe(0);
+      await writeFile(join(directory, `${hash}.json`), bytes);
+
       corpus.cases[0]!.observations[0]!.result = { type: "number", value: 3 };
       const drifted = await verifyCaptureArtifacts(corpus, directory);
       expect(hasIssue(drifted.issues, "does not bind reviewed observation")).toBe(true);
