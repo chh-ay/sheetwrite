@@ -58,7 +58,7 @@ function VanillaWorkbenchRoute() {
             "A failed Worker boot emits renderer-fallback and keeps painting on the main thread — requested vs. active is always visible.",
         },
       ]}
-      prompt="Edit B2, switch Main thread to Web Worker, then destroy and create the Grid. Watch the adjacent generation instrument prove each ownership boundary."
+      prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. The generation instrument shows each ownership boundary."
       sourcePath="docs/src/showcases/vanilla-workbench.ts"
       title="Own every Grid generation."
     >

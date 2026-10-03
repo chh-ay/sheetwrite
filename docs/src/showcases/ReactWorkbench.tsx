@@ -134,6 +134,7 @@ export default function ReactWorkbench() {
               ref={bench.gridRef}
               workbook={bench.workbook}
               data={bench.dataset}
+              presentation="data-grid"
               theme={ANALYTICS_THEME}
               readOnly={bench.readOnly}
               renderer={bench.renderer}

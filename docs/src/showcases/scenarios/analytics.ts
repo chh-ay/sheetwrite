@@ -96,12 +96,12 @@ export function createAnalyticsWorkbook(): Workbook {
         name: ANALYTICS_SHEET_NAME,
         rowCount: ANALYTICS_ROWS,
         columns: [
-          { key: "id", header: "ID", width: 72, type: "number" },
-          { key: "account", header: "Account", width: 210, type: "text" },
-          { key: "market", header: "Market", width: 130, type: "text" },
-          { key: "segment", header: "Segment", width: 118, type: "text" },
-          { key: "seats", header: "Seats", width: 90, type: "number" },
-          { key: "arr", header: "ARR", width: 138, type: "currency", numberFormat: "$#,##0" },
+          { key: "id", header: "ID", width: 90, type: "number" },
+          { key: "account", header: "Account", width: 310, type: "text" },
+          { key: "market", header: "Market", width: 180, type: "text" },
+          { key: "segment", header: "Segment", width: 160, type: "text" },
+          { key: "seats", header: "Seats", width: 120, type: "number" },
+          { key: "arr", header: "ARR", width: 180, type: "currency", numberFormat: "$#,##0" },
         ],
         conditionalFormats: [
           {
