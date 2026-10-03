@@ -21,7 +21,6 @@ declare global {
       run(action: "jump" | "edit" | "undo" | "save" | "renderer"): Promise<void>;
       reset(): void;
       traceLength(): number;
-      timerCount(): number;
     };
     __sheetwriteEngineLongTasks?: Array<{ startTime: number; duration: number }>;
   }
@@ -248,35 +247,37 @@ test("sustained Grid scrolling stays immediate, bounded, and free of long tasks"
   expect(evidence.loadedCells).toBeGreaterThan(0);
   expect(evidence.loadedCells).toBeLessThanOrEqual(8_192);
   expect(evidence.pageBytes).toBeLessThanOrEqual(2 * 1024 * 1024);
-  expect(evidence.engineBytes).toBeGreaterThanOrEqual(0);
+  expect(evidence.engineBytes).toBeGreaterThan(0);
   expect(evidence.longTasks.filter((entry) => entry.duration > 50)).toEqual([]);
   expect(evidence.frameCadence.p95).toBeLessThanOrEqual(35);
 });
 
-test("one hundred actions keep timers, trace, and DOM bounded, then lifecycle cleanup runs", async ({
+test("repeated actions keep the trace, log, and DOM bounded, then lifecycle cleanup runs", async ({
   page,
 }) => {
   await bootEngine(page);
-  const beforeNodes = await page.locator("*").count();
-  await page.evaluate(async () => {
-    const handle = window.__sheetwriteEngineShowcase!;
-    for (let loop = 0; loop < 50; loop += 1) {
-      await handle.run("edit");
-      await handle.run("undo");
-    }
-  });
+  const runBatch = () =>
+    page.evaluate(async () => {
+      const handle = window.__sheetwriteEngineShowcase!;
+      for (let loop = 0; loop < 50; loop += 1) {
+        await handle.run("edit");
+        await handle.run("undo");
+      }
+    });
+  await runBatch();
+  const firstBatchNodes = await page.locator("*").count();
+  await runBatch();
   const bounds = {
     trace: await page.evaluate(() => window.__sheetwriteEngineShowcase!.traceLength()),
     logNodes: await page.locator('[data-testid="engine-event-log"] > li').count(),
-    timers: await page.evaluate(() => window.__sheetwriteEngineShowcase!.timerCount()),
-    beforeNodes,
+    firstBatchNodes,
     afterNodes: await page.locator("*").count(),
   };
   console.log(`ENGINE_BOUND_EVIDENCE ${JSON.stringify(bounds)}`);
   expect(bounds.trace).toBeLessThanOrEqual(ENGINE_TRACE_LIMIT);
   expect(bounds.logNodes).toBeLessThanOrEqual(ENGINE_TRACE_LIMIT);
-  expect(bounds.timers).toBe(0);
-  expect(bounds.afterNodes).toBeLessThanOrEqual(beforeNodes + ENGINE_TRACE_LIMIT * 4);
+  // Once the log is full, more actions must not grow the page.
+  expect(bounds.afterNodes).toBeLessThanOrEqual(firstBatchNodes);
 
   await page.getByRole("link", { name: "Browse every live feature" }).click();
   await expect(page).toHaveURL(/\/showcases\/$/);

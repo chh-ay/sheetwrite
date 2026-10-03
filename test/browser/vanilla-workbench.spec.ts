@@ -153,7 +153,9 @@ function rendererReadout(requested: string, active: string): RegExp {
   return new RegExp(`Requested:\\s*${requested}\\b[\\s\\S]*Active:\\s*${active}\\b`);
 }
 
-test("boots product-first, paints, and exposes the ownership instruments", async ({ page }) => {
+test("boots product-first, paints, and exposes the ownership instruments", {
+  tag: "@portability",
+}, async ({ page }) => {
   const errors = collectErrors(page);
   await page.setViewportSize({ width: 1440, height: 900 });
 

@@ -1,6 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { Grid } from "../../packages/core/src/types.js";
-import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 declare global {
   interface Window {
@@ -10,17 +9,6 @@ declare global {
 }
 
 import { type examplePages, siteUrl } from "./playwright.config.js";
-
-// The framework-free example page boots and paints the revenue accounts
-// workbook. React/Vue/Svelte example routes are booted by their framework
-// workbench specs instead.
-const VANILLA_FIRST_CELL = "Account 000001";
-
-/**
- * Shared boot contract for every production-built example page: it loads
- * without console/page errors, the grid host mounts, WASM initializes far
- * enough to paint cells, and the canvas contains non-background pixels.
- */
 
 function urlOf(page: (typeof examplePages)[number]): string {
   return siteUrl(`/${page}/`);
@@ -40,59 +28,6 @@ function collectErrors(page: Page): BootErrors {
     errors.page.push(error.message);
   });
   return errors;
-}
-
-/** True when the canvas body holds opaque paint beyond its dominant background. */
-async function canvasBodyPainted(page: Page): Promise<boolean> {
-  const sample = await page.evaluate(() => {
-    const canvas = document.querySelector(".sheetwrite canvas");
-    if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) {
-      return null;
-    }
-    const ctx = canvas.getContext("2d");
-    const bounds = canvas.getBoundingClientRect();
-    if (!ctx || bounds.width === 0 || bounds.height === 0) return null;
-
-    const scaleX = canvas.width / bounds.width;
-    const scaleY = canvas.height / bounds.height;
-    // All shipped themes keep their row/column headers within these insets.
-    // Sampling beyond both excludes grid chrome while retaining several body cells.
-    const left = Math.ceil(64 * scaleX);
-    const top = Math.ceil(40 * scaleY);
-    const width = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
-    const height = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
-    if (width <= 0 || height <= 0) return null;
-
-    return Array.from(ctx.getImageData(left, top, width, height).data);
-  });
-
-  return sample !== null && hasOpaqueForeground(sample);
-}
-
-for (const name of ["vanilla"] as const) {
-  test(`${name} example boots, initializes WASM, and paints cells`, {
-    tag: "@portability",
-  }, async ({ page }) => {
-    const errors = collectErrors(page);
-
-    await page.goto(urlOf(name));
-    await page.waitForSelector(".sheetwrite", { state: "attached", timeout: 15_000 });
-    await expect
-      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
-        timeout: 15_000,
-        message: `${name} grid never exposed its expected cell value`,
-      })
-      .toContain(VANILLA_FIRST_CELL);
-    await expect
-      .poll(() => canvasBodyPainted(page), {
-        timeout: 15_000,
-        message: "grid body cells never painted",
-      })
-      .toBe(true);
-
-    expect(errors.page).toEqual([]);
-    expect(errors.console).toEqual([]);
-  });
 }
 
 test("workbook XLSX backend preserves formulas in a browser build", {
@@ -149,6 +84,8 @@ test("vanilla example commits an edit through the formula bar and undoes it", {
   // Select B2 via the name box, then commit a literal through the formula bar.
   await page.fill("#namebox", "B2");
   await page.press("#namebox", "Enter");
+  const original = await page.locator("#formula").inputValue();
+  expect(original).not.toBe("browser-smoke");
   await page.fill("#formula", "browser-smoke");
   await page.press("#formula", "Enter");
 
@@ -157,12 +94,12 @@ test("vanilla example commits an edit through the formula bar and undoes it", {
   await page.press("#namebox", "Enter");
   await expect(page.locator("#formula")).toHaveValue("browser-smoke");
 
-  // Ctrl+Z on the grid host undoes the commit.
-  await page.click(".sheetwrite", { position: { x: 200, y: 100 } });
+  // Ctrl+Z on the grid undoes the commit and restores the original value.
+  await page.locator(".sheetwrite").first().click();
   await page.keyboard.press("Control+z");
   await page.fill("#namebox", "B2");
   await page.press("#namebox", "Enter");
-  await expect(page.locator("#formula")).not.toHaveValue("browser-smoke");
+  await expect(page.locator("#formula")).toHaveValue(original);
 });
 
 test("dynamic spill entry, obstruction, resize, ownership, and undo are visible", async ({
