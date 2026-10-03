@@ -2060,6 +2060,96 @@
         }
       ],
       "returns": "scalar"
+    },
+    "trim-mean": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "percent",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "percent-rank": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "significance",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "known-y-x": {
+      "arguments": [
+        {
+          "name": "knownYs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownXs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "forecast": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownYs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownXs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -2683,6 +2773,42 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-descriptive": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "ignored",
+        "text": "ignored-in-ranges",
+        "boolean": "ignored-in-ranges",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -2701,6 +2827,15 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "Scalar binary64 evaluation, not array broadcasting or blanket spreadsheet parity. Domain validation and finite numerical convergence may return #NUM!."
+      ]
+    },
+    "analysis-descriptive": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits."
       ]
     }
   },
@@ -2746,6 +2881,15 @@
         "status": "source-linked",
         "paths": ["scripts/formula-contract.test.ts"]
       }
+    },
+    "analysis-descriptive": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/descriptive.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
     }
   },
   "unsupportedCategories": [
@@ -5133,6 +5277,222 @@
       "semantics": "analysis-distributions",
       "dialects": "analysis-distributions",
       "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AVEDEV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DEVSQ",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HARMEAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "KURT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SKEW",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SKEW.P",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TRIMMEAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "trim-mean",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTILE.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "QUARTILE.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTRANK.INC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percent-rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTRANK.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percent-rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RANK.AVG",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PEARSON",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RSQ",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SLOPE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "INTERCEPT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "STEYX",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FORECAST.LINEAR",
+      "aliases": ["FORECAST"],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "forecast",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
