@@ -11,9 +11,9 @@
     --sw-sp-control-height: 2.75rem;
     --sw-sp-page-width: 84rem;
     --sw-sp-measure: 54rem;
-    --sw-sp-stage-offset: 18rem;
-    --sw-sp-grid-height: clamp(32rem, calc(100dvh - var(--sw-sp-stage-offset)), 40rem);
-    --sw-sp-instrument-width: 18rem;
+    --sw-sp-stage-offset: 24rem;
+    --sw-sp-grid-height: clamp(28rem, calc(100dvh - var(--sw-sp-stage-offset)), 34rem);
+    --sw-sp-instrument-width: 16rem;
     --sw-sp-rail-width: 7rem;
     --sw-sp-line: 1px;
     --sw-sp-focus: 0 0 0 0.2rem color-mix(in srgb, var(--sw-accent) 35%, transparent);
@@ -31,6 +31,104 @@
     padding-block: 0.75rem var(--sw-sp-space-8);
   }
 
+  .sw-sp-page .sw-capability-hero {
+    padding: 1.5rem 0 2rem;
+  }
+
+  .sw-sp-page .sw-capability-hero h1 {
+    max-width: 24ch;
+    font-size: clamp(1.9rem, 3.3vw, 3rem);
+    line-height: 1.08;
+  }
+
+  .sw-sp-scale-strip {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem 2rem;
+    align-items: center;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--sw-border-strong);
+    background: var(--sw-surface-2);
+  }
+
+  .sw-sp-position {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .sw-sp-position > span {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-xs);
+    letter-spacing: 0.08em;
+  }
+
+  .sw-sp-position strong {
+    color: var(--sw-fg-strong);
+    font: 630 clamp(1.1rem, 2vw, 1.5rem) var(--sw-font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sw-sp-position meter {
+    width: 100%;
+    height: 0.75rem;
+    accent-color: var(--sw-accent);
+  }
+
+  .sw-sp-scale-ticks {
+    display: flex;
+    justify-content: space-between;
+    color: var(--sw-fg-dim);
+    font-size: var(--sw-type-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sw-sp-position meter::-webkit-meter-bar {
+    background: var(--sw-border-strong);
+    border: 0;
+  }
+
+  .sw-sp-position meter::-webkit-meter-optimum-value {
+    background: var(--sw-accent);
+  }
+
+  .sw-sp-position meter::-moz-meter-bar {
+    background: var(--sw-accent);
+  }
+
+  .sw-sp-position small,
+  .sw-sp-live-loading {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sw-sp-quick-jumps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .sw-sp-live-loading {
+    display: flex;
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  .sw-sp-live-loading strong {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-sp-diagnostics > summary {
+    padding: 1rem;
+    color: var(--sw-fg-strong);
+    font-weight: 620;
+    cursor: pointer;
+  }
+
   .sw-sp-kicker {
     margin: 0 0 var(--sw-sp-space-3);
     color: var(--sw-accent-strong);
@@ -42,10 +140,10 @@
   .sw-sp-status {
     margin: 0;
     padding: var(--sw-sp-space-2) var(--sw-sp-space-3);
-    border-left: calc(var(--sw-sp-line) * 3) solid var(--sw-accent);
+    border-top: var(--sw-sp-line) solid var(--sw-border);
     background: var(--sw-surface-1);
     color: var(--sw-fg);
-    font: 500 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+    font: 500 var(--sw-type-xs) / 1.5 var(--sw-font-body);
     overflow-wrap: anywhere;
   }
 
@@ -328,9 +426,9 @@
 
   .sw-sp-grid {
     width: 100%;
-    height: auto;
+    height: var(--sw-sp-grid-height);
     min-height: var(--sw-sp-grid-height);
-    flex: 1 1 var(--sw-sp-grid-height);
+    flex: 0 0 var(--sw-sp-grid-height);
     touch-action: pan-x pan-y;
     overscroll-behavior: contain;
     scroll-margin-top: calc(var(--sw-header-height) + var(--sw-sp-space-3));
@@ -413,14 +511,14 @@
   .sw-sp-navigator .sw-sp-overview-head {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
+    flex-wrap: wrap;
     gap: var(--sw-sp-space-2);
     padding: 0;
     text-align: left;
   }
 
   .sw-sp-navigator .sw-sp-overview-track {
-    min-height: 9rem;
+    min-height: 11rem;
     margin: 0;
   }
   .sw-sp-navigator .sw-sp-overview-head strong {
@@ -635,7 +733,7 @@
     border: 0;
     background: var(--sw-surface-2);
     color: var(--sw-fg-muted);
-    font: 620 var(--sw-type-xs) var(--sw-font-mono);
+    font: 620 var(--sw-type-xs) / 1 var(--sw-font-mono);
     pointer-events: auto;
     transform: translateY(-50%);
   }
@@ -1494,6 +1592,17 @@
   }
 
   @media (max-width: 860px) {
+    .sw-sp-scale-strip {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+    }
+
+    .sw-sp-quick-jumps button {
+      flex: 1;
+      padding-inline: 0.75rem;
+      white-space: nowrap;
+    }
+
     .sw-sp-frame {
       --sw-sp-grid-height: clamp(22rem, 56vh, 28rem);
       --sw-sp-rail-width: 5.5rem;
@@ -1580,6 +1689,10 @@
   }
 
   @media (max-width: 520px) {
+    .sw-sp-page .sw-capability-hero__facts {
+      display: none;
+    }
+
     .sw-sp-frame {
       --sw-sp-grid-height: clamp(20rem, 52vh, 26rem);
       --sw-sp-rail-width: 5rem;
