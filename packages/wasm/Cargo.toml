@@ -13,6 +13,7 @@ name = "sheetwrite_wasm"
 [features]
 default = ["formula-engine"]
 formula-engine = []
+analysis = ["formula-engine"]
 
 [dependencies]
 wasm-bindgen = "0.2"
