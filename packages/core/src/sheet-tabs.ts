@@ -319,7 +319,7 @@ export class SheetTabs {
     const focusButton =
       this.buttonFor(this.focusedId) ?? this.buttonFor(this.activeId) ?? this.buttons[0];
     if (editedInput) {
-      editedInput.focus();
+      editedInput.focus({ preventScroll: true });
       editedInput.setSelectionRange(0, editedInput.value.length);
       this.scrollIntoView(editedInput);
     } else if (menu) {
@@ -327,7 +327,7 @@ export class SheetTabs {
       this.focusMenuItem(0);
     } else if (restoreFocus && focusButton) {
       this.setRovingFocus(focusButton);
-      focusButton.focus();
+      focusButton.focus({ preventScroll: true });
       this.scrollIntoView(focusButton);
     }
 
@@ -796,7 +796,14 @@ export class SheetTabs {
   }
 
   private scrollIntoView(element: HTMLElement): void {
-    element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    // Only reveal the tab horizontally; the workbook may sit below the page fold.
+    const stripRect = this.host.getBoundingClientRect();
+    const tabRect = element.getBoundingClientRect();
+    if (tabRect.left < stripRect.left) {
+      this.host.scrollLeft += tabRect.left - stripRect.left;
+    } else if (tabRect.right > stripRect.right) {
+      this.host.scrollLeft += tabRect.right - stripRect.right;
+    }
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
@@ -906,7 +913,7 @@ export class SheetTabs {
     if (!target || target === active) return;
     this.focusedId = this.buttonIds[next]!;
     this.setRovingFocus(target);
-    target.focus();
+    target.focus({ preventScroll: true });
     this.scrollIntoView(target);
   };
 }

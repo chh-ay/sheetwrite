@@ -113,6 +113,31 @@ describe("SheetTabs", () => {
     expect(host.textContent).not.toContain("Secret");
   });
 
+  it("keeps tab scrolling inside the strip during mount and keyboard navigation", () => {
+    expect(scrolled).toEqual([]);
+    const selectedTab = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+    if (!selectedTab) throw new Error("Expected a selected tab");
+    const stripWidth = 100;
+    const nextTabLeft = 150;
+    const nextTabRight = 200;
+    Object.defineProperty(host, "getBoundingClientRect", {
+      value: () => ({ left: 0, right: stripWidth }),
+    });
+    const nextTab = tabButtons(host)[2];
+    if (!nextTab) throw new Error("Expected the next sheet tab");
+    Object.defineProperty(nextTab, "getBoundingClientRect", {
+      value: () => ({
+        left: nextTabLeft - host.scrollLeft,
+        right: nextTabRight - host.scrollLeft,
+      }),
+    });
+    selectedTab.focus();
+    key(selectedTab, "ArrowRight");
+    expect(document.activeElement).toBe(nextTab);
+    expect(host.scrollLeft).toBe(nextTabRight - stripWidth);
+    expect(scrolled).toEqual([]);
+  });
+
   it("renames inline by double-click and F2, committing Enter or changed blur and cancelling Escape", () => {
     const renames: Array<[string, string]> = [];
     tabs.destroy();
