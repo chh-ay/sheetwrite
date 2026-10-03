@@ -1,14 +1,14 @@
 ---
-title: "CellStore | @sheetwrite/wasm"
+title: "CellStore | @sheetwrite/formulas"
 description: "The workbook-wide store: every sheet, one string pool."
 ---
-<!-- api-export:@sheetwrite/wasm|.|CellStore -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
+<!-- api-export:@sheetwrite/formulas|.|CellStore -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>
 
 The workbook-wide store: every sheet, one string pool.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L41"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L41</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L41"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L41</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -1454,11 +1454,9 @@ class CellStore {
 ## Referenced by
 
 <div class="api-consumers" data-pagefind-ignore>
-<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
 
 <ul class="api-consumer-list">
-<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
-<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 

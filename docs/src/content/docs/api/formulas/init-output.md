@@ -1,14 +1,14 @@
 ---
-title: "InitOutput | @sheetwrite/wasm"
+title: "InitOutput | @sheetwrite/formulas"
 description: "Result of module initialization: the instantiated exports plus the shared linear memory."
 ---
-<!-- api-export:@sheetwrite/wasm|.|InitOutput -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="interface">interface</span></div>
+<!-- api-export:@sheetwrite/formulas|.|InitOutput -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="interface">interface</span></div>
 
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L448"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L448</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L453"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L453</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -125,6 +125,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
+<a href="#init-output-function-names"><code>functionNames</code></a>
 <a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
 <a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
 <a href="#init-output-rangesnapshot-formula-sources"><code>rangesnapshot_formulaSources</code></a>
@@ -151,7 +152,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>137</span>
+## Members <span class="api-count" data-pagefind-ignore>138</span>
 
 <div class="api-member-list">
 
@@ -1172,6 +1173,15 @@ readonly distinctcolumn_takeTexts: (a: number) => [number, number];
 
 </details>
 
+<details class="api-member" id="init-output-function-names" data-pagefind-weight="1">
+<summary><code>functionNames</code></summary>
+
+```ts generated
+readonly functionNames: () => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-rangesnapshot-byte-length" data-pagefind-weight="1">
 <summary><code>rangesnapshot_byteLength</code></summary>
 
@@ -2033,6 +2043,7 @@ export interface InitOutput {
   readonly distinctcolumn_takeKinds: (a: number) => [number, number];
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
+  readonly functionNames: () => [number, number];
   readonly rangesnapshot_byteLength: (a: number) => number;
   readonly rangesnapshot_formulaOffsets: (a: number) => [number, number];
   readonly rangesnapshot_formulaSources: (a: number) => [number, number];
@@ -2070,11 +2081,9 @@ export interface InitOutput {
 ## Referenced by
 
 <div class="api-consumers" data-pagefind-ignore>
-<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
 
 <ul class="api-consumer-list">
-<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
-<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
