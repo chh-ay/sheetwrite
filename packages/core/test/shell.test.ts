@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
@@ -183,7 +183,8 @@ describe("createToolbar", () => {
     expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
     grid.replaceTheme(undefined);
     expect(fill!.value).toBe("#ff0000");
-    expect(text!.value).not.toBe("#e5e7eb");
+    // The text swatch was never picked, so it follows the reset to the default theme.
+    expect(text!.value).toBe(DEFAULT_THEME.fg);
 
     piece.destroy();
     grid.destroy();
