@@ -9,8 +9,9 @@
   margin-bottom: 24px;
 }
 .host-rows-showcase h1 {
-  font-size: clamp(2rem, 5vw, 4.5rem);
-  line-height: 0.98;
+  font-family: var(--sw-font-display);
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.08;
   margin: 0.2em 0;
 }
 .host-rows-showcase .eyebrow {
@@ -26,10 +27,11 @@
   margin: 18px 0;
 }
 .host-row-actions button {
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: transparent;
-  padding: 8px 14px;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-demo-radius-1);
+  color: var(--sw-fg-strong);
+  background: var(--sw-surface-1);
+  padding: 10px 14px;
   font: inherit;
   cursor: pointer;
 }
@@ -40,10 +42,9 @@
   margin-top: 24px;
 }
 .host-row-proof > div {
-  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  border-radius: 18px;
-  padding: 18px;
-  background: color-mix(in srgb, #fff 90%, transparent);
+  min-width: 0;
+  border-top: 2px solid var(--sw-border);
+  padding: 18px 0;
 }
 .host-row-proof h2 {
   margin-top: 0;
@@ -51,6 +52,57 @@
 }
 .host-row-proof li {
   margin: 0.45rem 0;
-  font-family: ui-monospace, monospace;
-  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-type-sm);
+}
+
+.host-rows-showcase header > p:last-child {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-base);
+  line-height: 1.65;
+}
+
+.host-row-actions button:hover {
+  border-color: var(--sw-accent);
+  background: var(--sw-surface-2);
+}
+
+.host-row-actions button:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 3px;
+}
+
+.host-row-proof ul,
+.host-row-proof ol {
+  padding-inline-start: 1.25rem;
+}
+
+@media (max-width: 32rem) {
+  .host-rows-showcase {
+    padding: 28px 16px 48px;
+  }
+
+  .host-row-proof {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.host-rows-showcase,
+.host-rows-showcase .sheetwrite {
+  --sheetwrite-bg: var(--sw-surface-0);
+  --sheetwrite-fg: var(--sw-fg);
+  --sheetwrite-grid-line: var(--sw-border);
+  --sheetwrite-header-bg: var(--sw-surface-2);
+  --sheetwrite-header-fg: var(--sw-fg-strong);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  --sheetwrite-selection-border: var(--sw-accent);
+  --sheetwrite-widget-bg: var(--sw-surface-1);
+  --sheetwrite-widget-fg: var(--sw-fg);
+  --sheetwrite-widget-border: var(--sw-border);
+  --sheetwrite-tab-bg: var(--sw-surface-1);
+  --sheetwrite-tab-fg: var(--sw-fg-muted);
+  --sheetwrite-tab-border: var(--sw-border);
+  --sheetwrite-tab-active-bg: var(--sw-surface-2);
+  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
 }

@@ -2207,3 +2207,13 @@
 .sw-si-workbench .sheetwrite-tab-add:hover {
   color: var(--sw-fg-strong);
 }
+
+.sw-si-safety-note {
+  grid-column: 1;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-sm);
+  line-height: 1.5;
+}

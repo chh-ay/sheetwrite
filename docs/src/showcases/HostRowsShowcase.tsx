@@ -1,7 +1,7 @@
 import { createRowBridge, type Grid, type RowBridgeProjection } from "@sheetwrite/core";
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface HostEntity extends Record<string, string | number | boolean | null> {
   id: string;
@@ -52,6 +52,15 @@ export default function HostRowsShowcase() {
       }),
     [],
   );
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => grid.current?.replaceTheme({}));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const applyProjection = (projection: RowBridgeProjection<string>) => {
     setLog((entries) =>

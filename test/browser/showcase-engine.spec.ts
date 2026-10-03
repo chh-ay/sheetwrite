@@ -49,6 +49,16 @@ async function bootEngine(page: Page) {
 
 test("direct route jumps, edits a live formula, and undoes in the same Grid", async ({ page }) => {
   await bootEngine(page);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const store = window.__sheetwriteEngineShowcase?.grid()?.store;
+        return [2, 3, 4, 5].map(
+          (col) => store?.getCell({ sheet: "forecast", row: 0, col }).resolved,
+        );
+      }),
+    )
+    .toEqual(["Actual", "Forecast", "Variance", "Attainment"]);
   await page.fill('[data-testid="engine-jump-input"]', "24001");
   await page.click('[data-testid="engine-jump"]');
   await expect

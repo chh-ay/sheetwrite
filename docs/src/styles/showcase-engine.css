@@ -213,9 +213,10 @@
 
 .sw-engine-lanes > li {
   display: grid;
-  gap: var(--sw-demo-space-1);
+  gap: var(--sw-demo-space-2);
   padding: var(--sw-demo-space-4);
   border-bottom: 1px solid var(--sw-border);
+  border-left: 3px solid color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
 }
 
 .sw-engine-lanes > li > span {
@@ -227,7 +228,7 @@
 
 .sw-engine-lanes > li > strong {
   color: var(--sw-fg-strong);
-  font: 650 var(--sw-type-sm) / 1.35 var(--sw-font-display);
+  font: 650 var(--sw-type-base) / 1.35 var(--sw-font-display);
 }
 
 .sw-engine-lanes > li > p {

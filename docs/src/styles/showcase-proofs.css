@@ -1,9 +1,4 @@
-/* Route-scoped styles for the capability showcase routes:
-   /showcases/database (.sw-dbx-*) and /showcases/collaboration (.sw-clb-*),
-   sharing one page shell (.sw-proofs-page). All colors and spacing come from
-   the token sheet; no raw hex values outside token fallbacks. The page shell
-   uses theme-scoped --sw-* tokens; everything inside the demo stage uses the
-   always-dark --sw-demo-* tokens so the canvas never goes light. */
+/* Capability pages use site tokens for both the page and the live workbooks. */
 
 /* ---------- shared page shell ---------- */
 
@@ -71,8 +66,8 @@
 
 .sw-proofs-page__points ol {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 1.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
   margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
@@ -81,10 +76,8 @@
 .sw-proofs-page__points li {
   display: flex;
   gap: 0.85rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-demo-radius-2);
-  background: var(--sw-surface-1);
+  padding: 1rem 0;
+  border-top: 2px solid var(--sw-border);
 }
 
 .sw-proofs-page__points li > span {
@@ -715,10 +708,8 @@
   gap: var(--sw-demo-space-1);
   align-items: stretch;
   min-width: 0;
-  padding: var(--sw-demo-space-1);
-  border: 1px solid var(--sw-demo-border);
-  border-radius: var(--sw-demo-radius-2);
-  background: var(--sw-demo-deep);
+  border: 0;
+  background: transparent;
 }
 
 .sw-dbx__primary-actions {
@@ -920,17 +911,14 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  border: 1px solid var(--sw-demo-border);
-  border-radius: var(--sw-demo-radius-2);
-  overflow: hidden;
-  background: var(--sw-demo-border);
-  gap: 1px;
+  border-block: 1px solid var(--sw-demo-border);
+  gap: var(--sw-demo-space-3);
 }
 
 .sw-dbx__durability > div {
   min-width: 0;
   padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
-  background: var(--sw-demo-raised);
+  background: transparent;
 }
 
 .sw-dbx__durability dt,
