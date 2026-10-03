@@ -41,7 +41,7 @@ function SvelteShowcaseRoute() {
           detail: "Version conflicts and remount restoration remain inspectable on demand.",
         },
       ]}
-      prompt="Switch Offline → edit a ticket → see it enter the durable outbox → reconnect and watch dispatch acknowledge it."
+      prompt="Switch Offline, edit a ticket's Status, then inspect the durable outbox. Reconnect and watch dispatch acknowledge the edit."
       sourcePath="docs/src/showcases/SvelteShowcase.svelte"
       title="Dispatch keeps moving without signal."
     >

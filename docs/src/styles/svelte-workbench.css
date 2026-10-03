@@ -544,16 +544,6 @@
 
 /* ---- Small screens ------------------------------------------------------ */
 
-@media (max-width: 54rem) {
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-page__install {
-    grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.8fr);
-  }
-}
-
 @media (max-width: 48rem) {
   .sw-svw-chrome {
     grid-template-columns: minmax(0, 1fr) auto;
