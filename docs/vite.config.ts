@@ -113,6 +113,7 @@ export default defineConfig({
         // Test fixtures stay reachable for Playwright but out of search surfaces.
         { path: "/test/xlsx/", sitemap: { exclude: true } },
         { path: "/test/collaboration/", sitemap: { exclude: true } },
+        { path: "/test/formulas-engine/", sitemap: { exclude: true } },
         { path: "/test/framework-lifecycle/react/", sitemap: { exclude: true } },
         { path: "/test/framework-lifecycle/vue/", sitemap: { exclude: true } },
         { path: "/test/framework-lifecycle/svelte/", sitemap: { exclude: true } },

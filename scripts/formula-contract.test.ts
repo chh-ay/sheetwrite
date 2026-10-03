@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { extractAssistSpellings, validateFormulaContractRepository } from "./formula-contract.js";
+import { renderFormulaFunctionContract } from "./formula-docs.js";
 
 const ROOT = resolve(import.meta.dir, "..");
 const INVENTORY = JSON.parse(
@@ -13,6 +14,7 @@ interface MutableFunction {
   aliases: string[];
   family: string;
   contractStatus: string;
+  builds: string[];
   signature: string;
   semantics: string;
   dialects: string;
@@ -81,6 +83,22 @@ const MUTATIONS: MutationCase[] = [
     },
     expectedIssue: "string does not match ^(packages|test|scripts)/",
   },
+  {
+    name: "rejects an unrecognized engine build",
+    mutate: (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
+      if (formula) formula.builds = ["@sheetwrite/unknown"];
+    },
+    expectedIssue: "value is outside the closed enum",
+  },
+  {
+    name: "rejects moving an optional distribution into the default build",
+    mutate: (contract) => {
+      const formula = contract.functions.find((entry) => entry.canonical === "NORM.DIST");
+      if (formula) formula.builds.push("@sheetwrite/wasm");
+    },
+    expectedIssue: "parser/inventory drift: missing NORM.DIST",
+  },
 ];
 
 describe("formula capability contract", () => {
@@ -88,12 +106,24 @@ describe("formula capability contract", () => {
     const result = await validateFormulaContractRepository(ROOT);
     expect(result.issues).toEqual([]);
     expect(result.summary).toEqual({
-      functions: 154,
+      functions: 208,
       requiredSupported: 100,
       unsupportedCategories: 7,
       parserSpellings: 156,
       assistSpellings: 156,
+      formulasSpellings: 211,
     });
+  });
+
+  test("publishes default and optional package availability in generated function rows", () => {
+    const document = renderFormulaFunctionContract(INVENTORY);
+    const rows = document.split("\n");
+    const defaultRow = rows.find((row) => row.startsWith("| `SUM` |"));
+    const optionalRow = rows.find((row) => row.startsWith("| `NORM.DIST` |"));
+    expect(defaultRow).toContain("`@sheetwrite/wasm`, `@sheetwrite/formulas`");
+    expect(optionalRow).toContain("`@sheetwrite/formulas`");
+    expect(optionalRow).not.toContain("@sheetwrite/wasm");
+    expect(optionalRow).toContain("optional analysis");
   });
 
   test("extracts only literal assist registry entries", () => {
@@ -120,6 +150,30 @@ describe("formula capability contract", () => {
       mutation.mutate(candidate);
       const result = await validateFormulaContractRepository(ROOT, candidate);
       expect(result.issues.some((issue) => issue.includes(mutation.expectedIssue))).toBe(true);
+    });
+  }
+
+  // Engine selection is process-global; isolation protects both initialization
+  // paths from whichever package another test initialized first.
+  for (const build of ["@sheetwrite/wasm", "@sheetwrite/formulas"]) {
+    test(`evaluates distributions and gates autocomplete with ${build}`, async () => {
+      const probe = Bun.spawn(
+        [
+          process.execPath,
+          "--preload",
+          resolve(ROOT, "test-setup.ts"),
+          resolve(ROOT, "scripts/formula-contract-probe.ts"),
+          build,
+        ],
+        { cwd: ROOT, stdout: "pipe", stderr: "pipe" },
+      );
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(probe.stdout).text(),
+        new Response(probe.stderr).text(),
+        probe.exited,
+      ]);
+      expect(exitCode, `${stdout}\n${stderr}`).toBe(0);
+      expect(stdout).toContain(`${build}: distribution evaluation and assist contract passed`);
     });
   }
 });

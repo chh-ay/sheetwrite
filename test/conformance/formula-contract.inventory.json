@@ -1458,6 +1458,698 @@
         }
       ],
       "returns": "scalar"
+    },
+    "norm-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "norm-inv": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "norm-s-dist": {
+      "arguments": [
+        {
+          "name": "z",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "t-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "distribution-tail": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "distribution-inverse": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "f-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom2",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "f-tail": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom2",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "f-inverse": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom1",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "degreesFreedom2",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "binom-dist": {
+      "arguments": [
+        {
+          "name": "successes",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "trials",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "poisson-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "expon-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "gamma-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "gamma-inverse": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "beta-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lower",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "upper",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "beta-inverse": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lower",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "upper",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "lognorm-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "lognorm-inverse": {
+      "arguments": [
+        {
+          "name": "probability",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "weibull-dist": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "beta",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cumulative",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "confidence": {
+      "arguments": [
+        {
+          "name": "alpha",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "size",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "standardize": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mean",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "standardDeviation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "trim-mean": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "percent",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "percent-rank": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "significance",
+          "required": false,
+          "default": 3,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "known-y-x": {
+      "arguments": [
+        {
+          "name": "knownYs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownXs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "forecast": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownYs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownXs",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -2036,6 +2728,87 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-distributions": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "contextual",
+        "array": "contextual",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "bounded",
+        "iteration": {
+          "kind": "function-defined",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "analysis-descriptive": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "ignored",
+        "text": "ignored-in-ranges",
+        "boolean": "ignored-in-ranges",
+        "error": "propagate"
+      },
+      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
+      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": { "kind": "none", "maximum": null }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -2045,6 +2818,24 @@
       "openFormula": "unverified",
       "divergences": [
         "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
+      ]
+    },
+    "analysis-distributions": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Scalar binary64 evaluation, not array broadcasting or blanket spreadsheet parity. Domain validation and finite numerical convergence may return #NUM!."
+      ]
+    },
+    "analysis-descriptive": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits."
       ]
     }
   },
@@ -2072,6 +2863,33 @@
       "evaluator": { "status": "declared", "paths": [] },
       "assist": { "status": "missing", "paths": ["packages/core/src/formula-assist.ts"] },
       "evidence": { "status": "registration-tested", "paths": ["scripts/formula-contract.test.ts"] }
+    },
+    "analysis-distributions": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/distributions.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-descriptive": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/descriptive.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
     }
   },
   "unsupportedCategories": [
@@ -2191,6 +3009,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2202,6 +3021,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2213,6 +3033,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2224,6 +3045,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2235,6 +3057,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2246,6 +3069,7 @@
       "semantics": "lazy-control",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2257,6 +3081,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2268,6 +3093,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2279,6 +3105,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2290,6 +3117,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2301,6 +3129,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "parser-assisted-evaluator-declared",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2312,6 +3141,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2323,6 +3153,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2334,6 +3165,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2345,6 +3177,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2356,6 +3189,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2367,6 +3201,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2378,6 +3213,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2389,6 +3225,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2400,6 +3237,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2411,6 +3249,7 @@
       "semantics": "lazy-control",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2422,6 +3261,7 @@
       "semantics": "lazy-control",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2433,6 +3273,7 @@
       "semantics": "lazy-control",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2444,6 +3285,7 @@
       "semantics": "lazy-control",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2455,6 +3297,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2466,6 +3309,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2477,6 +3321,7 @@
       "semantics": "logical",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2488,6 +3333,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2499,6 +3345,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2510,6 +3357,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2521,6 +3369,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2532,6 +3381,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2543,6 +3393,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2554,6 +3405,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2565,6 +3417,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2576,6 +3429,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2587,6 +3441,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2598,6 +3453,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2609,6 +3465,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2620,6 +3477,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2631,6 +3489,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2642,6 +3501,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2653,6 +3513,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2664,6 +3525,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2675,6 +3537,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2686,6 +3549,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2697,6 +3561,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2708,6 +3573,7 @@
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2719,6 +3585,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2730,6 +3597,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2741,6 +3609,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2752,6 +3621,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2763,6 +3633,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2774,6 +3645,7 @@
       "semantics": "volatile-date",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2785,6 +3657,7 @@
       "semantics": "volatile-date",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2796,6 +3669,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2807,6 +3681,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2818,6 +3693,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2829,6 +3705,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2840,6 +3717,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2851,6 +3729,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2862,6 +3741,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2873,6 +3753,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2884,6 +3765,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2895,6 +3777,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2906,6 +3789,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2917,6 +3801,7 @@
       "semantics": "information",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2928,6 +3813,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2939,6 +3825,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2950,6 +3837,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2961,6 +3849,7 @@
       "semantics": "let-binding",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2972,6 +3861,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2983,6 +3873,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -2994,6 +3885,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3005,6 +3897,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3016,6 +3909,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3027,6 +3921,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3038,6 +3933,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3049,6 +3945,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3060,6 +3957,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3071,6 +3969,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3082,6 +3981,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3093,6 +3993,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3104,6 +4005,7 @@
       "semantics": "scalar",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3115,6 +4017,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3126,6 +4029,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3137,6 +4041,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3148,6 +4053,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3159,6 +4065,7 @@
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3170,6 +4077,7 @@
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3181,6 +4089,7 @@
       "semantics": "text-sensitive",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3192,6 +4101,7 @@
       "semantics": "text-search",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3203,6 +4113,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3214,6 +4125,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3225,6 +4137,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3236,6 +4149,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3247,6 +4161,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3258,6 +4173,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3269,6 +4185,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3280,6 +4197,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3291,6 +4209,7 @@
       "semantics": "text",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3302,6 +4221,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3313,6 +4233,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3324,6 +4245,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3335,6 +4257,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3346,6 +4269,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3357,6 +4281,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3368,6 +4293,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3379,6 +4305,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3390,6 +4317,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3401,6 +4329,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3412,6 +4341,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3423,6 +4353,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3434,6 +4365,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3445,6 +4377,7 @@
       "semantics": "date-time",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3456,6 +4389,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3467,6 +4401,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3478,6 +4413,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3489,6 +4425,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3500,6 +4437,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3511,6 +4449,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3522,6 +4461,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3533,6 +4473,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3544,6 +4485,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3555,6 +4497,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3566,6 +4509,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3577,6 +4521,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3588,6 +4533,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3599,6 +4545,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3610,6 +4557,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3621,6 +4569,7 @@
       "semantics": "aggregate",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3632,6 +4581,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3643,6 +4593,7 @@
       "semantics": "criteria",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3654,6 +4605,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3665,6 +4617,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3676,6 +4629,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3687,6 +4641,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3698,6 +4653,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3709,6 +4665,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3720,6 +4677,7 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3731,6 +4689,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3742,6 +4701,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3753,6 +4713,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3764,6 +4725,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3775,6 +4737,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3786,6 +4749,7 @@
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3797,6 +4761,7 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3808,6 +4773,7 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3819,6 +4785,7 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3830,6 +4797,7 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3841,6 +4809,7 @@
       "semantics": "financial-iterative",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3852,6 +4821,7 @@
       "semantics": "financial-iterative",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3863,6 +4833,7 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
     {
@@ -3874,7 +4845,656 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
+    },
+    {
+      "canonical": "NORM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "norm-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORM.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "norm-inv",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORM.S.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "norm-s-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NORM.S.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.DIST.2T",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.DIST.RT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "T.INV.2T",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHISQ.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "t-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHISQ.DIST.RT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHISQ.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CHISQ.INV.RT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "distribution-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.DIST.RT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-tail",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "F.INV.RT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "f-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BINOM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "binom-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "POISSON.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "poisson-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "EXPON.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "expon-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMA",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMALN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMA.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "gamma-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAMMA.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "gamma-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BETA.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "beta-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BETA.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "beta-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LOGNORM.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "lognorm-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LOGNORM.INV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "lognorm-inverse",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "WEIBULL.DIST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "weibull-dist",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CONFIDENCE.NORM",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "confidence",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CONFIDENCE.T",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "confidence",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "STANDARDIZE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "standardize",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FISHER",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FISHERINV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PHI",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GAUSS",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-distributions",
+      "dialects": "analysis-distributions",
+      "implementation": "analysis-distributions",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AVEDEV",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DEVSQ",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "HARMEAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "KURT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SKEW",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SKEW.P",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TRIMMEAN",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "trim-mean",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTILE.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "QUARTILE.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTRANK.INC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percent-rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTRANK.EXC",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percent-rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RANK.AVG",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "rank",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PEARSON",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RSQ",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SLOPE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "INTERCEPT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "STEYX",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "known-y-x",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FORECAST.LINEAR",
+      "aliases": ["FORECAST"],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "forecast",
+      "semantics": "analysis-descriptive",
+      "dialects": "analysis-descriptive",
+      "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
     }
   ],
   "operators": [

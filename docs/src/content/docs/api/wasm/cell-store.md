@@ -1465,6 +1465,6 @@ class CellStore {
 <p class="api-consumers-label">Public exports naming <code>CellStore</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

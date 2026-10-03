@@ -1,8 +1,9 @@
-import { type CellSnapshot, CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
+import type { CellSnapshot, RangeSnapshot } from "@sheetwrite/wasm";
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
+import { getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
   cloneCellHyperlink,
@@ -378,7 +379,7 @@ export class StoreDataEngine {
     );
     this.workbook = workbook;
     this.storageOptions = options;
-    this.wasm = new CellStore() as RecomputingCellStore;
+    this.wasm = new (getEngine().CellStore)() as RecomputingCellStore;
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
