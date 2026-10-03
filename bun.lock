@@ -9,6 +9,8 @@
         "@changesets/cli": "3.0.3",
         "@happy-dom/global-registrator": "^20.14.5",
         "@playwright/test": "^1.63.0",
+        "@sheetwrite/formulas": "workspace:*",
+        "@sheetwrite/wasm": "workspace:*",
         "@types/bun": "^1.4.2",
         "@types/node": "^26.6.1",
         "@types/react": "^19.3.0",
@@ -47,6 +49,7 @@
         "@fontsource-variable/space-grotesk": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
         "@sheetwrite/core": "workspace:*",
+        "@sheetwrite/formulas": "workspace:*",
         "@sheetwrite/react": "workspace:*",
         "@sheetwrite/svelte": "workspace:*",
         "@sheetwrite/vue": "workspace:*",
@@ -100,6 +103,10 @@
         "@sheetwrite/wasm": "workspace:*",
         "fflate": "0.8.3",
       },
+    },
+    "packages/formulas": {
+      "name": "@sheetwrite/formulas",
+      "version": "0.4.0",
     },
     "packages/react": {
       "name": "@sheetwrite/react",
@@ -494,6 +501,8 @@
     "@sheetwrite/core": ["@sheetwrite/core@workspace:packages/core"],
 
     "@sheetwrite/docs-start": ["@sheetwrite/docs-start@workspace:docs"],
+
+    "@sheetwrite/formulas": ["@sheetwrite/formulas@workspace:packages/formulas"],
 
     "@sheetwrite/react": ["@sheetwrite/react@workspace:packages/react"],
 

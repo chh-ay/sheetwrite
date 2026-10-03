@@ -919,8 +919,17 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
   return { corpus, manifest };
 }
 
+/**
+ * The compatibility test set runs through the default engine, so it reads only the
+ * functions in the `@sheetwrite/wasm` build. Rust tests in the family files cover the
+ * functions that only `@sheetwrite/formulas` has.
+ */
 export async function readFormulaInventory(path = INVENTORY_PATH): Promise<FormulaInventory> {
-  return JSON.parse(await readFile(path, "utf8")) as FormulaInventory;
+  const inventory = JSON.parse(await readFile(path, "utf8")) as FormulaInventory;
+  return {
+    ...inventory,
+    functions: inventory.functions.filter((entry) => entry.builds.includes("@sheetwrite/wasm")),
+  };
 }
 
 export async function readConformanceManifest(path = MANIFEST_PATH): Promise<ConformanceManifest> {

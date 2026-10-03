@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,7 @@ const REPOSITORY_ROOT = resolve(HERE, "..");
 const INVENTORY_PATH = "test/conformance/formula-contract.inventory.json";
 const SCHEMA_PATH = "test/conformance/formula-contract.schema.json";
 const ASSIST_PATH = "packages/core/src/formula-assist.ts";
+const ANALYSIS_PATH = "packages/wasm/src/eval/analysis";
 const REQUIRED_TARGET_HASH = "3efef696839478b92b59a004537f9ede7fa803f9749042bb830b664086495e80";
 const UNSUPPORTED_CATEGORY_HASH =
   "eef794e222795f2122b414d5ee9efd09802cf92ef372ae9fa12aac29fa06eb5b";
@@ -20,6 +21,7 @@ export interface FormulaContractSummary {
   unsupportedCategories: number;
   parserSpellings: number;
   assistSpellings: number;
+  formulasSpellings: number;
 }
 
 export interface FormulaContractValidation {
@@ -313,6 +315,13 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
     if (Array.isArray(entry.aliases) && entry.aliases.includes(canonical)) {
       issues.push(`${path}.aliases: canonical spelling cannot repeat as an alias`);
     }
+    if (
+      Array.isArray(entry.builds) &&
+      entry.builds.includes("@sheetwrite/wasm") &&
+      !entry.builds.includes("@sheetwrite/formulas")
+    ) {
+      issues.push(`${path}.builds: the full build must include every default function`);
+    }
     const references: Array<[string, JsonObject]> = [
       ["family", families],
       ["signature", signatures],
@@ -369,6 +378,7 @@ function expectedAssistNames(inventory: JsonObject, issues: string[]): Set<strin
   const implementations = stringMap(inventory.implementationProfiles);
   const functions = Array.isArray(inventory.functions) ? inventory.functions.filter(isObject) : [];
   for (const [index, entry] of functions.entries()) {
+    if (!Array.isArray(entry.builds) || !entry.builds.includes("@sheetwrite/wasm")) continue;
     const profile = objectProperty(implementations, entry.implementation);
     const assist = profile ? objectProperty(profile, "assist") : undefined;
     if (assist?.status === "implemented") {
@@ -380,11 +390,12 @@ function expectedAssistNames(inventory: JsonObject, issues: string[]): Set<strin
   return expected;
 }
 
-function inventoryParserNames(inventory: JsonObject): Set<string> {
+function inventoryParserNames(inventory: JsonObject, build = "@sheetwrite/wasm"): Set<string> {
   const names = new Set<string>();
   if (!Array.isArray(inventory.functions)) return names;
   for (const entry of inventory.functions) {
     if (!isObject(entry)) continue;
+    if (!Array.isArray(entry.builds) || !entry.builds.includes(build)) continue;
     for (const spelling of namesFromFunction(entry)) names.add(spelling);
   }
   return names;
@@ -455,6 +466,48 @@ function validatePortableFormulaSemantics(inventory: JsonObject, issues: string[
   }
 }
 
+interface AnalysisSources {
+  readonly registry: string;
+  readonly families: ReadonlyMap<string, string>;
+}
+
+async function readAnalysisSources(root: string): Promise<AnalysisSources> {
+  const directory = resolve(root, ANALYSIS_PATH);
+  const files = (await readdir(directory)).filter((file) => file.endsWith(".rs")).sort();
+  const sources = await Promise.all(
+    files.map(async (file) => [file, await readFile(resolve(directory, file), "utf8")] as const),
+  );
+  const families = new Map<string, string>();
+  let registry = "";
+  for (const [file, source] of sources) {
+    if (file === "mod.rs") registry = source;
+    else families.set(file.slice(0, -".rs".length), source);
+  }
+  return { registry, families };
+}
+
+/** Each `analysis/<family>.rs` must own one `NAMES` table and be registered in `mod.rs`. */
+function extractAnalysisSpellings(sources: AnalysisSources, issues: string[]): string[] {
+  const spellings: string[] = [];
+  if (sources.families.size === 0) issues.push("analysis family registry not found");
+  for (const [family, source] of sources.families) {
+    const declared = new RegExp(`^mod ${family};$`, "m").test(sources.registry);
+    if (!declared || !sources.registry.includes(`names: ${family}::NAMES,`)) {
+      issues.push(`analysis family ${family} is not registered in ${ANALYSIS_PATH}/mod.rs`);
+    }
+    const block = source.match(
+      /(?:pub(?:\([^)]*\))?\s+)?(?:const|static)\s+NAMES\s*:[^=]+=\s*&?\[([\s\S]*?)\];/,
+    );
+    const names = block?.[1]?.match(/"[A-Z][A-Z0-9.]*"/g)?.map((name) => name.slice(1, -1)) ?? [];
+    if (names.length === 0) issues.push(`analysis family ${family} has no NAMES table`);
+    spellings.push(...names);
+  }
+  if (new Set(spellings).size !== spellings.length) {
+    issues.push("analysis family registries contain duplicate spellings");
+  }
+  return spellings;
+}
+
 export function validateFormulaContractData(inventory: unknown, schema: unknown): string[] {
   const issues = [
     ...validateClosedSchema(schema),
@@ -469,12 +522,14 @@ export async function validateFormulaContractRepository(
   root = REPOSITORY_ROOT,
   inventoryOverride?: unknown,
 ): Promise<FormulaContractValidation> {
-  const [schemaSource, inventorySource, parserSource, assistSource] = await Promise.all([
-    readFile(resolve(root, SCHEMA_PATH), "utf8"),
-    inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
-    readFile(resolve(root, "packages/wasm/src/calc.rs"), "utf8"),
-    readFile(resolve(root, ASSIST_PATH), "utf8"),
-  ]);
+  const [schemaSource, inventorySource, parserSource, assistSource, analysisSources] =
+    await Promise.all([
+      readFile(resolve(root, SCHEMA_PATH), "utf8"),
+      inventoryOverride === undefined ? readFile(resolve(root, INVENTORY_PATH), "utf8") : undefined,
+      readFile(resolve(root, "packages/wasm/src/calc.rs"), "utf8"),
+      readFile(resolve(root, ASSIST_PATH), "utf8"),
+      readAnalysisSources(root),
+    ]);
   let schema: unknown;
   let inventory: unknown = inventoryOverride;
   const issues: string[] = [];
@@ -489,6 +544,7 @@ export async function validateFormulaContractRepository(
         unsupportedCategories: 0,
         parserSpellings: 0,
         assistSpellings: 0,
+        formulasSpellings: 0,
       },
     };
   }
@@ -504,6 +560,7 @@ export async function validateFormulaContractRepository(
           unsupportedCategories: 0,
           parserSpellings: 0,
           assistSpellings: 0,
+          formulasSpellings: 0,
         },
       };
     }
@@ -528,6 +585,7 @@ export async function validateFormulaContractRepository(
   if (new Set(assistSpellings).size !== assistSpellings.length) {
     issues.push("assist drift extraction found duplicate spellings");
   }
+  const extensionSpellings = extractAnalysisSpellings(analysisSources, issues);
   if (isObject(inventory)) {
     compareNameSets(
       new Set(parserSpellings),
@@ -539,6 +597,12 @@ export async function validateFormulaContractRepository(
       new Set(assistSpellings),
       expectedAssistNames(inventory, issues),
       "assist/inventory drift",
+      issues,
+    );
+    compareNameSets(
+      new Set([...parserSpellings, ...extensionSpellings]),
+      inventoryParserNames(inventory, "@sheetwrite/formulas"),
+      "formulas/inventory drift",
       issues,
     );
     await validateEvidencePaths(root, inventory, issues);
@@ -561,6 +625,7 @@ export async function validateFormulaContractRepository(
       unsupportedCategories: unsupported.length,
       parserSpellings: new Set(parserSpellings).size,
       assistSpellings: new Set(assistSpellings).size,
+      formulasSpellings: new Set([...parserSpellings, ...extensionSpellings]).size,
     },
   };
 }

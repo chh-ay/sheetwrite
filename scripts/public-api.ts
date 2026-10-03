@@ -260,7 +260,11 @@ function classifyEntry(
 ): ApiEntryClassification | undefined {
   if (kind === "asset") return "asset";
   if (packageName === "@sheetwrite/core" && subpath === "./testing") return "test-only";
-  if (packageName === "@sheetwrite/wasm" && subpath === ".") return "internal";
+  if (
+    (packageName === "@sheetwrite/wasm" || packageName === "@sheetwrite/formulas") &&
+    subpath === "."
+  )
+    return "internal";
   if (SUPPORTED_PACKAGES[packageName] === true) return "supported";
   return undefined;
 }

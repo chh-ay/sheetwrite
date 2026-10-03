@@ -1,4 +1,3 @@
-import { isLoaded, load } from "@sheetwrite/wasm";
 import { colToA1 } from "./a1.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
@@ -23,6 +22,7 @@ import {
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
 import { EditController, type EditNavigate } from "./editor.js";
+import { isEngineLoaded as isLoaded, loadEngine, type SheetwriteEngine } from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
@@ -282,12 +282,16 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
-/** Load the WASM data engine once. Must be awaited before `createGrid`. */
+/**
+ * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
+ * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ */
 export async function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
+  engine?: SheetwriteEngine,
 ): Promise<void> {
   try {
-    await load(source);
+    await loadEngine(source, engine);
   } catch (error) {
     throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
   }

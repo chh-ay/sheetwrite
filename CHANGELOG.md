@@ -4,6 +4,7 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 
 - [`@sheetwrite/core`](packages/core/CHANGELOG.md)
 - [`@sheetwrite/wasm`](packages/wasm/CHANGELOG.md)
+- [`@sheetwrite/formulas`](packages/formulas/CHANGELOG.md)
 - [`@sheetwrite/xlsx`](packages/xlsx/CHANGELOG.md)
 - [`@sheetwrite/react`](packages/react/CHANGELOG.md)
 - [`@sheetwrite/vue`](packages/vue/CHANGELOG.md)
@@ -11,6 +12,9 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 
 ## Unreleased
 
+- Add `@sheetwrite/formulas`, an optional full formula engine with 36 statistical
+  distribution functions. Select it with `initSheetwrite(undefined, formulas)`.
+  The default `@sheetwrite/wasm` engine does not change.
 - Build the docs once in CI, test the packaged static site, then deploy that
   output to Vercel. Vercel no longer rebuilds packages or installs Rust tools.
 - Send IndexNow updates after a successful production deployment, not during
