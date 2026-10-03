@@ -434,10 +434,15 @@
     scroll-margin-top: calc(var(--sw-header-height) + var(--sw-sp-space-3));
   }
 
+  /* Side by side, the grid sets the row height; the panel scrolls inside it
+     instead of stretching the row and leaving blank space under the grid. */
   .sw-sp-instrument {
     display: flex;
     min-width: 0;
     flex-direction: column;
+    contain: size;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--sw-surface-2);
   }
 
@@ -1609,7 +1614,7 @@
     }
 
     .sw-sp-page {
-      width: calc(100% - var(--sw-sp-space-5));
+      width: calc(100% - var(--sw-sp-space-6));
       padding-block: var(--sw-sp-space-5) var(--sw-sp-space-7);
     }
 
@@ -1630,6 +1635,8 @@
     .sw-sp-instrument {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      contain: none;
+      overflow-y: visible;
     }
 
     .sw-sp-challenge {

@@ -171,14 +171,14 @@ export function createBusinessWorkbook(): Workbook {
         rowCount: BUSINESS_ROWS,
         columns: [
           { key: "po", header: "PO", width: 110, type: "text" },
-          { key: "supplier", header: "Supplier", width: 230, type: "text" },
-          { key: "category", header: "Category", width: 160, type: "text" },
+          { key: "supplier", header: "Supplier", width: 190, type: "text" },
+          { key: "category", header: "Category", width: 140, type: "text" },
           { key: "status", header: "Status", width: 140, type: "text" },
           { key: "qty", header: "Qty", width: 90, type: "number" },
           {
             key: "unitCost",
             header: "Unit cost",
-            width: 140,
+            width: 120,
             type: "currency",
             numberFormat: "$#,##0",
           },

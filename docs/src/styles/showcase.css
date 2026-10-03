@@ -1690,7 +1690,7 @@
 
   @media (max-width: 42rem) {
     .sw-showcase-page {
-      width: min(calc(100% - 1rem), 92rem);
+      width: min(calc(100% - 2rem), 92rem);
       padding-top: 3rem;
     }
 
