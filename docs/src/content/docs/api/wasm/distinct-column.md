@@ -9,7 +9,7 @@ Distinct-value scan result for one column: parallel kind/number/text
 arrays whose buffers are surrendered once through the `take*` accessors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L370"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L370</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L382"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L382</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

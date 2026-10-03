@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L448"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L448</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L460"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L460</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -57,6 +57,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-filter-rows"><code>cellstore_filterRows</code></a>
 <a href="#init-output-cellstore-filter-rows-multi"><code>cellstore_filterRowsMulti</code></a>
 <a href="#init-output-cellstore-formula-matrix-resource-stats"><code>cellstore_formulaMatrixResourceStats</code></a>
+<a href="#init-output-cellstore-formula-read-bands"><code>cellstore_formulaReadBands</code></a>
 <a href="#init-output-cellstore-formula-source"><code>cellstore_formulaSource</code></a>
 <a href="#init-output-cellstore-get-cell"><code>cellstore_getCell</code></a>
 <a href="#init-output-cellstore-get-window"><code>cellstore_getWindow</code></a>
@@ -151,7 +152,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>137</span>
+## Members <span class="api-count" data-pagefind-ignore>138</span>
 
 <div class="api-member-list">
 
@@ -556,6 +557,15 @@ readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number,
 
 ```ts generated
 readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-formula-read-bands" data-pagefind-weight="1">
+<summary><code>cellstore_formulaReadBands</code></summary>
+
+```ts generated
+readonly cellstore_formulaReadBands: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number];
 ```
 
 </details>
@@ -1574,6 +1584,15 @@ export interface InitOutput {
   ) => [number, number];
   readonly cellstore_formulaMatrixResourceStats: (
     a: number,
+  ) => [number, number];
+  readonly cellstore_formulaReadBands: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
   ) => [number, number];
   readonly cellstore_formulaSource: (
     a: number,

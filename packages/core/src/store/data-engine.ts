@@ -822,6 +822,28 @@ export class StoreDataEngine {
     return this.wasm.loadedSpans(this.handleOf(sheet), startRow, endRow, column);
   }
 
+  /**
+   * Same-sheet cells that the formulas of a window read, as flat
+   * `[rowStart, rowEnd, columnStart, columnEnd)` rectangles. The walk follows
+   * reads into the formula cells they reach and skips any read that does not
+   * fit the remaining `maxCells` budget.
+   */
+  formulaReadBands(
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+    maxCells: number,
+  ): Uint32Array {
+    return this.wasm.formulaReadBands(
+      this.handleOf(sheet),
+      startRow,
+      endRow,
+      Uint32Array.from(columns),
+      maxCells,
+    );
+  }
+
   canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
