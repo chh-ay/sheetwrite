@@ -1332,10 +1332,6 @@
   .sw-clb__clients {
     grid-template-columns: 1fr;
   }
-
-  .sw-clb__grid {
-    height: 15rem;
-  }
 }
 
 @media (max-width: 44rem) {

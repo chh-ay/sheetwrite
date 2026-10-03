@@ -257,13 +257,12 @@
   font-size: var(--sw-type-xs);
 }
 
+/* The lane is narrow; wrap the caption rather than cutting off "broadcast". */
 .sw-clb__direction i {
-  overflow: hidden;
   border-bottom: 1px solid var(--sw-demo-border-strong);
   font-style: normal;
+  line-height: 1.4;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sw-clb__decisions {
@@ -372,10 +371,6 @@
 
   .sw-clb__workbench {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-clb__grid {
-    height: calc(var(--sw-demo-space-4) * 15);
   }
 
   .sw-clb__sequence {

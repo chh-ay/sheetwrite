@@ -571,13 +571,20 @@
     text-overflow: ellipsis;
   }
 
+  /* Stacked on narrow screens: the grid keeps a fixed row and the rail shows
+     all of its panels below it, instead of a short inner scroll box. */
+  .sw-svw .sw-demo-main {
+    height: auto;
+  }
+
   .sw-svw .sw-demo-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(16rem, 1fr) minmax(0, 16rem);
+    grid-template-rows: 22rem auto;
   }
 
   .sw-svw-rail {
     display: flex;
+    overflow: visible;
     border-top: 1px solid var(--sw-demo-border);
     border-left: 0;
   }
