@@ -830,7 +830,7 @@
 }
 
 .sw-dbx__grid {
-  height: 22rem;
+  height: 18.5rem;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-demo-accent) 10%, transparent);
 }
 
@@ -1310,7 +1310,7 @@
   }
 
   .sw-dbx__grid {
-    height: 18rem;
+    height: 18.5rem;
   }
 
   .sw-dbx__journal {

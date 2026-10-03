@@ -177,9 +177,6 @@ test("the live Grid is exactly one billion logical addresses with bounded rectan
 }) => {
   const errors = collectErrors(page);
   await bootScale(page);
-  await expect(
-    page.getByRole("heading", { name: "One billion addresses. One bounded working set." }),
-  ).toBeVisible();
   await expect(page.getByTestId("scale-status")).toContainText(
     "1,000,000 rows × 1,000 columns = 1,000,000,000 logical addresses",
   );

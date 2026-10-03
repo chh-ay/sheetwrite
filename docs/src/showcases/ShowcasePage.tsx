@@ -39,7 +39,6 @@ export function ShowcasePage({
   );
   const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0]!;
   const nextItem = SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length]!;
-  const adapterLabel = active === "vanilla" ? "Core API" : `${activeItem.label} binding`;
 
   return (
     <div className="sw-showcase-frame">
@@ -51,20 +50,6 @@ export function ShowcasePage({
             <p className="sw-showcase-page__eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p>{description}</p>
-            <dl className="sw-showcase-page__specs">
-              <div>
-                <dt>Adapter</dt>
-                <dd>{adapterLabel}</dd>
-              </div>
-              <div>
-                <dt>Engine</dt>
-                <dd>Rust / WASM</dd>
-              </div>
-              <div>
-                <dt>Surface</dt>
-                <dd>Canvas</dd>
-              </div>
-            </dl>
           </div>
           <aside className="sw-showcase-page__install" aria-label={`${activeItem.label} setup`}>
             <div>

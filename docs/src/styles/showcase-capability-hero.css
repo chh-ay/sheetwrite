@@ -6,7 +6,7 @@
     align-items: start;
     width: 100%;
     margin-inline: auto;
-    padding-block: clamp(1.75rem, 4vw, 3rem) clamp(1.25rem, 2.5vw, 2rem);
+    padding-block: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2vw, 1.25rem);
   }
 
   .sw-capability-hero__eyebrow {
@@ -22,7 +22,7 @@
     margin: 0;
     color: var(--sw-fg-strong);
     font-family: var(--sw-font-display);
-    font-size: clamp(2rem, 3.7vw, 3.25rem);
+    font-size: clamp(1.9rem, 3vw, 2.6rem);
     font-weight: 700;
     line-height: 1.08;
     letter-spacing: -0.04em;
@@ -31,10 +31,10 @@
 
   .sw-capability-hero__lede {
     max-width: 44rem;
-    margin: 1rem 0 0;
+    margin: 0.75rem 0 0;
     color: var(--sw-fg-muted);
-    font-size: 1.02rem;
-    line-height: 1.6;
+    font-size: 1rem;
+    line-height: 1.55;
   }
 
   .sw-capability-hero__facts {
