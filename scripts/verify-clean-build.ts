@@ -15,6 +15,7 @@ interface PackageManifest {
 const GENERATED_OUTPUTS = [
   "packages/wasm/pkg",
   "packages/wasm/target",
+  "packages/formulas/pkg",
   "packages/core/dist",
   "packages/xlsx/dist",
   "packages/react/dist",
@@ -25,6 +26,7 @@ const GENERATED_OUTPUTS = [
 
 const RUNTIME_ENTRY_PATHS = [
   "./packages/wasm/loader-node.mjs",
+  "./packages/formulas/loader-node.mjs",
   "./packages/core/dist/index.js",
   "./packages/xlsx/dist/index.js",
   "./packages/react/dist/index.js",

@@ -113,6 +113,22 @@ const packageSpecs: PackageSpec[] = [
     ],
   },
   {
+    directory: "packages/formulas",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "loader.d.ts",
+      "loader.mjs",
+      "loader-browser.mjs",
+      "loader-node.mjs",
+      "loader-state.mjs",
+      "pkg/sheetwrite_wasm.d.ts",
+      "pkg/sheetwrite_wasm.js",
+      "pkg/sheetwrite_wasm_bg.wasm",
+      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+    ],
+  },
+  {
     directory: "packages/xlsx",
     requiredFiles: [
       "LICENSE",
@@ -334,6 +350,29 @@ async function assertTarball(
   }
 
   await assertWorkerBundle(packageRoot, packedManifest);
+  if (manifest.name === "@sheetwrite/formulas") {
+    await run(
+      [
+        "node",
+        "--input-type=module",
+        "-e",
+        `import { strict as assert } from "node:assert";
+         const engine = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "loader-node.mjs")).href)});
+         await engine.load();
+         assert.equal(engine.isLoaded(), true);
+         const store = new engine.CellStore();
+         try {
+           const sheet = store.addSheet(1, 1);
+           store.setFormula(sheet, 0, 0, "=NORM.DIST(0,0,1,TRUE)", 0);
+           store.recompute(sheet);
+           const cell = store.getCell(sheet, 0, 0);
+           try { assert.ok(Math.abs(cell.num - 0.5) < 1e-12); }
+           finally { cell.free(); }
+         } finally { store.free(); }`,
+      ],
+      packageRoot,
+    );
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {

@@ -22,14 +22,14 @@ Two kinds of change need one more command:
 | If you changed | Also run |
 |---|---|
 | Anything rendered in a browser | `bun run test:browser` (first time: `bun run browser:install`) |
-| Rust under `packages/wasm` | `cargo test`, from `packages/wasm` |
+| Rust under `packages/wasm` | `cargo test` and `cargo test --features analysis`, from `packages/wasm` |
 
 ## What `verify:ci` covers, and what it does not
 
 It is composed as `VERIFY_CI_NODES` in `scripts/workspace-tooling.ts` and runs, in
 order:
 
-1. Tooling contract tests, JavaScript dependency audit, `cargo test`, `cargo audit`
+1. Tooling contract tests, JavaScript dependency audit, `cargo test` for the default and `analysis` features, `cargo audit`
 2. Package builds
 3. Clean-export check, typechecks, lint, unit tests, example builds, Node ESM resolution
 4. Packed-consumer and bundler-consumer installs
@@ -44,7 +44,7 @@ evidence, not a guarantee.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,
-`test:rust` is `cargo test` in `packages/wasm`. To map an id to the exact command:
+`test:rust` is `cargo test` in `packages/wasm`, and `test:rust:analysis` adds `--features analysis`. To map an id to the exact command:
 
 ```sh
 bun scripts/workspace-tooling.ts verify-ci --dry-run

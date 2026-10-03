@@ -217,6 +217,7 @@ const xlsxCodecPackages: Record<string, true> = {
 };
 const packageDirectories = [
   "packages/wasm",
+  "packages/formulas",
   "packages/core",
   "packages/xlsx",
   "packages/react",

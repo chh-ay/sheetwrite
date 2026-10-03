@@ -134,8 +134,9 @@ jobs:
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
       - name: Unit and Rust tests
         run: |
-          bun test packages test/browser/canvas-assertions.test.ts scripts/public-api.test.ts scripts/conformance.test.ts scripts/docs.test.ts bench/test
+          bun test packages test/browser/canvas-assertions.test.ts scripts/public-api.test.ts scripts/conformance.test.ts scripts/docs.test.ts scripts/formula-contract.test.ts bench/test
           cargo test --manifest-path packages/wasm/Cargo.toml
+          cargo test --manifest-path packages/wasm/Cargo.toml --features analysis
       - name: Type checks and public API
         run: |
           bun run typecheck

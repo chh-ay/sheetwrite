@@ -59,6 +59,7 @@ export interface FormulaInventoryFunction {
   signature: string;
   semantics: string;
   contractStatus: "supported" | "required-supported";
+  builds: readonly ("@sheetwrite/wasm" | "@sheetwrite/formulas")[];
   [key: string]: unknown;
 }
 

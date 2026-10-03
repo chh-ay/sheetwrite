@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "d315f8e498b81020750d3b175854bd115ee392b65d31e9e61b1e512dd2a26b5e",
+  "sha256": "6a6d6761a54788ad499b1e181db1ba55a0756c414bb3500ce331c887bbd7664a",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -193,6 +193,7 @@
         "SheetNameValidationResult",
         "SheetSnapshot",
         "SheetVisibility",
+        "SheetwriteEngine",
         "SheetwriteError",
         "SheetwriteErrorCode",
         "SheetwriteErrorContext",
@@ -421,6 +422,25 @@
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
       "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+    },
+    {
+      "package": "@sheetwrite/formulas",
+      "entryPoint": ".",
+      "exports": [
+        "CellOut",
+        "CellSnapshot",
+        "CellStore",
+        "DistinctColumn",
+        "InitInput",
+        "InitOutput",
+        "RangeSnapshot",
+        "SourceSnapshot",
+        "SyncInitInput",
+        "WindowView",
+        "initSync",
+        "isLoaded",
+        "load"
+      ]
     },
     {
       "package": "@sheetwrite/react",
