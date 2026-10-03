@@ -225,10 +225,10 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
     const headerRow: RowData = {
       period: "Period",
       region: "Region",
-      actual: "Actual",
-      forecast: "Forecast",
-      variance: "Variance",
-      attainment: "Attainment",
+      actual: { kind: "literal", value: "Actual" },
+      forecast: { kind: "literal", value: "Forecast" },
+      variance: { kind: "literal", value: "Variance" },
+      attainment: { kind: "literal", value: "Attainment" },
     };
     if (!columns) return headerRow;
     const keys = new Set(columns.flatMap((band) => band.keys));

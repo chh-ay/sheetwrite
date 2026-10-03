@@ -251,6 +251,14 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
 }) => {
   const errors = collectErrors(page);
   await bootInterop(page);
+  await expect(page.locator(".sheetwrite-shell-namebox")).toHaveValue("A1");
+  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("OP-1041");
+  await page.fill(".sheetwrite-shell-namebox", "B5");
+  await page.press(".sheetwrite-shell-namebox", "Enter");
+  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue(
+    '=HYPERLINK("https://evil.example","Q3 total")',
+  );
+  await expect(page.locator(".sw-si-safety-note")).toContainText("not a formula");
 
   // Edit through the real shell chrome: name box jump, formula-bar commit.
   await page.fill(".sheetwrite-shell-namebox", "B2");
