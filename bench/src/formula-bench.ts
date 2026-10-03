@@ -53,6 +53,10 @@ const TIMING_REGRESSION_FLOOR_MS = 0.1;
 const STORE_MEMORY_SCHEMA = 3;
 export const PRELIMINARY_BLOCKER =
   "preliminary capture has no schema-v2 baseline with attributed per-workload allocation samples";
+export const OUTPUT_CAPTURE_BLOCKER =
+  "capture written outside the tracked results file has no baseline comparison";
+/** A gated capture reads the tracked baseline; the other kinds record a blocked gate instead. */
+export type FormulaCaptureKind = "gated" | "preliminary" | "output";
 export const FORMULA_GATE_TOLERANCE =
   "exact matrix/output/provenance; raw summaries derived; timing median/p95 <= max(baseline*1.25, baseline+0.1ms); no attributed allocation or aggregate WASM regression";
 export const TIMING_METHOD =
@@ -200,6 +204,7 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
   }
   const large = smoke ? 1_000 : 100_000;
   const range = smoke ? 10_000 : 100_000;
+  const lookupFormulas = smoke ? 500 : 1_000;
   keys.push(
     formulaWorkloadKey({ id: "wide-fan-out-edit", size: 1_000 }),
     ...(smoke ? [] : [formulaWorkloadKey({ id: "wide-fan-out-edit", size: large })]),
@@ -211,19 +216,28 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "scalar-edit-affects-1", size: 1 }),
     formulaWorkloadKey({ id: "scalar-edit-affects-1000", size: 1_000 }),
     formulaWorkloadKey({ id: "scalar-edit-affects-100000", size: large }),
+    formulaWorkloadKey({ id: "formula-constant-edit", size: large }),
     formulaWorkloadKey({ id: "topology-remove-add", size: smoke ? 1_000 : 10_000 }),
     formulaWorkloadKey({ id: "cycles", size: 1_000 }),
     formulaWorkloadKey({ id: "removed-sheet-ref", size: 1_000 }),
     formulaWorkloadKey({ id: "error-propagation", size: 1_000 }),
     formulaWorkloadKey({ id: "criteria-range-edit", size: range }),
     formulaWorkloadKey({ id: "lookup-range-edit", size: range }),
+    ...LOOKUP_VARIANTS.flatMap((variant) => [
+      formulaWorkloadKey({ id: variant.id, size: lookupFormulas }),
+      formulaWorkloadKey({ id: `${variant.id}${LOOKUP_EDIT_SUFFIX}`, size: lookupFormulas }),
+    ]),
     formulaWorkloadKey({ id: "spill-filter-resize", size: range }),
     formulaWorkloadKey({ id: "sumproduct-vector-edit", size: range }),
     formulaWorkloadKey({ id: "sumproduct-matrix-edit", size: range }),
     formulaWorkloadKey({ id: "criteria-multi-range-edit", size: range }),
+    formulaWorkloadKey({ id: "sum-multi-range", size: range }),
+    formulaWorkloadKey({ id: "sumifs-3-criteria", size: range }),
+    formulaWorkloadKey({ id: "countif-100k", size: range }),
     formulaWorkloadKey({ id: "unicode-text-date-edit", size: 1_000 }),
     formulaWorkloadKey({ id: "percentile-covariance", size: range }),
     formulaWorkloadKey({ id: "let-reuse-edit", size: range }),
+    formulaWorkloadKey({ id: "let-repeat", size: range }),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
   );
@@ -232,6 +246,23 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
 }
 
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
+  "formula-constant-edit",
+  "vlookup-many",
+  "vlookup-many-edit",
+  "vlookup-many-sorted",
+  "vlookup-many-sorted-edit",
+  "xlookup-many",
+  "xlookup-many-edit",
+  "xlookup-many-sorted",
+  "xlookup-many-sorted-edit",
+  "text-lookup-many",
+  "text-lookup-many-edit",
+  "text-lookup-many-sorted",
+  "text-lookup-many-sorted-edit",
+  "sum-multi-range",
+  "sumifs-3-criteria",
+  "countif-100k",
+  "let-repeat",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -267,6 +298,8 @@ function diamondOutput(levels: number): number {
 }
 
 export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
+  const lookup = lookupVariantOutput(id);
+  if (lookup !== undefined) return lookup;
   switch (id) {
     case "independent-parse-load":
     case "independent-first-recompute":
@@ -279,6 +312,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return size + 10;
     case "scalar-edit-affects-0":
       return size + 1;
+    case "formula-constant-edit":
+      return `${CONSTANT_EDIT_FILL + CONSTANT_EDIT_EDITED_BASE}:${size + CONSTANT_EDIT_FILL}`;
     case "diamond-edit":
       return diamondOutput(size);
     case "shared-range-edit":
@@ -307,12 +342,21 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return size * 2 + 4;
     case "criteria-multi-range-edit":
       return size * 0.75 - 1;
+    case "sum-multi-range":
+      // Compared as text: the relative tolerance would hide a small error in a 5-billion total.
+      return `${(size * (size - 1)) / 2 + size * SUM_MULTI_RANGE_FILL}`;
+    case "sumifs-3-criteria":
+      return sumifsCriteriaTotal(size);
+    case "countif-100k":
+      return size - Math.floor(size / COUNTIF_MATCH_SHARE);
     case "unicode-text-date-edit":
       return 173_864;
     case "percentile-covariance":
       return (size * size - 1) / 6 + size * 0.9 + 0.1;
     case "let-reuse-edit":
       return 3 * (size + 1);
+    case "let-repeat":
+      return `${LET_REPEAT_FACTOR * LOOKUP_RESULT_FACTOR * (size - 1)}:${size - 1}`;
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -522,6 +566,43 @@ function fanOutEditFixture(count: number, unrelated = false): TimedFixture {
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+  };
+}
+
+/** Column B holds a fill value; the timed edit rewrites the literal of one formula only. */
+const CONSTANT_EDIT_FILL = 10;
+const CONSTANT_EDIT_BASE = 1;
+const CONSTANT_EDIT_EDITED_BASE = 2;
+
+function constantEditFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, () => CONSTANT_EDIT_FILL),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 2, `=A${row + 1}+B${row + 1}+${CONSTANT_EDIT_BASE}`, 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setFormula(sheet, 0, 2, `=A1+B1+${CONSTANT_EDIT_EDITED_BASE}`, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
   };
 }
@@ -754,6 +835,200 @@ function lookupRangeFixture(count: number): TimedFixture {
   };
 }
 
+/** Every lookup scenario pairs ten ascending table rows with each lookup formula. */
+const LOOKUP_TABLE_ROWS_PER_FORMULA = 10;
+const LOOKUP_RESULT_FACTOR = 2;
+const NUMERIC_LOOKUP_INITIAL_KEY = 5;
+const NUMERIC_LOOKUP_EDITED_KEY = 7;
+const NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY = 5.5;
+const NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY = 7.5;
+const TEXT_LOOKUP_KEY_PREFIX = "ITEM";
+const TEXT_LOOKUP_QUERY_PREFIX = "ItEm";
+const TEXT_LOOKUP_KEY_PADDING = 6;
+const TEXT_LOOKUP_INITIAL_ROW = 12;
+const TEXT_LOOKUP_EDITED_ROW = 37;
+const TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW = 11;
+const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
+
+/** Ascending numeric key column plus a result column that scales with the key. */
+function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, tableRows);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(tableRows, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    0,
+  );
+  return { store, sheet };
+}
+
+/** Zero-padded text keys stay ascending under the case-insensitive lookup comparison. */
+function textLookupKeyAt(row: number): string {
+  return `${TEXT_LOOKUP_KEY_PREFIX}${String(row).padStart(TEXT_LOOKUP_KEY_PADDING, "0")}`;
+}
+
+/** The query key differs from the stored key only by letter case. */
+function textLookupQueryKey(row: number): string {
+  return `${TEXT_LOOKUP_QUERY_PREFIX}${String(row).padStart(TEXT_LOOKUP_KEY_PADDING, "0")}`;
+}
+
+/** Sorts between the stored keys of `row` and `row + 1`, so only approximate matching can land. */
+function textLookupBetweenQueryKey(row: number): string {
+  return `${textLookupQueryKey(row)}5`;
+}
+
+/** Ascending text key column plus the same result column as the numeric table. */
+function textLookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, tableRows);
+  for (let row = 0; row < tableRows; row++) {
+    store.setString(sheet, row, 0, textLookupKeyAt(row), 0);
+  }
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    0,
+  );
+  return { store, sheet };
+}
+
+/** The shared key cell takes a number for numeric tables and text for text tables. */
+function writeLookupKey(store: CellStore, sheet: number, key: number | string): void {
+  if (typeof key === "number") store.setNumber(sheet, 0, 2, key, 0);
+  else store.setString(sheet, 0, 2, key, 0);
+}
+
+interface LookupVariant {
+  readonly id: string;
+  readonly table: (tableRows: number) => { store: CellStore; sheet: number };
+  readonly formula: (tableRows: number) => string;
+  readonly initialKey: number | string;
+  readonly editedKey: number | string;
+  readonly initialValue: number;
+  readonly editedValue: number;
+}
+
+/** Each lookup function runs once as a first-recalculation workload and once as a key-edit one. */
+const LOOKUP_EDIT_SUFFIX = "-edit";
+
+const LOOKUP_VARIANTS: readonly LookupVariant[] = [
+  {
+    id: "vlookup-many",
+    table: lookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "vlookup-many-sorted",
+    table: lookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
+    initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
+    initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
+    editedValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "xlookup-many",
+    table: lookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "xlookup-many-sorted",
+    table: lookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows},,-1,2)`,
+    initialKey: NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY,
+    initialValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_INITIAL_KEY) * LOOKUP_RESULT_FACTOR,
+    editedValue: Math.floor(NUMERIC_LOOKUP_APPROXIMATE_EDITED_KEY) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "text-lookup-many",
+    table: textLookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    initialKey: textLookupQueryKey(TEXT_LOOKUP_INITIAL_ROW),
+    editedKey: textLookupQueryKey(TEXT_LOOKUP_EDITED_ROW),
+    initialValue: (TEXT_LOOKUP_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
+    editedValue: (TEXT_LOOKUP_EDITED_ROW + 1) * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "text-lookup-many-sorted",
+    table: textLookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,TRUE)`,
+    initialKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW),
+    editedKey: textLookupBetweenQueryKey(TEXT_LOOKUP_APPROXIMATE_ROW),
+    initialValue: (TEXT_LOOKUP_APPROXIMATE_INITIAL_ROW + 1) * LOOKUP_RESULT_FACTOR,
+    editedValue: (TEXT_LOOKUP_APPROXIMATE_ROW + 1) * LOOKUP_RESULT_FACTOR,
+  },
+];
+
+/** Every lookup workload reports the shared result plus the key its formulas were last queried with. */
+function lookupVariantOutput(id: string): FormulaOutput | undefined {
+  const editsKey = id.endsWith(LOOKUP_EDIT_SUFFIX);
+  const baseId = editsKey ? id.slice(0, -LOOKUP_EDIT_SUFFIX.length) : id;
+  const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === baseId);
+  if (variant === undefined) return undefined;
+  return editsKey
+    ? `${variant.editedValue}:${variant.editedKey}`
+    : `${variant.initialValue}:${variant.initialKey}`;
+}
+
+/** The two timed units of a lookup workload; each one has its own workload id. */
+type LookupPhase = "first-recompute" | "key-edit";
+
+/**
+ * One shared key cell in C1 drives every lookup formula. The timed unit is either the first
+ * recalculation of all formulas or one key edit with its recalculation; afterwards every formula
+ * is read outside the timed interval and compared with the value computed here.
+ */
+function lookupFixture(count: number, phase: LookupPhase, variant: LookupVariant): TimedFixture {
+  const tableRows = count * LOOKUP_TABLE_ROWS_PER_FORMULA;
+  const { store, sheet } = variant.table(tableRows);
+  writeLookupKey(store, sheet, variant.initialKey);
+  const source = variant.formula(tableRows);
+  for (let row = 0; row < count; row++) store.setFormula(sheet, row, 3, source, 0);
+  const editsKey = phase === "key-edit";
+  const expectedValue = editsKey ? variant.editedValue : variant.initialValue;
+  const expectedKey = editsKey ? variant.editedKey : variant.initialKey;
+  // The edit phase starts from computed values, so its timed unit is the key edit alone.
+  if (editsKey) store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      if (editsKey) writeLookupKey(store, sheet, variant.editedKey);
+      store.recompute(sheet);
+    },
+    check: () => {
+      for (let row = 0; row < count; row++) {
+        const value = numberAt(store, sheet, row, 3);
+        assert(
+          value === expectedValue,
+          `${variant.id} row ${row} expected ${expectedValue}, observed ${value}`,
+        );
+      }
+      return `${expectedValue}:${expectedKey}`;
+    },
+    dispose: () => store.free(),
+  };
+}
+
 function spillFilterResizeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
@@ -901,6 +1176,124 @@ function criteriaMultiRangeFixture(count: number): TimedFixture {
   };
 }
 
+/** Column B repeats one fill value, so the two-range total is closed-form. */
+const SUM_MULTI_RANGE_FILL = 2;
+const COUNTIF_MATCH_SHARE = 2;
+
+function sumMultiRangeFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, () => SUM_MULTI_RANGE_FILL),
+    0,
+  );
+  store.setFormula(sheet, 0, 2, `=SUM(A1:A${count},B1:B${count})`, 0);
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () => `${numberAt(store, sheet, 0, 2)}`,
+    dispose: () => store.free(),
+  };
+}
+
+/** Criteria rows repeat every six rows: odd, divisible by three, and past the halfway threshold. */
+const SUMIFS_CRITERIA_PERIOD = 6;
+const SUMIFS_CRITERIA_OFFSET = 3;
+const SUMIFS_TEXT_MATCH = "keep";
+const SUMIFS_TEXT_OTHER = "skip";
+
+function sumifsCriteriaTotal(count: number): number {
+  const threshold = Math.floor(count / COUNTIF_MATCH_SHARE);
+  let total = 0;
+  for (let row = SUMIFS_CRITERIA_OFFSET; row < count; row += SUMIFS_CRITERIA_PERIOD) {
+    if (row >= threshold) total += row + 1;
+  }
+  return total;
+}
+
+function sumifsCriteriaFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(5, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => row % 2),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setString(
+      sheet,
+      row,
+      2,
+      row % (SUMIFS_CRITERIA_PERIOD / 2) === 0 ? SUMIFS_TEXT_MATCH : SUMIFS_TEXT_OTHER,
+      0,
+    );
+  }
+  store.setColumnNumbers(
+    sheet,
+    3,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setFormula(
+    sheet,
+    0,
+    4,
+    `=SUMIFS(D1:D${count},A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}",B1:B${count},1,C1:C${count},"${SUMIFS_TEXT_MATCH}")`,
+    0,
+  );
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () => numberAt(store, sheet, 0, 4),
+    dispose: () => store.free(),
+  };
+}
+
+function countifFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setFormula(
+    sheet,
+    0,
+    1,
+    `=COUNTIF(A1:A${count},">=${Math.floor(count / COUNTIF_MATCH_SHARE)}")`,
+    0,
+  );
+  return {
+    store,
+    run: () => store.recompute(sheet),
+    check: () => numberAt(store, sheet, 0, 1),
+    dispose: () => store.free(),
+  };
+}
+
 function unicodeTextDateFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
@@ -975,6 +1368,40 @@ function letReuseFixture(count: number): TimedFixture {
   };
 }
 
+/** The LET binding is used three times (`x+x+x`), so a re-evaluated binding costs that multiple. */
+const LET_REPEAT_FACTOR = 3;
+
+function letRepeatFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, count, 0);
+  store.setFormula(sheet, 0, 3, `=LET(x,XLOOKUP($C$1,A1:A${count},B1:B${count}),x+x+x)`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, count - 1, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 3)}:${numberAt(store, sheet, 0, 2)}`,
+    dispose: () => store.free(),
+  };
+}
+
 function iterativeFinanceFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
@@ -1034,6 +1461,7 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
   }
   const large = smoke ? 1_000 : 100_000;
   const range = smoke ? 10_000 : 100_000;
+  const lookupFormulas = smoke ? 500 : 1_000;
   results.push(
     collectFixture("wide-fan-out-edit", 1_000, () => fanOutEditFixture(1_000), samples),
     ...(smoke
@@ -1047,6 +1475,7 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
     collectFixture("scalar-edit-affects-1", 1, () => fanOutEditFixture(1), samples),
     collectFixture("scalar-edit-affects-1000", 1_000, () => fanOutEditFixture(1_000), samples),
     collectFixture("scalar-edit-affects-100000", large, () => fanOutEditFixture(large), samples),
+    collectFixture("formula-constant-edit", large, () => constantEditFixture(large), samples),
     collectFixture(
       "topology-remove-add",
       smoke ? 1_000 : 10_000,
@@ -1058,6 +1487,24 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
     collectFixture("error-propagation", 1_000, () => errorPropagationFixture(1_000), samples),
     collectFixture("criteria-range-edit", range, () => criteriaRangeFixture(range), samples),
     collectFixture("lookup-range-edit", range, () => lookupRangeFixture(range), samples),
+  );
+  for (const variant of LOOKUP_VARIANTS) {
+    results.push(
+      collectFixture(
+        variant.id,
+        lookupFormulas,
+        () => lookupFixture(lookupFormulas, "first-recompute", variant),
+        samples,
+      ),
+      collectFixture(
+        `${variant.id}${LOOKUP_EDIT_SUFFIX}`,
+        lookupFormulas,
+        () => lookupFixture(lookupFormulas, "key-edit", variant),
+        samples,
+      ),
+    );
+  }
+  results.push(
     collectFixture("spill-filter-resize", range, () => spillFilterResizeFixture(range), samples),
     collectFixture("sumproduct-vector-edit", range, () => sumProductVectorFixture(range), samples),
     collectFixture("sumproduct-matrix-edit", range, () => sumProductMatrixFixture(range), samples),
@@ -1067,6 +1514,9 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
       () => criteriaMultiRangeFixture(range),
       samples,
     ),
+    collectFixture("sum-multi-range", range, () => sumMultiRangeFixture(range), samples),
+    collectFixture("sumifs-3-criteria", range, () => sumifsCriteriaFixture(range), samples),
+    collectFixture("countif-100k", range, () => countifFixture(range), samples),
     collectFixture("unicode-text-date-edit", 1_000, () => unicodeTextDateFixture(1_000), samples),
     collectFixture(
       "percentile-covariance",
@@ -1075,6 +1525,7 @@ function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
       samples,
     ),
     collectFixture("let-reuse-edit", range, () => letReuseFixture(range), samples),
+    collectFixture("let-repeat", range, () => letRepeatFixture(range), samples),
     collectFixture("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000), samples),
     collectFixture(
       "incremental-dependency-closure-edit",
@@ -1166,22 +1617,44 @@ function currentFormulaSourceProvenance(commit: string): FormulaSourceProvenance
   };
 }
 
-function runnerCommand(mode: BenchmarkMode, preliminary: boolean): string[] {
+function runnerCommand(
+  mode: BenchmarkMode,
+  capture: FormulaCaptureKind,
+  outputPath?: string,
+): string[] {
   return [
     "bun",
     "run",
     "src/formula-bench.ts",
     ...(mode === "smoke" ? ["--smoke"] : []),
-    ...(preliminary ? ["--preliminary"] : []),
+    ...(capture === "preliminary" ? ["--preliminary"] : []),
+    ...(capture === "output" && outputPath !== undefined ? ["--output", outputPath] : []),
   ];
+}
+
+/** An output capture records the path it was written to, so validation checks its shape. */
+function runnerCommandMatches(
+  mode: BenchmarkMode,
+  capture: FormulaCaptureKind,
+  command: readonly string[],
+): boolean {
+  if (capture !== "output") {
+    return JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture));
+  }
+  const outputPath = command.at(-1) ?? "";
+  return (
+    outputPath.length > 0 &&
+    JSON.stringify(command) === JSON.stringify(runnerCommand(mode, capture, outputPath))
+  );
 }
 
 function currentRunnerProvenance(
   mode: BenchmarkMode,
-  preliminary: boolean,
+  capture: FormulaCaptureKind,
+  outputPath?: string,
 ): FormulaRunnerProvenance {
   return {
-    command: runnerCommand(mode, preliminary),
+    command: runnerCommand(mode, capture, outputPath),
     bun: Bun.version,
     node: process.versions.node,
     platform: process.platform,
@@ -1191,6 +1664,17 @@ function currentRunnerProvenance(
     concurrency: 1,
     gc: "Bun.gc(true) before every measured sample",
   };
+}
+
+/** A blocked capture declares why it carries no baseline comparison. */
+function formulaCaptureKind(regression: Record<string, unknown>): FormulaCaptureKind {
+  if (regression.status === "passed") return "gated";
+  if (regression.status !== "blocked") {
+    throw new Error("formula regression gate has no declared status");
+  }
+  if (regression.blocker === PRELIMINARY_BLOCKER) return "preliminary";
+  if (regression.blocker === OUTPUT_CAPTURE_BLOCKER) return "output";
+  throw new Error("formula blocked result does not declare a known blocker");
 }
 
 function objectRecord(value: unknown, path: string): Record<string, unknown> {
@@ -1234,7 +1718,10 @@ function validateArtifactBound(result: FormulaBenchmarkResult): void {
   }
 }
 
-function validateProvenance(result: CompleteFormulaBenchmarkResult, preliminary: boolean): void {
+function validateProvenance(
+  result: CompleteFormulaBenchmarkResult,
+  capture: FormulaCaptureKind,
+): void {
   exactObjectKeys(
     result.meta,
     ["bun", "platform", "arch", "commit", "dirty", "timestamp"],
@@ -1265,8 +1752,7 @@ function validateProvenance(result: CompleteFormulaBenchmarkResult, preliminary:
   if (
     !Array.isArray(result.runner.command) ||
     result.runner.command.some((part) => typeof part !== "string") ||
-    JSON.stringify(result.runner.command) !==
-      JSON.stringify(runnerCommand(result.mode, preliminary))
+    !runnerCommandMatches(result.mode, capture, result.runner.command)
   ) {
     throw new Error("formula runner provenance.command does not match the declared capture mode");
   }
@@ -1438,8 +1924,8 @@ function validateFormulaEvidence(
     );
   }
   const regression = objectRecord(result.gates.regression, "formula gates.regression");
-  const preliminary = regression.status === "blocked";
-  validateProvenance(result, preliminary);
+  const capture = formulaCaptureKind(regression);
+  validateProvenance(result, capture);
 
   const expectedSamples = expectedMode === "smoke" ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
   exactObjectKeys(
@@ -1527,14 +2013,8 @@ function validateFormulaEvidence(
       throw new Error("formula regression gate has malformed baseline provenance");
     }
   } else {
-    if (
-      result.gates.passed !== false ||
-      regression.status !== "blocked" ||
-      regression.blocker !== PRELIMINARY_BLOCKER
-    ) {
-      throw new Error(
-        "formula preliminary result must fail closed with its exact baseline blocker",
-      );
+    if (result.gates.passed !== false || capture === "gated") {
+      throw new Error("formula blocked result must fail closed with its declared baseline blocker");
     }
     exactObjectKeys(regression, ["status", "blocker"], "formula gates.regression");
   }
@@ -1545,11 +2025,16 @@ function validateFormulaEvidence(
       "independent-first-recompute",
       "criteria-range-edit",
       "lookup-range-edit",
+      "formula-constant-edit",
+      "sum-multi-range",
+      "sumifs-3-criteria",
+      "countif-100k",
       "sumproduct-vector-edit",
       "sumproduct-matrix-edit",
       "criteria-multi-range-edit",
       "percentile-covariance",
       "let-reuse-edit",
+      "let-repeat",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
     ]) {
@@ -1644,6 +2129,10 @@ export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResu
   };
 }
 
+/**
+ * An older baseline may leave out expanded workloads. Every core workload must still be listed,
+ * and no key outside the current full matrix is allowed.
+ */
 function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
   const observed = baseline.workloads.map(formulaWorkloadKey);
   const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
@@ -1651,6 +2140,17 @@ function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): strin
     if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
       return expected;
     }
+  }
+  const observedSet = new Set(observed);
+  const recognised = new Set(expectedFormulaWorkloadKeys("full"));
+  const core = legacyFormulaBaselineWorkloadKeys();
+  if (
+    observed.length > 0 &&
+    core.length > 0 &&
+    core.every((key) => observedSet.has(key)) &&
+    observed.every((key) => recognised.has(key))
+  ) {
+    return observed;
   }
   throw new Error("formula regression baseline does not match the current or legacy full matrix");
 }
@@ -1747,13 +2247,14 @@ export function validateFormulaCapture(
 
 function validateCurrentCaptureProvenance(
   result: CompleteFormulaBenchmarkResult,
-  preliminary: boolean,
+  capture: FormulaCaptureKind,
+  outputPath?: string,
 ): void {
   const currentSource = currentFormulaSourceProvenance(result.meta.commit);
   if (JSON.stringify(result.source) !== JSON.stringify(currentSource)) {
     throw new Error("formula capture source provenance does not match current source bytes");
   }
-  const currentRunner = currentRunnerProvenance(result.mode, preliminary);
+  const currentRunner = currentRunnerProvenance(result.mode, capture, outputPath);
   if (JSON.stringify(result.runner) !== JSON.stringify(currentRunner)) {
     throw new Error("formula capture runner provenance does not match the current runner");
   }
@@ -1787,7 +2288,7 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
       ? `Regression gate passed against ${
           (result.gates.regression as PassedRegressionGate).baselineCommit
         }.`
-      : `Preliminary evidence only; gate blocked: ${
+      : `Evidence without a baseline comparison; gate blocked: ${
           (result.gates.regression as BlockedRegressionGate).blocker
         }.`,
     "",
@@ -1795,10 +2296,17 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
   return lines.join("\n");
 }
 
-async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void> {
+async function runBenchmark(
+  smoke: boolean,
+  captureKind: FormulaCaptureKind,
+  outputPath?: string,
+): Promise<void> {
+  if (captureKind === "output" && outputPath === undefined) {
+    throw new Error("an output capture requires a path");
+  }
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
-  if (!preliminary) {
+  if (captureKind === "gated") {
     const rawBaseline = readFileSync(
       new URL("../results/formula-results.json", import.meta.url),
       "utf8",
@@ -1834,7 +2342,10 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
         baselineCommit: baselineIdentity.commit,
         baselineSourceDigest: baselineIdentity.sourceDigest,
       }
-    : { status: "blocked", blocker: PRELIMINARY_BLOCKER };
+    : {
+        status: "blocked",
+        blocker: captureKind === "output" ? OUTPUT_CAPTURE_BLOCKER : PRELIMINARY_BLOCKER,
+      };
   const result: CompleteFormulaBenchmarkResult = {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
@@ -1846,7 +2357,7 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
       arch: process.arch,
       ...capture,
     },
-    runner: currentRunnerProvenance(mode, preliminary),
+    runner: currentRunnerProvenance(mode, captureKind, outputPath),
     source: currentFormulaSourceProvenance(capture.commit),
     methodology: {
       warmupSamples: 1,
@@ -1864,13 +2375,13 @@ async function runBenchmark(smoke: boolean, preliminary: boolean): Promise<void>
       regression,
     },
   };
-  validateCurrentCaptureProvenance(result, preliminary);
+  validateCurrentCaptureProvenance(result, captureKind, outputPath);
   validateFormulaCapture(result, baseline);
-  if (!smoke) {
-    await Bun.write(
-      new URL("../results/formula-results.json", import.meta.url),
-      `${JSON.stringify(result, null, 2)}\n`,
-    );
+  const serialized = `${JSON.stringify(result, null, 2)}\n`;
+  if (outputPath !== undefined) {
+    await Bun.write(outputPath, serialized);
+  } else if (!smoke) {
+    await Bun.write(new URL("../results/formula-results.json", import.meta.url), serialized);
   }
   console.log(markdown(result));
   console.log(JSON.stringify(result));
@@ -1883,7 +2394,17 @@ if (import.meta.main) {
     assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
     console.log(JSON.stringify(runMemoryMode(formulas)));
   } else {
-    const preliminary = process.argv.includes("--preliminary");
-    await runBenchmark(process.argv.includes("--smoke"), preliminary);
+    const args = process.argv.slice(2).filter((argument) => argument !== "--");
+    const outputIndex = args.indexOf("--output");
+    const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
+    if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
+      throw new Error("--output requires a path");
+    }
+    // A capture written outside the tracked results file is recorded as an output capture; it
+    // skips the baseline comparison too, so the gate stays blocked.
+    let captureKind: FormulaCaptureKind = "gated";
+    if (outputPath !== undefined) captureKind = "output";
+    else if (args.includes("--preliminary")) captureKind = "preliminary";
+    await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
   }
 }

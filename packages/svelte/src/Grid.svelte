@@ -64,6 +64,12 @@ let controller: GridController | undefined = $state();
 let loading = $state(!isSheetwriteReady());
 let generation = 0;
 
+function forwardCommandStateChange(
+  event: Parameters<NonNullable<typeof onCommandStateChange>>[0],
+): void {
+  onCommandStateChange?.(event);
+}
+
 const handlers = {
   onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
   onRowDelta: (event: Parameters<NonNullable<typeof onRowDelta>>[0]) => onRowDelta?.(event),
@@ -76,8 +82,11 @@ const handlers = {
   onSearch: (event: Parameters<NonNullable<typeof onSearch>>[0]) => onSearch?.(event),
   onActiveSheetChange: (event: Parameters<NonNullable<typeof onActiveSheetChange>>[0]) =>
     onActiveSheetChange?.(event),
-  onCommandStateChange: (event: Parameters<NonNullable<typeof onCommandStateChange>>[0]) =>
-    onCommandStateChange?.(event),
+  // The controller only subscribes to command state while this is defined, so
+  // absence must be visible instead of an always-present wrapper.
+  get onCommandStateChange() {
+    return onCommandStateChange === undefined ? undefined : forwardCommandStateChange;
+  },
   onMutationRejected: (event: Parameters<NonNullable<typeof onMutationRejected>>[0]) =>
     onMutationRejected?.(event),
   onRendererFallback: (event: Parameters<NonNullable<typeof onRendererFallback>>[0]) =>

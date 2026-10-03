@@ -119,6 +119,47 @@ describe("RowBridge", () => {
     expect(remote.deltas).toHaveLength(1);
   });
 
+  it("rejects an inserted identity that already exists and releases it when removed", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      createRowId: () => "generated",
+    });
+    bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 1));
+    expect(bridge.rowIds()).toEqual(["row-a", "generated", "row-b", "row-c"]);
+
+    // The same identity at a different position is still a duplicate.
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 2)),
+    ).toThrow('Sheetwrite: duplicate inserted row ID "generated"');
+
+    bridge.project(
+      event([{ op: "moveRows", sheet: "sheet1", from: 1, count: 1, to: 3 }], [], "local", 3),
+    );
+    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c", "generated"]);
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 4)),
+    ).toThrow('Sheetwrite: duplicate inserted row ID "generated"');
+
+    bridge.project(event([{ op: "removeRows", sheet: "sheet1", at: 3, count: 1 }], [], "local", 5));
+    bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 6));
+    expect(bridge.rowIds()).toEqual(["row-a", "generated", "row-b", "row-c"]);
+  });
+
+  it("rejects an insert that collides with a constructor identity", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      createRowId: () => "row-a",
+    });
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 1)),
+    ).toThrow('Sheetwrite: duplicate inserted row ID "row-a"');
+    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c"]);
+  });
+
   it("captures packed and clear before/after cells only when detailed capture is enabled", () => {
     const workbook: Workbook = {
       activeSheet: "sheet1",

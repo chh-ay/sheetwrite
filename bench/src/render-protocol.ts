@@ -50,6 +50,12 @@ export const RENDER_SCENARIOS = [
 export const DIAGNOSTIC_RENDER_SCENARIOS = [
   { id: "formula-dense.paint", group: "formulae" },
   { id: "text-heavy.long-scroll", group: "view-scrolling" },
+  { id: "wrap-heavy.scroll", group: "view-scrolling" },
+  { id: "search-many.scroll", group: "view-scrolling" },
+  { id: "frozen.scroll", group: "view-scrolling" },
+  { id: "hscroll-small", group: "view-scrolling" },
+  { id: "cond-format.scroll", group: "formatting" },
+  { id: "number-format.hscroll", group: "formatting" },
   { id: "scroll-fractional.same-window", group: "view-scrolling" },
   { id: "geometry-unresized.1m", group: "geometry" },
   { id: WINDOW_TRANSFER_BASELINE_SCENARIO_ID, group: "view-scrolling" },

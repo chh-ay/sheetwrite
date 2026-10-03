@@ -275,6 +275,39 @@ pub struct CellStore {
     pub(crate) spill_owner_cell_limit: usize,
 }
 
+/// Cell order of the flat input arrays of a packed block write.
+///
+/// The store itself is column-major; the two orders exist because a document
+/// block arrives row-major while a columnar import arrives column-major straight
+/// from its source columns.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BlockInputOrder {
+    /// Cell `(row, col)` sits at `row * cols + col`.
+    RowMajor,
+    /// Cell `(row, col)` sits at `col * rows + row`.
+    ColumnMajor,
+}
+
+impl BlockInputOrder {
+    /// Position of one cell inside the flat input arrays.
+    #[inline]
+    fn index(self, row_offset: usize, col_offset: usize, rows: usize, cols: usize) -> usize {
+        match self {
+            Self::RowMajor => row_offset * cols + col_offset,
+            Self::ColumnMajor => col_offset * rows + row_offset,
+        }
+    }
+
+    /// Cell coordinates of one flat input position.
+    #[inline]
+    fn coordinates(self, offset: usize, rows: usize, cols: usize) -> (usize, usize) {
+        match self {
+            Self::RowMajor => (offset / cols, offset % cols),
+            Self::ColumnMajor => (offset % rows, offset / rows),
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
     #[wasm_bindgen(constructor)]
@@ -934,167 +967,6 @@ impl CellStore {
             self.bump_formula_epoch();
         }
     }
-    /// Atomically write one row-major mixed literal/formula/reference block.
-    /// Formula/reference offsets are sparse row-major exceptions. Reference
-    /// targets are packed `[sheet_handle, row, col]` triples. The compact
-    /// status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
-    /// source metadata, and `3` paged dirty-capacity rejection.
-    #[wasm_bindgen(js_name = setBlock)]
-    pub fn set_block(
-        &mut self,
-        sheet: usize,
-        start_row: usize,
-        start_col: usize,
-        rows: usize,
-        cols: usize,
-        kinds: &[u8],
-        numbers: &[f64],
-        texts: Vec<String>,
-        styles: &[u32],
-        formula_offsets: &[u32],
-        formula_sources: Vec<String>,
-        reference_offsets: &[u32],
-        reference_targets: &[u32],
-    ) -> u32 {
-        let Some(cell_count) = rows.checked_mul(cols) else {
-            return BLOCK_INVALID;
-        };
-        let dirty_revision = self.local_dirty_revision();
-        let Some(existing) = self.sheets.get(sheet) else {
-            return BLOCK_INVALID;
-        };
-        if rows == 0
-            || cols == 0
-            || cell_count > u32::MAX as usize
-            || kinds.len() != cell_count
-            || numbers.len() != cell_count
-            || texts.len() != cell_count
-            || styles.len() != cell_count
-            || formula_offsets.len() != formula_sources.len()
-            || reference_targets.len() != reference_offsets.len().saturating_mul(3)
-            || start_row
-                .checked_add(rows)
-                .is_none_or(|end| end > existing.row_count)
-            || start_row > u32::MAX as usize
-            || rows - 1 > u32::MAX as usize - start_row
-            || start_col
-                .checked_add(cols)
-                .is_none_or(|end| end > existing.n_cols)
-            || start_col > u32::MAX as usize
-            || cols - 1 > u32::MAX as usize - start_col
-        {
-            return BLOCK_INVALID;
-        }
-        if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, start_col, rows, cols) {
-            return BLOCK_RESOURCE_LIMIT;
-        }
-
-        let mut source_kinds = vec![0u8; cell_count];
-        let mut seen_offsets = HashSet::with_capacity(
-            formula_offsets
-                .len()
-                .saturating_add(reference_offsets.len()),
-        );
-        for &offset in formula_offsets {
-            let offset = offset as usize;
-            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
-                return BLOCK_SOURCE_INVALID;
-            }
-            source_kinds[offset] = 1;
-        }
-        for &offset in reference_offsets {
-            let offset = offset as usize;
-            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
-                return BLOCK_SOURCE_INVALID;
-            }
-            source_kinds[offset] = 2;
-        }
-
-        let mut prepared = Vec::with_capacity(seen_offsets.len());
-        for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
-            let offset = offset as usize;
-            let row = start_row + offset / cols;
-            let col = start_col + offset % cols;
-            let Some(key) = cell_key(row, col) else {
-                return BLOCK_SOURCE_INVALID;
-            };
-            prepared.push((
-                key,
-                self.parse_formula_entry(source, sheet as u32, key.0, key.1),
-            ));
-        }
-        for (index, &offset) in reference_offsets.iter().enumerate() {
-            let target_index = index * 3;
-            let target = AbsCellKey {
-                sheet: reference_targets[target_index],
-                row: reference_targets[target_index + 1],
-                col: reference_targets[target_index + 2],
-            };
-            let target_sheet = target.sheet as usize;
-            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
-                || !self.sheets[target_sheet]
-                    .contains_cell(target.row as usize, target.col as usize)
-            {
-                return BLOCK_SOURCE_INVALID;
-            }
-            let offset = offset as usize;
-            let row = start_row + offset / cols;
-            let col = start_col + offset % cols;
-            let Some(key) = cell_key(row, col) else {
-                return BLOCK_SOURCE_INVALID;
-            };
-            prepared.push((
-                key,
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            ));
-        }
-
-        if let Some(revision) = dirty_revision {
-            if !self.sheets[sheet].prepare_dirty_rect(start_row, start_col, rows, cols, revision) {
-                return BLOCK_RESOURCE_LIMIT;
-            }
-        }
-
-        let mut string_ids = vec![NO_STRING; cell_count];
-        for (offset, text) in texts.iter().enumerate() {
-            if source_kinds[offset] == 0 && kinds[offset] == KIND_STRING {
-                string_ids[offset] = self.intern(text);
-            }
-        }
-
-        let s = &mut self.sheets[sheet];
-        s.clear_all_spills();
-        for col_offset in 0..cols {
-            let col = start_col + col_offset;
-            for row_offset in 0..rows {
-                let row = start_row + row_offset;
-                let offset = row_offset * cols + col_offset;
-                let (kind, payload) = if source_kinds[offset] != 0 {
-                    (KIND_FORMULA, 0)
-                } else {
-                    match kinds[offset] {
-                        KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
-                        KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
-                        _ => (KIND_EMPTY, 0),
-                    }
-                };
-                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
-                    return BLOCK_RESOURCE_LIMIT;
-                }
-                if let Some(key) = cell_key(row, col) {
-                    s.formulas.remove(&key);
-                }
-            }
-        }
-        for (key, entry) in prepared {
-            s.formulas.insert(key, entry);
-        }
-        s.clear_dirty();
-        s.all_dirty = true;
-        self.bump_formula_epoch();
-        BLOCK_OK
-    }
-
     /// Write one sparse mixed transaction/page/snapshot block without
     /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
     /// paged cells are skipped; otherwise the whole sparse write is preflighted.
@@ -2438,6 +2310,11 @@ impl CellStore {
     /// edit performs one dependency-scoped pass instead of one full-sheet pass
     /// per setter. The returned value is the previous cached value until that
     /// barrier recompute runs, and the store facade ignores it for batched edits.
+    ///
+    /// The dependency index is invalidated only when the rewrite changes what
+    /// the formula reads or whether it produces an array. A constant-only edit
+    /// keeps the cached index, so its next recompute visits just the edited
+    /// formula and its dependents instead of every formula in the workbook.
     #[wasm_bindgen(js_name = setFormula)]
     pub fn set_formula(
         &mut self,
@@ -2459,6 +2336,10 @@ impl CellStore {
         }
 
         let entry = self.parse_formula_entry(src, sheet as u32, key.0, key.1);
+        let can_reuse_dependency_index = self.sheets[sheet]
+            .formulas
+            .get(&key)
+            .is_some_and(|previous| DepIndex::dependency_graph_unchanged(previous, &entry));
         let cached_value = {
             let s = &mut self.sheets[sheet];
 
@@ -2481,7 +2362,9 @@ impl CellStore {
             s.dirty_cells.insert(key);
             carried
         };
-        self.bump_formula_epoch();
+        if !can_reuse_dependency_index {
+            self.bump_formula_epoch();
+        }
         cached_value
     }
 
@@ -2653,6 +2536,370 @@ impl CellStore {
     #[wasm_bindgen(js_name = recomputeChanged)]
     pub fn recompute_changed_sources(&mut self) {
         self.recompute_changed();
+    }
+
+    /// Atomically write one row-major mixed literal/formula/reference block
+    /// whose text payload arrives packed instead of once per cell.
+    ///
+    /// `text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`
+    /// in cell-offset order. `text_offsets` carries their byte boundaries: the
+    /// n-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the
+    /// last entry equals the buffer length, so a block without strings passes an
+    /// empty buffer and `&[0]`. Strings are interned in the same order as a
+    /// per-cell write would intern them, so pool ids do not move. The compact
+    /// status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
+    /// source metadata, and `3` paged dirty-capacity rejection.
+    #[wasm_bindgen(js_name = setBlockPacked)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_block_packed(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        start_col: usize,
+        rows: usize,
+        cols: usize,
+        kinds: &[u8],
+        numbers: &[f64],
+        text_buf: &[u8],
+        text_offsets: &[u32],
+        styles: &[u32],
+        formula_offsets: &[u32],
+        formula_sources: Vec<String>,
+        reference_offsets: &[u32],
+        reference_targets: &[u32],
+    ) -> u32 {
+        self.write_packed_block(
+            BlockInputOrder::RowMajor,
+            sheet,
+            start_row,
+            start_col,
+            rows,
+            cols,
+            kinds,
+            numbers,
+            text_buf,
+            text_offsets,
+            styles,
+            formula_offsets,
+            &formula_sources,
+            reference_offsets,
+            reference_targets,
+        )
+    }
+
+    /// Atomically write one column-major mixed literal/formula/reference block
+    /// whose text payload arrives packed.
+    ///
+    /// This is [`Self::set_block_packed`] with the flat input arrays in the
+    /// store's own column-major order: cell `(row, col)` sits at
+    /// `col * rows + row`, so a columnar import can fill them column by column.
+    /// Text packing, source metadata and every status code behave exactly as in
+    /// [`Self::set_block_packed`].
+    #[wasm_bindgen(js_name = setColumnBlockPacked)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_column_block_packed(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        start_col: usize,
+        rows: usize,
+        cols: usize,
+        kinds: &[u8],
+        numbers: &[f64],
+        text_buf: &[u8],
+        text_offsets: &[u32],
+        styles: &[u32],
+        formula_offsets: &[u32],
+        formula_sources: Vec<String>,
+        reference_offsets: &[u32],
+        reference_targets: &[u32],
+    ) -> u32 {
+        self.write_packed_block(
+            BlockInputOrder::ColumnMajor,
+            sheet,
+            start_row,
+            start_col,
+            rows,
+            cols,
+            kinds,
+            numbers,
+            text_buf,
+            text_offsets,
+            styles,
+            formula_offsets,
+            &formula_sources,
+            reference_offsets,
+            reference_targets,
+        )
+    }
+
+    /// Shared body of the two packed writes. `order` says how the flat input
+    /// arrays of a `rows` × `cols` block are laid out; the store itself is
+    /// always written column-major.
+    #[allow(clippy::too_many_arguments)]
+    fn write_packed_block(
+        &mut self,
+        order: BlockInputOrder,
+        sheet: usize,
+        start_row: usize,
+        start_col: usize,
+        rows: usize,
+        cols: usize,
+        kinds: &[u8],
+        numbers: &[f64],
+        text_buf: &[u8],
+        text_offsets: &[u32],
+        styles: &[u32],
+        formula_offsets: &[u32],
+        formula_sources: &[String],
+        reference_offsets: &[u32],
+        reference_targets: &[u32],
+    ) -> u32 {
+        let Some(cell_count) = rows.checked_mul(cols) else {
+            return BLOCK_INVALID;
+        };
+        let dirty_revision = self.local_dirty_revision();
+        let Some(existing) = self.sheets.get(sheet) else {
+            return BLOCK_INVALID;
+        };
+        if rows == 0
+            || cols == 0
+            || cell_count > u32::MAX as usize
+            || kinds.len() != cell_count
+            || numbers.len() != cell_count
+            || styles.len() != cell_count
+            || text_offsets.is_empty()
+            || text_offsets.first() != Some(&0)
+            || text_offsets.last() != Some(&(text_buf.len() as u32))
+            || text_offsets.windows(2).any(|bounds| bounds[0] > bounds[1])
+            || formula_offsets.len() != formula_sources.len()
+            || reference_targets.len() != reference_offsets.len().saturating_mul(3)
+            || start_row
+                .checked_add(rows)
+                .is_none_or(|end| end > existing.row_count)
+            || start_row > u32::MAX as usize
+            || rows - 1 > u32::MAX as usize - start_row
+            || start_col
+                .checked_add(cols)
+                .is_none_or(|end| end > existing.n_cols)
+            || start_col > u32::MAX as usize
+            || cols - 1 > u32::MAX as usize - start_col
+        {
+            return BLOCK_INVALID;
+        }
+        let text_buf = match std::str::from_utf8(text_buf) {
+            Ok(text_buf) => text_buf,
+            Err(_) => return BLOCK_SOURCE_INVALID,
+        };
+        if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, start_col, rows, cols) {
+            return BLOCK_RESOURCE_LIMIT;
+        }
+
+        let mut source_kinds = vec![0u8; cell_count];
+        let mut seen_offsets = HashSet::with_capacity(
+            formula_offsets
+                .len()
+                .saturating_add(reference_offsets.len()),
+        );
+        for &offset in formula_offsets {
+            let offset = offset as usize;
+            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+                return BLOCK_SOURCE_INVALID;
+            }
+            source_kinds[offset] = 1;
+        }
+        for &offset in reference_offsets {
+            let offset = offset as usize;
+            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+                return BLOCK_SOURCE_INVALID;
+            }
+            source_kinds[offset] = 2;
+        }
+
+        let mut prepared = Vec::with_capacity(seen_offsets.len());
+        for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
+            let offset = offset as usize;
+            let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
+            let row = start_row + row_offset;
+            let col = start_col + col_offset;
+            let Some(key) = cell_key(row, col) else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            prepared.push((
+                key,
+                self.parse_formula_entry(source, sheet as u32, key.0, key.1),
+            ));
+        }
+        for (index, &offset) in reference_offsets.iter().enumerate() {
+            let target_index = index * 3;
+            let target = AbsCellKey {
+                sheet: reference_targets[target_index],
+                row: reference_targets[target_index + 1],
+                col: reference_targets[target_index + 2],
+            };
+            let target_sheet = target.sheet as usize;
+            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+                || !self.sheets[target_sheet]
+                    .contains_cell(target.row as usize, target.col as usize)
+            {
+                return BLOCK_SOURCE_INVALID;
+            }
+            let offset = offset as usize;
+            let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
+            let row = start_row + row_offset;
+            let col = start_col + col_offset;
+            let Some(key) = cell_key(row, col) else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            prepared.push((
+                key,
+                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
+            ));
+        }
+
+        // Check every text slice before reserving dirty capacity or interning,
+        // so a rejected block adds no strings to the append-only pool.
+        let text_count = text_offsets.len() - 1;
+        let string_cells = kinds.iter().filter(|&&kind| kind == KIND_STRING).count();
+        if string_cells != text_count
+            || text_offsets
+                .iter()
+                .any(|&bound| !text_buf.is_char_boundary(bound as usize))
+        {
+            return BLOCK_SOURCE_INVALID;
+        }
+
+        if let Some(revision) = dirty_revision {
+            if !self.sheets[sheet].prepare_dirty_rect(start_row, start_col, rows, cols, revision) {
+                return BLOCK_RESOURCE_LIMIT;
+            }
+        }
+
+        let mut string_ids = vec![NO_STRING; cell_count];
+        let mut text_bounds = text_offsets.windows(2);
+        for (offset, &kind) in kinds.iter().enumerate() {
+            if kind != KIND_STRING {
+                continue;
+            }
+            // Bounds were validated above: ascending, on char boundaries, one per string cell.
+            let Some(&[start, end]) = text_bounds.next() else {
+                return BLOCK_SOURCE_INVALID;
+            };
+            if source_kinds[offset] != 0 {
+                continue;
+            }
+            string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
+        }
+
+        let s = &mut self.sheets[sheet];
+        s.clear_all_spills();
+        for col_offset in 0..cols {
+            let col = start_col + col_offset;
+            for row_offset in 0..rows {
+                let row = start_row + row_offset;
+                let offset = order.index(row_offset, col_offset, rows, cols);
+                let (kind, payload) = if source_kinds[offset] != 0 {
+                    (KIND_FORMULA, 0)
+                } else {
+                    match kinds[offset] {
+                        KIND_NUMBER | KIND_BOOL => (kinds[offset], encode_num(numbers[offset])),
+                        KIND_STRING => (KIND_STRING, encode_str_id(string_ids[offset])),
+                        _ => (KIND_EMPTY, 0),
+                    }
+                };
+                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
+                    return BLOCK_RESOURCE_LIMIT;
+                }
+                if let Some(key) = cell_key(row, col) {
+                    s.formulas.remove(&key);
+                }
+            }
+        }
+        for (key, entry) in prepared {
+            s.formulas.insert(key, entry);
+        }
+        s.clear_dirty();
+        s.all_dirty = true;
+        self.bump_formula_epoch();
+        BLOCK_OK
+    }
+
+    /// Loaded row runs of one column inside `start_row..end_row`, as flat
+    /// `[start, end)` pairs in ascending, disjoint order.
+    ///
+    /// A row belongs to a run only when [`Self::columns_fully_loaded`] would
+    /// report it loaded, so a caller can reconcile a whole column with one call
+    /// instead of probing the band row by row. Rows outside the sheet and empty
+    /// requests produce no pairs.
+    #[wasm_bindgen(js_name = loadedSpans)]
+    pub fn loaded_spans(
+        &self,
+        sheet: usize,
+        start_row: usize,
+        end_row: usize,
+        col: u32,
+    ) -> Vec<u32> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        let col = col as usize;
+        if start_row >= end_row || !data.contains_cell(start_row, col) {
+            return Vec::new();
+        }
+        let end_row = end_row.min(data.row_count);
+        let mut spans = Vec::new();
+        let mut run_start: Option<usize> = None;
+        for row in start_row..end_row {
+            if data.is_loaded(row, col) {
+                run_start = run_start.or(Some(row));
+            } else if let Some(start) = run_start.take() {
+                spans.push(start as u32);
+                spans.push(row as u32);
+            }
+        }
+        if let Some(start) = run_start {
+            spans.push(start as u32);
+            spans.push(end_row as u32);
+        }
+        spans
+    }
+
+    /// Resolved values of a sparse coordinate list in one batched read.
+    ///
+    /// `rows` and `cols` are absolute coordinates and must have the same length;
+    /// otherwise the result carries no cells. Every entry reads exactly like
+    /// [`Self::get_cell`], so a batched capture reports the values a per-cell
+    /// read would.
+    #[wasm_bindgen(js_name = cellSnapshots)]
+    pub fn cell_snapshots(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> Option<CellSnapshot> {
+        if rows.len() != cols.len() {
+            return None;
+        }
+        let mut kinds = Vec::with_capacity(rows.len());
+        let mut numbers = Vec::with_capacity(rows.len());
+        let mut styles = Vec::with_capacity(rows.len());
+        let mut text_index = Vec::with_capacity(rows.len());
+        let mut strings: Vec<String> = Vec::new();
+        for (&row, &col) in rows.iter().zip(cols.iter()) {
+            let cell = self.get_cell(sheet, row as usize, col as usize);
+            kinds.push(cell.kind);
+            numbers.push(cell.num);
+            styles.push(cell.style);
+            match cell.string {
+                Some(text) => {
+                    strings.push(text);
+                    text_index.push(strings.len() as i32 - 1);
+                }
+                None => text_index.push(-1),
+            }
+        }
+        Some(CellSnapshot {
+            kinds,
+            numbers,
+            styles,
+            text_index,
+            strings,
+        })
     }
 }
 
@@ -3218,5 +3465,48 @@ impl CellOut {
     #[wasm_bindgen(getter)]
     pub fn style(&self) -> u32 {
         self.style
+    }
+}
+
+/// Resolved values of a sparse coordinate batch, one entry per requested cell.
+///
+/// Every list holds one entry per cell, in the requested order. Text is stored
+/// once: `text_index` names the cell's entry in `strings`, or `-1` when the cell
+/// has no text, exactly like [`CellOut::string`] reports it.
+#[wasm_bindgen]
+pub struct CellSnapshot {
+    kinds: Vec<u8>,
+    numbers: Vec<f64>,
+    styles: Vec<u32>,
+    text_index: Vec<i32>,
+    strings: Vec<String>,
+}
+
+#[wasm_bindgen]
+impl CellSnapshot {
+    #[wasm_bindgen(getter)]
+    pub fn kinds(&self) -> Vec<u8> {
+        self.kinds.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn numbers(&self) -> Vec<f64> {
+        self.numbers.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn styles(&self) -> Vec<u32> {
+        self.styles.clone()
+    }
+
+    /// Entry in [`Self::strings`] per cell, or `-1` for a cell without text.
+    #[wasm_bindgen(getter, js_name = textIndex)]
+    pub fn text_index(&self) -> Vec<i32> {
+        self.text_index.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn strings(&self) -> Vec<String> {
+        self.strings.clone()
     }
 }

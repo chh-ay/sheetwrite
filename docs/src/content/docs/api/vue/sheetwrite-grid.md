@@ -8,7 +8,7 @@ description: "Advanced framework component for workbook data or datasource input
 Advanced framework component for workbook data or datasource input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L425"><code>packages/vue/src/index.ts#L425</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L444"><code>packages/vue/src/index.ts#L444</code></a></dd></div>
 </dl>
 
 ## Declaration

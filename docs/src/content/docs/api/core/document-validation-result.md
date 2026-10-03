@@ -8,7 +8,7 @@ description: "Success or structured errors returned by document validation."
 Success or structured errors returned by document validation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L230"><code>packages/core/src/document-protocol.ts#L230</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L356"><code>packages/core/src/document-protocol.ts#L356</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

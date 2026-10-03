@@ -298,6 +298,73 @@ describe("SheetwriteStore", () => {
     expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
+  for (const operation of ["setBlock", "setRange"] as const) {
+    it(`preserves resolved before-values and styles in ${operation} rollback events`, () => {
+      const store = new SheetwriteStore(makeWorkbook(3));
+      const initialValues = ["雪😀", true, null, 7, null, null] as const;
+      const boldStyle = { bold: true };
+      store.applyTransaction({
+        patches: [
+          {
+            op: "setBlock",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 2 } },
+            block: {
+              rowCount: 2,
+              colCount: 3,
+              values: [...initialValues],
+              styleTable: [boldStyle],
+              styleIds: [0, 0, 0, 0, 0, 0],
+              formulas: [
+                [2, "=1/0"],
+                [4, "=A2*2"],
+              ],
+              refs: [[5, addr(0, 0)]],
+            },
+          },
+        ],
+      });
+      store.setDetailedChangeCapture(true);
+      const events: ChangeEvent[] = [];
+      store.on("change", (event) => events.push(event));
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 2 } };
+      const replacement: DocumentOp =
+        operation === "setBlock"
+          ? {
+              op: "setBlock",
+              range,
+              block: { rowCount: 2, colCount: 3, values: [null, null, null, null, null, null] },
+            }
+          : {
+              op: "setRange",
+              range,
+              cells: Array.from({ length: initialValues.length }, (_, offset) => ({
+                rowOffset: Math.floor(offset / 3),
+                colOffset: offset % 3,
+                value: { kind: "literal" as const, value: null },
+              })),
+            };
+      expect(store.applyTransaction({ patches: [replacement] }).status).toBe("applied");
+      expect(
+        events.map((event) =>
+          event.changes.map((change) => ({
+            addr: change.addr,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+            oldStyle: change.oldStyle,
+          })),
+        ),
+      ).toEqual([
+        ["雪😀", true, "#DIV/0!", 7, 14, "雪😀"].map((value, offset) => ({
+          addr: addr(Math.floor(offset / 3), offset % 3),
+          oldValue: { kind: "literal", value },
+          newValue: { kind: "literal", value: null },
+          oldStyle: boldStyle,
+        })),
+      ]);
+      store.dispose();
+    });
+  }
+
   it("evaluates arithmetic formulas and recomputes on dependency edits", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
@@ -1805,6 +1872,40 @@ describe("validation, protection, and notes metadata", () => {
           : [];
     expect(clearIssues).toMatchObject([{ ruleId: "amount-limit" }]);
     partial.dispose();
+  });
+
+  it("revalidates resource and address limits after permission callbacks mutate live operations", () => {
+    const maxEncodedBytes = 256;
+    for (const mutation of ["payload", "address"] as const) {
+      const workbook = makeWorkbook(3);
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("fixture is missing its sheet");
+      sheet.protectedRanges = [
+        {
+          id: "locked",
+          range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+        },
+      ];
+      const store = new SheetwriteStore(workbook, undefined, {
+        transactionResourceLimits: { maxEncodedBytes },
+      });
+      store.setProtectionResolver(({ operation }) => {
+        if (operation.op === "set" && operation.value.kind === "literal") {
+          if (mutation === "payload") operation.value.value = "x".repeat(maxEncodedBytes * 2);
+          else operation.addr.sheet = "missing-sheet";
+        }
+        return "allow";
+      });
+      try {
+        const result = store.applyTransaction({
+          patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "small" } }],
+        });
+        expect(result.status).toBe("rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+      } finally {
+        store.dispose();
+      }
+    }
   });
 
   it("denies protected local mutations by default and delegates permission to the host", () => {

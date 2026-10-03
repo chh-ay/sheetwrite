@@ -16,6 +16,50 @@ beforeAll(async () => {
 });
 
 describe("DocumentController", () => {
+  it("rejects nested payload growth from callbacks that retain operation identity", () => {
+    const maxEncodedBytes = 256;
+    const oversizedValue = "x".repeat(maxEncodedBytes * 2);
+    for (const mutationBoundary of ["materialization", "admission"] as const) {
+      const transactionResourceLimits = { maxEncodedBytes, maxOperations: 1 };
+      const store = new SheetwriteStore(makeWorkbook(4), undefined, { transactionResourceLimits });
+      const mutatePayload = (patches: readonly import("../src/types.js").DocumentOp[]) => {
+        const patch = patches[0];
+        if (patch?.op === "set" && patch.value.kind === "literal") {
+          patch.value.value = oversizedValue;
+        }
+      };
+      const controller = new DocumentController({
+        store,
+        loadable: store,
+        transactionResourceLimits,
+        readOnly: () => false,
+        epoch: () => 0,
+        materializeVirtualColumns: (patches) => {
+          if (mutationBoundary === "materialization") mutatePayload(patches);
+          return patches;
+        },
+        admitTransaction: (patches) => {
+          if (mutationBoundary === "admission") mutatePayload(patches);
+          return { ok: true, reservation: { cancel() {}, finish() {} } };
+        },
+        onMutationRejected: () => {},
+        onHistoryApplied: () => {},
+      });
+      const addr = { sheet: "s1", row: 0, col: 0 };
+      try {
+        expect(
+          controller.commit(
+            [{ op: "set", addr, value: { kind: "literal", value: "small" } }],
+            "api",
+          ).status,
+        ).toBe("rejected");
+        expect(store.getCell(addr).resolved).toBeNull();
+      } finally {
+        controller.destroy();
+        store.dispose();
+      }
+    }
+  });
   it("owns commit history and applies undo/redo through the store", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     let historyApplications = 0;

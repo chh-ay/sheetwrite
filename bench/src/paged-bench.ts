@@ -651,6 +651,7 @@ async function runBenchmark(
   mode: BenchmarkMode,
   chunkRows: number,
   prototype: boolean,
+  outputPath?: string,
 ): Promise<void> {
   await initSheetwrite();
   const rowCount = mode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
@@ -770,9 +771,9 @@ async function runBenchmark(
       `| ${probe.scenario} | ${(probe.wasmDeltaBytes / 1024 / 1024).toFixed(2)} | ${(probe.allocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.dirtyAllocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.retainedBytes / 1024 / 1024).toFixed(2)} | ${probe.chunks} | ${probe.loadedCells} | ${probe.dirtyCells} |`,
     );
   }
-  if (mode === "full" && !prototype) {
+  if (outputPath !== undefined || (mode === "full" && !prototype)) {
     await Bun.write(
-      new URL("../results/paged-results.json", import.meta.url),
+      outputPath ?? new URL("../results/paged-results.json", import.meta.url),
       `${JSON.stringify(result, null, 2)}\n`,
     );
   }
@@ -783,6 +784,11 @@ if (import.meta.main) {
   const probeIndex = process.argv.indexOf("--probe");
   const rowsIndex = process.argv.indexOf("--rows");
   const chunkRowsIndex = process.argv.indexOf("--chunk-rows");
+  const outputIndex = process.argv.indexOf("--output");
+  const outputPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : undefined;
+  if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
+    throw new Error("paged benchmark requires a path after --output");
+  }
   const scenario = probeIndex >= 0 ? process.argv[probeIndex + 1] : undefined;
   const rowCount = rowsIndex >= 0 ? Number(process.argv[rowsIndex + 1]) : Number.NaN;
   const chunkRows = chunkRowsIndex >= 0 ? Number(process.argv[chunkRowsIndex + 1]) : CHUNK_ROWS;
@@ -803,6 +809,7 @@ if (import.meta.main) {
       process.argv.includes("--smoke") ? "smoke" : "full",
       chunkRows,
       process.argv.includes("--prototype"),
+      outputPath,
     );
   }
 }

@@ -64,6 +64,8 @@ See [formula functions, exact semantics, errors, and compatibility](/docs/guides
 | `maxOperations` | 10,000 `DocumentOp` objects per transaction | Resource defense: bound object-heavy validation and dispatch | Transaction is rejected | `GridOptions.transactionResourceLimits`, `SheetwriteStoreOptions.transactionResourceLimits`, or an explicit limit passed to `validateTransactionResources` |
 | `maxEncodedBytes` | 8 MiB of UTF-8 JSON per operation array | Resource defense: bound exact payload inspection | Transaction is rejected | Same paths as `maxOperations` |
 
+These limits also apply to undo and redo. Undo restores the old values of an edit as one transaction, so its payload can be much larger than the edit itself: clearing a range is one small operation, but undoing it restores every cleared cell. At the default 8 MiB, undo of a clear larger than about 1,000,000 number cells, or fewer text cells, is above the limit. In that case `grid.undo()` changes nothing, the Grid emits `mutation-rejected` with the `resource-limit` issue, and the Grid removes that entry from the undo history so that older edits can still be undone. A host that needs undo for larger edits can raise `maxEncodedBytes`. With sync, every peer must also raise `maxVersionPayloadBytes` (below) to the same size, or the peers reject that version.
+
 [`DEFAULT_SNAPSHOT_RESOURCE_LIMITS`](/docs/api/core/default-snapshot-resource-limits/) owns validation and allocation defaults. Exceeding one produces a path-qualified validation error or `SnapshotResourceError` before store allocation; an allocation failure within a configured ceiling still surfaces as a resource failure.
 
 | Owner / resource | Default and unit | Why / evidence class | Behavior above the ceiling | Supported override |

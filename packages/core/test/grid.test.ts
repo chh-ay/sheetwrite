@@ -11,6 +11,7 @@ import {
 } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
   CellScalar,
   ChangeEvent,
@@ -424,6 +425,105 @@ describe("Grid transaction resource ingress", () => {
     expect(grid.store.getCell(first).resolved).toBeNull();
     expect(changes).toHaveLength(2);
     expect(rejectionEvents).toBe(0);
+    grid.destroy();
+  });
+
+  it("re-measures payloads that admission guards rewrote before the store applies them", () => {
+    const workbook = makeWorkbook(4);
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxEncodedBytes: 128 },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejectionEvents = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejectionEvents += 1;
+    });
+    const address = { sheet: "s1", row: 0, col: 0 };
+    let rewritePayload = false;
+    const disposeGuard = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        if (rewritePayload) {
+          const patch = operations[0];
+          if (patch?.op === "set") {
+            patch.value = { kind: "literal", value: "x".repeat(200) };
+          }
+        }
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+
+    const accepted = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(accepted.status).toBe("applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+
+    rewritePayload = true;
+    const rejected = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      issues: [{ kind: "resource-limit", resource: "encoded-bytes", max: 128 }],
+    });
+    if (rejected.status !== "rejected") throw new Error("rewritten payload unexpectedly applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+    expect(changes).toHaveLength(1);
+    expect(rejectionEvents).toBe(1);
+
+    disposeGuard();
+    grid.destroy();
+  });
+
+  it("reports an undo whose restore payload exceeds the limit and still undoes older edits", () => {
+    const rows = 200;
+    // The forward clear is one small range operation; its undo restores every
+    // cleared value, which is well above this limit.
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(rows),
+      data: makeColumnarData(rows),
+      transactionResourceLimits: { maxEncodedBytes: 4_096 },
+    });
+    const rejections: Array<{ kind: string; resource?: string }> = [];
+    grid.on("mutation-rejected", ({ issues }) => {
+      for (const issue of issues) {
+        rejections.push({
+          kind: issue.kind,
+          resource: "resource" in issue ? issue.resource : undefined,
+        });
+      }
+    });
+    const edited = { sheet: "s1", row: 0, col: 1 };
+    const cleared = { sheet: "s1", row: 5, col: 0 };
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "set", addr: edited, value: { kind: "literal", value: 7 } }],
+      }).status,
+    ).toBe("applied");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 2 } },
+            contents: true,
+            style: false,
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+
+    grid.undo();
+    expect(rejections).toEqual([{ kind: "resource-limit", resource: "encoded-bytes" }]);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+
+    grid.undo();
+    expect(grid.store.getCell(edited).resolved).toBe(0.5);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+    expect(rejections).toHaveLength(1);
     grid.destroy();
   });
 });

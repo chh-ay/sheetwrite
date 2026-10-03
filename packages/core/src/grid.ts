@@ -16,6 +16,7 @@ import { CustomEditorController } from "./custom-editor.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
+  admitTransactionResources,
   assertWorkbookAllocationLimits,
   resolveTransactionResourceLimits,
   validateTransactionResources,
@@ -548,6 +549,7 @@ export class GridImpl implements Grid {
       },
       transactionResourceLimits: this.transactionResourceLimits,
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
+      trustedResourceCallbacks: true,
     });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
@@ -728,6 +730,7 @@ export class GridImpl implements Grid {
       firstCol: () => this.firstCol(),
       lastCol: () => this.lastCol(),
       nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
+      previousVisibleColumn: (col) => this.geometry.previousVisibleColumn(col),
       colAtX: (contentX) => this.colAtX(contentX),
       rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
       rowCount: () => this.geometry.rowCount,
@@ -2249,7 +2252,17 @@ export class GridImpl implements Grid {
         issues: [resourceValidation.issue],
       };
     }
-    return this.document.commit(transaction.patches.slice(), "api");
+    // The controller receives a private copy of the caller's operations. The
+    // copy is verified against the measured payload, so the controller and the
+    // store reuse this measurement instead of walking it again.
+    const patches = transaction.patches.slice();
+    const admitted = admitTransactionResources(
+      patches,
+      this.transactionResourceLimits,
+      resourceValidation,
+      transaction.patches,
+    );
+    return this.document.commit(patches, "api", admitted);
   }
 
   exportSnapshot(): WorkbookSnapshot {

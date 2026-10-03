@@ -31,6 +31,16 @@ export interface DecodedPackedWindow {
   readonly localStringCount: number;
 }
 
+/** Resolved values of one rectangle plus its style dictionary, row-major. */
+export interface RectangleSnapshot {
+  /** Resolved scalar per cell; `null` for empty cells. */
+  readonly values: readonly CellScalar[];
+  /** Style dictionary slot per cell; index into {@link styles}. */
+  readonly styleIds: Uint32Array;
+  /** Style dictionary shared by every cell of the rectangle. */
+  readonly styles: readonly CellStyle[];
+}
+
 /** Validates the internal packed layout before exposing zero-copy owned-buffer views. */
 export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
   if (packed.byteLength < WINDOW_PACKED_HEADER_BYTES) {
@@ -486,6 +496,96 @@ export class StoreWindowReader {
   conditionalRulesChanged(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
     this.syncConditionalRules(sheet, this.handleOf(sheet));
+  }
+
+  /**
+   * Previous values and styles of one rectangle, row-major, in one packed read.
+   *
+   * This is the change-capture view of a rectangle: it replaces a `getCell` per
+   * cell. It is not a viewport read — it never pins paged rows and never merges
+   * hyperlink or conditional styles — so every entry is exactly what `getCell`
+   * returns for the same cell.
+   */
+  readRectangle(
+    sheet: SheetId,
+    startRow: number,
+    rows: number,
+    cols: readonly number[],
+  ): RectangleSnapshot {
+    const view = this.wasm.getWindow(
+      this.handleOf(sheet),
+      startRow,
+      startRow + rows,
+      this.colsU32For(cols),
+    ) as ConsumingWindowView;
+    let decoded: DecodedPackedWindow;
+    let strings: string[];
+    try {
+      decoded = decodePackedWindow(view.takePacked());
+      if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
+        throw new Error("Sheetwrite: invalid packed window shape");
+      }
+      strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
+      if (strings.length !== decoded.localStringCount) {
+        throw new Error("Sheetwrite: invalid packed window strings");
+      }
+      for (let index = 0; index < decoded.kinds.length; index++) {
+        const kind = decoded.kinds[index];
+        const local = decoded.stringIndex[index] ?? -1;
+        const pool = decoded.stringIds[index] ?? NO_STRING;
+        if (
+          (kind !== KIND_EMPTY &&
+            kind !== KIND_NUMBER &&
+            kind !== KIND_STRING &&
+            kind !== KIND_BOOL) ||
+          local < -1 ||
+          local >= strings.length ||
+          (local >= 0 && (kind !== KIND_STRING || pool !== NO_STRING)) ||
+          (kind === KIND_STRING && pool === NO_STRING && local < 0)
+        ) {
+          throw new Error("Sheetwrite: invalid packed window value");
+        }
+      }
+    } finally {
+      view.free();
+    }
+
+    const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    if (this.stringCache.size >= STRING_CACHE_CAP) this.stringCache.clear();
+    let missingIdSet: Set<number> | null = null;
+    for (let index = 0; index < stringIds.length; index++) {
+      const id = stringIds[index];
+      if (id !== undefined && id !== NO_STRING && !this.stringCache.has(id)) {
+        if (!missingIdSet) missingIdSet = new Set<number>();
+        missingIdSet.add(id);
+      }
+    }
+    if (missingIdSet) {
+      const missingIds = Uint32Array.from(missingIdSet);
+      const resolved = this.wasm.poolStrings(missingIds);
+      for (let index = 0; index < resolved.length; index++) {
+        this.stringCache.set(missingIds[index] ?? NO_STRING, resolved[index] ?? "");
+      }
+    }
+
+    const values = new Array<CellScalar>(kinds.length);
+    for (let index = 0; index < kinds.length; index++) {
+      const kind = kinds[index];
+      if (kind === KIND_NUMBER) {
+        values[index] = numbers[index] ?? null;
+      } else if (kind === KIND_BOOL) {
+        values[index] = (numbers[index] ?? 0) !== 0;
+      } else if (kind === KIND_STRING) {
+        const poolId = stringIds[index] ?? NO_STRING;
+        values[index] =
+          poolId !== NO_STRING
+            ? (this.stringCache.get(poolId) ?? null)
+            : (strings[stringIndex[index] ?? -1] ?? null);
+      } else {
+        values[index] = null;
+      }
+    }
+    return { values, styleIds, styles: this.stylesFrom(styleDict) };
   }
 
   resourceOwners(): ResourceOwnerBytes[] {

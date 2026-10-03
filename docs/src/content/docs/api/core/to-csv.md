@@ -12,7 +12,7 @@ API returns one in-memory string, but fetches at most
 `maxWriterWindowRows` view rows from the store per read.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L57"><code>packages/core/src/export.ts#L57</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L58"><code>packages/core/src/export.ts#L58</code></a></dd></div>
 </dl>
 
 ## Declaration

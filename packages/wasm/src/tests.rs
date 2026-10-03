@@ -902,7 +902,7 @@ fn public_api_bounds_checks_do_not_panic() {
         assert_eq!(store.style_id_at(99, 0, 0), 0);
         assert_eq!(store.style_id_at(sheet, 9, 9), 0);
         assert_ne!(
-            store.set_block(
+            store.set_block_packed(
                 99,
                 0,
                 0,
@@ -910,7 +910,8 @@ fn public_api_bounds_checks_do_not_panic() {
                 1,
                 &[KIND_EMPTY],
                 &[0.0],
-                vec![String::new()],
+                &[],
+                &[0],
                 &[0],
                 &[],
                 Vec::new(),
@@ -1559,6 +1560,97 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }
 
+/// Column 0 of 16 rows covering every kind the distinct scan distinguishes:
+/// numbers (`-0.0`, `0.0` and NaN included), pooled text with repeats, a blank,
+/// booleans, an error formula whose text carries no pool id, and a text formula
+/// whose result equals a stored string.
+fn fill_mixed_distinct_column(store: &mut CellStore, sheet: usize) {
+    store.set_string(sheet, 0, 0, "Beta", 0);
+    store.set_number(sheet, 1, 0, 2.0, 0);
+    store.set_string(sheet, 2, 0, "Beta", 0);
+    store.set_formula(sheet, 3, 0, "=1/0", 0);
+    store.set_number(sheet, 4, 0, 2.0, 0);
+    store.set_bool(sheet, 5, 0, true, 0);
+    store.set_number(sheet, 6, 0, -0.0, 0);
+    store.set_number(sheet, 7, 0, 0.0, 0);
+    store.set_number(sheet, 8, 0, f64::NAN, 0);
+    store.set_number(sheet, 9, 0, f64::NAN, 0);
+    // Row 10 stays blank.
+    store.set_string(sheet, 11, 0, "Alpha", 0);
+    store.set_formula(sheet, 12, 0, "=\"Alpha\"", 0);
+    store.set_string(sheet, 13, 0, "Beta", 0);
+    store.set_bool(sheet, 14, 0, false, 0);
+    store.set_formula(sheet, 15, 0, "=1+0", 0);
+    store.recompute(sheet);
+}
+
+fn distinct_number_bits(column: &mut crate::query::DistinctColumn) -> Vec<u64> {
+    column
+        .take_numbers()
+        .into_iter()
+        .map(f64::to_bits)
+        .collect()
+}
+
+#[test]
+fn distinct_values_keep_first_seen_order_across_mixed_kinds() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 16);
+    fill_mixed_distinct_column(&mut store, sheet);
+
+    let mut column = store.distinct_values(sheet, 0, 0);
+    // Text, number, error text, boolean, `-0.0`, `0.0`, NaN, blank, the pooled
+    // "Alpha" a formula also returns, false, then the numeric formula result.
+    assert_eq!(column.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0, 2, 3, 1]);
+    assert_eq!(
+        distinct_number_bits(&mut column),
+        vec![
+            2.0f64.to_bits(),
+            1.0f64.to_bits(),
+            (-0.0f64).to_bits(),
+            0.0f64.to_bits(),
+            f64::NAN.to_bits(),
+            0.0f64.to_bits(),
+            1.0f64.to_bits(),
+        ]
+    );
+    assert_eq!(column.take_texts(), vec!["Beta", "#DIV/0!", "Alpha"]);
+}
+
+#[test]
+fn distinct_values_limit_stops_the_first_seen_scan() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 16);
+    fill_mixed_distinct_column(&mut store, sheet);
+
+    // The error formula at row 3 restarts the scan on content hashing, so a
+    // limit that lands past it still returns identical values.
+    let mut three = store.distinct_values(sheet, 0, 3);
+    assert_eq!(three.take_kinds(), vec![2, 1, 2]);
+    assert_eq!(distinct_number_bits(&mut three), vec![2.0f64.to_bits()]);
+    assert_eq!(three.take_texts(), vec!["Beta", "#DIV/0!"]);
+
+    // Eight entries include the blank, the `-0.0`/`0.0` pair and NaN.
+    let mut eight = store.distinct_values(sheet, 0, 8);
+    assert_eq!(eight.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0]);
+    assert_eq!(
+        distinct_number_bits(&mut eight),
+        vec![
+            2.0f64.to_bits(),
+            1.0f64.to_bits(),
+            (-0.0f64).to_bits(),
+            0.0f64.to_bits(),
+            f64::NAN.to_bits(),
+        ]
+    );
+    assert_eq!(eight.take_texts(), vec!["Beta", "#DIV/0!"]);
+
+    // A limit past the distinct count returns the whole list.
+    let mut all = store.distinct_values(sheet, 0, 64);
+    assert_eq!(all.take_kinds().len(), 11);
+    assert_eq!(all.take_texts(), vec!["Beta", "#DIV/0!", "Alpha"]);
+}
+
 #[test]
 fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let mut store = CellStore::new();
@@ -1566,7 +1658,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let sheet = store.add_sheet(2, 2);
     store.set_sheet_name(sheet, "s1", "Sheet 1");
     assert_eq!(
-        store.set_block(
+        store.set_block_packed(
             sheet,
             0,
             0,
@@ -1574,12 +1666,8 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
             2,
             &[KIND_NUMBER, KIND_EMPTY, KIND_EMPTY, KIND_STRING],
             &[2.0, 0.0, 0.0, 0.0],
-            vec![
-                String::new(),
-                String::new(),
-                String::new(),
-                "tail".to_string(),
-            ],
+            b"tail",
+            &[0, 4],
             &[1, 2, 3, 4],
             &[1],
             vec!["=A1*3".to_string()],
@@ -2137,4 +2225,1186 @@ fn table_registry_rejects_ambiguous_names_columns_and_resource_overflow() {
         vec!["value".into()],
         vec!["Value".into()],
     ));
+}
+
+/// One cell of the input-order equivalence probe, described in row-major order.
+struct ProbeCell {
+    kind: u8,
+    number: f64,
+    text: &'static str,
+    style: u32,
+    formula_source: Option<String>,
+    is_reference: bool,
+}
+
+/// Append the probe's string cells to a packed text payload in the given order.
+fn push_probe_text(
+    cells: &[ProbeCell],
+    order: impl Iterator<Item = usize>,
+    text: &mut Vec<u8>,
+    offsets: &mut Vec<u32>,
+) {
+    for index in order {
+        let cell = &cells[index];
+        if cell.kind == KIND_STRING {
+            text.extend_from_slice(cell.text.as_bytes());
+            offsets.push(text.len() as u32);
+        }
+    }
+}
+
+#[test]
+fn column_major_block_input_matches_row_major_for_mixed_cells() {
+    const ROWS: usize = 6;
+    const COLS: usize = 4;
+    const TEXT_POOL: [&str; 4] = ["", "alpha", "雪😀", "omega"];
+    let mut cells = Vec::with_capacity(ROWS * COLS);
+    for index in 0..ROWS * COLS {
+        let formula_source = (index % 7 == 3).then(|| format!("=A1+{index}"));
+        let is_reference = formula_source.is_none() && index % 11 == 5;
+        // Formula cells carry a string kind and text so the packed payload has
+        // to consume their slot without interning it.
+        let kind = if formula_source.is_some() {
+            KIND_STRING
+        } else {
+            match index % 5 {
+                0 => KIND_EMPTY,
+                1 | 4 => KIND_NUMBER,
+                2 => KIND_BOOL,
+                _ => KIND_STRING,
+            }
+        };
+        cells.push(ProbeCell {
+            kind,
+            number: index as f64 + 0.5,
+            text: TEXT_POOL[index % TEXT_POOL.len()],
+            style: index as u32 % 3 + 1,
+            formula_source,
+            is_reference,
+        });
+    }
+
+    let mut row_kinds = Vec::with_capacity(cells.len());
+    let mut row_numbers = Vec::with_capacity(cells.len());
+    let mut row_styles = Vec::with_capacity(cells.len());
+    let mut column_kinds = vec![KIND_EMPTY; cells.len()];
+    let mut column_numbers = vec![0.0; cells.len()];
+    let mut column_styles = vec![0u32; cells.len()];
+    for (index, cell) in cells.iter().enumerate() {
+        row_kinds.push(cell.kind);
+        row_numbers.push(cell.number);
+        row_styles.push(cell.style);
+        let column_index = (index % COLS) * ROWS + index / COLS;
+        column_kinds[column_index] = cell.kind;
+        column_numbers[column_index] = cell.number;
+        column_styles[column_index] = cell.style;
+    }
+
+    let mut row_text = Vec::new();
+    let mut row_text_offsets = vec![0u32];
+    let mut column_text = Vec::new();
+    let mut column_text_offsets = vec![0u32];
+    push_probe_text(&cells, 0..cells.len(), &mut row_text, &mut row_text_offsets);
+    push_probe_text(
+        &cells,
+        (0..COLS).flat_map(|col| (0..ROWS).map(move |row| row * COLS + col)),
+        &mut column_text,
+        &mut column_text_offsets,
+    );
+    assert_ne!(
+        row_text, column_text,
+        "the probe must exercise both text orders"
+    );
+
+    let mut row_formula_offsets = Vec::new();
+    let mut row_formula_sources = Vec::new();
+    for (index, cell) in cells.iter().enumerate() {
+        if let Some(source) = &cell.formula_source {
+            row_formula_offsets.push(index as u32);
+            row_formula_sources.push(source.clone());
+        }
+    }
+    let mut column_formula_offsets = Vec::new();
+    let mut column_formula_sources = Vec::new();
+    for col in 0..COLS {
+        for row in 0..ROWS {
+            let index = row * COLS + col;
+            if let Some(source) = &cells[index].formula_source {
+                column_formula_offsets.push((col * ROWS + row) as u32);
+                column_formula_sources.push(source.clone());
+            }
+        }
+    }
+    let mut row_reference_offsets = Vec::new();
+    let mut column_reference_offsets = Vec::new();
+    for (index, cell) in cells.iter().enumerate() {
+        if cell.is_reference {
+            row_reference_offsets.push(index as u32);
+            column_reference_offsets.push(((index % COLS) * ROWS + index / COLS) as u32);
+        }
+    }
+
+    let mut row_major = CellStore::new();
+    let row_sheet = row_major.add_sheet(COLS, ROWS);
+    let row_targets: Vec<u32> = row_reference_offsets
+        .iter()
+        .flat_map(|_| [row_sheet as u32, 0, 0])
+        .collect();
+    assert_eq!(
+        row_major.set_block_packed(
+            row_sheet,
+            0,
+            0,
+            ROWS,
+            COLS,
+            &row_kinds,
+            &row_numbers,
+            &row_text,
+            &row_text_offsets,
+            &row_styles,
+            &row_formula_offsets,
+            row_formula_sources,
+            &row_reference_offsets,
+            &row_targets,
+        ),
+        0
+    );
+
+    let mut column_major = CellStore::new();
+    let column_sheet = column_major.add_sheet(COLS, ROWS);
+    let column_targets: Vec<u32> = column_reference_offsets
+        .iter()
+        .flat_map(|_| [column_sheet as u32, 0, 0])
+        .collect();
+    assert_eq!(
+        column_major.set_column_block_packed(
+            column_sheet,
+            0,
+            0,
+            ROWS,
+            COLS,
+            &column_kinds,
+            &column_numbers,
+            &column_text,
+            &column_text_offsets,
+            &column_styles,
+            &column_formula_offsets,
+            column_formula_sources,
+            &column_reference_offsets,
+            &column_targets,
+        ),
+        0
+    );
+
+    row_major.recompute_changed_sources();
+    column_major.recompute_changed_sources();
+    for row in 0..ROWS {
+        for col in 0..COLS {
+            let expected = row_major.get_cell(row_sheet, row, col);
+            let actual = column_major.get_cell(column_sheet, row, col);
+            assert_eq!(actual.kind(), expected.kind(), "kind at {row}:{col}");
+            assert_close(actual.num(), expected.num());
+            assert_eq!(actual.string(), expected.string(), "text at {row}:{col}");
+            assert_eq!(actual.style(), expected.style(), "style at {row}:{col}");
+        }
+    }
+
+    let row_sources = row_major
+        .capture_sources(row_sheet, 0, 0, ROWS, COLS)
+        .expect("row-major sources");
+    let column_sources = column_major
+        .capture_sources(column_sheet, 0, 0, ROWS, COLS)
+        .expect("column-major sources");
+    assert_eq!(
+        row_sources.formula_offsets(),
+        column_sources.formula_offsets()
+    );
+    assert_eq!(
+        row_sources.formula_sources(),
+        column_sources.formula_sources()
+    );
+    assert_eq!(
+        row_sources.reference_offsets(),
+        column_sources.reference_offsets()
+    );
+    assert_eq!(
+        row_sources.reference_targets(),
+        column_sources.reference_targets()
+    );
+}
+
+/// Compact status the store returns for invalid or duplicate source metadata.
+const INVALID_SOURCE_STATUS: u32 = 2;
+
+#[test]
+fn column_major_block_input_rejects_metadata_that_row_major_rejects() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 2);
+    // Two string cells but only one text boundary.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            2,
+            1,
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            b"x",
+            &[0, 1],
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+    // Out-of-bounds formula offset.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            1,
+            1,
+            &[KIND_EMPTY],
+            &[0.0],
+            &[],
+            &[0],
+            &[0],
+            &[4],
+            vec!["=A1".to_string()],
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+    // Duplicate source offset.
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            0,
+            0,
+            2,
+            1,
+            &[KIND_EMPTY, KIND_EMPTY],
+            &[0.0, 0.0],
+            &[],
+            &[0],
+            &[0, 0],
+            &[0, 0],
+            vec!["=A1".to_string(), "=A2".to_string()],
+            &[],
+            &[],
+        ),
+        INVALID_SOURCE_STATUS
+    );
+}
+
+#[test]
+fn loaded_spans_match_per_row_loaded_probes() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+    store.set_column_numbers(sheet, 1, 2, &[1.0, 2.0, 3.0, 4.0], 0);
+    store.end_page_load();
+    // A local edit is loaded but dirty; both states belong in a run.
+    store.set_number(sheet, 7, 0, 9.0, 0);
+
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 0), vec![0, 4, 7, 8]);
+    assert_eq!(store.loaded_spans(sheet, 1, 6, 0), vec![1, 4]);
+    assert_eq!(store.loaded_spans(sheet, 4, 8, 0), vec![7, 8]);
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 1), vec![2, 6]);
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 2), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(sheet, 3, 1, 0), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(sheet, 0, 8, 9), Vec::<u32>::new());
+    assert_eq!(store.loaded_spans(usize::MAX, 0, 8, 0), Vec::<u32>::new());
+    // Rows past the sheet never join a run.
+    assert_eq!(store.loaded_spans(sheet, 0, 20, 0), vec![0, 4, 7, 8]);
+
+    let mut brute = CellStore::new();
+    let brute_sheet = brute.add_paged_sheet(1, 64, 8, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let mut state = 12_345u32;
+    let mut loaded = Vec::with_capacity(64);
+    for row in 0..64 {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let is_loaded = state % 3 != 0;
+        loaded.push(is_loaded);
+        if is_loaded {
+            brute.set_number(brute_sheet, row, 0, row as f64, 0);
+        }
+    }
+    for band_start in [0usize, 5, 17, 33] {
+        for band_end in [band_start + 1, band_start + 9, 64] {
+            let mut expected = Vec::new();
+            let mut run: Option<usize> = None;
+            for row in band_start..band_end {
+                if loaded[row] {
+                    run = run.or(Some(row));
+                } else if let Some(start) = run.take() {
+                    expected.push(start as u32);
+                    expected.push(row as u32);
+                }
+            }
+            if let Some(start) = run {
+                expected.push(start as u32);
+                expected.push(band_end as u32);
+            }
+            assert_eq!(
+                brute.loaded_spans(brute_sheet, band_start, band_end, 0),
+                expected,
+                "band {band_start}..{band_end}"
+            );
+        }
+    }
+}
+/// "Values" filter coverage: the per-column lookup must answer exactly what the
+/// linear scan answered, including NaN, `-0.0`, blanks, booleans and text.
+mod value_set_filter {
+    use crate::*;
+
+    /// Sentinel the view layer sends for a picked boolean; the `\0` prefix keeps
+    /// it distinct from a cell holding the text `TRUE`.
+    const PICKED_TRUE: &str = "\0TRUE";
+    /// Sentinel for a picked `FALSE`; see [`PICKED_TRUE`].
+    const PICKED_FALSE: &str = "\0FALSE";
+
+    /// One column of 15 rows covering every kind the filter distinguishes:
+    /// numbers (`-0.0` and NaN included), pooled text, a text cell that spells a
+    /// boolean, real booleans, a blank, an error formula and a text formula.
+    fn mixed_column_store() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 15);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 1, 0, -0.0, 0);
+        store.set_number(sheet, 2, 0, 0.0, 0);
+        store.set_number(sheet, 3, 0, f64::NAN, 0);
+        store.set_number(sheet, 4, 0, 2.0, 0);
+        store.set_string(sheet, 5, 0, "Alpha", 0);
+        store.set_string(sheet, 6, 0, "Beta", 0);
+        store.set_string(sheet, 7, 0, "TRUE", 0);
+        store.set_bool(sheet, 8, 0, true, 0);
+        store.set_bool(sheet, 9, 0, false, 0);
+        // Row 10 stays blank.
+        store.set_formula(sheet, 11, 0, "=1/0", 0);
+        store.set_formula(sheet, 12, 0, "=\"Alpha\"", 0);
+        store.set_number(sheet, 13, 0, 3.0, 0);
+        store.set_number(sheet, 14, 0, 7.0, 0);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    /// Runs a "values" filter over column 0; nine or more picks take the lookup
+    /// path, eight or fewer the linear scan.
+    fn filter_values(
+        store: &CellStore,
+        sheet: usize,
+        numbers: &[f64],
+        texts: &[&str],
+        include_blank: bool,
+    ) -> Vec<u32> {
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[0],
+            &[u8::from(include_blank)],
+            &[],
+            &[numbers.len() as u32],
+            &[texts.len() as u32],
+            numbers,
+            texts.iter().map(|text| (*text).to_string()).collect(),
+        )
+    }
+
+    #[test]
+    fn value_lookup_matches_the_linear_scan_for_numbers_with_nan_and_negative_zero() {
+        let (store, sheet) = mixed_column_store();
+        let long = [1.0, 0.0, -0.0, f64::NAN, 2.0, 3.0, 4.0, 5.0, 5.0];
+        let short = [1.0, 0.0, -0.0, f64::NAN, 2.0, 3.0, 4.0, 5.0];
+        // NaN is never equal to anything, and `-0.0` equals `0.0`; the NaN cell
+        // in row 3 and the unpicked 7.0 in row 14 stay out either way.
+        let expected = vec![0, 1, 2, 4, 13];
+        assert_eq!(filter_values(&store, sheet, &long, &[], false), expected);
+        assert_eq!(filter_values(&store, sheet, &short, &[], false), expected);
+    }
+
+    #[test]
+    fn value_lookup_matches_the_linear_scan_for_text_and_error_cells() {
+        let (store, sheet) = mixed_column_store();
+        let long = [
+            PICKED_TRUE,
+            PICKED_FALSE,
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "#DIV/0!",
+            "TRUE",
+            "delta",
+            "delta",
+        ];
+        let short = [
+            PICKED_TRUE,
+            PICKED_FALSE,
+            "Alpha",
+            "Beta",
+            "Gamma",
+            "#DIV/0!",
+            "TRUE",
+            "delta",
+        ];
+        // Rows: both pooled text values, the text cell spelling TRUE, both real
+        // booleans, and the error formula whose sentinel text is a pick.
+        let expected = vec![5, 6, 7, 8, 9, 11, 12];
+        assert_eq!(filter_values(&store, sheet, &[], &long, false), expected);
+        assert_eq!(filter_values(&store, sheet, &[], &short, false), expected);
+    }
+
+    #[test]
+    fn boolean_picks_match_boolean_cells_only() {
+        let (store, sheet) = mixed_column_store();
+        let picks = [PICKED_TRUE, PICKED_FALSE, "a", "b", "c", "d", "e", "f", "g"];
+        // The text cell in row 7 spells TRUE but is not a boolean.
+        assert_eq!(filter_values(&store, sheet, &[], &picks, false), vec![8, 9]);
+    }
+
+    #[test]
+    fn value_lookup_includes_blanks_only_when_asked() {
+        let (store, sheet) = mixed_column_store();
+        let picks = [
+            "Alpha", "Beta", "Gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota",
+        ];
+        // Row 12 is the text formula resolving to "Alpha".
+        assert_eq!(
+            filter_values(&store, sheet, &[], &picks, false),
+            vec![5, 6, 12]
+        );
+        assert_eq!(
+            filter_values(&store, sheet, &[], &picks, true),
+            vec![5, 6, 10, 12]
+        );
+    }
+}
+
+/// Multi-key sort coverage over hand-written fixtures: ties keep the row id,
+/// keys can descend, candidate lists drop out-of-range rows, kinds order as
+/// numbers, text, booleans, blanks, and `-0.0` compares equal to `0.0`.
+mod multi_key_sort_fixtures {
+    use super::*;
+
+    /// Two keys of five rows: (col0 text, col1 number).
+    fn text_number_fixture() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 5);
+        store.set_string(sheet, 0, 0, "b", 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_string(sheet, 1, 0, "a", 0);
+        store.set_number(sheet, 1, 1, 5.0, 0);
+        store.set_string(sheet, 2, 0, "b", 0);
+        store.set_number(sheet, 2, 1, 1.0, 0);
+        store.set_string(sheet, 3, 0, "a", 0);
+        store.set_number(sheet, 3, 1, 5.0, 0);
+        store.set_string(sheet, 4, 0, "c", 0);
+        store.set_number(sheet, 4, 1, 3.0, 0);
+        (store, sheet)
+    }
+
+    #[test]
+    fn multi_key_sort_ties_keep_the_row_id() {
+        let (store, sheet) = text_number_fixture();
+        // Rows 1 and 3 share both keys, so the row id keeps them in order.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![1, 3, 2, 0, 4]
+        );
+        // Descending leading key, ascending second key.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
+            vec![4, 2, 0, 1, 3]
+        );
+        // Both keys descending.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 0], &[]),
+            vec![4, 0, 2, 1, 3]
+        );
+    }
+
+    #[test]
+    fn multi_key_sort_filters_candidates_and_keeps_their_order() {
+        let (store, sheet) = text_number_fixture();
+        // 99 is out of range and drops out; the rest sort as the full list does.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[0, 2, 3, 99]),
+            vec![3, 2, 0]
+        );
+        // One key over a candidate list takes the multi-key path too.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[1], &[0], &[0, 2, 3]),
+            vec![3, 0, 2]
+        );
+    }
+
+    /// Column 0 mixes a number, text, a blank, booleans, an error formula and a
+    /// numeric formula; column 1 is constant so equal keys fall to the row id.
+    fn mixed_kind_fixture() -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 9);
+        store.set_number(sheet, 0, 0, 2.0, 0);
+        store.set_string(sheet, 1, 0, "a", 0);
+        // Row 2 stays blank.
+        store.set_bool(sheet, 3, 0, true, 0);
+        store.set_number(sheet, 4, 0, 1.0, 0);
+        store.set_string(sheet, 5, 0, "b", 0);
+        store.set_bool(sheet, 6, 0, false, 0);
+        store.set_formula(sheet, 7, 0, "=1/0", 0);
+        store.set_formula(sheet, 8, 0, "=2+1", 0);
+        for row in 0..9 {
+            store.set_string(sheet, row, 1, "const", 0);
+        }
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn multi_key_sort_orders_kinds_numbers_text_booleans_blanks() {
+        let (store, sheet) = mixed_kind_fixture();
+        // Ascending: numbers 1.0, 2.0, 3.0; then error text, "a", "b"; then
+        // false, true; the blank sorts last. Descending reverses each group.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![4, 0, 8, 7, 1, 5, 6, 3, 2]
+        );
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
+            vec![2, 3, 6, 5, 1, 7, 8, 0, 4]
+        );
+        // Candidates restrict the same order to the picked rows.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[1, 3, 8, 12]),
+            vec![8, 1, 3]
+        );
+    }
+
+    #[test]
+    fn multi_key_sort_compares_negative_zero_as_equal_to_zero() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, 4);
+        store.set_number(sheet, 0, 0, 0.0, 0);
+        store.set_number(sheet, 1, 0, -0.0, 0);
+        store.set_number(sheet, 2, 0, 1.0, 0);
+        store.set_number(sheet, 3, 0, -0.0, 0);
+        for row in 0..4 {
+            store.set_string(sheet, row, 1, "k", 0);
+        }
+        // `-0.0 == 0.0`, so the three equal keys keep row-id order.
+        assert_eq!(
+            store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
+            vec![0, 1, 3, 2]
+        );
+    }
+}
+
+mod formula_dependency_epoch {
+    use super::*;
+
+    #[test]
+    fn constant_only_formula_rewrite_keeps_the_dependency_index() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 4);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_formula(sheet, 0, 2, "=A1+B1+1", 0);
+        store.set_formula(sheet, 1, 2, "=C1*2", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 12.0);
+        assert_close(number(&store, sheet, 1, 2), 24.0);
+
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=A1+B1+2", 0);
+        assert_eq!(
+            store.formula_epoch, epoch_before,
+            "a constant-only rewrite must keep the cached dependency index"
+        );
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 13.0);
+        assert_close(number(&store, sheet, 1, 2), 26.0);
+
+        // The cached index still routes read-cell edits to the rewritten cell
+        // and onward to its dependents.
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 17.0);
+        assert_close(number(&store, sheet, 1, 2), 34.0);
+    }
+
+    #[test]
+    fn formula_rewrite_with_new_reads_rebuilds_dependents() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 2);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_formula(sheet, 0, 2, "=A1", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=B1", 0);
+        assert!(
+            store.formula_epoch > epoch_before,
+            "a changed read set must invalidate the dependency index"
+        );
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 2.0);
+
+        store.set_number(sheet, 0, 0, 9.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 2.0);
+        store.set_number(sheet, 0, 1, 7.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 7.0);
+    }
+
+    #[test]
+    fn formula_rewrite_across_scalar_and_array_shapes_keeps_spills_consistent() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 3);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=A1", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+        assert_eq!(store.get_cell(sheet, 1, 2).kind(), KIND_EMPTY);
+
+        // Scalar to array: the spill arrives.
+        store.set_formula(sheet, 0, 2, "=A1:A3", 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0]
+        );
+
+        // Array to a different array with the same reads and shape: the index
+        // survives the rewrite and the spill is re-materialized.
+        let epoch_before = store.formula_epoch;
+        store.set_formula(sheet, 0, 2, "=SORT(A1:A3)", 0);
+        assert_eq!(store.formula_epoch, epoch_before);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0]
+        );
+
+        // Array back to scalar: the spill is released.
+        store.set_formula(sheet, 0, 2, "=A1+A2+A3", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 6.0);
+        assert_eq!(store.get_cell(sheet, 1, 2).kind(), KIND_EMPTY);
+        assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+    }
+
+    #[test]
+    fn batch_edits_refresh_spill_anchors_only_when_they_hit_the_range() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..4 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=A1:A4", 0);
+        store.set_formula(sheet, 0, 3, "=A1:A4", 0);
+        store.set_formula(sheet, 6, 2, "=C3*10", 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 3)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+        assert_close(number(&store, sheet, 6, 2), 30.0);
+
+        // Dirty cells outside every spilled range leave the spills as they are.
+        for row in 0..4 {
+            store.set_number(sheet, row, 5, 100.0 + row as f64, 0);
+        }
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 3.0, 4.0]
+        );
+
+        // A read-cell edit inside both spilled source ranges refreshes every
+        // dependent, including the formula that reads a spill cell whose value
+        // changed.
+        store.set_number(sheet, 2, 0, 30.0, 0);
+        store.recompute(sheet);
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 2)),
+            [1.0, 2.0, 30.0, 4.0]
+        );
+        assert_eq!(
+            [0, 1, 2, 3].map(|row| number(&store, sheet, row, 3)),
+            [1.0, 2.0, 30.0, 4.0]
+        );
+        assert_close(number(&store, sheet, 6, 2), 300.0);
+    }
+
+    fn next_rand(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        *state >> 33
+    }
+
+    fn snapshot_cells(store: &CellStore, sheet: usize, rows: usize, cols: usize) -> Vec<(u8, f64)> {
+        let mut cells = Vec::with_capacity(rows * cols);
+        for row in 0..rows {
+            for col in 0..cols {
+                let cell = store.get_cell(sheet, row, col);
+                cells.push((cell.kind(), cell.num()));
+            }
+        }
+        cells
+    }
+
+    /// A randomized edit sequence must land on exactly the values a rebuild
+    /// produces. A dependency index that survives an edit it should not, or a
+    /// spill anchor the dirty scan misses, would leave stale cells behind and
+    /// fail the comparison.
+    #[test]
+    fn random_edit_sequences_match_a_full_rebuild() {
+        const ROWS: usize = 10;
+        const COLS: usize = 5;
+        const EDITS: usize = 60;
+        let array_sources = ["=A1:A5", "=A1:A3", "=A1:A5+1", "=SUM(A1:A5)", "=SUM(A1:B5)"];
+        let dependent_sources = ["=C3*2", "=C4*2", "=SUM(A1:B5)"];
+        for seed in [1_u64, 7, 99] {
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(COLS, ROWS);
+            let mut state = seed;
+            for row in 0..ROWS {
+                for col in 0..2 {
+                    let value = (next_rand(&mut state) % 100) as f64;
+                    store.set_number(sheet, row, col, value, 0);
+                }
+            }
+            store.set_formula(sheet, 0, 2, array_sources[0], 0);
+            store.set_formula(sheet, 0, 3, "=SUM(A1:A5)", 0);
+            store.set_formula(sheet, 5, 4, dependent_sources[0], 0);
+            store.recompute(sheet);
+            for edit in 0..EDITS {
+                match next_rand(&mut state) % 5 {
+                    // Rewrite the spilled formula between shapes that read the
+                    // same cells and shapes that do not.
+                    0 => {
+                        let source = array_sources[(next_rand(&mut state) % 5) as usize];
+                        store.set_formula(sheet, 0, 2, source, 0);
+                    }
+                    // Edit a source cell of the spilled range.
+                    1 => {
+                        let row = (next_rand(&mut state) % ROWS as u64) as usize;
+                        let col = (next_rand(&mut state) % 2) as usize;
+                        let value = (next_rand(&mut state) % 1000) as f64;
+                        store.set_number(sheet, row, col, value, 0);
+                    }
+                    // Overwrite a cell inside a spilled block.
+                    2 => {
+                        let row = (next_rand(&mut state) % 5) as usize;
+                        let col = 2 + (next_rand(&mut state) % 2) as usize;
+                        let value = (next_rand(&mut state) % 1000) as f64;
+                        store.set_number(sheet, row, col, value, 0);
+                    }
+                    // Edit an unrelated cell.
+                    3 => {
+                        let row = (next_rand(&mut state) % ROWS as u64) as usize;
+                        if row != 5 {
+                            let value = (next_rand(&mut state) % 1000) as f64;
+                            store.set_number(sheet, row, 4, value, 0);
+                        }
+                    }
+                    // Rewrite a formula that reads a cell of the spilled block.
+                    _ => {
+                        let source = dependent_sources[(next_rand(&mut state) % 3) as usize];
+                        store.set_formula(sheet, 5, 4, source, 0);
+                    }
+                }
+                store.recompute(sheet);
+                let incremental = snapshot_cells(&store, sheet, ROWS, COLS);
+                // Drop every cache and dirty the whole sheet: the next pass
+                // must produce the same values from scratch.
+                store.dep_index = None;
+                store.sheets[sheet].all_dirty = true;
+                store.recompute(sheet);
+                assert_eq!(
+                    snapshot_cells(&store, sheet, ROWS, COLS),
+                    incremental,
+                    "seed={seed} edit={edit}"
+                );
+            }
+        }
+    }
+}
+
+/// Lookups that share a range reuse one decode; the reuse must not survive
+/// the recalculation, so an edit to the table has to show up.
+mod lookup_reuse {
+    use super::{assert_close, number};
+    use crate::CellStore;
+
+    #[test]
+    fn reused_lookups_notice_table_edits() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for row in 0..6 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+            store.set_number(sheet, row, 1, (row as f64 + 1.0) * 10.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=MATCH(4,A1:A6,0)", 0);
+        store.set_formula(sheet, 3, 2, "=XLOOKUP(4,A1:A6,B1:B6)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 40.0);
+        assert_close(number(&store, sheet, 1, 2), 40.0);
+        assert_close(number(&store, sheet, 2, 2), 4.0);
+        assert_close(number(&store, sheet, 3, 2), 40.0);
+
+        store.set_number(sheet, 3, 1, 400.0, 0);
+        store.set_number(sheet, 0, 0, 9.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 400.0);
+        assert_close(number(&store, sheet, 1, 2), 400.0);
+        assert_close(number(&store, sheet, 2, 2), 4.0);
+        assert_close(number(&store, sheet, 3, 2), 400.0);
+    }
+
+    /// A table that holds formulas changes during the pass, so it keeps the
+    /// plain materialization path and still answers with the fresh values.
+    #[test]
+    fn lookup_tables_holding_formulas_stay_correct() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for row in 0..6 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_number(sheet, 7, 7, 4.0, 0);
+        store.set_formula(sheet, 3, 1, "=H8*10", 0);
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(4,A1:B6,2,FALSE)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 40.0);
+
+        store.set_number(sheet, 7, 7, 8.0, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 80.0);
+    }
+}
+
+/// Lookup results through the public formula surface: duplicates, sorted-mode
+/// validation, the blank/zero/empty/`FALSE` equivalences, case folding and
+/// error precedence.
+mod lookup_results {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn duplicates_and_sorted_modes_follow_the_lookup_rules() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for (row, (key, result)) in [
+            (1.0, 10.0),
+            (2.0, 20.0),
+            (2.0, 200.0),
+            (3.0, 30.0),
+            (4.0, 40.0),
+        ]
+        .iter()
+        .enumerate()
+        {
+            store.set_number(sheet, row, 0, *key, 0);
+            store.set_number(sheet, row, 1, *result, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(2,A1:B5,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(2.5,A1:B5,2,TRUE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(0,A1:B5,2,TRUE)", 0);
+        store.set_formula(sheet, 3, 2, "=MATCH(2,A1:A5,0)", 0);
+        store.set_formula(sheet, 4, 2, "=XMATCH(2,A1:A5,0,-1)", 0);
+        store.set_formula(sheet, 5, 2, "=XLOOKUP(2,A1:A5,B1:B5,,-1,-1)", 0);
+        store.set_formula(sheet, 6, 2, "=XLOOKUP(9,A1:A5,B1:B5,,0)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 20.0);
+        assert_close(number(&store, sheet, 1, 2), 20.0);
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#N/A"));
+        assert_close(number(&store, sheet, 3, 2), 2.0);
+        assert_close(number(&store, sheet, 4, 2), 3.0);
+        assert_close(number(&store, sheet, 5, 2), 200.0);
+        assert_eq!(string(&store, sheet, 6, 2).as_deref(), Some("#N/A"));
+    }
+
+    #[test]
+    fn sorted_lookup_modes_refuse_an_unsorted_key_column() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for (row, key) in [3.0, 1.0, 2.0, 4.0].iter().enumerate() {
+            store.set_number(sheet, row, 0, *key, 0);
+            store.set_number(sheet, row, 1, *key * 10.0, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(3,A1:B4,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(3,A1:B4,2,TRUE)", 0);
+        store.set_formula(sheet, 2, 2, "=MATCH(3,A1:A4,1)", 0);
+        store.set_formula(sheet, 3, 2, "=XLOOKUP(3,A1:A4,B1:B4,,0,2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 30.0);
+        assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("#N/A"));
+    }
+
+    #[test]
+    fn keys_compare_like_the_engine_for_blank_zero_empty_and_case() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 0.0, 0);
+        store.set_string(sheet, 2, 0, "", 0);
+        store.set_bool(sheet, 3, 0, false, 0);
+        store.set_string(sheet, 4, 0, "café", 0);
+        store.set_string(sheet, 5, 0, "Key", 0);
+        for row in 0..6 {
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(0,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(\"\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(FALSE,A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 3, 2, "=VLOOKUP(\"CAFÉ\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 4, 2, "=VLOOKUP(\"key\",A1:B6,2,FALSE)", 0);
+        store.set_formula(sheet, 5, 2, "=XMATCH(\"k*\",A1:A6,2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 1.0);
+        assert_close(number(&store, sheet, 1, 2), 2.0);
+        assert_close(number(&store, sheet, 2, 2), 2.0);
+        assert_close(number(&store, sheet, 3, 2), 5.0);
+        assert_close(number(&store, sheet, 4, 2), 6.0);
+        assert_close(number(&store, sheet, 5, 2), 6.0);
+    }
+
+    #[test]
+    fn lookup_error_cells_keep_their_precedence() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_formula(sheet, 1, 0, "=1/0", 0);
+        store.set_number(sheet, 2, 0, 3.0, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_number(sheet, 1, 1, 20.0, 0);
+        store.set_number(sheet, 2, 1, 30.0, 0);
+        store.set_formula(sheet, 0, 2, "=VLOOKUP(1,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 1, 2, "=VLOOKUP(3,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 2, 2, "=VLOOKUP(99,A1:B3,2,FALSE)", 0);
+        store.set_formula(sheet, 3, 2, "=VLOOKUP(1,A1:B3,9,FALSE)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 10.0);
+        assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("#REF!"));
+    }
+}
+
+/// Reductions and criteria functions over their ranges, through the public
+/// formula surface: multi-range folds, matching rows and error precedence.
+mod streamed_reductions {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn multi_range_reductions_fold_every_argument() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_number(sheet, 1, 0, 2.0, 0);
+        store.set_string(sheet, 2, 0, "text", 0);
+        store.set_bool(sheet, 3, 0, true, 0);
+        store.set_number(sheet, 0, 1, 10.0, 0);
+        store.set_number(sheet, 1, 1, 20.0, 0);
+        store.set_number(sheet, 2, 1, 30.0, 0);
+        store.set_number(sheet, 3, 1, 40.0, 0);
+        store.set_formula(sheet, 0, 2, "=SUM(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 1, 2, "=AVERAGE(A1:A4)", 0);
+        store.set_formula(sheet, 2, 2, "=COUNT(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 3, 2, "=COUNTA(A1:A4)", 0);
+        store.set_formula(sheet, 4, 2, "=MIN(A1:A4,B1:B4)", 0);
+        store.set_formula(sheet, 5, 2, "=MAX(A1:A4,B1:B4)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 103.0);
+        assert_close(number(&store, sheet, 1, 2), 1.5);
+        assert_close(number(&store, sheet, 2, 2), 6.0);
+        assert_close(number(&store, sheet, 3, 2), 4.0);
+        assert_close(number(&store, sheet, 4, 2), 1.0);
+        assert_close(number(&store, sheet, 5, 2), 40.0);
+    }
+
+    #[test]
+    fn streamed_reductions_keep_argument_error_order() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        store.set_formula(sheet, 1, 0, "=1/0", 0);
+        store.set_number(sheet, 0, 1, 2.0, 0);
+        store.set_formula(sheet, 1, 1, "=NA()", 0);
+        store.set_number(sheet, 0, 2, 5.0, 0);
+        store.set_formula(sheet, 0, 3, "=SUM(A1:A3,B1:B3)", 0);
+        store.set_formula(sheet, 1, 3, "=SUM(B1:B3,A1:A3)", 0);
+        store.set_formula(sheet, 2, 3, "=AVERAGE(A1:A3)", 0);
+        store.set_formula(sheet, 3, 3, "=COUNT(C1:C3)", 0);
+        store.set_formula(sheet, 4, 3, "=COUNTA(C1:C3)", 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("#N/A"));
+        assert_eq!(string(&store, sheet, 2, 3).as_deref(), Some("#DIV/0!"));
+        assert_close(number(&store, sheet, 3, 3), 1.0);
+        assert_close(number(&store, sheet, 4, 3), 1.0);
+    }
+
+    #[test]
+    fn criteria_functions_walk_matching_rows() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for row in 0..5 {
+            store.set_string(sheet, row, 0, ["a", "b", "a", "b", "a"][row], 0);
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+            store.set_number(sheet, row, 2, ((row + 1) * 10) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 3, "=COUNTIF(A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 1, 3, "=SUMIF(A1:A5,\"a\",B1:B5)", 0);
+        store.set_formula(sheet, 2, 3, "=SUMIFS(B1:B5,A1:A5,\"b\",C1:C5,\">20\")", 0);
+        store.set_formula(sheet, 3, 3, "=COUNTIFS(A1:A5,\"b\",B1:B5,\">1\")", 0);
+        store.set_formula(sheet, 4, 3, "=AVERAGEIF(A1:A5,\"b\",B1:B5)", 0);
+        store.set_formula(sheet, 5, 3, "=MAXIFS(B1:B5,A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 6, 3, "=MINIFS(B1:B5,A1:A5,\"a\")", 0);
+        store.set_formula(sheet, 7, 3, "=SUMIF(A1:A5,\"z\",B1:B5)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 3), 3.0);
+        assert_close(number(&store, sheet, 1, 3), 9.0);
+        assert_close(number(&store, sheet, 2, 3), 4.0);
+        assert_close(number(&store, sheet, 3, 3), 2.0);
+        assert_close(number(&store, sheet, 4, 3), 3.0);
+        assert_close(number(&store, sheet, 5, 3), 5.0);
+        assert_close(number(&store, sheet, 6, 3), 1.0);
+        assert_close(number(&store, sheet, 7, 3), 0.0);
+    }
+
+    #[test]
+    fn criteria_wildcards_and_empty_matches_keep_their_results() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..4 {
+            store.set_string(sheet, row, 0, ["Key", "key", "Other", "Key"][row], 0);
+            store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 2, "=COUNTIF(A1:A4,\"k*\")", 0);
+        store.set_formula(sheet, 1, 2, "=SUMIF(A1:A4,\"k?y\",B1:B4)", 0);
+        store.set_formula(sheet, 2, 2, "=AVERAGEIF(A1:A4,\"z\",B1:B4)", 0);
+        store.set_formula(sheet, 3, 2, "=MAXIFS(B1:B4,A1:A4,\"z\")", 0);
+        store.set_formula(sheet, 4, 2, "=COUNTIFS(A1:A4,\"k*\",B1:B4,\">1\")", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 3.0);
+        assert_close(number(&store, sheet, 1, 2), 1.0 + 2.0 + 4.0);
+        assert_eq!(string(&store, sheet, 2, 2).as_deref(), Some("#DIV/0!"));
+        assert_close(number(&store, sheet, 3, 2), 0.0);
+        assert_close(number(&store, sheet, 4, 2), 2.0);
+    }
+}
+
+/// LET bindings through the public formula surface: unused bindings stay
+/// unevaluated, errors and shadowing behave as before, and range and array
+/// bindings keep their value shape.
+mod let_bindings {
+    use super::{assert_close, number, string};
+    use crate::CellStore;
+
+    #[test]
+    fn unused_bindings_are_not_evaluated_and_used_errors_propagate() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1/0,5)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1/0,x+1)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,y,1/0,x+y)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 5.0);
+        assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#DIV/0!"));
+        assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#DIV/0!"));
+    }
+
+    #[test]
+    fn bindings_keep_shadowing_and_visibility_rules() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_formula(sheet, 0, 0, "=LET(x,1,x,2,x+10)", 0);
+        store.set_formula(sheet, 1, 0, "=LET(x,1,y,x+1,x+y)", 0);
+        store.set_formula(sheet, 2, 0, "=LET(x,2,LET(y,3,x*y))", 0);
+        store.set_formula(sheet, 3, 0, "=LET(x,2,LET(x,3,x*2))", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 12.0);
+        assert_close(number(&store, sheet, 1, 0), 3.0);
+        assert_close(number(&store, sheet, 2, 0), 6.0);
+        assert_close(number(&store, sheet, 3, 0), 6.0);
+    }
+
+    #[test]
+    fn range_and_array_bindings_keep_their_value_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 8);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(sheet, 0, 1, "=LET(x,A1:A3,SUM(x))", 0);
+        store.set_formula(sheet, 1, 1, "=LET(x,A1:A3,SUM(x)+SUM(x))", 0);
+        store.set_formula(sheet, 2, 1, "=LET(x,A1:A3,MATCH(2,x,0))", 0);
+        store.set_formula(sheet, 3, 1, "=LET(x,SEQUENCE(3),SUM(x))", 0);
+        store.set_formula(sheet, 0, 3, "=LET(x,SEQUENCE(3),x)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 1), 6.0);
+        assert_close(number(&store, sheet, 1, 1), 12.0);
+        assert_close(number(&store, sheet, 2, 1), 2.0);
+        assert_close(number(&store, sheet, 3, 1), 6.0);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_close(number(&store, sheet, 2, 3), 3.0);
+    }
+}
+
+#[test]
+fn rejected_packed_text_adds_nothing_to_the_string_pool() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let write = |store: &mut CellStore, text: &str, offsets: &[u32]| {
+        store.set_block_packed(
+            sheet,
+            0,
+            0,
+            1,
+            2,
+            &[KIND_STRING, KIND_STRING],
+            &[0.0, 0.0],
+            text.as_bytes(),
+            offsets,
+            &[0, 0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        )
+    };
+    // Two string cells but one packed string.
+    assert_eq!(write(&mut store, "ab", &[0, 2]), 2);
+    // A bound inside the two-byte `é`.
+    assert_eq!(write(&mut store, "éa", &[0, 1, 3]), 2);
+    assert!(
+        store.strings.get(0).is_none(),
+        "a rejected block interned text"
+    );
+
+    assert_eq!(write(&mut store, "éa", &[0, 2, 3]), 0);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("é"));
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("a"));
 }

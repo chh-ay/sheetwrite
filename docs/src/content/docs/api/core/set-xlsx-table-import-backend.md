@@ -8,7 +8,7 @@ description: "Registers the optional table XLSX import implementation used by co
 Registers the optional table XLSX import implementation used by core.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L359"><code>packages/core/src/export.ts#L359</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L383"><code>packages/core/src/export.ts#L383</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -57,6 +57,81 @@ const DATE_TIME_FORMATTER_CACHE_LIMIT = 64;
 const formatCache = new Map<string, CompiledFormat>();
 const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Rendered-text cache for numbers and dates. `Intl` formatting and date token
+ * rendering dominate a repaint of formatted columns, and a scrolled frame
+ * re-renders the same values repeatedly. The outer map is keyed by the format
+ * code, then the locale, then the value, so a lookup never builds a composite
+ * key string.
+ *
+ * Three bounds keep the cache small: at most `NUMBER_TEXT_GROUP_LIMIT`
+ * (format, locale) groups, at most `NUMBER_TEXT_PER_GROUP_LIMIT` values in each
+ * group, and nothing longer than `NUMBER_TEXT_MAX_TEXT_LENGTH` characters. The
+ * worst case is therefore 8 × 512 = 4096 strings of at most 128 characters
+ * (about one MiB of text), and the group keys are references to strings the
+ * caller already holds.
+ */
+const NUMBER_TEXT_GROUP_LIMIT = 8;
+const NUMBER_TEXT_PER_GROUP_LIMIT = 512;
+const NUMBER_TEXT_MAX_TEXT_LENGTH = 128;
+const numberTextCache = new Map<string, Map<string, Map<number, string>>>();
+let numberTextGroups = 0;
+
+/** Drop the least recently added (format, locale) group. */
+function dropOldestNumberTextGroup(): void {
+  const oldestCode = numberTextCache.keys().next();
+  if (oldestCode.done) return;
+  const byLocale = numberTextCache.get(oldestCode.value);
+  if (byLocale === undefined) return;
+  const oldestLocale = byLocale.keys().next();
+  if (oldestLocale.done) {
+    numberTextCache.delete(oldestCode.value);
+    return;
+  }
+  byLocale.delete(oldestLocale.value);
+  numberTextGroups -= 1;
+  if (byLocale.size === 0) numberTextCache.delete(oldestCode.value);
+}
+
+function lookupNumberText(code: string, locale: string, value: number): string | undefined {
+  const byLocale = numberTextCache.get(code);
+  if (byLocale === undefined) return undefined;
+  const texts = byLocale.get(locale);
+  if (texts === undefined) return undefined;
+  const cached = texts.get(value);
+  if (cached === undefined) return undefined;
+  // Refresh recency so a scrolling window keeps the values it re-reads.
+  texts.delete(value);
+  texts.set(value, cached);
+  return cached;
+}
+
+function rememberNumberText(code: string, locale: string, value: number, text: string): string {
+  // Long output is rare and would make the retained text unbounded.
+  if (text.length > NUMBER_TEXT_MAX_TEXT_LENGTH) return text;
+  let byLocale = numberTextCache.get(code);
+  if (byLocale === undefined) {
+    byLocale = new Map();
+    numberTextCache.set(code, byLocale);
+  }
+  let texts = byLocale.get(locale);
+  if (texts === undefined) {
+    if (numberTextGroups >= NUMBER_TEXT_GROUP_LIMIT) dropOldestNumberTextGroup();
+    texts = new Map();
+    byLocale.set(locale, texts);
+    numberTextGroups += 1;
+  }
+  if (texts.delete(value)) texts.set(value, text);
+  else {
+    texts.set(value, text);
+    if (texts.size > NUMBER_TEXT_PER_GROUP_LIMIT) {
+      const oldest = texts.keys().next();
+      if (!oldest.done) texts.delete(oldest.value);
+    }
+  }
+  return text;
+}
 let compiledFormats = 0;
 let numberFormatters = 0;
 let dateTimeFormatters = 0;
@@ -125,6 +200,8 @@ export function resetNumberFormatResourcesForTest(): void {
   formatCache.clear();
   numberFormatterCache.clear();
   dateTimeFormatterCache.clear();
+  numberTextCache.clear();
+  numberTextGroups = 0;
   compiledFormats = 0;
   numberFormatters = 0;
   dateTimeFormatters = 0;
@@ -464,6 +541,22 @@ export function formatNumber(value: number | string, code?: string, locale = "en
     return textSection === undefined ? value : textSection.literal.replaceAll("@", value);
   }
   if (!Number.isFinite(value)) return "";
+
+  // `-0` and `0` share one Map key under SameValueZero but can render
+  // differently (a one-section code keeps the raw negative magnitude), so
+  // negative zero never enters the cache.
+  const cacheable = !Object.is(value, -0);
+  const formatCode = code ?? "";
+  if (cacheable) {
+    const cached = lookupNumberText(formatCode, locale, value);
+    if (cached !== undefined) return cached;
+  }
+  const text = renderNumberText(value, code, locale);
+  return cacheable ? rememberNumberText(formatCode, locale, value, text) : text;
+}
+
+/** Uncached format core; `formatNumber` owns the shared text cache. */
+function renderNumberText(value: number, code: string | undefined, locale: string): string {
   if (!code) return defaultFormatter(locale).format(value);
 
   const { section, magnitude } = sectionFor(value, compileFormat(code));

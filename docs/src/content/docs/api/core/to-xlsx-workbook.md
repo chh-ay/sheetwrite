@@ -8,7 +8,7 @@ description: "Formula-preserving, multi-sheet workbook export through the option
 Formula-preserving, multi-sheet workbook export through the optional XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L441"><code>packages/core/src/export.ts#L441</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L465"><code>packages/core/src/export.ts#L465</code></a></dd></div>
 </dl>
 
 ## Declaration

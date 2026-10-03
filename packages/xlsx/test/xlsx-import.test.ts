@@ -12,6 +12,7 @@ import {
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { registerXlsxBackends } from "../src/index.js";
+import { rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
 
 const FIXTURES = new URL("./fixtures/", import.meta.url);
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
@@ -427,6 +428,25 @@ describe("workbook OOXML fidelity", () => {
       { kind: "literal", value: 2 },
       { kind: "literal", value: 3 },
     ]);
+  });
+
+  it("applies column styles declared after the sheet data", async () => {
+    const styles = stylesXml(
+      '<fonts count="2"><font/><font><b/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
+    );
+    const imported = await fromXlsxWorkbook(
+      rawXlsx({
+        styles,
+        sheets: [
+          {
+            xml: worksheet(
+              '<dimension ref="A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><cols><col min="1" max="1" style="1"/></cols>',
+            ),
+          },
+        ],
+      }),
+    );
+    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toEqual({ bold: true });
   });
 });
 

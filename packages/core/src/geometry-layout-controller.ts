@@ -106,6 +106,13 @@ export class GeometryLayoutController {
     return this.visibleColumnIndices[next]!;
   }
 
+  /** Visible column before `column`, or -1 when it is hidden or the first one. */
+  previousVisibleColumn(column: number): number {
+    const position = this.columnIndex.positionOf(column);
+    if (position <= 0) return -1;
+    return this.visibleColumnIndices[position - 1] ?? -1;
+  }
+
   rowAtOffset(contentY: number): number {
     return this.rowIndex.rowAtOffset(contentY).row;
   }

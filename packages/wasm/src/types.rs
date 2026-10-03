@@ -175,6 +175,7 @@ impl ReadSet {
 
     pub(crate) fn collect(&mut self, ast: &Ast, formula_sheet: u32) {
         match ast {
+            Ast::LetSlot { expression, .. } => self.collect(expression, formula_sheet),
             Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
                 sheet: formula_sheet,
                 row: *row,
@@ -258,6 +259,7 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             ast_is_volatile(left) || ast_is_volatile(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
+        Ast::LetSlot { expression, .. } => ast_is_volatile(expression),
         _ => false,
     }
 }
@@ -270,6 +272,7 @@ fn ast_contains_let(ast: &Ast) -> bool {
             ast_contains_let(left) || ast_contains_let(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
+        Ast::LetSlot { expression, .. } => ast_contains_let(expression),
         _ => false,
     }
 }

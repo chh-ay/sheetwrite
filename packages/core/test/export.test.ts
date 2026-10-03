@@ -312,6 +312,23 @@ describe("export", () => {
     store.dispose();
   });
 
+  it("drops extra CSV fields from the projection but still counts them toward ceilings", () => {
+    const columns: Column[] = [
+      { key: "a", header: "A", width: 80, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text" },
+    ];
+    expect(fromCsv("A,B,C\r\n1,2,3\r\n4", columns)).toEqual({
+      rowCount: 2,
+      columns: { a: ["1", "4"], b: ["2", null] },
+    });
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxColumns: 2 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxCells: 5 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+  });
+
   it("coerces declared types canonically and loads booleans and dates without type loss", () => {
     const columns: Column[] = [
       { key: "bool", header: "Bool", width: 80, type: "text" },
@@ -352,6 +369,18 @@ describe("export", () => {
     expect(store.getCell({ sheet: "types", row: 0, col: 6 }).resolved).toBe("=1+1");
     expect(store.getFormula({ sheet: "types", row: 0, col: 6 })).toBeNull();
     store.dispose();
+  });
+
+  it("keeps non-ASCII boolean look-alikes and formula-like dates as text", () => {
+    const columns: Column[] = [
+      { key: "flag", header: "Flag", width: 80, type: "number" },
+      { key: "when", header: "When", width: 80, type: "date" },
+    ];
+    // `ſ` upper-cases to `S`, but spreadsheet booleans are ASCII only.
+    expect(fromCsv("Flag,When\nfalſe,=2026-07-18\nFaLsE,2026-07-18", columns).columns).toEqual({
+      flag: ["falſe", false],
+      when: ["=2026-07-18", parseDateInput("2026-07-18")],
+    });
   });
 
   it("enforces exact defaults and limit+1 before oversized delimited allocations", () => {
