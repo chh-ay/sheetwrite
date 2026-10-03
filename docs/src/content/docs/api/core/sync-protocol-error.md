@@ -8,7 +8,7 @@ description: "Typed rejection of malformed or resource-exhausting synchronizatio
 Typed rejection of malformed or resource-exhausting synchronization input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L179"><code>packages/core/src/sync.ts#L179</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L204"><code>packages/core/src/sync.ts#L204</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -9,6 +9,7 @@ import {
   rebaseDocumentOperations,
   type SheetSnapshot,
 } from "../src/index.js";
+import { decodeRestoreBlock, encodeRestoreBlock } from "../src/restore-block.js";
 
 const SHEET = "s1";
 const OTHER_SHEET = "s2";
@@ -23,6 +24,7 @@ const OP_CONFLICT_FAMILY = {
   setNote: "cell",
   setRange: "range",
   setBlock: "range",
+  restoreBlock: "range",
   setRangeStyle: "range",
   clearRange: "range",
   addRows: "sheet",
@@ -863,5 +865,72 @@ describe("server ordering, immutability, and determinism", () => {
         },
       ],
     });
+  });
+});
+
+describe("compressed restore rebasing", () => {
+  const target = { sheet: SHEET, start: { row: 8, col: 1 }, end: { row: 8, col: 1 } };
+  const block = {
+    rowCount: 1,
+    colCount: 1,
+    values: [null],
+    refs: [[0, { sheet: SHEET, row: 9, col: 1 }]] as [number, CellAddress][],
+    styleTable: [{ bold: true }],
+    styleIds: [0],
+  };
+
+  it("shifts both restore target and packed refs while preserving serialized encoding and caller input", () => {
+    const original = encodeRestoreBlock(target, block);
+    const before = JSON.stringify(original);
+    const result = rebaseDocumentOperations(
+      [original],
+      [{ op: "addRows", sheet: SHEET, at: 4, count: 2 }],
+    );
+    expect(result.status).toBe("rebased");
+    if (result.status !== "rebased") throw new Error("Expected safe restore rebase");
+    const restored = result.operations[0];
+    if (restored?.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+    expect(restored.range).toEqual({
+      sheet: SHEET,
+      start: { row: 10, col: 1 },
+      end: { row: 10, col: 1 },
+    });
+    expect(restored.encoding).toBe("deflate-json-v1");
+    expect(decodeRestoreBlock(restored)).toEqual({
+      ...block,
+      refs: [[0, { sheet: SHEET, row: 11, col: 1 }]],
+    });
+    expect(JSON.stringify(original)).toBe(before);
+  });
+
+  it("shifts cross-sheet packed references for column edits without moving its restore target", () => {
+    const original = encodeRestoreBlock({ ...target, sheet: OTHER_SHEET }, block);
+    const result = rebaseDocumentOperations([original], [structure("column", "insert", 0, 2)]);
+    if (result.status !== "rebased") throw new Error("Expected safe cross-sheet rebase");
+    const restored = result.operations[0];
+    if (restored?.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+    expect(restored.range).toEqual(original.range);
+    expect(decodeRestoreBlock(restored).refs).toEqual([[0, { sheet: SHEET, row: 9, col: 3 }]]);
+    expectConflict([original], [structure("row", "delete", 9, 1)], "structural-overlap");
+  });
+
+  it("keeps conservative formula conflicts and detects restore overlap from either side", () => {
+    const formula = encodeRestoreBlock(target, {
+      rowCount: 1,
+      colCount: 1,
+      values: [null],
+      formulas: [[0, "=A1"]],
+    });
+    expectConflict([formula], [structure("row", "insert")], "formula-structural");
+    const restored = encodeRestoreBlock(target, block);
+    const edit: DocumentOp = {
+      op: "set",
+      addr: { sheet: SHEET, row: 8, col: 1 },
+      value: literal(),
+    };
+    expectConflict([restored], [edit], "overlapping-edit");
+    expectConflict([edit], [restored], "overlapping-edit");
+    expectConflict([restored], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    expectConflict([restored], [structure("row", "delete", 8, 1)], "structural-overlap");
   });
 });

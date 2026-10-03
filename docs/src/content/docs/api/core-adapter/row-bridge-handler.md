@@ -8,7 +8,7 @@ description: "Callback accepted by imperative and framework adapters."
 Callback accepted by imperative and framework adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L198"><code>packages/core/src/row-bridge.ts#L198</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L199"><code>packages/core/src/row-bridge.ts#L199</code></a></dd></div>
 </dl>
 
 ## Declaration

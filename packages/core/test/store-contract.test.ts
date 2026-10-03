@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { SnapshotResourceError, SnapshotValidationError } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { ChangeEvent, DocumentOp, Workbook } from "../src/types.js";
+import type { ChangeEvent, DocumentOp, PackedCellBlock, Workbook } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -20,7 +21,7 @@ function contractWorkbook(): Workbook {
   return workbook;
 }
 
-function runFacadeContract(storage: "dense" | "paged"): void {
+function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): void {
   const store = new SheetwriteStore(contractWorkbook(), undefined, {
     storage,
     chunkRows: 4,
@@ -44,6 +45,15 @@ function runFacadeContract(storage: "dense" | "paged"): void {
 
   const range = { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } };
   const blockRange = { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 2, col: 2 } };
+  const block: PackedCellBlock = {
+    rowCount: 1,
+    colCount: 3,
+    values: [4, null, null],
+    formulas: [[1, "=A3*2"]],
+    refs: [[2, { sheet: "s1", row: 2, col: 1 }]],
+    styleTable: [{ bold: true }],
+    styleIds: [0, 0, 0],
+  };
   const patches: DocumentOp[] = [
     {
       op: "set",
@@ -59,17 +69,9 @@ function runFacadeContract(storage: "dense" | "paged"): void {
         { rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "range" } },
       ],
     },
-    {
-      op: "setBlock",
-      range: blockRange,
-      block: {
-        rowCount: 1,
-        colCount: 3,
-        values: [4, null, null],
-        formulas: [[1, "=A3*2"]],
-        refs: [[2, { sheet: "s1", row: 2, col: 1 }]],
-      },
-    },
+    restoreBlock
+      ? encodeRestoreBlock(blockRange, block)
+      : { op: "setBlock", range: blockRange, block },
     {
       op: "setRangeStyle",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 2 } },
@@ -100,6 +102,10 @@ function runFacadeContract(storage: "dense" | "paged"): void {
     col: 1,
   });
   expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style).toMatchObject({
+    bold: true,
+    italic: true,
+  });
+  expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).style).toMatchObject({
     bold: true,
     italic: true,
   });
@@ -159,6 +165,10 @@ function runFacadeContract(storage: "dense" | "paged"): void {
 describe("SheetwriteStore facade contract", () => {
   it("preserves paged transaction, view, snapshot, policy, and resource barriers", () => {
     runFacadeContract("paged");
+  });
+
+  it("preserves compressed restore payloads while applying and acknowledging paged cells", () => {
+    runFacadeContract("paged", true);
   });
 
   it("keeps snapshot validation at the facade trust boundary", () => {

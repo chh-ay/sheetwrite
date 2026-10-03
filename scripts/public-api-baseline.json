@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "12e8fb180db754ffdc0af7582c6e84242bdda2c236a4193e3085cabb6bce2ef2",
+  "sha256": "64596e3c44a8083bd134756666b8752f437c372373d111a21c795ad468f58292",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -115,6 +115,7 @@
         "PendingCommitLoadOptions",
         "PendingCommitStorage",
         "PersistenceAdapter",
+        "PersistenceBatchCommitRequest",
         "PersistenceCommitRequest",
         "PersistenceCommitResponse",
         "PersistenceError",
@@ -237,6 +238,7 @@
         "TransactionResourceValidationResult",
         "TransientResourcePeak",
         "ValidationPolicy",
+        "VersionBatchMember",
         "VersionedCommentEvent",
         "VersionedOperation",
         "VisibleWindowView",

@@ -1,3 +1,4 @@
+import { decodeRestoreBlock } from "./restore-block.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
@@ -69,7 +70,7 @@ interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId> extends RowBr
   readonly cell: RowBridgeCell<Id>;
 }
 
-/** A setRange/setBlock effect expanded to its exact changed cells. */
+/** A setRange/setBlock/restoreBlock effect expanded to its exact changed cells. */
 export interface RowBridgeRangeDelta<Id extends RowBridgeId = RowBridgeId>
   extends RowBridgeDeltaBase<Id> {
   readonly kind: "range";
@@ -288,6 +289,7 @@ function operationRange(operation: DocumentOp): Range | null {
       };
     case "setRange":
     case "setBlock":
+    case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
       return operation.range;
@@ -512,17 +514,19 @@ export class RowBridge<
         addresses.push(addr);
         values.set(cellAddressKey(addr), cell.value);
       }
-    } else if (operation.op === "setBlock") {
+    } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
+      const block =
+        operation.op === "restoreBlock" ? decodeRestoreBlock(operation) : operation.block;
       const range = operation.range;
       const startRow = Math.min(range.start.row, range.end.row);
       const startCol = Math.min(range.start.col, range.end.col);
-      const formulas = new Map(operation.block.formulas ?? []);
-      const refs = new Map(operation.block.refs ?? []);
-      for (let offset = 0; offset < operation.block.values.length; offset += 1) {
+      const formulas = new Map(block.formulas ?? []);
+      const refs = new Map(block.refs ?? []);
+      for (let offset = 0; offset < block.values.length; offset += 1) {
         const addr = {
           sheet: range.sheet,
-          row: startRow + Math.floor(offset / operation.block.colCount),
-          col: startCol + (offset % operation.block.colCount),
+          row: startRow + Math.floor(offset / block.colCount),
+          col: startCol + (offset % block.colCount),
         };
         addresses.push(addr);
         values.set(
@@ -531,7 +535,7 @@ export class RowBridge<
             ? { kind: "formula", src: formulas.get(offset)! }
             : refs.has(offset)
               ? { kind: "ref", target: refs.get(offset)! }
-              : { kind: "literal", value: operation.block.values[offset]! },
+              : { kind: "literal", value: block.values[offset] ?? null },
         );
       }
     } else if (operation.op === "clearRange") {
@@ -620,7 +624,8 @@ export class RowBridge<
         return [{ ...base, kind: "cell", cell } as RowBridgeCellDelta<Id>];
       }
       case "setRange":
-      case "setBlock": {
+      case "setBlock":
+      case "restoreBlock": {
         const cells = this.cellsFor(operation, changeQueues);
         const range = operation.range;
         const base = this.base(

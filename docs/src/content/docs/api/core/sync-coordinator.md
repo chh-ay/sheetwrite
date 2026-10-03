@@ -10,7 +10,7 @@ blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L261"><code>packages/core/src/sync.ts#L261</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L286"><code>packages/core/src/sync.ts#L286</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

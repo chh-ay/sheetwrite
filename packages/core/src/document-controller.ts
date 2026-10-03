@@ -1,4 +1,10 @@
 import {
+  atomicBatchLimits,
+  isAtomicBatch,
+  markAtomicBatch,
+  splitOversizedBlocks,
+} from "./atomic-batch.js";
+import {
   type AdmittedTransactionResources,
   admitTransactionResources,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
@@ -14,6 +20,7 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
+import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
 import type { CellValue, Column } from "./types/cell.js";
@@ -72,10 +79,11 @@ export class DocumentController {
     operations: readonly DocumentOp[],
     options: RemoteOperationOptions = {},
   ): ApplyTransactionResult {
-    const resourceValidation = validateTransactionResources(
-      operations,
-      this.transactionResourceLimits,
-    );
+    const atomic = isAtomicBatch(operations);
+    const limits = atomic
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
+    const resourceValidation = validateTransactionResources(operations, limits);
     if (!resourceValidation.ok) {
       return {
         status: "rejected",
@@ -86,12 +94,8 @@ export class DocumentController {
     // The store receives a private copy of the caller's operations; the copy is
     // verified to hold the measured operations before its record is handed over.
     const patches = operations.slice();
-    const admitted = admitTransactionResources(
-      patches,
-      this.transactionResourceLimits,
-      resourceValidation,
-      operations,
-    );
+    if (atomic) markAtomicBatch(patches);
+    const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
     return this.options.store.applyTransaction(
       withAdmittedTransactionResources({ patches }, admitted),
       {
@@ -107,11 +111,11 @@ export class DocumentController {
     reason: CommitReason,
     admitted?: AdmittedTransactionResources,
   ): ApplyTransactionResult {
-    const inputResources = resolveTransactionResourceValidation(
-      input,
-      this.transactionResourceLimits,
-      admitted,
-    );
+    const atomic = isAtomicBatch(input);
+    const limits = atomic
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
+    const inputResources = resolveTransactionResourceValidation(input, limits, admitted);
     if (!inputResources.result.ok) return this.rejectResources(inputResources.result.issue);
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
@@ -126,10 +130,8 @@ export class DocumentController {
       : undefined;
     const patches = this.options.materializeVirtualColumns(input);
     if (patches !== input) {
-      const materializedResources = resolveTransactionResourceValidation(
-        patches,
-        this.transactionResourceLimits,
-      );
+      if (atomic) markAtomicBatch(patches);
+      const materializedResources = resolveTransactionResourceValidation(patches, limits);
       if (!materializedResources.result.ok) {
         return this.rejectResources(materializedResources.result.issue);
       }
@@ -279,6 +281,7 @@ export class DocumentController {
         return [this.inverseSetPatch(patch)];
       case "setRange":
       case "setBlock":
+      case "restoreBlock":
       case "setRangeStyle":
       case "clearRange": {
         const compact = this.compactHistoryPart(patch.range);
@@ -843,7 +846,8 @@ export class DocumentController {
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
     try {
-      outcome = this.commit(patches, reason);
+      const fitted = this.fitHistoryPatches(patches);
+      outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
       this.applyingHistory = false;
     }
@@ -851,6 +855,76 @@ export class DocumentController {
     for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
     this.options.onHistoryApplied();
     return outcome;
+  }
+
+  /**
+   * Undo and redo restore old state, which can be much larger than the edit.
+   * A restore above the transaction limits first becomes compact
+   * `restoreBlock` operations, which keeps it one transaction and one server
+   * version. If it is still too large, its blocks are split into pieces that
+   * each fit one version, and the pieces become one atomic batch: one store
+   * commit, one history step, one `change` event, and an all-or-nothing
+   * multi-version commit in sync. The returned measurement lets the commit
+   * skip a second walk of the payload.
+   */
+  private fitHistoryPatches(patches: DocumentOp[]): {
+    patches: DocumentOp[];
+    admitted?: AdmittedTransactionResources;
+  } {
+    const limits = this.transactionResourceLimits;
+    const resources = validateTransactionResources(patches, limits);
+    if (resources.ok) {
+      return { patches, admitted: admitTransactionResources(patches, limits, resources) };
+    }
+    if (resources.issue.kind !== "resource-limit") return { patches };
+    if (resources.issue.resource === "encoded-bytes" && this.compactRestoreMayFit(patches)) {
+      const compact = patches.map((patch) => {
+        if (patch.op !== "setBlock") return patch;
+        try {
+          return encodeRestoreBlock(patch.range, patch.block);
+        } catch (error) {
+          // Above the restore block caps the block stays a candidate for splitting.
+          if (!(error instanceof RangeError)) throw error;
+          return patch;
+        }
+      });
+      const compactResources = validateTransactionResources(compact, limits);
+      if (compactResources.ok) {
+        return {
+          patches: compact,
+          admitted: admitTransactionResources(compact, limits, compactResources),
+        };
+      }
+    }
+    const split = splitOversizedBlocks(patches, limits);
+    // Without pieces that each fit one version, the original operations meet
+    // the ordinary limits and are rejected with the observed resource.
+    if (!split) return { patches };
+    const batch = markAtomicBatch(split.operations);
+    const batchLimits = atomicBatchLimits(limits);
+    const fitsBatch =
+      batch.length <= batchLimits.maxOperations &&
+      split.encodedBytes <= batchLimits.maxEncodedBytes;
+    return {
+      patches: batch,
+      ...(fitsBatch
+        ? {
+            admitted: admitTransactionResources(batch, batchLimits, {
+              operationCount: batch.length,
+              encodedBytes: split.encodedBytes,
+            }),
+          }
+        : {}),
+    };
+  }
+
+  /** Whether the sampled compression estimate of every block fits one transaction. */
+  private compactRestoreMayFit(patches: readonly DocumentOp[]): boolean {
+    let estimate = 0;
+    for (const patch of patches) {
+      if (patch.op === "setBlock") estimate += estimateRestoreBlockBytes(patch.block);
+    }
+    return estimate <= this.transactionResourceLimits.maxEncodedBytes;
   }
 
   /**
@@ -868,11 +942,16 @@ export class DocumentController {
   }
 }
 
-/** Rejections by the fixed per-transaction limits, which no retry can pass. */
+/**
+ * Rejections by the fixed transaction and server-version limits, which no
+ * retry can pass.
+ */
 function exceedsTransactionLimit(issue: MutationIssue): boolean {
   return (
     issue.kind === "resource-limit" &&
-    (issue.resource === "operations" || issue.resource === "encoded-bytes")
+    (issue.resource === "operations" ||
+      issue.resource === "encoded-bytes" ||
+      issue.resource === "batch-versions")
   );
 }
 

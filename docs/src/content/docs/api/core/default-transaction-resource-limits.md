@@ -10,7 +10,7 @@ Store or Grid. The count bounds object-heavy validation and dispatch; the
 exact UTF-8 JSON size bounds hostile or accidentally oversized payloads.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L39"><code>packages/core/src/document-protocol.ts#L39</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L40"><code>packages/core/src/document-protocol.ts#L40</code></a></dd></div>
 </dl>
 
 ## Declaration

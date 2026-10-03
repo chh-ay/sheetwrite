@@ -8,7 +8,7 @@ description: "Queue, version, connection, or error transition emitted by synchro
 Queue, version, connection, or error transition emitted by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L217"><code>packages/core/src/sync.ts#L217</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L242"><code>packages/core/src/sync.ts#L242</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>12</span>

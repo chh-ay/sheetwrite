@@ -8,7 +8,7 @@ description: "Resource ceilings applied before snapshot normalization or store a
 Resource ceilings applied before snapshot normalization or store allocation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L276"><code>packages/core/src/document-protocol.ts#L276</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L277"><code>packages/core/src/document-protocol.ts#L277</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

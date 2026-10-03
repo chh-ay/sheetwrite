@@ -26,6 +26,7 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
+import { decodeRestoreBlock } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -1457,6 +1458,7 @@ export class StoreDataEngine {
         else if (
           patch.op === "setRange" ||
           patch.op === "setBlock" ||
+          patch.op === "restoreBlock" ||
           patch.op === "setRangeStyle" ||
           patch.op === "clearRange"
         ) {
@@ -1597,13 +1599,14 @@ export class StoreDataEngine {
         }
         return true;
       }
-      case "setBlock": {
+      case "setBlock":
+      case "restoreBlock": {
         const bounds = normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
         const cellCount = rows * cols;
-        const { block } = patch;
+        const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
         const styleTable = block.styleTable ?? [];
         const styleIds = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];
@@ -2922,6 +2925,7 @@ export class StoreDataEngine {
         }
       } else if (
         operation.op === "setBlock" ||
+        operation.op === "restoreBlock" ||
         operation.op === "setRangeStyle" ||
         operation.op === "clearRange"
       ) {

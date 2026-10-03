@@ -38,6 +38,8 @@ export const SHEETWRITE_ERROR_CODES = [
   "pending-byte-limit",
   "late-echo",
   "remote-operations-rejected",
+  "invalid-batch",
+  "batch-limit",
   "pending-capacity",
   "presence-failed",
   "revision-failed",

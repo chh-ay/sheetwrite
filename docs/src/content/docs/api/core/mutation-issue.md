@@ -64,6 +64,7 @@ Structured warning or rejection produced while applying an operation.
   resource:
     | "operations"
     | "encoded-bytes"
+    | "batch-versions"
     | "pending-commits"
     | "pending-operations"
     | "pending-encoded-bytes"
@@ -128,6 +129,7 @@ export type MutationIssue =
       resource:
         | "operations"
         | "encoded-bytes"
+        | "batch-versions"
         | "pending-commits"
         | "pending-operations"
         | "pending-encoded-bytes"

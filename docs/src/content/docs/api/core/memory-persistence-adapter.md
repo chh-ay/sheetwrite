@@ -8,10 +8,10 @@ description: "Executable database-neutral reference adapter for tests, demos, an
 Executable database-neutral reference adapter for tests, demos, and local workflows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L86"><code>packages/core/src/persistence.ts#L86</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L96"><code>packages/core/src/persistence.ts#L96</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -29,6 +29,15 @@ constructor(...snapshots: readonly WorkbookSnapshot[]);
 
 ```ts generated
 commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>;
+```
+
+</details>
+
+<details class="api-member" id="memory-persistence-adapter-commit-batch" data-pagefind-weight="1">
+<summary><code>commitBatch</code> <span class="api-member-summary">Validate every member version against the default sync limits, apply the members in order to one scratch store, and publish all of them only when every member applied.</span></summary>
+
+```ts generated
+commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>;
 ```
 
 </details>
@@ -53,6 +62,9 @@ class MemoryPersistenceAdapter implements PersistenceAdapter {
   constructor(...snapshots: readonly WorkbookSnapshot[]);
   commit: (
     request: PersistenceCommitRequest,
+  ) => Promise<PersistenceCommitResponse>;
+  commitBatch: (
+    request: PersistenceBatchCommitRequest,
   ) => Promise<PersistenceCommitResponse>;
   load: (
     documentId: string,

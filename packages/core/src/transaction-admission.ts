@@ -18,6 +18,8 @@ export type GridTransactionAdmissionDecision =
 
 export interface GridTransactionAdmissionGuard {
   reserve(operations: readonly DocumentOp[]): GridTransactionAdmissionDecision;
+  /** The guard never changes the operations it receives, so measurements stay valid. */
+  readonly preservesOperations?: true;
 }
 
 const guardsByGrid = new WeakMap<Grid, Set<GridTransactionAdmissionGuard>>();
@@ -66,6 +68,7 @@ export function beginGridTransactionAdmission(
   if (!guards || guards.size === 0) return EMPTY_DECISION;
 
   const reservations: GridTransactionAdmissionReservation[] = [];
+  let inspectedOperations = false;
   try {
     for (const guard of guards) {
       const decision = guard.reserve(operations);
@@ -74,6 +77,7 @@ export function beginGridTransactionAdmission(
         return decision;
       }
       reservations.push(decision.reservation);
+      if (!guard.preservesOperations) inspectedOperations = true;
     }
   } catch (error) {
     for (const reservation of reservations) reservation.cancel();
@@ -82,12 +86,12 @@ export function beginGridTransactionAdmission(
 
   const soleReservation = reservations[0];
   if (reservations.length === 1 && soleReservation) {
-    return { ok: true, reservation: soleReservation, inspectedOperations: true };
+    return { ok: true, reservation: soleReservation, inspectedOperations };
   }
   let finished = false;
   return {
     ok: true,
-    inspectedOperations: true,
+    inspectedOperations,
     reservation: {
       cancel() {
         if (finished) return;

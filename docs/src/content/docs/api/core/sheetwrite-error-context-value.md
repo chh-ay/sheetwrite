@@ -8,7 +8,7 @@ description: "JSON-safe values accepted in a public failure context."
 JSON-safe values accepted in a public failure context.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L85"><code>packages/core/src/errors.ts#L85</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L87"><code>packages/core/src/errors.ts#L87</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>6</span>

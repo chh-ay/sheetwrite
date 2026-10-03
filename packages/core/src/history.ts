@@ -202,6 +202,7 @@ function rebasePatches(
     if (
       patch.op === "setRange" ||
       patch.op === "setBlock" ||
+      patch.op === "restoreBlock" ||
       patch.op === "setRangeStyle" ||
       patch.op === "clearRange"
     ) {

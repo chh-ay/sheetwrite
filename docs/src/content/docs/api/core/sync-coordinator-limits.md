@@ -8,7 +8,7 @@ description: "Resource ceilings applied independently to remote collaboration in
 Resource ceilings applied independently to remote collaboration input and local durability.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L112"><code>packages/core/src/sync.ts#L112</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L121"><code>packages/core/src/sync.ts#L121</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -20,12 +20,14 @@ Resource ceilings applied independently to remote collaboration input and local 
 <a href="#sync-coordinator-limits-max-buffered-operations"><code>maxBufferedOperations</code></a>
 <a href="#sync-coordinator-limits-max-buffered-bytes"><code>maxBufferedBytes</code></a>
 <a href="#sync-coordinator-limits-max-recent-acknowledgements"><code>maxRecentAcknowledgements</code></a>
+<a href="#sync-coordinator-limits-max-batch-versions"><code>maxBatchVersions</code></a>
+<a href="#sync-coordinator-limits-max-batch-bytes"><code>maxBatchBytes</code></a>
 <a href="#sync-coordinator-limits-max-pending-commits"><code>maxPendingCommits</code></a>
 <a href="#sync-coordinator-limits-max-pending-operations"><code>maxPendingOperations</code></a>
 <a href="#sync-coordinator-limits-max-pending-encoded-bytes"><code>maxPendingEncodedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>11</span>
+## Members <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-member-list">
 
@@ -104,6 +106,26 @@ defaults to 4,096. Once an ID expires, a stale operation carrying it is a
 reload-requiring protocol violation and its operations are never reapplied.</p>
 </details>
 
+<details class="api-member" id="sync-coordinator-limits-max-batch-versions" data-pagefind-weight="1">
+<summary><code>maxBatchVersions</code> <span class="api-member-summary">Versions in one atomic batch, sent or received; defaults to and cannot exceed 16.</span></summary>
+
+```ts generated
+maxBatchVersions: number;
+```
+
+<p class="api-member-doc">Versions in one atomic batch, sent or received; defaults to and cannot
+exceed 16. Each member version stays within the per-version limits.</p>
+</details>
+
+<details class="api-member" id="sync-coordinator-limits-max-batch-bytes" data-pagefind-weight="1">
+<summary><code>maxBatchBytes</code> <span class="api-member-summary">Aggregate encoded operation bytes in one atomic batch, sent or received; defaults to and cannot exceed 64 MiB.</span></summary>
+
+```ts generated
+maxBatchBytes: number;
+```
+
+</details>
+
 <details class="api-member" id="sync-coordinator-limits-max-pending-commits" data-pagefind-weight="1">
 <summary><code>maxPendingCommits</code> <span class="api-member-summary">Pending local commits, including synchronous reservations; defaults to 10,000.</span></summary>
 
@@ -147,6 +169,8 @@ export interface SyncCoordinatorLimits {
   maxBufferedOperations: number;
   maxBufferedBytes: number;
   maxRecentAcknowledgements: number;
+  maxBatchVersions: number;
+  maxBatchBytes: number;
   maxPendingCommits: number;
   maxPendingOperations: number;
   maxPendingEncodedBytes: number;

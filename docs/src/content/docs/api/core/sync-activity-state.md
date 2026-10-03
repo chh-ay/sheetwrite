@@ -8,7 +8,7 @@ description: "Current persistence activity reported by a sync coordinator."
 Current persistence activity reported by a sync coordinator.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L60"><code>packages/core/src/sync.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L69"><code>packages/core/src/sync.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration

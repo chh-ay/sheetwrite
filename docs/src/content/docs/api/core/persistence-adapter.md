@@ -8,10 +8,10 @@ description: "Host load and commit contract for versioned workbook persistence."
 Host load and commit contract for versioned workbook persistence.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L123"><code>packages/core/src/types/transaction.ts#L123</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L149"><code>packages/core/src/types/transaction.ts#L149</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -32,6 +32,20 @@ commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
 ```
 
 </details>
+
+<details class="api-member" id="persistence-adapter-commit-batch" data-pagefind-weight="1">
+<summary><code>commitBatch</code> <span class="api-member-summary">Commit an atomic batch at versions baseVersion + 1 through baseVersion + versionOperationCounts.length.</span></summary>
+
+```ts generated
+commitBatch?(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse>;
+```
+
+<p class="api-member-doc">Commit an atomic batch at versions `baseVersion + 1` through
+`baseVersion + versionOperationCounts.length`. Apply every member or none,
+publish every member with its `batch` position, and acknowledge with the
+last version. `SyncCoordinator` rejects a local transaction that needs more
+than one version when the adapter does not implement this method.</p>
+</details>
 </div>
 
 ## Declaration
@@ -44,6 +58,9 @@ export interface PersistenceAdapter {
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
   commit(
     request: PersistenceCommitRequest,
+  ): Promise<PersistenceCommitResponse>;
+  commitBatch?(
+    request: PersistenceBatchCommitRequest,
   ): Promise<PersistenceCommitResponse>;
 }
 ```

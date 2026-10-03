@@ -3175,7 +3175,13 @@ See [formula functions, exact semantics, errors, and compatibility](https://shee
 | `maxOperations` | 10,000 `DocumentOp` objects per transaction | Resource defense: bound object-heavy validation and dispatch | Transaction is rejected | `GridOptions.transactionResourceLimits`, `SheetwriteStoreOptions.transactionResourceLimits`, or an explicit limit passed to `validateTransactionResources` |
 | `maxEncodedBytes` | 8 MiB of UTF-8 JSON per operation array | Resource defense: bound exact payload inspection | Transaction is rejected | Same paths as `maxOperations` |
 
-These limits also apply to undo and redo. Undo restores the old values of an edit as one transaction, so its payload can be much larger than the edit itself: clearing a range is one small operation, but undoing it restores every cleared cell. At the default 8 MiB, undo of a clear larger than about 1,000,000 number cells, or fewer text cells, is above the limit. In that case `grid.undo()` changes nothing, the Grid emits `mutation-rejected` with the `resource-limit` issue, and the Grid removes that entry from the undo history so that older edits can still be undone. A host that needs undo for larger edits can raise `maxEncodedBytes`. With sync, every peer must also raise `maxVersionPayloadBytes` (below) to the same size, or the peers reject that version.
+Ordinary host transactions keep these limits. Undo and redo first try a lossless `restoreBlock` operation when a packed restore exceeds the byte limit. A 1,000 × 1,000 number clear and a 300,000-cell text clear can fit one version without raising either 8 MiB limit.
+
+`restoreBlock` carries base64 raw DEFLATE of UTF-8 JSON for a `PackedCellBlock`. Each block is limited to 64 MiB of decoded JSON and 4,000,000 cells. Validation checks the compressed stream, exact decoded size, cell dimensions, values, formulas, references, and styles before mutation. These expansion ceilings are fixed.
+
+If compact encoding cannot fit, the Grid splits packed restores into smaller operations and applies them as one atomic batch. The batch keeps one undo step and one committed change event. Sync requires an adapter with `commitBatch`; each member version still passes the normal 8 MiB and operation limits. The whole batch has at most 16 versions and 64 MiB of encoded operations. A peer applies all members once or none. These larger internal ceilings are not available to host `applyTransaction` calls.
+
+If the restore exceeds the batch ceilings, cannot be split, or needs an unsupported adapter method, `grid.undo()` changes nothing and emits `mutation-rejected`. A fixed-limit rejection removes that entry so older edits remain undoable. Hosts and peers must support `restoreBlock` and batch metadata before exchanging these versions. Existing operation kinds and host result/event behavior do not change. XLSX export reads restored values from the document; it does not store the compressed operation.
 
 [`DEFAULT_SNAPSHOT_RESOURCE_LIMITS`](https://sheetwrite.vercel.app/docs/api/core/default-snapshot-resource-limits/) owns validation and allocation defaults. Exceeding one produces a path-qualified validation error or `SnapshotResourceError` before store allocation; an allocation failure within a configured ceiling still surfaces as a resource failure.
 
@@ -3216,6 +3222,8 @@ The override object accepts positive safe integers. CSV and TSV still return com
 | `maxMutationIdBytes` | 256 UTF-8 bytes per mutation ID | Resource defense: IDs cross transport and persistence boundaries | At the ceiling accepted; an oversized ID is a typed protocol error | `limits.maxMutationIdBytes` |
 | `maxOperationsPerVersion` | 10,000 operations per remote version | Resource defense: match one atomic transaction | At the ceiling accepted; above it emits a protocol error and reload requirement | `limits.maxOperationsPerVersion` |
 | `maxVersionPayloadBytes` | 8 MiB UTF-8 JSON per remote version | Resource defense: match one atomic transaction payload | At the ceiling accepted; above it emits a protocol error and reload requirement | `limits.maxVersionPayloadBytes` |
+| `maxBatchVersions` | 16 versions per atomic batch | Resource defense: bound one all-or-nothing step | More versions are rejected before local or peer mutation | `limits.maxBatchVersions`; may only lower the fixed ceiling |
+| `maxBatchBytes` | 64 MiB aggregate encoded operations per batch | Resource defense: bound assembled batch payload | Oversized batches are rejected without applying a member | `limits.maxBatchBytes`; may only lower the fixed ceiling |
 | `maxFutureVersionDistance` | 1,024 versions ahead | Recovery bound: avoid retaining an unbounded gap | A greater distance clears the gap buffer and requests reload/recovery | `limits.maxFutureVersionDistance` |
 | `maxBufferedVersions` | 256 future versions | Resource defense: bound retained gap count | The next version clears the gap buffer and requests reload/recovery | `limits.maxBufferedVersions` |
 | `maxBufferedOperations` | 40,000 aggregate operations | Resource defense: bound retained gap work | The operation that would exceed it clears the gap buffer and requests reload/recovery | `limits.maxBufferedOperations` |
@@ -3285,6 +3293,28 @@ Source: https://sheetwrite.vercel.app/docs/reference/document-operations/
 ## Remote input
 
 Apply sequenced host input through the remote operation path so events carry `source: "remote"` and are not re-enqueued as local output. Versions must be contiguous: gaps require reload or an explicit `SyncVersionGapRequest` recovery flow.
+
+### Large restores
+
+Undo can emit `restoreBlock` when the ordinary `setBlock` payload exceeds the transaction byte limit. This operation has `range`, `encoding: "deflate-json-v1"`, `decodedBytes`, and `data` fields. `data` is canonical base64 of a raw DEFLATE stream. Its decoded bytes contain UTF-8 JSON for a `PackedCellBlock`, not another operation or transaction.
+
+Persist and replay the operation unchanged. Servers and peers must validate the encoding and decoded block before applying it. The encoded operation still uses the normal transaction and version payload limits. A block can expand to at most 64 MiB of JSON and 4,000,000 cells. Invalid streams or blocks are rejected before mutation. Snapshot schema version 1 remains unchanged because snapshots store the resulting cells, not restore streams.
+
+The operation has the same range, formula, reference, style, protection, and conservative rebase behavior as `setBlock`. The Grid emits one change event and sync submits one version. Hosts that dispatch over the exhaustive `DocumentOp` union must add `restoreBlock` support before accepting new clients.
+
+### Atomic multi-version batches
+
+If a restore still cannot fit one version, the Grid splits packed blocks into smaller ranges. It applies those operations as one transaction and emits one `change` event. Ordinary host `applyTransaction` limits and result fields do not change.
+
+The persistence adapter must implement `commitBatch`. Its request carries the usual commit fields plus `versionOperationCounts`. Each count selects the next consecutive operations for one version. Counts must be positive, cover all operations, and describe at least two versions. Every version must pass the normal operation and byte limits. A batch has at most 16 versions and 64 MiB of encoded operations.
+
+The server must validate all versions and apply all operations in one database transaction. It must publish all versions or none. Versions run from `baseVersion + 1` to `baseVersion + versionOperationCounts.length`. Each published version carries `batch: { index, count }` with a zero-based index and the same mutation ID. The response acknowledges the last version. Retry uses the same mutation ID for the whole batch.
+
+Peers hold batch members until all consecutive versions arrive. They validate and apply the combined operations once. A rejected member leaves the peer document and server-version cursor unchanged. Missing versions use the normal gap recovery path. Pending IndexedDB records retain `versionOperationCounts` across reload. Rebase preserves batch boundaries and rejects ambiguous range, formula, or reference changes with a typed conflict. Adapters without `commitBatch` reject an oversized local step before mutation.
+
+Malformed pending batch counts raise `IndexedDbPendingCommitStorageError` with code `transaction`. The memory adapter reports rejected document application with `PersistenceError` code `commit-rejected`. Invalid remote batch metadata uses `SyncProtocolError` code `invalid-batch`; a batch ceiling uses `batch-limit`. A complete batch rejected by the Grid uses `remote-operations-rejected`.
+
+XLSX export reads the restored document cells. It does not store restore streams or batch metadata.
 
 ## Snapshots and rebase
 
@@ -4404,7 +4434,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -4920,10 +4950,15 @@ Renderer/codec ceiling for one sheet's hyperlink metadata.
 ##### `MemoryPersistenceAdapter` — class
 
 ```ts
-class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }
+class MemoryPersistenceAdapter implements PersistenceAdapter { constructor(...snapshots: readonly WorkbookSnapshot[]); commit: (request: PersistenceCommitRequest) => Promise<PersistenceCommitResponse>; commitBatch: (request: PersistenceBatchCommitRequest) => Promise<PersistenceCommitResponse>; load: (documentId: string, signal?: AbortSignal) => Promise<WorkbookSnapshot> }
 ```
 
 Executable database-neutral reference adapter for tests, demos, and local workflows.
+
+Members:
+- `commitBatch` — Validate every member version against the default sync limits, apply the
+members in order to one scratch store, and publish all of them only when
+every member applied.
 
 ##### `MergeRange` — interface
 
@@ -4936,7 +4971,7 @@ Inclusive merged-cell rectangle in data-row/column coordinates.
 ##### `MutationIssue` — type
 
 ```ts
-export type MutationIssue = | { kind: "validation"; severity: "error" | "warning"; ruleId: string; addr: CellAddress; value: CellValue; message: string; operationIndex: number; } | { kind: "protection"; severity: "error"; protectedRangeId: string; range: Range; operationIndex: number; message: string; } | { kind: "invalid-operation"; severity: "error"; operationIndex: number; message: string; } | { kind: "resource-limit"; severity: "error"; resource: | "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; } | { kind: "sheet-lifecycle"; severity: "error"; code: SheetLifecycleIssueCode; sheet?: SheetId; operationIndex: number; message: string; };
+export type MutationIssue = | { kind: "validation"; severity: "error" | "warning"; ruleId: string; addr: CellAddress; value: CellValue; message: string; operationIndex: number; } | { kind: "protection"; severity: "error"; protectedRangeId: string; range: Range; operationIndex: number; message: string; } | { kind: "invalid-operation"; severity: "error"; operationIndex: number; message: string; } | { kind: "resource-limit"; severity: "error"; resource: | "operations" | "encoded-bytes" | "batch-versions" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; } | { kind: "sheet-lifecycle"; severity: "error"; code: SheetLifecycleIssueCode; sheet?: SheetId; operationIndex: number; message: string; };
 ```
 
 Structured warning or rejection produced while applying an operation.
@@ -5076,10 +5111,16 @@ to a text literal.
 ##### `PendingCommit` — interface
 
 ```ts
-export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; }
+export interface PendingCommit { documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
 ```
 
 Immutable local operation batch awaiting a host acknowledgement.
+
+Members:
+- `versionOperationCounts` — Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.
 
 ##### `PendingCommitLoadOptions` — interface
 
@@ -5109,18 +5150,45 @@ the caller's expected view.
 ##### `PersistenceAdapter` — interface
 
 ```ts
-export interface PersistenceAdapter { load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>; commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>; }
+export interface PersistenceAdapter { load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>; commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>; commitBatch?(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse>; }
 ```
 
 Host load and commit contract for versioned workbook persistence.
 
+Members:
+- `commitBatch` — Commit an atomic batch at versions `baseVersion + 1` through
+`baseVersion + versionOperationCounts.length`. Apply every member or none,
+publish every member with its `batch` position, and acknowledge with the
+last version. `SyncCoordinator` rejects a local transaction that needs more
+than one version when the adapter does not implement this method.
+
+##### `PersistenceBatchCommitRequest` — interface
+
+```ts
+export interface PersistenceBatchCommitRequest { readonly versionOperationCounts: readonly number[]; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; signal?: AbortSignal; }
+```
+
+Cancellable commit of one atomic batch that spans several server versions.
+
+Members:
+- `versionOperationCounts` — Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.
+
 ##### `PersistenceCommitRequest` — interface
 
 ```ts
-export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; }
+export interface PersistenceCommitRequest { signal?: AbortSignal; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
 ```
 
 Cancellable pending commit submitted to a persistence adapter.
+
+Members:
+- `versionOperationCounts` — Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.
 
 ##### `PersistenceCommitResponse` — type
 
@@ -5577,7 +5645,7 @@ Result of projection or reconciliation.
 export interface RowBridgeRangeDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "range"; readonly range: Range; readonly cells: readonly RowBridgeCell<Id>[]; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
-A setRange/setBlock effect expanded to its exact changed cells.
+A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.
 
 ##### `RowBridgeReconciliationInput` — interface
 
@@ -5896,7 +5964,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -5912,7 +5980,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -6220,12 +6288,16 @@ Queue, version, connection, or error transition emitted by synchronization.
 ##### `SyncCoordinatorLimits` — interface
 
 ```ts
-export interface SyncCoordinatorLimits { maxMutationIdBytes: number; maxOperationsPerVersion: number; maxVersionPayloadBytes: number; maxFutureVersionDistance: number; maxBufferedVersions: number; maxBufferedOperations: number; maxBufferedBytes: number; maxRecentAcknowledgements: number; maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }
+export interface SyncCoordinatorLimits { maxMutationIdBytes: number; maxOperationsPerVersion: number; maxVersionPayloadBytes: number; maxFutureVersionDistance: number; maxBufferedVersions: number; maxBufferedOperations: number; maxBufferedBytes: number; maxRecentAcknowledgements: number; maxBatchVersions: number; maxBatchBytes: number; maxPendingCommits: number; maxPendingOperations: number; maxPendingEncodedBytes: number; }
 ```
 
 Resource ceilings applied independently to remote collaboration input and local durability.
 
 Members:
+- `maxBatchBytes` — Aggregate encoded operation bytes in one atomic batch, sent or received;
+defaults to and cannot exceed 64 MiB.
+- `maxBatchVersions` — Versions in one atomic batch, sent or received; defaults to and cannot
+exceed 16. Each member version stays within the per-version limits.
 - `maxBufferedBytes` — Aggregate encoded bytes retained in the gap buffer; defaults to 32 MiB.
 - `maxBufferedOperations` — Aggregate operations retained in the gap buffer; defaults to 40,000.
 - `maxBufferedVersions` — Remote future versions retained in the gap buffer; defaults to 256.
@@ -6256,10 +6328,16 @@ snapshot for the host to remount before calling `resumeAfterReload`.
 ##### `SyncMutationRecord` — interface
 
 ```ts
-export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; }
+export interface SyncMutationRecord { status: SyncMutationStatus; documentId: string; baseVersion: number; clientMutationId: string; readonly operations: readonly DocumentOp[]; readonly versionOperationCounts?: readonly number[]; }
 ```
 
 Pending commit paired with its current synchronization status.
+
+Members:
+- `versionOperationCounts` — Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.
 
 ##### `SyncMutationStatus` — type
 
@@ -6272,7 +6350,7 @@ Lifecycle state of one local mutation in the synchronization queue.
 ##### `SyncPendingCapacityError` — class
 
 ```ts
-class SyncPendingCapacityError extends SheetwriteError { constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>); issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; }; name: "SyncPendingCapacityError" }
+class SyncPendingCapacityError extends SheetwriteError { constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>); issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "batch-versions" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; }; name: "SyncPendingCapacityError" }
 ```
 
 Typed local transaction rejection produced when the durable queue cannot reserve capacity.
@@ -6309,7 +6387,7 @@ Typed rejection of malformed or resource-exhausting synchronization input.
 ##### `SyncProtocolErrorCode` — type
 
 ```ts
-export type SyncProtocolErrorCode = | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected";
+export type SyncProtocolErrorCode = | "invalid-limits" | "invalid-version" | "invalid-id" | "invalid-operations" | "operation-limit" | "payload-limit" | "response-id-mismatch" | "future-distance-limit" | "buffer-count-limit" | "buffer-operation-limit" | "buffer-byte-limit" | "pending-count-limit" | "pending-operation-limit" | "pending-byte-limit" | "late-echo" | "remote-operations-rejected" | "invalid-batch" | "batch-limit";
 ```
 
 Stable category identifying which synchronization protocol bound was violated.
@@ -6541,6 +6619,18 @@ Reject-or-warn policy attached to a data-validation rule.
 
 Validate one canonical table against sheet bounds and workbook-global identities.
 
+##### `VersionBatchMember` — interface
+
+```ts
+export interface VersionBatchMember { index: number; count: number; }
+```
+
+Position of one server version inside an atomic multi-version batch.
+
+Members:
+- `count` — Number of consecutive versions in the batch; at least 2.
+- `index` — Zero-based position of this version in the batch.
+
 ##### `VersionedCommentEvent` — interface
 
 ```ts
@@ -6552,10 +6642,15 @@ Comment mutation paired with its assigned server version.
 ##### `VersionedOperation` — interface
 
 ```ts
-export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; }
+export interface VersionedOperation { version: number; readonly operations: readonly DocumentOp[]; clientMutationId?: string; batch?: VersionBatchMember; }
 ```
 
 Remote document operations paired with a contiguous server version.
+
+Members:
+- `batch` — Present when this version is one member of an atomic batch. Every member
+carries the same `clientMutationId` and `count`. Receivers apply the batch
+only after its last member arrives.
 
 ##### `VisibleWindowView` — interface
 
@@ -7166,7 +7261,7 @@ Result of projection or reconciliation.
 export interface RowBridgeRangeDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "range"; readonly range: Range; readonly cells: readonly RowBridgeCell<Id>[]; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
-A setRange/setBlock effect expanded to its exact changed cells.
+A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.
 
 ##### `RowBridgeReconciliationInput` — interface
 
@@ -7223,7 +7318,7 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -7239,7 +7334,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.

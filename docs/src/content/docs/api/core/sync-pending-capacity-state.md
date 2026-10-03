@@ -8,7 +8,7 @@ description: "Whether the durable local queue can currently admit another transa
 Whether the durable local queue can currently admit another transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L70"><code>packages/core/src/sync.ts#L70</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L79"><code>packages/core/src/sync.ts#L79</code></a></dd></div>
 </dl>
 
 ## Declaration

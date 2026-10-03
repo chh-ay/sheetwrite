@@ -42,6 +42,43 @@ interface StoredPendingCommit extends PendingCommit {
   sequence?: number;
 }
 
+/** The atomic batch shape of a commit; one-version commits store no field. */
+function storedVersionOperationCounts(
+  commit: PendingCommit,
+): Pick<PendingCommit, "versionOperationCounts"> {
+  return commit.versionOperationCounts
+    ? { versionOperationCounts: [...commit.versionOperationCounts] }
+    : {};
+}
+
+function assertVersionOperationCounts(commit: PendingCommit): void {
+  const counts = commit.versionOperationCounts;
+  if (counts === undefined) return;
+  let total = 0;
+  let valid = Array.isArray(counts) && counts.length >= 2;
+  if (valid) {
+    for (let index = 0; index < counts.length; index++) {
+      const count = counts[index];
+      if (
+        !Object.hasOwn(counts, index) ||
+        count === undefined ||
+        !Number.isSafeInteger(count) ||
+        count <= 0
+      ) {
+        valid = false;
+        break;
+      }
+      total += count;
+    }
+  }
+  if (!valid || total !== commit.operations.length) {
+    throw new IndexedDbPendingCommitStorageError(
+      "transaction",
+      "Pending queue record has invalid atomic batch version operation counts",
+    );
+  }
+}
+
 interface QueueMeta {
   documentId: string;
   nextSequence: number;
@@ -93,6 +130,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
 
   async put(commit: PendingCommit, signal?: AbortSignal): Promise<void> {
     throwIfAborted(signal);
+    assertVersionOperationCounts(commit);
     const database = await this.open(signal);
     const transaction = database.transaction([this.storeName, this.metaStoreName], "readwrite");
     const store = transaction.objectStore(this.storeName);
@@ -125,6 +163,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
         baseVersion: commit.baseVersion,
         clientMutationId: commit.clientMutationId,
         operations: cloneJsonValue(commit.operations),
+        ...storedVersionOperationCounts(commit),
       } satisfies StoredPendingCommit);
       await transactionDone(transaction, signal);
     } catch (error) {
@@ -159,6 +198,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
         "Replacement commits must be unique and belong to the target document",
       );
     }
+    for (const commit of commits) assertVersionOperationCounts(commit);
     const database = await this.open(signal);
     const transaction = database.transaction([this.storeName, this.metaStoreName], "readwrite");
     const store = transaction.objectStore(this.storeName);
@@ -197,6 +237,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
             baseVersion: commit.baseVersion,
             clientMutationId: commit.clientMutationId,
             operations: cloneJsonValue(commit.operations),
+            ...storedVersionOperationCounts(commit),
           } satisfies StoredPendingCommit);
         }
         metaStore.put({
@@ -316,6 +357,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
           baseVersion: record.baseVersion,
           clientMutationId: record.clientMutationId,
           operations: record.operations,
+          ...storedVersionOperationCounts(record),
         });
       });
       await completion;
@@ -451,6 +493,7 @@ function accountStoredRecord(
       "Pending queue record operations are invalid",
     );
   }
+  assertVersionOperationCounts(record);
   if (stats.records + 1 > options.maxRecords) {
     throw new IndexedDbPendingCommitStorageError(
       "limit",
