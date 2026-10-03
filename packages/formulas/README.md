@@ -61,11 +61,14 @@ A family is one Rust file that owns a group of functions. Only the full engine c
    ```rust
    Family {
        names: <family>::NAMES,
+       reference_cells: &[],
        evaluate: Some(<family>::evaluate),
        evaluate_ast: None,
        array: None,
    },
    ```
+
+   `reference_cells` lists the names whose single-cell arguments are references, like `SUM(A1)`: text and logical values in that cell are ignored instead of converted. Use it for functions that take a list of numbers, such as `SKEW` or `DEVSQ`. Leave it empty for functions whose arguments are single values, such as the distributions.
 
    These are the only shared lines that you change. Do not edit `calc.rs`, `eval/mod.rs`, `eval/functions.rs`, or `eval/array.rs`. Name lookup, `functionNames()`, formula assist, and dispatch already read `FAMILIES`.
 
@@ -97,7 +100,7 @@ A family is one Rust file that owns a group of functions. Only the full engine c
    }
    ```
 
-   - `evaluate` (scalar): use it when each argument is one value. The engine evaluates and coerces the arguments first. Read them with `require_arity`, `number_arg`, and `bool_arg` from `eval/functions.rs`. The distribution family in `analysis/distributions.rs` is the example.
+   - `evaluate` (scalar): use it when each argument is one value or a range of values. The engine evaluates and coerces the arguments first. Read single values with `require_arity`, `number_arg`, and `bool_arg`, and the numbers of a range with `numeric_entries`, all from `eval/functions.rs`. `analysis/distributions.rs` (single values) and `analysis/descriptive.rs` (ranges and value pairs) are the examples.
    - `evaluate_ast`: use it when a function must see the arguments before coercion, for example a range with its shape, a criteria table, or an argument that the function evaluates only on some paths. Evaluate an argument with `store.eval_ast(argument, sheet, affected, memo, visiting, depth + 1)`.
    - `array`: use it when a function returns a matrix that spills. `produces_array` tells the engine that a call returns an array. `shape` and `bound` must agree with the matrix that `evaluate` returns.
 
@@ -110,9 +113,10 @@ A family is one Rust file that owns a group of functions. Only the full engine c
    cargo test --features analysis
    ```
 
-5. Add each function to `test/conformance/formula-contract.inventory.json` with `"builds": ["@sheetwrite/formulas"]` and its signature, semantics, dialect, and implementation profiles. Then run:
+5. Add each function to `test/conformance/formula-contract.inventory.json` with `"builds": ["@sheetwrite/formulas"]` and its signature, semantics, dialect, and implementation profiles. Update the function counts in `scripts/formula-contract.test.ts`, then run:
 
    ```sh
+   bun scripts/conformance.ts generate && bunx biome format --write test/conformance/corpus.manifest.json
    bun run docs:generate
    bun test scripts/formula-contract.test.ts
    ```

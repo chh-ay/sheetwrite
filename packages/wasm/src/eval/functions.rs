@@ -555,26 +555,28 @@ pub(super) fn numeric_entries<'a>(
 }
 
 pub(super) fn treats_cell_as_reference(func: Func) -> bool {
-    matches!(
-        func,
+    match func {
         Func::Sum
-            | Func::Avg
-            | Func::Min
-            | Func::Max
-            | Func::Count
-            | Func::CountA
-            | Func::Product
-            | Func::Median
-            | Func::ModeSngl
-            | Func::StdevS
-            | Func::StdevP
-            | Func::VarS
-            | Func::VarP
-            | Func::GeoMean
-            | Func::CountBlank
-            | Func::Npv
-            | Func::Irr
-    )
+        | Func::Avg
+        | Func::Min
+        | Func::Max
+        | Func::Count
+        | Func::CountA
+        | Func::Product
+        | Func::Median
+        | Func::ModeSngl
+        | Func::StdevS
+        | Func::StdevP
+        | Func::VarS
+        | Func::VarP
+        | Func::GeoMean
+        | Func::CountBlank
+        | Func::Npv
+        | Func::Irr => true,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(name) => super::analysis::treats_cell_as_reference(name),
+        _ => false,
+    }
 }
 
 #[cfg(test)]
