@@ -157,6 +157,38 @@ describe("createToolbar", () => {
     grid.destroy();
     store.dispose();
   });
+
+  it("shows the theme's text and fill colors until the user picks one", () => {
+    const { grid, store, host } = makeGrid();
+    grid.setTheme({ fg: "#123", bg: "rgb(250, 240, 230)" });
+    const piece = createToolbar(host, grid, {
+      items: [{ action: "textColor" }, { action: "fillColor" }],
+    });
+    const [text, fill] = [...piece.element.querySelectorAll<HTMLInputElement>("input")];
+    // An unseeded color input shows black, which is wrong for an unstyled fill.
+    expect(text!.value).toBe("#112233");
+    expect(fill!.value).toBe("#faf0e6");
+
+    // A theme switch (for example to dark) updates swatches the user has not used.
+    grid.setTheme({ fg: "#e5e7eb", bg: "#0b1220" });
+    expect(text!.value).toBe("#e5e7eb");
+    expect(fill!.value).toBe("#0b1220");
+
+    // Once the user picks a fill, that choice stays when the theme changes.
+    const addr = { sheet: "s1", row: 1, col: 0 };
+    grid.setSelection({ kind: "cell", addr });
+    fill!.value = "#ff0000";
+    fill!.dispatchEvent(new Event("change"));
+    fill!.dispatchEvent(new Event("blur"));
+    expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
+    grid.replaceTheme(undefined);
+    expect(fill!.value).toBe("#ff0000");
+    expect(text!.value).not.toBe("#e5e7eb");
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
     const host = mountHost();
     const grid = {} as Grid;

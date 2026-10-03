@@ -431,6 +431,7 @@ export class GridImpl implements Grid {
     "datasource-error": new Set(),
     "mutation-rejected": new Set(),
     "export-error": new Set(),
+    "theme-change": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -2155,9 +2156,14 @@ export class GridImpl implements Grid {
     this.scheduleRender();
   }
 
+  getTheme(): Theme {
+    return { ...this.baseTheme };
+  }
+
   setTheme(theme: Partial<Theme>): void {
     this.baseTheme = { ...this.baseTheme, ...theme };
     this.applyZoomedTheme();
+    this.emitThemeChange();
   }
 
   replaceTheme(theme: Partial<Theme> | undefined): void {
@@ -2165,6 +2171,13 @@ export class GridImpl implements Grid {
     // then host CSS custom properties, then the new option value.
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
     this.applyZoomedTheme();
+    this.emitThemeChange();
+  }
+
+  private emitThemeChange(): void {
+    const listeners = this.listeners["theme-change"];
+    if (listeners.size === 0) return;
+    for (const fn of listeners) fn({ theme: { ...this.baseTheme } });
   }
 
   getEffectiveTheme(): Theme {

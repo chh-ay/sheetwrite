@@ -22,12 +22,13 @@ Payload map for events emitted by a Grid.
 <a href="#grid-events-mutation-rejected"><code>mutation-rejected</code></a>
 <a href="#grid-events-active-sheet"><code>active-sheet</code></a>
 <a href="#grid-events-hyperlink-activate"><code>hyperlink-activate</code></a>
+<a href="#grid-events-theme-change"><code>theme-change</code></a>
 <a href="#grid-events-renderer-fallback"><code>renderer-fallback</code></a>
 <a href="#grid-events-datasource-error"><code>datasource-error</code></a>
 <a href="#grid-events-export-error"><code>export-error</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>13</span>
+## Members <span class="api-count" data-pagefind-ignore>14</span>
 
 <div class="api-member-list">
 
@@ -121,6 +122,16 @@ search: SearchResult;
 
 </details>
 
+<details class="api-member" id="grid-events-theme-change" data-pagefind-weight="1">
+<summary><code>theme-change</code> <span class="api-member-summary">Emitted after setTheme or replaceTheme changes the base theme.</span></summary>
+
+```ts generated
+"theme-change": { theme: Theme };
+```
+
+<p class="api-member-doc">Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy.</p>
+</details>
+
 <details class="api-member" id="grid-events-renderer-fallback" data-pagefind-weight="1">
 <summary><code>renderer-fallback</code> <span class="api-member-summary">Emitted once when the worker renderer could not be constructed and the grid fell back to the main-thread canvas renderer.</span></summary>
 
@@ -184,6 +195,9 @@ export interface GridEvents {
     sheet: SheetId;
   };
   "hyperlink-activate": HyperlinkActivationEvent;
+  "theme-change": {
+    theme: Theme;
+  };
   "renderer-fallback": {
     requested: "worker";
     error: SheetwriteError;
