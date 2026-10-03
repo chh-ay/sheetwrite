@@ -44,7 +44,7 @@ function ReactWorkbenchRoute() {
             "CSV import lands as one undoable commit; CSV/XLSX exports hand off to the interoperability proofs.",
         },
       ]}
-      prompt="Filter a market, select an ARR cell, and commit a new value. Watch the visible rows, KPI rail, and Grid history reconcile together."
+      prompt="Use the named column headers to find an account or ARR value. Filter a market, then edit an ARR cell. The KPI rail and Grid history update together."
       sourcePath="docs/src/showcases/ReactWorkbench.tsx"
       title="Controlled analytics, without a shadow copy."
     >

@@ -112,7 +112,8 @@ export function createInteropSnapshot(): WorkbookSnapshot {
             colCount: 5,
             cells: ORDER_ROWS.flatMap(([sku, item, qty, price], row) => [
               literal(row, 0, sku),
-              literal(row, 1, item),
+              // Keep the injection probe literal and contained, not an active link.
+              { ...literal(row, 1, item), style: { wrap: true } },
               literal(row, 2, qty),
               literal(row, 3, price),
               formula(row, 4, `=C${row + 1}*D${row + 1}`),

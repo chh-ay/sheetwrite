@@ -183,6 +183,31 @@ export function defaultToolbarItems(config: GridConfig): ToolbarItem[] {
   return items;
 }
 
+const HEX_CHANNEL = (value: number): string =>
+  Math.max(0, Math.min(255, Math.round(value)))
+    .toString(16)
+    .padStart(2, "0");
+
+/**
+ * Convert a theme color to the `#rrggbb` form a color input accepts. Handles
+ * hex (3, 4, 6 or 8 digits; alpha dropped) and `rgb()`/`rgba()`. Returns null
+ * for other forms, so the input keeps its current value.
+ */
+function toHexColor(color: string): string | null {
+  const value = color.trim().toLowerCase();
+  const hex = /^#([0-9a-f]{3,8})$/.exec(value)?.[1];
+  if (hex !== undefined) {
+    if (hex.length === 3 || hex.length === 4) {
+      return `#${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}`;
+    }
+    if (hex.length === 6 || hex.length === 8) return `#${hex.slice(0, 6)}`;
+    return null;
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(value);
+  if (rgb === null) return null;
+  return `#${HEX_CHANNEL(Number(rgb[1]))}${HEX_CHANNEL(Number(rgb[2]))}${HEX_CHANNEL(Number(rgb[3]))}`;
+}
+
 /**
  * Render toolbar items into `bar`, binding built-in actions to `grid.actions`
  * and custom `onClick` handlers to the grid handle. Shared by the grid's
@@ -230,10 +255,13 @@ export function renderToolbarItems(
   };
 
   const colorPickDisposers: Array<() => void> = [];
+  /** Reseed hooks for color inputs the user has not picked from yet. */
+  const colorSeeders: Array<() => void> = [];
 
   const addColorInput = (
     suffix: string,
     title: string,
+    themeColor: () => string,
     onPick: (color: string) => void,
   ): HTMLInputElement => {
     const input = document.createElement("input");
@@ -242,12 +270,25 @@ export function renderToolbarItems(
     input.title = title;
     if (title) input.setAttribute("aria-label", title);
 
+    // A color input shows black until it has a value. Until the user picks,
+    // show the color the grid paints by default, so the swatch is truthful.
+    let picked = false;
+    const seed = (): void => {
+      if (picked) return;
+      const hex = toHexColor(themeColor());
+      if (hex !== null) input.value = hex;
+    };
+    seed();
+    colorSeeders.push(seed);
+    input.addEventListener("pointerdown", seed);
+    input.addEventListener("focus", seed);
     let timer: number | undefined;
     let lastCommitted: string | undefined;
     const commit = (): void => {
       timer = undefined;
       if (input.value === lastCommitted) return;
       lastCommitted = input.value;
+      picked = true;
       onPick(input.value);
     };
     const schedule = (): void => {
@@ -292,7 +333,12 @@ export function renderToolbarItems(
     if (action === "textColor") {
       controls.set(
         action,
-        addColorInput("textColor", title, (color) => grid.actions.setTextColor(color)),
+        addColorInput(
+          "textColor",
+          title,
+          () => grid.getTheme().fg,
+          (color) => grid.actions.setTextColor(color),
+        ),
       );
       continue;
     }
@@ -300,7 +346,12 @@ export function renderToolbarItems(
     if (action === "fillColor") {
       controls.set(
         action,
-        addColorInput("fillColor", title, (color) => grid.actions.setFillColor(color)),
+        addColorInput(
+          "fillColor",
+          title,
+          () => grid.getTheme().bg,
+          (color) => grid.actions.setFillColor(color),
+        ),
       );
       continue;
     }
@@ -342,8 +393,15 @@ export function renderToolbarItems(
     typeof grid.on === "function"
       ? grid.on("command-state-change", (event) => update(event.states))
       : () => {};
+  const disposeTheme =
+    typeof grid.on === "function" && colorSeeders.length > 0
+      ? grid.on("theme-change", () => {
+          for (const seed of colorSeeders) seed();
+        })
+      : () => {};
   return () => {
     disposeState();
+    disposeTheme();
     for (const dispose of colorPickDisposers) dispose();
   };
 }

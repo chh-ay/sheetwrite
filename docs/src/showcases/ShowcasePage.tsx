@@ -39,7 +39,6 @@ export function ShowcasePage({
   );
   const activeItem = SHOWCASE_NAVIGATION[activeIndex] ?? SHOWCASE_NAVIGATION[0]!;
   const nextItem = SHOWCASE_NAVIGATION[(activeIndex + 1) % SHOWCASE_NAVIGATION.length]!;
-  const adapterLabel = active === "vanilla" ? "Core API" : `${activeItem.label} binding`;
 
   return (
     <div className="sw-showcase-frame">
@@ -51,25 +50,11 @@ export function ShowcasePage({
             <p className="sw-showcase-page__eyebrow">{eyebrow}</p>
             <h1>{title}</h1>
             <p>{description}</p>
-            <dl className="sw-showcase-page__specs">
-              <div>
-                <dt>Adapter</dt>
-                <dd>{adapterLabel}</dd>
-              </div>
-              <div>
-                <dt>Engine</dt>
-                <dd>Rust / WASM</dd>
-              </div>
-              <div>
-                <dt>Surface</dt>
-                <dd>Canvas</dd>
-              </div>
-            </dl>
           </div>
           <aside className="sw-showcase-page__install" aria-label={`${activeItem.label} setup`}>
             <div>
               <span>First-party package</span>
-              <strong>Start with the real adapter.</strong>
+              <strong>Use this package in your app.</strong>
             </div>
             <InstallCommand packageName={packageName} />
             <a href={guide}>Open the integration guide →</a>
@@ -82,7 +67,7 @@ export function ShowcasePage({
               <strong>Live workbook</strong>
               <span>/ {activeItem.label}</span>
             </div>
-            <span>Real adapter · interactive state</span>
+            <span>Editable workbook · live adapter state</span>
           </header>
           <div className="sw-showcase-stage__viewport">{children}</div>
           <footer className="sw-showcase-stage__prompt">
@@ -94,8 +79,8 @@ export function ShowcasePage({
 
         <section aria-labelledby={`${active}-runtime-details`} className="sw-showcase-page__proof">
           <header>
-            <p className="sw-showcase-page__eyebrow">PUBLISHED RUNTIME</p>
-            <h2 id={`${active}-runtime-details`}>See the contract working.</h2>
+            <p className="sw-showcase-page__eyebrow">Public API in use</p>
+            <h2 id={`${active}-runtime-details`}>What this example demonstrates.</h2>
             <p>
               No mock controls or copied state. Every interaction above crosses the public adapter
               and Grid APIs.
@@ -116,8 +101,8 @@ export function ShowcasePage({
 
         <footer className="sw-showcase-page__footer">
           <div>
-            <span>CONTINUE BUILDING</span>
-            <strong>Take the integration apart.</strong>
+            <span>Build with this adapter</span>
+            <strong>Explore the integration.</strong>
             <p>Lifecycle, SSR, reset, and event contracts are documented for this adapter.</p>
           </div>
           <nav aria-label="Example resources">

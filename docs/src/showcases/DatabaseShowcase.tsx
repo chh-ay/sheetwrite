@@ -99,7 +99,10 @@ function resolveDatabaseGridTheme(host: HTMLElement): Partial<Theme> {
 }
 
 function mountDatabaseGrid(host: HTMLElement, snapshot: unknown): Grid {
-  return createGridFromSnapshot(host, snapshot, { theme: resolveDatabaseGridTheme(host) });
+  return createGridFromSnapshot(host, snapshot, {
+    presentation: "data-grid",
+    theme: resolveDatabaseGridTheme(host),
+  });
 }
 
 /** Attaches the storage-gauge and sync-event listeners one session needs. */
