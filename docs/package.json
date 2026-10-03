@@ -16,6 +16,7 @@
     "@fontsource-variable/space-grotesk": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/react": "workspace:*",
     "@sheetwrite/svelte": "workspace:*",
     "@sheetwrite/vue": "workspace:*",

@@ -1,14 +1,14 @@
 ---
-title: "WindowView | @sheetwrite/wasm"
+title: "WindowView | @sheetwrite/formulas"
 description: "A bulk window of resolved cells, row-major over nrows x ncols."
 ---
-<!-- api-export:@sheetwrite/wasm|.|WindowView -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/wasm/">@sheetwrite/wasm</a><span class="api-status" data-kind="class">class</span></div>
+<!-- api-export:@sheetwrite/formulas|.|WindowView -->
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/formulas/">@sheetwrite/formulas</a><span class="api-status" data-kind="class">class</span></div>
 
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L441"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L441</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L441"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L441</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>
@@ -83,11 +83,9 @@ class WindowView {
 ## Referenced by
 
 <div class="api-consumers" data-pagefind-ignore>
-<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/wasm</code></p>
+<p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
 
 <ul class="api-consumer-list">
-<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
-<li><code>@sheetwrite/core</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 

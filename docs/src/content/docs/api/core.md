@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>314</dd></div>
+<div><dt>Exports</dt><dd>315</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -60,7 +60,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/from-xlsx-table/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>fromXlsxTable</code></span><span class="api-symbol-card__desc">Parse the first sheet of .xlsx bytes into ColumnarData.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/from-xlsx-workbook/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>fromXlsxWorkbook</code></span><span class="api-symbol-card__desc">Formula-preserving, multi-sheet workbook import through the optional XLSX backend.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/hyperlink-at/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>hyperlinkAt</code></span><span class="api-symbol-card__desc">Return the first validated hyperlink covering an address, or null when none does.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/init-sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSheetwrite</code></span><span class="api-symbol-card__desc">Load the WASM data engine once.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/init-sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSheetwrite</code></span><span class="api-symbol-card__desc">Load one WASM engine before createGrid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-safe-external-hyperlink/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSafeExternalHyperlink</code></span><span class="api-symbol-card__desc">Validate, but never activate or fetch, an external hyperlink target.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteError</code></span><span class="api-symbol-card__desc">Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/is-sheetwrite-ready/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isSheetwriteReady</code></span><span class="api-symbol-card__desc">Whether initSheetwrite has completed — the single readiness source.</span></a>
@@ -100,7 +100,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>140</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>141</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -205,6 +205,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/search-result/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SearchResult</code></span><span class="api-symbol-card__desc">Ordered matches and active index produced by a grid search.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Sheet</code></span><span class="api-symbol-card__desc">Workbook sheet schema used when creating a live grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheet-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetSnapshot</code></span><span class="api-symbol-card__desc">Serializable complete state for one workbook sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sheetwrite-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteEngine</code></span><span class="api-symbol-card__desc">A complete engine module from @sheetwrite/wasm or @sheetwrite/formulas.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-envelope/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteErrorEnvelope</code></span><span class="api-symbol-card__desc">Structural form preserved across realms and JSON serialization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-error-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteErrorOptions</code></span><span class="api-symbol-card__desc">Optional cause, diagnostic context, and boundary-known retryability.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sheetwrite-store-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>SheetwriteStoreOptions</code></span><span class="api-symbol-card__desc">Storage layout plus snapshot and transaction resource ceilings for one store.</span></a>

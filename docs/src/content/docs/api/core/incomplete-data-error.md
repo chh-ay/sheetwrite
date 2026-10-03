@@ -8,7 +8,7 @@ description: "Error thrown when an operation requires datasource cells that are 
 Error thrown when an operation requires datasource cells that are not loaded.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store/data-engine.ts#L243"><code>packages/core/src/store/data-engine.ts#L243</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store/data-engine.ts#L244"><code>packages/core/src/store/data-engine.ts#L244</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
