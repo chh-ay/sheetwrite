@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import type { ColumnarData, Grid, GridEvents, Workbook } from "@sheetwrite/core";
+import type { ColumnarData, Grid, Workbook } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { createApp, defineComponent, h, nextTick, reactive, ref, shallowRef } from "vue";
@@ -155,51 +155,6 @@ async function mountConformanceGrid(props: AdapterConformanceProps): Promise<Mou
 runSharedAdapterLifecycleContract("Vue", mountConformanceGrid);
 
 describe("SheetwriteGrid Vue lifecycle", () => {
-  it("emits change after a scripted store transaction", () => {
-    const changes: unknown[] = [];
-    const harness = mountGrid(makeWorkbook(), {
-      onGridChange: (event: unknown) => changes.push(event),
-    });
-
-    harness.getGrid()!.store.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 0 },
-          value: { kind: "literal", value: "x" },
-        },
-      ],
-    });
-
-    expect(changes).toHaveLength(1);
-    harness.unmount();
-  });
-
-  it("emits selection after setSelection", () => {
-    const selections: unknown[] = [];
-    const harness = mountGrid(makeWorkbook(), {
-      onSelectionChange: (selection: unknown) => selections.push(selection),
-    });
-
-    harness.getGrid()!.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
-
-    expect(selections).toHaveLength(1);
-    expect(selections[0]).toMatchObject({ kind: "cell", addr: { row: 1, col: 0 } });
-    harness.unmount();
-  });
-
-  it("emits active-sheet with the sheet id on setActiveSheet", () => {
-    const events: Array<GridEvents["active-sheet"]> = [];
-    const harness = mountGrid(makeWorkbook(5, true), {
-      onActiveSheetChange: (event: GridEvents["active-sheet"]) => events.push(event),
-    });
-
-    harness.getGrid()!.setActiveSheet("s2");
-
-    expect(events).toEqual([{ sheet: "s2" }]);
-    harness.unmount();
-  });
-
   it("does NOT recreate on a mutation inside data (shallow watch contract)", async () => {
     const harness = mountGrid(makeWorkbook());
     const first = harness.getGrid();

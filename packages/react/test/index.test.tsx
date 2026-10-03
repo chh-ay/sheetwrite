@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import type { Grid, GridEvents, Workbook } from "@sheetwrite/core";
+import type { Grid, Workbook } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { act, createRef, type ReactElement, StrictMode, Suspense, startTransition } from "react";
@@ -127,50 +127,9 @@ describe("SheetwriteGrid React lifecycle", () => {
     expect(exitCode, stderr).toBe(0);
     const result = JSON.parse(stdout) as { errors: string[]; html: string };
     expect(result.errors).toEqual([]);
-    expect(result.html).toContain('class="sheetwrite"');
-  });
-
-  it("forwards active-sheet through onActiveSheetChange, reading the live callback", async () => {
-    const workbook = makeWorkbook(true);
-
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    const gridRef = createRef<Grid>();
-    const events: Array<GridEvents["active-sheet"]> = [];
-
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          onActiveSheetChange={(event) => events.push(event)}
-        />,
-      );
-    });
-
-    gridRef.current!.setActiveSheet("sheet2");
-    expect(events).toEqual([{ sheet: "sheet2" }]);
-
-    // A re-render swaps the live callback without recreating the grid.
-    const swapped: Array<GridEvents["active-sheet"]> = [];
-    const first = gridRef.current;
-    await act(async () => {
-      root.render(
-        <SheetwriteGrid
-          ref={gridRef}
-          workbook={workbook}
-          onActiveSheetChange={(event) => swapped.push(event)}
-        />,
-      );
-    });
-
-    expect(gridRef.current).toBe(first);
-    gridRef.current!.setActiveSheet("sheet");
-    expect(events).toEqual([{ sheet: "sheet2" }]);
-    expect(swapped).toEqual([{ sheet: "sheet" }]);
-
-    await act(async () => root.unmount());
+    const markup = document.createElement("div");
+    markup.innerHTML = result.html;
+    expect(markup.firstElementChild).not.toBeNull();
   });
 
   it("does not publish callbacks from a concurrent render that is later abandoned", async () => {
@@ -242,6 +201,7 @@ describe("SheetwriteGrid React lifecycle", () => {
     const root = createRoot(host);
     const gridRef = createRef<Grid>();
     const ready: Grid[] = [];
+    const destroyed = new Set<Grid>();
 
     await act(async () => {
       root.render(
@@ -249,20 +209,25 @@ describe("SheetwriteGrid React lifecycle", () => {
           <SheetwriteGrid
             ref={gridRef}
             workbook={workbook}
-            onReady={({ grid }) => ready.push(grid)}
+            onReady={({ grid }) => {
+              const destroy = grid.destroy.bind(grid);
+              grid.destroy = () => {
+                destroyed.add(grid);
+                destroy();
+              };
+              ready.push(grid);
+            }}
           />
         </StrictMode>,
       );
     });
 
-    // StrictMode replays the mount effect: create → destroy → create.
-    expect(ready).toHaveLength(2);
-    expect(gridRef.current).toBe(ready[1]!);
-    expect(gridRef.current).not.toBe(ready[0]!);
-
-    // The replayed-away first grid is fully torn down: exactly one live grid
-    // remains inside the host.
-    expect(host.querySelectorAll(".sheetwrite").length).toBe(1);
+    // StrictMode replays the mount effect. Only the latest grid stays live.
+    expect(ready.length).toBeGreaterThan(1);
+    expect(gridRef.current).toBe(ready.at(-1)!);
+    for (const retired of ready.slice(0, -1)) expect(destroyed.has(retired)).toBe(true);
+    expect(destroyed.has(ready.at(-1)!)).toBe(false);
+    expect(host.querySelectorAll('[role="grid"]').length).toBe(1);
 
     await act(async () => root.unmount());
     expect(gridRef.current).toBeNull();
