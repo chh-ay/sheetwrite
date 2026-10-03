@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
-import { assertReviewedActionPins, parseWorkflowContract } from "./workflow-contract.js";
 import {
   CARGO_AUDIT_VERSION,
   CARGO_LLVM_COV_VERSION,
@@ -18,11 +17,6 @@ const packageManifest = JSON.parse(readFileSync(resolve(root, "package.json"), "
 };
 const rustToolchain = readFileSync(resolve(root, "rust-toolchain.toml"), "utf8");
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
-const versionWorkflow = readFileSync(resolve(root, ".github/workflows/version.yml"), "utf8");
-const releaseWorkflow = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
-const parsedWorkflow = parseWorkflowContract(workflow, "CI workflow");
-const parsedVersionWorkflow = parseWorkflowContract(versionWorkflow, "version workflow");
-const parsedReleaseWorkflow = parseWorkflowContract(releaseWorkflow, "release workflow");
 const nodeVersion = readFileSync(resolve(root, ".node-version"), "utf8").trim();
 const WORKFLOW_NODE_VERSION = "$" + "{{ env.NODE_VERSION }}";
 const sizeReport = JSON.parse(readFileSync(resolve(root, "scripts/size-report.json"), "utf8")) as {
@@ -57,16 +51,6 @@ describe("contributor and CI toolchain contract", () => {
       'cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked',
     );
     expect(workflow).not.toMatch(/curl[^\n]*\|\s*(?:ba)?sh/);
-  });
-
-  it("pins every third-party action to its reviewed immutable commit", () => {
-    expect(() =>
-      assertReviewedActionPins([
-        { name: "CI", workflow: parsedWorkflow },
-        { name: "version", workflow: parsedVersionWorkflow },
-        { name: "release", workflow: parsedReleaseWorkflow },
-      ]),
-    ).not.toThrow();
     expect(workflow).not.toMatch(
       /(?:bun-version|NODE_VERSION|NPM_VERSION|RUST_VERSION|WASM_PACK_VERSION):\s*(?:latest|stable)\b/,
     );

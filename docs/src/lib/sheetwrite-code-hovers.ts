@@ -262,10 +262,6 @@ async function formatSignature(rawSignature: string, printWidth: number): Promis
   }
 }
 
-export async function formatHoverSignature(raw: string, printWidth = 80): Promise<string> {
-  return formatSignature(normalizeQuickInfo(raw), printWidth);
-}
-
 /**
  * Formats a bare type expression (e.g. one union variant) by round-tripping
  * it through a synthetic alias, so prettier can lay out long object types.

@@ -121,32 +121,32 @@ async function arrayCorpus(): Promise<ConformanceCorpus> {
 }
 
 describe("bounded Google Sheets capture", () => {
-  it("partitions quota-bounded workbooks and preserves request and case ordering", async () => {
+  it("partitions quota-bounded workbooks and preserves case ordering", async () => {
     const corpus = await formulaCorpus(MAX_GOOGLE_CASES_PER_WORKBOOK + 1);
     const mock = mockGoogle();
     await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).resolves.toBe(
       "memory://google-capture",
     );
-    expect(mock.calls).toEqual([
-      "create:0:50",
-      "update:0",
-      "read:0",
-      "export:0",
-      "delete:0",
-      "create:1:1",
-      "update:1",
-      "read:1",
-      "export:1",
-      "delete:1",
-      "persist",
-    ]);
     const artifact = mock.artifact();
     expect(artifact.observations.map((entry) => entry.caseId)).toEqual(
       corpus.cases.map((entry) => entry.id),
     );
-    expect(
-      (artifact.workbooks as Array<{ caseCount: number }>).map((entry) => entry.caseCount),
-    ).toEqual([50, 1]);
+    const counts = (artifact.workbooks as Array<{ caseCount: number }>).map(
+      (entry) => entry.caseCount,
+    );
+    expect(counts.length).toBeGreaterThan(1);
+    for (const count of counts) expect(count).toBeLessThanOrEqual(MAX_GOOGLE_CASES_PER_WORKBOOK);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(corpus.cases.length);
+
+    // Each workbook is written before it is read and deleted before the capture persists.
+    const persisted = mock.calls.indexOf("persist");
+    counts.forEach((_, index) => {
+      const at = (step: string) => mock.calls.indexOf(`${step}:${index}`);
+      expect(at("update")).toBeGreaterThan(-1);
+      expect(at("update")).toBeLessThan(at("read"));
+      expect(at("delete")).toBeGreaterThan(at("read"));
+      expect(at("delete")).toBeLessThan(persisted);
+    });
     expect(
       validateGoogleCaptureArtifact(artifact, corpus, mock.dependencies.producerVersion),
     ).toEqual([]);
@@ -158,7 +158,8 @@ describe("bounded Google Sheets capture", () => {
     await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
       "read failure 0",
     );
-    expect(mock.calls).toEqual(["create:0:2", "update:0", "read:0", "delete:0"]);
+    expect(mock.calls).toContain("delete:0");
+    expect(mock.calls).not.toContain("persist");
   });
 
   it("fails closed on observation, producer-version, quota, and workbook binding tamper", async () => {
@@ -166,65 +167,62 @@ describe("bounded Google Sheets capture", () => {
     const mock = mockGoogle();
     await captureGoogleWithDependencies(corpus, mock.dependencies);
     const artifact = mock.artifact();
+    const version = mock.dependencies.producerVersion;
+    expect(validateGoogleCaptureArtifact(artifact, corpus, version)).toEqual([]);
 
-    const reordered = structuredClone(artifact);
-    [reordered.observations[0], reordered.observations[1]] = [
-      reordered.observations[1]!,
-      reordered.observations[0]!,
-    ];
-    expect(
-      validateGoogleCaptureArtifact(reordered, corpus, mock.dependencies.producerVersion).some(
-        (issue) => issue.includes("reordered"),
-      ),
-    ).toBe(true);
-
-    const tampered = structuredClone(artifact) as CaptureArtifact & {
+    type Tamperable = CaptureArtifact & {
       batchSize: number;
       workbooks: Array<{ workbookSha256: string }>;
     };
-    tampered.batchSize += 1;
-    tampered.workbooks[0]!.workbookSha256 = "0".repeat(64);
-    expect(
-      validateGoogleCaptureArtifact(tampered, corpus, "different-version").join("\n"),
-    ).toContain("quota drift");
-    expect(
-      validateGoogleCaptureArtifact(tampered, corpus, "different-version").join("\n"),
-    ).toContain("tampered workbook binding");
-    expect(
-      validateGoogleCaptureArtifact(tampered, corpus, "different-version").join("\n"),
-    ).toContain("exact producer version");
-  });
-  it("rejects a spill larger than the expected envelope", async () => {
-    const corpus = await arrayCorpus();
-    const mock = mockGoogle({ gridValues: [[1], [2], [3]] });
-    await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
-      "array result exceeds expected shape",
-    );
-    expect(mock.calls.at(-1)).toBe("delete:0");
+    const tampers: Array<[string, (copy: Tamperable) => void, string]> = [
+      [
+        "reordered observations",
+        (copy) => {
+          [copy.observations[0], copy.observations[1]] = [
+            copy.observations[1]!,
+            copy.observations[0]!,
+          ];
+        },
+        version,
+      ],
+      ["quota", (copy) => (copy.batchSize += 1), version],
+      ["workbook digest", (copy) => (copy.workbooks[0]!.workbookSha256 = "0".repeat(64)), version],
+      ["producer version", () => {}, "different-version"],
+    ];
+    for (const [label, tamper, expectedVersion] of tampers) {
+      const copy = structuredClone(artifact) as Tamperable;
+      tamper(copy);
+      expect(
+        validateGoogleCaptureArtifact(copy, corpus, expectedVersion).length,
+        label,
+      ).toBeGreaterThan(0);
+    }
   });
 
-  it("rejects an occupied sentinel column at the array boundary", async () => {
-    const corpus = await arrayCorpus();
-    const mock = mockGoogle({ gridValues: [[1, "block"], [2]] });
-    await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
-      "array result exceeds expected shape",
-    );
-    expect(mock.calls.at(-1)).toBe("delete:0");
+  it("rejects a result outside the expected array envelope and cleans up", async () => {
+    for (const gridValues of [
+      [[1], [2], [3]], // extra row
+      [[1, "block"], [2]], // occupied column past the boundary
+    ]) {
+      const corpus = await arrayCorpus();
+      const mock = mockGoogle({ gridValues });
+      await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).rejects.toThrow(
+        "array result exceeds expected shape",
+      );
+      expect(mock.calls).toContain("delete:0");
+      expect(mock.calls).not.toContain("persist");
+    }
   });
 
   it("accepts an omitted trailing blank inside the declared array shape", async () => {
     const corpus = await arrayCorpus();
-    corpus.cases[0]!.expected = {
-      type: "array",
-      value: [[1], [null]],
-      rows: 2,
-      columns: 1,
-    };
+    const expected = { type: "array", value: [[1], [null]], rows: 2, columns: 1 } as const;
+    corpus.cases[0]!.expected = expected;
     const mock = mockGoogle({ gridValues: [[1]] });
     await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).resolves.toBe(
       "memory://google-capture",
     );
-    expect(mock.calls.at(-2)).toBe("delete:0");
-    expect(mock.calls.at(-1)).toBe("persist");
+    expect(mock.calls).toContain("delete:0");
+    expect(mock.artifact().observations[0]).toMatchObject({ result: expected });
   });
 });

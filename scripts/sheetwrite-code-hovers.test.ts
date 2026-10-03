@@ -1,8 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { injectHoverPrelude } from "../docs/src/lib/hover-preludes.js";
 import {
   collectFenceHovers,
-  formatHoverSignature,
   isHighQualityHover,
   referenceRouteForHover,
 } from "../docs/src/lib/sheetwrite-code-hovers.js";
@@ -10,21 +8,6 @@ import {
   SheetwriteTypeEngine,
   type SheetwriteTypeHover,
 } from "../docs/src/lib/sheetwrite-type-engine.js";
-
-describe("Sheetwrite code hover signatures", () => {
-  it("formats generic function parameters at semantic boundaries", async () => {
-    const signature = await formatHoverSignature(
-      `(alias) const Sheetwrite: <Row extends Record<string, CellScalar>>(props: SheetwriteProps<Row> & { ref?: ForwardedRef<Grid> }) => ReactElement\nimport Sheetwrite`,
-      68,
-    );
-
-    expect(signature).toContain(
-      "const Sheetwrite: <Row extends Record<string, CellScalar>>(\n  props:",
-    );
-    expect(signature).toContain("ref?: ForwardedRef<Grid>");
-    expect(signature).toEndWith(") => ReactElement");
-  });
-});
 
 describe("Sheetwrite type engine", () => {
   it("owns TypeScript quick info with workspace module resolution", () => {
@@ -39,7 +22,7 @@ export function persist(event: ChangeEvent): void {
       "ts",
     );
 
-    expect(hovers.length).toBeGreaterThanOrEqual(5);
+    expect(hovers.find((hover) => hover.target === "ChangeEvent")?.text).toContain("ChangeEvent");
     expect(hovers.find((hover) => hover.target === "persist")?.text).toContain(
       "event: ChangeEvent",
     );
@@ -121,18 +104,15 @@ describe("Sheetwrite hover preludes", () => {
 
   it("maps single-line script positions around an injected prelude", () => {
     const source = '<script lang="ts">grid.destroy();</script>';
-    const injection = injectHoverPrelude(
-      source,
-      "svelte",
-      "declare const grid: { destroy(): void };",
-    );
-    expect(injection.analysisSource.split("\n")[2]).toBe("grid.destroy();</script>");
-    expect(injection.toOriginal({ line: 1, character: 3 })).toBeNull();
-    expect(injection.toOriginal({ line: 2, character: 0 })).toEqual({
-      line: 0,
-      character: 18,
-      start: 18,
-    });
+    const hovers = collectFenceHovers(source, "svelte", engine, "core");
+    const destroy = hovers.find((hover) => hover.target === "destroy");
+    expect(destroy).toMatchObject({ line: 0, character: source.indexOf("destroy") });
+    for (const hover of hovers) {
+      expect(hover.line).toBe(0);
+      expect(source.slice(hover.character, hover.character + hover.target.length)).toBe(
+        hover.target,
+      );
+    }
   });
 
   it("resolves prelude-backed host state in partial ts snippets", () => {

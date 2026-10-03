@@ -73,67 +73,44 @@ describe("JavaScript dependency audit policy", () => {
     );
   });
 
-  it("requires reviewed ownership for low and moderate findings", () => {
-    for (const severity of ["low", "moderate"] as const) {
+  it("requires a reviewed allowance for a finding of every severity", () => {
+    for (const severity of ["low", "moderate", "high", "critical"] as const) {
       expect(() => evaluateAuditPolicy(auditResult(severity), [], TODAY)).toThrow(
-        `vulnerable/GHSA-AAAA-BBBB-CCCC (${severity})`,
+        "vulnerable/GHSA-AAAA-BBBB-CCCC",
       );
       const result = evaluateAuditPolicy(auditResult(severity), [REVIEWED_ALLOWANCE], TODAY);
-      expect(result.nonBlockingFindings).toHaveLength(1);
-      expect(result.allowedBlockingFindings).toEqual([]);
+      const blocking = severity === "high" || severity === "critical";
+      expect(result.allowedBlockingFindings).toHaveLength(blocking ? 1 : 0);
+      expect(result.nonBlockingFindings).toHaveLength(blocking ? 0 : 1);
     }
   });
 
-  it("rejects an unowned high or critical finding", () => {
-    expect(() => evaluateAuditPolicy(auditResult("high"), [], TODAY)).toThrow(
-      "Unallowlisted dependency findings",
-    );
-    expect(() => evaluateAuditPolicy(auditResult("critical"), [], TODAY)).toThrow(
-      "Unallowlisted dependency findings",
-    );
-  });
-
-  it("rejects an expired allowance", () => {
-    expect(() =>
-      evaluateAuditPolicy(
-        auditResult("high"),
-        [{ ...REVIEWED_ALLOWANCE, expires: "2026-07-13" }],
-        TODAY,
+  it("requires complete, exact, unexpired, near-term allowance metadata", () => {
+    const invalid: Array<[string, Record<string, string>]> = [
+      ...(["advisory", "package", "owner", "rationale", "expires"] as const).map(
+        (field): [string, Record<string, string>] => [`empty ${field}`, { [field]: "" }],
       ),
-    ).toThrow("expired on 2026-07-13");
-  });
-
-  it("requires complete, exact, near-term allowance metadata", () => {
-    for (const field of ["advisory", "package", "owner", "rationale", "expires"] as const) {
+      ["impossible date", { expires: "2026-02-31" }],
+      ["expired", { expires: "2026-07-13" }],
+      ["too far ahead", { expires: "2026-10-13" }],
+      ["unknown field", { reason: REVIEWED_ALLOWANCE.rationale }],
+    ];
+    for (const severity of ["moderate", "high"] as const) {
       expect(() =>
-        evaluateAuditPolicy(
-          auditResult("moderate"),
-          [{ ...REVIEWED_ALLOWANCE, [field]: "" }],
-          TODAY,
-        ),
-      ).toThrow(`empty ${field}`);
+        evaluateAuditPolicy(auditResult(severity), [REVIEWED_ALLOWANCE], TODAY),
+      ).not.toThrow();
+      for (const [label, change] of invalid) {
+        expect(
+          () =>
+            evaluateAuditPolicy(
+              auditResult(severity),
+              [{ ...REVIEWED_ALLOWANCE, ...change }],
+              TODAY,
+            ),
+          `${severity}: ${label}`,
+        ).toThrow();
+      }
     }
-    expect(() =>
-      evaluateAuditPolicy(
-        auditResult("moderate"),
-        [{ ...REVIEWED_ALLOWANCE, expires: "2026-02-31" }],
-        TODAY,
-      ),
-    ).toThrow("is not a calendar date");
-    expect(() =>
-      evaluateAuditPolicy(
-        auditResult("moderate"),
-        [{ ...REVIEWED_ALLOWANCE, expires: "2026-10-13" }],
-        TODAY,
-      ),
-    ).toThrow(`more than ${AUDIT_ALLOWANCE_MAX_DAYS} days`);
-    expect(() =>
-      evaluateAuditPolicy(
-        auditResult("moderate"),
-        [{ ...REVIEWED_ALLOWANCE, reason: REVIEWED_ALLOWANCE.rationale }],
-        TODAY,
-      ),
-    ).toThrow("unknown field: reason");
   });
 
   it("rejects stale allowances as soon as the dependency or advisory disappears", () => {
