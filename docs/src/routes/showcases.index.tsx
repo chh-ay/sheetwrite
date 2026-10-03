@@ -46,12 +46,24 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
 };
 
-/** Accurate mount and runtime cues per first-party adapter. */
-const FRAMEWORK_MOUNTS: Readonly<Record<string, { mount: string; pkg: string }>> = {
-  vanilla: { mount: "createGrid(host, …)", pkg: "@sheetwrite/core" },
-  react: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/react" },
-  vue: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/vue" },
-  svelte: { mount: "<SheetwriteGrid bind:grid />", pkg: "@sheetwrite/svelte" },
+/** Real import and mount line per first-party adapter. */
+const FRAMEWORK_MOUNTS: Readonly<Record<string, { name: string; mount: string; pkg: string }>> = {
+  vanilla: { name: "createGrid", mount: "createGrid(host, { workbook })", pkg: "@sheetwrite/core" },
+  react: {
+    name: "SheetwriteGrid",
+    mount: "<SheetwriteGrid workbook={book} />",
+    pkg: "@sheetwrite/react",
+  },
+  vue: {
+    name: "SheetwriteGrid",
+    mount: '<SheetwriteGrid :workbook="book" />',
+    pkg: "@sheetwrite/vue",
+  },
+  svelte: {
+    name: "SheetwriteGrid",
+    mount: "<SheetwriteGrid {workbook} bind:grid />",
+    pkg: "@sheetwrite/svelte",
+  },
 };
 
 const FRAMEWORK_SUMMARY: Readonly<Record<string, string>> = {
@@ -242,21 +254,18 @@ function ShowcaseHub() {
       <SiteTopbar active="showcases" />
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
-          <h1>Eight real experiences. Pick your proof.</h1>
+          <p className="sw-hub__eyebrow">Showcases</p>
+          <h1>See Sheetwrite at work.</h1>
           <p className="sw-hub__lede">
-            Explore scale, workbook exchange, durable storage, and collaboration. Each example opens
-            a live spreadsheet with real controls.
+            Each example opens a live spreadsheet with real controls. Start with a capability, or
+            pick the framework you build with.
           </p>
         </header>
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
-          <div className="sw-hub__section-heading">
-            <div>
-              <p className="sw-hub__section-index">Find your use case</p>
-              <h2 id="hub-scenes">Pick the proof that matches your work</h2>
-            </div>
-            <p>Four capability examples. Four framework integrations.</p>
-          </div>
+          <h2 className="sw-hub__visually-hidden" id="hub-scenes">
+            Live examples
+          </h2>
           <div className="sw-hub__toolbar">
             <fieldset className="sw-hub__filters">
               <legend>Filter product examples</legend>
@@ -288,9 +297,12 @@ function ShowcaseHub() {
                   >
                     {isFramework ? (
                       <span aria-hidden="true" className="sw-hub-framework-scene">
-                        <span>{owner.label.replace(" workbench", "")}</span>
-                        <code>{cue?.mount}</code>
-                        <small>{cue?.pkg}</small>
+                        <code className="sw-hub-framework-scene__import">
+                          <span>import</span> {"{ "}
+                          {cue?.name}
+                          {" }"} <span>from</span> <em>"{cue?.pkg}"</em>
+                        </code>
+                        <code className="sw-hub-framework-scene__mount">{cue?.mount}</code>
                       </span>
                     ) : (
                       <CapabilityScene

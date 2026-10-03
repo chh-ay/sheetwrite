@@ -18,57 +18,46 @@
   outline-offset: var(--sw-demo-space-1);
 }
 
-/* Give the launcher a real opening beat before the proof gallery. */
+/* A short opening, then straight into the gallery. */
 .sw-hub__hero {
-  padding-block: 1rem 1.5rem;
+  max-width: 46rem;
+  padding-block: clamp(1.5rem, 4vw, 3rem) 0;
+}
+
+.sw-hub__eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--sw-accent-strong);
+  font: 650 0.78rem / 1.4 var(--sw-font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .sw-hub__hero h1 {
   margin: 0;
   color: var(--sw-fg-strong);
-  font: 650 clamp(2rem, 3vw, 2.75rem) / 1.15 var(--sw-font-display);
-  letter-spacing: -0.025em;
+  font: 700 clamp(2.25rem, 4.2vw, 3.5rem) / 1.05 var(--sw-font-display);
+  letter-spacing: -0.04em;
+  text-wrap: balance;
 }
 
 .sw-hub__lede {
-  margin: var(--sw-demo-space-2) 0 0;
+  margin: 1rem 0 0;
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
-  line-height: 1.5;
+  font-size: 1.05rem;
+  line-height: 1.6;
 }
 
-/* The filter toolbar separates the introduction from the gallery. */
 .sw-hub__scenes {
-  margin-top: 1.25rem;
+  margin-top: clamp(1.75rem, 3vw, 2.5rem);
 }
 
-.sw-hub__section-heading {
-  display: flex;
-  gap: 1rem;
-  align-items: baseline;
-}
-
-.sw-hub__section-heading > div {
-  min-width: 0;
-}
-
-.sw-hub__section-index {
-  margin: 0 0 0.5rem;
-  color: var(--sw-accent-strong);
-  font: 600 0.8125rem / 1.4 var(--sw-font-body);
-}
-
-.sw-hub__section-heading h2 {
-  margin: 0;
-  color: var(--sw-fg-strong);
-  font: 650 1.25rem / 1.2 var(--sw-font-display);
-}
-
-.sw-hub__section-heading > p {
-  margin: 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
-  line-height: 1.45;
+.sw-hub__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .sw-hub__toolbar {
@@ -77,7 +66,7 @@
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  margin: 1.5rem 0;
+  margin: 0 0 1.25rem;
 }
 
 .sw-hub__filters {
@@ -248,23 +237,32 @@
 
 .sw-hub-framework-scene {
   justify-content: center;
-}
-
-.sw-hub-framework-scene > span {
-  color: var(--sw-demo-fg-strong);
-  font: 650 1rem / 1.25rem var(--sw-font-display);
+  gap: 0.35rem;
+  min-height: 7.5rem;
 }
 
 .sw-hub-framework-scene code {
-  color: var(--sw-hub-accent);
-  font: 600 0.8125rem / 1.6 var(--sw-font-mono);
+  display: block;
+  font: 500 0.78rem / 1.6 var(--sw-font-mono);
   overflow-wrap: anywhere;
 }
 
-.sw-hub-framework-scene small {
+.sw-hub-framework-scene__import {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.75rem / 1.4 var(--sw-font-mono);
-  overflow-wrap: anywhere;
+}
+
+.sw-hub-framework-scene__import span {
+  color: #c4b5fd;
+}
+
+.sw-hub-framework-scene__import em {
+  color: var(--sw-demo-accent-strong);
+  font-style: normal;
+}
+
+.sw-hub-framework-scene__mount {
+  color: var(--sw-hub-accent);
+  font-weight: 600;
 }
 
 /* Million-row telemetry. */
@@ -539,12 +537,8 @@
 }
 
 @media (max-width: 63.999rem) {
-  .sw-hub__section-heading {
-    display: block;
-  }
-
-  .sw-hub__section-heading > p {
-    margin-top: 0.75rem;
+  .sw-hub__hero {
+    max-width: none;
   }
 }
 

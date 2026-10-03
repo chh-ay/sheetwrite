@@ -24,7 +24,6 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
   await page.goto(siteUrl("/showcases/"));
   await page.waitForLoadState("networkidle");
 
-  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
   // The Showcases link is page-current on the hub itself.
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
 

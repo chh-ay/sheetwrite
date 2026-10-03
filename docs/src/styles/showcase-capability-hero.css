@@ -3,11 +3,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1.65fr) minmax(16rem, 1fr);
     gap: clamp(1.5rem, 4vw, 3.5rem);
-    align-items: center;
-    width: min(74rem, 100%);
-    min-height: 9.5rem;
+    align-items: start;
+    width: 100%;
     margin-inline: auto;
-    margin-bottom: 0.5rem;
+    padding-block: clamp(1.75rem, 4vw, 3rem) clamp(1.25rem, 2.5vw, 2rem);
   }
 
   .sw-capability-hero__eyebrow {
@@ -75,8 +74,6 @@
   @media (max-width: 60rem) {
     .sw-capability-hero {
       grid-template-columns: minmax(0, 1fr);
-      align-items: start;
-      min-height: 0;
     }
     .sw-capability-hero__facts {
       padding-left: 0;
