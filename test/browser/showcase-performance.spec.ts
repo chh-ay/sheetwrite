@@ -251,8 +251,9 @@ test("row and column navigators agree with the public window headers", async ({ 
   const landmarkRows: number[] = [];
   for (const [landmark, selected, dataRow] of [
     ["25", "A250001", 250_000],
-    ["74", "A740000", 739_999],
-    ["99", "A990000", 989_999],
+    ["50", "A500001", 500_000],
+    ["75", "A750000", 749_999],
+    ["100", "A1000000", 999_999],
   ] as const) {
     await page.getByTestId(`scale-landmark-${landmark}`).click();
     await expect(page.getByTestId("scale-current-a1")).toHaveText(selected);
@@ -272,6 +273,7 @@ test("row and column navigators agree with the public window headers", async ({ 
   }
   expect(landmarkRows[0]).toBeLessThan(landmarkRows[1]!);
   expect(landmarkRows[1]).toBeLessThan(landmarkRows[2]!);
+  expect(landmarkRows[2]).toBeLessThan(landmarkRows[3]!);
 
   const rail = page.getByTestId("scale-overview");
   const railBox = await rail.boundingBox();
@@ -400,7 +402,7 @@ test("a distant physical edit survives clean-tile eviction, far horizontal motio
   expect(farWindow.firstColumn).toBeGreaterThan(900);
   expect(farWindow.lastColumn).toBeLessThan(COLUMNS);
 
-  for (const landmark of ["0", "25", "99", "0", "25"]) {
+  for (const landmark of ["0", "25", "100", "0", "25"]) {
     await page.getByTestId(`scale-landmark-${landmark}`).click();
     await page.waitForTimeout(250);
   }

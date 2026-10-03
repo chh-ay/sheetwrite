@@ -70,8 +70,9 @@ export const Route = createFileRoute("/showcases/performance")({
 const LANDMARKS = [
   { label: "0%", ratio: 0 },
   { label: "25%", ratio: 0.25 },
-  { label: "74%", ratio: 0.74 },
-  { label: "99%", ratio: 0.99 },
+  { label: "50%", ratio: 0.5 },
+  { label: "75%", ratio: 0.75 },
+  { label: "100%", ratio: 1 },
 ] as const;
 const SCALE_OVERSCAN = 4;
 
