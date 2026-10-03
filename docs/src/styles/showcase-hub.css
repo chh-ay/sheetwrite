@@ -1,5 +1,4 @@
-/* /showcases/ route-owned launcher. Uses shared Plan 076 tokens and never mounts
-   a Grid or runtime on the hub itself. */
+/* Route-owned gallery. Static previews do not mount a Grid or runtime. */
 
 .sw-hub-frame {
   min-height: 100vh;
@@ -21,28 +20,13 @@
 
 /* Give the launcher a real opening beat before the proof gallery. */
 .sw-hub__hero {
-  display: block;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--sw-border);
-}
-
-.sw-hub__hero-copy {
-  min-width: 0;
-}
-
-.sw-hub__eyebrow,
-.sw-hub__section-index {
-  margin: 0 0 var(--sw-demo-space-1);
-  color: var(--sw-accent-strong);
-  font: 600 var(--sw-type-xs) / 1.35 var(--sw-font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  padding-block: 1rem 1.5rem;
 }
 
 .sw-hub__hero h1 {
   margin: 0;
   color: var(--sw-fg-strong);
-  font: 650 clamp(2rem, 3vw, 2.25rem) / 1 var(--sw-font-display);
+  font: 650 clamp(2rem, 3vw, 2.75rem) / 1.15 var(--sw-font-display);
   letter-spacing: -0.025em;
 }
 
@@ -53,79 +37,25 @@
   line-height: 1.5;
 }
 
-.sw-hub__hero-notes {
-  display: grid;
-  gap: var(--sw-demo-space-1);
-  padding-left: var(--sw-demo-space-3);
-  border-left: 2px solid var(--sw-accent);
-}
-
-.sw-hub__inventory {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sw-demo-space-2);
-  align-items: baseline;
-  margin: 0;
-}
-
-.sw-hub__inventory strong {
-  color: var(--sw-fg-strong);
-  font: 650 var(--sw-type-sm) / 1.35 var(--sw-font-display);
-}
-
-.sw-hub__inventory span {
-  color: var(--sw-fg-dim);
-  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
-}
-
-.sw-hub__internals {
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-type-sm);
-}
-
-.sw-hub__internals summary {
-  width: fit-content;
-  padding-block: var(--sw-demo-space-1);
-  color: var(--sw-accent-strong);
-  font: 600 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
-  cursor: pointer;
-}
-
-.sw-hub__internals > div {
-  padding: var(--sw-demo-space-2) 0 0 var(--sw-demo-space-3);
-  border-left: 1px solid var(--sw-border-strong);
-}
-
-.sw-hub__internals p {
-  margin: 0 0 var(--sw-demo-space-2);
-  line-height: 1.5;
-}
-
-.sw-hub__internals a {
-  color: var(--sw-accent-strong);
-  text-underline-offset: var(--sw-demo-space-1);
-}
-
-/* Keep the section hierarchy readable before the dense proof controls. */
+/* The filter toolbar separates the introduction from the gallery. */
 .sw-hub__scenes {
   margin-top: 1.25rem;
 }
 
 .sw-hub__section-heading {
   display: flex;
-  gap: var(--sw-demo-space-4);
-  align-items: end;
-  justify-content: space-between;
-}
-
-.sw-hub__section-heading > div {
-  display: flex;
-  gap: var(--sw-demo-space-3);
+  gap: 1rem;
   align-items: baseline;
 }
 
-.sw-hub__section-heading .sw-hub__section-index {
-  margin: 0;
+.sw-hub__section-heading > div {
+  min-width: 0;
+}
+
+.sw-hub__section-index {
+  margin: 0 0 0.5rem;
+  color: var(--sw-accent-strong);
+  font: 600 0.8125rem / 1.4 var(--sw-font-body);
 }
 
 .sw-hub__section-heading h2 {
@@ -145,14 +75,16 @@
   display: flex;
   gap: var(--sw-demo-space-3);
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  margin: 1.25rem 0;
+  margin: 1.5rem 0;
 }
 
 .sw-hub__filters {
   display: flex;
   min-width: 0;
-  gap: var(--sw-demo-space-2);
+  flex-wrap: wrap;
+  gap: 0.5rem;
   align-items: center;
   margin: 0;
   padding: 0;
@@ -160,12 +92,11 @@
 }
 
 .sw-hub__filters legend {
-  float: left;
-  margin-right: var(--sw-demo-space-3);
-  color: var(--sw-fg-dim);
-  font: 600 var(--sw-type-xs) / 1 var(--sw-font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .sw-hub__filters button {
@@ -175,8 +106,7 @@
   border-radius: var(--sw-demo-radius-1);
   background: var(--sw-surface-1);
   color: var(--sw-fg-muted);
-  font: 600 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
-  white-space: nowrap;
+  font: 600 0.8125rem / 1.3 var(--sw-font-body);
   cursor: pointer;
   transition:
     border-color var(--sw-demo-transition),
@@ -203,11 +133,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Cohesive 4 × 2 launcher gallery. All eight cards share the same geometry. */
+/* Four columns on desktop, two on tablet, and one on small screens. */
 .sw-hub-scenes {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(1.25rem, 2vw, 2rem);
+  grid-auto-rows: 1fr;
+  gap: 1.25rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -215,7 +146,7 @@
 
 .sw-hub-scenes > li {
   min-width: 0;
-  height: 15rem;
+  display: flex;
 }
 
 .sw-hub-launch {
@@ -224,8 +155,8 @@
 
   display: grid;
   height: 100%;
-  grid-template-rows: 6.5rem minmax(0, 1fr);
-  overflow: hidden;
+  width: 100%;
+  grid-template-rows: minmax(10rem, auto) 1fr;
   border: 1px solid var(--sw-border);
   border-radius: var(--sw-demo-radius-2);
   background: var(--sw-surface-1);
@@ -262,48 +193,45 @@
 .sw-hub-launch__body {
   display: grid;
   min-width: 0;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: var(--sw-demo-space-1);
-  padding: 1rem 1.25rem;
-  border-top: 3px solid var(--sw-hub-accent);
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0.625rem;
+  padding: 1.25rem;
+  border-top: 2px solid var(--sw-hub-accent);
   background: var(--sw-surface-1);
 }
 
 .sw-hub-launch__meta {
-  overflow: hidden;
   color: var(--sw-hub-accent-ink);
-  font: 600 var(--sw-type-xs) / 1.35 var(--sw-font-mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font: 600 0.75rem / 1.4 var(--sw-font-body);
 }
 
 .sw-hub-launch__body > strong {
   color: var(--sw-fg-strong);
-  font: 650 1.05rem / 1.25 var(--sw-font-display);
+  font: 650 1.25rem / 1.25 var(--sw-font-display);
 }
 
 .sw-hub-launch__summary {
   color: var(--sw-fg-muted);
-  font: 400 0.875rem / 1.45 var(--sw-font-body);
+  font: 400 0.875rem / 1.6 var(--sw-font-body);
 }
 
 .sw-hub__owner-count {
-  align-self: end;
-  color: var(--sw-hub-accent-ink);
-  font: 600 0.8125rem / 1.35 var(--sw-font-body);
+  display: block;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sw-border);
+  color: var(--sw-accent-strong);
+  font: 600 0.875rem / 1.4 var(--sw-font-body);
 }
 
-/* Every preview receives the same high-contrast window and proportions. */
+/* Previews have room for their diagrams and a separate caption. */
 .sw-hub-scene,
 .sw-hub-framework-scene {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 0.5rem;
-  overflow: hidden;
-  padding: 0.75rem 1rem;
+  padding: 1.25rem;
   border-bottom: 1px solid var(--sw-demo-border);
   background: var(--sw-demo-panel);
   color: var(--sw-demo-fg);
@@ -315,11 +243,7 @@
   margin-top: auto;
   overflow: visible;
   color: var(--sw-demo-muted);
-  font: 600 0.75rem / 1.35 var(--sw-font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: normal;
-  text-overflow: clip;
+  font: 500 0.75rem / 1.5 var(--sw-font-body);
 }
 
 .sw-hub-framework-scene {
@@ -332,25 +256,22 @@
 }
 
 .sw-hub-framework-scene code {
-  overflow: hidden;
   color: var(--sw-hub-accent);
-  font: 600 0.8125rem / 1.4 var(--sw-font-mono);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font: 600 0.8125rem / 1.6 var(--sw-font-mono);
+  overflow-wrap: anywhere;
 }
 
 .sw-hub-framework-scene small {
-  overflow: hidden;
   color: var(--sw-demo-fg-soft);
   font: 500 0.75rem / 1.4 var(--sw-font-mono);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 /* Million-row telemetry. */
 .sw-hub-tele {
   display: flex;
-  gap: var(--sw-demo-space-4);
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .sw-hub-tele__stat {
@@ -360,13 +281,13 @@
 
 .sw-hub-tele__stat strong {
   color: var(--sw-demo-fg-strong);
-  font: 650 1rem / 1.15 var(--sw-font-display);
+  font: 650 1rem / 1.5 var(--sw-font-display);
   font-variant-numeric: tabular-nums;
 }
 
 .sw-hub-tele__stat small {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.75rem / 1.3 var(--sw-font-mono);
+  font: 500 0.75rem / 1.5 var(--sw-font-mono);
 }
 
 .sw-hub-tele__bars {
@@ -401,9 +322,13 @@
 /* IndexedDB commit timeline. */
 .sw-hub-commits {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 0.8fr)) minmax(0, 1.5fr) minmax(
+      0,
+      1.3fr
+    );
   align-items: start;
-  justify-content: space-between;
+  gap: 0.25rem;
   margin-block: auto;
 }
 
@@ -420,7 +345,8 @@
 .sw-hub-commits__node {
   position: relative;
   display: grid;
-  gap: var(--sw-demo-space-1);
+  min-width: 0;
+  gap: 0.5rem;
   justify-items: center;
 }
 
@@ -450,7 +376,9 @@
 
 .sw-hub-commits__node code {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.6875rem / 1.2 var(--sw-font-mono);
+  font: 500 0.6875rem / 1.4 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 /* Workbook exchange. */
@@ -480,14 +408,23 @@
 .sw-hub-exchange__arrow {
   position: relative;
   width: 1.5rem;
+  height: 1rem;
+}
+
+.sw-hub-exchange__arrow::before {
+  position: absolute;
+  top: calc(50% - 1px);
+  right: 2px;
+  left: 0;
   height: 2px;
   background: var(--sw-hub-accent);
+  content: "";
 }
 
 .sw-hub-exchange__arrow::after {
   position: absolute;
   top: 50%;
-  right: 0;
+  right: 2px;
   width: var(--sw-demo-space-2);
   height: var(--sw-demo-space-2);
   border-top: 2px solid var(--sw-hub-accent);
@@ -595,133 +532,35 @@
   }
 }
 
-/* Tablet is a stable two-column gallery. */
-@media (min-width: 80rem) and (min-height: 56rem) {
-  .sw-hub {
-    padding-top: 3rem;
-  }
-
-  .sw-hub__hero {
-    padding-bottom: 1.75rem;
-  }
-
-  .sw-hub__scenes {
-    margin-top: 2.25rem;
-  }
-
-  .sw-hub__toolbar {
-    margin-block: 1.5rem;
-  }
-}
-
 @media (max-width: 79.999rem) {
   .sw-hub-scenes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-/* Mobile keeps the same cards and truthful previews in one readable column. */
-@media (max-width: 48rem) {
-  .sw-hub {
-    width: calc(100% - 2rem);
-    padding-top: var(--sw-demo-space-4);
-  }
-
-  .sw-hub__hero {
-    display: block;
-  }
-
-  .sw-hub__hero h1 {
-    font-size: 2rem;
-  }
-
-  .sw-hub__hero-notes {
-    padding-left: var(--sw-demo-space-3);
-  }
-
-  .sw-hub__inventory {
-    display: grid;
-  }
-
+@media (max-width: 63.999rem) {
   .sw-hub__section-heading {
     display: block;
   }
 
-  .sw-hub__section-heading > div {
-    display: block;
-  }
-
-  .sw-hub__section-heading .sw-hub__section-index {
-    margin-bottom: var(--sw-demo-space-1);
-  }
-
   .sw-hub__section-heading > p {
-    display: none;
+    margin-top: 0.75rem;
   }
+}
 
-  .sw-hub__toolbar {
-    display: grid;
-    overflow: hidden;
-    margin-block: var(--sw-demo-space-2);
-  }
-
-  .sw-hub__filters {
-    overflow-x: auto;
-    padding: var(--sw-demo-space-1);
-    scrollbar-width: none;
-    touch-action: pan-x;
-  }
-
-  .sw-hub__filters::-webkit-scrollbar {
-    display: none;
-  }
-
-  .sw-hub__filters legend {
-    display: none;
+@media (max-width: 39.999rem) {
+  .sw-hub {
+    width: calc(100% - 2rem);
+    padding-top: 1rem;
   }
 
   .sw-hub-scenes {
     grid-template-columns: minmax(0, 1fr);
-    counter-reset: hub-item;
   }
 
-  .sw-hub-scenes > li {
-    height: 6.5rem;
-    counter-increment: hub-item;
-  }
-
-  .sw-hub-launch {
-    position: relative;
-    display: block;
-    border-radius: var(--sw-demo-radius-1);
-  }
-
-  .sw-hub-launch::before {
-    position: absolute;
-    top: var(--sw-demo-space-3);
-    left: var(--sw-demo-space-3);
-    z-index: 1;
-    color: var(--sw-hub-accent-ink);
-    font: 600 var(--sw-type-xs) / 1 var(--sw-font-mono);
-    content: counter(hub-item, decimal-leading-zero);
-  }
-
-  .sw-hub-scene,
-  .sw-hub-framework-scene {
-    display: none;
-  }
-
-  .sw-hub-launch__body {
-    height: 100%;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    gap: var(--sw-demo-space-1);
-    padding: var(--sw-demo-space-2) var(--sw-demo-space-3) var(--sw-demo-space-2) 3rem;
-    border-top: 0;
-    border-left: var(--sw-demo-space-1) solid var(--sw-hub-accent);
-  }
-
-  .sw-hub__owner-count {
-    display: none;
+  .sw-hub__toolbar {
+    align-items: start;
+    gap: 0.75rem;
   }
 }
 

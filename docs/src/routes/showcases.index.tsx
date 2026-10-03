@@ -243,15 +243,19 @@ function ShowcaseHub() {
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
           <h1>Eight real experiences. Pick your proof.</h1>
+          <p className="sw-hub__lede">
+            Explore scale, workbook exchange, durable storage, and collaboration. Each example opens
+            a live spreadsheet with real controls.
+          </p>
         </header>
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
           <div className="sw-hub__section-heading">
             <div>
-              <p className="sw-hub__section-index">01 / Product experiences</p>
+              <p className="sw-hub__section-index">Find your use case</p>
               <h2 id="hub-scenes">Pick the proof that matches your work</h2>
             </div>
-            <p>Preview the interaction, then open the owning route to use it.</p>
+            <p>Four capability examples. Four framework integrations.</p>
           </div>
           <div className="sw-hub__toolbar">
             <fieldset className="sw-hub__filters">
@@ -304,7 +308,7 @@ function ShowcaseHub() {
                           ? FRAMEWORK_SUMMARY[owner.id]
                           : SCENE_SUMMARY[owner.id as SceneOwnerId]}
                       </span>
-                      <span className="sw-hub__owner-count">Open live experience →</span>
+                      <span className="sw-hub__owner-count">Open live example →</span>
                     </span>
                   </Link>
                 </li>
