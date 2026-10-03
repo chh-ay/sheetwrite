@@ -340,19 +340,22 @@ describe("canonical release artifacts", () => {
     );
     await expect(verifyReleaseArtifacts(lifecycleRoot)).rejects.toThrow("retains prepublishOnly");
 
-    const exportRoot = await temporaryDirectory();
-    const exportPackages = await Promise.all(
-      PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
-        writeTarball(exportRoot, name, name, index === 0 ? { exports: "./Missing.js" } : {}),
-      ),
-    );
-    await writeFile(
-      join(exportRoot, RELEASE_ARTIFACT_MANIFEST),
-      serializeReleaseManifest({ ...manifest(), packages: exportPackages }),
-    );
-    await expect(verifyReleaseArtifacts(exportRoot)).rejects.toThrow(
-      "package target does not exist with exact case",
-    );
+    // A missing target, and one that differs from a packed file (README.md) only by case.
+    for (const target of ["./Missing.js", "./readme.md"]) {
+      const exportRoot = await temporaryDirectory();
+      const exportPackages = await Promise.all(
+        PUBLISHABLE_PACKAGE_ORDER.map((name, index) =>
+          writeTarball(exportRoot, name, name, index === 0 ? { exports: target } : {}),
+        ),
+      );
+      await writeFile(
+        join(exportRoot, RELEASE_ARTIFACT_MANIFEST),
+        serializeReleaseManifest({ ...manifest(), packages: exportPackages }),
+      );
+      await expect(verifyReleaseArtifacts(exportRoot), target).rejects.toThrow(
+        "package target does not exist with exact case",
+      );
+    }
   });
 
   it("rejects malicious archive paths before trusting the file list", async () => {

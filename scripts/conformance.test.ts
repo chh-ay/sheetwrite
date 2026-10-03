@@ -228,35 +228,56 @@ describe("neutral conformance corpus", () => {
 
 describe("offline typed comparison", () => {
   it("reports type, error, tolerance, spill shape, formula, and displayed-text differences", () => {
-    expect(compareResults({ type: "number", value: 2 }, { type: "string", value: "2" })).toEqual([
-      "type: expected number, received string",
+    const fields = (differences: readonly string[]) =>
+      differences.map((difference) => difference.slice(0, difference.indexOf(":"))).sort();
+    const tolerant = {
+      type: "number",
+      value: 1,
+      tolerance: { kind: "absolute", value: 0.01 },
+    } as const;
+    const array = {
+      type: "array",
+      value: [[1, 2]],
+      rows: 1,
+      columns: 2,
+      formula: "=A1:B1",
+    } as const;
+    const text = { type: "string", value: "2", displayedText: "2.00" } as const;
+
+    // Equal results, and a number inside its tolerance, have no differences.
+    for (const [expected, received] of [
+      [
+        { type: "error", error: "#N/A" },
+        { type: "error", error: "#N/A" },
+      ],
+      [tolerant, { type: "number", value: 1.005 }],
+      [array, structuredClone(array)],
+      [text, { ...text }],
+    ] as const) {
+      expect(compareResults(expected, received)).toEqual([]);
+    }
+
+    expect(
+      fields(compareResults({ type: "number", value: 2 }, { type: "string", value: "2" })),
+    ).toEqual(["type"]);
+    expect(
+      fields(compareResults({ type: "error", error: "#N/A" }, { type: "error", error: "#REF!" })),
+    ).toEqual(["error"]);
+    expect(fields(compareResults(tolerant, { type: "number", value: 1.02 }))).toEqual(["value"]);
+    expect(
+      fields(
+        compareResults(array, {
+          type: "array",
+          value: [[1], [2]],
+          rows: 2,
+          columns: 1,
+          formula: "=A1:A2",
+        }),
+      ),
+    ).toEqual(["columns", "formula", "rows", "value"]);
+    expect(fields(compareResults(text, { ...text, displayedText: "2" }))).toEqual([
+      "displayedText",
     ]);
-    expect(
-      compareResults({ type: "error", error: "#N/A" }, { type: "error", error: "#REF!" }),
-    ).toEqual(["error: expected #N/A, received #REF!"]);
-    expect(
-      compareResults(
-        { type: "number", value: 1, tolerance: { kind: "absolute", value: 0.01 } },
-        { type: "number", value: 1.02 },
-      ),
-    ).toEqual(["value: expected 1, received 1.02"]);
-    expect(
-      compareResults(
-        { type: "array", value: [[1, 2]], rows: 1, columns: 2, formula: "=A1:B1" },
-        { type: "array", value: [[1], [2]], rows: 2, columns: 1, formula: "=A1:A2" },
-      ),
-    ).toEqual([
-      "value: expected [[1,2]], received [[1],[2]]",
-      "rows: expected 1, received 2",
-      "columns: expected 2, received 1",
-      "formula: expected =A1:B1, received =A1:A2",
-    ]);
-    expect(
-      compareResults(
-        { type: "string", value: "2", displayedText: "2.00" },
-        { type: "string", value: "2", displayedText: "2" },
-      ),
-    ).toEqual(["displayedText: expected 2.00, received 2"]);
   });
 
   it("rejects incomplete or drifted Excel Office Script captures", async () => {
