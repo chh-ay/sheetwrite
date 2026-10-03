@@ -40,6 +40,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-filter-rows"><code>filterRows</code></a>
 <a href="#cell-store-filter-rows-multi"><code>filterRowsMulti</code></a>
 <a href="#cell-store-formula-matrix-resource-stats"><code>formulaMatrixResourceStats</code></a>
+<a href="#cell-store-formula-read-bands"><code>formulaReadBands</code></a>
 <a href="#cell-store-formula-source"><code>formulaSource</code></a>
 <a href="#cell-store-free"><code>free</code></a>
 <a href="#cell-store-get-cell"><code>getCell</code></a>
@@ -107,7 +108,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>93</span>
+## Members <span class="api-count" data-pagefind-ignore>94</span>
 
 <div class="api-member-list">
 
@@ -383,6 +384,24 @@ filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Ui
 formulaMatrixResourceStats: () => Float64Array;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-formula-read-bands" data-pagefind-weight="1">
+<summary><code>formulaReadBands</code> <span class="api-member-summary">Same-sheet cells that the formulas in startrow..endrow × cols read, as flat [rowstart, rowend, colstart, colend) rectangles.</span></summary>
+
+```ts generated
+formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array;
+```
+
+<p class="api-member-doc">Same-sheet cells that the formulas in `start_row..end_row` × `cols`
+read, as flat `[row_start, row_end, col_start, col_end)` rectangles.
+
+The walk follows each read into the formula cells it reaches, so for
+`H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`. It skips
+reads of other sheets. `max_cells` bounds the walk: a read larger than
+the remaining budget is skipped, so one whole-column range cannot make a
+window demand the full column. Rectangles are disjoint and ascend by
+column, then by row.</p>
 </details>
 
 <details class="api-member" id="cell-store-formula-source" data-pagefind-weight="1">
@@ -1164,6 +1183,13 @@ class CellStore {
     value_texts: string[],
   ) => Uint32Array;
   formulaMatrixResourceStats: () => Float64Array;
+  formulaReadBands: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    cols: Uint32Array,
+    max_cells: number,
+  ) => Uint32Array;
   formulaSource: (
     sheet: number,
     row: number,

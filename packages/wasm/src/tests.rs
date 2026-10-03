@@ -1478,6 +1478,37 @@ fn paged_formulas_propagate_loading_until_dependencies_arrive() {
 }
 
 #[test]
+fn formula_read_bands_follow_same_sheet_formula_chains_within_the_budget() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(8, 100, 16, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let other = store.add_paged_sheet(2, 100, 16, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_sheet_name(sheet, "main", "Main");
+    store.set_sheet_name(other, "other", "Other");
+    // Column H reads C and D; the cross-sheet read is not reported.
+    store.set_formula(sheet, 40, 7, "=C41*D41+Other!A1", 0);
+    store.set_formula(sheet, 41, 7, "=C42*D42", 0);
+    // D42 is a formula too, so the walk continues into E40:F42.
+    store.set_formula(sheet, 41, 3, "=SUM(E40:F42)", 0);
+    // A 100-cell read that does not fit the remaining budget is skipped.
+    store.set_formula(sheet, 41, 6, "=SUM(A1:A100)", 0);
+
+    assert_eq!(
+        store.formula_read_bands(sheet, 40, 42, &[6, 7], 64),
+        vec![40, 42, 2, 4, 39, 42, 4, 6],
+    );
+    assert_eq!(
+        store.formula_read_bands(sheet, 40, 42, &[6, 7], 1_000),
+        vec![0, 100, 0, 1, 40, 42, 2, 4, 39, 42, 4, 6],
+    );
+    assert!(store
+        .formula_read_bands(sheet, 0, 40, &[6, 7], 1_000)
+        .is_empty());
+    assert!(store
+        .formula_read_bands(usize::MAX, 40, 42, &[7], 1_000)
+        .is_empty());
+}
+
+#[test]
 fn multi_filter_kinds_match_resolved_cell_values() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 6);

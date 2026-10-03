@@ -342,4 +342,69 @@ describe("datasource repaint invalidation", () => {
     expect(recorder.paints.length).toBeGreaterThan(0);
     grid.destroy();
   });
+
+  it("loads the off-screen cells that visible formulas read", async () => {
+    const columnCount = 20;
+    const workbook = makeWorkbook(1_000);
+    workbook.sheets[0]!.columns = Array.from({ length: columnCount }, (_, column) => ({
+      key: `c${column}`,
+      header: `C${column}`,
+      width: 100,
+      type: "number" as const,
+    }));
+    const host = mountHost();
+    const grid = new GridImpl(host, {
+      workbook,
+      datasourceStorage: { mode: "paged" },
+      datasource: {
+        capabilities: WINDOWED_DATASOURCE,
+        // Column A holds the row index; every other column doubles it.
+        getRows: (request) =>
+          Promise.resolve(
+            coveredPage(
+              request,
+              Array.from({ length: request.end - request.start }, (_, offset) => {
+                const row = request.start + offset;
+                const values: RowData = { c0: row };
+                for (let column = 1; column < columnCount; column++) {
+                  values[`c${column}`] = { kind: "formula", src: `=A${row + 1}*2` };
+                }
+                return values;
+              }),
+            ),
+          ),
+      },
+    });
+    const recorder = makePaintRecorder();
+    Reflect.set(grid, "renderer", recorder);
+    let scrollEvent: GridEvents["scroll"] | undefined;
+    grid.on("scroll", (event) => {
+      scrollEvent = event;
+    });
+
+    // Scroll right past column A and down past the first loaded rows at once.
+    const scrollTop = 4_000;
+    const scroller = scrollerOf(host);
+    scroller.scrollLeft = 1_200;
+    scroller.scrollTop = scrollTop;
+    scroller.dispatchEvent(new Event("scroll"));
+    // Pages resolve as microtasks and renders run synchronously, so the
+    // viewport page, the formula-read page, and their repaints settle here.
+    for (let turn = 0; turn < 32; turn++) await Promise.resolve();
+
+    if (!scrollEvent) throw new Error("scroll event was not emitted");
+    const column = scrollEvent.firstVisibleColumn;
+    if (column === null) throw new Error("no column is visible");
+    expect(column).toBeGreaterThan(4);
+    // The scroll event includes overscan rows; check the rows on screen.
+    const { rowHeight, headerHeight } = DEFAULT_THEME;
+    const firstOnScreen = Math.floor(scrollTop / rowHeight);
+    const lastOnScreen = Math.floor((scrollTop + host.clientHeight - headerHeight - 1) / rowHeight);
+    const lastPaint = recorder.paints.at(-1)?.values ?? [];
+    for (let row = firstOnScreen; row <= lastOnScreen; row++) {
+      expect(grid.store.getCell({ sheet: "s1", row, col: column }).resolved).toBe(row * 2);
+      expect(lastPaint).toContain(row * 2);
+    }
+    grid.destroy();
+  });
 });

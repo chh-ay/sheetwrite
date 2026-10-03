@@ -17,6 +17,8 @@ export const DATASOURCE_MAX_ACTIVE_REQUESTS = 6;
 export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 const DATASOURCE_NO_PROGRESS_RETRIES = 1;
 const ESTIMATED_CELL_BYTES = 16;
+/** Formula reads outside the viewport share the prefetch byte horizon. */
+const DATASOURCE_FORMULA_READ_MAX_CELLS = DATASOURCE_PREFETCH_MAX_BYTES / ESTIMATED_CELL_BYTES;
 const LOGICAL_FRAME_MS = 16.7;
 
 let datasourceClockForTest: (() => number) | undefined;
@@ -511,6 +513,8 @@ interface PendingDemand extends RowBand {
   readonly direction: -1 | 0 | 1;
   readonly viewportOrigin: boolean;
   readonly durableOrigin: boolean;
+  /** Off-viewport cells that formulas in the viewport read. */
+  readonly formulaReadOrigin: boolean;
   readonly attempt: number;
 }
 
@@ -525,6 +529,7 @@ interface ActiveRequest extends RowBand {
   readonly releaseRevision: () => void;
   readonly speculativeOrigin: boolean;
   readonly viewportOrigin: boolean;
+  readonly formulaReadOrigin: boolean;
   durableDemand: boolean;
   priority: RequestPriority;
   direction: -1 | 0 | 1;
@@ -680,6 +685,7 @@ export class DatasourceController {
   private readonly requests = new Set<ActiveRequest>();
   private readonly durableDemand = new SparseColumnIntervals();
   private viewportDemand: PendingDemand | null = null;
+  private formulaReadDemand: PendingDemand[] = [];
   private speculativeDemand: PendingDemand[] = [];
   private retryDemand: PendingDemand[] = [];
   private drainingDemand = false;
@@ -719,12 +725,16 @@ export class DatasourceController {
     this.drainDemand();
   }
 
-  /** Records the viewport, starts visible work, then bounded row-direction speculation. */
+  /**
+   * Records the viewport, starts visible work and the off-viewport cells its
+   * formulas read, then bounded row-direction speculation.
+   */
   updateViewport(start: number, end: number, indices: readonly number[]): void {
     if (this.destroyed) return;
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) {
       this.viewportDemand = null;
+      this.formulaReadDemand.length = 0;
       this.speculativeDemand.length = 0;
       this.visibleWaitStarted.clear();
       return;
@@ -754,9 +764,11 @@ export class DatasourceController {
       columns.length,
     );
     this.lastViewport = { ...bounds, columns, at: now };
+    const formulaReads = this.formulaReadDemands(bounds.start, bounds.end, columns);
     this.cancelObsoleteSpeculation(
       { ...bounds, columns },
       speculative,
+      formulaReads,
       jump ? "jump" : reversal ? "reversal" : "obsolete",
       reversal || jump,
     );
@@ -785,12 +797,15 @@ export class DatasourceController {
         direction: 0,
         viewportOrigin: true,
         durableOrigin: false,
+        formulaReadOrigin: false,
         attempt: 0,
       };
+      this.formulaReadDemand = formulaReads;
       this.setSpeculativeDemand(speculative, visibleRows, effectiveDirection, columns);
       this.drainDemand();
     } else {
       this.viewportDemand = null;
+      this.formulaReadDemand.length = 0;
       this.speculativeDemand.length = 0;
     }
   }
@@ -862,6 +877,7 @@ export class DatasourceController {
     const queuedDemandEntries =
       this.durableDemand.bandCount +
       (this.viewportDemand?.columns.length ?? 0) +
+      this.formulaReadDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
       this.speculativeDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
       this.retryDemand.reduce((sum, demand) => sum + demand.columns.length, 0);
     const tileEntries =
@@ -949,6 +965,7 @@ export class DatasourceController {
     this.generation += 1;
     this.durableDemand.clear();
     this.viewportDemand = null;
+    this.formulaReadDemand.length = 0;
     this.speculativeDemand.length = 0;
     this.retryDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "reset");
@@ -969,6 +986,7 @@ export class DatasourceController {
     this.generation += 1;
     this.durableDemand.clear();
     this.viewportDemand = null;
+    this.formulaReadDemand.length = 0;
     this.speculativeDemand.length = 0;
     this.retryDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "destroy");
@@ -1034,15 +1052,7 @@ export class DatasourceController {
       if (datasource.capabilities?.protocol !== 2) {
         throw new RangeError("Datasource must declare protocol 2 capabilities");
       }
-      if (datasource.capabilities.columns === "full-width") {
-        // Full-width compatibility shares this engine but is horizontally non-scalable.
-        if (!schema.allIndices) {
-          schema.allIndices = Object.freeze(
-            Array.from({ length: schema.keys.length }, (_, index) => index),
-          );
-        }
-        return schema.allIndices;
-      }
+      if (datasource.capabilities.columns === "full-width") return this.allColumns(schema);
       if (datasource.capabilities.columns !== "windowed") {
         throw new RangeError("Datasource column capability must be windowed or full-width");
       }
@@ -1058,6 +1068,77 @@ export class DatasourceController {
     const stable = Object.freeze(normalized);
     this.lastCanonicalColumns = stable;
     return stable;
+  }
+
+  /** Full-width compatibility shares this engine but is horizontally non-scalable. */
+  private allColumns(schema: SchemaSnapshot): readonly number[] {
+    if (!schema.allIndices) {
+      schema.allIndices = Object.freeze(
+        Array.from({ length: schema.keys.length }, (_, index) => index),
+      );
+    }
+    return schema.allIndices;
+  }
+
+  /**
+   * Off-viewport cells that the formulas of the viewport read. A formula shows
+   * `#LOADING!` until every cell it reads is loaded, and the column window does
+   * not include a column that is off screen.
+   */
+  private formulaReadDemands(
+    start: number,
+    end: number,
+    columns: readonly number[],
+  ): PendingDemand[] {
+    const loadable = this.options.loadable;
+    const datasource = this.options.datasource;
+    const engine = loadable && datasource ? storeEngine(loadable) : undefined;
+    if (!engine) return [];
+    const schema = this.schema();
+    const bands = engine.formulaReadBands(
+      schema.sheet,
+      start,
+      end,
+      columns,
+      DATASOURCE_FORMULA_READ_MAX_CELLS,
+    );
+    const demands: PendingDemand[] = [];
+    for (let index = 0; index < bands.length; index += 4) {
+      const rowStart = bands[index];
+      const rowEnd = bands[index + 1];
+      const columnStart = bands[index + 2];
+      const columnEnd = bands[index + 3];
+      if (
+        rowStart === undefined ||
+        rowEnd === undefined ||
+        columnStart === undefined ||
+        columnEnd === undefined
+      ) {
+        throw new Error("Sheetwrite: formula read bands are not a quad sequence");
+      }
+      const rows = normalizeBounds(rowStart, rowEnd, this.rowCount);
+      const schemaColumnEnd = Math.min(columnEnd, schema.keys.length);
+      if (rows.start === rows.end || columnStart >= schemaColumnEnd) continue;
+      demands.push({
+        ...rows,
+        columns:
+          datasource?.capabilities.columns === "full-width"
+            ? this.allColumns(schema)
+            : Object.freeze(
+                Array.from(
+                  { length: schemaColumnEnd - columnStart },
+                  (_, offset) => columnStart + offset,
+                ),
+              ),
+        priority: "visible",
+        direction: 0,
+        viewportOrigin: false,
+        durableOrigin: false,
+        formulaReadOrigin: true,
+        attempt: 0,
+      });
+    }
+    return demands;
   }
 
   private canonicalBands(
@@ -1117,6 +1198,7 @@ export class DatasourceController {
             direction,
             viewportOrigin: false,
             durableOrigin: false,
+            formulaReadOrigin: false,
             attempt: 0,
           });
         }
@@ -1130,6 +1212,7 @@ export class DatasourceController {
             direction,
             viewportOrigin: false,
             durableOrigin: false,
+            formulaReadOrigin: false,
             attempt: 0,
           });
         }
@@ -1165,10 +1248,18 @@ export class DatasourceController {
             direction: 0,
             viewportOrigin: false,
             durableOrigin: true,
+            formulaReadOrigin: false,
             attempt: 0,
           };
           if (!this.dispatchRange(datasource, loadable, demand)) return;
           this.durableDemand.remove(durable.columns, durable.start, durable.end);
+          continue;
+        }
+
+        const formulaRead = this.formulaReadDemand[0];
+        if (formulaRead) {
+          if (!this.dispatchRange(datasource, loadable, formulaRead)) return;
+          this.formulaReadDemand.shift();
           continue;
         }
 
@@ -1234,18 +1325,7 @@ export class DatasourceController {
         const requestColumns = demand.columns.filter((candidate) =>
           this.tileUncovered(candidate, row, requestEnd),
         );
-        this.requestBand(
-          datasource,
-          loadable,
-          row,
-          requestEnd,
-          requestColumns,
-          demand.priority,
-          demand.direction,
-          demand.viewportOrigin,
-          demand.durableOrigin,
-          demand.attempt,
-        );
+        this.requestBand(datasource, loadable, demand, row, requestEnd, requestColumns);
         row = requestEnd;
       }
     }
@@ -1276,16 +1356,14 @@ export class DatasourceController {
   private requestBand(
     datasource: DataSource,
     loadable: SheetwriteStore,
+    demand: PendingDemand,
     start: number,
     end: number,
     columns: readonly number[],
-    priority: RequestPriority,
-    direction: -1 | 0 | 1,
-    viewportOrigin: boolean,
-    durableOrigin: boolean,
-    attempt: number,
   ): void {
     if (columns.length === 0 || start >= end) return;
+    const { priority, direction, viewportOrigin, durableOrigin, formulaReadOrigin, attempt } =
+      demand;
     const schema = this.schema();
     const bands = this.canonicalBands(columns, schema);
     const id = this.allocateRequestId();
@@ -1306,6 +1384,7 @@ export class DatasourceController {
       releaseRevision: this.options.retainRevision(revision),
       speculativeOrigin: priority === "speculative",
       viewportOrigin,
+      formulaReadOrigin,
       durableDemand: durableOrigin,
       priority,
       direction,
@@ -1500,6 +1579,7 @@ export class DatasourceController {
       direction: request.direction,
       viewportOrigin: request.viewportOrigin,
       durableOrigin: request.durableDemand,
+      formulaReadOrigin: request.formulaReadOrigin,
       attempt,
     });
   }
@@ -1661,16 +1741,28 @@ export class DatasourceController {
   private cancelObsoleteSpeculation(
     viewport: RowBand & { columns: readonly number[] },
     intervals: readonly RowBand[],
+    formulaReads: readonly PendingDemand[],
     reason: "obsolete" | "reversal" | "jump",
     cancelGeneration: boolean,
   ): void {
     this.retryDemand = this.retryDemand.filter(
       (demand) =>
         demand.durableOrigin ||
+        (demand.formulaReadOrigin &&
+          formulaReads.some(
+            (read) => rowsIntersect(demand, read) && columnsIntersect(demand.columns, read.columns),
+          )) ||
         (rowsIntersect(demand, viewport) && columnsSubset(demand.columns, viewport.columns)),
     );
     for (const request of [...this.requests]) {
       if (request.durableDemand) continue;
+      if (request.formulaReadOrigin) {
+        const stillRead = formulaReads.some(
+          (read) => rowsIntersect(request, read) && columnsIntersect(request.columns, read.columns),
+        );
+        if (!stillRead) this.abortRequest(request, reason);
+        continue;
+      }
       const intersectsViewport =
         rowsIntersect(request, viewport) && columnsSubset(request.columns, viewport.columns);
       if (request.speculativeOrigin) {

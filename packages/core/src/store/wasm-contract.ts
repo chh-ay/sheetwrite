@@ -189,6 +189,13 @@ export type RecomputingCellStore = CellStore & {
   rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
   columnsFullyLoaded(sheet: number, startRow: number, endRow: number, cols: Uint32Array): boolean;
   loadedSpans(sheet: number, startRow: number, endRow: number, col: number): Uint32Array;
+  formulaReadBands(
+    sheet: number,
+    startRow: number,
+    endRow: number,
+    cols: Uint32Array,
+    maxCells: number,
+  ): Uint32Array;
   cellSnapshots(sheet: number, rows: Uint32Array, cols: Uint32Array): CellSnapshot | undefined;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
   beginPageLoad(): void;
