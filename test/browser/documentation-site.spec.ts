@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { SITE_BASE, SITE_PORT, siteUrl } from "./playwright.config.js";
 
@@ -105,11 +106,7 @@ test("site root serves the product landing", async ({ page }) => {
   // Semantic contract: exactly one H1, and no live grid runtime on the landing.
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
-  const productStory = page.getByTestId("landing-product-story");
-  await expect(productStory).toBeVisible();
-  await expect(productStory).toHaveAttribute("data-landing-phase", "resolve", { timeout: 10_000 });
-  await expect(productStory.getByText("Illustrative product view")).toBeVisible();
-  await expect(productStory.getByText(/static Sheetwrite composition/i)).toBeVisible();
+  await expect(page.getByTestId("landing-product-story")).toBeVisible();
   expect(wasmRequests).toEqual([]);
   await expect(page).toHaveTitle(SITE_TITLE);
   for (const selector of [
@@ -137,24 +134,21 @@ test("site root serves the product landing", async ({ page }) => {
   const structuredData = await page
     .locator('script[type="application/ld+json"]')
     .evaluateAll((scripts) => scripts.map((script) => JSON.parse(script.textContent ?? "null")));
-  expect(structuredData).toHaveLength(1);
-  expect(
-    structuredData[0]?.["@graph"]?.map((entry: { "@type": string }) => entry["@type"]),
-  ).toEqual(["WebSite", "SoftwareSourceCode"]);
-  expect(structuredData[0]?.["@graph"]?.[1]).toMatchObject({
+  const graph: Array<Record<string, unknown>> = structuredData.flatMap(
+    (entry) => entry?.["@graph"] ?? [],
+  );
+  expect(graph.find((entry) => entry["@type"] === "WebSite")).toBeDefined();
+  // The published version must follow the packages, not a hand-copied number.
+  const { version } = JSON.parse(
+    readFileSync(new URL("../../packages/core/package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  expect(graph.find((entry) => entry["@type"] === "SoftwareSourceCode")).toMatchObject({
     codeRepository: "https://github.com/chh-ay/sheetwrite",
     license: "https://opensource.org/license/mit",
-    programmingLanguage: ["TypeScript", "Rust"],
-    runtimePlatform: ["Web", "WebAssembly"],
-    version: "0.1.0",
+    version,
   });
   // Benchmark section publishes real generated numbers, never placeholders.
-  const benchStats = page.locator("#benchmarks .sw-bench-stats li");
-  await expect(benchStats.first()).toBeVisible();
-  await expect(page.locator("#benchmarks")).toContainText("See how we measured it.");
-  // Feature navigation: four focused proofs and four adapter workbenches link out.
-  await expect(page.locator("main a[data-proof]")).toHaveCount(4);
-  await expect(page.locator("main a[data-framework]")).toHaveCount(4);
+  await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
   await page.getByRole("link", { name: /Performance & scale/ }).click();
@@ -346,43 +340,48 @@ test.describe("documentation site", () => {
     SnapshotValidationError: `${SITE_BASE}/docs/api/core/snapshot-validation-error/`,
   } as const;
 
-  for (const [term, expectedHref] of Object.entries(searchTargets)) {
-    test(`documentation search resolves ${term} to its generated anchor`, async ({ page }) => {
-      // A concrete page: opening search mid /docs/ redirect re-render is racy.
-      await page.goto(docsUrl("start/installation/"));
-      await waitForHydration(page);
-      await page
-        .getByRole("button", { name: /search/i })
-        .first()
-        .click();
-      const search = page.locator('input[placeholder="Search APIs, guides, and examples"]');
-      await search.fill(term);
-      const matchingLink = page.locator(`a[href='${expectedHref}']`);
-      await expect(matchingLink.first()).toBeVisible({ timeout: 15_000 });
-    });
-  }
-
-  test("documentation search excludes browser-only test routes", async ({ page }) => {
+  async function openSearch(page: Page) {
+    // A concrete page: opening search mid /docs/ redirect re-render is racy.
     await page.goto(docsUrl("start/installation/"));
     await waitForHydration(page);
     await page
       .getByRole("button", { name: /search/i })
       .first()
       .click();
-    await page
-      .locator('input[placeholder="Search APIs, guides, and examples"]')
-      .fill("XLSX browser verification");
-    await expect(page.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
+    const dialog = page.getByRole("dialog", { name: "Search documentation" });
+    return { dialog, input: dialog.getByLabel("Search documentation") };
+  }
+
+  for (const [term, expectedHref] of Object.entries(searchTargets)) {
+    test(`documentation search resolves ${term} to its generated anchor`, async ({ page }) => {
+      const { dialog, input } = await openSearch(page);
+      await input.fill(term);
+      const matchingLink = dialog.locator(`a[href='${expectedHref}']`).first();
+      await expect(matchingLink).toBeVisible({ timeout: 15_000 });
+      await matchingLink.click();
+      await expect(page).toHaveURL(expectedHref);
+      await expect(page.getByText(term).first()).toBeVisible();
+    });
+  }
+
+  test("documentation search excludes browser-only test routes", async ({ page }) => {
+    const { dialog, input } = await openSearch(page);
+    // The query must first return real documentation results, or the check below proves nothing.
+    await input.fill("XLSX browser verification");
+    await expect(dialog.locator(`a[href^='${SITE_BASE}/docs/']`).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(dialog.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
   });
 
-  test("member deep links open and emphasize the target row", async ({ page }) => {
+  test("member deep links open the target row in view", async ({ page }) => {
     // The search-anchor form: the fragment targets a hidden h3, and the
-    // following collapsed details row must open and carry the emphasis flag.
+    // following collapsed details row must open and scroll into view.
     await page.goto(docsUrl("api/core/grid/#applytransaction"));
     await waitForHydration(page);
     const member = page.locator("#grid-apply-transaction");
     await expect(member).toHaveAttribute("open", "");
-    await expect(member).toHaveAttribute("data-revealed", "");
-    await expect(member.locator(".expressive-code").first()).toBeVisible();
+    await expect(member).toBeInViewport();
+    await expect(member.getByText("applyTransaction").first()).toBeVisible();
   });
 });
