@@ -1,39 +1,49 @@
+.host-rows-frame {
+  min-height: 100vh;
+  background: var(--sw-surface-0);
+}
 .host-rows-showcase {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 48px 24px 72px;
+  padding: clamp(1.5rem, 3vw, 2.5rem) 24px 72px;
   color: var(--sw-fg);
 }
 .host-rows-showcase header {
   max-width: 760px;
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
 }
 .host-rows-showcase h1 {
-  font-family: var(--sw-font-display);
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 1.08;
-  margin: 0.2em 0;
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 700 clamp(2rem, 3.4vw, 3rem) / 1.08 var(--sw-font-display);
+  letter-spacing: -0.04em;
 }
 .host-rows-showcase .eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  margin: 0 0 0.75rem;
+  color: var(--sw-accent-strong);
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 .host-row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 18px 0;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
 }
 .host-row-actions button {
+  min-height: 2.5rem;
   border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-demo-radius-1);
+  border-radius: var(--sw-demo-radius-2);
   color: var(--sw-fg-strong);
   background: var(--sw-surface-1);
-  padding: 10px 14px;
-  font: inherit;
+  padding: 0 0.9rem;
+  font: 600 var(--sw-type-sm) / 1 var(--sw-font-body);
   cursor: pointer;
+  transition:
+    border-color var(--sw-demo-transition),
+    background-color var(--sw-demo-transition);
 }
 .host-row-proof {
   display: grid;
@@ -58,9 +68,10 @@
 }
 
 .host-rows-showcase header > p:last-child {
+  margin: 0.75rem 0 0;
   color: var(--sw-fg-muted);
-  font-size: var(--sw-type-base);
-  line-height: 1.65;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .host-row-actions button:hover {

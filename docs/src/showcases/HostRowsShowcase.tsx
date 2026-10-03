@@ -2,6 +2,7 @@ import { createRowBridge, type Grid, type RowBridgeProjection } from "@sheetwrit
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SiteTopbar } from "../components/SiteTopbar.js";
 
 interface HostEntity extends Record<string, string | number | boolean | null> {
   id: string;
@@ -10,10 +11,11 @@ interface HostEntity extends Record<string, string | number | boolean | null> {
   region: string;
 }
 
+// Widths fill the 1,130px stage, so the grid shows no empty padding columns.
 const columns = [
-  { key: "name" as const, title: "Customer" },
-  { key: "amount" as const, title: "Amount", type: "number" as const },
-  { key: "region" as const, title: "Region" },
+  { key: "name" as const, title: "Customer", width: 460 },
+  { key: "amount" as const, title: "Amount", type: "number" as const, width: 280 },
+  { key: "region" as const, title: "Region", width: 330 },
 ];
 const initialRows: HostEntity[] = [
   { id: "account-a", name: "Ada", amount: 120, region: "North" },
@@ -105,109 +107,112 @@ export default function HostRowsShowcase() {
   };
 
   return (
-    <main className="host-rows-showcase" data-testid="host-rows-showcase">
-      <header>
-        <p className="eyebrow">Host-owned rows</p>
-        <h1>One grid, one entity store</h1>
-        <p>
-          Sort and filter only change the view. Every committed edit still names the same account
-          row.
-        </p>
-      </header>
-      <div className="host-row-actions">
-        <button type="button" onClick={() => grid.current?.sortBy(1, false)}>
-          Sort amount
-        </button>
-        <button type="button" onClick={() => grid.current?.filterBy(2, "North")}>
-          Filter North
-        </button>
-        <button type="button" onClick={() => grid.current?.insertRows(1)}>
-          Insert row
-        </button>
-        <button type="button" onClick={() => grid.current?.removeRows(1)}>
-          Delete row
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            denyNext.current = true;
-            grid.current?.applyTransaction({
-              patches: [
-                {
-                  op: "set",
-                  addr: { sheet: "sheet1", row: 0, col: 1 },
-                  value: { kind: "literal", value: 999 },
-                },
-              ],
-            });
-          }}
-        >
-          Reject next edit
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const result = bridge.reconcile({
-              status: "transformed",
-              transactionId: "server-normalized",
-              operations: [
-                {
-                  op: "set",
-                  addr: { sheet: "sheet1", row: 1, col: 1 },
-                  value: { kind: "literal", value: 80 },
-                },
-              ],
-            });
-            applyProjection(result);
-          }}
-        >
-          Transformed accept
-        </button>
-        <button type="button" onClick={remoteUpdate}>
-          Remote update
-        </button>
-      </div>
-      <SheetwriteGrid
-        {...input}
-        ref={grid}
-        rowBridge={bridge}
-        onRowDelta={applyProjection}
-        onMutationRejected={() =>
-          applyProjection(
-            bridge.reconcile({
-              status: "rejected",
-              transactionId: "rejected-showcase",
-              operations: [],
-            }),
-          )
-        }
-        protectionResolver={() => {
-          if (!denyNext.current) return "allow";
-          denyNext.current = false;
-          return "deny";
-        }}
-        height={360}
-      />
-      <section className="host-row-proof">
-        <div>
-          <h2>Host entities</h2>
-          <ul data-testid="host-entity-list">
-            {[...entities.values()].map((row) => (
-              <li key={row.id}>
-                {row.id}: {row.name} · {row.amount} · {row.region}
-              </li>
-            ))}
-          </ul>
+    <div className="host-rows-frame">
+      <SiteTopbar active="showcases" />
+      <main className="host-rows-showcase" data-testid="host-rows-showcase">
+        <header>
+          <p className="eyebrow">Host-owned rows</p>
+          <h1>One grid, one entity store.</h1>
+          <p>
+            Sort and filter change only the view. Every committed edit still names the same account
+            row in your app's own store.
+          </p>
+        </header>
+        <div className="host-row-actions">
+          <button type="button" onClick={() => grid.current?.sortBy(1, false)}>
+            Sort amount
+          </button>
+          <button type="button" onClick={() => grid.current?.filterBy(2, "North")}>
+            Filter North
+          </button>
+          <button type="button" onClick={() => grid.current?.insertRows(1)}>
+            Insert row
+          </button>
+          <button type="button" onClick={() => grid.current?.removeRows(1)}>
+            Delete row
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              denyNext.current = true;
+              grid.current?.applyTransaction({
+                patches: [
+                  {
+                    op: "set",
+                    addr: { sheet: "sheet1", row: 0, col: 1 },
+                    value: { kind: "literal", value: 999 },
+                  },
+                ],
+              });
+            }}
+          >
+            Reject next edit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const result = bridge.reconcile({
+                status: "transformed",
+                transactionId: "server-normalized",
+                operations: [
+                  {
+                    op: "set",
+                    addr: { sheet: "sheet1", row: 1, col: 1 },
+                    value: { kind: "literal", value: 80 },
+                  },
+                ],
+              });
+              applyProjection(result);
+            }}
+          >
+            Transformed accept
+          </button>
+          <button type="button" onClick={remoteUpdate}>
+            Remote update
+          </button>
         </div>
-        <div>
-          <h2>Delta log</h2>
-          <ol data-testid="host-delta-log">
-            {log.map((entry) => (
-              <li key={entry.id}>{entry.text}</li>
-            ))}
-          </ol>
-        </div>
-      </section>
-    </main>
+        <SheetwriteGrid
+          {...input}
+          ref={grid}
+          rowBridge={bridge}
+          onRowDelta={applyProjection}
+          onMutationRejected={() =>
+            applyProjection(
+              bridge.reconcile({
+                status: "rejected",
+                transactionId: "rejected-showcase",
+                operations: [],
+              }),
+            )
+          }
+          protectionResolver={() => {
+            if (!denyNext.current) return "allow";
+            denyNext.current = false;
+            return "deny";
+          }}
+          height={230}
+        />
+        <section className="host-row-proof">
+          <div>
+            <h2>Host entities</h2>
+            <ul data-testid="host-entity-list">
+              {[...entities.values()].map((row) => (
+                <li key={row.id}>
+                  {row.id}: {row.name} · {row.amount} · {row.region}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h2>Delta log</h2>
+            <ol data-testid="host-delta-log">
+              {log.map((entry) => (
+                <li key={entry.id}>{entry.text}</li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
