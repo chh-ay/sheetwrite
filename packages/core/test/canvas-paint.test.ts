@@ -27,6 +27,8 @@ interface FillTextCall {
   fillStyle: string;
   font: string;
   maxWidth?: number;
+  /** Clip rectangles in effect when the text was drawn (all apply at once). */
+  clips: ClipRectCall[];
 }
 
 interface MoveToCall {
@@ -79,8 +81,19 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.fillRect = (x: number, y: number, w: number, h: number) => {
     ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
   };
+  // Track the clip stack across save/restore so each draw knows its clips.
+  let activeClips: ClipRectCall[] = [];
+  const savedClips: ClipRectCall[][] = [];
   ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
-    ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle, font: ctx.font });
+    ctx.fillTexts.push({
+      text,
+      x,
+      y,
+      maxWidth,
+      fillStyle: ctx.fillStyle,
+      font: ctx.font,
+      clips: [...activeClips],
+    });
   };
   let segmentStart: MoveToCall | undefined;
   ctx.moveTo = (x: number, y: number) => {
@@ -101,10 +114,19 @@ function makeRecordingCtx(): RecordingCtx {
     pendingRect = { x, y, w, h };
   };
   ctx.clip = () => {
-    if (pendingRect) ctx.clipRects.push(pendingRect);
+    if (pendingRect) {
+      ctx.clipRects.push(pendingRect);
+      activeClips = [...activeClips, pendingRect];
+    }
+  };
+  ctx.save = () => {
+    savedClips.push(activeClips);
+  };
+  ctx.restore = () => {
+    activeClips = savedClips.pop() ?? [];
   };
 
-  for (const op of ["setTransform", "beginPath", "save", "restore", "stroke", "setLineDash"]) {
+  for (const op of ["setTransform", "beginPath", "stroke", "setLineDash"]) {
     ctx[op] = () => {};
   }
 
@@ -573,5 +595,18 @@ describe("scroll blit and damage-band integrity", () => {
     const label = ctx.fillTexts.find((call) => call.text === "2");
     expect(label).toBeDefined();
     expect(label?.y).toBe(56);
+  });
+
+  it("never paints a row number into the column header band", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    const theme = makeTheme({ rowHeaderWidth: 40 });
+    // Row 1 is scrolled 16px under the header: its band is y in [4, 28) and
+    // its number is centred at y=16, inside the header band [0, 20).
+    const ctx = render(view, layout, { ...UNIFORM_VIEWPORT, scrollTop: 16 }, theme);
+    const label = ctx.fillTexts.find((call) => call.text === "1");
+    expect(label).toBeDefined();
+    const clipTop = Math.max(...label!.clips.map((clip) => clip.y));
+    expect(clipTop).toBeGreaterThanOrEqual(HEADER_HEIGHT);
   });
 });

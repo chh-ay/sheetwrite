@@ -612,6 +612,17 @@ export function paintFrame(
     ctx.clip();
     applyFill(ctx, state, theme.headerBg);
     ctx.fillRect(0, 0, g, height);
+    ctx.strokeStyle = theme.gridLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(g - 0.5, 0);
+    ctx.lineTo(g - 0.5, height);
+    ctx.stroke();
+    // Row numbers stay below the column header, like the cell body: a row
+    // scrolled half under the header must not paint its number in the corner.
+    ctx.beginPath();
+    ctx.rect(0, headerHeight, g, Math.max(0, height - headerHeight));
+    ctx.clip();
     applyFill(ctx, state, theme.headerFg);
     applyFont(ctx, state, theme.font);
     ctx.textAlign = "center";
@@ -630,12 +641,6 @@ export function paintFrame(
       const cy = bandTop + bandHeight / 2;
       ctx.fillText(String(row + 1), g / 2, cy);
     }
-    ctx.strokeStyle = theme.gridLine;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(g - 0.5, 0);
-    ctx.lineTo(g - 0.5, height);
-    ctx.stroke();
     ctx.restore();
   }
   ctx.restore();
