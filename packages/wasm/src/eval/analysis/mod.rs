@@ -1,7 +1,9 @@
 //! Optional function families for the complete analysis engine.
 
+mod dates;
 mod descriptive;
 mod distributions;
+mod finance;
 
 use std::collections::{HashMap, HashSet};
 
@@ -62,6 +64,13 @@ pub(super) struct Family {
 
 const FAMILIES: &[Family] = &[
     Family {
+        names: dates::NAMES,
+        reference_cells: &[],
+        evaluate: Some(dates::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
         names: descriptive::NAMES,
         reference_cells: descriptive::REFERENCE_CELLS,
         evaluate: Some(descriptive::evaluate),
@@ -72,6 +81,13 @@ const FAMILIES: &[Family] = &[
         names: distributions::NAMES,
         reference_cells: &[],
         evaluate: Some(distributions::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: finance::NAMES,
+        reference_cells: &[],
+        evaluate: Some(finance::evaluate),
         evaluate_ast: None,
         array: None,
     },

@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **54 optional analysis functions** (208 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **73 optional analysis functions** (227 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -71,6 +71,10 @@ Taxonomy/source: [Date and time functions](https://support.microsoft.com/en-us/o
 | `NETWORKDAYS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`networkdays`](#signature-networkdays) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `YEARFRAC` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `DAYS360` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DATEDIF` | `@sheetwrite/formulas` | optional analysis | [`datedif`](#signature-datedif) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `ISOWEEKNUM` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `NETWORKDAYS.INTL` | `@sheetwrite/formulas` | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `WORKDAY.INTL` | `@sheetwrite/formulas` | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
 
 ### Financial
 
@@ -86,6 +90,21 @@ Taxonomy/source: [Financial functions](https://support.microsoft.com/en-us/offic
 | `RATE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`rate`](#signature-rate) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `IPMT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `PPMT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CUMIPMT` | `@sheetwrite/formulas` | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `CUMPRINC` | `@sheetwrite/formulas` | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `DB` | `@sheetwrite/formulas` | optional analysis | [`db`](#signature-db) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `DDB` | `@sheetwrite/formulas` | optional analysis | [`ddb`](#signature-ddb) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `EFFECT` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `FVSCHEDULE` | `@sheetwrite/formulas` | optional analysis | [`fvschedule`](#signature-fvschedule) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `MIRR` | `@sheetwrite/formulas` | optional analysis | [`mirr`](#signature-mirr) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `NOMINAL` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `NPER` | `@sheetwrite/formulas` | optional analysis | [`nper`](#signature-nper) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `PDURATION` | `@sheetwrite/formulas` | optional analysis | [`pduration`](#signature-pduration) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `RRI` | `@sheetwrite/formulas` | optional analysis | [`rri`](#signature-rri) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `SLN` | `@sheetwrite/formulas` | optional analysis | [`sln`](#signature-sln) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `SYD` | `@sheetwrite/formulas` | optional analysis | [`syd`](#signature-syd) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `XIRR` | `@sheetwrite/formulas` | optional analysis | [`xirr`](#signature-xirr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `XNPV` | `@sheetwrite/formulas` | optional analysis | [`xnpv`](#signature-xnpv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
 
 ### Information and error
 
@@ -1143,6 +1162,156 @@ Return shape: `scalar`.
 | `knownYs` | yes | none | `range`, `array`, `reference` | `once` |
 | `knownXs` | yes | none | `range`, `array`, `reference` | `once` |
 
+### Signature: datedif
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `startDate` | yes | none | `scalar`, `reference` | `once` |
+| `endDate` | yes | none | `scalar`, `reference` | `once` |
+| `unit` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: calendar-intl
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `startDate` | yes | none | `scalar`, `reference` | `once` |
+| `endDateOrDays` | yes | none | `scalar`, `reference` | `once` |
+| `weekend` | no | 1 | `scalar`, `reference` | `once` |
+| `holidays` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: nper
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `payment` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | no | 0 | `scalar`, `reference` | `once` |
+| `type` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: xnpv
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: xirr
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `guess` | no | 0.1 | `scalar`, `reference` | `once` |
+
+### Signature: mirr
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `financeRate` | yes | none | `scalar`, `reference` | `once` |
+| `reinvestRate` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: cumulative-payment
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `nper` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `startPeriod` | yes | none | `scalar`, `reference` | `once` |
+| `endPeriod` | yes | none | `scalar`, `reference` | `once` |
+| `type` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: sln
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: syd
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: db
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+| `month` | no | 12 | `scalar`, `reference` | `once` |
+
+### Signature: ddb
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+| `factor` | no | 2 | `scalar`, `reference` | `once` |
+
+### Signature: rri
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `nper` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: pduration
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: fvschedule
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `principal` | yes | none | `scalar`, `reference` | `once` |
+| `schedule` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -1439,6 +1608,24 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | --- | --- |
 | Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/descriptive.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/descriptive.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-dates
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/dates.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/dates.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-finance
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/finance.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/finance.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 

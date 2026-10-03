@@ -2150,6 +2150,440 @@
         }
       ],
       "returns": "scalar"
+    },
+    "datedif": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "unit",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "calendar-intl": {
+      "arguments": [
+        {
+          "name": "startDate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endDateOrDays",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "weekend",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "holidays",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "nper": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "payment",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "xnpv": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "dates",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "xirr": {
+      "arguments": [
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "dates",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "guess",
+          "required": false,
+          "default": 0.1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "mirr": {
+      "arguments": [
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "financeRate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "reinvestRate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "cumulative-payment": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "startPeriod",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "endPeriod",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "type",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "sln": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "life",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "syd": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "life",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "db": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "life",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "month",
+          "required": false,
+          "default": 12,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "ddb": {
+      "arguments": [
+        {
+          "name": "cost",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "salvage",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "life",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "period",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "factor",
+          "required": false,
+          "default": 2,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "rri": {
+      "arguments": [
+        {
+          "name": "nper",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "pduration": {
+      "arguments": [
+        {
+          "name": "rate",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "presentValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "futureValue",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "fvschedule": {
+      "arguments": [
+        {
+          "name": "principal",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "schedule",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -2887,6 +3321,24 @@
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/descriptive.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
+    },
+    "analysis-dates": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/dates.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
+    },
+    "analysis-finance": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/finance.rs"]
       },
       "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
       "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
@@ -5493,6 +5945,234 @@
       "semantics": "analysis-descriptive",
       "dialects": "analysis-descriptive",
       "implementation": "analysis-descriptive",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DATEDIF",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "datedif",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "analysis-dates",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ISOWEEKNUM",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "analysis-dates",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NETWORKDAYS.INTL",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "calendar-intl",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "analysis-dates",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "WORKDAY.INTL",
+      "aliases": [],
+      "family": "date-time",
+      "contractStatus": "supported",
+      "signature": "calendar-intl",
+      "semantics": "date-time",
+      "dialects": "excel-documented",
+      "implementation": "analysis-dates",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CUMIPMT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "cumulative-payment",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CUMPRINC",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "cumulative-payment",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DB",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "db",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DDB",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "ddb",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "EFFECT",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FVSCHEDULE",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "fvschedule",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MIRR",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "mirr",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NOMINAL",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "NPER",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "nper",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PDURATION",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "pduration",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RRI",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "rri",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SLN",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "sln",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SYD",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "syd",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "XIRR",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "xirr",
+      "semantics": "financial-iterative",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "XNPV",
+      "aliases": [],
+      "family": "financial",
+      "contractStatus": "supported",
+      "signature": "xnpv",
+      "semantics": "financial",
+      "dialects": "excel-documented",
+      "implementation": "analysis-finance",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
