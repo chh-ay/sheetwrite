@@ -192,6 +192,8 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+    #[cfg(feature = "analysis")]
+    Analysis(&'static str),
 }
 
 const fn ascii_upper(byte: u8) -> u8 {
@@ -236,6 +238,10 @@ macro_rules! define_function_registry {
             {
                 return Some(FUNCTION_NAMES[index].1);
             }
+            #[cfg(feature = "analysis")]
+            if let Some(name) = crate::eval::analysis::lookup(name) {
+                return Some(Func::Analysis(name));
+            }
             FUNCTION_ALIASES
                 .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
                 .ok()
@@ -245,9 +251,23 @@ macro_rules! define_function_registry {
         fn func_name(func: Func) -> &'static str {
             match func {
                 $(Func::$variant => $canonical,)+
+                #[cfg(feature = "analysis")]
+                Func::Analysis(name) => name,
             }
         }
     };
+}
+
+#[cfg(feature = "analysis")]
+pub(crate) fn function_names() -> Vec<String> {
+    let mut names: Vec<String> = FUNCTION_NAMES.iter()
+        .chain(FUNCTION_ALIASES.iter())
+        .map(|(name, _)| (*name).to_owned())
+        .chain(crate::eval::analysis::names().map(str::to_owned))
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
 }
 
 define_function_registry! {
@@ -2299,5 +2319,28 @@ mod tests {
         }
         assert_eq!(parse_col(""), None);
         assert_eq!(parse_col("A1"), None);
+    }
+
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn analysis_names_resolve_to_their_family_without_shadowing_built_ins() {
+        let names: Vec<&str> = crate::eval::analysis::names().collect();
+        for name in &names {
+            assert!(
+                name.bytes().all(|byte| !byte.is_ascii_lowercase()),
+                "{name} must be uppercase"
+            );
+            // A built-in or alias with the same spelling would win the lookup.
+            assert_eq!(lookup_func(name), Some(Func::Analysis(name)), "{name}");
+            assert_eq!(lookup_func(&name.to_ascii_lowercase()), Some(Func::Analysis(name)));
+            assert_eq!(func_name(Func::Analysis(name)), *name);
+        }
+        let listed = function_names();
+        assert_eq!(
+            listed.len(),
+            FUNCTION_NAMES.len() + FUNCTION_ALIASES.len() + names.len(),
+            "every spelling is listed once"
+        );
+        assert!(listed.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

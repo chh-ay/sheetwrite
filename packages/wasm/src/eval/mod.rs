@@ -1,6 +1,8 @@
 //! Formula recompute: dependency index, affected-set growth, evaluation.
 
 mod array;
+#[cfg(feature = "analysis")]
+pub(crate) mod analysis;
 mod criteria;
 mod date;
 mod dependency;
@@ -1059,6 +1061,28 @@ impl CellStore {
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
             return Value::Error(FormulaError::Num);
+        }
+
+        #[cfg(feature = "analysis")]
+        if let Func::Analysis(name) = func {
+            if let Some(family) = analysis::family(name) {
+                if let Some(hooks) = &family.array {
+                    if (hooks.produces_array)(name, args) {
+                        return match (hooks.evaluate)(
+                            self, name, args, sheet, affected, memo, visiting, depth,
+                        ).and_then(|matrix| {
+                            matrix.validate_bytes()?;
+                            Ok(matrix)
+                        }) {
+                            Ok(matrix) => matrix.into_first(),
+                            Err(error) => Value::Error(error),
+                        };
+                    }
+                }
+                if let Some(evaluate) = family.evaluate_ast {
+                    return evaluate(self, name, args, sheet, affected, memo, visiting, depth);
+                }
+            }
         }
 
         if func == Func::Let {

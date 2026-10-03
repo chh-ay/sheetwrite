@@ -34,6 +34,10 @@ pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis(name), args) => super::analysis::family(name)
+            .and_then(|family| family.array.as_ref())
+            .is_some_and(|hooks| (hooks.produces_array)(name, args)),
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -94,6 +98,14 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                Some((hooks.bound)(self, name, args, formula_sheet))
+            }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
@@ -184,6 +196,14 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                (hooks.evaluate)(self, name, args, sheet, affected, memo, visiting, depth + 1)
+            }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
@@ -260,6 +280,21 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)
+                    .and_then(|family| family.array.as_ref())
+                    .ok_or(FormulaError::Value)?;
+                if !(hooks.produces_array)(name, args) {
+                    return Err(FormulaError::Value);
+                }
+                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet)?;
+                let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+                if cells != validated {
+                    return Err(FormulaError::Value);
+                }
+                return Ok((rows, cols, cells));
+            }
             Ast::Func(Func::Let, args) => {
                 let (expanded, _) = expand_let_ast(args)?;
                 return self.matrix_shape(&expanded, formula_sheet);
