@@ -6,6 +6,7 @@ mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
+pub(crate) mod lambda;
 mod math;
 mod matrices;
 mod regression;
@@ -164,6 +165,18 @@ const FAMILIES: &[Family] = &[
             shape: reshape::shape,
             bound: reshape::bound,
             evaluate: reshape::evaluate,
+        }),
+    },
+    Family {
+        names: lambda::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(lambda::evaluate),
+        array: Some(ArrayHooks {
+            produces_array: lambda::produces_array,
+            shape: lambda::shape,
+            bound: lambda::bound,
+            evaluate: lambda::evaluate_matrix,
         }),
     },
 ];

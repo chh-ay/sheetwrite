@@ -214,7 +214,38 @@ fn expand_let_node<'a>(
         }
     }
     count_let_node(nodes)?;
+    #[cfg(feature = "analysis")]
+    if let Ast::UnknownFunc(name, args) = ast {
+        if let Some((_, expression, visible, _)) = bindings.iter().rev()
+            .find(|(binding, ..)| binding.eq_ignore_ascii_case(name)).copied()
+        {
+            let hidden = bindings.split_off(visible);
+            let callee = expand_let_node(expression, bindings, nodes, next_slot);
+            bindings.extend(hidden);
+            let callee = callee?;
+            let mut invocation = vec![callee];
+            invocation.extend(args.iter().map(|argument| {
+                expand_let_node(argument, bindings, nodes, next_slot)
+            }).collect::<Result<Vec<_>, _>>()?);
+            return Ok(Ast::UnknownFunc(analysis::lambda::CALL.into(), invocation));
+        }
+    }
     Ok(match ast {
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis("LAMBDA"), args) if !args.is_empty() => {
+            let mut captured = Vec::with_capacity(bindings.len());
+            for (name, expression, visible, slot) in bindings.iter().copied() {
+                if args[..args.len() - 1].iter().any(|parameter| {
+                    matches!(parameter, Ast::Name(parameter) if parameter.eq_ignore_ascii_case(name))
+                }) { continue; }
+                let mut earlier = bindings[..visible].to_vec();
+                let expanded = expand_let_node(expression, &mut earlier, nodes, next_slot)?;
+                captured.push((name, Ast::LetSlot { slot, expression: Box::new(expanded) }));
+            }
+            let mut definition = args[..args.len() - 1].to_vec();
+            definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
+            Ast::Func(Func::Analysis("LAMBDA"), definition)
+        }
         Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
         Ast::Func(func, args) => Ast::Func(
             *func,
@@ -868,6 +899,12 @@ impl CellStore {
         }
 
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
+                analysis::lambda::evaluate(self, analysis::lambda::CALL, args, sheet, affected, memo, visiting, depth + 1)
+            }
             Ast::Num(n) => Value::number(*n),
             Ast::Str(text) => Value::text(text.as_str()),
             Ast::Bool(value) => Value::Bool(*value),

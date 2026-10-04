@@ -491,7 +491,9 @@ function extractAnalysisSpellings(sources: AnalysisSources, issues: string[]): s
   const spellings: string[] = [];
   if (sources.families.size === 0) issues.push("analysis family registry not found");
   for (const [family, source] of sources.families) {
-    const declared = new RegExp(`^mod ${family};$`, "m").test(sources.registry);
+    const declared = new RegExp(`^(?:pub(?:\\([^)]*\\))?\\s+)?mod ${family};$`, "m").test(
+      sources.registry,
+    );
     if (!declared || !sources.registry.includes(`names: ${family}::NAMES,`)) {
       issues.push(`analysis family ${family} is not registered in ${ANALYSIS_PATH}/mod.rs`);
     }

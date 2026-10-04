@@ -36,6 +36,24 @@ The full engine also includes more math functions and matrix functions. `MMULT`,
 
 `AGGREGATE` supports reference-form and array-form operations and error-ignore options. The engine has no hidden-row state, so options that ignore hidden rows have no effect.
 
+## LAMBDA helpers
+
+The full engine supports `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`, and `ISOMITTED`.
+
+```text
+=LAMBDA(x,x+1)(2)
+=LET(increment,LAMBDA(x,x+1),MAP(A1:A3,increment))
+=MAKEARRAY(3,3,LAMBDA(row,col,row*col))
+```
+
+Parameters use lexical scope. `LET` can bind a function. Omitted arguments are distinct from supplied blank cells. A function left uncalled in a cell returns `#CALC!`. Wrong parameter counts return `#VALUE!`. Helper results must be single values, not nested arrays.
+
+Calls have a depth limit of 64 and a work limit of 2,000,000 units per outer helper evaluation. The existing matrix shape, byte, and spill limits also apply. A limit violation returns `#NUM!`.
+
+Named ranges remain available. Workbook-defined named formulas are not available, so recursive examples must pass the function as an explicit parameter. `GROUPBY` and `PIVOTBY` are not included. They need complete contracts for grouping keys, totals, ordering, header detection, filters, and eta-reduced function arguments.
+
+The implementation uses full-engine-only parser postfix calls, lexical name resolution, `LET` capture, and transient matrix parameter values. These shared Rust changes are behind `analysis`. The family registry validator accepts scoped module visibility so the parser and evaluator can use the family hooks.
+
 ## Contributors
 
 The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep this package version aligned with `@sheetwrite/wasm` and keep its loader contract the same.

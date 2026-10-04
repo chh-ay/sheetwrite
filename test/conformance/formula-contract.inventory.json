@@ -3237,6 +3237,172 @@
         }
       ],
       "returns": "array"
+    },
+    "lambda-lambda": {
+      "arguments": [
+        {
+          "name": "parameter",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "zero-or-more"
+        },
+        {
+          "name": "calculation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "lambda-map": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "lambda-reduce": {
+      "arguments": [
+        {
+          "name": "initialValue",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "lambda-scan": {
+      "arguments": [
+        {
+          "name": "initialValue",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "lambda-byrow": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "lambda-bycol": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "lambda-makearray": {
+      "arguments": [
+        {
+          "name": "rows",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "columns",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lambda",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "lambda-isomitted": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -4184,6 +4350,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-lambda": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "bounded",
+          "maximum": 2000000
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "function-defined",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -4248,6 +4459,16 @@
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported."
+      ]
+    },
+    "analysis-lambda": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available.",
+        "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.",
+        "GROUPBY and PIVOTBY are not registered. They require grouping, totals, ordering, header detection, filtering, and eta-reduced function argument contracts."
       ]
     }
   },
@@ -4473,6 +4694,24 @@
       "evidence": {
         "status": "source-linked",
         "paths": ["packages/wasm/src/eval/analysis/reshape.rs"]
+      }
+    },
+    "analysis-lambda": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/lambda.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/eval/analysis/lambda.rs"]
       }
     }
   },
@@ -8036,6 +8275,102 @@
       "implementation": "analysis-reshape",
       "builds": ["@sheetwrite/formulas"],
       "version": 1
+    },
+    {
+      "canonical": "LAMBDA",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-lambda",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MAP",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-map",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "REDUCE",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-reduce",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SCAN",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-scan",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BYROW",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-byrow",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "BYCOL",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-bycol",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MAKEARRAY",
+      "aliases": [],
+      "family": "logical-control",
+      "contractStatus": "supported",
+      "signature": "lambda-makearray",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "ISOMITTED",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "lambda-isomitted",
+      "semantics": "analysis-lambda",
+      "dialects": "analysis-lambda",
+      "implementation": "analysis-lambda",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
     }
   ],
   "operators": [

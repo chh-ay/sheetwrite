@@ -32,6 +32,12 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            super::analysis::lambda::produces_array(name, args)
+        }
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         #[cfg(feature = "analysis")]
@@ -98,6 +104,12 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0)),
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                ast_produces_array(ast).then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+            }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(name), args) => {
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
@@ -197,6 +209,17 @@ impl CellStore {
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
             #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, values } => {
+                Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                if !ast_produces_array(ast) {
+                    return None;
+                }
+                super::analysis::lambda::evaluate_matrix(self, name, args, sheet, affected, memo, visiting, depth + 1)
+            }
+            #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(name), args) => {
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
                 if !(hooks.produces_array)(name, args) {
@@ -280,6 +303,14 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => {
+                return Ok((*rows, *cols, EvalMatrix::validate_shape(*rows, *cols, 1, 0)?));
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                return super::analysis::lambda::shape(self, name, args, formula_sheet);
+            }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(name), args) => {
                 let hooks = super::analysis::family(name)
