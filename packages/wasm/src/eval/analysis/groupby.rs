@@ -371,7 +371,7 @@ impl Aggregator {
                 label,
             });
         }
-        if let Ast::Func(Func::Analysis("LAMBDA"), _) = expression {
+        if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = expression {
             let arity = super::lambda::parameter_count(expression)?;
             if !(1..=2).contains(&arity) {
                 return Err(FormulaError::Value);
@@ -423,7 +423,7 @@ impl Aggregator {
         if self.arity == 2 {
             arguments.push(source(total_rows));
         }
-        let invocation = if let Ast::Func(Func::Analysis("LAMBDA"), _) = &self.function {
+        let invocation = if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
             arguments.insert(0, self.function.clone());
             Ast::UnknownFunc(super::lambda::CALL.into(), arguments)
         } else if let Ast::Func(function, _) = self.function {

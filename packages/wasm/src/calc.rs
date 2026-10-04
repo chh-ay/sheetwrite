@@ -193,7 +193,7 @@ pub enum Func {
     Ipmt,
     Ppmt,
     #[cfg(feature = "analysis")]
-    Analysis(&'static str),
+    Analysis(u16),
 }
 
 const fn ascii_upper(byte: u8) -> u8 {
@@ -239,8 +239,8 @@ macro_rules! define_function_registry {
                 return Some(FUNCTION_NAMES[index].1);
             }
             #[cfg(feature = "analysis")]
-            if let Some(name) = crate::eval::analysis::lookup(name) {
-                return Some(Func::Analysis(name));
+            if let Some(id) = crate::eval::analysis::lookup(name) {
+                return Some(Func::Analysis(id));
             }
             FUNCTION_ALIASES
                 .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
@@ -252,7 +252,7 @@ macro_rules! define_function_registry {
             match func {
                 $(Func::$variant => $canonical,)+
                 #[cfg(feature = "analysis")]
-                Func::Analysis(name) => name,
+                Func::Analysis(id) => crate::eval::analysis::name(id),
             }
         }
     };
@@ -1348,14 +1348,14 @@ where
             Ast::Func(Func::Let, resolved)
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis("LAMBDA"), mut args) if !args.is_empty() => {
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), mut args) if !args.is_empty() => {
             let body = args.pop().expect("nonempty arguments");
             let mut scoped = locals.to_vec();
             scoped.extend(args.iter().filter_map(|parameter| {
                 if let Ast::Name(name) = parameter { Some(name.clone()) } else { None }
             }));
             args.push(resolve_named_ranges_inner(body, formula_sheet, resolve, &scoped));
-            Ast::Func(Func::Analysis("LAMBDA"), args)
+            Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args)
         }
         Ast::Func(func, args) => Ast::Func(
             func,
@@ -2389,9 +2389,10 @@ mod tests {
                 "{name} must be uppercase"
             );
             // A built-in or alias with the same spelling would win the lookup.
-            assert_eq!(lookup_func(name), Some(Func::Analysis(name)), "{name}");
-            assert_eq!(lookup_func(&name.to_ascii_lowercase()), Some(Func::Analysis(name)));
-            assert_eq!(func_name(Func::Analysis(name)), *name);
+            let id = crate::eval::analysis::lookup(name).expect("registered analysis name");
+            assert_eq!(lookup_func(name), Some(Func::Analysis(id)), "{name}");
+            assert_eq!(lookup_func(&name.to_ascii_lowercase()), Some(Func::Analysis(id)));
+            assert_eq!(func_name(Func::Analysis(id)), *name);
         }
         let listed = function_names();
         assert_eq!(

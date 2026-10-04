@@ -58,8 +58,8 @@ fn operation(function_number: i64) -> Option<Func> {
         15 => Func::Small,
         16 => Func::PercentileInc,
         17 => Func::QuartileInc,
-        18 => Func::Analysis("PERCENTILE.EXC"),
-        19 => Func::Analysis("QUARTILE.EXC"),
+        18 => Func::Analysis(super::PERCENTILE_EXC_ID),
+        19 => Func::Analysis(super::QUARTILE_EXC_ID),
         _ => return None,
     })
 }
@@ -198,7 +198,7 @@ fn push_data(
 fn contains_subtotal(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Subtotal, _) => true,
-        Ast::Func(Func::Analysis(name), _) if NAMES.contains(name) => true,
+        Ast::Func(Func::Analysis(id), _) if NAMES.contains(&super::name(*id)) => true,
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(contains_subtotal),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             contains_subtotal(left) || contains_subtotal(right)

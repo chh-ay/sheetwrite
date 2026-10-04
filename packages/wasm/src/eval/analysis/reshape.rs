@@ -126,8 +126,9 @@ fn source_extent(
     if !is_array_argument(ast, sheet) {
         return Ok(Some((1, 1)));
     }
-    if let Ast::Func(Func::Analysis(name), args) = ast {
-        if NAMES.binary_search(name).is_ok() {
+    if let Ast::Func(Func::Analysis(id), args) = ast {
+        let name = super::name(*id);
+        if NAMES.binary_search(&name).is_ok() {
             return Ok(match estimate(store, name, args, sheet)? {
                 Estimate::Exact { rows, cols } => Some((rows, cols)),
                 Estimate::Approximate { .. } | Estimate::Unknown => None,

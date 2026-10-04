@@ -194,9 +194,51 @@ const FAMILIES: &[Family] = &[
     },
 ];
 
-pub(crate) fn lookup(input: &str) -> Option<&'static str> {
+const FAMILY_SHIFT: u32 = 8;
+const NAME_MASK: u16 = 0xff;
+
+const _: () = {
+    assert!(FAMILIES.len() <= 256);
+    let mut family = 0;
+    while family < FAMILIES.len() {
+        assert!(FAMILIES[family].names.len() <= 256);
+        family += 1;
+    }
+};
+
+// Keep named IDs tied to the registry when families or names move.
+const fn known_id(input: &str) -> u16 {
+    let mut family = 0;
+    while family < FAMILIES.len() {
+        let mut index = 0;
+        while index < FAMILIES[family].names.len() {
+            let candidate = FAMILIES[family].names[index].as_bytes();
+            let requested = input.as_bytes();
+            let mut byte = 0;
+            while byte < candidate.len() && byte < requested.len() && candidate[byte] == requested[byte] {
+                byte += 1;
+            }
+            if byte == candidate.len() && byte == requested.len() {
+                return ((family as u16) << FAMILY_SHIFT) | index as u16;
+            }
+            index += 1;
+        }
+        family += 1;
+    }
+    panic!("analysis name is not registered");
+}
+
+pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
+pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
+pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");
+
+pub(crate) fn name(id: u16) -> &'static str {
+    FAMILIES[usize::from(id >> FAMILY_SHIFT)].names[usize::from(id & NAME_MASK)]
+}
+
+pub(crate) fn lookup(input: &str) -> Option<u16> {
     // Compare bytes without allocating an uppercase copy of the input.
-    FAMILIES.iter().find_map(|family| {
+    FAMILIES.iter().enumerate().find_map(|(family_index, family)| {
         family
             .names
             .binary_search_by(|name| {
@@ -204,7 +246,7 @@ pub(crate) fn lookup(input: &str) -> Option<&'static str> {
                     .cmp(input.bytes().map(|byte| byte.to_ascii_uppercase()))
             })
             .ok()
-            .map(|index| family.names[index])
+            .map(|index| ((family_index as u16) << FAMILY_SHIFT) | index as u16)
     })
 }
 
