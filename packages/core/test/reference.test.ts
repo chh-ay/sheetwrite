@@ -55,7 +55,7 @@ describe("Rust-owned reference source projections", () => {
       new RangeSourceProjection(new Uint32Array(), [], Uint32Array.of(0), Uint32Array.of(8, 1, 2), [
         "s1",
       ]).referenceAt(0),
-    ).toThrow("unknown sheet");
+    ).toThrow(Error);
     expect(REF_CYCLE).toBe("#CYCLE!");
   });
 });

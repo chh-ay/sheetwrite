@@ -379,12 +379,12 @@ describe("IndexedDbPendingCommitStorage", () => {
     });
 
     Reflect.deleteProperty(globalThis, "indexedDB");
-    await expect(storage.load("document-a", LOAD_OPTIONS)).rejects.toEqual(
-      new IndexedDbPendingCommitStorageError(
-        "unavailable",
-        "IndexedDB is unavailable; use a host PendingCommitStorage adapter",
-      ),
-    );
+    const unavailable = storage.load("document-a", LOAD_OPTIONS);
+    await expect(unavailable).rejects.toBeInstanceOf(IndexedDbPendingCommitStorageError);
+    await expect(unavailable).rejects.toMatchObject({
+      code: "unavailable",
+      operation: "pending-storage",
+    });
     storage.close();
   });
   it("closes a blocked attempt's late database and permits a retry", async () => {
