@@ -1071,7 +1071,10 @@ mod tests {
             ])
         );
         // A row key sorts columns.
-        assert_eq!(evaluate(data, "=SORTBY(E1:G1,E2:G2,-1)"), grid(&[&["y", "z", "x"]]));
+        assert_eq!(
+            evaluate(data, "=SORTBY(E1:G1,E2:G2,-1)"),
+            grid(&[&["y", "z", "x"]])
+        );
         for formula in [
             "=SORTBY(A1:A5,C1:C4)",
             "=SORTBY(A1:A5,C1:C5,2)",
