@@ -613,7 +613,7 @@
       "category": "install-closure",
       "owner": "core"
     },
-    "closure.core.xlsxCodecPackageCount": {
+    "closure.core.xlsxPackageCount": {
       "actual": 0,
       "unit": "count",
       "category": "optional-dependency-isolation",
@@ -631,7 +631,7 @@
       "category": "install-closure",
       "owner": "react"
     },
-    "closure.react.xlsxCodecPackageCount": {
+    "closure.react.xlsxPackageCount": {
       "actual": 0,
       "unit": "count",
       "category": "optional-dependency-isolation",
@@ -649,7 +649,7 @@
       "category": "install-closure",
       "owner": "svelte"
     },
-    "closure.svelte.xlsxCodecPackageCount": {
+    "closure.svelte.xlsxPackageCount": {
       "actual": 0,
       "unit": "count",
       "category": "optional-dependency-isolation",
@@ -667,7 +667,7 @@
       "category": "install-closure",
       "owner": "vue"
     },
-    "closure.vue.xlsxCodecPackageCount": {
+    "closure.vue.xlsxPackageCount": {
       "actual": 0,
       "unit": "count",
       "category": "optional-dependency-isolation",

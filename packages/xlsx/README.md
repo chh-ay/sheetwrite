@@ -1,6 +1,6 @@
 # @sheetwrite/xlsx
 
-Optional deterministic OOXML table and workbook backends for `@sheetwrite/core`. The package is isolated from core and uses the pinned `fflate` codec for bounded ZIP processing.
+Optional deterministic OOXML table and workbook backends for `@sheetwrite/core`. Core does not depend on this package. It uses the pinned `fflate` codec for bounded ZIP processing.
 
 ## Install and register
 
