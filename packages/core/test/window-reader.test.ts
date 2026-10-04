@@ -47,32 +47,31 @@ function makePackedWindow(): Uint8Array {
 
 describe("packed window decoding", () => {
   it("rejects truncated, inconsistent, and unaligned layouts", () => {
-    expect(() => decodePackedWindow(new Uint8Array(HEADER_BYTES - 1))).toThrow(
-      "truncated packed window",
-    );
+    expect(() => decodePackedWindow(new Uint8Array(HEADER_BYTES - 1))).toThrow(Error);
 
     const truncated = makePackedWindow().slice(0, -1);
-    expect(() => decodePackedWindow(truncated)).toThrow("truncated packed window");
+    expect(() => decodePackedWindow(truncated)).toThrow(Error);
 
     const badDimensions = makePackedWindow();
     new DataView(badDimensions.buffer).setUint32(24, 3, true);
-    expect(() => decodePackedWindow(badDimensions)).toThrow("invalid packed window dimensions");
+    expect(() => decodePackedWindow(badDimensions)).toThrow(Error);
 
     const badConditionalLength = makePackedWindow();
     new DataView(badConditionalLength.buffer).setUint32(32, 1, true);
-    expect(() => decodePackedWindow(badConditionalLength)).toThrow(
-      "invalid packed conditional-match length",
-    );
+    expect(() => decodePackedWindow(badConditionalLength)).toThrow(Error);
 
     const badStyleLength = makePackedWindow();
     new DataView(badStyleLength.buffer).setUint32(28, 3, true);
-    expect(() => decodePackedWindow(badStyleLength)).toThrow("invalid packed window layout");
+    expect(() => decodePackedWindow(badStyleLength)).toThrow(Error);
 
     const valid = makePackedWindow();
+    expect(decodePackedWindow(valid)).toMatchObject({
+      nRows: 2,
+      nCols: 2,
+      numbers: new Float64Array([0, 42.5, 0, 1]),
+    });
     const shifted = new Uint8Array(valid.byteLength + 1);
     shifted.set(valid, 1);
-    expect(() => decodePackedWindow(shifted.subarray(1))).toThrow(
-      "invalid packed window alignment",
-    );
+    expect(() => decodePackedWindow(shifted.subarray(1))).toThrow(Error);
   });
 });

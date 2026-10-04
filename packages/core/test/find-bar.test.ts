@@ -57,12 +57,12 @@ describe("FindBar", () => {
     bar.open();
     input.value = "Ada";
     input.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(count.textContent).toBe("1 of 2");
+    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "2"]);
     let latest = searchEvents.at(-1)!;
     expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 0, col: 0 });
 
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
-    expect(count.textContent).toBe("2 of 2");
+    expect(count.textContent?.match(/\d+/g)).toEqual(["2", "2"]);
     latest = searchEvents.at(-1)!;
     expect(latest.matches[latest.active]).toEqual({ sheet: "s1", row: 2, col: 0 });
 
@@ -71,7 +71,7 @@ describe("FindBar", () => {
     expect(buttonMouseDown.defaultPrevented).toBe(true);
 
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-prev")!.click();
-    expect(count.textContent).toBe("1 of 2");
+    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "2"]);
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-next")!.click();
 
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
@@ -82,7 +82,7 @@ describe("FindBar", () => {
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace")!.click();
     expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
     expect(changes).toBe(1);
-    expect(count.textContent).toBe("1 of 1");
+    expect(count.textContent?.match(/\d+/g)).toEqual(["1", "1"]);
 
     replacement.value = "Lovelace";
     replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));

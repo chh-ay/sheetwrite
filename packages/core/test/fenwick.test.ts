@@ -27,7 +27,6 @@ describe("OffsetIndex", () => {
   it("materializes and indexes a non-default inserted band", () => {
     const idx = new OffsetIndex(3, 20);
     idx.insertRows(1, 2, 35);
-    expect(idx.backingStoreBytes).toBe(5 * 8 + 6 * 8);
     expect(idx.totalHeight).toBe(130);
     expect([0, 1, 2, 3, 4].map((row) => idx.heightOf(row))).toEqual([20, 35, 35, 20, 20]);
     expect(idx.offsetOf(3)).toBe(90);

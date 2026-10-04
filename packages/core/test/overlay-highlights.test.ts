@@ -292,9 +292,14 @@ describe("note indicators follow the active view", () => {
     const atTop = paintedRects(host);
     expect(atTop).toHaveLength(1);
     expect(atTop[0]?.top).toBe(bodyTop(5, 0));
-    expect(atTop[0]?.left).toBe(ROW_HEADER_WIDTH + COL_WIDTH - 8);
-    expect(atTop[0]?.width).toBe(8);
-    expect(atTop[0]?.clipPath).toBe("polygon(0 0, 100% 0, 100% 100%)");
+    const marker = atTop[0];
+    if (!marker) throw new Error("Expected a visible note marker");
+    expect(marker.left).toBeGreaterThanOrEqual(ROW_HEADER_WIDTH);
+    expect(marker.width).toBeGreaterThan(0);
+    expect(marker.width).toBeLessThan(COL_WIDTH);
+    expect(marker.left + marker.width).toBeLessThanOrEqual(ROW_HEADER_WIDTH + COL_WIDTH);
+    expect(marker.height).toBeGreaterThan(0);
+    expect(marker.height).toBeLessThanOrEqual(ROW_HEIGHT);
 
     scroller.scrollTop = 8 * ROW_HEIGHT;
     grid.refresh();

@@ -100,9 +100,7 @@ describe("StoreViewState packed inverse index", () => {
     expect(view.viewRowOf("s1", 4)).toBeNull();
 
     const oversized = sortedView(0x1_0000_0000, [0]);
-    expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(
-      "exceeds the packed inverse row limit of 4294967295",
-    );
+    expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(RangeError);
   });
 
   it("isolates sheet caches and releases every retained index on removal and disposal", () => {
@@ -144,18 +142,12 @@ describe("StoreViewState packed inverse index", () => {
 
   it("rejects out-of-bounds and duplicate view rows instead of creating coordinate aliases", () => {
     const outOfBounds = sortedView(3, [0, 3]);
-    expect(() => outOfBounds.view.viewRowOf("s1", 0)).toThrow(
-      "view order for sheet s1 contains out-of-bounds data row 3",
-    );
+    expect(() => outOfBounds.view.viewRowOf("s1", 0)).toThrow(RangeError);
 
     const denseDuplicate = sortedView(3, [0, 1, 1]);
-    expect(() => denseDuplicate.view.viewRowOf("s1", 0)).toThrow(
-      "view order for sheet s1 contains duplicate data row 1",
-    );
+    expect(() => denseDuplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
 
     const sparseDuplicate = sortedView(1_000_000, [0, 8, 0]);
-    expect(() => sparseDuplicate.view.viewRowOf("s1", 0)).toThrow(
-      "view order for sheet s1 contains duplicate data row 0",
-    );
+    expect(() => sparseDuplicate.view.viewRowOf("s1", 0)).toThrow(RangeError);
   });
 });

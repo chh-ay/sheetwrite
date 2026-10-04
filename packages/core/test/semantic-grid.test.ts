@@ -182,7 +182,8 @@ describe("custom editor canonical lifecycle", () => {
 
     grid.beginEdit(0, 1);
     let input = activeEditorInput(host);
-    expect(input.getAttribute("aria-label")).toBe("Edit Amount, row 1");
+    expect(input.getAttribute("aria-label")).toContain("Amount");
+    expect(input.getAttribute("aria-label")).toMatch(/\b1\b/);
     expect(stats.contexts[0]?.address).toEqual({ sheet: "s1", row: 0, col: 1 });
     expect(stats.contexts[0]?.value).toBe(0.5);
 

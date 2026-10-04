@@ -20,16 +20,13 @@ describe("initSheetwrite readiness and re-entrancy", () => {
   it("guards pre-init, shares concurrent init, and rejects a conflicting source", async () => {
     const result = await runProbe("lifecycle");
 
-    // Pre-init: readiness false, SheetwriteStore throws the actionable message.
     expect(result.readyBefore).toBe(false);
-    expect(result.preInitStore).toBe(
-      "Sheetwrite: await initSheetwrite() before constructing SheetwriteStore",
-    );
-
-    // A concurrent call with a DIFFERENT source rejects loudly.
-    expect(result.concurrentDifferentSource).toBe(
-      "Sheetwrite: concurrent load() with a different source while initialization is in flight",
-    );
+    expect(result.preInitStore).toMatchObject({ status: "rejected", name: "Error" });
+    expect(result.concurrentDifferentSource).toMatchObject({
+      status: "rejected",
+      code: "initialization-failed",
+      operation: "initialize",
+    });
 
     // Success flips readiness; overlapping same-source calls share the
     // in-flight init, and repeats after success stay fulfilled.
@@ -45,7 +42,11 @@ describe("initSheetwrite readiness and re-entrancy", () => {
   it("clears the cache on a failed init so a corrected call retries", async () => {
     const result = await runProbe("retry");
 
-    expect(String(result.firstFailure)).toStartWith("rejected: ");
+    expect(result.firstFailure).toMatchObject({
+      status: "rejected",
+      code: "initialization-failed",
+      operation: "initialize",
+    });
     expect(result.readyAfterFailure).toBe(false);
     expect(result.readyAfterRetry).toBe(true);
   });

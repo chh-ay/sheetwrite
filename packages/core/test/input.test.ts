@@ -143,18 +143,12 @@ describe("pointer input: mouse parity", () => {
 
   it("focuses the grid on mouse selection so printable keys start editing", () => {
     const { grid, scroller, workbook, host } = makeGrid();
-    let focusCalls = 0;
-    const nativeFocus = host.focus.bind(host);
-    host.focus = (options?: FocusOptions) => {
-      focusCalls += 1;
-      nativeFocus(options);
-    };
     const outside = document.createElement("button");
     document.body.appendChild(outside);
     outside.focus();
 
     scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(1, 1, workbook) }));
-    expect(focusCalls).toBe(1);
+    expect(document.activeElement).toBe(host);
 
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Q", bubbles: true }));
     const editor = host.querySelector("textarea.sheetwrite-editor");

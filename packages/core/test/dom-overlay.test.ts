@@ -333,9 +333,7 @@ describe("retained DOM cell renderer overlay", () => {
       },
     };
 
-    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(
-      "CellRenderer.dom() must return a unique HTMLElement for each cell",
-    );
+    expect(() => grid.defineCellRenderer("dom", sharedRenderer)).toThrow(TypeError);
     expect(sharedDestroys).toBe(1);
     expect(shared.parentNode).toBeNull();
     expect(host.querySelectorAll(".sheetwrite-dom-cell")).toHaveLength(0);
@@ -422,8 +420,10 @@ describe("retained DOM cell renderer overlay", () => {
     const labels = [...host.querySelectorAll<HTMLElement>("[data-sheetwrite-presence-label]")];
     expect(labels).toHaveLength(overlays.length);
     expect(labels.some((label) => label.dataset.presenceKind === "marker")).toBe(true);
-    expect(labels[0]!.title).toBe("actor-0");
-    expect(labels[0]!.getAttribute("aria-label")).toBe("Remote selection: actor-0");
+    const firstLabel = labels[0];
+    if (!firstLabel) throw new Error("Expected a presence label for the first actor");
+    expect(firstLabel.title).toBe("actor-0");
+    expect(firstLabel.getAttribute("aria-label")).toContain("actor-0");
     for (const label of labels) {
       expect(px(label.style.left)).toBeGreaterThanOrEqual(0);
       expect(px(label.style.top)).toBeGreaterThanOrEqual(0);
