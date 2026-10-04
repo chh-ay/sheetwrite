@@ -123,6 +123,8 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     const wasmPath = `packages/${capture.engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`;
     if (
       capture.wasm.sha256 !== result.sourceFiles[wasmPath] ||
+      capture.wasm.sha256 !==
+        capture.shared.source.files["packages/wasm/pkg/sheetwrite_wasm_bg.wasm"] ||
       !Number.isSafeInteger(capture.wasm.rawBytes) ||
       !Number.isSafeInteger(capture.wasm.brotliBytes) ||
       capture.wasm.brotliBytes <= 0 ||

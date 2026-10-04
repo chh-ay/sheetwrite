@@ -47,7 +47,9 @@ const FORMULA_SOURCE_URLS = {
   "bench/src/stats.ts": new URL("./stats.ts", import.meta.url),
   "bun.lock": new URL("../../bun.lock", import.meta.url),
   "packages/wasm/pkg/sheetwrite_wasm.js": new URL(
-    "../../packages/wasm/pkg/sheetwrite_wasm.js",
+    process.env.SHEETWRITE_BENCH_ENGINE === "full"
+      ? "../../packages/formulas/pkg/sheetwrite_wasm.js"
+      : "../../packages/wasm/pkg/sheetwrite_wasm.js",
     import.meta.url,
   ),
   "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": WASM_PATH,

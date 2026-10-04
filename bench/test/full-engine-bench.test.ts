@@ -62,7 +62,7 @@ describe("full engine benchmark evidence", () => {
       expect(() => validateFullEngineResult(result)).toThrow();
     },
   );
-  it.each(["raw", "summary", "wasm", "digest", "commit"])(
+  it.each(["raw", "summary", "wasm", "digest", "commit", "binding"])(
     "rejects invalid engine %s evidence",
     (fault) => {
       const result = recordedCapture();
@@ -76,6 +76,11 @@ describe("full engine benchmark evidence", () => {
       if (fault === "wasm") engine.wasm.sha256 = "0".repeat(64);
       if (fault === "digest") result.sourceDigest = "0".repeat(64);
       if (fault === "commit") engine.shared.meta.commit = "0".repeat(40);
+      if (fault === "binding") {
+        const other = result.engines.find((capture) => capture.engine !== engine.engine);
+        if (!other) throw new Error("Missing second engine");
+        engine.shared = structuredClone(other.shared);
+      }
       expect(() => validateFullEngineResult(result)).toThrow();
     },
   );
