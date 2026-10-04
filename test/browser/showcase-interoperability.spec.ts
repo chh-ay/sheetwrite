@@ -3,6 +3,7 @@ import compatibilityResults from "../../docs/src/generated/compatibility-results
   type: "json",
 };
 import type { Grid } from "../../packages/core/src/types.js";
+import fixtureManifest from "../../packages/xlsx/test/fixtures/manifest.json" with { type: "json" };
 import { siteUrl } from "./playwright.config.js";
 
 declare global {
@@ -305,26 +306,15 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
     )
     .toEqual(["Calc", "Hidden", "Inputs"]);
 
-  // The import reports its fidelity losses as structured, coded warnings —
-  // every rendered warning carries a code chip from the public warning union.
+  const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
+  if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
+  await openDisclosure(page, "interop-warnings-disclosure");
   const warnings = page.locator('[data-testid="interop-warnings"]');
-  await expect(warnings).toContainText("libreoffice-rich.xlsx");
+  await expect(warnings).toBeVisible();
+  await expect(warnings).toContainText(fixture.file);
   const codes = await warnings.locator(".sw-si-warncode").allTextContents();
-  expect(codes.length).toBeGreaterThan(0);
-  const VALID_CODES = [
-    "boolean-literal",
-    "rich-text",
-    "hyperlink",
-    "unsupported-cell-value",
-    "unsupported-feature",
-    "external-relationship",
-    "external-formula",
-    "format-loss",
-    "validation-loss",
-    "invalid-metadata",
-  ];
-  for (const code of codes) {
-    expect(VALID_CODES).toContain(code.trim());
+  for (const warning of fixture.expectedWarnings) {
+    expect(codes.map((code) => code.trim())).toContain(warning.split(":")[0]?.trim());
   }
   await page.waitForSelector(".sw-si-grid canvas", { state: "attached", timeout: 15_000 });
 
