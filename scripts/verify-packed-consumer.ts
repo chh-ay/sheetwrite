@@ -643,7 +643,16 @@ try {
   await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
   await run(
-    ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
+    [
+      "npm",
+      "ls",
+      "@sheetwrite/core",
+      "@sheetwrite/wasm",
+      "@sheetwrite/formulas",
+      "react",
+      "svelte",
+      "vue",
+    ],
     consumerRoot,
   );
   const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
@@ -652,6 +661,7 @@ try {
   await run(["npm", "run", "bundle:frameworks"], consumerRoot);
   await verifyMountedFrameworkConsumers(consumerRoot);
   await run(["npm", "run", "runtime"], consumerRoot);
+  await run(["npm", "run", "runtime:formulas"], consumerRoot);
 
   // The Vite build must have compiled the packed Svelte adapter and retained
   // its operational-event wiring, in addition to the mounted browser proof.

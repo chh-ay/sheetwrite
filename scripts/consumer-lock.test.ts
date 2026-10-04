@@ -91,6 +91,7 @@ describe("immutable release consumer locks", () => {
     }
     expect([...internalIntegrities].map(([name]) => name).sort()).toEqual([
       "@sheetwrite/core",
+      "@sheetwrite/formulas",
       "@sheetwrite/react",
       "@sheetwrite/svelte",
       "@sheetwrite/vue",

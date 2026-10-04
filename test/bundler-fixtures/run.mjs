@@ -212,8 +212,9 @@ if (artifactDirectory === undefined) {
   const releaseManifestBytes = await readFile(join(artifactRoot, "release-artifacts.json"));
   const releaseManifest = JSON.parse(releaseManifestBytes.toString("utf8"));
   artifactManifestDigest = `sha512-${createHash("sha512").update(releaseManifestBytes).digest("base64")}`;
-  if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 6) {
-    throw new Error("Canonical release manifest must contain exactly six packages");
+  // The bundler fixtures use six of the seven release packages; they do not use @sheetwrite/formulas.
+  if (!Array.isArray(releaseManifest.packages) || releaseManifest.packages.length !== 7) {
+    throw new Error("Canonical release manifest must contain exactly seven packages");
   }
   for (const sourceManifest of sourceManifests) {
     const artifact = releaseManifest.packages.find((entry) => entry.name === sourceManifest.name);
