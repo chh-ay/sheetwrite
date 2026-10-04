@@ -41,7 +41,7 @@ export function renderFullEngineEvidence(
   const lines = [
     "### Default and full formula engines",
     "",
-    '<div class="evidence-available"><strong>Validated evidence.</strong> Eight shared workloads have nine paired rounds per engine. The full engine also has eight checked analysis workloads.</div>',
+    `<div class="evidence-available"><strong>Validated evidence.</strong> Eight shared workloads have ${matched.rounds} paired rounds per engine. The full engine also has eight checked analysis workloads.</div>`,
     "",
     '<dl class="bench-meta" data-pagefind-ignore>',
     `<div><dt>Matched capture</dt><dd>${matched.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
@@ -59,7 +59,7 @@ export function renderFullEngineEvidence(
       ? "No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows."
       : `${slowerCount} shared workloads tested in the matched rounds had a median paired ratio more than 5% slower with the full engine.`,
     "",
-    "The ratio is full time divided by default time within each pair. The table shows the median of nine paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time. Wide spreads and very short operations limit what this small sample can show.",
+    `The ratio is full time divided by default time within each pair. The table shows the median of ${matched.rounds} paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time. Wide spreads and very short operations limit what this sample can show.`,
     "",
     "| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 |",
     "| --- | ---: | ---: | ---: | ---: | ---: |",

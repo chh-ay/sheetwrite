@@ -88,7 +88,7 @@ flock -x /home/vvin/learn/sheetwrite-wt/build.lock flock -x /home/vvin/learn/she
 ```
 
 `bench:formula:matched` checks the eight shared rows that were slower in the
-first sequential capture. It runs nine default/full pairs per row. Each timed
+first sequential capture. It runs 51 default/full pairs per row. Each timed
 sample uses a fresh process and one untimed warmup. The artifact retains all
 samples and checksums, median paired ratios, and the p10 to p90 ratio spread.
 The single-sample runner is `bun run src/formula-bench.ts --sample ID SIZE`.

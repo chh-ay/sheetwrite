@@ -263,7 +263,7 @@ async function capture(): Promise<void> {
   const engines: EngineCapture[] = [];
   for (const engine of ENGINE_IDS) {
     // Keep tracked results unchanged until both engines and all checks finish.
-    const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", "/dev/stdout"], {
+    const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", "-"], {
       cwd: new URL("..", import.meta.url).pathname,
       env: { ...process.env, SHEETWRITE_BENCH_ENGINE: engine },
       stdout: "pipe",

@@ -2385,7 +2385,9 @@ async function runBenchmark(
   validateCurrentCaptureProvenance(result, captureKind, outputPath);
   validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
-  if (outputPath !== undefined) {
+  if (outputPath === "-") {
+    process.stdout.write(serialized);
+  } else if (outputPath !== undefined) {
     await Bun.write(outputPath, serialized);
   } else if (!smoke) {
     await Bun.write(new URL("../results/formula-results.json", import.meta.url), serialized);

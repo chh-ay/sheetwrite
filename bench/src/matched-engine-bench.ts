@@ -16,11 +16,11 @@ export const MATCHED_ENGINE_WORKLOADS = [
   { id: "scalar-edit-affects-0", size: 1_000 },
   { id: "vlookup-many", size: 1_000 },
 ] as const;
-const ROUNDS = 9;
+const ROUNDS = 51;
 const ENGINES = ["default", "full"] as const;
 type EngineId = (typeof ENGINES)[number];
 const METHOD =
-  "nine ABAB paired rounds per workload; one fresh Bun process and one untimed warmup fixture per timed sample";
+  "51 ABAB paired rounds per workload; one fresh Bun process and one untimed warmup fixture per timed sample";
 const SOURCE_PATHS = [
   "bench/src/matched-engine-bench.ts",
   "bench/src/formula-bench.ts",
@@ -44,11 +44,11 @@ export interface MatchedEngineRow {
   ratioP90: number;
 }
 export interface MatchedEngineResult {
-  schemaVersion: 1;
+  schemaVersion: 2;
   meta: ProtocolCaptureMeta;
   runner: { cpu: string; kernel: string; bun: string; arch: string; concurrency: 1 };
   method: string;
-  rounds: 9;
+  rounds: typeof ROUNDS;
   sourceFiles: Record<string, string>;
   sourceDigest: string;
   rows: MatchedEngineRow[];
@@ -82,7 +82,7 @@ function rowSamples(samples: readonly MatchedSample[], engine: EngineId): number
 }
 export function validateMatchedEngineResult(result: MatchedEngineResult): void {
   if (
-    result.schemaVersion !== 1 ||
+    result.schemaVersion !== 2 ||
     result.method !== METHOD ||
     result.rounds !== ROUNDS ||
     result.runner.concurrency !== 1
@@ -193,7 +193,7 @@ async function captureMatchedEngines(): Promise<void> {
     ]),
   );
   const result: MatchedEngineResult = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     meta,
     runner: {
       cpu: cpus()[0]?.model ?? "unknown",
