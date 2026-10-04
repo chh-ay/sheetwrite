@@ -429,7 +429,8 @@ impl CellStore {
         let include =
             self.eval_array_matrix_arg(&args[1], sheet, affected, memo, visiting, depth + 1)?;
         array.validate_copies(2)?;
-        debug_assert_eq!(array.values.len(), array_cells);
+        // Value-dependent arrays can shrink from their static shape bound.
+        debug_assert!(array.values.len() <= array_cells);
 
         let filter_rows = include.rows == array.rows && include.cols == 1;
         let filter_cols = include.rows == 1 && include.cols == array.cols;
@@ -1125,6 +1126,23 @@ mod tests {
         );
         assert_close(number(&store, sheet, 1, 5), 20.0);
         assert_close(number(&store, sheet, 0, 7), 21.0);
+    }
+
+    #[test]
+    fn filter_uses_evaluated_unique_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 6);
+        for (row, value) in [1.0, 1.0, 2.0].into_iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_number(sheet, 0, 1, 1.0, 0);
+        store.set_number(sheet, 1, 1, 1.0, 0);
+        store.set_formula(sheet, 0, 3, "=FILTER(UNIQUE(A1:A3),B1:B2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_eq!(store.spill_anchor_row(sheet, 1, 3), 0);
+        assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
     }
 
     #[test]
