@@ -2395,23 +2395,46 @@ async function runBenchmark(
 }
 
 if (import.meta.main) {
-  const memoryIndex = process.argv.indexOf("--memory");
-  if (memoryIndex >= 0) {
-    const formulas = Number(process.argv[memoryIndex + 1]);
-    assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
-    console.log(JSON.stringify(runMemoryMode(formulas)));
+  const sampleIndex = process.argv.indexOf("--sample");
+  if (sampleIndex >= 0) {
+    const id = process.argv[sampleIndex + 1];
+    const size = Number(process.argv[sampleIndex + 2]);
+    assert(Number.isInteger(size) && size > 0, "invalid sample size");
+    const factories: Record<string, FixtureFactory> = {
+      "independent-parse-load": () => independentLoadFixture(size),
+      "independent-first-recompute": () => independentRecomputeFixture(size),
+      "linear-chain": () => chainFixture(size),
+      "wide-fan-out-edit": () => fanOutEditFixture(size),
+      "scalar-edit-affects-0": () => fanOutEditFixture(size, true),
+      "vlookup-many": () => {
+        const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === "vlookup-many");
+        assert(variant, "missing VLOOKUP variant");
+        return lookupFixture(size, "first-recompute", variant);
+      },
+    };
+    const factory = id === undefined ? undefined : factories[id];
+    assert(id !== undefined && factory, "unknown single-sample workload");
+    await initSheetwrite(undefined, engine);
+    process.stdout.write(`${JSON.stringify(collectFixture(id, size, factory, 1))}\n`);
   } else {
-    const args = process.argv.slice(2).filter((argument) => argument !== "--");
-    const outputIndex = args.indexOf("--output");
-    const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
-    if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
-      throw new Error("--output requires a path");
+    const memoryIndex = process.argv.indexOf("--memory");
+    if (memoryIndex >= 0) {
+      const formulas = Number(process.argv[memoryIndex + 1]);
+      assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
+      console.log(JSON.stringify(runMemoryMode(formulas)));
+    } else {
+      const args = process.argv.slice(2).filter((argument) => argument !== "--");
+      const outputIndex = args.indexOf("--output");
+      const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
+      if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
+        throw new Error("--output requires a path");
+      }
+      // A capture written outside the tracked results file is recorded as an output capture; it
+      // skips the baseline comparison too, so the gate stays blocked.
+      let captureKind: FormulaCaptureKind = "gated";
+      if (outputPath !== undefined) captureKind = "output";
+      else if (args.includes("--preliminary")) captureKind = "preliminary";
+      await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
     }
-    // A capture written outside the tracked results file is recorded as an output capture; it
-    // skips the baseline comparison too, so the gate stays blocked.
-    let captureKind: FormulaCaptureKind = "gated";
-    if (outputPath !== undefined) captureKind = "output";
-    else if (args.includes("--preliminary")) captureKind = "preliminary";
-    await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
   }
 }

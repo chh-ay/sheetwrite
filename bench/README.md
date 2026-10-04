@@ -87,6 +87,14 @@ Build the packages first. Run the capture from `bench/` with one pinned runner:
 flock -x /home/vvin/learn/sheetwrite-wt/build.lock flock -x /home/vvin/learn/sheetwrite-wt/quiet.lock taskset -c 4 bun run src/full-engine-bench.ts
 ```
 
+`bench:formula:matched` checks the eight shared rows that were slower in the
+first sequential capture. It runs nine default/full pairs per row. Each timed
+sample uses a fresh process and one untimed warmup. The artifact retains all
+samples and checksums, median paired ratios, and the p10 to p90 ratio spread.
+The single-sample runner is `bun run src/formula-bench.ts --sample ID SIZE`.
+It supports the matched workload set. Use the same pinned-runner command as
+above with `src/matched-engine-bench.ts`.
+
 The suite covers independent parse/load and first recompute, safe-depth linear
 chains, 100K fan-out, diamonds, shared/distinct ranges, cross-sheet ranges,
 scalar edits affecting 0/1/1K/100K formulas, topology removal/addition, cycles,

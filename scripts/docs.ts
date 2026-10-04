@@ -50,6 +50,11 @@ import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
+  renderFullEngineEvidence,
+  validateFullEngineArtifact,
+  validateMatchedEngineArtifact,
+} from "./full-engine-docs.js";
+import {
   type ApiEntryPoint,
   type ApiExport,
   type ApiPackage,
@@ -2031,6 +2036,16 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "bun run --filter @sheetwrite/bench bench:formula",
     validateFormulaArtifact,
   );
+  const fullEngine = await loadEvidence(
+    "bench/results/full-engine-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:engines",
+    validateFullEngineArtifact,
+  );
+  const matchedEngine = await loadEvidence(
+    "bench/results/full-engine-matched-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:matched",
+    validateMatchedEngineArtifact,
+  );
   const sizeHistory =
     sizeHistoryOverride ??
     validateSizeHistory(
@@ -2274,6 +2289,12 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     );
   } else {
     pending.push(formula);
+  }
+  if ("evidence" in fullEngine && "evidence" in matchedEngine) {
+    lines.push(renderFullEngineEvidence(fullEngine.evidence, matchedEngine.evidence));
+  } else {
+    if (!("evidence" in fullEngine)) pending.push(fullEngine);
+    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
   }
   lines.push("## Delivery size", "");
   const latestRelease = sizeHistory.releases.at(-1);
