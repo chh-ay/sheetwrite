@@ -2,6 +2,8 @@
 
 The full Sheetwrite Rust/WASM engine. This package builds the same store and loader API as `@sheetwrite/wasm`, with the `analysis` feature enabled. The default engine stays unchanged. Install this package only when your app needs the full formula engine.
 
+The full engine includes `TOCOL`, `TOROW`, `WRAPROWS`, `WRAPCOLS`, `EXPAND`, `HSTACK`, and `VSTACK`. These functions return spill arrays. They support scan order, blank and error filtering, and padding. Missing padding values default to `#N/A`.
+
 ## Select the engine
 
 ```ts

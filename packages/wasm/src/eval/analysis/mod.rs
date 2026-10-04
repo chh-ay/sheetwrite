@@ -9,6 +9,7 @@ mod finance;
 mod math;
 mod matrices;
 mod regression;
+mod reshape;
 mod text;
 
 use std::collections::{HashMap, HashSet};
@@ -151,6 +152,18 @@ const FAMILIES: &[Family] = &[
             shape: text::shape,
             bound: text::bound,
             evaluate: text::evaluate_matrix,
+        }),
+    },
+    Family {
+        names: reshape::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: None,
+        array: Some(ArrayHooks {
+            produces_array: reshape::produces_array,
+            shape: reshape::shape,
+            bound: reshape::bound,
+            evaluate: reshape::evaluate,
         }),
     },
 ];
