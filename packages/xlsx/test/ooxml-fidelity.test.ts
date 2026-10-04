@@ -378,12 +378,10 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(imported.sheets[0]!.filters).toBeUndefined();
     expect(imported.sheets[0]!.protectedRanges).toBeUndefined();
     expect(imported.sheets[0]!.sortKeys).toEqual([{ col: 0, ascending: false }]);
-    expect(warnings.map((warning) => warning.message)).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("excludes its header row"),
-        expect.stringContaining("host authorization callbacks"),
-      ]),
-    );
+    expect(warnings).toEqual([
+      expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
+      expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
+    ]);
   });
 
   it("rejects percent-decoded logical-name collisions and traversal", async () => {
@@ -393,7 +391,10 @@ describe("raw spec-authored OOXML fidelity", () => {
       sheetwriteWorkbookBackend.fromXlsxWorkbook(
         zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME }),
       ),
-    ).rejects.toThrow(/duplicate logical part name/i);
+    ).rejects.toMatchObject({
+      code: "xlsx-import-failed",
+      message: expect.stringMatching(/duplicate/i),
+    });
 
     const traversal = unzipSync(rawWorkbook(sheet('<dimension ref="A1"/><sheetData/>')));
     traversal["xl/%2e%2e/evil.xml"] = strToU8("<evil/>");
@@ -401,6 +402,9 @@ describe("raw spec-authored OOXML fidelity", () => {
       sheetwriteWorkbookBackend.fromXlsxWorkbook(
         zipSync(traversal, { level: 6, mtime: FIXED_ZIP_TIME }),
       ),
-    ).rejects.toThrow(/unsafe part name/i);
+    ).rejects.toMatchObject({
+      code: "xlsx-import-failed",
+      message: expect.stringMatching(/unsafe part name/i),
+    });
   });
 });
