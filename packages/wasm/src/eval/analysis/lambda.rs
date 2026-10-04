@@ -94,6 +94,9 @@ fn definition(mut expression: &Ast) -> Result<(&[Ast], &Ast), FormulaError> {
     }
     Ok((parameters, body))
 }
+pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
+    definition(expression).map(|(parameters, _)| parameters.len())
+}
 
 pub(crate) fn capture(expression: &Ast, bindings: &[(&str, Ast)]) -> Result<Ast, FormulaError> {
     substitute(expression, bindings, &mut 0)

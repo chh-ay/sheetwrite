@@ -3434,6 +3434,168 @@
         }
       ],
       "returns": "scalar"
+    },
+    "groupby-groupby": {
+      "arguments": [
+        {
+          "name": "rowFields",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "function",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fieldHeaders",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "totalDepth",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "sortOrder",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "filterArray",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fieldRelationship",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "groupby-pivotby": {
+      "arguments": [
+        {
+          "name": "rowFields",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "colFields",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "values",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "function",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "fieldHeaders",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rowTotalDepth",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rowSortOrder",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "colTotalDepth",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "colSortOrder",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "filterArray",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "relativeTo",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "groupby-percentof": {
+      "arguments": [
+        {
+          "name": "dataSubset",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "dataAll",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -4426,6 +4588,51 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-groupby": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "bounded",
+          "maximum": 2000000
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "function-defined",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -4498,8 +4705,16 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available.",
-        "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.",
-        "GROUPBY and PIVOTBY are not registered. They require grouping, totals, ordering, header detection, filtering, and eta-reduced function argument contracts."
+        "LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays."
+      ]
+    },
+    "analysis-groupby": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported.",
+        "Grouping and output use the engine spill and work limits."
       ]
     }
   },
@@ -4743,6 +4958,24 @@
       "evidence": {
         "status": "source-linked",
         "paths": ["packages/wasm/src/eval/analysis/lambda.rs"]
+      }
+    },
+    "analysis-groupby": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/groupby.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/eval/analysis/groupby.rs"]
       }
     }
   },
@@ -8426,6 +8659,42 @@
       "implementation": "analysis-lambda",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GROUPBY",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "groupby-groupby",
+      "semantics": "analysis-groupby",
+      "dialects": "analysis-groupby",
+      "implementation": "analysis-groupby",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "PIVOTBY",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "groupby-pivotby",
+      "semantics": "analysis-groupby",
+      "dialects": "analysis-groupby",
+      "implementation": "analysis-groupby",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "PERCENTOF",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "groupby-percentof",
+      "semantics": "analysis-groupby",
+      "dialects": "analysis-groupby",
+      "implementation": "analysis-groupby",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
     }
   ],
   "operators": [

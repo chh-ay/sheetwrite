@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **142 optional analysis functions** (296 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **145 optional analysis functions** (299 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -51,6 +51,9 @@ Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/
 | `VSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `WRAPCOLS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `WRAPROWS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `GROUPBY` | `@sheetwrite/formulas` | optional analysis | [`groupby-groupby`](#signature-groupby-groupby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
+| `PIVOTBY` | `@sheetwrite/formulas` | optional analysis | [`groupby-pivotby`](#signature-groupby-pivotby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
+| `PERCENTOF` | `@sheetwrite/formulas` | optional analysis | [`groupby-percentof`](#signature-groupby-percentof) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
 
 ### Date and time
 
@@ -1722,6 +1725,48 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
+### Signature: groupby-groupby
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rowFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `function` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldHeaders` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `totalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `sortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldRelationship` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: groupby-pivotby
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rowFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `function` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldHeaders` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowTotalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowSortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colTotalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colSortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `relativeTo` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: groupby-percentof
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `dataSubset` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dataAll` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -1990,6 +2035,18 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
+### Semantics: analysis-groupby
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: insensitive<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: bounded<br />maximum: 2000000 |
+| calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
 ## Dialect profiles
 
 ### Dialect: regex-lite-subset
@@ -2070,7 +2127,17 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Google Sheets | unverified |
 | OpenFormula | unverified |
 
-Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays. GROUPBY and PIVOTBY are not registered. They require grouping, totals, ordering, header detection, filtering, and eta-reduced function argument contracts.
+Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
+
+### Dialect: analysis-groupby
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported. Grouping and output use the engine spill and work limits.
 
 ## Implementation profiles
 
@@ -2190,6 +2257,15 @@ Limitations: Available only in @sheetwrite/formulas. Named ranges are supported,
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
+
+### Implementation: analysis-groupby
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
 
 ## Unsupported categories
 

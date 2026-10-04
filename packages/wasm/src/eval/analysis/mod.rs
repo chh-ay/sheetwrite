@@ -6,6 +6,7 @@ mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
+mod groupby;
 pub(crate) mod lambda;
 mod math;
 mod matrices;
@@ -70,6 +71,18 @@ pub(super) struct Family {
 }
 
 const FAMILIES: &[Family] = &[
+    Family {
+        names: groupby::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(groupby::evaluate_ast),
+        array: Some(ArrayHooks {
+            produces_array: groupby::produces_array,
+            shape: groupby::shape,
+            bound: groupby::bound,
+            evaluate: groupby::evaluate_matrix,
+        }),
+    },
     Family {
         names: aggregate::NAMES,
         reference_cells: &[],

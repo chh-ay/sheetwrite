@@ -50,9 +50,17 @@ Parameters use lexical scope. `LET` can bind a function. Omitted arguments are d
 
 Calls have a depth limit of 64 and a work limit of 2,000,000 units per outer helper evaluation. The existing matrix shape, byte, and spill limits also apply. A limit violation returns `#NUM!`.
 
-Named ranges remain available. Workbook-defined named formulas are not available, so recursive examples must pass the function as an explicit parameter. `GROUPBY` and `PIVOTBY` are not included. They need complete contracts for grouping keys, totals, ordering, header detection, filters, and eta-reduced function arguments.
+Named ranges remain available. Workbook-defined named formulas are not available, so recursive examples must pass the function as an explicit parameter.
 
 The implementation uses full-engine-only parser postfix calls, lexical name resolution, `LET` capture, and transient matrix parameter values. These shared Rust changes are behind `analysis`. The family registry validator accepts scoped module visibility so the parser and evaluator can use the family hooks.
+
+## Group and pivot summaries
+
+The full engine includes `GROUPBY`, `PIVOTBY`, and `PERCENTOF`. Group and pivot summaries accept a single eta-reduced built-in function, such as `SUM`, or a `LAMBDA` with one or two parameters. Vectors of functions are not supported because function values are not stored in cell arrays.
+
+Row and column fields can have multiple columns. The functions support headers, filters, grand totals, subtotals, and field or value sorting. Keys use the engine's case-insensitive comparison. `PIVOTBY` supports all five `relative_to` codes for two-parameter functions. `PERCENTOF` divides the sum of a subset by the sum of its total set.
+
+Grouping, aggregation, and output use the existing spill and work limits. Too much work or an oversized result returns `#NUM!`. An empty filtered result returns `#CALC!`.
 
 ## Contributors
 
