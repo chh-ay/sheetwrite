@@ -15,6 +15,7 @@
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
     "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
+    "bench:formula:engines": "bun run src/full-engine-bench.ts",
     "bench:view-index": "bun run src/view-index-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
     "bench:resource": "bun run src/resource-bench.ts",
@@ -41,6 +42,7 @@
   },
   "dependencies": {
     "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/wasm": "workspace:*",
     "handsontable": "^18.0.0"
   }

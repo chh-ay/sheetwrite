@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
-import { CellStore, initSync } from "@sheetwrite/wasm";
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+import * as defaultEngine from "@sheetwrite/wasm";
+
+const engine = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? formulas : defaultEngine;
+const { CellStore, initSync } = engine;
+type CellStore = defaultEngine.CellStore;
+
 import {
   dependencyClosureFormulas,
   diamondFormulas,
@@ -25,7 +32,12 @@ import {
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
-const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
+const WASM_PATH = new URL(
+  process.env.SHEETWRITE_BENCH_ENGINE === "full"
+    ? "../../packages/formulas/pkg/sheetwrite_wasm_bg.wasm"
+    : "../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
+  import.meta.url,
+);
 const FORMULA_SOURCE_URLS = {
   "bench/package.json": new URL("../package.json", import.meta.url),
   "bench/src/formula-bench.ts": new URL("./formula-bench.ts", import.meta.url),
@@ -413,14 +425,6 @@ function outputsEqual(actual: FormulaOutput, expected: FormulaOutput): boolean {
   return Math.abs(actual - expected) <= tolerance;
 }
 
-function assertExpectedOutput(id: string, size: number, actual: FormulaOutput): void {
-  const expected = expectedFormulaOutput(id, size);
-  assert(
-    outputsEqual(actual, expected),
-    `${formulaWorkloadKey({ id, size })} expected ${String(expected)}, observed ${String(actual)}`,
-  );
-}
-
 function exactInteger(value: number, path: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${path} must be a non-negative safe integer`);
@@ -459,17 +463,18 @@ function summarizeAllocations(samples: readonly FormulaAllocationSample[]): Form
   };
 }
 
-function collectFixture(
+export function collectFixture(
   id: string,
   size: number,
   factory: FixtureFactory,
   samples = DEFAULT_SAMPLES,
+  expectedOutput?: FormulaOutput,
 ): CompleteFormulaWorkloadResult {
-  const expected = expectedFormulaOutput(id, size);
+  const expected = expectedOutput ?? expectedFormulaOutput(id, size);
   const warm = factory();
   warm.store.resetFormulaMatrixResourceStats();
   warm.run();
-  assertExpectedOutput(id, size, warm.check());
+  assert(outputsEqual(warm.check(), expected), `${id} warmup output`);
   allocationAt(warm.store);
   warm.dispose();
 
@@ -485,7 +490,7 @@ function collectFixture(
     raw[index] = now() - started;
     allocationSamples[index] = allocationAt(fixture.store);
     output = fixture.check();
-    assertExpectedOutput(id, size, output);
+    assert(outputsEqual(output, expected), `${id} measured output`);
     fixture.dispose();
   }
   return {
@@ -2331,7 +2336,7 @@ async function runBenchmark(
     baseline = parsedBaseline;
   }
 
-  initSync({ module: readFileSync(WASM_PATH) });
+  await initSheetwrite(undefined, engine);
   const capture = protocolCaptureMeta();
   const workloads = runWorkloads(smoke);
   const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
