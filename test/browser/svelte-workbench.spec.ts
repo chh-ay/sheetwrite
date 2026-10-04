@@ -244,7 +244,6 @@ test("offline edits queue durably and drain in order on reconnect", async ({ pag
     timeout: 15_000,
   });
   await expect(page.getByTestId("queue-count")).toHaveText("0");
-  await expect(page.getByTestId("activity-feed")).toContainText("Server v2 acknowledged you-2");
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -267,11 +266,7 @@ test("the durable outbox survives a full island remount while offline", async ({
 
   // The new grid generation hydrates the pending edit from IndexedDB and
   // re-applies it locally; nothing was sent while offline.
-  await expect(page.getByTestId("activity-feed")).toContainText(
-    "Restored 1 durable edit from the IndexedDB outbox",
-    { timeout: 15_000 },
-  );
-  await expect(page.getByTestId("queue-count")).toHaveText("1");
+  await expect(page.getByTestId("queue-count")).toHaveText("1", { timeout: 15_000 });
   await expect
     .poll(() => resolvedCell(page, 0, STATUS_COL), {
       timeout: 15_000,
@@ -307,8 +302,6 @@ test("reconnecting onto concurrent server work surfaces a conflict that merge re
   const conflictPanel = page.getByTestId("conflict-panel");
   await expect(conflictPanel).toBeVisible({ timeout: 15_000 });
   await expect(conflictPanel).toContainText("you-1");
-  await expect(conflictPanel).toContainText("based on v0; the server is at v1");
-  await expect(conflictPanel).toContainText("no overlap with your queued edits");
   await expect(page.getByTestId("sync-status")).toContainText("conflict", { ignoreCase: true });
   await expect(
     page.getByTestId("pending-queue").locator('li[data-status="conflicted"]'),

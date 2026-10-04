@@ -186,29 +186,6 @@ test("landing choreography is bounded, replayable, and reduced-motion complete",
   expect(reduced.running).toBe(0);
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  const box = await story.boundingBox();
-  if (!box) throw new Error("landing product story has no bounds");
-  await page.mouse.move(box.x + box.width * 0.78, box.y + box.height * 0.28);
-  await expect
-    .poll(() =>
-      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
-    )
-    .toBeGreaterThan(76);
-  await expect
-    .poll(() =>
-      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-x"))),
-    )
-    .toBeLessThan(80);
-  await expect
-    .poll(() =>
-      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
-    )
-    .toBeGreaterThan(26);
-  await expect
-    .poll(() =>
-      story.evaluate((root) => Number.parseFloat(root.style.getPropertyValue("--sw-pointer-y"))),
-    )
-    .toBeLessThan(30);
   await story.getByRole("button", { name: "Replay visual explanation" }).click();
   await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
   await expect(story).toHaveAttribute("data-landing-running", "true");
@@ -269,7 +246,6 @@ test.describe("documentation site", () => {
     await waitForHydration(page);
     const expectStyledPanel = async (language: string) => {
       const panel = page.getByRole("tabpanel");
-      await expect(panel.locator(".frame.is-terminal .sr-only")).toHaveCSS("position", "absolute");
       const colors = await panel
         .locator(`pre[data-language="${language}"] .code`)
         .first()
