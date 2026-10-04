@@ -482,7 +482,7 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 <div><dt>Source</dt><dd>Produced independently through LibreOffice UNO; generator checksum is recorded in fixtures/manifest.json.</dd></div>
 <div><dt>SHA-256</dt><dd><code>75fb643cafcbe660caaff5062423403a592fc483d3dedf8e76ad9b3a006883c2</code></dd></div>
 <div><dt>Checked result</dt><dd>formulas; styles; merges; validation; notes; freeze panes; named range</dd></div>
-<div><dt>Warnings</dt><dd>unsupported-feature: hidden worksheet visibility</dd></div>
+<div><dt>Warnings</dt><dd>rich-text: comment formatting was flattened</dd></div>
 </dl>
 </article>
 <article class="compat-evidence-file">

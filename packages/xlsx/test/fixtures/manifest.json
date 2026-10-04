@@ -51,7 +51,7 @@
         "frozen row and column",
         "named range"
       ],
-      "expectedWarnings": ["unsupported-feature: hidden worksheet visibility"]
+      "expectedWarnings": ["rich-text: comment formatting was flattened"]
     },
     {
       "file": "libreoffice-metadata.xlsx",
