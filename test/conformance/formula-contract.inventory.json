@@ -71,6 +71,282 @@
     }
   },
   "signatureProfiles": {
+    "text-delimiter": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "delimiter",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "instanceNum",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchMode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchEnd",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "ifNotFound",
+          "required": false,
+          "default": "#N/A",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "text-split": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "colDelimiter",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rowDelimiter",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "ignoreEmpty",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "matchMode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "padWith",
+          "required": false,
+          "default": "#N/A",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "text-fixed": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "decimals",
+          "required": false,
+          "default": 2,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "noCommas",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "text-dollar": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "decimals",
+          "required": false,
+          "default": 2,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "value-to-text": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "format",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "array-to-text": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "format",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "regex-test": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "pattern",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "caseSensitivity",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "regex-extract": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "pattern",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "returnMode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "caseSensitivity",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "contextual"
+    },
+    "regex-replace": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "pattern",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "replacement",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "occurrence",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "caseSensitivity",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
     "zero": { "arguments": [], "returns": "scalar" },
     "unary-value": {
       "arguments": [
@@ -3246,6 +3522,17 @@
     }
   },
   "dialectProfiles": {
+    "regex-lite-subset": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax, not full PCRE2. Lookaround, backreferences, Unicode classes such as \\p{L}, and other patterns the engine cannot compile return #VALUE!.",
+        "\\d, \\s, and \\w use ASCII character classes. \\b uses ASCII word boundaries.",
+        "As in Excel, caseSensitivity is 0 (case-sensitive, the default) or 1 (case-insensitive). Case-insensitive matching and the (?i) flag fold ASCII letters only. If caseSensitivity is 1 or the pattern enables an inline i flag, a pattern with a non-ASCII cased letter or a \\x, \\u, or \\U escape returns #VALUE!.",
+        "Regex programs are limited to 2 MiB. Text inputs and outputs are limited to 32,767 characters."
+      ]
+    },
     "excel-documented": {
       "excel": "documented",
       "googleSheets": "unverified",
@@ -3274,6 +3561,18 @@
     }
   },
   "implementationProfiles": {
+    "text-analysis": {
+      "parser": { "status": "implemented", "paths": ["packages/wasm/src/eval/analysis/mod.rs"] },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/text.rs"]
+      },
+      "assist": { "status": "implemented", "paths": ["packages/wasm/src/eval/analysis/mod.rs"] },
+      "evidence": {
+        "status": "behavior-tested",
+        "paths": ["packages/wasm/src/eval/analysis/text.rs"]
+      }
+    },
     "implemented-assisted": {
       "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
       "evaluator": {
@@ -3452,6 +3751,126 @@
     }
   ],
   "functions": [
+    {
+      "canonical": "ARRAYTOTEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "array-to-text",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "DOLLAR",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-dollar",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FIXED",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-fixed",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REGEXEXTRACT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "regex-extract",
+      "semantics": "text",
+      "dialects": "regex-lite-subset",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REGEXREPLACE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "regex-replace",
+      "semantics": "text",
+      "dialects": "regex-lite-subset",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "REGEXTEST",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "regex-test",
+      "semantics": "text",
+      "dialects": "regex-lite-subset",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TEXTAFTER",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-delimiter",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TEXTBEFORE",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-delimiter",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "TEXTSPLIT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "text-split",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "VALUETOTEXT",
+      "aliases": [],
+      "family": "text",
+      "contractStatus": "supported",
+      "signature": "value-to-text",
+      "semantics": "text",
+      "dialects": "excel-documented",
+      "implementation": "text-analysis",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
     {
       "canonical": "SUM",
       "aliases": [],

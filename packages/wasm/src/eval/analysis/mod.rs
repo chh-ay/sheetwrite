@@ -4,6 +4,7 @@ mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
+mod text;
 
 use std::collections::{HashMap, HashSet};
 
@@ -90,6 +91,18 @@ const FAMILIES: &[Family] = &[
         evaluate: Some(finance::evaluate),
         evaluate_ast: None,
         array: None,
+    },
+    Family {
+        names: text::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(text::evaluate_ast),
+        array: Some(ArrayHooks {
+            produces_array: text::produces_array,
+            shape: text::shape,
+            bound: text::bound,
+            evaluate: text::evaluate_matrix,
+        }),
     },
 ];
 
