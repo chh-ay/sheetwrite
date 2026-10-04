@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **73 optional analysis functions** (227 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **132 optional analysis functions** (286 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -43,6 +43,13 @@ Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/
 | `DROP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `CHOOSECOLS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `CHOOSEROWS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EXPAND` | `@sheetwrite/formulas` | optional analysis | [`reshape-expand`](#signature-reshape-expand) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `HSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `TOCOL` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `TOROW` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `VSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `WRAPCOLS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `WRAPROWS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 
 ### Date and time
 
@@ -198,6 +205,26 @@ Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com
 | `GCD` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `LCM` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `SUBTOTAL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`subtotal`](#signature-subtotal) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `AGGREGATE` | `@sheetwrite/formulas` | optional analysis | [`aggregate`](#signature-aggregate) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `CEILING.MATH` | `@sheetwrite/formulas` | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `COMBIN` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `COMBINA` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FACT` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FACTDOUBLE` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FLOOR.MATH` | `@sheetwrite/formulas` | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MDETERM` | `@sheetwrite/formulas` | optional analysis | [`array-unary`](#signature-array-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MINVERSE` | `@sheetwrite/formulas` | optional analysis | [`matrix-unary`](#signature-matrix-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MMULT` | `@sheetwrite/formulas` | optional analysis | [`matrix-pair`](#signature-matrix-pair) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MULTINOMIAL` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MUNIT` | `@sheetwrite/formulas` | optional analysis | [`matrix-unit`](#signature-matrix-unit) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `PERMUT` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `PERMUTATIONA` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SERIESSUM` | `@sheetwrite/formulas` | optional analysis | [`series-sum`](#signature-series-sum) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SQRTPI` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMSQ` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMX2MY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMX2PY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMXMY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
 
 ### Statistical
 
@@ -286,6 +313,16 @@ Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/off
 | `INTERCEPT` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
 | `STEYX` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
 | `FORECAST.LINEAR` (`FORECAST`) | `@sheetwrite/formulas` | optional analysis | [`forecast`](#signature-forecast) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `FREQUENCY` | `@sheetwrite/formulas` | optional analysis | [`frequency`](#signature-frequency) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `GROWTH` | `@sheetwrite/formulas` | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `LINEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `LOGEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PERCENTILE` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PERCENTRANK` | `@sheetwrite/formulas` | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PROB` | `@sheetwrite/formulas` | optional analysis | [`probability-range`](#signature-probability-range) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `QUARTILE` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `RANK` | `@sheetwrite/formulas` | optional analysis | [`rank`](#signature-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `TREND` | `@sheetwrite/formulas` | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
 
 ### Text
 
@@ -293,6 +330,16 @@ Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/exc
 
 | Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
 | --- | --- | --- | --- | --- | --- | --- |
+| `ARRAYTOTEXT` | `@sheetwrite/formulas` | optional analysis | [`array-to-text`](#signature-array-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `DOLLAR` | `@sheetwrite/formulas` | optional analysis | [`text-dollar`](#signature-text-dollar) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `FIXED` | `@sheetwrite/formulas` | optional analysis | [`text-fixed`](#signature-text-fixed) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXEXTRACT` | `@sheetwrite/formulas` | optional analysis | [`regex-extract`](#signature-regex-extract) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXREPLACE` | `@sheetwrite/formulas` | optional analysis | [`regex-replace`](#signature-regex-replace) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXTEST` | `@sheetwrite/formulas` | optional analysis | [`regex-test`](#signature-regex-test) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTAFTER` | `@sheetwrite/formulas` | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTBEFORE` | `@sheetwrite/formulas` | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTSPLIT` | `@sheetwrite/formulas` | optional analysis | [`text-split`](#signature-text-split) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `VALUETOTEXT` | `@sheetwrite/formulas` | optional analysis | [`value-to-text`](#signature-value-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
 | `LEN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `LEFT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `RIGHT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
@@ -325,9 +372,124 @@ Taxonomy/source: [Types of operators](https://support.microsoft.com/en-us/office
 | Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
 | --- | --- | --- | --- | --- | --- | --- |
 
+### Database
+
+Taxonomy/source: [Database functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
+
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `DAVERAGE` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DCOUNT` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DCOUNTA` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DGET` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DMAX` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DMIN` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DPRODUCT` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSTDEV` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSTDEVP` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSUM` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DVAR` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DVARP` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+
 ## Signature profiles
 
 Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.
+
+### Signature: text-delimiter
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `delimiter` | yes | none | `scalar`, `reference` | `once` |
+| `instanceNum` | no | 1 | `scalar`, `reference` | `once` |
+| `matchMode` | no | 0 | `scalar`, `reference` | `once` |
+| `matchEnd` | no | 0 | `scalar`, `reference` | `once` |
+| `ifNotFound` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: text-split
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `colDelimiter` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowDelimiter` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `ignoreEmpty` | no | false | `scalar`, `reference` | `once` |
+| `matchMode` | no | 0 | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: text-fixed
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `decimals` | no | 2 | `scalar`, `reference` | `once` |
+| `noCommas` | no | false | `scalar`, `reference` | `once` |
+
+### Signature: text-dollar
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `decimals` | no | 2 | `scalar`, `reference` | `once` |
+
+### Signature: value-to-text
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `reference` | `once` |
+| `format` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: array-to-text
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `format` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-test
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-extract
+
+Return shape: `contextual`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `returnMode` | no | 0 | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-replace
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `replacement` | yes | none | `scalar`, `reference` | `once` |
+| `occurrence` | no | 0 | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
 
 ### Signature: zero
 
@@ -1312,6 +1474,153 @@ Return shape: `scalar`.
 | `principal` | yes | none | `scalar`, `reference` | `once` |
 | `schedule` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
+### Signature: regression-fit
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `knownY` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownX` | no | 1,2,3,... | `range`, `array`, `reference` | `once` |
+| `const` | no | true | `scalar`, `reference` | `once` |
+| `stats` | no | false | `scalar`, `reference` | `once` |
+
+### Signature: regression-predict
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `knownY` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownX` | no | 1,2,3,... | `range`, `array`, `reference` | `once` |
+| `newX` | no | knownX | `range`, `array`, `reference` | `once` |
+| `const` | no | true | `scalar`, `reference` | `once` |
+
+### Signature: frequency
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `data` | yes | none | `range`, `array`, `reference` | `once` |
+| `bins` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: probability-range
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `xRange` | yes | none | `range`, `array`, `reference` | `once` |
+| `probRange` | yes | none | `range`, `array`, `reference` | `once` |
+| `lowerLimit` | no | 0 | `scalar`, `reference` | `once` |
+| `upperLimit` | no | lowerLimit | `scalar`, `reference` | `once` |
+
+### Signature: database
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `database` | yes | none | `range`, `reference` | `once` |
+| `field` | yes | none | `scalar`, `reference` | `once` |
+| `criteria` | yes | none | `range`, `reference` | `once` |
+
+### Signature: round-math
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `significance` | no | 1 | `scalar`, `reference` | `once` |
+| `mode` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: series-sum
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `n` | yes | none | `scalar`, `reference` | `once` |
+| `m` | yes | none | `scalar`, `reference` | `once` |
+| `coefficients` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: aggregate
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `functionNumber` | yes | none | `scalar`, `reference` | `once` |
+| `options` | yes | none | `scalar`, `reference` | `once` |
+| `reference` | yes | none | `range`, `array`, `reference` | `one-or-more` |
+
+### Signature: matrix-pair
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array1` | yes | none | `range`, `array`, `reference` | `once` |
+| `array2` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: matrix-unary
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: matrix-unit
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `dimension` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: reshape-flatten
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `ignore` | no | 0 | `scalar`, `reference` | `once` |
+| `scanByColumn` | no | FALSE | `scalar`, `reference` | `once` |
+
+### Signature: reshape-wrap
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `vector` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `wrapCount` | yes | none | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: reshape-expand
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rows` | yes | none | `scalar`, `reference` | `once` |
+| `columns` | no | source columns | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: reshape-stack
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -1532,7 +1841,53 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
+### Semantics: analysis-regression
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-math
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: function-defined |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-database
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: scalar |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: function-defined |
+| text | case: insensitive<br />wildcard: supported |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
 ## Dialect profiles
+
+### Dialect: regex-lite-subset
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax, not full PCRE2. Lookaround, backreferences, Unicode classes such as \p{L}, and other patterns the engine cannot compile return #VALUE!. \d, \s, and \w use ASCII character classes. \b uses ASCII word boundaries. As in Excel, caseSensitivity is 0 (case-sensitive, the default) or 1 (case-insensitive). Case-insensitive matching and the (?i) flag fold ASCII letters only. If caseSensitivity is 1 or the pattern enables an inline i flag, a pattern with a non-ASCII cased letter or a \x, \u, or \U escape returns #VALUE!. Regex programs are limited to 2 MiB. Text inputs and outputs are limited to 32,767 characters.
 
 ### Dialect: excel-documented
 
@@ -1564,7 +1919,46 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits.
 
+### Dialect: analysis-regression
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.
+
+### Dialect: analysis-math
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits.
+
+### Dialect: analysis-database
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.
+
 ## Implementation profiles
+
+### Implementation: text-analysis
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
+| Formula assist | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
+| Evidence | behavior-tested<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
 
 ### Implementation: implemented-assisted
 
@@ -1628,6 +2022,42 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/finance.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/finance.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-regression
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/regression.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/regression.rs)<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-math
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/math.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/math.rs)<br />[`packages/wasm/src/eval/analysis/aggregate.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/aggregate.rs)<br />[`packages/wasm/src/eval/analysis/matrices.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/matrices.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-database
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/database.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/database.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-reshape
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
 
 ## Unsupported categories
 
