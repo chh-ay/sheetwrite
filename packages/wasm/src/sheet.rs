@@ -1212,6 +1212,15 @@ impl SheetData {
         self.spill_owners.get(&cell).copied()
     }
 
+    /// The range that `anchor` spills into now. `spill_ranges` also keeps
+    /// blocked attempts; only an installed spill owns its anchor cell.
+    pub(crate) fn installed_spill(&self, anchor: CellKey) -> Option<SpillRange> {
+        if self.spill_owner(anchor) != Some(anchor) {
+            return None;
+        }
+        self.spill_ranges.get(&anchor).copied()
+    }
+
     /// Remove only cells still owned by `anchor`; a user-written obstruction that
     /// detached from the spill remains untouched.
     pub(crate) fn compact_spill_metadata(&mut self) {

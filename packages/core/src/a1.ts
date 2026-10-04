@@ -84,13 +84,14 @@ export function remapFormulaA1Refs(
   remap: (index: number) => number | null,
 ): string {
   return source.replace(
-    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)(#?)/g,
     (
       match: string,
       colAbsolute: string,
       letters: string,
       rowAbsolute: string,
       digits: string,
+      spill: string,
       offset: number,
       full: string,
     ): string => {
@@ -100,10 +101,11 @@ export function remapFormulaA1Refs(
       const col = labelToCol(letters.toUpperCase());
       const row = Number(digits) - 1;
       const mapped = remap(axis === "row" ? row : col);
+      // A deleted anchor also ends its spill reference: `A1#` becomes `#REF!`.
       if (mapped === null) return "#REF!";
       return axis === "row"
-        ? `${colAbsolute}${colToA1(col)}${rowAbsolute}${mapped + 1}`
-        : `${colAbsolute}${colToA1(mapped)}${rowAbsolute}${row + 1}`;
+        ? `${colAbsolute}${colToA1(col)}${rowAbsolute}${mapped + 1}${spill}`
+        : `${colAbsolute}${colToA1(mapped)}${rowAbsolute}${row + 1}${spill}`;
     },
   );
 }

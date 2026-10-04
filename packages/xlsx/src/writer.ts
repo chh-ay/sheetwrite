@@ -8,7 +8,7 @@ import type {
   WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { colToA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
-import { formulaContainsExternalReference } from "./formula.js";
+import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
 import {
   assertResource,
@@ -338,7 +338,7 @@ function cellXml(
       });
       return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
     }
-    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
+    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(spillReferencesToXlsx(formula)))}</f></c>`;
   }
   if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
   if (typeof value.value === "string") {

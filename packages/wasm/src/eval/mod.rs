@@ -478,42 +478,41 @@ impl CellStore {
         let mut cyclic: HashSet<AbsCellKey> = HashSet::new();
 
         loop {
-            let mut pending: Vec<(AbsCellKey, Ast)> = affected
+            let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
                 .iter()
                 .filter(|key| !processed_arrays.contains(key))
                 .filter_map(|&key| {
-                    let ast = self
+                    let entry = self
                         .sheets
                         .get(key.sheet as usize)?
                         .formulas
-                        .get(&key.local())?
-                        .ast
-                        .as_ref()?;
+                        .get(&key.local())?;
+                    let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()
-                        .then(|| (key, ast.clone()))
+                        .then(|| (key, ast.clone(), entry.has_spill_refs))
                 })
                 .collect();
             if pending.is_empty() {
                 break;
             }
-            pending.sort_unstable_by_key(|(key, _)| (key.sheet, key.row, key.col));
+            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
 
             let mut changed_sheets = HashSet::new();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
-            for (key, ast) in pending {
+            for (key, ast, has_spill_refs) in pending {
+                // Spill references read the spills installed so far in this pass.
+                let ast = if has_spill_refs {
+                    self.resolve_spill_refs(&ast, key.sheet as usize)
+                } else {
+                    ast
+                };
                 processed_arrays.insert(key);
                 sequence += 1;
                 evaluated_at.insert(key, sequence);
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
-                let vacated_range = self.sheets[output_sheet]
-                    .spill_owner(local)
-                    .and_then(|owner| {
-                        (owner == local)
-                            .then(|| self.sheets[output_sheet].spill_ranges.get(&local).copied())
-                    })
-                    .flatten();
+                let vacated_range = self.sheets[output_sheet].installed_spill(local);
                 let cleared = self.sheets[output_sheet].clear_spill(local);
                 if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
@@ -563,12 +562,21 @@ impl CellStore {
                     None => Err(FormulaError::Value),
                 };
                 let changed = self.install_spill_result(key, evaluated, &mut memo);
-                if !changed.is_empty() {
+                // Formulas that use `A1#` read only the anchor cell. The anchor
+                // counts as changed when its spill range or spilled cells
+                // changed. A new anchor value alone needs no notice: a reader
+                // evaluates the anchor formula on demand when it reads it.
+                let installed_range = self.sheets[output_sheet].installed_spill(local);
+                if installed_range != vacated_range || !changed.is_empty() {
+                    let mut cells = changed.clone();
+                    cells.push(local);
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,
                         sequence,
-                        cells: changed.clone(),
+                        cells,
                     });
+                }
+                if !changed.is_empty() {
                     self.sheets[output_sheet].dirty_cells.extend(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -906,7 +914,12 @@ impl CellStore {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);
-                    self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
+                    if entry.has_spill_refs {
+                        let resolved = self.resolve_spill_refs(ast, sheet);
+                        self.eval_ast(&resolved, sheet, affected, memo, visiting, depth + 1)
+                    } else {
+                        self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
+                    }
                 }
                 None => Value::Error(entry.error.unwrap_or(FormulaError::Value)),
             },

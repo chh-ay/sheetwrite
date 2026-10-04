@@ -285,6 +285,19 @@ fn ast_contains_let(ast: &Ast) -> bool {
     }
 }
 
+fn ast_contains_spill_ref(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::AnchorArray, _) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_spill_ref),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_contains_spill_ref(left) || ast_contains_spill_ref(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_spill_ref(inner),
+        Ast::LetSlot { expression, .. } => ast_contains_spill_ref(expression),
+        _ => false,
+    }
+}
+
 fn formula_metadata(ast: &Ast, formula_sheet: u32) -> (ReadSet, bool) {
     if !ast_contains_let(ast) {
         return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
@@ -314,6 +327,9 @@ pub(crate) struct FormulaEntry {
     pub(crate) error: Option<FormulaError>,
     pub(crate) value_kind: FormulaValueKind,
     pub(crate) volatile: bool,
+    /// The formula contains `A1#`. Each evaluation replaces those with the
+    /// current spill ranges; other formulas skip that step.
+    pub(crate) has_spill_refs: bool,
     pub(crate) source_kind: PersistedSourceKind,
 }
 
@@ -326,6 +342,7 @@ impl FormulaEntry {
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
         let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
+            has_spill_refs: ast_contains_spill_ref(&ast),
             ast: Some(ast),
             source: source.to_string(),
             reads,
@@ -354,6 +371,7 @@ impl FormulaEntry {
             error: None,
             value_kind: FormulaValueKind::Blank,
             volatile: false,
+            has_spill_refs: false,
             source_kind: PersistedSourceKind::Reference,
         }
     }
@@ -397,6 +415,7 @@ impl FormulaEntry {
             error: Some(error),
             value_kind: FormulaValueKind::Number,
             volatile: false,
+            has_spill_refs: false,
             source_kind: PersistedSourceKind::Formula,
         }
     }
