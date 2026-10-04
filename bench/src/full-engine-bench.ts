@@ -18,7 +18,7 @@ const SAMPLE_COUNT = 5;
 const ANALYSIS_COUNT = 1_000;
 export const ANALYSIS_CASES = [
   { id: "linest", formula: "=SUM(LINEST(B1:B100,A1:A100))", expected: 5 },
-  { id: "xirr", formula: "=XIRR({-100,110},{1,366})", expected: 0.1 },
+  { id: "xirr", formula: "=XIRR(A1:A2,B1:B2)", expected: 0.1 },
   { id: "dsum", formula: '=DSUM(A1:B101,"value",D1:D2)', expected: 10_400 },
   {
     id: "textsplit-regexreplace",
@@ -26,13 +26,13 @@ export const ANALYSIS_CASES = [
     expected: 3,
   },
   { id: "sortby", formula: "=INDEX(SORTBY(B1:B100,A1:A100,-1),1,1)", expected: 203 },
-  { id: "mode-mult", formula: "=SUM(MODE.MULT({1,1,2,2,3}))", expected: 3 },
+  { id: "mode-mult", formula: "=SUM(MODE.MULT(1,1,2,2,3))", expected: 3 },
   {
     id: "map-reduce",
     formula: "=REDUCE(0,MAP(A1:A100,LAMBDA(x,x+1)),LAMBDA(a,x,a+x))",
     expected: 5_150,
   },
-  { id: "mmult", formula: "=SUM(MMULT({1,2;3,4},{5,6;7,8}))", expected: 134 },
+  { id: "mmult", formula: "=SUM(MMULT(A1:B2,C1:D2))", expected: 134 },
 ] as const;
 
 interface EngineCapture {
@@ -87,6 +87,16 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     ],
     "engine artifact fields",
   );
+  if (Buffer.byteLength(JSON.stringify(result)) > 4 * 1024 * 1024)
+    throw new Error("engine artifact exceeds the 4 MiB bound");
+  exactKeys(result.meta, ["commit", "dirty", "timestamp"], "engine metadata");
+  if (
+    !/^[0-9a-f]{40}$/u.test(result.meta.commit) ||
+    typeof result.meta.dirty !== "boolean" ||
+    !Number.isFinite(Date.parse(result.meta.timestamp)) ||
+    new Date(result.meta.timestamp).toISOString() !== result.meta.timestamp
+  )
+    throw new Error("invalid engine metadata");
   if (result.schemaVersion !== 1 || result.initializationMethod !== INIT_METHOD)
     throw new Error("engine protocol mismatch");
   exactKeys(result.sourceFiles, SOURCE_PATHS, "engine source files");
@@ -140,6 +150,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       workload.size !== ANALYSIS_COUNT ||
       workload.samplesMs.length !== SAMPLE_COUNT ||
       typeof workload.output !== "number" ||
+      !Number.isFinite(workload.output) ||
       Math.abs(workload.output - scenario.expected * ANALYSIS_COUNT) >
         1e-7 * Math.max(1, Math.abs(workload.output))
     )
@@ -150,6 +161,18 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       "analysis fields",
     );
     validateRawStat(workload.samplesMs, workload.stat, workload.id);
+    if (workload.stat.p95 >= 30_000) throw new Error("analysis exceeded the 30 second ceiling");
+    exactKeys(
+      workload.allocationStat,
+      ["retainedBytes", "peakTransientBytes", "transientAllocations"],
+      "analysis allocation fields",
+    );
+    for (const sample of workload.allocationSamples)
+      exactKeys(
+        sample,
+        ["retainedBytes", "peakTransientBytes", "transientAllocations"],
+        "analysis allocation sample fields",
+      );
     if (workload.allocationSamples.length !== SAMPLE_COUNT)
       throw new Error("missing analysis allocation samples");
     for (const field of ["retainedBytes", "peakTransientBytes", "transientAllocations"] as const) {
@@ -177,6 +200,16 @@ function analysisFixture(formula: string) {
     Float64Array.from({ length: 100 }, (_, row) => 2 * (row + 1) + 3),
     0,
   );
+  if (formula.startsWith("=XIRR")) {
+    store.setColumnNumbers(sheet, 0, 0, new Float64Array([-100, 110]), 0);
+    store.setColumnNumbers(sheet, 1, 0, new Float64Array([1, 366]), 0);
+  }
+  if (formula.includes("MMULT")) {
+    store.setColumnNumbers(sheet, 0, 0, new Float64Array([1, 3]), 0);
+    store.setColumnNumbers(sheet, 1, 0, new Float64Array([2, 4]), 0);
+    store.setColumnNumbers(sheet, 2, 0, new Float64Array([5, 7]), 0);
+    store.setColumnNumbers(sheet, 3, 0, new Float64Array([6, 8]), 0);
+  }
   // The database has its own header row. Its final value is not part of the regression data.
   if (formula.startsWith("=DSUM")) {
     store.setString(sheet, 0, 0, "key", 0);
