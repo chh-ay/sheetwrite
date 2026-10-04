@@ -33,7 +33,9 @@ use crate::types::{
 use array::{ast_produces_array, dynamic_recompute_within_limit};
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 pub(crate) use dependency::DepIndex;
-use dependency::{build_dep_index, collect_affected_formulas, seed_dependency_depth_errors};
+use dependency::{
+    build_dep_index, collect_affected_formulas, direct_readers, seed_dependency_depth_errors,
+};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 use lookup::{
     clear_cached_lookups, find_match_index_indexed, integer_arg, list_reuse, positive_index,
@@ -341,6 +343,13 @@ fn address_text(
     Ok(output)
 }
 
+/// Cells that one spill install or clear changed, and when it happened.
+struct SpillChange {
+    sheet: usize,
+    sequence: usize,
+    cells: Vec<(u32, u32)>,
+}
+
 impl CellStore {
     pub(crate) fn recompute_sheet(&mut self, sheet: usize) {
         self.recompute_seed_sheets(&[sheet]);
@@ -458,6 +467,15 @@ impl CellStore {
 
         let mut seeded_sheets: HashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
+        // Spills are evaluated in cell order, so a spill can read another
+        // spill before that one is installed. `evaluated_at` and the change
+        // log find readers that ran before a spill they read changed, and the
+        // next pass evaluates them again. A reader that keeps coming back
+        // reads its own output through other spills: that is a cycle.
+        let mut sequence = 0usize;
+        let mut evaluated_at: HashMap<AbsCellKey, usize> = HashMap::new();
+        let mut requeued: HashMap<AbsCellKey, usize> = HashMap::new();
+        let mut cyclic: HashSet<AbsCellKey> = HashSet::new();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast)> = affected
@@ -482,8 +500,11 @@ impl CellStore {
             pending.sort_unstable_by_key(|(key, _)| (key.sheet, key.row, key.col));
 
             let mut changed_sheets = HashSet::new();
+            let mut spill_changes: Vec<SpillChange> = Vec::new();
             for (key, ast) in pending {
                 processed_arrays.insert(key);
+                sequence += 1;
+                evaluated_at.insert(key, sequence);
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let vacated_range = self.sheets[output_sheet]
@@ -495,6 +516,11 @@ impl CellStore {
                     .flatten();
                 let cleared = self.sheets[output_sheet].clear_spill(local);
                 if !cleared.is_empty() {
+                    spill_changes.push(SpillChange {
+                        sheet: output_sheet,
+                        sequence,
+                        cells: cleared.clone(),
+                    });
                     self.sheets[output_sheet].dirty_cells.extend(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -516,6 +542,7 @@ impl CellStore {
                 memo.remove(&key);
 
                 let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
+                    _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
                     Some(Ok(bound)) => match dynamic_recompute_within_limit(spill_work, bound) {
                         Some(total) => {
                             spill_work = total;
@@ -537,6 +564,11 @@ impl CellStore {
                 };
                 let changed = self.install_spill_result(key, evaluated, &mut memo);
                 if !changed.is_empty() {
+                    spill_changes.push(SpillChange {
+                        sheet: output_sheet,
+                        sequence,
+                        cells: changed.clone(),
+                    });
                     self.sheets[output_sheet].dirty_cells.extend(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -552,6 +584,24 @@ impl CellStore {
                     changed_sheet,
                     index,
                 ));
+            }
+            for change in spill_changes {
+                for reader in direct_readers(index, change.sheet, &change.cells) {
+                    let is_stale = evaluated_at
+                        .get(&reader)
+                        .is_some_and(|&evaluated| evaluated < change.sequence);
+                    if !is_stale || cyclic.contains(&reader) {
+                        continue;
+                    }
+                    let count = requeued.entry(reader).or_insert(0);
+                    *count += 1;
+                    // Without a cycle, a reader comes back at most once per
+                    // spill in front of it.
+                    if *count > affected.len() {
+                        cyclic.insert(reader);
+                    }
+                    processed_arrays.remove(&reader);
+                }
             }
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }

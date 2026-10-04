@@ -3531,3 +3531,33 @@ fn rejected_packed_text_adds_nothing_to_the_string_pool() {
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("é"));
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("a"));
 }
+
+#[test]
+fn spill_that_reads_a_later_spill_sees_its_current_values() {
+    // B1 is evaluated before C1 in cell order, but must read C1's new spill.
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 8);
+    store.set_number(sheet, 0, 0, 3.0, 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(A1)", 0);
+    store.set_formula(sheet, 0, 1, "=C1:C5", 0);
+    store.recompute(sheet);
+    let column_b = |store: &CellStore| -> Vec<f64> {
+        (0..5).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+    };
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 0.0, 0.0]);
+    store.set_number(sheet, 0, 0, 4.0, 0);
+    store.recompute(sheet);
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 4.0, 0.0]);
+}
+
+#[test]
+fn spills_that_read_each_other_end_as_a_cycle() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 8);
+    store.set_formula(sheet, 0, 0, "=C1:C2", 0);
+    store.set_formula(sheet, 0, 2, "=A1:A2", 0);
+    store.recompute(sheet);
+    let shown = |col| store.get_cell(sheet, 0, col).string();
+    assert_eq!(shown(0).as_deref(), Some("#CYCLE!"));
+    assert_eq!(shown(2).as_deref(), Some("#CYCLE!"));
+}
