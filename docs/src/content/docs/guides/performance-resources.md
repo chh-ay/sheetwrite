@@ -1063,6 +1063,75 @@ Reproduce with:
 bun run --filter @sheetwrite/bench bench:formula
 ```
 
+### Default and full formula engines
+
+<div class="evidence-available"><strong>Validated evidence.</strong> Eight shared workloads have 51 paired rounds per engine. The full engine also has eight checked analysis workloads.</div>
+
+<dl class="bench-meta" data-pagefind-ignore>
+<div><dt>Matched capture</dt><dd>2026-10-04 11:18 UTC</dd></div>
+<div><dt>Matched commit</dt><dd><code>a50a897e9f93</code> clean worktree</dd></div>
+<div><dt>Analysis capture</dt><dd>2026-10-04 11:20 UTC</dd></div>
+<div><dt>Analysis commit</dt><dd><code>a50a897e9f93</code> clean worktree</dd></div>
+<div><dt>Machine</dt><dd>12th Gen Intel(R) Core(TM) i9-12900H · Linux 7.2.8-1-cachyos · x64 · Bun 1.4.2</dd></div>
+</dl>
+
+The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.
+
+The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. We checked those eight rows with matched rounds. Each pair runs default, then full. Each timed sample uses a fresh Bun process and one untimed warmup fixture. The runner used CPU 4 and one concurrent capture.
+
+No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows.
+
+The ratio is full time divided by default time within each pair. The table shows the median of 51 paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time. Wide spreads and very short operations limit what this sample can show.
+
+| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| independent-parse-load | 1,000 | 2.0895 | 2.6377 | 1.0149 | 0.3786–3.5129 |
+| independent-first-recompute | 1,000 | 0.7200 | 0.7008 | 0.9939 | 0.2959–2.3024 |
+| independent-parse-load | 10,000 | 13.4585 | 13.8707 | 1.0095 | 0.8935–1.1378 |
+| independent-first-recompute | 10,000 | 26.5895 | 26.3255 | 0.9859 | 0.9088–1.0561 |
+| linear-chain | 8 | 0.1210 | 0.1215 | 1.0113 | 0.9194–1.1899 |
+| wide-fan-out-edit | 1,000 | 0.4538 | 0.4473 | 0.9849 | 0.8534–1.1019 |
+| scalar-edit-affects-0 | 1,000 | 0.0107 | 0.0107 | 0.9957 | 0.8127–1.2054 |
+| vlookup-many | 1,000 | 5.7530 | 5.5446 | 0.9398 | 0.7541–1.4022 |
+
+#### Analysis workloads
+
+Each workload has 1,000 formulas. It has one untimed warmup and five measured samples. Each sample uses a fresh store. The timer measures first recompute. Setup and output reads are outside the timer. Every result is read and summed as a checked checksum. The default engine does not run these analysis functions.
+
+LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.
+
+| Full-only workload | Median ms | p95 ms |
+| --- | ---: | ---: |
+| linest | 9.6148 | 12.1373 |
+| xirr | 4.0459 | 5.6680 |
+| dsum | 12.0187 | 70.5729 |
+| textsplit-regexreplace | 6.5583 | 8.0209 |
+| sortby | 4.4068 | 8.6183 |
+| mode-mult | 0.9337 | 0.9587 |
+| map-reduce | 26.3824 | 28.0090 |
+| mmult | 1.1064 | 3.0955 |
+
+#### WASM size and Node initialization
+
+| Engine | Node | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| default | v26.9.0 | 767,306 | 231,555 | 5.4321 | 10.7175 |
+| full | v26.9.0 | 1,013,611 | 308,622 | 7.4081 | 8.0404 |
+
+Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.
+
+Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.
+
+Reproduce after `bun run build:packages`:
+
+```sh verify title="Default and full engine evidence"
+cd bench
+bun run bench:formula:engines
+bun run bench:formula:matched
+```
+
+The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
+
 ## Delivery size
 
 <section class="size-history" aria-label="Published package size history">
