@@ -411,6 +411,18 @@
       ],
       "returns": "scalar"
     },
+    "variadic-values-array": {
+      "arguments": [
+        {
+          "name": "value",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "array"
+    },
     "optional-variadic-values": {
       "arguments": [
         {
@@ -1548,6 +1560,25 @@
           "default": "all",
           "accepts": ["scalar", "reference"],
           "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "sort-by": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "byArrayAndOrder",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "range", "array", "reference"],
+          "repeat": "paired"
         }
       ],
       "returns": "array"
@@ -7701,6 +7732,18 @@
       "builds": ["@sheetwrite/formulas"]
     },
     {
+      "canonical": "MODE.MULT",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "variadic-values-array",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
       "canonical": "GROWTH",
       "aliases": [],
       "family": "statistical",
@@ -8210,6 +8253,18 @@
       "family": "array",
       "contractStatus": "supported",
       "signature": "reshape-stack",
+      "semantics": "array",
+      "dialects": "excel-documented",
+      "implementation": "analysis-reshape",
+      "builds": ["@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "SORTBY",
+      "aliases": [],
+      "family": "array",
+      "contractStatus": "supported",
+      "signature": "sort-by",
       "semantics": "array",
       "dialects": "excel-documented",
       "implementation": "analysis-reshape",

@@ -1,5 +1,5 @@
 //! Dynamic array reshaping for the full engine: TOCOL, TOROW, WRAPROWS,
-//! WRAPCOLS, EXPAND, HSTACK, and VSTACK.
+//! WRAPCOLS, EXPAND, HSTACK, VSTACK, and SORTBY.
 //!
 //! `shape` and `bound` read only argument shapes and literal numbers. The
 //! engine calls them before it recalculates cells, so cell values can be out of
@@ -7,6 +7,7 @@
 //! of the result. Otherwise `shape` gives a size that the limits accept and
 //! `bound` gives an upper bound of cells.
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
@@ -15,14 +16,17 @@ use super::super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES, SPILL_MAX_CELLS, SPILL_MAX_COLS,
     SPILL_MAX_RECOMPUTE_CELLS, SPILL_MAX_ROWS,
 };
-use super::super::value::{bool_from_value, number_from_value};
+use super::super::value::{bool_from_value, compare_values, number_from_value};
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &[
-    "EXPAND", "HSTACK", "TOCOL", "TOROW", "VSTACK", "WRAPCOLS", "WRAPROWS",
+    "EXPAND", "HSTACK", "SORTBY", "TOCOL", "TOROW", "VSTACK", "WRAPCOLS", "WRAPROWS",
 ];
+
+/// Most arguments that a function call can have.
+const MAX_ARGUMENTS: usize = 255;
 
 /// Largest TOCOL and TOROW `ignore` code: 1 skips blanks, 2 skips errors.
 const MAX_IGNORE_CODE: f64 = 3.0;
@@ -38,6 +42,8 @@ fn check_arity(name: &str, args: &[Ast]) -> Result<(), FormulaError> {
         "TOCOL" | "TOROW" => (1..=3).contains(&args.len()),
         "WRAPCOLS" | "WRAPROWS" => (2..=3).contains(&args.len()),
         "EXPAND" => (2..=4).contains(&args.len()),
+        // SORTBY(array, by_array1, [order1], by_array2, [order2], ...)
+        "SORTBY" => (2..=MAX_ARGUMENTS).contains(&args.len()),
         _ => false,
     };
     if is_valid {
@@ -274,6 +280,10 @@ fn estimate(
                 max_cells: SPILL_MAX_CELLS,
             },
         },
+        "SORTBY" => Estimate::Exact {
+            rows: source_rows,
+            cols: source_cols,
+        },
         _ => return Err(FormulaError::Value),
     })
 }
@@ -491,6 +501,7 @@ pub(super) fn evaluate(
         "TOCOL" | "TOROW" => flatten(&mut evaluation, name, &inputs),
         "WRAPCOLS" | "WRAPROWS" => wrap(&mut evaluation, name, &inputs),
         "EXPAND" => expand(&mut evaluation, &inputs),
+        "SORTBY" => sort_by(&mut evaluation, &inputs),
         _ => stack(name, &inputs),
     }
 }
@@ -539,6 +550,91 @@ fn flatten(
     };
     EvalMatrix::validate_shape(rows, cols, 1, inputs.bytes)?;
     Ok(EvalMatrix::new(rows, cols, values.values))
+}
+
+/// One SORTBY key: a row or column of values with one value per sorted item.
+struct SortKey {
+    values: EvalMatrix,
+    is_descending: bool,
+}
+
+/// Sorts the rows (or columns) of `array` by one or more key vectors. Keys are
+/// compared in order, and the sort is stable, so items with equal keys keep
+/// their order. A column key sorts rows; a row key sorts columns; every key must
+/// have one value per item and all keys must use the same direction.
+fn sort_by(evaluation: &mut Evaluation<'_>, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
+    let source = &inputs.matrices[0];
+    let args = evaluation.args;
+    let mut sorts_rows = None;
+    let mut keys = Vec::with_capacity(args.len() / 2);
+    let mut work = inputs.cells;
+    for by_index in (1..args.len()).step_by(2) {
+        let by = evaluation.source(&args[by_index])?;
+        let is_column_key = by.cols == 1 && by.rows == source.rows;
+        let is_row_key = by.rows == 1 && by.cols == source.cols;
+        let key_sorts_rows = match (is_column_key, is_row_key) {
+            (true, _) => true,
+            (false, true) => false,
+            (false, false) => return Err(FormulaError::Value),
+        };
+        if *sorts_rows.get_or_insert(key_sorts_rows) != key_sorts_rows {
+            return Err(FormulaError::Value);
+        }
+        let order = match evaluation.scalar(by_index + 1) {
+            None => 1.0,
+            Some(value) => number_from_value(&value)?.trunc(),
+        };
+        if order != 1.0 && order != -1.0 {
+            return Err(FormulaError::Value);
+        }
+        work = work.checked_add(by.values.len()).ok_or(FormulaError::Num)?;
+        keys.push(SortKey {
+            values: by,
+            is_descending: order == -1.0,
+        });
+    }
+    let sorts_rows = sorts_rows.unwrap_or(true);
+    let item_count = if sorts_rows { source.rows } else { source.cols };
+    // A comparison sort reads about n·log2(n) pairs per key.
+    let comparisons = item_count
+        .checked_mul(item_count.max(2).ilog2() as usize)
+        .and_then(|pairs| pairs.checked_mul(keys.len()))
+        .ok_or(FormulaError::Num)?;
+    if work.saturating_add(comparisons) > SPILL_MAX_RECOMPUTE_CELLS {
+        return Err(FormulaError::Num);
+    }
+
+    let mut error = None;
+    let order = super::sorted_positions(item_count, &mut |left, right| {
+        for key in &keys {
+            match compare_values(&key.values.values[left], &key.values.values[right]) {
+                Ok(Ordering::Equal) => continue,
+                Ok(ordering) if key.is_descending => return ordering.reverse(),
+                Ok(ordering) => return ordering,
+                Err(found) => {
+                    error.get_or_insert(found);
+                    return Ordering::Equal;
+                }
+            }
+        }
+        Ordering::Equal
+    });
+    if let Some(error) = error {
+        return Err(error);
+    }
+
+    let mut output = inputs.reserve(source.rows, source.cols)?;
+    for row in 0..source.rows {
+        for col in 0..source.cols {
+            let (from_row, from_col) = if sorts_rows {
+                (order[row], col)
+            } else {
+                (row, order[col])
+            };
+            output.push(&source.values[from_row * source.cols + from_col])?;
+        }
+    }
+    Ok(EvalMatrix::new(source.rows, source.cols, output.values))
 }
 
 fn wrap(
@@ -946,6 +1042,42 @@ mod tests {
         ];
         for (formula, expected) in cases {
             assert_eq!(evaluate(data, formula), grid(&[&[expected]]), "{formula}");
+        }
+    }
+
+    #[test]
+    fn sortby_sorts_by_several_keys_and_keeps_ties_stable() {
+        // https://support.microsoft.com/en-us/office/sortby-function-cd2d7a62-1b93-435c-b561-d6a35134f28f
+        let data: &[&[&str]] = &[
+            &["Tom", "East", "30", "", "x", "y", "z"],
+            &["Amy", "West", "20", "", "1", "3", "2"],
+            &["Sal", "East", "20"],
+            &["Bob", "West", "30"],
+            &["Eve", "East", "10"],
+        ];
+        // Amy and Sal tie on 20, and Tom and Bob on 30: they keep their order.
+        assert_eq!(
+            evaluate(data, "=SORTBY(A1:A5,C1:C5)"),
+            column(&["Eve", "Amy", "Sal", "Tom", "Bob"])
+        );
+        assert_eq!(
+            evaluate(data, "=SORTBY(A1:C5,B1:B5,1,C1:C5,-1)"),
+            grid(&[
+                &["Tom", "East", "30"],
+                &["Sal", "East", "20"],
+                &["Eve", "East", "10"],
+                &["Bob", "West", "30"],
+                &["Amy", "West", "20"],
+            ])
+        );
+        // A row key sorts columns.
+        assert_eq!(evaluate(data, "=SORTBY(E1:G1,E2:G2,-1)"), grid(&[&["y", "z", "x"]]));
+        for formula in [
+            "=SORTBY(A1:A5,C1:C4)",
+            "=SORTBY(A1:A5,C1:C5,2)",
+            "=SORTBY(A1:A5,C1:C5,1,E1:G1)",
+        ] {
+            assert_eq!(evaluate(data, formula), grid(&[&["#VALUE!"]]), "{formula}");
         }
     }
 

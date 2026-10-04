@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **140 optional analysis functions** (294 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **142 optional analysis functions** (296 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -45,6 +45,7 @@ Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/
 | `CHOOSEROWS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `EXPAND` | `@sheetwrite/formulas` | optional analysis | [`reshape-expand`](#signature-reshape-expand) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `HSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `SORTBY` | `@sheetwrite/formulas` | optional analysis | [`sort-by`](#signature-sort-by) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `TOCOL` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `TOROW` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
 | `VSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
@@ -322,6 +323,7 @@ Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/off
 | `STEYX` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
 | `FORECAST.LINEAR` (`FORECAST`) | `@sheetwrite/formulas` | optional analysis | [`forecast`](#signature-forecast) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
 | `FREQUENCY` | `@sheetwrite/formulas` | optional analysis | [`frequency`](#signature-frequency) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `MODE.MULT` | `@sheetwrite/formulas` | optional analysis | [`variadic-values-array`](#signature-variadic-values-array) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
 | `GROWTH` | `@sheetwrite/formulas` | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
 | `LINEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
 | `LOGEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
@@ -535,6 +537,14 @@ Return shape: `scalar`.
 ### Signature: variadic-values
 
 Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+
+### Signature: variadic-values-array
+
+Return shape: `array`.
 
 | Argument | Required | Default | Accepts | Repetition |
 | --- | --- | --- | --- | --- |
@@ -1010,6 +1020,15 @@ Return shape: `array`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `rows` | yes | none | `scalar`, `reference` | `once` |
 | `columns` | no | all | `scalar`, `reference` | `once` |
+
+### Signature: sort-by
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+| `byArrayAndOrder` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 
 ### Signature: choose-axis
 

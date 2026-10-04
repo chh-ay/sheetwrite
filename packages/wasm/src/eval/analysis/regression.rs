@@ -1,9 +1,10 @@
-//! Least-squares arrays, FREQUENCY, PROB and legacy statistical names.
+//! Least-squares arrays, FREQUENCY, MODE.MULT, PROB and legacy statistical names.
 
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
-use super::super::value::bool_from_value;
+use super::super::array::ast_produces_array;
+use super::super::value::{aggregate_number, bool_from_value};
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
@@ -15,6 +16,7 @@ pub(crate) const NAMES: &[&str] = &[
     "GROWTH",
     "LINEST",
     "LOGEST",
+    "MODE.MULT",
     "PERCENTILE",
     "PERCENTRANK",
     "PROB",
@@ -28,6 +30,7 @@ const QR_DEPENDENCE_FACTOR: f64 = 64.0;
 const QR_WORK_PER_CELL: usize = 4;
 const LINEST_MAX_ARGS: usize = 4;
 const FREQUENCY_ARGS: usize = 2;
+const MODE_MAX_ARGS: usize = 255;
 
 /// The legacy names use the same rules as their current names.
 pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
@@ -68,7 +71,7 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
-    matches!(name, "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "TREND")
+    matches!(name, "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND")
 }
 
 fn argument_shape(
@@ -78,6 +81,9 @@ fn argument_shape(
 ) -> Result<(usize, usize, usize), FormulaError> {
     match ast {
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
+        // A scalar expression such as 1/0 or A1*2 gives one value; its
+        // error, if any, appears when it is evaluated.
+        _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
         _ => store.matrix_shape(ast, sheet),
     }
 }
@@ -99,6 +105,18 @@ pub(crate) fn shape(
         let (_, _, bin_cells) = argument_shape(store, &args[1], sheet)?;
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
+    } else if name == "MODE.MULT" {
+        if args.is_empty() || args.len() > MODE_MAX_ARGS {
+            return Err(FormulaError::Value);
+        }
+        let mut cells = 0usize;
+        for arg in args {
+            let (_, _, arg_cells) = argument_shape(store, arg, sheet)?;
+            cells = cells.checked_add(arg_cells).ok_or(FormulaError::Num)?;
+        }
+        validate_mode_resources(cells)?;
+        // A mode occurs at least twice, so at most half of the values are modes.
+        ((cells / 2).max(1), 1)
     } else {
         if args.is_empty() || args.len() > LINEST_MAX_ARGS {
             return Err(FormulaError::Value);
@@ -178,6 +196,19 @@ fn validate_prediction_resources(
         .and_then(|cells| cells.checked_mul(std::mem::size_of::<Value>()))
         .ok_or(FormulaError::Num)?;
     EvalMatrix::validate_shape(new_rows, new_cols, 1, input_bytes)?;
+    Ok(())
+}
+
+/// MODE.MULT keeps one count per distinct value, so its work and memory are
+/// linear in the number of input cells.
+fn validate_mode_resources(cells: usize) -> Result<(), FormulaError> {
+    if cells > SPILL_MAX_RECOMPUTE_CELLS {
+        return Err(FormulaError::Num);
+    }
+    let workspace = cells
+        .checked_mul(std::mem::size_of::<(u64, usize)>())
+        .ok_or(FormulaError::Num)?;
+    EvalMatrix::validate_shape((cells / 2).max(1), 1, 1, workspace)?;
     Ok(())
 }
 
@@ -263,8 +294,10 @@ pub(crate) fn evaluate_array(
         visiting,
         depth,
     };
-    if name == "FREQUENCY" {
-        return frequency(&mut evaluation, args);
+    match name {
+        "FREQUENCY" => return frequency(&mut evaluation, args),
+        "MODE.MULT" => return modes(&mut evaluation, args),
+        _ => {}
     }
     let y_matrix = evaluation.matrix(&args[0])?;
     let x_matrix = if let Some(ast) = optional_ast(args, 1) {
@@ -385,6 +418,69 @@ fn frequency(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix
         1,
         counts.into_iter().map(Value::number).collect(),
     ))
+}
+
+/// Returns every value that occurs most often, as one column, in the order of
+/// first occurrence. No repeated value gives #N/A. Values typed directly as
+/// arguments follow the scalar rules (TRUE and numeric text count); values
+/// from references and arrays count only when they are numbers.
+fn modes(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+    let mut numbers = Vec::new();
+    for arg in args {
+        let from_range = is_reference(arg) || ast_produces_array(arg);
+        for value in &evaluation.matrix(arg)?.values {
+            if let Some(number) = aggregate_number(value, from_range)? {
+                // -0 and 0 are the same value.
+                numbers.push(number + 0.0);
+            }
+        }
+    }
+    // Sort positions by value. The sort is stable, so each run of equal values
+    // starts at its first occurrence.
+    let positions = super::sorted_positions(numbers.len(), &mut |left, right| {
+        numbers[left].total_cmp(&numbers[right])
+    });
+    let mut runs = Vec::new(); // (first position, count)
+    let mut highest = 0;
+    for (index, &position) in positions.iter().enumerate() {
+        if index > 0 && numbers[positions[index - 1]] == numbers[position] {
+            let run: &mut (usize, usize) = runs.last_mut().expect("a run is open");
+            run.1 += 1;
+            highest = highest.max(run.1);
+        } else {
+            runs.push((position, 1));
+        }
+    }
+    if highest < 2 {
+        return Err(FormulaError::Na);
+    }
+    // Mark the first occurrence of each mode, then read them in input order.
+    let mut is_first_of_mode = vec![false; numbers.len()];
+    for (first, count) in runs {
+        is_first_of_mode[first] = count == highest;
+    }
+    let modes: Vec<Value> = numbers
+        .iter()
+        .zip(is_first_of_mode)
+        .filter(|(_, is_mode)| *is_mode)
+        .map(|(&number, _)| Value::number(number))
+        .collect();
+    Ok(EvalMatrix::new(modes.len(), 1, modes))
+}
+
+fn is_reference(ast: &Ast) -> bool {
+    match ast {
+        Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::NamedRange(..)
+        | Ast::Structured(..) => true,
+        Ast::LetSlot { expression, .. } => is_reference(expression),
+        _ => false,
+    }
 }
 
 struct Fit {
@@ -968,6 +1064,36 @@ mod tests {
         store.set_number(sheet, 0, 2, 1.0, 0);
         store.recompute(sheet);
         close(&store, sheet, 3, 5, 2.0, 0.0);
+    }
+
+    #[test]
+    fn mode_mult_returns_every_mode_in_first_occurrence_order() {
+        // https://support.microsoft.com/en-us/office/mode-mult-function-50fd9464-b2ba-4191-b57a-39446689ae8c
+        let (mut store, sheet) = sheet_with_columns(&[
+            &[1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0, 2.0, 3.0, 5.0, 6.0, 1.0],
+            &[7.0, 8.0, 9.0],
+            &[1.0, 0.0, 2.0, 2.0],
+        ]);
+        // A text "1" in a referenced cell is ignored, so only 2 repeats in C1:C4.
+        store.set_string(sheet, 1, 2, "1", 0);
+        store.set_formula(sheet, 0, 4, "=MODE.MULT(A1:A12)", 0);
+        store.set_formula(sheet, 0, 6, "=MODE.MULT(B1:B3)", 0);
+        store.set_formula(sheet, 0, 8, "=MODE.MULT(1,\"1\",TRUE,2)", 0);
+        store.set_formula(sheet, 0, 10, "=MODE.MULT(C1:C4)", 0);
+        store.set_formula(sheet, 0, 12, "=MODE.MULT(A1:A3,1/0)", 0);
+        store.set_formula(sheet, 0, 14, "=MODE.MULT(0,-0,5)", 0);
+        store.recompute(sheet);
+        for (row, expected) in [1.0, 2.0, 3.0].iter().enumerate() {
+            close(&store, sheet, row, 4, *expected, 0.0);
+        }
+        assert!(store.get_cell(sheet, 3, 4).string().is_none());
+        let text = |col| store.get_cell(sheet, 0, col).string();
+        assert_eq!(text(6).as_deref(), Some("#N/A"));
+        // Typed TRUE and "1" count as 1.
+        close(&store, sheet, 0, 8, 1.0, 0.0);
+        close(&store, sheet, 0, 10, 2.0, 0.0);
+        assert_eq!(text(12).as_deref(), Some("#DIV/0!"));
+        close(&store, sheet, 0, 14, 0.0, 0.0);
     }
 
     #[test]

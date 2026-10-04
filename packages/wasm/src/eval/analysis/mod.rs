@@ -219,6 +219,20 @@ pub(super) fn treats_cell_as_reference(name: &str) -> bool {
     family(name).is_some_and(|family| family.reference_cells.contains(&name))
 }
 
+/// Returns the positions `0..count` in stable sorted order.
+///
+/// Every family sorts through this one function. The comparison is a trait
+/// object, so the binary holds one copy of the sort instead of one copy per
+/// call site. The comparison cost is small next to comparing cell values.
+pub(super) fn sorted_positions(
+    count: usize,
+    compare: &mut dyn FnMut(usize, usize) -> std::cmp::Ordering,
+) -> Vec<usize> {
+    let mut positions: Vec<usize> = (0..count).collect();
+    positions.sort_by(|&left, &right| compare(left, right));
+    positions
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
