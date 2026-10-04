@@ -82,11 +82,11 @@ export function renderFullEngineEvidence(
     "",
     "#### WASM size and Node initialization",
     "",
-    "| Engine | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |",
-    "| --- | ---: | ---: | ---: | ---: |",
+    "| Engine | Node | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
     ...full.engines.map(
       (engine) =>
-        `| ${engine.engine} | ${engine.wasm.rawBytes.toLocaleString("en-US")} | ${engine.wasm.brotliBytes.toLocaleString("en-US")} | ${engine.initialization.stat.median.toFixed(4)} | ${engine.initialization.stat.p95.toFixed(4)} |`,
+        `| ${engine.engine} | ${engine.initialization.node} | ${engine.wasm.rawBytes.toLocaleString("en-US")} | ${engine.wasm.brotliBytes.toLocaleString("en-US")} | ${engine.initialization.stat.median.toFixed(4)} | ${engine.initialization.stat.p95.toFixed(4)} |`,
     ),
     "",
     "Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.",

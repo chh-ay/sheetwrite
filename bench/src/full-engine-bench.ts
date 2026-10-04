@@ -39,10 +39,10 @@ interface EngineCapture {
   engine: (typeof ENGINE_IDS)[number];
   shared: CompleteFormulaBenchmarkResult;
   wasm: { rawBytes: number; brotliBytes: number; sha256: string };
-  initialization: { samplesMs: number[]; stat: Stat };
+  initialization: { node: string; samplesMs: number[]; stat: Stat };
 }
 export interface FullEngineResult {
-  schemaVersion: 1;
+  schemaVersion: 2;
   meta: ProtocolCaptureMeta;
   sourceFiles: Record<string, string>;
   sourceDigest: string;
@@ -97,7 +97,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     new Date(result.meta.timestamp).toISOString() !== result.meta.timestamp
   )
     throw new Error("invalid engine metadata");
-  if (result.schemaVersion !== 1 || result.initializationMethod !== INIT_METHOD)
+  if (result.schemaVersion !== 2 || result.initializationMethod !== INIT_METHOD)
     throw new Error("engine protocol mismatch");
   exactKeys(result.sourceFiles, SOURCE_PATHS, "engine source files");
   if (
@@ -131,7 +131,13 @@ export function validateFullEngineResult(result: FullEngineResult): void {
       capture.wasm.rawBytes < capture.wasm.brotliBytes
     )
       throw new Error("engine wasm evidence mismatch");
-    exactKeys(capture.initialization, ["samplesMs", "stat"], "engine initialization fields");
+    exactKeys(
+      capture.initialization,
+      ["node", "samplesMs", "stat"],
+      "engine initialization fields",
+    );
+    if (!/^v\d+\.\d+\.\d+$/u.test(capture.initialization.node))
+      throw new Error("invalid initialization Node version");
     if (capture.initialization.samplesMs.length !== SAMPLE_COUNT)
       throw new Error("missing initialization samples");
     validateRawStat(
@@ -256,15 +262,17 @@ async function capture(): Promise<void> {
   const meta = protocolCaptureMeta();
   const engines: EngineCapture[] = [];
   for (const engine of ENGINE_IDS) {
-    const output = new URL(`../results/formula-${engine}-results.json`, import.meta.url).pathname;
-    const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", output], {
+    // Keep tracked results unchanged until both engines and all checks finish.
+    const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", "/dev/stdout"], {
       cwd: new URL("..", import.meta.url).pathname,
       env: { ...process.env, SHEETWRITE_BENCH_ENGINE: engine },
       stdout: "pipe",
       stderr: "inherit",
     });
     if (child.exitCode !== 0) throw new Error(`${engine} shared capture failed`);
-    const shared = JSON.parse(readFileSync(output, "utf8")) as CompleteFormulaBenchmarkResult;
+    const lastLine = child.stdout.toString().trim().split("\n").at(-1);
+    if (!lastLine) throw new Error(`${engine} shared capture returned no evidence`);
+    const shared = JSON.parse(lastLine) as CompleteFormulaBenchmarkResult;
     const bytes = readFileSync(
       new URL(
         `../../packages/${engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`,
@@ -272,13 +280,21 @@ async function capture(): Promise<void> {
       ),
     );
     const samplesMs: number[] = [];
+    let node = "";
     for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
       const initialized = Bun.spawnSync(
         ["node", new URL("./node-engine-init.mjs", import.meta.url).pathname, engine],
         { stdout: "pipe", stderr: "inherit" },
       );
       if (initialized.exitCode !== 0) throw new Error(`${engine} Node initialization failed`);
-      samplesMs.push(Number(initialized.stdout.toString()));
+      const probe = JSON.parse(initialized.stdout.toString()) as {
+        elapsedMs: number;
+        node: string;
+      };
+      if (node !== "" && node !== probe.node)
+        throw new Error("Node version changed during capture");
+      node = probe.node;
+      samplesMs.push(probe.elapsedMs);
     }
     engines.push({
       engine,
@@ -289,7 +305,7 @@ async function capture(): Promise<void> {
           .length,
         sha256: hash(bytes),
       },
-      initialization: { samplesMs, stat: summarize(samplesMs) },
+      initialization: { node, samplesMs, stat: summarize(samplesMs) },
     });
   }
   await initSheetwrite(undefined, formulas);
@@ -309,7 +325,7 @@ async function capture(): Promise<void> {
     ]),
   );
   const result: FullEngineResult = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     meta,
     sourceFiles,
     sourceDigest: sourceDigest({ meta, sourceFiles }),
@@ -318,6 +334,12 @@ async function capture(): Promise<void> {
     analysis,
   };
   validateFullEngineResult(result);
+  for (const capture of engines) {
+    await Bun.write(
+      new URL(`../results/formula-${capture.engine}-results.json`, import.meta.url),
+      `${JSON.stringify(capture.shared, null, 2)}\n`,
+    );
+  }
   await Bun.write(
     new URL("../results/full-engine-results.json", import.meta.url),
     `${JSON.stringify(result, null, 2)}\n`,

@@ -6,4 +6,6 @@ if (engine !== "default" && engine !== "full") throw new Error("Expected default
 const formulas = engine === "full" ? await import("@sheetwrite/formulas") : undefined;
 const started = performance.now();
 await initSheetwrite(undefined, formulas);
-process.stdout.write(`${performance.now() - started}\n`);
+process.stdout.write(
+  `${JSON.stringify({ elapsedMs: performance.now() - started, node: process.version })}\n`,
+);
