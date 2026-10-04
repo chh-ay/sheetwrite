@@ -1,9 +1,13 @@
 //! Optional function families for the complete analysis engine.
 
+mod aggregate;
+mod database;
 mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
+mod math;
+mod matrices;
 mod regression;
 mod text;
 
@@ -41,8 +45,7 @@ pub(super) type MatrixEvaluator = fn(
 
 pub(super) type ShapeEvaluator =
     fn(&CellStore, &str, &[Ast], usize) -> Result<(usize, usize, usize), FormulaError>;
-pub(super) type BoundEvaluator =
-    fn(&CellStore, &str, &[Ast], usize) -> Result<usize, FormulaError>;
+pub(super) type BoundEvaluator = fn(&CellStore, &str, &[Ast], usize) -> Result<usize, FormulaError>;
 
 /// Array hooks must use the same shape, byte and work limits as built-in arrays.
 pub(super) struct ArrayHooks {
@@ -65,6 +68,20 @@ pub(super) struct Family {
 }
 
 const FAMILIES: &[Family] = &[
+    Family {
+        names: aggregate::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(aggregate::evaluate_ast),
+        array: None,
+    },
+    Family {
+        names: database::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(database::evaluate_ast),
+        array: None,
+    },
     Family {
         names: dates::NAMES,
         reference_cells: &[],
@@ -94,15 +111,22 @@ const FAMILIES: &[Family] = &[
         array: None,
     },
     Family {
-        names: text::NAMES,
+        names: math::NAMES,
+        reference_cells: math::REFERENCE_CELLS,
+        evaluate: Some(math::evaluate),
+        evaluate_ast: None,
+        array: None,
+    },
+    Family {
+        names: matrices::NAMES,
         reference_cells: &[],
         evaluate: None,
-        evaluate_ast: Some(text::evaluate_ast),
+        evaluate_ast: Some(matrices::evaluate_ast),
         array: Some(ArrayHooks {
-            produces_array: text::produces_array,
-            shape: text::shape,
-            bound: text::bound,
-            evaluate: text::evaluate_matrix,
+            produces_array: matrices::produces_array,
+            shape: matrices::shape,
+            bound: matrices::bound,
+            evaluate: matrices::evaluate_matrix,
         }),
     },
     Family {
@@ -117,28 +141,52 @@ const FAMILIES: &[Family] = &[
             evaluate: regression::evaluate_array,
         }),
     },
+    Family {
+        names: text::NAMES,
+        reference_cells: &[],
+        evaluate: None,
+        evaluate_ast: Some(text::evaluate_ast),
+        array: Some(ArrayHooks {
+            produces_array: text::produces_array,
+            shape: text::shape,
+            bound: text::bound,
+            evaluate: text::evaluate_matrix,
+        }),
+    },
 ];
 
 pub(crate) fn lookup(input: &str) -> Option<&'static str> {
     // Compare bytes without allocating an uppercase copy of the input.
     FAMILIES.iter().find_map(|family| {
-        family.names.binary_search_by(|name| {
-            name.bytes().cmp(input.bytes().map(|byte| byte.to_ascii_uppercase()))
-        }).ok().map(|index| family.names[index])
+        family
+            .names
+            .binary_search_by(|name| {
+                name.bytes()
+                    .cmp(input.bytes().map(|byte| byte.to_ascii_uppercase()))
+            })
+            .ok()
+            .map(|index| family.names[index])
     })
 }
 
 pub(crate) fn names() -> impl Iterator<Item = &'static str> {
-    FAMILIES.iter().flat_map(|family| family.names.iter().copied())
+    FAMILIES
+        .iter()
+        .flat_map(|family| family.names.iter().copied())
 }
 
 pub(super) fn family(name: &str) -> Option<&'static Family> {
-    FAMILIES.iter().find(|family| family.names.binary_search(&name).is_ok())
+    FAMILIES
+        .iter()
+        .find(|family| family.names.binary_search(&name).is_ok())
 }
 
 pub(super) fn evaluate_scalar(name: &str, values: &FuncAccumulator) -> EvalResult {
-    family(name).and_then(|family| family.evaluate)
-        .map_or(Value::Error(FormulaError::Name), |evaluate| evaluate(name, values))
+    family(name)
+        .and_then(|family| family.evaluate)
+        .map_or(Value::Error(FormulaError::Name), |evaluate| {
+            evaluate(name, values)
+        })
 }
 
 pub(super) fn treats_cell_as_reference(name: &str) -> bool {
@@ -153,15 +201,32 @@ mod tests {
     fn family_tables_are_sorted_and_each_name_has_one_owner() {
         for family in FAMILIES {
             // `lookup` and `family` use binary search over each table.
-            assert!(family.names.windows(2).all(|pair| pair[0] < pair[1]), "{:?}", family.names);
-            assert!(family.evaluate.is_some() || family.evaluate_ast.is_some() || family.array.is_some());
+            assert!(
+                family.names.windows(2).all(|pair| pair[0] < pair[1]),
+                "{:?}",
+                family.names
+            );
+            assert!(
+                family.evaluate.is_some()
+                    || family.evaluate_ast.is_some()
+                    || family.array.is_some()
+            );
         }
         for name in names() {
             let owner = family(name).expect("every name has a family");
-            assert!(owner.reference_cells.iter().all(|cell| owner.names.contains(cell)));
-            let owners = FAMILIES.iter().filter(|family| family.names.contains(&name)).count();
+            assert!(owner
+                .reference_cells
+                .iter()
+                .all(|cell| owner.names.contains(cell)));
+            let owners = FAMILIES
+                .iter()
+                .filter(|family| family.names.contains(&name))
+                .count();
             assert_eq!(owners, 1, "{name}");
-            assert!(family(name).is_some_and(|owner| owner.names.contains(&name)), "{name}");
+            assert!(
+                family(name).is_some_and(|owner| owner.names.contains(&name)),
+                "{name}"
+            );
         }
     }
 }

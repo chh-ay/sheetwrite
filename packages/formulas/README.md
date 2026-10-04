@@ -26,6 +26,14 @@ The package exports the generated engine API, `load(source?)`, and `isLoaded()`.
 
 `@sheetwrite/formulas/wasm` exports the raw binary for custom asset handling. Normal apps should use zero-argument loading.
 
+## Database and math functions
+
+The full engine includes database functions with header-based fields and criteria tables. Criteria columns use AND. Criteria rows use OR. Text criteria are case-insensitive and support `*`, `?`, and `~`. Criteria cells can contain formulas that return comparison values. Custom formula predicates under headers that are not database fields are not supported.
+
+The full engine also includes more math functions and matrix functions. `MMULT`, `MINVERSE`, and `MUNIT` return spill arrays and use the engine's shape, memory, and work limits. `MDETERM` returns a scalar.
+
+`AGGREGATE` supports reference-form and array-form operations and error-ignore options. The engine has no hidden-row state, so options that ignore hidden rows have no effect.
+
 ## Contributors
 
 The Rust source is in `../wasm`. Do not add a second Rust crate here. Keep this package version aligned with `@sheetwrite/wasm` and keep its loader contract the same.

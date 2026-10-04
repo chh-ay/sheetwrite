@@ -68,6 +68,11 @@
       "title": "Formula operators",
       "source": "microsoft-excel-operators",
       "section": "Types of operators"
+    },
+    "database": {
+      "title": "Database",
+      "source": "microsoft-excel-functions",
+      "section": "Database functions"
     }
   },
   "signatureProfiles": {
@@ -2981,6 +2986,160 @@
         }
       ],
       "returns": "scalar"
+    },
+    "database": {
+      "arguments": [
+        {
+          "name": "database",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "field",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "criteria",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "round-math": {
+      "arguments": [
+        {
+          "name": "number",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "significance",
+          "required": false,
+          "default": 1,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "mode",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "series-sum": {
+      "arguments": [
+        {
+          "name": "x",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "n",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "m",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "coefficients",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "aggregate": {
+      "arguments": [
+        {
+          "name": "functionNumber",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "options",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "reference",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "one-or-more"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "matrix-pair": {
+      "arguments": [
+        {
+          "name": "array1",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "array2",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "matrix-unary": {
+      "arguments": [
+        {
+          "name": "array",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "matrix-unit": {
+      "arguments": [
+        {
+          "name": "dimension",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
     }
   },
   "semanticsProfiles": {
@@ -3838,6 +3997,96 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "analysis-math": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "function-defined"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "analysis-database": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "function-defined"
+      },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "supported"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -3884,6 +4133,24 @@
       "openFormula": "unverified",
       "divergences": [
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
+      ]
+    },
+    "analysis-math": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits."
+      ]
+    },
+    "analysis-database": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
+        "Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported."
       ]
     }
   },
@@ -4051,6 +4318,46 @@
           "packages/wasm/src/eval/analysis/regression.rs",
           "scripts/formula-contract.test.ts"
         ]
+      }
+    },
+    "analysis-math": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/analysis/math.rs",
+          "packages/wasm/src/eval/analysis/aggregate.rs",
+          "packages/wasm/src/eval/analysis/matrices.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-database": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/database.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
       }
     }
   },
@@ -7144,6 +7451,390 @@
       "semantics": "analysis-regression",
       "dialects": "analysis-regression",
       "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DAVERAGE",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DCOUNT",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DCOUNTA",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DGET",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DMAX",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DMIN",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DPRODUCT",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DSTDEV",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DSTDEVP",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DSUM",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DVAR",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "DVARP",
+      "aliases": [],
+      "family": "database",
+      "contractStatus": "supported",
+      "signature": "database",
+      "semantics": "analysis-database",
+      "dialects": "analysis-database",
+      "implementation": "analysis-database",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "AGGREGATE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "aggregate",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "CEILING.MATH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "round-math",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COMBIN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "COMBINA",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FACT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FACTDOUBLE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FLOOR.MATH",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "round-math",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MDETERM",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "array-unary",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MINVERSE",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "matrix-unary",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MMULT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "matrix-pair",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MULTINOMIAL",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "MUNIT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "matrix-unit",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERMUT",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERMUTATIONA",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "binary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SERIESSUM",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "series-sum",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SQRTPI",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "unary-number",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SUMSQ",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "variadic-values",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SUMX2MY2",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SUMX2PY2",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "SUMXMY2",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "pair-arrays",
+      "semantics": "analysis-math",
+      "dialects": "analysis-math",
+      "implementation": "analysis-math",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
