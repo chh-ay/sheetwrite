@@ -1,9 +1,9 @@
 //! Least-squares arrays, FREQUENCY, MODE.MULT, PROB and legacy statistical names.
 
+use super::super::array::ast_produces_array;
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
-use super::super::array::ast_produces_array;
 use super::super::value::{aggregate_number, bool_from_value};
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
@@ -71,7 +71,10 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
-    matches!(name, "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND")
+    matches!(
+        name,
+        "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND"
+    )
 }
 
 fn argument_shape(
@@ -400,12 +403,12 @@ fn numeric_values(matrix: &EvalMatrix) -> Result<Vec<f64>, FormulaError> {
 fn frequency(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let numbers = numeric_values(&evaluation.matrix(&args[0])?)?;
     let bins = numeric_values(&evaluation.matrix(&args[1])?)?;
-    let mut order: Vec<usize> = (0..bins.len()).collect();
-    order.sort_by(|&left, &right| {
+    let order = super::sorted_positions(bins.len(), &mut |left, right| {
         bins[left]
             .partial_cmp(&bins[right])
             .unwrap_or(Ordering::Equal)
     });
+    // Each data value searches the bins. Keep those repeated reads contiguous.
     let sorted_bins: Vec<f64> = order.iter().map(|&index| bins[index]).collect();
     let mut counts = vec![0.0; bins.len() + 1];
     for number in numbers {
@@ -606,10 +609,11 @@ fn fit(
             *number -= mean;
         }
     }
-    let centered: Vec<f64> = responses
-        .iter()
-        .map(|response| response - response_mean)
-        .collect();
+    // Raw responses are no longer needed. Reuse their buffer for centering.
+    for response in &mut responses {
+        *response -= response_mean;
+    }
+    let centered = responses;
     let total_ss = centered.iter().map(|response| response * response).sum();
     // Reorthogonalized QR drops dependent columns. Their coefficients and errors are zero.
     let mut orthogonal: Vec<Vec<f64>> = Vec::new();

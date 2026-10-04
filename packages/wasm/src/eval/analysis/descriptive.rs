@@ -1,14 +1,30 @@
 //! Descriptive statistics, ranking and simple linear regression.
 
-use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 use super::super::functions::{
     integer_arg, number_arg, numeric_entries, require_arity, FuncAccumulator, FuncValue,
 };
+use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
 pub(crate) const NAMES: &[&str] = &[
-    "AVEDEV", "DEVSQ", "FORECAST", "FORECAST.LINEAR", "HARMEAN", "INTERCEPT", "KURT",
-    "PEARSON", "PERCENTILE.EXC", "PERCENTRANK.EXC", "PERCENTRANK.INC", "QUARTILE.EXC",
-    "RANK.AVG", "RSQ", "SKEW", "SKEW.P", "SLOPE", "STEYX", "TRIMMEAN",
+    "AVEDEV",
+    "DEVSQ",
+    "FORECAST",
+    "FORECAST.LINEAR",
+    "HARMEAN",
+    "INTERCEPT",
+    "KURT",
+    "PEARSON",
+    "PERCENTILE.EXC",
+    "PERCENTRANK.EXC",
+    "PERCENTRANK.INC",
+    "QUARTILE.EXC",
+    "RANK.AVG",
+    "RSQ",
+    "SKEW",
+    "SKEW.P",
+    "SLOPE",
+    "STEYX",
+    "TRIMMEAN",
 ];
 
 /// Functions whose arguments are number lists: a single-cell argument is a
@@ -20,7 +36,11 @@ type NumberResult = Result<f64, FormulaError>;
 
 pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
     calculate(name, values).map_or_else(Value::Error, |number| {
-        if number.is_finite() { Value::number(number) } else { Value::Error(FormulaError::Num) }
+        if number.is_finite() {
+            Value::number(number)
+        } else {
+            Value::Error(FormulaError::Num)
+        }
     })
 }
 
@@ -40,11 +60,17 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
         }
         "TRIMMEAN" => {
             require_arity(values, 2, 2)?;
-            trimmed_mean(numbers(values.arg(0).unwrap_or_default())?, number_arg(values, 1, None)?)
+            trimmed_mean(
+                numbers(values.arg(0).unwrap_or_default())?,
+                number_arg(values, 1, None)?,
+            )
         }
         "PERCENTILE.EXC" => {
             require_arity(values, 2, 2)?;
-            percentile_exclusive(numbers(values.arg(0).unwrap_or_default())?, number_arg(values, 1, None)?)
+            percentile_exclusive(
+                numbers(values.arg(0).unwrap_or_default())?,
+                number_arg(values, 1, None)?,
+            )
         }
         "QUARTILE.EXC" => {
             require_arity(values, 2, 2)?;
@@ -52,7 +78,10 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             if !(1..=3).contains(&quartile) {
                 return Err(FormulaError::Num);
             }
-            percentile_exclusive(numbers(values.arg(0).unwrap_or_default())?, quartile as f64 * 0.25)
+            percentile_exclusive(
+                numbers(values.arg(0).unwrap_or_default())?,
+                quartile as f64 * 0.25,
+            )
         }
         "PERCENTRANK.INC" | "PERCENTRANK.EXC" => {
             require_arity(values, 2, 3)?;
@@ -74,7 +103,10 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
         "PEARSON" | "RSQ" | "SLOPE" | "INTERCEPT" | "STEYX" => {
             require_arity(values, 2, 2)?;
             // PEARSON takes (array1, array2); the others take (known_y, known_x).
-            let fit = Fit::from_pairs(values.arg(1).unwrap_or_default(), values.arg(0).unwrap_or_default())?;
+            let fit = Fit::from_pairs(
+                values.arg(1).unwrap_or_default(),
+                values.arg(0).unwrap_or_default(),
+            )?;
             match name {
                 "PEARSON" => fit.correlation(),
                 "RSQ" => fit.correlation().map(|r| r * r),
@@ -86,7 +118,10 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
         "FORECAST" | "FORECAST.LINEAR" => {
             require_arity(values, 3, 3)?;
             let x = number_arg(values, 0, None)?;
-            let fit = Fit::from_pairs(values.arg(2).unwrap_or_default(), values.arg(1).unwrap_or_default())?;
+            let fit = Fit::from_pairs(
+                values.arg(2).unwrap_or_default(),
+                values.arg(1).unwrap_or_default(),
+            )?;
             Ok(fit.intercept()? + fit.slope()? * x)
         }
         _ => Err(FormulaError::Name),
@@ -111,31 +146,53 @@ fn moments(numbers: &[f64]) -> Result<Moments, FormulaError> {
     if numbers.is_empty() {
         return Err(FormulaError::Num);
     }
-    let mut result = Moments { count: 0.0, mean: 0.0, m2: 0.0 };
+    let mut result = Moments {
+        count: 0.0,
+        mean: 0.0,
+        m2: 0.0,
+    };
     for &value in numbers {
         result.count += 1.0;
         let delta = value - result.mean;
         result.mean += delta / result.count;
         result.m2 += delta * (value - result.mean);
     }
-    if result.mean.is_finite() && result.m2.is_finite() { Ok(result) } else { Err(FormulaError::Num) }
+    if result.mean.is_finite() && result.m2.is_finite() {
+        Ok(result)
+    } else {
+        Err(FormulaError::Num)
+    }
 }
 
 fn average_deviation(numbers: &[f64]) -> NumberResult {
     let mean = moments(numbers)?.mean;
-    Ok(numbers.iter().map(|value| (value - mean).abs()).sum::<f64>() / numbers.len() as f64)
+    Ok(numbers
+        .iter()
+        .map(|value| (value - mean).abs())
+        .sum::<f64>()
+        / numbers.len() as f64)
 }
 
 fn harmonic_mean(numbers: &[f64]) -> NumberResult {
-    if numbers.is_empty() || numbers.iter().any(|&value| value <= 0.0) {
+    if numbers.is_empty() {
         return Err(FormulaError::Num);
     }
-    Ok(numbers.len() as f64 / numbers.iter().map(|value| 1.0 / value).sum::<f64>())
+    let mut reciprocals = 0.0;
+    for &number in numbers {
+        if number <= 0.0 {
+            return Err(FormulaError::Num);
+        }
+        reciprocals += 1.0 / number;
+    }
+    Ok(numbers.len() as f64 / reciprocals)
 }
 
 /// Sum of standardized powers `((x - mean) / deviation)^power`.
 fn standardized_sum(numbers: &[f64], mean: f64, deviation: f64, power: i32) -> f64 {
-    numbers.iter().map(|value| ((value - mean) / deviation).powi(power)).sum()
+    numbers
+        .iter()
+        .map(|value| ((value - mean) / deviation).powi(power))
+        .sum()
 }
 
 fn skewness(numbers: &[f64], sample: bool) -> NumberResult {
@@ -169,6 +226,7 @@ fn trimmed_mean(mut numbers: Vec<f64>, percent: f64) -> NumberResult {
     }
     // Excel drops floor(n * percent / 2) points from each end.
     let drop = (numbers.len() as f64 * percent / 2.0).floor() as usize;
+    // This plain-number sort shares the default engine's f64 instantiation.
     numbers.sort_unstable_by(f64::total_cmp);
     let kept = &numbers[drop..numbers.len() - drop];
     Ok(kept.iter().sum::<f64>() / kept.len() as f64)
@@ -187,22 +245,39 @@ fn percentile_exclusive(mut numbers: Vec<f64>, fraction: f64) -> NumberResult {
     Ok(base + (rank - lower as f64) * (next - base))
 }
 
-fn percent_rank(mut numbers: Vec<f64>, target: f64, exclusive: bool, significance: i64) -> NumberResult {
+fn percent_rank(
+    numbers: Vec<f64>,
+    target: f64,
+    exclusive: bool,
+    significance: i64,
+) -> NumberResult {
     if numbers.is_empty() {
         return Err(FormulaError::Num);
     }
-    numbers.sort_unstable_by(f64::total_cmp);
-    let (first, last) = (numbers[0], numbers[numbers.len() - 1]);
-    if target < first || target > last {
-        return Err(FormulaError::Na);
+    // Rank needs only the count below the target and its two neighbours.
+    // A scan avoids sorting and does not allocate a position buffer.
+    let mut below = 0usize;
+    let mut has_target = false;
+    let mut lower: Option<f64> = None;
+    let mut upper: Option<f64> = None;
+    for &number in &numbers {
+        if number < target {
+            below += 1;
+            if lower.is_none_or(|previous| number.total_cmp(&previous).is_gt()) {
+                lower = Some(number);
+            }
+        } else if number == target {
+            has_target = true;
+        } else if upper.is_none_or(|previous| number.total_cmp(&previous).is_lt()) {
+            upper = Some(number);
+        }
     }
-    // Position of the target among the sorted values, interpolated between neighbours.
-    let below = numbers.partition_point(|&value| value < target);
-    let position = if numbers[below] == target {
+    let position = if has_target {
         below as f64
     } else {
-        let lower = numbers[below - 1];
-        (below - 1) as f64 + (target - lower) / (numbers[below] - lower)
+        let lower = lower.ok_or(FormulaError::Na)?;
+        let upper = upper.ok_or(FormulaError::Na)?;
+        (below - 1) as f64 + (target - lower) / (upper - lower)
     };
     let count = numbers.len() as f64;
     let rank = if exclusive {
@@ -218,14 +293,19 @@ fn percent_rank(mut numbers: Vec<f64>, target: f64, exclusive: bool, significanc
 }
 
 fn rank_average(numbers: &[f64], target: f64, ascending: bool) -> NumberResult {
-    let ties = numbers.iter().filter(|&&value| value == target).count();
+    let mut ties = 0usize;
+    let mut before = 0usize;
+    for &number in numbers {
+        ties += usize::from(number == target);
+        before += usize::from(if ascending {
+            number < target
+        } else {
+            number > target
+        });
+    }
     if ties == 0 {
         return Err(FormulaError::Na);
     }
-    let before = numbers
-        .iter()
-        .filter(|&&value| if ascending { value < target } else { value > target })
-        .count();
     // Tied values share the average of the ranks they occupy.
     Ok(before as f64 + (ties as f64 + 1.0) / 2.0)
 }
@@ -245,7 +325,14 @@ impl Fit {
         if xs.len() != ys.len() {
             return Err(FormulaError::Na);
         }
-        let mut fit = Fit { count: 0.0, mean_x: 0.0, mean_y: 0.0, sxx: 0.0, syy: 0.0, sxy: 0.0 };
+        let mut fit = Fit {
+            count: 0.0,
+            mean_x: 0.0,
+            mean_y: 0.0,
+            sxx: 0.0,
+            syy: 0.0,
+            sxy: 0.0,
+        };
         for (x, y) in xs.iter().zip(ys) {
             match (&x.value, &y.value) {
                 (Value::Error(error), _) | (_, Value::Error(error)) => return Err(*error),
@@ -331,7 +418,10 @@ mod tests {
     fn assert_close(name: &str, args: Vec<Arg>, expected: f64, tolerance: f64) {
         match number(name, args) {
             Value::Number(actual) => {
-                assert!((actual - expected).abs() <= tolerance, "{name}: {actual} vs {expected}");
+                assert!(
+                    (actual - expected).abs() <= tolerance,
+                    "{name}: {actual} vs {expected}"
+                );
             }
             other => panic!("{name}: expected {expected}, got {other:?}"),
         }
@@ -347,27 +437,53 @@ mod tests {
         assert_close("SKEW", vec![array_arg(&skew_data)], 0.359543, 1e-6);
         assert_close("SKEW.P", vec![array_arg(&skew_data)], 0.303193, 1e-6);
         assert_close("KURT", vec![array_arg(&skew_data)], -0.151799637, 1e-9);
-        assert_close("AVEDEV", vec![array_arg(&[4.0, 5.0, 6.0, 7.0, 5.0, 4.0, 3.0])], 1.020408163, 1e-9);
+        assert_close(
+            "AVEDEV",
+            vec![array_arg(&[4.0, 5.0, 6.0, 7.0, 5.0, 4.0, 3.0])],
+            1.020408163,
+            1e-9,
+        );
         let devsq = [4.0, 5.0, 8.0, 7.0, 11.0, 4.0, 3.0];
         assert_close("DEVSQ", vec![array_arg(&devsq)], 48.0, 0.0);
         assert_close("HARMEAN", vec![array_arg(&devsq)], 5.028376, 1e-6);
         let trim = [4.0, 5.0, 6.0, 7.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0];
-        assert_close("TRIMMEAN", vec![array_arg(&trim), scalar_arg(0.2)], 3.777777778, 1e-9);
+        assert_close(
+            "TRIMMEAN",
+            vec![array_arg(&trim), scalar_arg(0.2)],
+            3.777777778,
+            1e-9,
+        );
 
         let ys = [2.0, 3.0, 9.0, 1.0, 8.0, 7.0, 5.0];
         let xs = [6.0, 5.0, 11.0, 7.0, 5.0, 4.0, 4.0];
-        assert_close("SLOPE", vec![array_arg(&ys), array_arg(&xs)], 0.305556, 1e-6);
+        assert_close(
+            "SLOPE",
+            vec![array_arg(&ys), array_arg(&xs)],
+            0.305556,
+            1e-6,
+        );
         assert_close("RSQ", vec![array_arg(&ys), array_arg(&xs)], 0.05795, 1e-5);
-        assert_close("STEYX", vec![array_arg(&ys), array_arg(&xs)], 3.305719, 1e-6);
+        assert_close(
+            "STEYX",
+            vec![array_arg(&ys), array_arg(&xs)],
+            3.305719,
+            1e-6,
+        );
         assert_close(
             "INTERCEPT",
-            vec![array_arg(&[2.0, 3.0, 9.0, 1.0, 8.0]), array_arg(&[6.0, 5.0, 11.0, 7.0, 5.0])],
+            vec![
+                array_arg(&[2.0, 3.0, 9.0, 1.0, 8.0]),
+                array_arg(&[6.0, 5.0, 11.0, 7.0, 5.0]),
+            ],
             0.0483871,
             1e-7,
         );
         assert_close(
             "PEARSON",
-            vec![array_arg(&[9.0, 7.0, 5.0, 3.0, 1.0]), array_arg(&[10.0, 6.0, 1.0, 5.0, 3.0])],
+            vec![
+                array_arg(&[9.0, 7.0, 5.0, 3.0, 1.0]),
+                array_arg(&[10.0, 6.0, 1.0, 5.0, 3.0]),
+            ],
             0.699379,
             1e-6,
         );
@@ -379,17 +495,49 @@ mod tests {
         assert_close("FORECAST.LINEAR", forecast, 10.607253, 1e-6);
 
         let exc = [1.0, 2.0, 3.0, 6.0, 6.0, 6.0, 7.0, 8.0, 9.0];
-        assert_close("PERCENTILE.EXC", vec![array_arg(&exc), scalar_arg(0.25)], 2.5, 0.0);
-        let quartiles = [6.0, 7.0, 15.0, 36.0, 39.0, 40.0, 41.0, 42.0, 43.0, 47.0, 49.0];
-        assert_close("QUARTILE.EXC", vec![array_arg(&quartiles), scalar_arg(1.0)], 15.0, 0.0);
-        assert_close("QUARTILE.EXC", vec![array_arg(&quartiles), scalar_arg(3.0)], 43.0, 0.0);
+        assert_close(
+            "PERCENTILE.EXC",
+            vec![array_arg(&exc), scalar_arg(0.25)],
+            2.5,
+            0.0,
+        );
+        let quartiles = [
+            6.0, 7.0, 15.0, 36.0, 39.0, 40.0, 41.0, 42.0, 43.0, 47.0, 49.0,
+        ];
+        assert_close(
+            "QUARTILE.EXC",
+            vec![array_arg(&quartiles), scalar_arg(1.0)],
+            15.0,
+            0.0,
+        );
+        assert_close(
+            "QUARTILE.EXC",
+            vec![array_arg(&quartiles), scalar_arg(3.0)],
+            43.0,
+            0.0,
+        );
 
         let inc = [13.0, 12.0, 11.0, 8.0, 4.0, 3.0, 2.0, 1.0, 1.0, 1.0];
         for (target, expected) in [(2.0, 0.333), (4.0, 0.555), (8.0, 0.666), (5.0, 0.583)] {
-            assert_close("PERCENTRANK.INC", vec![array_arg(&inc), scalar_arg(target)], expected, 0.0);
+            assert_close(
+                "PERCENTRANK.INC",
+                vec![array_arg(&inc), scalar_arg(target)],
+                expected,
+                0.0,
+            );
         }
-        assert_close("PERCENTRANK.EXC", vec![array_arg(&exc), scalar_arg(7.0)], 0.7, 0.0);
-        assert_close("PERCENTRANK.EXC", vec![array_arg(&exc), scalar_arg(5.43)], 0.381, 0.0);
+        assert_close(
+            "PERCENTRANK.EXC",
+            vec![array_arg(&exc), scalar_arg(7.0)],
+            0.7,
+            0.0,
+        );
+        assert_close(
+            "PERCENTRANK.EXC",
+            vec![array_arg(&exc), scalar_arg(5.43)],
+            0.381,
+            0.0,
+        );
         assert_close(
             "PERCENTRANK.EXC",
             vec![array_arg(&exc), scalar_arg(5.43), scalar_arg(1.0)],
@@ -397,16 +545,36 @@ mod tests {
             0.0,
         );
         let temperatures = [89.0, 88.0, 92.0, 101.0, 94.0, 97.0, 95.0];
-        assert_close("RANK.AVG", vec![scalar_arg(94.0), array_arg(&temperatures)], 4.0, 0.0);
+        assert_close(
+            "RANK.AVG",
+            vec![scalar_arg(94.0), array_arg(&temperatures)],
+            4.0,
+            0.0,
+        );
     }
 
     #[test]
     fn ties_rank_at_their_average_position() {
         let values = [1.0, 3.0, 3.0, 5.0];
         // Descending: 5 is first, the two 3s share places 2 and 3.
-        assert_close("RANK.AVG", vec![scalar_arg(3.0), array_arg(&values)], 2.5, 0.0);
-        assert_close("RANK.AVG", vec![scalar_arg(3.0), array_arg(&values), scalar_arg(1.0)], 2.5, 0.0);
-        assert_close("RANK.AVG", vec![scalar_arg(5.0), array_arg(&values), scalar_arg(1.0)], 4.0, 0.0);
+        assert_close(
+            "RANK.AVG",
+            vec![scalar_arg(3.0), array_arg(&values)],
+            2.5,
+            0.0,
+        );
+        assert_close(
+            "RANK.AVG",
+            vec![scalar_arg(3.0), array_arg(&values), scalar_arg(1.0)],
+            2.5,
+            0.0,
+        );
+        assert_close(
+            "RANK.AVG",
+            vec![scalar_arg(5.0), array_arg(&values), scalar_arg(1.0)],
+            4.0,
+            0.0,
+        );
     }
 
     #[test]
@@ -414,18 +582,62 @@ mod tests {
         let short = [1.0, 2.0];
         let cases: Vec<(&str, Vec<Arg>, FormulaError)> = vec![
             ("SKEW", vec![array_arg(&short)], FormulaError::DivZero),
-            ("KURT", vec![array_arg(&[1.0, 2.0, 3.0])], FormulaError::DivZero),
-            ("SKEW.P", vec![array_arg(&[4.0, 4.0, 4.0])], FormulaError::DivZero),
+            (
+                "KURT",
+                vec![array_arg(&[1.0, 2.0, 3.0])],
+                FormulaError::DivZero,
+            ),
+            (
+                "SKEW.P",
+                vec![array_arg(&[4.0, 4.0, 4.0])],
+                FormulaError::DivZero,
+            ),
             ("HARMEAN", vec![array_arg(&[1.0, 0.0])], FormulaError::Num),
-            ("TRIMMEAN", vec![array_arg(&short), scalar_arg(1.0)], FormulaError::Num),
-            ("PERCENTILE.EXC", vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(0.1)], FormulaError::Num),
-            ("QUARTILE.EXC", vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(4.0)], FormulaError::Num),
-            ("PERCENTRANK.INC", vec![array_arg(&short), scalar_arg(9.0)], FormulaError::Na),
-            ("PERCENTRANK.INC", vec![array_arg(&short), scalar_arg(1.0), scalar_arg(0.0)], FormulaError::Num),
-            ("RANK.AVG", vec![scalar_arg(9.0), array_arg(&short)], FormulaError::Na),
-            ("SLOPE", vec![array_arg(&short), array_arg(&[1.0])], FormulaError::Na),
-            ("SLOPE", vec![array_arg(&short), array_arg(&[3.0, 3.0])], FormulaError::DivZero),
-            ("STEYX", vec![array_arg(&short), array_arg(&[1.0, 2.0])], FormulaError::DivZero),
+            (
+                "TRIMMEAN",
+                vec![array_arg(&short), scalar_arg(1.0)],
+                FormulaError::Num,
+            ),
+            (
+                "PERCENTILE.EXC",
+                vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(0.1)],
+                FormulaError::Num,
+            ),
+            (
+                "QUARTILE.EXC",
+                vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(4.0)],
+                FormulaError::Num,
+            ),
+            (
+                "PERCENTRANK.INC",
+                vec![array_arg(&short), scalar_arg(9.0)],
+                FormulaError::Na,
+            ),
+            (
+                "PERCENTRANK.INC",
+                vec![array_arg(&short), scalar_arg(1.0), scalar_arg(0.0)],
+                FormulaError::Num,
+            ),
+            (
+                "RANK.AVG",
+                vec![scalar_arg(9.0), array_arg(&short)],
+                FormulaError::Na,
+            ),
+            (
+                "SLOPE",
+                vec![array_arg(&short), array_arg(&[1.0])],
+                FormulaError::Na,
+            ),
+            (
+                "SLOPE",
+                vec![array_arg(&short), array_arg(&[3.0, 3.0])],
+                FormulaError::DivZero,
+            ),
+            (
+                "STEYX",
+                vec![array_arg(&short), array_arg(&[1.0, 2.0])],
+                FormulaError::DivZero,
+            ),
         ];
         for (name, args, error) in cases {
             assert_eq!(number(name, args), Value::Error(error), "{name}");
@@ -434,7 +646,10 @@ mod tests {
 
     #[test]
     fn regression_skips_pairs_with_non_numbers() {
-        let ys: Arg = (true, vec![Value::number(2.0), Value::text("n/a"), Value::number(6.0)]);
+        let ys: Arg = (
+            true,
+            vec![Value::number(2.0), Value::text("n/a"), Value::number(6.0)],
+        );
         let xs = array_arg(&[1.0, 2.0, 3.0]);
         // Only (1, 2) and (3, 6) remain: slope 2, intercept 0.
         assert_close("SLOPE", vec![ys.clone(), xs.clone()], 2.0, 1e-12);
@@ -457,6 +672,9 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(store.get_cell(sheet, 0, 2).num(), 0.5);
         assert_eq!(store.get_cell(sheet, 1, 2).num(), 2.0);
-        assert_eq!(store.get_cell(sheet, 2, 2).string().as_deref(), Some("#VALUE!"));
+        assert_eq!(
+            store.get_cell(sheet, 2, 2).string().as_deref(),
+            Some("#VALUE!")
+        );
     }
 }

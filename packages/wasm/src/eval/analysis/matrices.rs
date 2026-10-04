@@ -182,11 +182,16 @@ pub(crate) fn evaluate_matrix(
             check_work(rows, inner, cols)?;
             EvalMatrix::validate_shape(rows, cols, 1, 0)?;
             let mut product = zeros(rows * cols)?;
-            for row in 0..rows {
-                for col in 0..cols {
-                    product[row * cols + col] = (0..inner)
-                        .map(|step| left[row * inner + step] * right[step * cols + col])
-                        .sum();
+            // Iterator sums start at -0.0. Keep that sign for zero products.
+            product.fill(-0.0);
+            // Read each right-hand row once. Keep the original sum order.
+            for (left_row, product_row) in
+                left.chunks_exact(inner).zip(product.chunks_exact_mut(cols))
+            {
+                for (&factor, right_row) in left_row.iter().zip(right.chunks_exact(cols)) {
+                    for (result, &number) in product_row.iter_mut().zip(right_row) {
+                        *result += factor * number;
+                    }
                 }
             }
             (rows, cols, product)

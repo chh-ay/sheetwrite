@@ -479,7 +479,7 @@ fn reduce(
     }
     let array = context.matrix(&arguments[1])?;
     let mut accumulator = context.scalar(&arguments[0]);
-    let mut results = Vec::with_capacity(if scan { array.values.len() } else { 1 });
+    let mut results = Vec::with_capacity(if scan { array.values.len() } else { 0 });
     for value in &array.values {
         accumulator = context.invoke(&arguments[2], &[literal(&accumulator), literal(value)])?;
         if scan {

@@ -315,19 +315,33 @@ fn fixed(context: &mut Context<'_>, name: &str, args: &[Ast]) -> Result<Value, F
     }
     text_value(output)
 }
-fn serialize(value: &Value, strict: bool) -> Result<String, FormulaError> {
+/// Append directly so ARRAYTOTEXT does not allocate a string for each cell.
+fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), FormulaError> {
     match value {
-        Value::Text(text) if strict => Ok(format!("\"{}\"", text.replace('"', "\"\""))),
-        Value::Error(error) => Ok(error.sentinel().to_string()),
-        Value::Blank if strict => Ok("\"\"".to_string()),
-        _ => text_from_value(value),
+        Value::Text(text) if strict => {
+            output.push('"');
+            for part in text.split_inclusive('"') {
+                output.push_str(part);
+                if part.ends_with('"') {
+                    output.push('"');
+                }
+            }
+            output.push('"');
+        }
+        Value::Text(text) => output.push_str(text),
+        Value::Error(error) => output.push_str(error.sentinel()),
+        Value::Blank if strict => output.push_str("\"\""),
+        _ => output.push_str(&text_from_value(value)?),
     }
+    Ok(())
 }
 fn to_text(context: &mut Context<'_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, 2)?;
     let strict = mode(context, args, 1)?;
     if name == "VALUETOTEXT" {
-        return text_value(serialize(&context.scalar(args, 0, Value::Blank), strict)?);
+        let mut output = String::new();
+        serialize(&mut output, &context.scalar(args, 0, Value::Blank), strict)?;
+        return text_value(output);
     }
     let matrix = context.matrix(&args[0])?;
     let mut output = String::new();
@@ -342,10 +356,11 @@ fn to_text(context: &mut Context<'_>, name: &str, args: &[Ast]) -> Result<Value,
             if column != 0 {
                 output.push_str(if strict { "," } else { ", " });
             }
-            output.push_str(&serialize(
+            serialize(
+                &mut output,
                 &matrix.values[row * matrix.cols + column],
                 strict,
-            )?);
+            )?;
             if output.len() > MAX_TEXT_BYTES {
                 return Err(FormulaError::Value);
             }

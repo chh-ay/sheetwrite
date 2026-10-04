@@ -234,9 +234,9 @@ pub(super) fn treats_cell_as_reference(name: &str) -> bool {
 
 /// Returns the positions `0..count` in stable sorted order.
 ///
-/// Every family sorts through this one function. The comparison is a trait
-/// object, so the binary holds one copy of the sort instead of one copy per
-/// call site. The comparison cost is small next to comparing cell values.
+/// Family position sorts use one shared implementation. The comparison is a
+/// trait object, so the binary holds one copy of the stable sort. Plain f64
+/// sorts can reuse the default engine's smaller unstable sort instead.
 pub(super) fn sorted_positions(
     count: usize,
     compare: &mut dyn FnMut(usize, usize) -> std::cmp::Ordering,
