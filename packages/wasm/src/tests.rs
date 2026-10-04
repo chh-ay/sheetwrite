@@ -1988,6 +1988,98 @@ fn required_sequence_spill_regression_preserves_matrix_shape() {
 }
 
 #[test]
+fn array_constants_spill_with_their_shape_and_keep_element_types() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 8);
+    store.set_formula(sheet, 0, 0, "={1,2;3,4}", 0);
+    store.set_formula(sheet, 3, 0, "={10;20;30}", 0);
+    store.set_formula(sheet, 3, 2, "={\"a\",TRUE,#N/A,-2.5}", 0);
+    store.set_formula(sheet, 6, 2, "={#NULL!,#VALUE!,#NUM!,#NAME?}", 0);
+    store.recompute(sheet);
+
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_close(number(&store, sheet, 0, 1), 2.0);
+    assert_close(number(&store, sheet, 1, 0), 3.0);
+    assert_close(number(&store, sheet, 1, 1), 4.0);
+    assert_eq!(store.get_cell(sheet, 0, 2).kind(), KIND_EMPTY);
+    assert_eq!(store.get_cell(sheet, 2, 0).kind(), KIND_EMPTY);
+    assert_eq!(
+        (
+            store.spill_anchor_row(sheet, 1, 1),
+            store.spill_anchor_col(sheet, 1, 1)
+        ),
+        (0, 0)
+    );
+
+    assert_close(number(&store, sheet, 5, 0), 30.0);
+    assert_eq!(store.get_cell(sheet, 6, 0).kind(), KIND_EMPTY);
+
+    assert_eq!(string(&store, sheet, 3, 2).as_deref(), Some("a"));
+    let logical = store.get_cell(sheet, 3, 3);
+    assert_eq!((logical.kind(), logical.num()), (KIND_BOOL, 1.0));
+    assert_eq!(string(&store, sheet, 3, 4).as_deref(), Some("#N/A"));
+    assert_close(number(&store, sheet, 3, 5), -2.5);
+    for (col, expected) in [(2, "#NULL!"), (3, "#VALUE!"), (4, "#NUM!"), (5, "#NAME?")] {
+        assert_eq!(string(&store, sheet, 6, col).as_deref(), Some(expected));
+    }
+}
+
+#[test]
+fn array_constants_act_as_array_arguments() {
+    let cases = [
+        ("=SUM({1,2,3})", 6.0),
+        ("=SUM({1,\"a\",TRUE;4,5,6})", 16.0),
+        ("=AVERAGE({1,2;3,6})", 3.0),
+        ("=COUNT({1,\"a\",TRUE,2})", 2.0),
+        ("=MAX({-4,7,2})", 7.0),
+        ("=INDEX({1,2;3,4},2,1)", 3.0),
+        ("=INDEX({5,6,7},3)", 7.0),
+        ("=ROWS({1,2;3,4;5,6})", 3.0),
+        ("=COLUMNS({1,2;3,4;5,6})", 2.0),
+        ("=MATCH(\"b\",{\"a\",\"b\",\"c\"},0)", 2.0),
+        ("=VLOOKUP(2,{1,10;2,20},2,FALSE)", 20.0),
+        ("=SUMPRODUCT({1,2},{3,4})", 11.0),
+        ("=SUM(TRANSPOSE({1;2;3}))", 6.0),
+    ];
+    for (source, expected) in cases {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_formula(sheet, 0, 0, source, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 0), None, "{source}");
+        assert_close(number(&store, sheet, 0, 0), expected);
+    }
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, "=SUM({1,#DIV/0!})", 0);
+    store.set_formula(sheet, 1, 0, "={1,2;3}", 0);
+    store.set_formula(sheet, 2, 0, "={A2,1}", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#DIV/0!"));
+    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("#VALUE!"));
+    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("#VALUE!"));
+}
+
+#[test]
+fn array_constants_survive_structural_rewrites() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_formula(sheet, 0, 1, "=SUM({1,2;3,4})+A1", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 15.0);
+
+    store.add_rows(sheet, 0, 1);
+    store.recompute(sheet);
+    assert_eq!(
+        store.formula_source(sheet, 1, 1).as_deref(),
+        Some("=(SUM({1,2;3,4})+A2)")
+    );
+    assert_close(number(&store, sheet, 1, 1), 15.0);
+}
+
+#[test]
 fn every_indexed_array_producer_reinstalls_spills_after_dependency_edits() {
     let cases = [
         ("=A1:A3", 0, 9.0, 2, 0, 3.0),

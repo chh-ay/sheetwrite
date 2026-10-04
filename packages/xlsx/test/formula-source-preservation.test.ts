@@ -20,7 +20,7 @@ const INVENTORY = (await Bun.file(
 const FORMULA_SOURCES = INVENTORY.functions
   .filter((entry) => entry.contractStatus === "required-supported")
   .map((entry) => `=${entry.canonical}()`);
-
+FORMULA_SOURCES.push("={1,2;3,4}", "=SUM({1,2,3})", '={"A1",TRUE,#N/A}');
 beforeAll(async () => {
   await initSheetwrite();
   registerXlsxBackends();
@@ -67,8 +67,8 @@ describe("XLSX formula source preservation", () => {
   it("round-trips every required target source without asserting recalculation or producer compatibility", async () => {
     const encoded = await toXlsxWorkbook(formulaWorkbook());
     const decoded = await fromXlsxWorkbook(encoded);
-    expect(FORMULA_SOURCES).toHaveLength(100);
-    expect(new Set(FORMULA_SOURCES).size).toBe(100);
+    expect(FORMULA_SOURCES).toHaveLength(103);
+    expect(new Set(FORMULA_SOURCES).size).toBe(103);
 
     expect(decoded.workbook.activeSheet).toBe("formula");
     expect(decoded.sheets).toHaveLength(1);
@@ -76,7 +76,7 @@ describe("XLSX formula source preservation", () => {
       id: "formula",
       name: "Formula Source",
       order: 0,
-      rowCount: 100,
+      rowCount: 103,
     });
     expect(formulaSources(decoded)).toEqual(FORMULA_SOURCES);
   });

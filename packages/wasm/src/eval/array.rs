@@ -38,7 +38,11 @@ pub(super) fn ast_produces_array(ast: &Ast) -> bool {
         Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
             super::analysis::lambda::produces_array(name, args)
         }
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
+        Ast::Range(..)
+        | Ast::AbsRange(..)
+        | Ast::NamedRange(..)
+        | Ast::Structured(..)
+        | Ast::Array { .. } => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(id), args) => {
@@ -122,7 +126,11 @@ impl CellStore {
                 }
                 Some((hooks.bound)(self, name, args, formula_sheet))
             }
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => Some(
+            Ast::Range(..)
+            | Ast::AbsRange(..)
+            | Ast::NamedRange(..)
+            | Ast::Structured(..)
+            | Ast::Array { .. } => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
             ),
@@ -235,6 +243,9 @@ impl CellStore {
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
+            Ast::Array { values, .. } => self
+                .matrix_shape(ast, sheet)
+                .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
             Ast::LetSlot { expression, .. } => {
                 return self.eval_dynamic_array(expression, sheet, affected, memo, visiting, depth)
             }
@@ -341,6 +352,11 @@ impl CellStore {
             }
             Ast::LetSlot { expression, .. } => {
                 return self.matrix_shape(expression, formula_sheet);
+            }
+            Ast::Array { cols, values } => {
+                let cols = *cols as usize;
+                let rows = values.len() / cols;
+                return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
             Ast::Func(Func::Transpose, args) => {
                 let (rows, cols, cells) =

@@ -1,8 +1,8 @@
 //! Formula recompute: dependency index, affected-set growth, evaluation.
 
-mod array;
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
+mod array;
 mod criteria;
 mod date;
 mod dependency;
@@ -909,6 +909,8 @@ impl CellStore {
             Ast::Str(text) => Value::text(text.as_str()),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
+            // A scalar position uses the first element, as other array results do.
+            Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
             Ast::Cell(row, col, _) => self.eval_at(
                 sheet,
                 *row as usize,
@@ -1108,7 +1110,8 @@ impl CellStore {
                     if (hooks.produces_array)(name, args) {
                         return match (hooks.evaluate)(
                             self, name, args, sheet, affected, memo, visiting, depth,
-                        ).and_then(|matrix| {
+                        )
+                        .and_then(|matrix| {
                             matrix.validate_bytes()?;
                             Ok(matrix)
                         }) {
