@@ -5,7 +5,7 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **132 optional analysis functions** (286 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **140 optional analysis functions** (294 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
 
@@ -132,6 +132,7 @@ Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/off
 | `N` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `T` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `NA` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`zero`](#signature-zero) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISOMITTED` | `@sheetwrite/formulas` | optional analysis | [`lambda-isomitted`](#signature-lambda-isomitted) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
 
 ### Logical and control flow
 
@@ -149,6 +150,13 @@ Taxonomy/source: [Logical functions](https://support.microsoft.com/en-us/office/
 | `TRUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `FALSE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 | `LET` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`let`](#signature-let) | [`let-binding`](#semantics-let-binding) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LAMBDA` | `@sheetwrite/formulas` | optional analysis | [`lambda-lambda`](#signature-lambda-lambda) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `MAP` | `@sheetwrite/formulas` | optional analysis | [`lambda-map`](#signature-lambda-map) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `REDUCE` | `@sheetwrite/formulas` | optional analysis | [`lambda-reduce`](#signature-lambda-reduce) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `SCAN` | `@sheetwrite/formulas` | optional analysis | [`lambda-scan`](#signature-lambda-scan) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `BYROW` | `@sheetwrite/formulas` | optional analysis | [`lambda-byrow`](#signature-lambda-byrow) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `BYCOL` | `@sheetwrite/formulas` | optional analysis | [`lambda-bycol`](#signature-lambda-bycol) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `MAKEARRAY` | `@sheetwrite/formulas` | optional analysis | [`lambda-makearray`](#signature-lambda-makearray) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
 
 ### Lookup and reference
 
@@ -1621,6 +1629,80 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
+### Signature: lambda-lambda
+
+Return shape: `contextual`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `parameter` | no | none | `scalar`, `range`, `array`, `reference` | `zero-or-more` |
+| `calculation` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-map
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-reduce
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `initialValue` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-scan
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `initialValue` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-byrow
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-bycol
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-makearray
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rows` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `columns` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-isomitted
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
@@ -1877,6 +1959,18 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
+### Semantics: analysis-lambda
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: bounded<br />maximum: 2000000 |
+| calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
 ## Dialect profiles
 
 ### Dialect: regex-lite-subset
@@ -1948,6 +2042,16 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | OpenFormula | unverified |
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.
+
+### Dialect: analysis-lambda
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays. GROUPBY and PIVOTBY are not registered. They require grouping, totals, ordering, header detection, filtering, and eta-reduced function argument contracts.
 
 ## Implementation profiles
 
@@ -2058,6 +2162,15 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
+
+### Implementation: analysis-lambda
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
 
 ## Unsupported categories
 
