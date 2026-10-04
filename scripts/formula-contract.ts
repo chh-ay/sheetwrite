@@ -259,7 +259,7 @@ export function extractParserSpellings(source: string): string[] {
 
 export function extractAssistSpellings(source: string): string[] {
   const match = source.match(
-    /export const FORMULA_FUNCTIONS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\n\s*\];/,
+    /(?:export )?const FORMULA_FUNCTIONS:\s*readonly string\[\]\s*=\s*\[([\s\S]*?)\n\s*\];/,
   );
   const body = match?.[1];
   if (body === undefined) throw new Error("formula assist registry not found");

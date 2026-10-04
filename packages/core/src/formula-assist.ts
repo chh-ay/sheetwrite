@@ -12,7 +12,7 @@ import type { Theme } from "./types/render.js";
  * drops a function. Every alias is listed (AVG/AVERAGE, CONCAT/CONCATENATE) so
  * autocomplete only ever offers spellings the parser will actually accept.
  */
-export const FORMULA_FUNCTIONS: readonly string[] = [
+const FORMULA_FUNCTIONS: readonly string[] = [
   "ABS",
   "ADDRESS",
   "AND",
@@ -177,7 +177,7 @@ export const FORMULA_FUNCTIONS: readonly string[] = [
  * underlying cell content stays legible; passed through as per-range
  * {@link HighlightRange.color}.
  */
-export const REF_PALETTE: readonly string[] = [
+const REF_PALETTE: readonly string[] = [
   "#4285f455",
   "#ea433555",
   "#f9ab0055",
@@ -194,7 +194,7 @@ export const REF_PALETTE: readonly string[] = [
  * digit, operator, or paren), which is exactly when no function suggestion is
  * wanted.
  */
-export function functionTokenAt(text: string, caret: number): string | null {
+function functionTokenAt(text: string, caret: number): string | null {
   const match = /([A-Za-z][A-Za-z0-9.]*)$/.exec(text.slice(0, caret));
   return match?.[1] ?? null;
 }
@@ -219,7 +219,7 @@ function parseCell(ref: string): { row: number; col: number } | null {
  * `shiftA1Refs` in a1.ts, including the "skip tokens glued to an alphanumeric"
  * rule that stops function names (and identifiers) from matching.
  */
-export function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
+function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
   const re = /(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/g;
   const out: HighlightRange[] = [];
 
