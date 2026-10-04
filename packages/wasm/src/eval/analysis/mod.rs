@@ -4,6 +4,7 @@ mod dates;
 mod descriptive;
 mod distributions;
 mod finance;
+mod regression;
 mod text;
 
 use std::collections::{HashMap, HashSet};
@@ -102,6 +103,18 @@ const FAMILIES: &[Family] = &[
             shape: text::shape,
             bound: text::bound,
             evaluate: text::evaluate_matrix,
+        }),
+    },
+    Family {
+        names: regression::NAMES,
+        reference_cells: &[],
+        evaluate: Some(regression::evaluate),
+        evaluate_ast: None,
+        array: Some(ArrayHooks {
+            produces_array: regression::produces_array,
+            shape: regression::shape,
+            bound: regression::bound,
+            evaluate: regression::evaluate_array,
         }),
     },
 ];

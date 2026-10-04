@@ -347,7 +347,10 @@
       ],
       "returns": "scalar"
     },
-    "zero": { "arguments": [], "returns": "scalar" },
+    "zero": {
+      "arguments": [],
+      "returns": "scalar"
+    },
     "unary-value": {
       "arguments": [
         {
@@ -2860,6 +2863,124 @@
         }
       ],
       "returns": "scalar"
+    },
+    "regression-fit": {
+      "arguments": [
+        {
+          "name": "knownY",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownX",
+          "required": false,
+          "default": "1,2,3,...",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "const",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "stats",
+          "required": false,
+          "default": false,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "regression-predict": {
+      "arguments": [
+        {
+          "name": "knownY",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "knownX",
+          "required": false,
+          "default": "1,2,3,...",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "newX",
+          "required": false,
+          "default": "knownX",
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "const",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "frequency": {
+      "arguments": [
+        {
+          "name": "data",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "bins",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "array"
+    },
+    "probability-range": {
+      "arguments": [
+        {
+          "name": "xRange",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "probRange",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "array", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "lowerLimit",
+          "required": false,
+          "default": 0,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "upperLimit",
+          "required": false,
+          "default": "lowerLimit",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -2877,12 +2998,21 @@
         "boolean": "number",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -2913,12 +3043,21 @@
         "boolean": "ignored-in-ranges",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -2949,12 +3088,21 @@
         "boolean": "preserved",
         "error": "function-defined"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "exact",
         "domain": "all-inputs",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -2985,12 +3133,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "literal" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "exact",
         "domain": "all-inputs",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3021,12 +3178,21 @@
         "boolean": "function-defined",
         "error": "trap-selected"
       },
-      "text": { "case": "insensitive", "wildcard": "literal" },
-      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "function-defined",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "contextual",
@@ -3057,12 +3223,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "literal" },
-      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "function-defined",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "contextual",
@@ -3093,12 +3268,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "function-defined", "wildcard": "literal" },
-      "environment": { "locale": "function-defined", "dateSystem": "function-defined" },
+      "text": {
+        "case": "function-defined",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "function-defined",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "not-applicable",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3129,12 +3313,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "sensitive", "wildcard": "literal" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "sensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "not-applicable",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3165,12 +3358,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "supported" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "supported"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "not-applicable",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3201,12 +3403,21 @@
         "boolean": "function-defined",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "supported" },
-      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "supported"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3237,12 +3448,21 @@
         "boolean": "number",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "literal" },
-      "environment": { "locale": "invariant", "dateSystem": "excel-1900" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "excel-1900"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "bounded",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3273,12 +3493,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "not-applicable", "dateSystem": "host-clock" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "not-applicable",
+        "dateSystem": "host-clock"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "bounded",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "none",
@@ -3309,12 +3538,21 @@
         "boolean": "function-defined",
         "error": "propagate"
       },
-      "text": { "case": "insensitive", "wildcard": "function-defined" },
-      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "function-defined"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "exact",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3345,12 +3583,21 @@
         "boolean": "preserved",
         "error": "propagate"
       },
-      "text": { "case": "function-defined", "wildcard": "function-defined" },
-      "environment": { "locale": "invariant", "dateSystem": "function-defined" },
+      "text": {
+        "case": "function-defined",
+        "wildcard": "function-defined"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "function-defined"
+      },
       "numeric": {
         "tolerance": "function-defined",
         "domain": "bounded",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3381,12 +3628,21 @@
         "boolean": "number",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "bounded",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3417,12 +3673,21 @@
         "boolean": "number",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "bounded",
-        "iteration": { "kind": "bounded", "maximum": 100 }
+        "iteration": {
+          "kind": "bounded",
+          "maximum": 100
+        }
       },
       "calculation": {
         "dependencies": "tracked",
@@ -3498,17 +3763,71 @@
         "boolean": "ignored-in-ranges",
         "error": "propagate"
       },
-      "text": { "case": "not-applicable", "wildcard": "not-applicable" },
-      "environment": { "locale": "invariant", "dateSystem": "not-applicable" },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
       "numeric": {
         "tolerance": "binary64",
         "domain": "function-defined",
-        "iteration": { "kind": "none", "maximum": null }
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
       },
       "calculation": {
         "dependencies": "tracked",
         "lazy": "eager",
         "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "analysis-regression": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "accepted",
+        "array": "accepted",
+        "broadcast": "none",
+        "result": "contextual"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "binary64",
+        "domain": "function-defined",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "contextual",
         "fill": "relative-reference-rewrite",
         "copy": "relative-reference-rewrite",
         "structuralRewrite": "ast-reference-rewrite"
@@ -3558,44 +3877,88 @@
         "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.",
         "Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits."
       ]
+    },
+    "analysis-regression": {
+      "excel": "documented",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?."
+      ]
     }
   },
   "implementationProfiles": {
     "text-analysis": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/eval/analysis/mod.rs"] },
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/mod.rs"]
+      },
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/text.rs"]
       },
-      "assist": { "status": "implemented", "paths": ["packages/wasm/src/eval/analysis/mod.rs"] },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/mod.rs"]
+      },
       "evidence": {
         "status": "behavior-tested",
         "paths": ["packages/wasm/src/eval/analysis/text.rs"]
       }
     },
     "implemented-assisted": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/mod.rs", "packages/wasm/src/eval/functions.rs"]
       },
-      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
       "evidence": {
         "status": "source-linked",
         "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
       }
     },
     "parser-assisted-evaluator-declared": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
-      "evaluator": { "status": "declared", "paths": [] },
-      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
-      "evidence": { "status": "source-linked", "paths": ["packages/core/src/formula-assist.ts"] }
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "declared",
+        "paths": []
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      }
     },
     "parser-declared-target": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
-      "evaluator": { "status": "declared", "paths": [] },
-      "assist": { "status": "missing", "paths": ["packages/core/src/formula-assist.ts"] },
-      "evidence": { "status": "registration-tested", "paths": ["scripts/formula-contract.test.ts"] }
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "declared",
+        "paths": []
+      },
+      "assist": {
+        "status": "missing",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "registration-tested",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
     },
     "analysis-distributions": {
       "parser": {
@@ -3616,31 +3979,79 @@
       }
     },
     "analysis-descriptive": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/descriptive.rs"]
       },
-      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
-      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
     },
     "analysis-dates": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/dates.rs"]
       },
-      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
-      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
     },
     "analysis-finance": {
-      "parser": { "status": "implemented", "paths": ["packages/wasm/src/calc.rs"] },
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
       "evaluator": {
         "status": "implemented",
         "paths": ["packages/wasm/src/eval/analysis/finance.rs"]
       },
-      "assist": { "status": "implemented", "paths": ["packages/core/src/formula-assist.ts"] },
-      "evidence": { "status": "source-linked", "paths": ["scripts/formula-contract.test.ts"] }
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["scripts/formula-contract.test.ts"]
+      }
+    },
+    "analysis-regression": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/analysis/regression.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": [
+          "packages/wasm/src/eval/analysis/regression.rs",
+          "scripts/formula-contract.test.ts"
+        ]
+      }
     }
   },
   "unsupportedCategories": [
@@ -3652,7 +4063,10 @@
       "examples": ["INDIRECT", "OFFSET", "RAND", "RANDBETWEEN", "RANDARRAY"],
       "source": "microsoft-excel-functions",
       "section": "Math and trigonometry functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3667,7 +4081,10 @@
       "examples": ["ENCODEURL", "FILTERXML", "IMAGE", "WEBSERVICE"],
       "source": "microsoft-excel-functions",
       "section": "Web functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3682,7 +4099,10 @@
       "examples": ["GOOGLEFINANCE", "IMPORTDATA", "IMPORTHTML", "IMPORTXML", "RTD"],
       "source": "microsoft-excel-functions",
       "section": "Add-in and Automation functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3697,7 +4117,10 @@
       "examples": ["DAVERAGE", "DCOUNT", "DGET", "DSUM", "DVAR"],
       "source": "microsoft-excel-functions",
       "section": "Database functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3712,7 +4135,10 @@
       "examples": ["CUBEMEMBER", "CUBESET", "CUBEVALUE"],
       "source": "microsoft-excel-functions",
       "section": "Cube functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3727,7 +4153,10 @@
       "examples": ["BYCOL", "BYROW", "LAMBDA", "MAKEARRAY", "MAP", "REDUCE", "SCAN"],
       "source": "microsoft-excel-functions",
       "section": "Logical functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -3742,7 +4171,10 @@
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",
-      "implementation": { "status": "missing", "paths": [] },
+      "implementation": {
+        "status": "missing",
+        "paths": []
+      },
       "evidence": {
         "status": "registration-tested",
         "paths": ["scripts/formula-contract.test.ts"]
@@ -6592,6 +7024,126 @@
       "semantics": "financial",
       "dialects": "excel-documented",
       "implementation": "analysis-finance",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "FREQUENCY",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "frequency",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "GROWTH",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "regression-predict",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LINEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "regression-fit",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "LOGEST",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "regression-fit",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTILE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PERCENTRANK",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percent-rank",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "PROB",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "probability-range",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "QUARTILE",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "percentile",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "RANK",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "rank",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
+      "version": 1,
+      "builds": ["@sheetwrite/formulas"]
+    },
+    {
+      "canonical": "TREND",
+      "aliases": [],
+      "family": "statistical",
+      "contractStatus": "supported",
+      "signature": "regression-predict",
+      "semantics": "analysis-regression",
+      "dialects": "analysis-regression",
+      "implementation": "analysis-regression",
       "version": 1,
       "builds": ["@sheetwrite/formulas"]
     }
