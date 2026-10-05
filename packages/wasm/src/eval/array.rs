@@ -126,7 +126,14 @@ impl CellStore {
             name: String::new(),
             quoted: false,
         };
-        Ast::AbsRange(sheet, row, col, range.row_end, range.col_end, RangeFlags::default())
+        Ast::AbsRange(
+            sheet,
+            row,
+            col,
+            range.row_end,
+            range.col_end,
+            RangeFlags::default(),
+        )
     }
 
     /// A copy of `ast` in which every `A1#` is the range that its anchor
@@ -166,13 +173,19 @@ impl CellStore {
         match ast {
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, formula_sheet);
-                Some(self.matrix_shape(&range, formula_sheet).map(|(_, _, cells)| cells))
+                Some(
+                    self.matrix_shape(&range, formula_sheet)
+                        .map(|(_, _, cells)| cells),
+                )
             }
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, .. } => Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0)),
+            Ast::BoundMatrix { rows, cols, .. } => {
+                Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0))
+            }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                ast_produces_array(ast).then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+                ast_produces_array(ast)
+                    .then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -291,7 +304,16 @@ impl CellStore {
                 if !ast_produces_array(ast) {
                     return None;
                 }
-                super::analysis::lambda::evaluate_matrix(self, name, args, sheet, affected, memo, visiting, depth + 1)
+                super::analysis::lambda::evaluate_matrix(
+                    self,
+                    name,
+                    args,
+                    sheet,
+                    affected,
+                    memo,
+                    visiting,
+                    depth + 1,
+                )
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -382,12 +404,17 @@ impl CellStore {
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
             Ast::Func(Func::AnchorArray, args) => {
-                return self.matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);
+                return self
+                    .matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);
             }
             Ast::InvalidRef => return Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, .. } => {
-                return Ok((*rows, *cols, EvalMatrix::validate_shape(*rows, *cols, 1, 0)?));
+                return Ok((
+                    *rows,
+                    *cols,
+                    EvalMatrix::validate_shape(*rows, *cols, 1, 0)?,
+                ));
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
@@ -761,41 +788,44 @@ impl CellStore {
         )?;
         debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
 
-        let mut buckets: HashMap<u64, Vec<(usize, usize)>> = HashMap::new();
-        let mut order = Vec::with_capacity(item_count);
+        // Store collision chains in insertion order, without an allocation per hash.
+        let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
+        let mut representatives: Vec<(usize, usize, Option<usize>)> =
+            Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
         for item in 0..item_count {
             let hash = matrix_item_hash(&array, item, by_col);
-            let bucket = buckets.entry(hash).or_default();
+            let mut position = buckets.get(&hash).map(|&(first, _)| first);
             let mut found = None;
-            for (position, (representative, _)) in bucket.iter().enumerate() {
+            while let Some(index) = position {
+                let (representative, _, next) = representatives[index];
                 comparisons = comparisons.checked_add(1).ok_or(FormulaError::Num)?;
                 if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
                     return Err(FormulaError::Num);
                 }
-                if matrix_items_equal(&array, *representative, item, by_col)? {
-                    found = Some(position);
+                if matrix_items_equal(&array, representative, item, by_col)? {
+                    found = Some(index);
                     break;
                 }
+                position = next;
             }
             if let Some(position) = found {
-                bucket[position].1 += 1;
+                representatives[position].1 += 1;
             } else {
-                bucket.push((item, 1));
-                order.push((hash, item));
+                let next = representatives.len();
+                if let Some((_, last)) = buckets.get_mut(&hash) {
+                    representatives[*last].2 = Some(next);
+                    *last = next;
+                } else {
+                    buckets.insert(hash, (next, next));
+                }
+                representatives.push((item, 1, None));
             }
         }
 
-        let retained: Vec<usize> = order
+        let retained: Vec<usize> = representatives
             .into_iter()
-            .filter_map(|(hash, item)| {
-                let count = buckets
-                    .get(&hash)?
-                    .iter()
-                    .find(|(representative, _)| *representative == item)?
-                    .1;
-                (!exactly_once || count == 1).then_some(item)
-            })
+            .filter_map(|(item, count, _)| (!exactly_once || count == 1).then_some(item))
             .collect();
         if retained.is_empty() {
             return Err(FormulaError::Calc);

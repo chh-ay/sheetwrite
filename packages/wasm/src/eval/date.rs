@@ -370,32 +370,62 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
 
 fn workday(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     require_arity(values, 2, 3)?;
-    let mut current = serial_date_arg(values, 0)?;
+    let current = serial_date_arg(values, 0)?;
     let days = integer_arg(values, 1, None)?;
-    let holidays = holiday_serials(values, 2)?;
+    let mut holidays = holiday_serials(values, 2)?;
     if days == 0 {
         return Ok(current as f64);
     }
-    if days.unsigned_abs() as usize > MAX_DATE_SCAN {
+    if days.unsigned_abs() > MAX_DATE_SCAN as u64 {
         return Err(FormulaError::Num);
     }
-    let direction = days.signum();
-    let mut remaining = days.unsigned_abs();
-    let mut scanned = 0usize;
-    while remaining != 0 {
-        scanned += 1;
-        if scanned > MAX_DATE_SCAN {
-            return Err(FormulaError::Num);
-        }
-        current = current.checked_add(direction).ok_or(FormulaError::Num)?;
-        if !(0..=MAX_DATE_SERIAL).contains(&current) {
-            return Err(FormulaError::Num);
-        }
-        if is_workday(current)? && holidays.binary_search(&current).is_err() {
-            remaining -= 1;
+    // Count whole weeks and holidays instead of visiting every calendar day.
+    let mut retained = 0;
+    for index in 0..holidays.len() {
+        if is_workday(holidays[index])? {
+            holidays[retained] = holidays[index];
+            retained += 1;
         }
     }
-    Ok(current as f64)
+    holidays.truncate(retained);
+    let working_days_between = |lower, upper| -> Result<i64, FormulaError> {
+        let first = holidays.partition_point(|&serial| serial < lower);
+        let last = holidays.partition_point(|&serial| serial <= upper);
+        Ok(weekdays_inclusive(lower, upper)? - (last - first) as i64)
+    };
+    let requested = days.unsigned_abs() as i64;
+    let available = if days > 0 {
+        working_days_between(current + 1, MAX_DATE_SERIAL)?
+    } else {
+        working_days_between(0, current - 1)?
+    };
+    if available < requested {
+        return Err(FormulaError::Num);
+    }
+    let mut lower = if days > 0 { current + 1 } else { 0 };
+    let mut upper = if days > 0 {
+        MAX_DATE_SERIAL
+    } else {
+        current - 1
+    };
+    while lower < upper {
+        if days > 0 {
+            let middle = lower + (upper - lower) / 2;
+            if working_days_between(current + 1, middle)? >= requested {
+                upper = middle;
+            } else {
+                lower = middle + 1;
+            }
+        } else {
+            let middle = lower + (upper - lower + 1) / 2;
+            if working_days_between(middle, current - 1)? >= requested {
+                lower = middle;
+            } else {
+                upper = middle - 1;
+            }
+        }
+    }
+    Ok(lower as f64)
 }
 
 fn cyclic_weekdays(start: i64, end: i64) -> Result<i64, FormulaError> {
