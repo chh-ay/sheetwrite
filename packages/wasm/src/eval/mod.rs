@@ -559,6 +559,8 @@ impl CellStore {
                         None => Err(FormulaError::Num),
                     },
                     Some(Err(error)) => Err(error),
+                    // A top-level `A1#` whose anchor holds no spill.
+                    None if matches!(ast, Ast::InvalidRef) => Err(FormulaError::Ref),
                     None => Err(FormulaError::Value),
                 };
                 let changed = self.install_spill_result(key, evaluated, &mut memo);

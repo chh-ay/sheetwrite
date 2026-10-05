@@ -3574,6 +3574,7 @@ fn spill_references_follow_the_current_spill_of_their_anchor() {
     store.set_formula(sheet, 0, 4, "=INDEX(A1#,2)", 0);
     store.set_formula(sheet, 0, 5, "=COUNTIF(A1#,\">1\")", 0);
     store.set_formula(sheet, 0, 6, "=SUM(J1#)", 0);
+    store.set_formula(sheet, 0, 7, "=J1#", 0);
     store.recompute(sheet);
     let column_b = |store: &CellStore| -> Vec<f64> {
         (0..6).map(|row| store.get_cell(sheet, row, 1).num()).collect()
@@ -3585,6 +3586,7 @@ fn spill_references_follow_the_current_spill_of_their_anchor() {
     assert_eq!(results(&store), [6.0, 3.0, 2.0, 2.0]);
     // J1 holds a value, not a spill.
     assert_eq!(string(&store, sheet, 0, 6).as_deref(), Some("#REF!"));
+    assert_eq!(string(&store, sheet, 0, 7).as_deref(), Some("#REF!"));
 
     store.set_number(sheet, 0, 9, 5.0, 0);
     store.recompute(sheet);

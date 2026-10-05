@@ -168,8 +168,6 @@ impl CellStore {
                 let range = self.spill_reference(args, formula_sheet);
                 Some(self.matrix_shape(&range, formula_sheet).map(|(_, _, cells)| cells))
             }
-            // A deleted reference, or `A1#` when A1 holds no spill.
-            Ast::InvalidRef => Some(Err(FormulaError::Ref)),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, .. } => Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0)),
             #[cfg(feature = "analysis")]
