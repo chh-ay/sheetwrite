@@ -28,7 +28,7 @@ bun run src/check.ts --baseline results/render-baseline.json --fresh results/ren
 
 A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.
 
-The committed baseline pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.
+The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.
 
 ## Render benchmark
 
@@ -1085,6 +1085,55 @@ Reproduce with:
 bun run --filter @sheetwrite/bench bench:formula
 ```
 
+### Default and full formula engines
+
+<div class="evidence-available"><strong>Validated evidence.</strong> Both engines ran the shared workload matrix. The paired-ratio capture is not published on this page yet, so no engine-to-engine ratio is claimed here.</div>
+
+<dl class="bench-meta" data-pagefind-ignore>
+<div><dt>Analysis capture</dt><dd>2026-10-04 11:20 UTC</dd></div>
+<div><dt>Analysis commit</dt><dd><code>a50a897e9f93</code> clean worktree</dd></div>
+</dl>
+
+The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.
+
+#### Analysis workloads
+
+Each workload has 1,000 formulas. It has one untimed warmup and five measured samples. Each sample uses a fresh store. The timer measures first recompute. Setup and output reads are outside the timer. Every result is read and summed as a checked checksum. The default engine does not run these analysis functions.
+
+LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.
+
+| Full-only workload | Median ms | p95 ms |
+| --- | ---: | ---: |
+| linest | 9.6148 | 12.1373 |
+| xirr | 4.0459 | 5.6680 |
+| dsum | 12.0187 | 70.5729 |
+| textsplit-regexreplace | 6.5583 | 8.0209 |
+| sortby | 4.4068 | 8.6183 |
+| mode-mult | 0.9337 | 0.9587 |
+| map-reduce | 26.3824 | 28.0090 |
+| mmult | 1.1064 | 3.0955 |
+
+#### WASM size and Node initialization
+
+| Engine | Node | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| default | v26.9.0 | 767,306 | 231,555 | 5.4321 | 10.7175 |
+| full | v26.9.0 | 1,013,611 | 308,622 | 7.4081 | 8.0404 |
+
+Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.
+
+Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.
+
+Reproduce after `bun run build:packages`:
+
+```sh verify title="Default and full engine evidence"
+cd bench
+bun run bench:formula:engines
+bun run bench:formula:matched
+```
+
+The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
+
 ## Delivery size
 
 <section class="size-history" aria-label="Published package size history">
@@ -1320,4 +1369,4 @@ These protocols have no validated artifact in this environment yet, so no number
 | --- | --- | --- |
 | `bench/results/core-paths-results.json` | artifact is missing | `bun run --filter @sheetwrite/bench bench:core-paths` |
 | `bench/results/full-engine-matched-results.json` | Matched engine evidence is invalid: Matched engine protocol mismatch | `bun run --filter @sheetwrite/bench bench:formula:matched` |
-| `bench/results/xlsx-results.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run --filter @sheetwrite/bench bench:xlsx` |
+| `bench/results/xlsx-results.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>` |

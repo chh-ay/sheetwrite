@@ -1,9 +1,19 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { CONTROLLED_BASELINE_MINIMUM_ROUNDS } from "./controlled-baseline.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;
 const REPOSITORY_ROOT = resolve(BENCH_ROOT, "..");
 const SCRATCH_DIRECTORY = "results/smoke";
+/** The codec checkout the XLSX capture compares against; see `bench:xlsx`. */
+const XLSX_BASELINE_COMMIT = "87fadb72397947ea8c6ba576682925c7879579b8";
+/** Replaced with `--xlsx-baseline-root` at run time. */
+const XLSX_BASELINE_ROOT_TOKEN = "{xlsx-baseline-root}";
+
+interface ReleaseOptions {
+  /** Prepared checkout of the XLSX baseline commit with its packages built. */
+  readonly xlsxBaselineRoot: string;
+}
 
 /** One capture the evidence page publishes numbers from. */
 interface CaptureStep {
@@ -81,7 +91,7 @@ const STEPS: readonly CaptureStep[] = [
   {
     name: "xlsx",
     artifacts: ["xlsx-results.json"],
-    full: [["bench:xlsx"]],
+    full: [["bench:xlsx", "--baseline-root", XLSX_BASELINE_ROOT_TOKEN]],
     smoke: [["src/xlsx-bench.ts", "--smoke", "--output", `${SCRATCH_DIRECTORY}/xlsx-results.json`]],
   },
   {
@@ -181,9 +191,46 @@ async function artifactStamp(path: string): Promise<ArtifactStamp | undefined> {
   };
 }
 
+/** Substitute run-time values into a step's arguments. */
+function resolveCommands(
+  commands: readonly (readonly string[])[],
+  options: ReleaseOptions,
+): readonly (readonly string[])[] {
+  return commands.map((command) =>
+    command.map((argument) =>
+      argument === XLSX_BASELINE_ROOT_TOKEN ? options.xlsxBaselineRoot : argument,
+    ),
+  );
+}
+
+/**
+ * The XLSX capture compares the current tree against the pre-0.5.0 codec, so it
+ * needs a prepared checkout of that commit before the run starts: failing here
+ * costs seconds, failing after the browser capture costs the whole run.
+ */
+function requireXlsxBaselineRoot(argument: string | undefined): string {
+  if (argument === undefined || argument.startsWith("--")) {
+    throw new Error(
+      `the release capture needs --xlsx-baseline-root: a checkout of ${XLSX_BASELINE_COMMIT} with its packages built, for example\n` +
+        `  git worktree add ../sheetwrite-xlsx-baseline ${XLSX_BASELINE_COMMIT}\n` +
+        `  (cd ../sheetwrite-xlsx-baseline && bun install --frozen-lockfile && bun run build:packages)`,
+    );
+  }
+  if (!existsSync(resolve(argument))) {
+    throw new Error(`--xlsx-baseline-root does not exist: ${argument}`);
+  }
+  return resolve(argument);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const smoke = args.includes("--smoke");
+  const optionIndex = args.indexOf("--xlsx-baseline-root");
+  const options: ReleaseOptions = {
+    xlsxBaselineRoot: smoke
+      ? ""
+      : requireXlsxBaselineRoot(optionIndex < 0 ? undefined : args[optionIndex + 1]),
+  };
   const commit = gitOutput(["rev-parse", "HEAD"]);
   const dirtyTree = gitOutput(["status", "--porcelain", "--untracked-files=no"]).length > 0;
   if (dirtyTree) {
@@ -200,7 +247,7 @@ async function main(): Promise<void> {
         : `writing evidence to ${resultsDir}`,
       smoke
         ? "the engine captures and the regression baseline have no smoke matrix and are skipped; run without --smoke for the release set"
-        : "run this under `flock -x ../build.lock flock -x ../quiet.lock taskset -c 4` so every timing is pinned and the tree is quiet",
+        : "run on an otherwise idle machine, pinned to one CPU (e.g. `taskset -c 4 bun run bench:release` on Linux); no concurrent builds or timing captures, because competing work adds scheduler and CPU noise",
       "",
     ].join("\n"),
   );
@@ -212,7 +259,7 @@ async function main(): Promise<void> {
       process.stderr.write(`\n=== ${step.name}: skipped (no smoke matrix)\n`);
       continue;
     }
-    for (const command of commands) runStep(step.name, command);
+    for (const command of resolveCommands(commands, options)) runStep(step.name, command);
     for (const artifact of step.artifacts) {
       const stamp = await artifactStamp(resolve(resultsDir, artifact));
       if (stamp === undefined) {

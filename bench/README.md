@@ -81,10 +81,13 @@ passed timing regression gate. The legacy shared source keys name the WASM
 role; their hashes use the selected engine. The outer artifact records the
 physical paths and binds each engine to its captured WASM hash.
 
-Build the packages first. Run the capture from `bench/` with one pinned runner:
+Build the packages first. Run one capture at a time from `bench/` on an
+otherwise idle machine, pinned to one CPU. Do not run concurrent builds or
+timing captures: competing work adds scheduler and CPU noise. For example,
+on Linux with CPU 4:
 
 ```sh
-flock -x /home/vvin/learn/sheetwrite-wt/build.lock flock -x /home/vvin/learn/sheetwrite-wt/quiet.lock taskset -c 4 bun run src/full-engine-bench.ts
+taskset -c 4 bun run src/full-engine-bench.ts
 ```
 
 `bench:formula:matched` checks the eight shared rows that were slower in the
@@ -225,20 +228,25 @@ bun run bench:core-paths
 The evidence page at
 `docs/src/content/docs/guides/performance-resources.md` publishes every
 artifact above. One command captures that whole set, in order, from a clean
-tree:
+tree. Use one pinned CPU on an otherwise idle machine, with no concurrent
+builds or timing captures. The example below uses CPU 4 on Linux:
 
 ```sh
 # Build first: every capture needs the built packages and WASM binaries.
 bun run build:packages
 
-# Then, from bench/, under the repository locks and pinned to one CPU:
-flock -x ../build.lock flock -x ../quiet.lock taskset -c 4 \
-  bun run bench:release
+# Then, from bench/, with the prepared XLSX comparison checkout:
+taskset -c 4 bun run bench:release --xlsx-baseline-root /path/to/sheetwrite-xlsx-baseline
 ```
 
 `bench:release` refuses a dirty tree, runs the captures in page order, stops at
 the first failure, and rejects an artifact that does not stamp the current
-clean commit. `bench:release:smoke` rehearses the same order with the smoke
+clean commit. The XLSX capture compares the current tree against the
+pre-0.5.0 codec, so the run needs a prepared checkout of that commit
+(`git worktree add ../sheetwrite-xlsx-baseline 87fadb72`, then
+`bun install --frozen-lockfile && bun run build:packages` inside it) passed as
+`--xlsx-baseline-root <checkout path>`. `bench:release:smoke`
+rehearses the same order with the smoke
 matrices of the suites that have one, writing to `results/smoke/` (ignored by
 git) so a rehearsal never overwrites published evidence. Regenerate the page
 after a release capture with `bun run docs:generate`.

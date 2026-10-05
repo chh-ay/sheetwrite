@@ -77,14 +77,17 @@ function conformingCapture(): MatchedEngineResult {
       const samples = Array.from({ length: TEST_ROUNDS }, (_, round) =>
         (["default", "full"] as const).map((engine) => sampleFor(workload, engine, round)),
       ).flat();
-      const durations = samples.map((sample) => sample.samplesMs[0] ?? 0);
-      const ratios = samples.map(() => 1);
+      const durationsFor = (engine: "default" | "full"): number[] =>
+        samples
+          .filter((sample) => sample.engine === engine)
+          .map((sample) => sample.samplesMs[0] ?? 0);
+      const ratios = Array.from({ length: TEST_ROUNDS }, () => 1);
       return {
         id: workload.id,
         size: workload.size,
         samples,
-        defaultStat: summarize(durations),
-        fullStat: summarize(durations),
+        defaultStat: summarize(durationsFor("default")),
+        fullStat: summarize(durationsFor("full")),
         ratioStat: summarize(ratios),
         ratioP10: 1,
         ratioP90: 1,

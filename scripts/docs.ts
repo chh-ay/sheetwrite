@@ -2387,10 +2387,12 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
           }),
           "",
         ]),
-    "Reproduce with:",
+    "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
     '```sh verify title="XLSX codec evidence"',
-    "bun run --filter @sheetwrite/bench bench:xlsx",
+    `git worktree add ../sheetwrite-xlsx-baseline ${baselineCommit ?? "<baseline commit>"}`,
+    "cd ../sheetwrite-xlsx-baseline && bun install --frozen-lockfile && bun run build:packages",
+    "cd - && bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root ../sheetwrite-xlsx-baseline",
     "```",
     "",
   ];
@@ -2429,7 +2431,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   );
   const xlsx = await loadEvidence(
     "bench/results/xlsx-results.json",
-    "bun run --filter @sheetwrite/bench bench:xlsx",
+    "bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>",
     validateXlsxArtifact,
   );
   const captures = (
@@ -2475,7 +2477,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "",
     "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
     "",
-    "The committed baseline pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
+    "The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
     "",
     "## Render benchmark",
     "",
@@ -2701,10 +2703,16 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(formula);
   }
-  if ("evidence" in fullEngine && "evidence" in matchedEngine) {
-    lines.push(renderFullEngineEvidence(fullEngine.evidence, matchedEngine.evidence));
+  if ("evidence" in fullEngine) {
+    lines.push(
+      renderFullEngineEvidence(
+        fullEngine.evidence,
+        "evidence" in matchedEngine ? matchedEngine.evidence : undefined,
+      ),
+    );
+    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
   } else {
-    if (!("evidence" in fullEngine)) pending.push(fullEngine);
+    pending.push(fullEngine);
     if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
   }
   if ("evidence" in xlsx) {
