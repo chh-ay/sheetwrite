@@ -171,9 +171,22 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             let is_right = name.ends_with(".RT");
             if name.starts_with("F.INV") {
                 ensure((0.0..=1.0).contains(&x))?;
+                let log_normalizer = if is_right {
+                    log_beta(denominator * HALF, numerator * HALF)
+                } else {
+                    log_beta(numerator * HALF, denominator * HALF)
+                };
                 positive_inverse(
                     x,
-                    |point| f_probability(point, numerator, denominator, is_right),
+                    |point| {
+                        f_probability_with_log(
+                            point,
+                            numerator,
+                            denominator,
+                            is_right,
+                            log_normalizer,
+                        )
+                    },
                     is_right,
                 )
             } else {
@@ -398,7 +411,17 @@ fn gamma_probability(shape: f64, x: f64, is_right: bool) -> NumberResult {
     if x.is_infinite() {
         return Ok(if is_right { 0.0 } else { 1.0 });
     }
-    let factor = (shape * x.ln() - x - log_gamma(shape)).exp();
+    gamma_probability_with_log(shape, x, is_right, log_gamma(shape))
+}
+
+fn gamma_probability_with_log(shape: f64, x: f64, is_right: bool, log_shape: f64) -> NumberResult {
+    if x == 0.0 {
+        return Ok(if is_right { 1.0 } else { 0.0 });
+    }
+    if x.is_infinite() {
+        return Ok(if is_right { 0.0 } else { 1.0 });
+    }
+    let factor = (shape * x.ln() - x - log_shape).exp();
     if x < shape + 1.0 {
         let mut term = 1.0 / shape;
         let mut sum = term;
@@ -462,7 +485,17 @@ fn beta_probability(x: f64, alpha: f64, beta: f64) -> NumberResult {
     if x >= 1.0 {
         return Ok(1.0);
     }
-    let factor = (alpha * x.ln() + beta * (-x).ln_1p() - log_beta(alpha, beta)).exp();
+    beta_probability_with_log(x, alpha, beta, log_beta(alpha, beta))
+}
+
+fn beta_probability_with_log(x: f64, alpha: f64, beta: f64, log_normalizer: f64) -> NumberResult {
+    if x <= 0.0 {
+        return Ok(0.0);
+    }
+    if x >= 1.0 {
+        return Ok(1.0);
+    }
+    let factor = (alpha * x.ln() + beta * (-x).ln_1p() - log_normalizer).exp();
     let probability = if x < (alpha + 1.0) / (alpha + beta + 2.0) {
         factor * beta_fraction(x, alpha, beta)? / alpha
     } else {
@@ -500,7 +533,12 @@ fn normal_inverse(probability: f64) -> NumberResult {
     } else {
         1.0 - probability
     };
-    let quantile = positive_inverse(tail, |point| normal_cdf(-point), true)?;
+    let log_shape = log_gamma(HALF);
+    let quantile = positive_inverse(
+        tail,
+        |point| Ok(HALF * gamma_probability_with_log(HALF, point * point * HALF, true, log_shape)?),
+        true,
+    )?;
     Ok(if is_negative { -quantile } else { quantile })
 }
 
@@ -516,20 +554,56 @@ fn student_inverse(probability: f64, degrees: f64) -> NumberResult {
     } else {
         1.0 - probability
     };
-    let quantile = positive_inverse(tail, |point| student_tail(point, degrees), true)?;
+    let alpha = degrees * HALF;
+    let log_normalizer = log_beta(alpha, HALF);
+    let quantile = positive_inverse(
+        tail,
+        |point| {
+            Ok(HALF
+                * beta_probability_with_log(
+                    degrees / (degrees + point * point),
+                    alpha,
+                    HALF,
+                    log_normalizer,
+                )?)
+        },
+        true,
+    )?;
     Ok(if is_negative { -quantile } else { quantile })
 }
 
 fn f_probability(x: f64, numerator: f64, denominator: f64, is_right: bool) -> NumberResult {
+    if x == 0.0 {
+        return Ok(if is_right { 1.0 } else { 0.0 });
+    }
+    if x.is_infinite() {
+        return Ok(if is_right { 0.0 } else { 1.0 });
+    }
+    let log_normalizer = if is_right {
+        log_beta(denominator * HALF, numerator * HALF)
+    } else {
+        log_beta(numerator * HALF, denominator * HALF)
+    };
+    f_probability_with_log(x, numerator, denominator, is_right, log_normalizer)
+}
+
+fn f_probability_with_log(
+    x: f64,
+    numerator: f64,
+    denominator: f64,
+    is_right: bool,
+    log_normalizer: f64,
+) -> NumberResult {
     if is_right {
-        beta_probability(
+        beta_probability_with_log(
             1.0 / (1.0 + numerator / denominator * x),
             denominator * HALF,
             numerator * HALF,
+            log_normalizer,
         )
     } else {
         let ratio = numerator / denominator * x;
-        beta_probability(
+        beta_probability_with_log(
             if ratio.is_infinite() {
                 1.0
             } else {
@@ -537,6 +611,7 @@ fn f_probability(x: f64, numerator: f64, denominator: f64, is_right: bool) -> Nu
             },
             numerator * HALF,
             denominator * HALF,
+            log_normalizer,
         )
     }
 }
@@ -553,10 +628,12 @@ fn gamma_inverse(probability: f64, shape: f64, scale: f64, is_right: bool) -> Nu
     } else {
         1.0 - probability
     };
+    // The shape is fixed throughout bracketing and bisection.
+    let log_shape = log_gamma(shape);
     Ok(scale
         * positive_inverse(
             target,
-            |point| gamma_probability(shape, point, use_right),
+            |point| gamma_probability_with_log(shape, point, use_right, log_shape),
             use_right,
         )?)
 }
@@ -568,11 +645,12 @@ fn beta_inverse(probability: f64, alpha: f64, beta: f64) -> NumberResult {
     if probability > HALF {
         return Ok(1.0 - beta_inverse(1.0 - probability, beta, alpha)?);
     }
+    let log_normalizer = log_beta(alpha, beta);
     bisect(
         probability,
         0.0,
         1.0,
-        |point| beta_probability(point, alpha, beta),
+        |point| beta_probability_with_log(point, alpha, beta, log_normalizer),
         false,
     )
 }

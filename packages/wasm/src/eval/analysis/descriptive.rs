@@ -238,10 +238,15 @@ fn percentile_exclusive(mut numbers: Vec<f64>, fraction: f64) -> NumberResult {
     if numbers.is_empty() || !(rank >= 1.0 && rank <= count) {
         return Err(FormulaError::Num);
     }
-    numbers.sort_unstable_by(f64::total_cmp);
+    // Only the two adjacent order statistics are needed, not a full sort.
     let lower = rank.floor() as usize;
-    let base = numbers[lower - 1];
-    let next = numbers.get(lower).copied().unwrap_or(base);
+    let (_, base, above) = numbers.select_nth_unstable_by(lower - 1, f64::total_cmp);
+    let base = *base;
+    let next = above
+        .iter()
+        .min_by(|left, right| left.total_cmp(right))
+        .copied()
+        .unwrap_or(base);
     Ok(base + (rank - lower as f64) * (next - base))
 }
 

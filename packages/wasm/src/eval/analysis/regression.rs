@@ -326,6 +326,7 @@ pub(crate) fn evaluate_array(
             is_vertical,
             has_intercept,
             is_exponential,
+            has_statistics,
         )?;
         let rows = if has_statistics { STATS_ROWS } else { 1 };
         return fit.statistics(rows, is_exponential);
@@ -336,6 +337,7 @@ pub(crate) fn evaluate_array(
         is_vertical,
         has_intercept,
         is_exponential,
+        false,
     )?;
     let predictions = if let Some(ast) = optional_ast(args, 2) {
         evaluation.matrix(ast)?
@@ -403,12 +405,13 @@ fn numeric_values(matrix: &EvalMatrix) -> Result<Vec<f64>, FormulaError> {
 fn frequency(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let numbers = numeric_values(&evaluation.matrix(&args[0])?)?;
     let bins = numeric_values(&evaluation.matrix(&args[1])?)?;
-    let order = super::sorted_positions(bins.len(), &mut |left, right| {
+    let mut order = super::sorted_positions(bins.len(), &mut |left, right| {
         bins[left]
             .partial_cmp(&bins[right])
             .unwrap_or(Ordering::Equal)
     });
-    // Each data value searches the bins. Keep those repeated reads contiguous.
+    // Equal bins always route to the first bin. Search only those distinct bins.
+    order.dedup_by(|right, left| bins[*right] == bins[*left]);
     let sorted_bins: Vec<f64> = order.iter().map(|&index| bins[index]).collect();
     let mut counts = vec![0.0; bins.len() + 1];
     for number in numbers {
@@ -489,6 +492,10 @@ fn is_reference(ast: &Ast) -> bool {
 struct Fit {
     coefficients: Vec<f64>,
     intercept: f64,
+    statistics: Option<FitStatistics>,
+}
+
+struct FitStatistics {
     errors: Vec<f64>,
     intercept_error: Value,
     residual_ss: f64,
@@ -561,6 +568,7 @@ fn fit(
     is_vertical: bool,
     has_intercept: bool,
     is_exponential: bool,
+    has_statistics: bool,
 ) -> Result<Fit, FormulaError> {
     let observation_count = y_matrix.values.len();
     let predictor_count =
@@ -614,14 +622,17 @@ fn fit(
         *response -= response_mean;
     }
     let centered = responses;
-    let total_ss = centered.iter().map(|response| response * response).sum();
     // Reorthogonalized QR drops dependent columns. Their coefficients and errors are zero.
     let mut orthogonal: Vec<Vec<f64>> = Vec::new();
     let mut active = Vec::new();
     let mut triangular = vec![vec![0.0; predictor_count]; predictor_count];
-    for (predictor, column) in columns.iter().enumerate() {
-        let mut residual = column.clone();
+    for (predictor, column) in columns.iter_mut().enumerate() {
         let original_norm = dot(column, column).sqrt();
+        let mut residual = if has_statistics {
+            column.clone()
+        } else {
+            std::mem::take(column)
+        };
         for _ in 0..2 {
             for (basis_index, basis) in orthogonal.iter().enumerate() {
                 let projection = dot(&residual, basis);
@@ -657,6 +668,18 @@ fn fit(
             / triangular[basis_index][predictor];
     }
     let intercept = response_mean - dot(&coefficients, &means);
+    if !coefficients.iter().all(|number| number.is_finite()) || !intercept.is_finite() {
+        return Err(FormulaError::Num);
+    }
+    // Predictions and coefficient-only results do not need residuals or errors.
+    if !has_statistics {
+        return Ok(Fit {
+            coefficients,
+            intercept,
+            statistics: None,
+        });
+    }
+    let total_ss = centered.iter().map(|response| response * response).sum();
     let residual_ss = (0..count)
         .map(|observation| {
             let residual = centered[observation]
@@ -706,18 +729,17 @@ fn fit(
     } else {
         Value::Error(FormulaError::Na)
     };
-    if !coefficients.iter().all(|number| number.is_finite()) || !intercept.is_finite() {
-        return Err(FormulaError::Num);
-    }
     Ok(Fit {
         coefficients,
         intercept,
-        errors,
-        intercept_error,
-        residual_ss,
-        total_ss,
-        degrees,
-        rank,
+        statistics: Some(FitStatistics {
+            errors,
+            intercept_error,
+            residual_ss,
+            total_ss,
+            degrees,
+            rank,
+        }),
     })
 }
 
@@ -749,32 +771,36 @@ impl Fit {
             }
             values[index] = Value::number(coefficient);
         }
-        if rows == STATS_ROWS {
-            for (index, error) in self.errors.iter().rev().enumerate() {
+        if let Some(statistics) = self.statistics {
+            for (index, error) in statistics.errors.iter().rev().enumerate() {
                 values[cols + index] = Value::number(*error);
             }
-            values[2 * cols - 1] = self.intercept_error;
-            let explained = (self.total_ss - self.residual_ss).max(0.0);
-            values[2 * cols] = if self.total_ss == 0.0 {
+            values[2 * cols - 1] = statistics.intercept_error;
+            let explained = (statistics.total_ss - statistics.residual_ss).max(0.0);
+            values[2 * cols] = if statistics.total_ss == 0.0 {
                 Value::Error(FormulaError::DivZero)
             } else {
-                Value::number(explained / self.total_ss)
+                Value::number(explained / statistics.total_ss)
             };
-            values[2 * cols + 1] = if self.degrees == 0 {
+            values[2 * cols + 1] = if statistics.degrees == 0 {
                 Value::Error(FormulaError::DivZero)
             } else {
-                Value::number((self.residual_ss / self.degrees as f64).sqrt())
+                Value::number((statistics.residual_ss / statistics.degrees as f64).sqrt())
             };
-            values[3 * cols] = if self.rank == 0 || self.residual_ss == 0.0 || self.degrees == 0 {
-                Value::Error(FormulaError::DivZero)
-            } else {
-                Value::number(
-                    explained / self.rank as f64 / (self.residual_ss / self.degrees as f64),
-                )
-            };
-            values[3 * cols + 1] = Value::number(self.degrees as f64);
+            values[3 * cols] =
+                if statistics.rank == 0 || statistics.residual_ss == 0.0 || statistics.degrees == 0
+                {
+                    Value::Error(FormulaError::DivZero)
+                } else {
+                    Value::number(
+                        explained
+                            / statistics.rank as f64
+                            / (statistics.residual_ss / statistics.degrees as f64),
+                    )
+                };
+            values[3 * cols + 1] = Value::number(statistics.degrees as f64);
             values[4 * cols] = Value::number(explained);
-            values[4 * cols + 1] = Value::number(self.residual_ss);
+            values[4 * cols + 1] = Value::number(statistics.residual_ss);
         }
         Ok(EvalMatrix::new(rows, cols, values))
     }
