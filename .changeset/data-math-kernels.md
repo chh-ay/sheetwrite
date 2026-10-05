@@ -3,4 +3,4 @@
 "@sheetwrite/formulas": patch
 ---
 
-Reduce repeated indexing when formulas calculate matrix determinants and inverses.
+Reduce repeated indexing in matrix calculations and avoid allocation in sums of squares.
