@@ -17,6 +17,7 @@ pub(super) enum UnaryOp {
     Percent,
 }
 
+#[inline]
 pub(super) fn unary(op: UnaryOp, value: &Value) -> Value {
     match number_from_value(value) {
         Ok(number) => Value::number(match op {
@@ -28,6 +29,7 @@ pub(super) fn unary(op: UnaryOp, value: &Value) -> Value {
     }
 }
 
+#[inline]
 pub(super) fn binary<Right: std::borrow::Borrow<Value>>(
     op: Op,
     left: &Value,
@@ -63,6 +65,7 @@ pub(super) fn binary<Right: std::borrow::Borrow<Value>>(
     }
 }
 
+#[inline]
 pub(super) fn comparison(op: CmpOp, left: &Value, right: &Value) -> Value {
     let ordering = match compare_values(left, right) {
         Ok(ordering) => ordering,
@@ -161,9 +164,13 @@ impl CellStore {
                 Ast::Pos(_) => UnaryOp::Pos,
                 _ => UnaryOp::Percent,
             };
-            let mut matrix = self
-                .eval_dynamic_array(inner, sheet, affected, memo, visiting, depth + 1)
-                .ok_or(FormulaError::Value)??;
+            let mut matrix =
+                match self.operator_operand(inner, sheet, affected, memo, visiting, depth + 1)? {
+                    Operand::Array(matrix) => matrix,
+                    Operand::Scalar(value) => {
+                        return Ok(EvalMatrix::new(1, 1, vec![unary(op, &value)]));
+                    }
+                };
             for value in &mut matrix.values {
                 *value = unary(op, value);
             }

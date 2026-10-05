@@ -563,9 +563,14 @@ impl CellStore {
                         None => Err(FormulaError::Num),
                     },
                     Some(Err(error)) => Err(error),
-                    // A top-level `A1#` whose anchor holds no spill.
-                    None if matches!(ast, Ast::InvalidRef) => Err(FormulaError::Ref),
-                    None => Err(FormulaError::Value),
+                    // Resolving a missing spill removes its array marker.
+                    // Keep the scalar expression's error instead of replacing it.
+                    None => match self.eval_ast(
+                        &ast, output_sheet, &affected, &mut memo, &mut visiting, 0,
+                    ) {
+                        Value::Error(error) => Err(error),
+                        _ => Err(FormulaError::Value),
+                    },
                 };
                 let changed = self.install_spill_result(key, evaluated, &mut memo);
                 // Formulas that use `A1#` read only the anchor cell. The anchor

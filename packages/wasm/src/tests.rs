@@ -2077,6 +2077,11 @@ fn array_operators_broadcast_each_axis_and_keep_element_errors() {
         ("={1,#N/A,\"bad\",4}+1", 4, &["2", "#N/A", "#VALUE!", "5"]),
         ("=SEQUENCE(2,2)*2", 2, &["2", "4", "6", "8"]),
         ("=FILTER({1;2;3},{TRUE;FALSE;TRUE})+10", 1, &["11", "13"]),
+        ("=-LET(x,SEQUENCE(3),1)", 1, &["-1"]),
+        ("=+LET(x,SEQUENCE(3),2)", 1, &["2"]),
+        ("=LET(x,SEQUENCE(3),25)%", 1, &["0.25"]),
+        ("=H1#*10", 1, &["#REF!"]),
+        ("=-H1#", 1, &["#REF!"]),
     ];
     for &(source, cols, expected) in cases {
         let mut store = CellStore::new();
