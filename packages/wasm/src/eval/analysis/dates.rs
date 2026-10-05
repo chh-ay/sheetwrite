@@ -4,7 +4,6 @@ use super::super::date::{date_parts, date_serial, parse_date_value};
 use super::super::functions::{integer_arg, require_arity, text_arg, FuncAccumulator};
 use super::super::value::number_from_value;
 use crate::types::{EvalResult, FormulaError, Value};
-use std::collections::HashSet;
 
 pub(crate) const NAMES: &[&str] = &["DATEDIF", "ISOWEEKNUM", "NETWORKDAYS.INTL", "WORKDAY.INTL"];
 const MAX_SERIAL: i64 = 2_958_465;
@@ -66,7 +65,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> DateResult {
             require_arity(values, 2, 4)?;
             let start = serial_arg(values, 0)?;
             let weekend = weekend_mask(values)?;
-            let holidays = holidays(values)?;
+            let holidays = holidays(values, &weekend)?;
             if name == "NETWORKDAYS.INTL" {
                 let end = serial_arg(values, 1)?;
                 if start <= end {
@@ -117,42 +116,40 @@ fn weekend_mask(values: &FuncAccumulator) -> Result<[bool; 7], FormulaError> {
     Ok(weekend)
 }
 
-fn holidays(values: &FuncAccumulator) -> Result<HashSet<i64>, FormulaError> {
+fn holidays(values: &FuncAccumulator, weekend: &[bool; 7]) -> Result<Vec<i64>, FormulaError> {
     let entries = values.arg(3).unwrap_or_default();
-    let mut result = HashSet::new();
-    result
+    let mut working_holidays = Vec::new();
+    working_holidays
         .try_reserve(entries.len())
         .map_err(|_| FormulaError::Num)?;
     for entry in entries {
         if matches!(entry.value, Value::Blank) {
             continue;
         }
-        result.insert(serial_value(&entry.value)?);
+        let serial = serial_value(&entry.value)?;
+        if !weekend[weekday(serial)] {
+            working_holidays.push(serial);
+        }
     }
-    Ok(result)
+    working_holidays.sort_unstable();
+    working_holidays.dedup();
+    Ok(working_holidays)
 }
 
-fn workday_count(start: i64, end: i64, weekend: &[bool; 7], holidays: &HashSet<i64>) -> i64 {
+fn workday_count(start: i64, end: i64, weekend: &[bool; 7], holidays: &[i64]) -> i64 {
     let length = end - start + 1;
     let per_week = weekend.iter().filter(|&&is_weekend| !is_weekend).count() as i64;
     let mut count = length / DAYS_PER_WEEK * per_week;
     for offset in 0..length % DAYS_PER_WEEK {
         count += i64::from(!weekend[weekday(start + offset)]);
     }
-    for &holiday in holidays {
-        if (start..=end).contains(&holiday) && !weekend[weekday(holiday)] {
-            count -= 1;
-        }
-    }
-    count
+    // Sorted working-day holidays let every search count its interval in logarithmic time.
+    let first = holidays.partition_point(|&holiday| holiday < start);
+    let last = holidays.partition_point(|&holiday| holiday <= end);
+    count - (last - first) as i64
 }
 
-fn workday_offset(
-    start: i64,
-    offset: i64,
-    weekend: &[bool; 7],
-    holidays: &HashSet<i64>,
-) -> DateResult {
+fn workday_offset(start: i64, offset: i64, weekend: &[bool; 7], holidays: &[i64]) -> DateResult {
     if weekend.iter().all(|&is_weekend| is_weekend) {
         return Err(FormulaError::Value);
     }

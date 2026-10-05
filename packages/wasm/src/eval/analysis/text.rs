@@ -1,5 +1,8 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
+use std::rc::Rc;
 
 use regex_lite::{Captures, Regex, RegexBuilder};
 
@@ -26,6 +29,18 @@ const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 const MAX_MATCH_WORK: usize = 2_000_000;
 const MAX_REGEX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_DECIMALS: i64 = 127;
+const REGEX_CACHE_CAPACITY: usize = 4;
+
+struct CachedRegex {
+    pattern: String,
+    insensitive: bool,
+    regex: Rc<Regex>,
+}
+
+thread_local! {
+    // Bound compiled-pattern memory without synchronizing independent evaluations.
+    static REGEX_CACHE: RefCell<Vec<CachedRegex>> = const { RefCell::new(Vec::new()) };
+}
 
 struct Context<'a> {
     store: &'a CellStore,
@@ -171,6 +186,26 @@ fn split_parts<'a>(
 ) -> Result<Vec<&'a str>, FormulaError> {
     if delimiters.is_empty() {
         return Ok(vec![text]);
+    }
+    if !insensitive && delimiters.len() == 1 && text.is_ascii() {
+        let delimiter = &delimiters[0];
+        let mut parts = Vec::new();
+        let mut comparisons = 0usize;
+        for (index, part) in text.split(delimiter).enumerate() {
+            // ASCII byte lengths preserve the general scanner's comparison budget.
+            comparisons += part.len() + usize::from(index != 0);
+            if !ignore_empty || !part.is_empty() {
+                parts.push(part);
+            }
+        }
+        *work = comparisons
+            .checked_mul(delimiter.len())
+            .and_then(|cost| work.checked_add(cost))
+            .ok_or(FormulaError::Num)?;
+        if *work > MAX_MATCH_WORK {
+            return Err(FormulaError::Num);
+        }
+        return Ok(parts);
     }
     let mut parts = Vec::new();
     let mut start = 0;
@@ -331,7 +366,12 @@ fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), For
         Value::Text(text) => output.push_str(text),
         Value::Error(error) => output.push_str(error.sentinel()),
         Value::Blank if strict => output.push_str("\"\""),
-        _ => output.push_str(&text_from_value(value)?),
+        Value::Number(number) if number.is_finite() => {
+            write!(output, "{number}").map_err(|_| FormulaError::Value)?;
+        }
+        Value::Number(_) => return Err(FormulaError::Num),
+        Value::Bool(boolean) => output.push_str(if *boolean { "TRUE" } else { "FALSE" }),
+        Value::Blank => {}
     }
     Ok(())
 }
@@ -390,15 +430,38 @@ fn needs_unicode_case(pattern: &str, insensitive: bool) -> bool {
                 .any(|escape| pattern.contains(escape)))
 }
 
-fn compile_regex(pattern: &str, insensitive: bool) -> Result<Regex, FormulaError> {
-    if needs_unicode_case(pattern, insensitive) {
-        return Err(FormulaError::Value);
-    }
-    RegexBuilder::new(pattern)
-        .case_insensitive(insensitive)
-        .size_limit(MAX_REGEX_BYTES)
-        .build()
-        .map_err(|_| FormulaError::Value)
+fn compile_regex(pattern: &str, insensitive: bool) -> Result<Rc<Regex>, FormulaError> {
+    REGEX_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(index) = cache
+            .iter()
+            .position(|entry| entry.insensitive == insensitive && entry.pattern == pattern)
+        {
+            let entry = cache.remove(index);
+            let regex = Rc::clone(&entry.regex);
+            cache.push(entry);
+            return Ok(regex);
+        }
+        if needs_unicode_case(pattern, insensitive) {
+            return Err(FormulaError::Value);
+        }
+        let regex = Rc::new(
+            RegexBuilder::new(pattern)
+                .case_insensitive(insensitive)
+                .size_limit(MAX_REGEX_BYTES)
+                .build()
+                .map_err(|_| FormulaError::Value)?,
+        );
+        if cache.len() == REGEX_CACHE_CAPACITY {
+            cache.remove(0);
+        }
+        cache.push(CachedRegex {
+            pattern: pattern.to_owned(),
+            insensitive,
+            regex: Rc::clone(&regex),
+        });
+        Ok(regex)
+    })
 }
 
 fn append_text(output: &mut String, text: &str) -> Result<(), FormulaError> {
