@@ -11,6 +11,7 @@ mod functions;
 mod lookup;
 mod math;
 mod matrix;
+mod operators;
 mod range_reader;
 mod statistics;
 mod text;
@@ -21,7 +22,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::calc::{Ast, CmpOp, Func, Op};
+use crate::calc::{Ast, Func};
 use crate::sheet::{spill_ownership_within_budget, SheetData, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
@@ -1033,99 +1034,27 @@ impl CellStore {
             | Ast::Range(..)
             | Ast::AbsRange(..)
             | Ast::SheetRange(..) => Value::Error(FormulaError::Value),
-            Ast::Neg(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(-value),
-                Err(error) => Value::Error(error),
-            },
-            Ast::Pos(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(value),
-                Err(error) => Value::Error(error),
-            },
-            Ast::Percent(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(value / 100.0),
-                Err(error) => Value::Error(error),
-            },
+            Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
+                let op = match ast {
+                    Ast::Neg(_) => operators::UnaryOp::Neg,
+                    Ast::Pos(_) => operators::UnaryOp::Pos,
+                    _ => operators::UnaryOp::Percent,
+                };
+                operators::unary(
+                    op,
+                    &self.eval_ast(expr, sheet, affected, memo, visiting, depth + 1),
+                )
+            }
             Ast::Bin(op, left, right) => {
                 let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
-                if *op == Op::Concat {
-                    let left = match text_from_value(&left) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    };
-                    let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                    let right = match text_from_value(&right) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    };
-                    return Value::text(left + &right);
-                }
-                let a = match number_from_value(&left) {
-                    Ok(value) => value,
-                    Err(error) => return Value::Error(error),
-                };
-                let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                let b = match number_from_value(&right) {
-                    Ok(value) => value,
-                    Err(error) => return Value::Error(error),
-                };
-                match op {
-                    Op::Add => Value::number(a + b),
-                    Op::Sub => Value::number(a - b),
-                    Op::Mul => Value::number(a * b),
-                    Op::Div => {
-                        if b == 0.0 {
-                            Value::Error(FormulaError::DivZero)
-                        } else {
-                            Value::number(a / b)
-                        }
-                    }
-                    Op::Pow => {
-                        if a == 0.0 && b < 0.0 {
-                            Value::Error(FormulaError::DivZero)
-                        } else {
-                            Value::number(a.powf(b))
-                        }
-                    }
-                    Op::Concat => unreachable!("concatenation returned before numeric coercion"),
-                }
+                operators::binary(*op, &left, || {
+                    self.eval_ast(right, sheet, affected, memo, visiting, depth + 1)
+                })
             }
             Ast::Cmp(op, left, right) => {
                 let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
                 let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                let ord = match compare_values(&left, &right) {
-                    Ok(ord) => ord,
-                    Err(error) => return Value::Error(error),
-                };
-                let res = match op {
-                    CmpOp::Eq => ord == Ordering::Equal,
-                    CmpOp::Ne => ord != Ordering::Equal,
-                    CmpOp::Lt => ord == Ordering::Less,
-                    CmpOp::Gt => ord == Ordering::Greater,
-                    CmpOp::Le => matches!(ord, Ordering::Less | Ordering::Equal),
-                    CmpOp::Ge => matches!(ord, Ordering::Greater | Ordering::Equal),
-                };
-                Value::Bool(res)
+                operators::comparison(*op, &left, &right)
             }
             Ast::Func(
                 Func::Filter
