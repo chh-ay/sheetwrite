@@ -30,7 +30,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     }
 }
 
-pub(super) fn ast_produces_array(ast: &Ast) -> bool {
+pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray, _) => true,
         #[cfg(feature = "analysis")]
@@ -45,6 +45,10 @@ pub(super) fn ast_produces_array(ast: &Ast) -> bool {
         | Ast::Structured(..)
         | Ast::Array { .. } => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_produces_array(left) || ast_produces_array(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_produces_array(inner),
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(id), args) => {
             let name = super::analysis::name(*id);
@@ -171,6 +175,21 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+                if ast_produces_array(ast) =>
+            {
+                Some(
+                    self.matrix_shape(ast, formula_sheet)
+                        .map(|shape| shape.2)
+                        .or_else(|error| {
+                            if error == FormulaError::Value {
+                                Ok(SPILL_MAX_CELLS)
+                            } else {
+                                Err(error)
+                            }
+                        }),
+                )
+            }
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, formula_sheet);
                 Some(
@@ -290,6 +309,11 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
+            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+                if ast_produces_array(ast) =>
+            {
+                self.eval_operator_array(ast, sheet, affected, memo, visiting, depth + 1)
+            }
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, sheet);
                 return self.eval_dynamic_array(&range, sheet, affected, memo, visiting, depth);
@@ -403,6 +427,24 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                let (left_rows, left_cols, _) = if ast_produces_array(left) {
+                    self.matrix_shape(left, formula_sheet)?
+                } else {
+                    (1, 1, 1)
+                };
+                let (right_rows, right_cols, _) = if ast_produces_array(right) {
+                    self.matrix_shape(right, formula_sheet)?
+                } else {
+                    (1, 1, 1)
+                };
+                let rows = left_rows.max(right_rows);
+                let cols = left_cols.max(right_cols);
+                return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
+            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                return self.matrix_shape(inner, formula_sheet);
+            }
             Ast::Func(Func::AnchorArray, args) => {
                 return self
                     .matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);

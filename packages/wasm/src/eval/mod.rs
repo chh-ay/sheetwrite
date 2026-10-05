@@ -31,7 +31,8 @@ use crate::types::{
     KIND_FORMULA, KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
-use array::{ast_produces_array, dynamic_recompute_within_limit};
+pub(crate) use array::ast_produces_array;
+use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 pub(crate) use dependency::DepIndex;
 use dependency::{
@@ -47,8 +48,7 @@ pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use range_reader::RangeReader;
 use value::{
-    aggregate_number, bool_from_value, cached_formula_value, compare_values, number_from_value,
-    text_from_value,
+    aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
 };
 
 const LET_BINDING_LIMIT: usize = 126;
@@ -488,6 +488,9 @@ impl CellStore {
                         .get(key.sheet as usize)?
                         .formulas
                         .get(&key.local())?;
+                    if !entry.produces_array {
+                        return None;
+                    }
                     let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()

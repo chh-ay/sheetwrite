@@ -8,8 +8,6 @@ use crate::types::{
     AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
 
-use super::array::ast_produces_array;
-
 pub(crate) struct DepIndex {
     exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,
     range_groups: Vec<RangeGroup>,
@@ -111,8 +109,7 @@ impl DepIndex {
             && next.error.is_none()
             && previous.reads.cells == next.reads.cells
             && previous.reads.ranges == next.reads.ranges
-            && previous.ast.as_ref().is_some_and(ast_produces_array)
-                == next.ast.as_ref().is_some_and(ast_produces_array)
+            && previous.produces_array == next.produces_array
     }
 }
 
@@ -178,7 +175,7 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (&formula_cell, entry) in &sheet.formulas {
-            has_dynamic_arrays |= entry.ast.as_ref().is_some_and(ast_produces_array);
+            has_dynamic_arrays |= entry.produces_array;
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
