@@ -170,25 +170,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             let denominator = degrees_arg(values, 2)?;
             let is_right = name.ends_with(".RT");
             if name.starts_with("F.INV") {
-                ensure((0.0..=1.0).contains(&x))?;
-                let log_normalizer = if is_right {
-                    log_beta(denominator * HALF, numerator * HALF)
-                } else {
-                    log_beta(numerator * HALF, denominator * HALF)
-                };
-                positive_inverse(
-                    x,
-                    |point| {
-                        f_probability_with_log(
-                            point,
-                            numerator,
-                            denominator,
-                            is_right,
-                            log_normalizer,
-                        )
-                    },
-                    is_right,
-                )
+                f_inverse(x, numerator, denominator, is_right)
             } else {
                 ensure(x >= 0.0)?;
                 if is_right || bool_arg(values, 3, None)? {
@@ -614,6 +596,20 @@ fn f_probability_with_log(
             log_normalizer,
         )
     }
+}
+
+fn f_inverse(probability: f64, numerator: f64, denominator: f64, is_right: bool) -> NumberResult {
+    ensure((0.0..=1.0).contains(&probability))?;
+    let log_normalizer = if is_right {
+        log_beta(denominator * HALF, numerator * HALF)
+    } else {
+        log_beta(numerator * HALF, denominator * HALF)
+    };
+    positive_inverse(
+        probability,
+        |point| f_probability_with_log(point, numerator, denominator, is_right, log_normalizer),
+        is_right,
+    )
 }
 
 fn gamma_inverse(probability: f64, shape: f64, scale: f64, is_right: bool) -> NumberResult {
