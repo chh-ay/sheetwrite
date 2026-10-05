@@ -293,10 +293,12 @@ fn determinant(dimension: usize, mut matrix: Vec<f64>) -> Result<f64, FormulaErr
             result = -result;
         }
         result *= pivot;
-        for row in col + 1..dimension {
-            let factor = matrix[row * dimension + col] / pivot;
-            for step in col..dimension {
-                matrix[row * dimension + step] -= factor * matrix[col * dimension + step];
+        let (pivot_rows, remaining_rows) = matrix.split_at_mut((col + 1) * dimension);
+        let pivot_row = &pivot_rows[col * dimension..];
+        for row in remaining_rows.chunks_exact_mut(dimension) {
+            let factor = row[col] / pivot;
+            for (number, &pivot_number) in row[col..].iter_mut().zip(&pivot_row[col..]) {
+                *number -= factor * pivot_number;
             }
         }
     }
@@ -323,15 +325,32 @@ fn inverse(dimension: usize, mut matrix: Vec<f64>) -> Result<Vec<f64>, FormulaEr
         if pivot == 0.0 {
             return Err(FormulaError::Num);
         }
-        for step in 0..dimension {
-            matrix[col * dimension + step] /= pivot;
-            result[col * dimension + step] /= pivot;
+        let (matrix_before, matrix_pivot_and_after) = matrix.split_at_mut(col * dimension);
+        let (matrix_pivot, matrix_after) = matrix_pivot_and_after.split_at_mut(dimension);
+        let (result_before, result_pivot_and_after) = result.split_at_mut(col * dimension);
+        let (result_pivot, result_after) = result_pivot_and_after.split_at_mut(dimension);
+        for (number, inverse_number) in matrix_pivot.iter_mut().zip(result_pivot.iter_mut()) {
+            *number /= pivot;
+            *inverse_number /= pivot;
         }
-        for row in (0..dimension).filter(|&row| row != col) {
-            let factor = matrix[row * dimension + col];
-            for step in 0..dimension {
-                matrix[row * dimension + step] -= factor * matrix[col * dimension + step];
-                result[row * dimension + step] -= factor * result[col * dimension + step];
+        // Disjoint row slices borrow the pivot without copying it for each row.
+        for (row, inverse_row) in matrix_before
+            .chunks_exact_mut(dimension)
+            .chain(matrix_after.chunks_exact_mut(dimension))
+            .zip(
+                result_before
+                    .chunks_exact_mut(dimension)
+                    .chain(result_after.chunks_exact_mut(dimension)),
+            )
+        {
+            let factor = row[col];
+            for ((number, &pivot_number), (inverse_number, &inverse_pivot_number)) in row
+                .iter_mut()
+                .zip(matrix_pivot.iter())
+                .zip(inverse_row.iter_mut().zip(result_pivot.iter()))
+            {
+                *number -= factor * pivot_number;
+                *inverse_number -= factor * inverse_pivot_number;
             }
         }
     }
