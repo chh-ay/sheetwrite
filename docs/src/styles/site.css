@@ -1561,7 +1561,8 @@ body .sw-code-popover__accessible-signature {
 
 /* Evidence page callouts. */
 .evidence-available,
-.evidence-unavailable {
+.evidence-unavailable,
+.evidence-mixed {
   margin: 0 0 1.2rem;
   border: 1px solid color-mix(in srgb, var(--sw-accent) 30%, var(--sw-border));
   border-radius: 0.55rem;
@@ -1574,6 +1575,12 @@ body .sw-code-popover__accessible-signature {
   border-color: var(--sw-border);
   background: var(--sw-surface-1);
   color: var(--sw-fg-muted);
+}
+
+/* Capture vintages differ: a caution tone, not the "validated" accent. */
+.evidence-mixed {
+  border-color: color-mix(in srgb, var(--sw-state-pending) 45%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-state-pending) 6%, var(--sw-surface-1));
 }
 
 .error-catalog {

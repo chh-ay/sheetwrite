@@ -1,8 +1,16 @@
 import { type FullEngineResult, validateFullEngineResult } from "../bench/src/full-engine-bench.js";
 import {
   type MatchedEngineResult,
+  type MatchedEngineRow,
   validateMatchedEngineResult,
 } from "../bench/src/matched-engine-bench.js";
+
+/**
+ * Largest paired-ratio p10–p90 span (p90/p10) that still supports a ratio
+ * claim. Identical shared work is the control: when the protocol is quiet, the
+ * paired ratio stays near 1 and its spread stays narrow.
+ */
+const MATCHED_SPREAD_CEILING = 1.5;
 
 export function validateFullEngineArtifact(
   value: Record<string, unknown>,
@@ -38,6 +46,18 @@ export function renderFullEngineEvidence(
       throw new Error("Matched and analysis captures use different engine binaries");
   }
   const slowerCount = matched.rows.filter((row) => row.ratioStat.median > 1.05).length;
+  const sampleIterations = (row: MatchedEngineRow): { min: number; max: number } =>
+    row.samples.reduce(
+      (range, sample) => ({
+        min: Math.min(range.min, sample.iterations),
+        max: Math.max(range.max, sample.iterations),
+      }),
+      { min: Number.POSITIVE_INFINITY, max: 0 },
+    );
+  const widestSpread = matched.rows.reduce(
+    (worst, row) => Math.max(worst, row.ratioP90 / row.ratioP10),
+    0,
+  );
   const lines = [
     "### Default and full formula engines",
     "",
@@ -53,20 +73,26 @@ export function renderFullEngineEvidence(
     "",
     "The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.",
     "",
-    "The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. We checked those eight rows with matched rounds. Each pair runs default, then full. Each timed sample uses a fresh Bun process and one untimed warmup fixture. The runner used CPU 4 and one concurrent capture.",
+    `The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. Those eight rows were checked with matched rounds. Each pair runs default, then full, in separate Bun processes. A timed sample starts with ${matched.warmupFixtures} untimed warm-up fixtures and then repeats the workload until at least ${matched.minimumSampleDurationMs} ms of measured time; the sample is the per-iteration mean, so a short operation is measured over many repetitions instead of one cold run. The runner used CPU 4 and one concurrent capture.`,
     "",
     slowerCount === 0
       ? "No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows."
       : `${slowerCount} shared workloads tested in the matched rounds had a median paired ratio more than 5% slower with the full engine.`,
     "",
-    `The ratio is full time divided by default time within each pair. The table shows the median of ${matched.rounds} paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time. Wide spreads and very short operations limit what this sample can show.`,
+    `The ratio is full time divided by default time within each pair. The table shows the median of ${matched.rounds} paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time.`,
     "",
-    "| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
-    ...matched.rows.map(
-      (row) =>
-        `| ${row.id} | ${row.size.toLocaleString("en-US")} | ${row.defaultStat.median.toFixed(4)} | ${row.fullStat.median.toFixed(4)} | ${row.ratioStat.median.toFixed(4)} | ${row.ratioP10.toFixed(4)}–${row.ratioP90.toFixed(4)} |`,
-    ),
+    widestSpread <= MATCHED_SPREAD_CEILING
+      ? `Identical shared work is the control for this protocol: the widest paired-ratio p10–p90 span across the eight rows is ${widestSpread.toFixed(2)}× (ceiling ${MATCHED_SPREAD_CEILING.toFixed(2)}×), so each median ratio is supported by its paired samples.`
+      : `At least one row's paired-ratio p10–p90 span is ${widestSpread.toFixed(2)}× (ceiling ${MATCHED_SPREAD_CEILING.toFixed(2)}×). Rows above the ceiling are marked and their median ratio should not be read as a measured difference.`,
+    "",
+    "| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 | Iterations per sample |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...matched.rows.map((row) => {
+      const iterations = sampleIterations(row);
+      const spread = row.ratioP90 / row.ratioP10;
+      const marker = spread > MATCHED_SPREAD_CEILING ? " ⚠︎" : "";
+      return `| ${row.id}${marker} | ${row.size.toLocaleString("en-US")} | ${row.defaultStat.median.toFixed(4)} | ${row.fullStat.median.toFixed(4)} | ${row.ratioStat.median.toFixed(4)} | ${row.ratioP10.toFixed(4)}–${row.ratioP90.toFixed(4)} | ${iterations.min}–${iterations.max} |`;
+    }),
     "",
     "#### Analysis workloads",
     "",

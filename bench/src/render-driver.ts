@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "@playwright/test";
 import { DEFAULT_SEED, datasetChecksum, makeColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
+import { sourceTreeDirty } from "./protocol-meta.js";
 import benchmarkPage from "./render-bench.html";
 import { validateRenderGateArtifact } from "./render-gate.js";
 import {
@@ -698,7 +699,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
     runId,
     metadata: {
       commit: gitOutput(["rev-parse", "HEAD"]),
-      dirty: gitOutput(["status", "--porcelain", "--untracked-files=no"]).length > 0,
+      dirty: sourceTreeDirty(false),
       timestamp,
       bunVersion: Bun.version,
       nodeVersion: process.versions.node,

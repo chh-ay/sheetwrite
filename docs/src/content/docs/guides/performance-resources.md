@@ -4,6 +4,17 @@ description: "Freshness-gated benchmark and package-size evidence for Sheetwrite
 ---
 Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.
 
+## Capture
+
+<div class="evidence-mixed" data-pagefind-ignore><strong>Mixed capture vintages.</strong> The sections below were captured at different commits. Each section is internally consistent and each one names its own commit; the page as a whole is not a single point-in-time measurement.</div>
+
+| Section | Artifact | Commit | Captured |
+| --- | --- | --- | --- |
+| Render benchmark | `bench/results/render-scale.json` | <code>47f164385fd9</code> | 2026-07-16 21:59 UTC |
+| Data engine benchmark | `bench/results/data-results.json` | <code>6154cca220eb</code> | 2026-07-16 22:05 UTC |
+| Formula engine benchmark | `bench/results/formula-results.json` | <code>ed66b6d7c95c</code> | 2026-10-02 18:09 UTC |
+| Formula engines (analysis capture) | `bench/results/full-engine-results.json` | <code>a50a897e9f93</code> | 2026-10-04 11:20 UTC |
+
 ## Matched local regression check
 
 Timing comparisons run deliberately on a controlled local machine, not as a required CI job. Capture ten fresh matched rounds, retain every raw sample, and compare the fresh artifact with the committed baseline. Any unapproved slowdown fails the local command.
@@ -16,6 +27,8 @@ bun run src/check.ts --baseline results/render-baseline.json --fresh results/ren
 ```
 
 A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.
+
+The committed baseline pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.
 
 ## Render benchmark
 
@@ -644,11 +657,20 @@ Both engines drive identical scripted interactions in a controlled browser. Pick
 <figcaption>Every bar in a panel shares the ruler's scale (speed is logarithmic - each tick is 10x), so lengths compare across rows as well as within them. Bright numbers are the median run; faded numbers are the p95 run (speed) or the interaction's heap delta (memory). Rows marked as not completed are runs the engine could not finish - the recorded failure (crash, timeout, or failed correctness checkpoint) lives in the raw artifact.</figcaption>
 </figure>
 
+Every expected cell carries either a timing or its recorded failure. These cells did not finish and have no timing:
+
+| Engine | Size | Scenario | Stage | Recorded error | Cells |
+| --- | ---: | --- | --- | --- | ---: |
+| handsontable | 1M | altering.insert-5-rows-top | warmup | RangeError: Maximum call stack size exceeded | 10 |
+| handsontable | 1M | altering.remove-5-rows-top | warmup | RangeError: Maximum call stack size exceeded | 10 |
+
+
 <details class="bench-method" data-pagefind-ignore>
 <summary>Methodology - what each scenario does</summary>
 <div class="bench-method__body">
 <p>Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.</p>
-<p>Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing.</p>
+<p>Each measured sample repeats one logical action until it covers at least 100 ms of measured time, so timer resolution and scheduler jitter cannot decide a sample. Every raw sample is retained in the artifact.</p>
+<p>Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing. The failure table names the stage and the recorded error behind every missing cell.</p>
 <dl>
 <div><dt><code>scroll-down.top-left</code></dt><dd>From the origin, jump-scroll 50 px down: a fresh row band enters the viewport and must paint.</dd></div>
 <div><dt><code>scroll-down.middle</code></dt><dd>The same 50 px jump starting from the vertical middle of the scroll range.</dd></div>
@@ -1063,75 +1085,6 @@ Reproduce with:
 bun run --filter @sheetwrite/bench bench:formula
 ```
 
-### Default and full formula engines
-
-<div class="evidence-available"><strong>Validated evidence.</strong> Eight shared workloads have 51 paired rounds per engine. The full engine also has eight checked analysis workloads.</div>
-
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Matched capture</dt><dd>2026-10-04 11:18 UTC</dd></div>
-<div><dt>Matched commit</dt><dd><code>a50a897e9f93</code> clean worktree</dd></div>
-<div><dt>Analysis capture</dt><dd>2026-10-04 11:20 UTC</dd></div>
-<div><dt>Analysis commit</dt><dd><code>a50a897e9f93</code> clean worktree</dd></div>
-<div><dt>Machine</dt><dd>12th Gen Intel(R) Core(TM) i9-12900H · Linux 7.2.8-1-cachyos · x64 · Bun 1.4.2</dd></div>
-</dl>
-
-The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.
-
-The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. We checked those eight rows with matched rounds. Each pair runs default, then full. Each timed sample uses a fresh Bun process and one untimed warmup fixture. The runner used CPU 4 and one concurrent capture.
-
-No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows.
-
-The ratio is full time divided by default time within each pair. The table shows the median of 51 paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time. Wide spreads and very short operations limit what this sample can show.
-
-| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| independent-parse-load | 1,000 | 2.0895 | 2.6377 | 1.0149 | 0.3786–3.5129 |
-| independent-first-recompute | 1,000 | 0.7200 | 0.7008 | 0.9939 | 0.2959–2.3024 |
-| independent-parse-load | 10,000 | 13.4585 | 13.8707 | 1.0095 | 0.8935–1.1378 |
-| independent-first-recompute | 10,000 | 26.5895 | 26.3255 | 0.9859 | 0.9088–1.0561 |
-| linear-chain | 8 | 0.1210 | 0.1215 | 1.0113 | 0.9194–1.1899 |
-| wide-fan-out-edit | 1,000 | 0.4538 | 0.4473 | 0.9849 | 0.8534–1.1019 |
-| scalar-edit-affects-0 | 1,000 | 0.0107 | 0.0107 | 0.9957 | 0.8127–1.2054 |
-| vlookup-many | 1,000 | 5.7530 | 5.5446 | 0.9398 | 0.7541–1.4022 |
-
-#### Analysis workloads
-
-Each workload has 1,000 formulas. It has one untimed warmup and five measured samples. Each sample uses a fresh store. The timer measures first recompute. Setup and output reads are outside the timer. Every result is read and summed as a checked checksum. The default engine does not run these analysis functions.
-
-LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.
-
-| Full-only workload | Median ms | p95 ms |
-| --- | ---: | ---: |
-| linest | 9.6148 | 12.1373 |
-| xirr | 4.0459 | 5.6680 |
-| dsum | 12.0187 | 70.5729 |
-| textsplit-regexreplace | 6.5583 | 8.0209 |
-| sortby | 4.4068 | 8.6183 |
-| mode-mult | 0.9337 | 0.9587 |
-| map-reduce | 26.3824 | 28.0090 |
-| mmult | 1.1064 | 3.0955 |
-
-#### WASM size and Node initialization
-
-| Engine | Node | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |
-| --- | --- | ---: | ---: | ---: | ---: |
-| default | v26.9.0 | 767,306 | 231,555 | 5.4321 | 10.7175 |
-| full | v26.9.0 | 1,013,611 | 308,622 | 7.4081 | 8.0404 |
-
-Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.
-
-Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.
-
-Reproduce after `bun run build:packages`:
-
-```sh verify title="Default and full engine evidence"
-cd bench
-bun run bench:formula:engines
-bun run bench:formula:matched
-```
-
-The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
-
 ## Delivery size
 
 <section class="size-history" aria-label="Published package size history">
@@ -1358,3 +1311,13 @@ The landing-page data comes from a separate browser benchmark. The Delivery size
 </details>
 <footer class="size-history__footer"><span>Increase</span><span>Decrease</span><code>scripts/size-history.json</code></footer>
 </section>
+
+## Pending local evidence
+
+These protocols have no validated artifact in this environment yet, so no numbers are published for them.
+
+| Artifact | Status | Reproduce with |
+| --- | --- | --- |
+| `bench/results/core-paths-results.json` | artifact is missing | `bun run --filter @sheetwrite/bench bench:core-paths` |
+| `bench/results/full-engine-matched-results.json` | Matched engine evidence is invalid: Matched engine protocol mismatch | `bun run --filter @sheetwrite/bench bench:formula:matched` |
+| `bench/results/xlsx-results.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run --filter @sheetwrite/bench bench:xlsx` |
