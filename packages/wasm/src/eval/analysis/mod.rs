@@ -8,7 +8,7 @@ mod distributions;
 mod finance;
 mod groupby;
 pub(crate) mod lambda;
-mod math;
+pub(super) mod math;
 mod matrices;
 mod regression;
 mod reshape;

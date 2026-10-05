@@ -1541,6 +1541,23 @@ impl CellStore {
             return result;
         }
 
+        #[cfg(feature = "analysis")]
+        if let Func::Analysis(id) = func {
+            let name = analysis::name(id);
+            let result = match name {
+                "SUMSQ" => analysis::math::streamed_sum_squares(
+                    self, args, sheet, affected, memo, visiting, depth + 1,
+                ),
+                "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
+                    self, name, args, sheet, affected, memo, visiting, depth + 1,
+                ),
+                _ => None,
+            };
+            if let Some(result) = result {
+                return result;
+            }
+        }
+
         let mut values = FuncAccumulator::default();
         for arg in args {
             let range = match arg {
