@@ -400,8 +400,22 @@ export function boundedJsonByteLength(
   };
   const addString = (input: string): void => {
     add(2);
-    for (let index = 0; index < input.length; index++) {
+    let index = 0;
+    while (index < input.length) {
       const code = input.charCodeAt(index);
+      if (code >= 0x20 && code <= 0x7f && code !== 0x22 && code !== 0x5c) {
+        // Batch plain ASCII, but stop scanning at the first overflowing byte.
+        const runLimit = Math.min(input.length, index + Math.floor(limit - bytes) + 1);
+        let runEnd = index + 1;
+        while (runEnd < runLimit) {
+          const next = input.charCodeAt(runEnd);
+          if (next < 0x20 || next > 0x7f || next === 0x22 || next === 0x5c) break;
+          runEnd += 1;
+        }
+        add(runEnd - index);
+        index = runEnd;
+        continue;
+      }
       if (
         code === 0x22 ||
         code === 0x5c ||
@@ -414,8 +428,6 @@ export function boundedJsonByteLength(
         add(2);
       } else if (code < 0x20) {
         add(6);
-      } else if (code <= 0x7f) {
-        add(1);
       } else if (code <= 0x7ff) {
         add(2);
       } else if (code >= 0xd800 && code <= 0xdbff) {
@@ -431,6 +443,7 @@ export function boundedJsonByteLength(
       } else {
         add(3);
       }
+      index += 1;
     }
   };
   const visit = (input: unknown): void => {
@@ -450,7 +463,8 @@ export function boundedJsonByteLength(
       if (!Number.isFinite(input)) {
         throw new JsonByteLengthError("invalid", "JSON numbers must be finite");
       }
-      add(JSON.stringify(input).length);
+      // JSON encodes a finite number as its ToString, so no JSON machinery is needed.
+      add(String(input).length);
       return;
     }
     if (typeof input !== "object") {
@@ -491,7 +505,8 @@ export function boundedJsonByteLength(
       throw new JsonByteLengthError("invalid", "JSON values must contain only plain objects");
     }
     const record = input as Record<string, unknown>;
-    if (Object.getOwnPropertyDescriptor(record, "toJSON")) {
+    // Any own property named toJSON is rejected, whatever its descriptor says.
+    if (Object.hasOwn(record, "toJSON")) {
       throw new JsonByteLengthError("invalid", "JSON values cannot define toJSON");
     }
     add(2);
