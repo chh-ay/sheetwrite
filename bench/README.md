@@ -234,8 +234,11 @@ bun run bench:core-paths
 
 The evidence page at
 `docs/src/content/docs/guides/performance-resources.md` publishes every
-artifact above. One command captures that whole set, in order, from a clean
-tree. Use one pinned CPU on an otherwise idle machine, with no concurrent
+artifact above. `bench:release` captures render-scale, the interaction
+evidence, paged storage, data, core paths, formula, formula engines, matched
+engines, and XLSX, then records the render regression baseline last. Every
+capture stamps its artifact with the commit, tree state, and timestamp.
+Use one pinned CPU on an otherwise idle machine, with no concurrent
 builds or timing captures. The example below uses CPU 4 on Linux:
 
 ```sh
@@ -257,6 +260,18 @@ rehearses the same order with the smoke
 matrices of the suites that have one, writing to `results/smoke/` (ignored by
 git) so a rehearsal never overwrites published evidence. Regenerate the page
 after a release capture with `bun run docs:generate`.
+
+The performance showcase reads `results/paged-results.json` and
+`results/interaction-results.json`. `bench:paged` writes the paged capture;
+`bench:interaction` measures the current values of the four interaction metrics
+on the current build — packed inverse-index lookup latency, inverse-index
+backing bytes, retained bytes after 100 distant edits, and the cold-route long
+task owned by Sheetwrite — with raw samples, their summary, and the runner.
+Those four metrics are held to the absolute release ceilings recorded in
+`src/interaction-gate.ts`, not to a comparison with another build: the version 1
+artifact was a one-off before/after pair, and a release cannot re-measure a
+baseline build. `bench:release` refreshes both captures, and
+`bench:interaction:smoke` rehearses the interaction one.
 
 A change to a harness source file, to the sampling flags, or to the protocol
 version invalidates the committed render baseline: `bench:check` compares the
