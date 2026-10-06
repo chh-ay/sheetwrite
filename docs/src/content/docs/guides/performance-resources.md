@@ -6,20 +6,6 @@ Every number on this page comes from a validated local protocol artifact capture
 
 ## Capture
 
-`bench:release` also captures the performance showcase's two captures: the
-paged-storage evidence at `bench/results/paged-results.json` and the
-interaction evidence at `bench/results/interaction-results.json`. Its smoke
-rehearsal writes only to `bench/results/smoke/`.
-
-The interaction capture (`bench:interaction`, schema `interaction-current-v2`)
-measures the current build, not a comparison: packed inverse-index lookup
-latency in nanoseconds, inverse-index backing bytes, retained bytes after 100
-distant edits, and the cold-route long task owned by Sheetwrite. It records the
-raw samples, the summary derived from them, the runner, and the method, and it
-holds those four metrics to absolute release ceilings. Version 1 recorded a
-one-off before/after pair whose baseline build cannot be re-measured at a later
-release, so no old sample is carried forward into the current capture.
-
 <div class="evidence-mixed" data-pagefind-ignore><strong>Mixed capture vintages.</strong> The sections below were captured at different commits. Each section is internally consistent and each one names its own commit; the page as a whole is not a single point-in-time measurement.</div>
 
 | Section | Artifact | Commit | Captured |
@@ -28,6 +14,10 @@ release, so no old sample is carried forward into the current capture.
 | Data engine benchmark | `bench/results/data-results.json` | <code>6154cca220eb</code> | 2026-07-16 22:05 UTC |
 | Formula engine benchmark | `bench/results/formula-results.json` | <code>ed66b6d7c95c</code> | 2026-10-02 18:09 UTC |
 | Formula engines (analysis capture) | `bench/results/full-engine-results.json` | <code>a50a897e9f93</code> | 2026-10-04 11:20 UTC |
+
+`bench:release` captures render-scale, the performance showcase's paged storage at `bench/results/paged-results.json`, the interaction evidence at `bench/results/interaction-results.json`, data, core paths, formula, formula engines, matched engines, and XLSX, then re-records the render regression baseline last. Its smoke rehearsal writes only to `bench/results/smoke/`.
+
+The interaction capture (`bench:interaction`, schema `interaction-current-v2`) measures the current build, not a comparison: packed inverse-index lookup latency in nanoseconds, inverse-index backing bytes, retained bytes after 100 distant edits, and the cold-route long task owned by Sheetwrite. It records the raw samples, the summary derived from them, the runner, and the method, and it holds those four metrics to absolute release ceilings. Version 1 recorded a one-off before/after pair whose baseline build cannot be re-measured at a later release, so no old sample is carried forward into the current capture.
 
 ## Matched local regression check
 
