@@ -96,7 +96,7 @@ impl DepIndex {
     /// [`build_dep_index`] reads unchanged.
     ///
     /// When this holds, the cached index still describes the rewritten
-    /// formula, so `set_formula` keeps the current formula epoch and the next
+    /// formula, so source replacement keeps the current formula epoch and the next
     /// recompute skips the whole-workbook rebuild. The formula cell itself is
     /// still marked dirty, so it is always re-evaluated.
     ///

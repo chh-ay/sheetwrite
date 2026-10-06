@@ -3087,7 +3087,25 @@ mod formula_dependency_epoch {
         assert_close(number(&store, sheet, 1, 2), 24.0);
 
         let epoch_before = store.formula_epoch;
-        store.set_formula(sheet, 0, 2, "=A1+B1+2", 0);
+        assert_eq!(
+            store.set_sparse_block(
+                sheet,
+                0,
+                2,
+                1,
+                1,
+                &[0],
+                &[KIND_EMPTY],
+                &[0.0],
+                vec![String::new()],
+                &[0],
+                &[0],
+                vec!["=A1+B1+2".into()],
+                &[],
+                &[],
+            ),
+            0,
+        );
         assert_eq!(
             store.formula_epoch, epoch_before,
             "a constant-only rewrite must keep the cached dependency index"
@@ -3685,7 +3703,9 @@ fn spill_that_reads_a_later_spill_sees_its_current_values() {
     store.set_formula(sheet, 0, 1, "=C1:C5", 0);
     store.recompute(sheet);
     let column_b = |store: &CellStore| -> Vec<f64> {
-        (0..5).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+        (0..5)
+            .map(|row| store.get_cell(sheet, row, 1).num())
+            .collect()
     };
     assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 0.0, 0.0]);
     store.set_number(sheet, 0, 0, 4.0, 0);
@@ -3720,11 +3740,15 @@ fn spill_references_follow_the_current_spill_of_their_anchor() {
     store.set_formula(sheet, 0, 7, "=J1#", 0);
     store.recompute(sheet);
     let column_b = |store: &CellStore| -> Vec<f64> {
-        (0..6).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+        (0..6)
+            .map(|row| store.get_cell(sheet, row, 1).num())
+            .collect()
     };
     assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 0.0, 0.0, 0.0]);
     let results = |store: &CellStore| -> Vec<f64> {
-        (2..=5).map(|col| store.get_cell(sheet, 0, col).num()).collect()
+        (2..=5)
+            .map(|col| store.get_cell(sheet, 0, col).num())
+            .collect()
     };
     assert_eq!(results(&store), [6.0, 3.0, 2.0, 2.0]);
     // J1 holds a value, not a spill.
@@ -3748,12 +3772,18 @@ fn spill_references_shift_with_their_anchor_and_break_when_it_is_deleted() {
 
     store.remove_rows(sheet, 1, 1);
     store.recompute(sheet);
-    assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some("=SUM(A2#)"));
+    assert_eq!(
+        store.formula_source(sheet, 0, 2).as_deref(),
+        Some("=SUM(A2#)")
+    );
     assert_close(number(&store, sheet, 0, 2), 3.0);
 
     store.remove_rows(sheet, 1, 1);
     store.recompute(sheet);
-    assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some("=SUM(#REF!)"));
+    assert_eq!(
+        store.formula_source(sheet, 0, 2).as_deref(),
+        Some("=SUM(#REF!)")
+    );
     assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#REF!"));
 }
 
@@ -3766,7 +3796,9 @@ fn a_spill_that_reads_a_later_anchor_follows_its_resize() {
     store.set_formula(sheet, 2, 0, "=SEQUENCE(J1)", 0);
     store.recompute(sheet);
     let column_b = |store: &CellStore| -> Vec<f64> {
-        (0..5).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+        (0..5)
+            .map(|row| store.get_cell(sheet, row, 1).num())
+            .collect()
     };
     assert_eq!(column_b(&store), [2.0, 1.0, 0.0, 0.0, 0.0]);
 
