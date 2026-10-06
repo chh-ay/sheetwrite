@@ -691,6 +691,7 @@ export class ClipboardController {
       availableRows > 0 &&
       width > 0 &&
       targetCols.length === width &&
+      targetCols.every((col, index) => col === focus.col + index) &&
       Array.from({ length: availableRows }, (_, row) => row).every(
         (row) =>
           widthAt(row) === width && this.deps.toDataRow(focus.row + row) === firstDataRow + row,
