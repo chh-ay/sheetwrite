@@ -19,6 +19,9 @@
     "svelte",
     "canvas"
   ],
+  "sideEffects": [
+    "**/*.css"
+  ],
   "svelte": "./src/index.ts",
   "exports": {
     ".": {
@@ -29,7 +32,8 @@
     "./styles.css": "./styles.css"
   },
   "files": [
-    "src",
+    "src/**/*.ts",
+    "src/**/*.svelte",
     "styles.css"
   ],
   "publishConfig": {

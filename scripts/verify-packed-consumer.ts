@@ -133,13 +133,9 @@ const packageSpecs: PackageSpec[] = [
       "LICENSE",
       "README.md",
       "dist/index.d.ts",
-      "dist/index.d.ts.map",
       "dist/index.js",
-      "dist/index.js.map",
       "dist/register.d.ts",
-      "dist/register.d.ts.map",
       "dist/register.js",
-      "dist/register.js.map",
       "dist/registration.d.ts",
       "dist/registration.js",
       "dist/table-export.d.ts",
@@ -418,6 +414,37 @@ async function verifyNoExcelClosure(
   await run(["node", "--input-type=module", "--eval", runtime], root);
 }
 
+async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
+  // Each stylesheet is the only import in its bundle. A combined framework
+  // bundle could hide a dropped adapter import behind another copy of core CSS.
+  await run(
+    [
+      "node",
+      "--input-type=module",
+      "--eval",
+      `import { build } from "esbuild";
+       for (const framework of ["react", "vue", "svelte"]) {
+         const result = await build({
+           stdin: {
+             contents: 'import "@sheetwrite/' + framework + '/styles.css";',
+             resolveDir: process.cwd(),
+             sourcefile: framework + ".js",
+           },
+           bundle: true,
+           treeShaking: true,
+           write: false,
+           outdir: "stylesheet-probe",
+         });
+         const css = result.outputFiles.filter(file => file.path.endsWith(".css"));
+         if (!css.some(file => file.text.includes(".sheetwrite"))) {
+           throw new Error(framework + " packed stylesheet was removed by tree shaking");
+         }
+       }`,
+    ],
+    consumerRoot,
+  );
+}
+
 async function resolveRuntimeDependency(
   name: string,
   packageRoot: string,
@@ -657,6 +684,7 @@ try {
   );
   const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
   await run(["npm", "run", "typecheck"], consumerRoot);
+  await verifyAdapterStylesheets(consumerRoot);
   await run(["npm", "run", "bundle"], consumerRoot);
   await run(["npm", "run", "bundle:frameworks"], consumerRoot);
   await verifyMountedFrameworkConsumers(consumerRoot);

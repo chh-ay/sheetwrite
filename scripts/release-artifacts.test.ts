@@ -115,13 +115,7 @@ const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
     "styles.css",
     "shell.css",
   ],
-  "@sheetwrite/xlsx": [
-    "README.md",
-    "LICENSE",
-    "dist/index.d.ts",
-    "dist/index.js",
-    "dist/index.js.map",
-  ],
+  "@sheetwrite/xlsx": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
   "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],
@@ -195,21 +189,26 @@ async function writeTarball(
 }
 
 describe("canonical release artifacts", () => {
-  it("rejects source maps in the published core package", () => {
-    const base = manifest();
-    const packages = base.packages.map((artifact) =>
-      artifact.name === "@sheetwrite/core"
-        ? {
-            ...artifact,
-            fileCount: 2,
-            files: ["dist/index.js.map", "package.json"],
-          }
-        : artifact,
-    );
-    expect(() => validateReleaseManifest({ ...base, packages })).toThrow(
-      "@sheetwrite/core published files must exclude source maps",
-    );
-  });
+  for (const name of PUBLISHABLE_PACKAGE_ORDER) {
+    for (const path of ["dist/index.js.map", "dist/index.d.ts.map"]) {
+      it(`rejects ${path} in the published ${name} package`, () => {
+        const base = manifest();
+        const files = [path, "package.json"];
+        const packages = base.packages.map((artifact) =>
+          artifact.name === name
+            ? {
+                ...artifact,
+                fileCount: files.length,
+                files,
+              }
+            : artifact,
+        );
+        expect(() => validateReleaseManifest({ ...base, packages })).toThrow(
+          `${name} published files must exclude source maps`,
+        );
+      });
+    }
+  }
 
   it("rewrites workspace ranges and enforces release cleanliness", () => {
     const versions = new Map([
