@@ -564,9 +564,14 @@ function renderNumberText(value: number, code: string | undefined, locale: strin
 
   const descriptor = section.numeric;
   if (!descriptor) return section.literal.replaceAll("@", "");
-  const scaled = descriptor.percent ? magnitude * 100 : magnitude;
+  // Only the first-section fallback keeps a negative magnitude. Put its
+  // automatic sign before all affixes, not inside the formatted digit run.
+  // Preserve the existing handling of raw -0, dates, and explicit sections.
+  const automaticMinus = magnitude < 0;
+  const numericValue = automaticMinus ? -magnitude : magnitude;
+  const scaled = descriptor.percent ? numericValue * 100 : numericValue;
   const body = descriptor.scientific
     ? formatScientific(scaled, descriptor.decimals, descriptor.exponentDigits)
     : formatter(locale, descriptor.decimals, descriptor.grouped).format(scaled);
-  return `${descriptor.prefix}${body}${descriptor.suffix}`;
+  return `${automaticMinus ? "-" : ""}${descriptor.prefix}${body}${descriptor.suffix}`;
 }
