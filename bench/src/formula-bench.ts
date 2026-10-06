@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
-import { initSheetwrite } from "@sheetwrite/core";
+import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 import * as defaultEngine from "@sheetwrite/wasm";
 
@@ -702,7 +702,7 @@ const CONSTANT_EDIT_FILL = 10;
 const CONSTANT_EDIT_BASE = 1;
 const CONSTANT_EDIT_EDITED_BASE = 2;
 
-function constantEditFixture(count: number): TimedFixture {
+export function constantEditFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
   store.setColumnNumbers(
@@ -732,6 +732,75 @@ function constantEditFixture(count: number): TimedFixture {
     check: () => `${numberAt(store, sheet, 0, 2)}:${numberAt(store, sheet, count - 1, 2)}`,
     dispose: () => store.free(),
   };
+}
+
+/** Measure the single-cell transaction used by Grid, not the scalar WASM adapter. */
+export function gridConstantEditSample(count: number) {
+  const store = new SheetwriteStore(
+    {
+      activeSheet: "constant-edit",
+      sheets: [
+        {
+          id: "constant-edit",
+          name: "Constant edit",
+          rowCount: count,
+          columns: ["a", "b", "c"].map((id) => ({
+            id,
+            key: id,
+            header: id,
+            width: 100,
+            type: "number" as const,
+          })),
+        },
+      ],
+    },
+    {
+      rowCount: count,
+      columns: {
+        a: Array.from({ length: count }, (_, row) => row),
+        b: Array.from({ length: count }, () => CONSTANT_EDIT_FILL),
+        c: Array.from({ length: count }, (_, row) => ({
+          kind: "formula" as const,
+          src: `=A${row + 1}+B${row + 1}+${CONSTANT_EDIT_BASE}`,
+        })),
+      },
+    },
+  );
+  try {
+    const samplesMs: number[] = [];
+    // Alternate constants so every sample is a real source replacement.
+    for (let sample = 0; sample < 12; sample++) {
+      const constant = sample % 2 === 0 ? CONSTANT_EDIT_EDITED_BASE : CONSTANT_EDIT_BASE;
+      const started = now();
+      const result = store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "constant-edit", row: 0, col: 2 },
+            value: { kind: "formula", src: `=A1+B1+${constant}` },
+          },
+        ],
+      });
+      const elapsedMs = now() - started;
+      assert(result.status === "applied", "Grid constant edit must apply");
+      assert(
+        store.getCell({ sheet: "constant-edit", row: 0, col: 2 }).resolved ===
+          CONSTANT_EDIT_FILL + constant,
+        "Grid constant edit output",
+      );
+      if (sample >= 2) samplesMs.push(elapsedMs);
+    }
+    const output = `${store.getCell({ sheet: "constant-edit", row: 0, col: 2 }).resolved}:${store.getCell({ sheet: "constant-edit", row: count - 1, col: 2 }).resolved}`;
+    return {
+      id: "grid-formula-constant-edit",
+      size: count,
+      samplesMs,
+      stat: summarize(samplesMs),
+      output,
+    };
+  } finally {
+    store.dispose();
+  }
 }
 
 function diamondFixture(levels: number): TimedFixture {
@@ -2518,6 +2587,11 @@ async function runBenchmark(
 
 if (import.meta.main) {
   const sampleIndex = process.argv.indexOf("--sample");
+  if (process.argv.includes("--grid-constant-edit")) {
+    await initSheetwrite(undefined, engine);
+    process.stdout.write(`${JSON.stringify(gridConstantEditSample(100_000))}\n`);
+    process.exit(0);
+  }
   if (sampleIndex >= 0) {
     const id = process.argv[sampleIndex + 1];
     const size = Number(process.argv[sampleIndex + 2]);
@@ -2528,6 +2602,7 @@ if (import.meta.main) {
       "linear-chain": () => chainFixture(size),
       "wide-fan-out-edit": () => fanOutEditFixture(size),
       "scalar-edit-affects-0": () => fanOutEditFixture(size, true),
+      "formula-constant-edit": () => constantEditFixture(size),
       "vlookup-many": () => {
         const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === "vlookup-many");
         assert(variant, "missing VLOOKUP variant");

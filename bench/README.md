@@ -21,6 +21,13 @@ browser. The data-layer bench therefore runs Handsontable only where it
 completes headlessly (1k/10k) and pushes Sheetwrite to 1M to show its scaling;
 the browser bench carries the at-scale head-to-head.
 
+The formula benchmark also exposes `bun run bench:formula --grid-constant-edit`.
+It loads 100,000 formulas and measures single-cell `SheetwriteStore.applyTransaction`
+edits, the same source-replacement path that Grid uses. The edit alternates two
+constants, checks the computed value after each edit, and reports ten samples
+after two warmups. The scalar `formula-constant-edit` workload remains available
+through `--sample formula-constant-edit 100000` for comparison.
+
 ─────────────────────────────────────────────────────────────────────────────
 
 ## Methodology
