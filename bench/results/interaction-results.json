@@ -1,70 +1,147 @@
 {
-  "protocolVersion": 1,
-  "matrixId": "interaction-full-v1",
-  "capturedAt": "2026-07-22T03:02:46Z",
-  "source": {
-    "commit": "77c41983b53f09c393c6f8b82a4033283c0f9830",
-    "workingTree": true,
-    "runtime": "Bun 1.3.14 on Linux x64",
-    "browser": "Chrome 140.0.7339.127 via Playwright 1.61.1",
-    "cpu": "12th Gen Intel Core i9-12900H",
-    "samples": 5,
-    "warmup": "none; each cold-route sample used a new browser context",
-    "correctness": "first real feed cell resolved to 1 before each cold sample completed"
+  "protocolVersion": 2,
+  "matrixId": "interaction-current-v2",
+  "mode": "full",
+  "metadata": {
+    "commit": "5b5f8b4d2b296475cceef6cc658437e8f85f2f6a",
+    "dirty": false,
+    "timestamp": "2026-10-06T17:40:23.096Z"
   },
-  "directionalPrefetch": {
-    "sourceLatencyMs": 90,
-    "frameBudgetMs": 16.7,
-    "residencyRatioSamples": [1, 1, 1, 1, 1],
-    "p95VisibleWaitMsSamples": [0, 0, 0, 0, 0],
-    "requestedRowMultiplierSamples": [1.1162790697674418, 1.1162790697674418, 1.1162790697674418, 1.1162790697674418, 1.1162790697674418],
-    "medianResidencyRatio": 1,
-    "medianP95VisibleWaitMs": 0
+  "runner": {
+    "runtime": "Bun 1.4.2 on linux x64",
+    "browser": "153.0.8010.12",
+    "cpu": "12th Gen Intel(R) Core(TM) i9-12900H"
   },
-  "viewIndex": {
-    "rows": 1000000,
-    "lookupsPerRun": 524288,
-    "baseline": {
-      "lookupMedianNsSamples": [37.88488769531501, 39.244018554689816, 44.43444824218934, 45.83947753906622, 44.521118164060624],
-      "lookupP95NsSamples": [45.98823242187404, 54.03151855468516, 101.12755126953121, 62.81248779296663, 83.76065673827702],
-      "retainedBytes": 67125641,
-      "coldBuildMs": 109.215509
-    },
-    "packed": {
-      "lookupMedianNsSamples": [25.080932617187276, 29.146606445313097, 25.03100585937463, 31.878540039062454, 32.43225097656309],
-      "lookupP95NsSamples": [45.79450683593725, 73.24847412109399, 66.49718017578127, 68.38371582031252, 81.93341064453101],
-      "retainedBytes": 4043043,
-      "backingBytes": 4000000,
-      "coldBuildMs": 4.693290000000001
-    },
-    "medianLookupImprovementRatio": 0.3440538231407775,
-    "p95LookupRegressionRatio": 0.08869618483682662,
-    "retainedHeapReductionRatio": 0.9397690220939566
+  "method": {
+    "lookup": "Fresh packed view-index worker process per sample: 1,000,000 rows of one column, 128 batches of 4,096 deterministic lookups (524,288 lookups), nanoseconds per lookup measured over the batches. inverseIndexBytes is the inverse view-index backing store of that worker.",
+    "dirty": "Fresh paged dirty-100 probe process per sample: 1,000,000 rows, 100 distant edits, no clean page loaded. dirty100Bytes is allocated plus sparse dirty bytes retained.",
+    "coldRoute": "Current Vite development route /showcases/performance/, rendered once before sampling so the development server's transform cache is warm, then loaded in a fresh browser context per sample with no shared cache, code cache, or service worker state. Server-side rendering answers the route before the first sample, and a sample measures the browser, not the first server transform; this is a development-server measurement, not a production bundle. usableMs is the page clock when the first rectangular page of feed cells became resident in the public paged store, an upper bound that includes the readiness poll.",
+    "attribution": "Chrome DevTools protocol tracing (devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-v8.cpu_profiler) from before navigation until the page is usable, in the renderer process: 50 ms or longer RunTask events are long tasks, and the V8 CPU profile on the same clock says what ran inside them. A task is owned by Sheetwrite when frames served from packages account for at least half of the CPU profiled inside it, and its complete duration is then recorded as the owned long task. Tasks below that share, tasks running only other code, and tasks the profile does not cover are reported as unattributed, so a partly owned task is never counted as owned work. A zero sample means no owned long task was observed.",
+    "previous": "Same-schema comparison only. When the artifact already at this path is a capture of interaction-current-v2, previous records that capture's identity and its per-metric medians, so a reader can state the change without inventing a baseline. A first capture, or an unreadable predecessor, records null."
   },
-  "sparseDirty": {
-    "baseline100Bytes": 5427200,
-    "dirty100Bytes": 5679,
-    "dirty10000Bytes": 718911,
-    "dirty100ReductionRatio": 0.9989536040683962,
-    "dirty100CleanChunks": 0,
-    "dirty10000CleanChunks": 0
+  "rows": 1000000,
+  "lookupsPerRun": 524288,
+  "samples": {
+    "lookupMedianNs": [
+      31.459106445311942,
+      26.614868164063534,
+      22.76940917968727,
+      23.46667480468759,
+      24.449707031250558
+    ],
+    "lookupP95Ns": [
+      442.6306884765626,
+      412.91258544921925,
+      307.31452636718694,
+      406.04642333984384,
+      366.7959350585941
+    ],
+    "inverseIndexBytes": [
+      4000000,
+      4000000,
+      4000000,
+      4000000,
+      4000000
+    ],
+    "dirty100Bytes": [
+      5679,
+      5679,
+      5679,
+      5679,
+      5679
+    ],
+    "ownedColdLongTaskMs": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "unattributedColdLongTaskMs": [
+      127.079,
+      118.366,
+      129.117,
+      108.983,
+      112.155
+    ],
+    "usableMs": [
+      1507.2000000001863,
+      1351.5999999996275,
+      1345.5999999996275,
+      1369.5,
+      1297.5
+    ]
   },
-  "coldRoute": {
-    "route": "/showcases/performance/",
-    "before": {
-      "usableMsSamples": [291.3, 351.2, 242.3, 265.5, 250.1],
-      "sheetwriteLongTaskMsSamples": [64.2, 65.8, 56.4, 65, 63.9],
-      "dominantOwner": "eager 100,000-row revenue scenario imported only for four theme fields"
+  "values": {
+    "lookupMedianNs": {
+      "median": 24.449707031250558,
+      "p95": 30.49025878906226,
+      "mean": 25.751953125000178,
+      "stddev": 3.134649315693444,
+      "min": 22.76940917968727,
+      "max": 31.459106445311942,
+      "iters": 5
     },
-    "after": {
-      "usableMsSamples": [231.5, 216.6, 201.3, 215.8, 186.6],
-      "sheetwriteLongTaskMsSamples": [0, 0, 0, 0, 0],
-      "routeCpuMsSamples": [9.209, 9.037, 9.064, 8.057, 7.202],
-      "gridBuildCpuMsSamples": [6.859, 6.268, 6.241, 5.343, 6.407],
-      "reportedUnattributedLongTaskMsSamples": [54, 54, 0, 0, 0]
+    "lookupP95Ns": {
+      "median": 406.04642333984384,
+      "p95": 436.687067871094,
+      "mean": 387.1400317382814,
+      "stddev": 46.66236755863049,
+      "min": 307.31452636718694,
+      "max": 442.6306884765626,
+      "iters": 5
     },
-    "medianUsableImprovementRatio": 0.1871939736346515,
-    "sheetwriteLongTaskCeilingMs": 50,
-    "sheetwriteLongTaskGatePassed": true
+    "inverseIndexBytes": {
+      "median": 4000000,
+      "p95": 4000000,
+      "mean": 4000000,
+      "stddev": 0,
+      "min": 4000000,
+      "max": 4000000,
+      "iters": 5
+    },
+    "dirty100Bytes": {
+      "median": 5679,
+      "p95": 5679,
+      "mean": 5679,
+      "stddev": 0,
+      "min": 5679,
+      "max": 5679,
+      "iters": 5
+    },
+    "ownedColdLongTaskMs": {
+      "median": 0,
+      "p95": 0,
+      "mean": 0,
+      "stddev": 0,
+      "min": 0,
+      "max": 0,
+      "iters": 5
+    },
+    "unattributedColdLongTaskMs": {
+      "median": 118.366,
+      "p95": 128.7094,
+      "mean": 119.14000000000001,
+      "stddev": 7.938793359195081,
+      "min": 108.983,
+      "max": 129.117,
+      "iters": 5
+    },
+    "usableMs": {
+      "median": 1351.5999999996275,
+      "p95": 1479.660000000149,
+      "mean": 1374.2799999998883,
+      "stddev": 70.60122945117568,
+      "min": 1297.5,
+      "max": 1507.2000000001863,
+      "iters": 5
+    }
+  },
+  "previous": null,
+  "ceilings": {
+    "lookupP95Ns": 1000,
+    "inverseIndexBytes": 4000000,
+    "dirty100Bytes": 1048576,
+    "ownedColdLongTaskMs": 50
   }
 }
