@@ -2361,6 +2361,8 @@ Vue emits `row-delta`; Svelte and the imperative controller use `onRowDelta`. Al
 
 Remote changes should enter through `grid.applyRemoteOperations(...)`. Their projections have `status: "remote"` and `source: "remote"`. An echoed local transaction is returned as `duplicate` with no deltas. For a server rejection or transformed acceptance, call `bridge.reconcile(...)` with the server result and the canonical applied operations. The bridge does not update your store automatically; your callback remains the only place that changes host rows.
 
+The bridge retains at most 4,096 recent transaction IDs and 4,096 recent local operation fingerprints. If your host applies its own echoes directly through `applyRemoteOperations`, deliver them within the last 4,096 transactions. An echo outside this window is no longer recognized and projects as a remote change. `SyncCoordinator` suppresses acknowledged local echoes before they become Grid change events.
+
 ### Interaction and editing
 
 Source: https://sheetwrite.vercel.app/docs/guides/interaction/

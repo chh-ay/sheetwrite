@@ -8,7 +8,7 @@ description: "Create a typed bridge while preserving row and identity inference.
 Create a typed bridge while preserving row and identity inference.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L869"><code>packages/core/src/row-bridge.ts#L869</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L879"><code>packages/core/src/row-bridge.ts#L879</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -888,7 +888,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L869",
+              "source": "src/row-bridge.ts#L879",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -3011,7 +3011,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L316",
+              "source": "src/row-bridge.ts#L328",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -3274,7 +3274,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L877",
+              "source": "src/row-bridge.ts#L887",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -5470,7 +5470,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L869",
+              "source": "src/row-bridge.ts#L879",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -5830,7 +5830,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L316",
+              "source": "src/row-bridge.ts#L328",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -6093,7 +6093,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L877",
+              "source": "src/row-bridge.ts#L887",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []

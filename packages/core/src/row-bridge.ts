@@ -307,6 +307,18 @@ function operationColumns(operation: DocumentOp): string[] {
   }
 }
 
+// Match SyncCoordinator's maxRecentAcknowledgements for hosts that apply echoes directly.
+const MAX_RECENT_ROW_TRANSACTIONS = 4096;
+
+function rememberRecentIdentity(identities: Set<string>, identity: string): void {
+  identities.delete(identity);
+  identities.add(identity);
+  if (identities.size > MAX_RECENT_ROW_TRANSACTIONS) {
+    const oldest = identities.values().next();
+    if (!oldest.done) identities.delete(oldest.value);
+  }
+}
+
 /**
  * Projects canonical document transactions into host-owned row changes.
  *
@@ -319,7 +331,6 @@ export class RowBridge<
 > {
   private readonly sheets = new Map<SheetId, MutableSheetState<Id>>();
   private readonly createRowId: RowBridgeOptions<Row, Id>["createRowId"];
-  private readonly seenFingerprints = new Set<string>();
   private readonly localFingerprints = new Set<string>();
   private readonly seenTransactionIds = new Set<string>();
   private latestVersion = -Infinity;
@@ -453,16 +464,15 @@ export class RowBridge<
     }
     if (event.source === "remote" && this.localFingerprints.has(fingerprint)) {
       this.localFingerprints.delete(fingerprint);
-      if (hasTransactionIdentity) this.seenTransactionIds.add(transaction.id);
+      if (hasTransactionIdentity) rememberRecentIdentity(this.seenTransactionIds, transaction.id);
       return { status: "duplicate", transaction, deltas: [] };
     }
     if (event.epoch !== undefined && event.epoch < this.latestVersion) {
       return { status: "out-of-order", transaction, deltas: [] };
     }
     if (event.epoch !== undefined) this.latestVersion = Math.max(this.latestVersion, event.epoch);
-    if (hasTransactionIdentity) this.seenTransactionIds.add(transaction.id);
-    this.seenFingerprints.add(fingerprint);
-    if (event.source === "local") this.localFingerprints.add(fingerprint);
+    if (hasTransactionIdentity) rememberRecentIdentity(this.seenTransactionIds, transaction.id);
+    if (event.source === "local") rememberRecentIdentity(this.localFingerprints, fingerprint);
     const changeQueues = new Map<string, CellChange[]>();
     for (const change of event.changes) {
       const key = cellAddressKey(change.addr);

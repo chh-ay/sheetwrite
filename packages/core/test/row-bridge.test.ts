@@ -119,6 +119,54 @@ describe("RowBridge", () => {
     expect(remote.deltas).toHaveLength(1);
   });
 
+  const echoWindowSize = 4096;
+  for (const identity of ["transaction ID", "operation fingerprint"] as const) {
+    for (const laterTransactions of [echoWindowSize - 1, echoWindowSize + 1]) {
+      it(`recognizes ${identity} echoes only within the recent window (${laterTransactions} later transactions)`, () => {
+        const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+        const addr = { sheet: "sheet1", row: 0, col: 1 };
+        const operations: DocumentOp[] = [{ op: "set", addr, value: literal(0) }];
+        // Use explicit IDs without epochs so version ordering cannot mask identity eviction.
+        bridge.project(event(operations), undefined, "original");
+        for (let index = 1; index <= laterTransactions; index += 1) {
+          bridge.project(
+            event([{ op: "set", addr, value: literal(index) }]),
+            undefined,
+            `later-${index}`,
+          );
+        }
+        const echoValue = identity === "transaction ID" ? -1 : 0;
+        const echo = bridge.project(
+          event(
+            [{ op: "set", addr, value: literal(echoValue) }],
+            [{ addr, oldValue: literal(laterTransactions), newValue: literal(echoValue) }],
+            "remote",
+          ),
+          undefined,
+          identity === "transaction ID" ? "original" : "server-echo",
+        );
+        if (laterTransactions < echoWindowSize) {
+          expect(echo.status).toBe("duplicate");
+          expect(echo.deltas).toEqual([]);
+        } else {
+          expect(echo.status).toBe("remote");
+          expect(echo.deltas).toEqual([
+            expect.objectContaining({
+              kind: "cell",
+              source: "remote",
+              cell: expect.objectContaining({
+                rowId: "row-a",
+                columnKey: "amount",
+                previous: literal(laterTransactions),
+                next: literal(echoValue),
+              }),
+            }),
+          ]);
+        }
+      });
+    }
+  }
+
   it("rejects an inserted identity that already exists and releases it when removed", () => {
     const bridge = createRowBridge({
       columns,
