@@ -40,9 +40,9 @@ use dependency::{
 };
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 use lookup::{
-    clear_cached_lookups, find_match_index_indexed, integer_arg, list_reuse, positive_index,
-    remember_list, remember_result, remember_table, result_reuse, table_reuse, CachedList,
-    CachedResult, CachedTable, LookupPassGuard, ReuseEntry, TablePart,
+    find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list, remember_result,
+    remember_table, result_reuse, table_reuse, CachedList, CachedResult, CachedTable, LookupPassGuard,
+    ReuseEntry, TablePart,
 };
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
@@ -373,7 +373,6 @@ impl CellStore {
             return;
         }
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
-        clear_cached_lookups();
         let _lookup_pass = LookupPassGuard::begin();
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {

@@ -667,9 +667,8 @@ impl<Materialized> Clone for ReuseEntry<Materialized> {
 }
 
 thread_local! {
-    /// What one recalculation pass knows about the ranges its lookups read,
-    /// keyed by the range and the part read from it. Cleared where the
-    /// range-sum cache is cleared, so none of it outlives its pass.
+    /// Reuse state belongs to the active guard, which releases decoded
+    /// ranges even when recalculation returns early.
     static CACHED_TABLES: RefCell<HashMap<(CellRange, TablePart), ReuseEntry<CachedTable>>> =
         RefCell::new(HashMap::new());
     static CACHED_LISTS: RefCell<HashMap<CellRange, ReuseEntry<CachedList>>> =
@@ -682,8 +681,7 @@ thread_local! {
     static LOOKUP_PASS_ACTIVE: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Keeps reused ranges alive for one recalculation pass. Dropping the guard
-/// ends the pass, after which every lookup decodes its own range again.
+/// Owns the lifetime of decoded lookup ranges for one recalculation pass.
 pub(super) struct LookupPassGuard;
 
 impl LookupPassGuard {
@@ -697,6 +695,7 @@ impl LookupPassGuard {
 impl Drop for LookupPassGuard {
     fn drop(&mut self) {
         LOOKUP_PASS_ACTIVE.with(|active| active.set(false));
+        clear_cached_lookups();
     }
 }
 
@@ -704,8 +703,7 @@ fn pass_is_active() -> bool {
     LOOKUP_PASS_ACTIVE.with(Cell::get)
 }
 
-/// Drops every reuse state. A recalculation pass clears it first thing.
-pub(super) fn clear_cached_lookups() {
+fn clear_cached_lookups() {
     CACHED_TABLES.with(|tables| tables.borrow_mut().clear());
     CACHED_LISTS.with(|lists| lists.borrow_mut().clear());
     CACHED_RESULTS.with(|results| results.borrow_mut().clear());
@@ -763,4 +761,42 @@ pub(super) fn remember_result(range: CellRange, state: ReuseEntry<CachedResult>)
     CACHED_RESULTS.with(|results| {
         results.borrow_mut().insert(range, state);
     });
+}
+
+#[cfg(test)]
+mod lifetime_tests {
+    use super::*;
+    use crate::store::CellStore;
+
+    #[test]
+    fn recompute_releases_lookup_ranges_before_store_drop() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 3);
+        for row in 0..3 {
+            store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+            store.set_number(sheet, row, 1, ((row + 1) * 10) as f64, 0);
+            store.set_formula(sheet, row, 2, "=VLOOKUP(2,$A$1:$B$3,2,FALSE)", 0);
+            store.set_formula(sheet, row, 3, "=XLOOKUP(2,$A$1:$A$3,$B$1:$B$3)", 0);
+        }
+        store.recompute(sheet);
+        for row in 0..3 {
+            assert_eq!(store.get_cell(sheet, row, 2).num(), 20.0);
+            assert_eq!(store.get_cell(sheet, row, 3).num(), 20.0);
+        }
+        let cache_lengths = || {
+            (
+                CACHED_TABLES.with(|cache| cache.borrow().len()),
+                CACHED_LISTS.with(|cache| cache.borrow().len()),
+                CACHED_RESULTS.with(|cache| cache.borrow().len()),
+            )
+        };
+        let after_recompute = cache_lengths();
+        drop(store);
+        let after_store_drop = cache_lengths();
+        assert_eq!(
+            (after_recompute, after_store_drop),
+            ((0, 0, 0), (0, 0, 0)),
+            "lookup ranges must be released before the store is dropped"
+        );
+    }
 }
