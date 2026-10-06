@@ -542,7 +542,7 @@ async function main(): Promise<void> {
     metadata: protocolCaptureMeta(),
     runner: {
       runtime: `Bun ${Bun.version} on ${process.platform} ${process.arch}`,
-      browser: browser.version(),
+      browser: `Chromium ${browser.version()}`,
       cpu: cpus()[0]?.model ?? "unknown",
     },
     method: methodNotes(),
