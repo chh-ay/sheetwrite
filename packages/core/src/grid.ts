@@ -107,6 +107,7 @@ import type {
   TransactionResourceLimits,
 } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
+import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
 /** Platform fallback used when no reliable browser scroll clamp can be measured. */
@@ -2167,6 +2168,7 @@ export class GridImpl implements Grid {
   setTheme(theme: Partial<Theme>): void {
     this.baseTheme = { ...this.baseTheme, ...theme };
     this.applyZoomedTheme();
+    this.reseedWidgetTheme();
     this.emitThemeChange();
   }
 
@@ -2175,7 +2177,19 @@ export class GridImpl implements Grid {
     // then host CSS custom properties, then the new option value.
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
     this.applyZoomedTheme();
+    this.reseedWidgetTheme();
     this.emitThemeChange();
+  }
+
+  /**
+   * The built-in toolbar, find bar, and context menu read their palette from
+   * custom properties seeded on the grid root when they are created. Seed them
+   * again from the new base theme so a theme switch (for example to dark)
+   * repaints the widgets too, not only the canvas.
+   */
+  private reseedWidgetTheme(): void {
+    if (!this.toolbar && !this.contextMenu && !this.findBar) return;
+    seedWidgetTheme(this.host, this.baseTheme);
   }
 
   private emitThemeChange(): void {

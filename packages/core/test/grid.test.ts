@@ -736,6 +736,31 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
 
     grid.destroy();
   });
+
+  it("a theme change repaints the built-in toolbar, find bar, and menus", () => {
+    const workbook = makeWorkbook(10);
+    const host = mountHost();
+    const grid = new GridImpl(
+      host,
+      { workbook, config: { toolbar: true } },
+      makeFakeStore(workbook),
+    );
+    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
+    // The built-in widgets read their palette from custom properties seeded on
+    // the grid root (host CSS can still override them per widget).
+    const widgetColor = (name: string) => host.style.getPropertyValue(name).trim();
+
+    // A host switching to its dark palette.
+    grid.replaceTheme({ headerBg: "#0b1220", headerFg: "#dce3ee", bg: "#121a28" });
+    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#0b1220");
+    expect(widgetColor("--sheetwrite-toolbar-fg")).toBe("#dce3ee");
+    expect(widgetColor("--sheetwrite-widget-bg")).toBe("#121a28");
+
+    grid.setTheme({ headerBg: "#f0f2f5" });
+    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#f0f2f5");
+
+    grid.destroy();
+  });
 });
 
 describe("ChangeEvent.commitReason", () => {
