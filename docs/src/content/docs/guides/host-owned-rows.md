@@ -81,4 +81,17 @@ Vue emits `row-delta`; Svelte and the imperative controller use `onRowDelta`. Al
 
 Remote changes should enter through `grid.applyRemoteOperations(...)`. Their projections have `status: "remote"` and `source: "remote"`. An echoed local transaction is returned as `duplicate` with no deltas. For a server rejection or transformed acceptance, call `bridge.reconcile(...)` with the server result and the canonical applied operations. The bridge does not update your store automatically; your callback remains the only place that changes host rows.
 
-The bridge retains at most 4,096 recent transaction IDs and 4,096 recent local operation fingerprints. If your host applies its own echoes directly through `applyRemoteOperations`, deliver them within the last 4,096 transactions. An echo outside this window is no longer recognized and projects as a remote change. `SyncCoordinator` suppresses acknowledged local echoes before they become Grid change events.
+By default, the bridge retains at most 8,192 recent transaction IDs and 8,192 recent local operation fingerprints. If your host applies its own echoes directly through `applyRemoteOperations`, deliver each echo before its identity leaves this window. An echo outside this window is no longer recognized and projects as a remote change. `SyncCoordinator` removes acknowledged local echoes before they become Grid change events, so its separate 4,096 acknowledgement window does not set the bridge limit.
+
+Set `maxRecentTransactions` in `createRowBridge` to change the limit for each identity window. The value must be a positive safe integer; invalid values throw a `RangeError`. Raise the limit if your host can project more than 8,192 transactions before an echo arrives. A larger limit retains more identity strings and uses more memory.
+
+```ts compile prelude="core" title="Allow more delayed direct echoes"
+import { createRowBridge } from "@sheetwrite/core";
+
+const bridge = createRowBridge({
+  columns: [{ key: "total" }],
+  defaultRows: [{ id: "invoice-1", total: 120 }],
+  getRowId: (row) => row.id,
+  maxRecentTransactions: 16384,
+});
+```
