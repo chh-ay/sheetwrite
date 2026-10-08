@@ -12,15 +12,17 @@ import {
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import {
   COLLABORATION_ACTORS,
-  COLLABORATION_DOCUMENT_ID,
-  COLLABORATION_TOTAL_CELL,
-  makeCollaborationSnapshot,
   ShowcaseCollaborationServer,
   type ShowcaseCommitRecord,
   ShowcaseLinkError,
   ShowcaseNetworkLink,
   ShowcasePresenceBus,
 } from "../src/showcases/collaboration-protocol.ts";
+import {
+  COLLABORATION_DOCUMENT_ID,
+  COLLABORATION_TOTAL_CELL,
+  makeCollaborationSnapshot,
+} from "../src/showcases/collaboration-seed.js";
 
 /** Forecast column amounts by row straight from the generated seed, independent of the engine. */
 function seedForecastAmounts(): readonly number[] {

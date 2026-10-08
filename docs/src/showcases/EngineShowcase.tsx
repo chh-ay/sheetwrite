@@ -9,8 +9,22 @@ import {
   bindEngineEvents,
   createEngineHostSaver,
   createEngineLiveDataSource,
-  createEngineLiveWorkbook,
   createEngineTrace,
+  ENGINE_LOADING_MARKER,
+  ENGINE_TRACE_LIMIT,
+  type EngineAction,
+  type EngineEvent,
+  type EngineEventBindings,
+  type EngineEventInput,
+  type EngineHostSaver,
+  type EngineRenderer,
+  type EngineTrace,
+  engineLiveTheme,
+  formatEngineEvent,
+  formatEngineValue,
+} from "./scenarios/engine-live.js";
+import {
+  createEngineLiveWorkbook,
   ENGINE_ACCOUNT_ROWS,
   ENGINE_ACTUAL_ADJUSTMENT,
   ENGINE_COLUMN_INDEX,
@@ -19,23 +33,11 @@ import {
   ENGINE_LIVE_ROWS,
   ENGINE_LIVE_SHEET,
   ENGINE_LIVE_STORAGE,
-  ENGINE_LOADING_MARKER,
   ENGINE_PLAN_COLUMN,
   ENGINE_PLAN_KEY,
-  ENGINE_TRACE_LIMIT,
-  type EngineAction,
   type EngineColumnBand,
-  type EngineEvent,
-  type EngineEventBindings,
-  type EngineEventInput,
-  type EngineHostSaver,
-  type EngineRenderer,
-  type EngineTrace,
   engineAccountTotalRow,
-  engineLiveTheme,
-  formatEngineEvent,
-  formatEngineValue,
-} from "./scenarios/engine-live.js";
+} from "./scenarios/engine-live-data.js";
 import "@sheetwrite/core/styles.css";
 
 interface EngineShowcaseHandle {

@@ -4,9 +4,9 @@ import {
   bindEngineEvents,
   createEngineLiveDataSource,
   createEngineTrace,
-  ENGINE_LIVE_SHEET,
   type EngineEventInput,
 } from "../src/showcases/scenarios/engine-live.js";
+import { ENGINE_LIVE_SHEET } from "../src/showcases/scenarios/engine-live-data.js";
 
 function fakeGrid(onListener: (event: string, listener: (payload: never) => void) => void): Grid {
   const store = {

@@ -15,12 +15,6 @@ import "@sheetwrite/core/styles.css";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   COLLABORATION_ACTORS,
-  COLLABORATION_DOCUMENT_ID,
-  COLLABORATION_FORECAST_ROWS,
-  COLLABORATION_TOTAL_CELL,
-  COLLABORATION_WORKBOOK_COLUMNS,
-  COLLABORATION_WORKBOOK_ROWS,
-  makeCollaborationSnapshot,
   type ShowcaseActor,
   ShowcaseCollaborationServer,
   type ShowcaseCommitRecord,
@@ -29,6 +23,14 @@ import {
   ShowcaseNetworkLink,
   ShowcasePresenceBus,
 } from "./collaboration-protocol.js";
+import {
+  COLLABORATION_DOCUMENT_ID,
+  COLLABORATION_FORECAST_ROWS,
+  COLLABORATION_TOTAL_CELL,
+  COLLABORATION_WORKBOOK_COLUMNS,
+  COLLABORATION_WORKBOOK_ROWS,
+  makeCollaborationSnapshot,
+} from "./collaboration-seed.js";
 import { USAGE_RANGE, USAGE_SHEET_ID, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
 
 const LOG_LIMIT = 10;

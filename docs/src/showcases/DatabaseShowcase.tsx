@@ -13,13 +13,15 @@ import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import "@sheetwrite/core/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShowcaseLinkError, ShowcaseNetworkLink } from "./collaboration-protocol.js";
-import { makeUsageSheet, USAGE_RANGE, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
 import {
   DATABASE_DOCUMENT_ID,
   DATABASE_REVENUE_ROWS,
   DATABASE_TOTAL_CELL,
-  deleteShowcaseDatabase,
   makeDatabaseSeedSnapshot,
+} from "./database-seed.js";
+import { makeUsageSheet, USAGE_RANGE, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
+import {
+  deleteShowcaseDatabase,
   type ShowcaseDatabaseStats,
   ShowcaseIndexedDbAdapter,
 } from "./showcase-database.js";

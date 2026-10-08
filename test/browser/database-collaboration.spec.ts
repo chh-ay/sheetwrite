@@ -3,8 +3,8 @@ import {
   COLLABORATION_WORKBOOK_COLUMNS,
   COLLABORATION_WORKBOOK_ROWS,
   makeCollaborationSnapshot,
-} from "../../docs/src/showcases/collaboration-protocol.js";
-import { makeDatabaseSeedSnapshot } from "../../docs/src/showcases/showcase-database.js";
+} from "../../docs/src/showcases/collaboration-seed.js";
+import { makeDatabaseSeedSnapshot } from "../../docs/src/showcases/database-seed.js";
 import { siteUrl } from "./playwright.config.js";
 
 // Browser contracts for the two capability proof routes:

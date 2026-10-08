@@ -3,7 +3,7 @@ import {
   createEngineLiveWorkbook,
   ENGINE_LIVE_STORAGE,
   engineLiveRow,
-} from "../../docs/src/showcases/scenarios/engine-live.js";
+} from "../../docs/src/showcases/scenarios/engine-live-data.js";
 import { siteUrl } from "./playwright.config.js";
 
 /**

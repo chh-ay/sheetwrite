@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep browser smoke specs independent of built workspace packages by sharing pure engine workbook and collaboration/database seed modules with the showcases.
 - Cut uncompressed page weight by 21–56% across the site (7–18% after Brotli): share one popover panel per distinct hovered symbol, serve Expressive Code styles once from the cached site stylesheet instead of inlining them on every page, keep landing snippets, the docs page index, and the capability inventory out of the bundle every page loads, and stop sending landing and showcase styles to documentation pages. Hidden landing code tabs load on intent.
 - Deploy content-hashed assets and Pagefind shards with a one-year immutable cache; HTML and stable entry files still revalidate on each deployment.
 - Make the landing hero and architecture illustrations seekable through keyboard-accessible numbered chapters, with replay-safe state and reduced-motion still frames. Add undo/redo, tile-fetch, recalculation, and host-save animation sequences.

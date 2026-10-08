@@ -7,8 +7,8 @@ import {
   DATABASE_REVENUE_ROWS,
   DATABASE_TOTAL_CELL,
   makeDatabaseSeedSnapshot,
-  ShowcaseIndexedDbAdapter,
-} from "../src/showcases/showcase-database.ts";
+} from "../src/showcases/database-seed.js";
+import { ShowcaseIndexedDbAdapter } from "../src/showcases/showcase-database.ts";
 
 const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
 const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
