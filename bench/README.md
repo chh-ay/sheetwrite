@@ -277,9 +277,12 @@ baseline build. `bench:release` refreshes both captures, and
 Grid-interface timings under happy-dom: row and column resize with twenty move
 events followed by release, editor open/commit, pointer selection, and two
 untouched controls (one hundred cell-input reads and a column aggregate).
-It reports nine raw samples in milliseconds per operation after one warmup,
-with one hundred operations per sample. Fixture restoration is outside the
-timed interval; resize includes admission and history, but not undo.
+It reports eleven raw samples in milliseconds per operation after three discarded
+warmups. Each sample runs two thousand resize/edit operations, ten thousand
+selection/read operations, or two hundred thousand aggregates. Garbage collection
+and fixture restoration are outside the timed interval; resize includes admission
+and history, but not undo. Longer samples keep sub-millisecond paths from turning
+process startup and scheduling noise into an apparent regression.
 These are imperative-path timings, not browser paint or input-to-frame latency.
 For comparisons, build each checkout's packages first, run an A/A control, then
 alternate five ABBA rounds on the same CPU under an exclusive lock:

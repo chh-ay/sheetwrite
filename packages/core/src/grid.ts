@@ -1350,8 +1350,10 @@ export class GridImpl implements Grid {
 
   private emitSelection(): void {
     this.ariaMirror.bumpVersion();
-    const sel = this.getSelection();
-    for (const fn of this.listeners.selection) fn({ selection: sel });
+    if (this.listeners.selection.size > 0) {
+      const selection = this.getSelection();
+      for (const listener of this.listeners.selection) listener({ selection });
+    }
     this.emitCommandStateChange();
   }
 

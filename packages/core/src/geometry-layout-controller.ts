@@ -57,17 +57,19 @@ export class GeometryLayoutController {
   private rowTopsView = this.rowTopsScratch;
   private rowHeightsView = this.rowHeightsScratch;
   private rowGeometryLength = 0;
-  private columnPreview: { column: number; width: number } | null = null;
+  private previewColumn = -1;
+  private previewWidth = 0;
   private hasRowPreview = false;
 
   previewColumnWidth(column: number, width: number): void {
-    this.columnPreview = { column, width };
-    this.rebuildColumns();
+    this.previewColumn = column;
+    this.previewWidth = width;
+    this.columnIndex.setWidth(column, width * this.options.zoom());
   }
 
   columnWidth(column: number): number {
-    return this.columnPreview?.column === column
-      ? this.columnPreview.width
+    return this.previewColumn === column
+      ? this.previewWidth
       : (this.options.sheet().columns[column]?.width ?? 0);
   }
 
@@ -77,9 +79,10 @@ export class GeometryLayoutController {
   }
 
   clearResizePreview(): void {
-    if (this.columnPreview) {
-      this.columnPreview = null;
-      this.rebuildColumns();
+    if (this.previewColumn !== -1) {
+      const column = this.previewColumn;
+      this.previewColumn = -1;
+      this.columnIndex.setWidth(column, this.columnWidth(column) * this.options.zoom());
     }
     if (this.hasRowPreview) {
       this.hasRowPreview = false;

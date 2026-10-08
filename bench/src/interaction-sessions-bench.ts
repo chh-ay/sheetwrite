@@ -3,8 +3,11 @@ import { createGrid, DEFAULT_THEME, initSheetwrite, type Workbook } from "@sheet
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 
 const ROWS = 100;
-const ITERATIONS = 100;
-const SAMPLES = 9;
+const INTERACTION_ITERATIONS = 2_000;
+const CONTROL_ITERATIONS = 10_000;
+const AGGREGATE_ITERATIONS = 200_000;
+const WARMUPS = 3;
+const SAMPLES = 11;
 const DRAG_STEPS = 20;
 await initSheetwrite();
 const restoreCanvas = installCanvasTestStubs();
@@ -53,9 +56,16 @@ try {
     "aggregate",
   ] as const) {
     const timings: number[] = [];
-    for (let sample = -1; sample < SAMPLES; sample++) {
+    const iterations =
+      workload === "aggregate"
+        ? AGGREGATE_ITERATIONS
+        : workload === "selection" || workload === "get-cell"
+          ? CONTROL_ITERATIONS
+          : INTERACTION_ITERATIONS;
+    for (let sample = -WARMUPS; sample < SAMPLES; sample++) {
+      Bun.gc(true);
       let elapsed = 0;
-      for (let iteration = 0; iteration < ITERATIONS; iteration++) {
+      for (let iteration = 0; iteration < iterations; iteration++) {
         const started = performance.now();
         if (workload === "column-resize" || workload === "row-resize") {
           const isColumn = workload === "column-resize";
@@ -94,11 +104,13 @@ try {
         else if (workload === "row-resize") grid.setRowHeight(0, DEFAULT_THEME.rowHeight);
         else if (workload === "edit") grid.undo();
       }
-      if (sample >= 0) timings.push(elapsed / ITERATIONS);
+      if (sample >= 0) timings.push(elapsed / iterations);
     }
     samples[workload] = timings;
   }
-  process.stdout.write(`${JSON.stringify({ unit: "ms/operation", samples })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ unit: "ms/operation", warmups: WARMUPS, interactionIterations: INTERACTION_ITERATIONS, controlIterations: CONTROL_ITERATIONS, aggregateIterations: AGGREGATE_ITERATIONS, samples })}\n`,
+  );
 } finally {
   grid.destroy();
   host.remove();

@@ -289,12 +289,7 @@ export class InteractionSessions {
     const generation = ++this.generation;
     this.editingAddress = dataAddr;
     const selection = this.deps.selection();
-    const focus = selection.focusCell;
-    const selectionChanged =
-      !focus ||
-      focus.row !== editCell.row ||
-      focus.col !== editCell.col ||
-      selection.toSelection(dataAddr.sheet)?.kind !== "cell";
+    const selectionChanged = !selection.isCell(editCell.row, editCell.col);
     selection.selectCell(editCell.row, editCell.col);
     this.deps.scheduleRender();
     if (selectionChanged) this.deps.emitSelection();
