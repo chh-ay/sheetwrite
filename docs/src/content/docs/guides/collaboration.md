@@ -272,6 +272,9 @@ async function reloadAfterConflict(
     return session;
   }
 
+  // Freeze local edits and let queued writes finish before reading the queue.
+  session.grid.setReadOnly(true);
+  await session.sync.ready();
   const pending = session.sync.pendingCommits();
   const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
     ...entry.operations,
@@ -284,6 +287,7 @@ async function reloadAfterConflict(
     const result = rebaseDocumentOperations(record.operations, remoteOperations);
     if (result.status === "conflict") {
       console.error("Manual conflict review required", result.conflict);
+      session.grid.setReadOnly(false);
       return session; // old queue and grid remain intact
     }
     safeBatches.push(result);
@@ -325,6 +329,18 @@ product-specific conflict UI. If the server returns only a snapshot, the host
 cannot infer a safe transform; offer explicit discard/export/manual re-entry
 instead. Reloading a snapshot over pending edits without this decision loses
 intent.
+
+Two ordering rules keep recovery from losing work:
+
+- Freeze the Grid and await `sync.ready()` before reading `pendingCommits()`.
+  An edit made while recovery awaits would be neither rebased nor removed, and
+  a queue write still in flight could land after its removal. Either comes back
+  on the remounted client with a stale base version.
+- Keep remote operations that arrive between loading `latest` and
+  `sync.subscribe(...)`, and deliver them to the new coordinator. Drop versions
+  at or below `latest.version`, which the snapshot already contains. A
+  transport that only forwards to the current subscriber loses them, and the
+  client then waits on a version gap that never closes.
 
 ## Presence
 
