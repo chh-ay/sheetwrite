@@ -8,7 +8,7 @@ description: "Executable database-neutral reference adapter for tests, demos, an
 Executable database-neutral reference adapter for tests, demos, and local workflows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L96"><code>packages/core/src/persistence.ts#L96</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L102"><code>packages/core/src/persistence.ts#L102</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

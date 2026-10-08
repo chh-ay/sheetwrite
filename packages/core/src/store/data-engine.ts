@@ -27,7 +27,7 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
-import { decodeRestoreBlock } from "../restore-block.js";
+import { restoreBlockFacts } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -1602,12 +1602,13 @@ export class StoreDataEngine {
       }
       case "setBlock":
       case "restoreBlock": {
-        const bounds = normalizedRange(patch.range);
+        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+        const bounds = prepared?.range ?? normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
         const cellCount = rows * cols;
-        const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
+        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
         const styleTable = block.styleTable ?? [];
         const styleIds = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];

@@ -11,7 +11,7 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
-import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
+import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -1996,15 +1996,26 @@ export function validateDocumentOperationShape(
       }
       if (errors.length) break;
       try {
-        const block = decodeRestoreBlockPayload(
+        const prepared = preparedRestore(
           operation as unknown as Extract<DocumentOp, { op: "restoreBlock" }>,
+          validateDocumentOperationShape,
         );
         errors.push(
-          ...validateDocumentOperationShape(
-            { op: "setBlock", range: ownValue(operation, "range"), block },
-            path,
-          ),
+          ...prepared.errors.map((error) => ({
+            ...error,
+            path: path + error.path.slice("operation".length),
+          })),
         );
+        if (prepared.errors.length === 0) {
+          const range = operation.range as Range;
+          if (
+            prepared.block.rowCount !== Math.abs(range.end.row - range.start.row) + 1 ||
+            prepared.block.colCount !== Math.abs(range.end.col - range.start.col) + 1 ||
+            (prepared.block.styleIds !== undefined && prepared.block.styleTable === undefined)
+          ) {
+            invalid(errors, path, "Invalid restore block");
+          }
+        }
       } catch (error) {
         invalid(errors, path, error instanceof Error ? error.message : "Invalid restore block");
       }

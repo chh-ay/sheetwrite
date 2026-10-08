@@ -1,4 +1,4 @@
-import { decodeRestoreBlock } from "./restore-block.js";
+import { restoreBlockFacts } from "./restore-block.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
@@ -599,9 +599,9 @@ export class RowBridge<
         values.set(cellAddressKey(addr), cell.value);
       }
     } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
-      const block =
-        operation.op === "restoreBlock" ? decodeRestoreBlock(operation) : operation.block;
-      const range = operation.range;
+      const prepared = operation.op === "restoreBlock" ? restoreBlockFacts(operation) : undefined;
+      const block = prepared?.block ?? (operation as Extract<DocumentOp, { op: "setBlock" }>).block;
+      const range = prepared?.range ?? operation.range;
       const startRow = Math.min(range.start.row, range.end.row);
       const startCol = Math.min(range.start.col, range.end.col);
       const formulas = new Map(block.formulas ?? []);

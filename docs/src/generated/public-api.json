@@ -876,7 +876,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L56",
+              "source": "src/persistence.ts#L62",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
               "memberDocs": []
@@ -1323,7 +1323,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2955",
+              "source": "src/document-protocol.ts#L2966",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -2229,7 +2229,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L96",
+              "source": "src/persistence.ts#L102",
               "jsDocTags": [],
               "documentation": "Executable database-neutral reference adapter for tests, demos, and local workflows.",
               "memberDocs": [
@@ -2534,7 +2534,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L44",
+              "source": "src/persistence.ts#L50",
               "jsDocTags": [],
               "documentation": "Typed failure raised by persistence and synchronization flows.",
               "memberDocs": []
@@ -2546,7 +2546,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L36",
+              "source": "src/persistence.ts#L42",
               "jsDocTags": [],
               "documentation": "Stable category for a persistence failure.",
               "memberDocs": []
@@ -2767,7 +2767,7 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L48",
+              "source": "src/rebase.ts#L51",
               "jsDocTags": [],
               "documentation": "Conservative server-ordered rebase for pending offline work. Non-overlapping\nliteral edits are shifted across row/column insertion and deletion. Ambiguous\nformula, overlapping, sheet-lifecycle, and move cases become explicit\nconflicts instead of lossy guesses. This is the collaboration design gate;\nno CRDT dependency is required for the supported cases.",
               "memberDocs": []
@@ -4030,7 +4030,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L30",
+              "source": "src/persistence.ts#L36",
               "jsDocTags": [],
               "documentation": "Grid creation options accepted when hydrating a validated snapshot.",
               "memberDocs": []
@@ -4871,7 +4871,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2917",
+              "source": "src/document-protocol.ts#L2928",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
