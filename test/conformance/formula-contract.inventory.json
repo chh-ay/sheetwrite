@@ -5035,24 +5035,6 @@
       "version": 1
     },
     {
-      "id": "database",
-      "title": "Database functions",
-      "status": "unsupported",
-      "scope": "D-prefixed database aggregation functions are not evaluated.",
-      "examples": ["DAVERAGE", "DCOUNT", "DGET", "DSUM", "DVAR"],
-      "source": "microsoft-excel-functions",
-      "section": "Database functions",
-      "implementation": {
-        "status": "missing",
-        "paths": []
-      },
-      "evidence": {
-        "status": "registration-tested",
-        "paths": ["scripts/formula-contract.test.ts"]
-      },
-      "version": 1
-    },
-    {
       "id": "cube",
       "title": "Cube functions",
       "status": "unsupported",
@@ -5060,24 +5042,6 @@
       "examples": ["CUBEMEMBER", "CUBESET", "CUBEVALUE"],
       "source": "microsoft-excel-functions",
       "section": "Cube functions",
-      "implementation": {
-        "status": "missing",
-        "paths": []
-      },
-      "evidence": {
-        "status": "registration-tested",
-        "paths": ["scripts/formula-contract.test.ts"]
-      },
-      "version": 1
-    },
-    {
-      "id": "lambda",
-      "title": "LAMBDA and higher-order functions",
-      "status": "unsupported",
-      "scope": "User-defined lambdas and higher-order array execution are not evaluated.",
-      "examples": ["BYCOL", "BYROW", "LAMBDA", "MAKEARRAY", "MAP", "REDUCE", "SCAN"],
-      "source": "microsoft-excel-functions",
-      "section": "Logical functions",
       "implementation": {
         "status": "missing",
         "paths": []

@@ -2,7 +2,27 @@
 
 The full Sheetwrite Rust/WASM engine. This package builds the same store and loader API as `@sheetwrite/wasm`, with the `analysis` feature enabled. The default engine stays unchanged. Install this package only when your app needs the full formula engine.
 
-The full engine includes `TOCOL`, `TOROW`, `WRAPROWS`, `WRAPCOLS`, `EXPAND`, `HSTACK`, and `VSTACK`. These functions return spill arrays. They support scan order, blank and error filtering, and padding. Missing padding values default to `#N/A`.
+The full engine adds these function families:
+
+| Family | Examples |
+| --- | --- |
+| Distributions | `NORM.DIST`, `T.INV.2T`, `CHISQ.DIST.RT`, `BINOM.DIST`, `GAMMA.INV` |
+| Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `FORECAST.LINEAR` |
+| Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
+| Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT` |
+| Dates | `NETWORKDAYS.INTL`, `WORKDAY.INTL`, `DATEDIF`, `ISOWEEKNUM` |
+| Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE` |
+| Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET` |
+| Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ` |
+| Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
+| LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `MAKEARRAY` |
+| Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
+
+The [formulas guide](https://sheetwrite.vercel.app/docs/guides/formulas/#full-formula-engine) describes the limits, and the [formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/) lists every function with its build. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples, and the [formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/) runs thirteen panels of them live.
+
+## Reshaping functions
+
+`TOCOL`, `TOROW`, `WRAPROWS`, `WRAPCOLS`, `EXPAND`, `HSTACK`, and `VSTACK` return spill arrays. They support scan order, blank and error filtering, and padding. Missing padding values default to `#N/A`.
 
 ## Select the engine
 

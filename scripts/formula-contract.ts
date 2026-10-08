@@ -11,7 +11,7 @@ const ASSIST_PATH = "packages/core/src/formula-assist.ts";
 const ANALYSIS_PATH = "packages/wasm/src/eval/analysis";
 const REQUIRED_TARGET_HASH = "3efef696839478b92b59a004537f9ede7fa803f9749042bb830b664086495e80";
 const UNSUPPORTED_CATEGORY_HASH =
-  "eef794e222795f2122b414d5ee9efd09802cf92ef372ae9fa12aac29fa06eb5b";
+  "84d65b931bb56e52b65e22bc98ec22caa51c309e4481e5d87acd0740bc58c29c";
 const FORMULA_NAME = /^[A-Z][A-Z0-9.]*$/;
 const _ID = /^[a-z][a-z0-9-]*$/;
 
@@ -369,6 +369,14 @@ function validateReferencesAndNames(inventory: JsonObject, issues: string[]): vo
       issues.push(
         `contract.unsupportedCategories[${index}].source: unknown source ${String(category.source)}`,
       );
+    }
+    // An unsupported example must not also be a function that some build evaluates.
+    for (const example of Array.isArray(category.examples) ? category.examples : []) {
+      if (typeof example === "string" && parserNames.has(example)) {
+        issues.push(
+          `contract.unsupportedCategories[${index}].examples: ${example} is a supported function`,
+        );
+      }
     }
   }
 }
