@@ -49,9 +49,44 @@ grid.on("change", ({ transaction }) => {
 
 `initSheetwrite()` is re-entrant. Call it before `createGrid`; concurrent calls share initialization and a failed call can be retried. Destroy the returned grid when its host is permanently removed.
 
+## Add a formula
+
+A formula is a cell value with `kind: "formula"`. The engine calculates it at once, and dependent cells follow every later edit.
+
+```ts prelude="core" partial="continues the complete example above" title="Add a total"
+grid.applyTransaction({
+  patches: [
+    {
+      op: "set",
+      addr: { sheet: "sales", row: 2, col: 1 },
+      value: { kind: "formula", src: "=SUM(B1:B2)" },
+    },
+  ],
+});
+
+console.log(grid.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+```
+
+Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](/docs/guides/analysis-formulas/) before you create the grid.
+
+## Save and open the document
+
+`exportSnapshot()` returns the complete document: values, formulas, styles, and sheet settings. Store it as JSON, and open it later with `createGridFromSnapshot`. Selection, scroll position, and zoom are session state; they are not in the snapshot.
+
+```ts prelude="core" partial="continues the complete example above" title="Save and open"
+const saved = JSON.stringify(grid.exportSnapshot());
+grid.destroy();
+
+const reopened = createGridFromSnapshot(host, JSON.parse(saved));
+console.log(reopened.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+```
+
+For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](/docs/guides/persistence/) explains the adapter and the offline queue.
+
 ## Next steps
 
 - Open the [Vanilla example](/vanilla/) to exercise the same lifecycle in a production build.
 - Choose a [framework integration](/docs/frameworks/lifecycle/).
 - Learn when the [`Grid` and `Store` own state](/docs/concepts/runtime-ownership/).
+- Read [what is new in 0.5.0](/docs/start/whats-new/).
 - Browse the generated [`@sheetwrite/core` API](/docs/api/core/).

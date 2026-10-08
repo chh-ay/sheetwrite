@@ -37,9 +37,16 @@ lets the store hand the renderer a transferable, typed-array-backed window.
 Because the engine is columnar and WASM-resident:
 
 - A sheet of 100k+ rows costs no DOM nodes and no per-cell JS objects.
+- Bulk loads write packed blocks: one engine call per column, with all text
+  cells in one UTF-8 buffer instead of one string per cell crossing into WASM.
 - The render hot path is a single bulk read, not N cell lookups.
 - The same snapshot can be transferred to a worker for off-thread painting (see
   [Worker rendering](/docs/guides/worker-rendering/)).
+
+The same engine calculates formulas. The default build is `@sheetwrite/wasm`, and
+the optional full build `@sheetwrite/formulas` adds the analysis functions. See
+[Calculation engine](/docs/concepts/calculation-engine/) for recalculation,
+spills, and limits.
 
 ## Virtualization & scaled scroll
 

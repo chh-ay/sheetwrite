@@ -55,6 +55,12 @@ Sheetwrite packages are released together at version 0.4.0. This index is genera
 - [Error handling](https://sheetwrite.vercel.app/docs/reference/events-errors/): Typed failures, stable codes, recovery paths, event direction, validation, and incomplete-data behavior.
 - [Compatibility and limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/): Explicit compatibility boundaries, resource ceilings, tuning defaults, limit behavior, and override paths.
 
+## More guides
+
+- [Calculation engine](https://sheetwrite.vercel.app/docs/concepts/calculation-engine/): How Sheetwrite calculates formulas: two engine builds, incremental recalculation, spills, paged data, errors, and limits.
+- [Analysis formulas](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
+- [What's new in 0.5.0](https://sheetwrite.vercel.app/docs/start/whats-new/): The full formula engine, spill references, large undo, faster loading and import, and the upgrade checklist for Sheetwrite 0.5.0.
+
 ## Public API
 
 - [API reference](https://sheetwrite.vercel.app/docs/api/): Generated reference for every classified Sheetwrite package entry point.

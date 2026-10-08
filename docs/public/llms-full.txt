@@ -8,6 +8,7 @@ Packages: 0.4.0. Canonical HTML: https://sheetwrite.vercel.app/docs/
 
 ## Contents
 
+- [Calculation engine](#calculation-engine)
 - [Runtime ownership](#runtime-ownership)
 - [Adapter lifecycle](#adapter-lifecycle)
 - [React](#react)
@@ -15,6 +16,7 @@ Packages: 0.4.0. Canonical HTML: https://sheetwrite.vercel.app/docs/
 - [Vanilla JavaScript](#vanilla-javascript)
 - [Vue](#vue)
 - [Accessibility](#accessibility)
+- [Analysis formulas](#analysis-formulas)
 - [Collaboration and offline work](#collaboration-and-offline-work)
 - [Configuration](#configuration)
 - [Data operations and export](#data-operations-and-export)
@@ -31,9 +33,96 @@ Packages: 0.4.0. Canonical HTML: https://sheetwrite.vercel.app/docs/
 - [Error handling](#error-handling)
 - [Your first grid](#your-first-grid)
 - [Installation](#installation)
+- [What's new in 0.5.0](#what-s-new-in-0-5-0)
 - [Public API declarations](#public-api-declarations)
 
 ## Authored guides
+
+### Calculation engine
+
+Source: https://sheetwrite.vercel.app/docs/concepts/calculation-engine/
+
+Sheetwrite calculates formulas in a Rust engine compiled to WebAssembly. The
+TypeScript core sends edits to the engine as transactions, and the engine keeps
+every formula result current. This page explains the model. The
+[formulas guide](https://sheetwrite.vercel.app/docs/guides/formulas/) has the exact syntax and semantics.
+
+## One engine, two builds
+
+| Build | Package | Use it when |
+| --- | --- | --- |
+| Default | `@sheetwrite/wasm` | The app needs the standard functions: math, lookup, text, logic, dates, dynamic arrays, and `LET`. It is the smallest download. |
+| Full | `@sheetwrite/formulas` | The app needs analysis functions: `GROUPBY`, `PIVOTBY`, `LAMBDA`, statistics, regression, finance, regex, and more. |
+
+Both builds compile from the same source and have the same API, storage, and
+limits. The full build only registers more functions. An app selects one build
+one time, before it creates a Grid or a store, and cannot change it later. See
+[Full formula engine](https://sheetwrite.vercel.app/docs/start/installation/#full-formula-engine) and the
+[analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/).
+
+## What happens on an edit
+
+1. The Grid or the host submits a transaction, for example a `set` operation.
+2. The engine stores the new values and marks the changed cells dirty.
+3. A dependency index records which formulas read which cells and ranges. The
+engine uses it to find every formula that the dirty cells affect, also
+through other formulas.
+4. Only those formulas calculate again. A formula that no change reaches keeps
+its result.
+5. The transaction returns after the calculation. `store.getCell(address).resolved`
+gives the new result at once, and the `change` event and the next paint show it.
+
+The dependency index changes only when formula reads change. If you rewrite a
+formula and its cell and range reads stay the same, for example a new constant,
+the index stays valid.
+
+## Spills
+
+A formula that returns an array, such as `=SORT(A2:A100)` or `={1,2;3,4}`,
+**spills**: the formula cell is the anchor, and the result fills the cells to
+its right and below. Spills are atomic. If any destination cell is not empty,
+the anchor shows `#SPILL!` and no partial result appears.
+
+`A1#` refers to the current spill of `A1` and follows it when it grows or
+shrinks. When one spill reads another, the engine calculates them in dependency
+order, so the reader always sees current values. Spills that read each other
+show `#CYCLE!`. See [Dynamic arrays and spills](https://sheetwrite.vercel.app/docs/guides/formulas/#dynamic-arrays-and-spills).
+
+## Paged data and `#LOADING!`
+
+With a windowed datasource, only some rows are in memory. A formula that reads
+cells that are not loaded yet shows `#LOADING!` and calculates again when they
+arrive. For visible formulas, the Grid asks the engine which same-sheet cells
+they read and loads those cells with the window, within a cell budget. See
+[Cells that visible formulas read](https://sheetwrite.vercel.app/docs/guides/configuration/#cells-that-visible-formulas-read).
+
+## Errors are values
+
+A formula error is a result, not an exception: `#DIV/0!`, `#N/A`, `#NAME?`,
+`#REF!`, `#VALUE!`, `#NUM!`, `#SPILL!`, `#CALC!`, `#CYCLE!`, and `#LOADING!`.
+Errors flow to dependent formulas, and `IFERROR` can replace them. An unknown
+function returns `#NAME?`, and its source stays in the document, so a later
+engine build can calculate it. See [Scalars, coercion, and errors](https://sheetwrite.vercel.app/docs/guides/formulas/#scalars-coercion-and-errors).
+
+## Limits
+
+Every formula runs inside fixed resource limits. When a formula reaches a limit,
+it returns an error, usually `#NUM!`, and never a partial result:
+
+- one range can hold at most 1,000,000 cells;
+- one spill can hold at most 1,000,000 cells and 64 MiB;
+- one dynamic-array calculation can do at most 2,000,000 cell operations;
+- dependencies and nested expressions can be at most 256 levels deep.
+
+The [compatibility limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/#formula-evaluation)
+list every limit, its unit, and its behavior.
+
+## No network, no custom code
+
+Formula calculation makes no network request and runs no JavaScript from the
+document. Functions that need external data, such as `WEBSERVICE` or
+`GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` change only when the host
+calls `store.recalculateVolatile(date)`.
 
 ### Runtime ownership
 
@@ -69,9 +158,16 @@ lets the store hand the renderer a transferable, typed-array-backed window.
 Because the engine is columnar and WASM-resident:
 
 - A sheet of 100k+ rows costs no DOM nodes and no per-cell JS objects.
+- Bulk loads write packed blocks: one engine call per column, with all text
+cells in one UTF-8 buffer instead of one string per cell crossing into WASM.
 - The render hot path is a single bulk read, not N cell lookups.
 - The same snapshot can be transferred to a worker for off-thread painting (see
 [Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/)).
+
+The same engine calculates formulas. The default build is `@sheetwrite/wasm`, and
+the optional full build `@sheetwrite/formulas` adds the analysis functions. See
+[Calculation engine](https://sheetwrite.vercel.app/docs/concepts/calculation-engine/) for recalculation,
+spills, and limits.
 
 ## Virtualization & scaled scroll
 
@@ -470,6 +566,7 @@ export function Sheet({ columns, rows, save, onReady }: SheetProps) {
     <Sheetwrite
       columns={columns}
       defaultRows={rows}
+      height={420}
       onGridChange={(event) => save(event.transaction)}
       onReady={onReady}
     />
@@ -518,6 +615,7 @@ The binding is populated before `onReady` and cleared before reset or unmount. A
 <Sheetwrite
   {columns}
   defaultRows={rows}
+  height={420}
   bind:grid
   onGridChange={handleGridChange}
   {onReady}
@@ -602,6 +700,7 @@ const handleReady = (event: GridReadyEvent) => emit("ready", event);
   <Sheetwrite
     :columns="columns"
     :default-rows="rows"
+    :height="420"
     @grid-change="handleGridChange"
     @ready="handleReady"
   />
@@ -719,6 +818,241 @@ window. Use the grid's keyboard navigation (arrows, Page Up/Down, Home/End — s
 [Interaction](https://sheetwrite.vercel.app/docs/guides/interaction/#keyboard-navigation)) to move focus; that scrolls
 new rows into view and into the mirror, and updates `aria-activedescendant`.
 
+### Analysis formulas
+
+Source: https://sheetwrite.vercel.app/docs/guides/analysis-formulas/
+
+The full formula engine, `@sheetwrite/formulas`, adds analysis functions to the
+default engine: grouping and pivot tables, `LAMBDA` helpers, statistics,
+regression, distributions, finance, dates, text and regex, reshaping, database
+functions, and matrices. This guide shows one task for each family. The
+[formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/) lists every
+function, its signature, and its build. The
+[formulas guide](https://sheetwrite.vercel.app/docs/guides/formulas/) explains syntax, references, errors,
+and spills. To see these functions recalculate live over 20,000 orders, open the
+[formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/).
+
+## Select the engine
+
+Select the full engine one time, before you create a Grid or a store. The rest
+of the API does not change.
+
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+With the default engine, these functions return `#NAME?`, and formula assist
+does not suggest them.
+
+## The example data
+
+All examples use this sheet of 12 orders in `A1:G12`. Column E holds
+`Units × Price`, and column F holds order dates.
+
+| Row | A Region | B Product | C Units | D Price | E Revenue | F Date | G Note |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- |
+| 1 | North | Desk | 4 | 250 | 1,000 | 2026-01-05 | Ref INV-1042; ship by Friday |
+| 2 | South | Chair | 10 | 80 | 800 | 2026-01-09 | Ref INV-1043; gift wrap |
+| 3 | North | Chair | 6 | 80 | 480 | 2026-01-14 | Ref INV-1044 |
+| 4 | East | Desk | 2 | 250 | 500 | 2026-01-20 | Ref INV-1045; call 555-0142 |
+| 5 | South | Lamp | 15 | 30 | 450 | 2026-02-02 | Ref INV-1046 |
+| 6 | East | Lamp | 8 | 30 | 240 | 2026-02-06 | Ref INV-1047; ship by Monday |
+| 7 | North | Lamp | 12 | 30 | 360 | 2026-02-11 | Ref INV-1048 |
+| 8 | South | Desk | 3 | 250 | 750 | 2026-02-17 | Ref INV-1049 |
+| 9 | East | Chair | 7 | 80 | 560 | 2026-02-23 | Ref INV-1050; call 555-0187 |
+| 10 | North | Desk | 5 | 250 | 1,250 | 2026-03-03 | Ref INV-1051 |
+| 11 | South | Chair | 9 | 80 | 720 | 2026-03-10 | Ref INV-1052 |
+| 12 | East | Desk | 1 | 250 | 250 | 2026-03-16 | Ref INV-1053; gift wrap |
+
+Cash flows for the finance examples are in `H1:I4`: −10,000 on 2026-01-01,
+2,500 on 2026-04-01, 4,200 on 2026-09-01, and 6,000 on 2026-12-31.
+
+Every result below comes from the full engine. Results that spill are shown as
+the cells they fill.
+
+## Summarize: GROUPBY, PIVOTBY, PERCENTOF
+
+`GROUPBY` groups rows by one or more key columns and aggregates the values. It
+adds a total row by default.
+
+```text
+=GROUPBY(A1:A12, E1:E12, SUM)
+```
+
+| Region | Revenue |
+| --- | ---: |
+| East | 1550 |
+| North | 3090 |
+| South | 2720 |
+| Total | 7360 |
+
+`PIVOTBY` adds column keys:
+
+```text
+=PIVOTBY(A1:A12, B1:B12, E1:E12, SUM)
+```
+
+| | Chair | Desk | Lamp | Total |
+| --- | ---: | ---: | ---: | ---: |
+| East | 560 | 750 | 240 | 1550 |
+| North | 480 | 2250 | 360 | 3090 |
+| South | 1520 | 750 | 450 | 2720 |
+| Total | 2560 | 3750 | 1050 | 7360 |
+
+The optional arguments control headers, totals, and sort order. `PERCENTOF` as
+the function gives each group's share, and a `LAMBDA` can be the function:
+
+| Formula | Result |
+| --- | --- |
+| `=GROUPBY(A1:A12, E1:E12, SUM, 0, 0, -2)` | North 3090, South 2720, East 1550 (no total, largest first) |
+| `=GROUPBY(A1:A12, E1:E12, PERCENTOF, 0, 0)` | East 0.2106, North 0.4198, South 0.3696 |
+| `=GROUPBY(B1:B12, C1:C12, LAMBDA(units, MAX(units)), 0, 0)` | Chair 10, Desk 5, Lamp 15 |
+
+A vector of functions, such as `HSTACK(SUM, AVERAGE)`, returns `#VALUE!`. Use
+one function per `GROUPBY`.
+
+## Your own functions: LAMBDA, MAP, REDUCE, SCAN, BYROW
+
+`LAMBDA` makes a function from parameters and a calculation. The helpers call it
+for each value, row, or column.
+
+| Formula | Result |
+| --- | --- |
+| `=MAP(C1:C3, D1:D3, LAMBDA(units, price, units * price))` | 1000; 800; 480 (spills down) |
+| `=REDUCE(0, E1:E12, LAMBDA(total, x, IF(x >= 1000, total + x, total)))` | 2250 |
+| `=SCAN(0, E1:E4, LAMBDA(running, x, running + x))` | 1000; 1800; 2280; 2780 (running total) |
+| `=BYROW(C1:D3, LAMBDA(row, PRODUCT(row)))` | 1000; 800; 480 |
+| `=LET(big, LAMBDA(x, x >= 1000), FILTER(B1:B12, MAP(E1:E12, big)))` | Desk; Desk |
+
+`LET` can name a `LAMBDA` and call it later. An uncalled `LAMBDA` returns
+`#CALC!`, and a call with the wrong number of arguments returns `#VALUE!`. Calls
+nest up to 64 deep.
+
+## Describe: statistics and ranking
+
+| Formula | Result | Meaning |
+| --- | --- | --- |
+| `=TRIMMEAN(E1:E12, 0.2)` | 587 | Mean revenue without the top and bottom 10% |
+| `=PERCENTILE.EXC(E1:E12, 0.9)` | 1175 | 90th percentile order |
+| `=RANK.AVG(E2, E1:E12)` | 3 | The South chair order is the third largest |
+| `=SKEW(E1:E12)` | 0.784 | Revenue has a tail of large orders |
+| `=FREQUENCY(E1:E12, {500, 1000})` | 6; 5; 1 | Orders up to 500, up to 1,000, and above |
+| `=MODE.MULT({4, 10, 6, 4, 15, 10, 8})` | 4; 10 | Every most frequent value |
+
+## Forecast: regression
+
+Monthly revenue for six months was 1200, 1350, 1500, 1580, 1700, and 1850.
+
+| Formula | Result |
+| --- | --- |
+| `=FORECAST.LINEAR(7, {1200,1350,1500,1580,1700,1850}, {1,2,3,4,5,6})` | 1968 |
+| `=TREND({1200;1350;1500;1580;1700;1850}, {1;2;3;4;5;6}, {7;8;9})` | 1968; 2093.14; 2218.29 |
+| `=LINEST({1200;1350;1500;1580;1700;1850}, {1;2;3;4;5;6})` | 125.14, 1092 (slope, intercept) |
+
+`LINEST` and `LOGEST` accept more than one predictor column, the `const`
+argument, and `stats = TRUE` for five rows of fit statistics. `TREND` and
+`GROWTH` project new values from the same fit.
+
+## Estimate risk: distributions
+
+| Formula | Result | Meaning |
+| --- | --- | --- |
+| `=NORM.INV(0.95, 1000, 120)` | 1197.38 | Demand that covers 95% of days, with mean 1000 and deviation 120 |
+| `=BINOM.DIST(3, 10, 0.2, FALSE)` | 0.2013 | Chance of exactly 3 returns in 10 orders at a 20% return rate |
+| `=CONFIDENCE.T(0.05, STDEV.S(E1:E12), 12)` | 193.05 | Half-width of the 95% interval for mean revenue |
+
+The engine has 36 distribution functions: normal, Student t, chi-squared, F,
+binomial, Poisson, exponential, gamma, beta, lognormal, and Weibull, with their
+inverses.
+
+## Plan money: finance
+
+| Formula | Result | Meaning |
+| --- | --- | --- |
+| `=XIRR(H1:H4, I1:I4)` | 0.3897 | Annual return of irregular cash flows (39%) |
+| `=XNPV(0.08, H1:H4, I1:I4)` | 1999.96 | Their value today at 8% a year |
+| `=PMT(0.06/12, 36, -25000)` | 760.55 | Monthly payment on a 25,000 loan over 3 years at 6% |
+| `=CUMIPMT(0.06/12, 36, 25000, 1, 12, 0)` | −1286.73 | Interest paid in the first year of that loan |
+
+The full engine also has `MIRR`, `NPER`, `CUMPRINC`, `EFFECT`, `NOMINAL`, and
+depreciation functions (`SLN`, `DB`, `DDB`, `SYD`).
+
+## Schedule: working days and dates
+
+| Formula | Result |
+| --- | --- |
+| `=NETWORKDAYS.INTL(DATE(2026,1,1), DATE(2026,1,31), 1)` | 22 working days |
+| `=WORKDAY.INTL(DATE(2026,1,30), 5, "0000011")` | 46059, that is 2026-02-06 |
+| `=DATEDIF(DATE(2024,3,15), DATE(2026,1,5), "m")` | 21 full months |
+| `=ISOWEEKNUM(DATE(2026,1,5))` | 2 |
+
+The weekend argument is a number or a seven-character mask that starts on
+Monday: `"0000011"` means Saturday and Sunday. A holiday range is the optional
+last argument.
+
+## Clean text: split, extract, and regex
+
+| Formula | Result |
+| --- | --- |
+| `=TEXTSPLIT("North,South,East", ",")` | North, South, East (spills across) |
+| `=TEXTBEFORE(G1, ";")` | Ref INV-1042 |
+| `=TEXTAFTER(G1, "; ")` | ship by Friday |
+| `=REGEXEXTRACT(G1, "INV-[0-9]+")` | INV-1042 |
+| `=REGEXREPLACE(G4, "[0-9]{3}-[0-9]{4}", "***-****")` | Ref INV-1045; call \*\*\*-\*\*\*\* |
+| `=REGEXTEST(G6, "ship by")` | TRUE |
+| `=ARRAYTOTEXT({"North", "South"})` | North, South |
+
+Regex uses the regex-lite syntax. Patterns with lookaround, backreferences, or
+Unicode classes return `#VALUE!`, never a wrong match. Case-insensitive matching
+folds ASCII letters only.
+
+## Reshape arrays
+
+| Formula | Result |
+| --- | --- |
+| `=VSTACK({"Region","Units"}, HSTACK(A1:A3, C1:C3))` | A header row on top of North 4, South 10, North 6 |
+| `=TAKE(SORTBY(HSTACK(B1:B12, E1:E12), E1:E12, -1), 3)` | Desk 1250, Desk 1000, Chair 800 |
+| `=WRAPROWS(SEQUENCE(6), 3)` | 1, 2, 3 / 4, 5, 6 |
+| `=TOCOL({1,2;3,4})` | 1; 2; 3; 4 |
+| `=EXPAND({1,2;3,4}, 3, 3, 0)` | The 2 × 2 array padded to 3 × 3 with 0 |
+
+`SORTBY` keeps equal items in their order. `TOCOL` and `TOROW` can skip blanks
+and errors and read by row or by column.
+
+## Query tables: database functions
+
+Database functions take a table with a header row, a field, and a criteria table
+with the same headers. Criteria columns use AND, and criteria rows use OR.
+
+| Formula | Result |
+| --- | --- |
+| `=DSUM({"Region","Units";"North",4;"South",10;"North",6}, "Units", {"Region";"North"})` | 10 |
+| `=DAVERAGE({"Region","Units";"North",4;"South",10;"North",6}, "Units", {"Region";"North"})` | 5 |
+
+In a workbook, the table and the criteria are usually ranges, such as
+`=DSUM(A1:E200, "Revenue", H1:H2)`.
+
+## Matrices
+
+| Formula | Result |
+| --- | --- |
+| `=MMULT({1,2;3,4}, {5;6})` | 17; 39 |
+| `=MINVERSE({4,7;2,6})` | 0.6, −0.7 / −0.2, 0.4 |
+| `=MDETERM({4,7;2,6})` | 10 |
+| `=SUMSQ(C1:C3)` | 152 |
+
+## Limits
+
+- All these functions use the normal spill, shape, memory, and work limits. A
+result that does not fit returns an error, not a partial result.
+- `AGGREGATE` options that skip hidden rows have no effect, because formulas do
+not see hidden-row state.
+- Each family's exact argument rules are in the
+[formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/).
+
 ### Collaboration and offline work
 
 Source: https://sheetwrite.vercel.app/docs/guides/collaboration/
@@ -778,6 +1112,7 @@ An HTTP adapter can stay transport-neutral at the core boundary:
 ```ts
 import type {
   PersistenceAdapter,
+  PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   WorkbookSnapshot,
@@ -797,6 +1132,20 @@ const persistenceAdapter: PersistenceAdapter = {
     const { signal, ...body } = request;
     const response = await fetch(
       `/api/documents/${encodeURIComponent(request.documentId)}/operations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      },
+    );
+    return responseJson<PersistenceCommitResponse>(response);
+  },
+  // Required for undo of very large edits; see "Large undo and atomic batches".
+  async commitBatch(request: PersistenceBatchCommitRequest) {
+    const { signal, ...body } = request;
+    const response = await fetch(
+      `/api/documents/${encodeURIComponent(request.documentId)}/operation-batches`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -848,12 +1197,55 @@ Handle `commit()` in one database transaction:
 5. Periodically fold the log into `snapshot_json`; never rewrite operation
 versions or accept client-authored server timestamps.
 
+Handle `commitBatch()` the same way, with one difference: the request has
+`versionOperationCounts`, and it fills several consecutive versions. In one
+database transaction, check the duplicate and the base version once, validate
+every version, then append all of them or none. Store each version with its
+`batch: { index, count }` position, and acknowledge with the last version.
+
 Normalized cell tables are an alternative for products that need SQL queries
 over cell values. They do not replace the protocol: the host must still
 reconstruct a complete schema-versioned `WorkbookSnapshot`, preserve formula
 source/style/metadata, and serialize structural operations under one document
 version. Mixing independent cell writes with the operation log breaks atomic
 row/column/formula semantics.
+
+## Large undo and atomic batches
+
+Undo of a large clear restores the old cells. When the ordinary `setBlock`
+operation is too large for one version, the Grid sends one `restoreBlock`
+operation instead: the same cells as compressed JSON (`deflate-json-v1`). If
+even that does not fit one version, the Grid splits the restore into an atomic
+batch of up to 16 versions and 64 MiB. Undo stays one history step and one
+`change` event.
+
+Before you accept 0.5.0 clients, make sure that your server:
+
+1. accepts `restoreBlock` wherever it switches over the `DocumentOp` union, and
+decodes it as untrusted input. `@sheetwrite/core` does not export a server
+decoder, so your decoder must do these checks, in this order, before it
+changes the document:
+- `encoding` is `"deflate-json-v1"`, and `decodedBytes` is a positive
+integer of at most 64 MiB;
+- `data` is canonical base64 (it decodes and re-encodes to the same text);
+- the raw DEFLATE stream inflates into a buffer of exactly `decodedBytes`
+bytes. Never inflate without that output limit: a small stream can expand
+to gigabytes. Reject a stream that ends early or has bytes left over;
+- the bytes are valid UTF-8 JSON of a `PackedCellBlock` whose row and
+column counts match `range`, with at most 4,000,000 cells;
+- every value, formula, reference, and style in the block passes the same
+validation as a `setBlock` operation;
+2. implements `commitBatch` as above, or accepts that `SyncCoordinator`
+rejects a local step that needs more than one version;
+3. publishes batch members with their `batch` field, so that peers apply the
+whole batch at once; and
+4. folds `restoreBlock` into snapshots as ordinary cells. Snapshots never
+store restore streams.
+
+The [document operations reference](https://sheetwrite.vercel.app/docs/reference/document-operations/#atomic-multi-version-batches)
+has the exact field rules, limits, and error codes. When an undo is above the
+transaction limits even after this, the Grid changes nothing and reports it;
+see [Interaction](https://sheetwrite.vercel.app/docs/guides/interaction/#undo-and-redo).
 
 ## Durable pending commits
 
@@ -1339,6 +1731,17 @@ acknowledgement. Full-sheet queries and exports report incomplete data until all
 required pages are loaded. `Store.queryCapability(sheet)` and
 `getCellLoadState(addr)` expose that state.
 Default chunk/cache values and eviction behavior are listed in [Compatibility and limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/#rendering-interaction-and-paged-data).
+
+#### Cells that visible formulas read
+
+A visible formula can read cells outside the visible window, for example a
+variance column that reads a plan column far to the right. The Grid asks the
+engine which same-sheet cells the visible formulas read, also through other
+formulas, and requests those cells with the window. The formula then resolves
+instead of staying `#LOADING!`. A cell budget equal to the prefetch byte limit
+bounds this work, so a whole-column read does not load the full column in one
+window. Reads from other sheets are not loaded this way; return those values
+from the datasource or keep that sheet dense.
 
 ### Serializable documents
 
@@ -2029,9 +2432,43 @@ grid.store.applyTransaction({
 
 ## Supported formulas
 
-The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference publishes all **100 required-supported target functions plus every incumbent function**, grouped by family, with aliases, exact signature and semantic profiles, implementation/evidence paths, source links, and behavior status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
+The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference lists every function in both engines, grouped by family, with aliases, exact signature and semantic profiles, implementation and evidence paths, source links, and behavior status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
 
 [Browse the generated formula function contract →](https://sheetwrite.vercel.app/docs/reference/formula-functions/)
+
+## Full formula engine
+
+Sheetwrite has two engine builds with the same API. `@sheetwrite/wasm` is the default engine: it has the standard function set and the smallest download. `@sheetwrite/formulas` is the full engine: the same engine with the analysis families below. An app selects one engine, one time, before it creates a Grid or a store:
+
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+| Family | Examples |
+| --- | --- |
+| Distributions | `NORM.DIST`, `T.INV.2T`, `CHISQ.DIST.RT`, `BINOM.DIST`, `GAMMA.INV`, `CONFIDENCE.T` |
+| Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `KURT`, `FORECAST.LINEAR` |
+| Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
+| Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT`, `DDB` |
+| Dates | `NETWORKDAYS.INTL`, `WORKDAY.INTL`, `DATEDIF`, `ISOWEEKNUM` |
+| Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE`, `ARRAYTOTEXT` |
+| Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET`, `DMAX`, `DSTDEV` |
+| Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ`, `COMBIN` |
+| Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
+| LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`, `ISOMITTED` |
+| Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
+
+The default engine returns `#NAME?` for these functions, and formula assist does not suggest them. The [formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/) runs thirteen panels of them live over 20,000 orders, and the [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples.
+
+Limits of the full engine:
+
+- `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls are limited to a depth of 64 and 2,000,000 work units per outer helper; more returns `#NUM!`.
+- `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
+- Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
+- `AGGREGATE` options that skip hidden rows have no effect, because formulas do not see hidden-row state.
 
 Function names are case-insensitive. Commas are the only documented argument separator. Interior omitted optional arguments are preserved (`XLOOKUP(key, keys, results,, 0)`). Locale-specific separators are not accepted.
 
@@ -2068,7 +2505,7 @@ Coercion follows these documented rules:
 
 Bindings are lazy. Only names reachable from `calculation` are expanded and evaluated, so an unused cell read, error, or `NOW()` does not become a dependency, error, or volatile marker. A used binding preserves ordinary formula dependency, spill, copy/fill, and structural-reference behavior. `LET(x,1/0,7)` therefore returns `7`, while `LET(x,A1,x+1)` tracks `A1`.
 
-One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes across reachable bindings. Invalid name/arity/binding structure returns `#VALUE!`; expansion beyond the node ceiling returns `#NUM!`. `LET` does not create callable functions: `LAMBDA` and higher-order execution remain unsupported.
+One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes across reachable bindings. Invalid name/arity/binding structure returns `#VALUE!`; expansion beyond the node ceiling returns `#NUM!`. In the full engine, a `LET` value can be a `LAMBDA`; see [Full formula engine](#full-formula-engine).
 
 ## References, ranges, and named ranges
 
@@ -2217,7 +2654,7 @@ Lookup errors in the scanned range propagate. Approximate modes validate orderin
 `FILTER`, `SORT`, `UNIQUE`, `TRANSPOSE`, `SEQUENCE`, `TAKE`, `DROP`, `CHOOSECOLS`, and `CHOOSEROWS` return rectangular values. A direct range formula such as `=A1:B4` also spills:
 
 - `FILTER(array, include, [if_empty])` accepts a one-column include range matching the array's rows or a one-row include range matching its columns. Shape mismatches are `#VALUE!`. No selected values returns `if_empty`, or `#CALC!` when omitted.
-- `SORT(array, [sort_index], [sort_order], [by_col])` defaults to the first column, ascending. `sort_index` selects the row/column key; `sort_order` is `1` or `-1`; `by_col=TRUE` sorts columns instead of rows. Multi-key sorting is unsupported.
+- `SORT(array, [sort_index], [sort_order], [by_col])` defaults to the first column, ascending. `sort_index` selects the row/column key; `sort_order` is `1` or `-1`; `by_col=TRUE` sorts columns instead of rows. For several keys, use `SORTBY` in the full engine.
 - `UNIQUE(array, [by_col], [exactly_once])` preserves first-seen order. `by_col=TRUE` compares columns; `exactly_once=TRUE` keeps only items occurring once. An empty result is `#CALC!`.
 - `TRANSPOSE(array)` swaps rows and columns.
 - `SEQUENCE(rows, [columns], [start], [step])` requires positive integer dimensions and defaults to one column, start `1`, step `1`; values fill row-major.
@@ -2256,13 +2693,13 @@ The admission check happens before materialization when the shape is statically 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. Automatic volatile functions beyond the explicit `TODAY`/`NOW` host-clock barrier, network functions, external/live-data providers, arbitrary external workbook references, database functions, cube/OLAP functions, and `LAMBDA` or higher-order array execution are unsupported. Examples include `RAND`, `RANDBETWEEN`, `INDIRECT`, `OFFSET`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, `DSUM`, `CUBEVALUE`, `LAMBDA`, `MAP`, `REDUCE`, and `SCAN`.
+Formula evaluation performs no network request and runs no custom JavaScript. Automatic volatile functions beyond the explicit `TODAY`/`NOW` host-clock barrier, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `RAND`, `RANDBETWEEN`, `INDIRECT`, `OFFSET`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](https://sheetwrite.vercel.app/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
 
 ## Performance evidence
 
-No formula throughput or latency number is published from this guide because no checked final formula-performance evidence file is present. Follow the [performance evidence guide](https://sheetwrite.vercel.app/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
+The [default and full formula engine results](https://sheetwrite.vercel.app/docs/guides/performance-resources/#default-and-full-formula-engines) compare both engines on the formula benchmark and time the analysis families. Follow the [performance evidence guide](https://sheetwrite.vercel.app/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
 
 ## Point mode and reference rewriting
 
@@ -2445,6 +2882,34 @@ When the grid is focused and not editing:
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 
+## Undo and redo
+
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step
+through the last 200 recorded transactions. Remote operations from a
+`SyncCoordinator` do not create undo entries.
+
+Undo of a large clear restores every old cell. When the restore is larger than
+one transaction allows, the Grid sends one compressed `restoreBlock` operation.
+If that still needs more than one server version, it uses an atomic batch,
+which needs `PersistenceAdapter.commitBatch`. See
+[Large undo and atomic batches](https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches).
+
+If the restore is above the batch ceilings, cannot be split, or needs a
+`commitBatch` that the adapter does not have, `grid.undo()` changes nothing. The
+Grid emits `mutation-rejected` with a `resource-limit` issue and removes that
+entry from the history, so older edits can still be undone. Show the reason to
+the user:
+
+```ts
+grid.on("mutation-rejected", ({ issues }) => {
+  for (const issue of issues) {
+    if (issue.kind === "resource-limit") {
+      console.warn(`Not undone: ${issue.resource} ${issue.actual} is above ${issue.max}.`);
+    }
+  }
+});
+```
+
 ## Inline editing
 
 Editing happens in a single real `<textarea>` overlaid on the active cell. It is
@@ -2622,10 +3087,29 @@ A commit response is `applied`, `duplicate`, or `conflict`. Applied and duplicat
 
 Document snapshots include workbook/sheet data, formula source, formatting, validation, protection metadata, notes, names, filters, and related document state. Selection, scroll position, caret state, search overlays, host read-only policy, and local zoom remain session state.
 
+## What your host implements
+
+| Part | You provide | Sheetwrite provides |
+| --- | --- | --- |
+| Load | `PersistenceAdapter.load` returns a validated `WorkbookSnapshot` with its `version`. | `createGridFromSnapshot`, `validateWorkbookSnapshot` |
+| Save | `PersistenceAdapter.commit` appends one version in one database transaction. | `SyncCoordinator` queues, sends, and acknowledges commits in order. |
+| Large undo | `restoreBlock` in your operation handler. Optional: `PersistenceAdapter.commitBatch`. | The Grid encodes large restores and, if needed, splits them into atomic batches. |
+| Offline work | Nothing, in the browser. | `IndexedDbPendingCommitStorage` keeps pending commits across reloads. |
+| Conflicts | A recovery UX for conflicts that rebase cannot resolve. | Conservative rebase and typed conflict events. |
+
+The [collaboration guide](https://sheetwrite.vercel.app/docs/guides/collaboration/#load-mount-queue-and-acknowledge) has a complete HTTP adapter, the server table design, and the commit steps.
+
+## Large undo
+
+Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.0 sends such a restore as one compressed `restoreBlock` operation. Your server must accept that operation before it accepts 0.5.0 clients. When even the compressed restore needs more than one server version, the Grid uses an atomic batch, which needs `commitBatch`. Without `commitBatch`, only that undo is rejected; everything else works. See [Large undo and atomic batches](https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches).
+
+## See also
+
 - [Collaboration and conservative rebase](https://sheetwrite.vercel.app/docs/guides/collaboration/)
 - [Document operations reference](https://sheetwrite.vercel.app/docs/reference/document-operations/)
 - [`PersistenceAdapter` and sync API](https://sheetwrite.vercel.app/docs/api/core/persistence-adapter/)
 - [`@sheetwrite/core/browser`](https://sheetwrite.vercel.app/docs/api/core-browser/)
+- [Database showcase](https://sheetwrite.vercel.app/showcases/database/): IndexedDB persistence, reload recovery, and compaction, live.
 
 ### Styling and theming
 
@@ -2716,6 +3200,20 @@ removing it (or dropping a field) restores defaults instead of leaving stale
 merged values behind.
 - `grid.getEffectiveTheme()` returns the effective (post-zoom) theme currently
 painting.
+- `grid.getTheme()` returns a copy of the base theme, before zoom scaling.
+
+After `setTheme` or `replaceTheme` changes the base theme, the Grid emits
+`theme-change` with a copy of the new theme. Use it to keep host controls in
+step with the canvas. The built-in toolbar uses it: its text and fill colour
+swatches show the theme's `fg` and `bg` until the user picks a colour.
+
+```ts
+const swatch = document.querySelector<HTMLElement>("#fill-swatch")!;
+swatch.style.background = grid.getTheme().bg;
+grid.on("theme-change", ({ theme }) => {
+  swatch.style.background = theme.bg;
+});
+```
 
 Tailwind works through the same seam: set `--sheetwrite-*` custom properties on
 the host with arbitrary-property utilities (e.g.
@@ -3158,7 +3656,7 @@ Source: https://sheetwrite.vercel.app/docs/reference/compatibility-limits/
 | Area | Supported contract | Boundary |
 | --- | --- | --- |
 | Data | Eager columnar data or cancellable datasource pages; dense and allocation-lazy paged storage | Full-sheet queries and exports are incomplete until required pages load |
-| Formulas | Persisted formula source, A1/range references, named ranges, the inventory-derived supported function contract, bounded lexical `LET`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external/network/database/cube/LAMBDA categories and automatic volatility beyond the clock barrier are unsupported |
+| Formulas | Persisted formula source, A1/range references, spill references, named ranges, the inventory-derived supported function contract in two engine builds, bounded lexical `LET` and `LAMBDA`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external, network, cube, and live-data categories and automatic volatility beyond the clock barrier are unsupported |
 | Protection | Serializable client interaction policy with atomic/partial local mutation behavior | Never server authorization; remote operations bypass local UX policy |
 | Collaboration | Host sequencing, stable mutation IDs, durable optimistic edits, ordered remote operations, presence/comments/revisions, conservative rebase | No bundled server, CRDT, or general OT; ambiguous structural/formula conflicts require host UX |
 | Worker | OffscreenCanvas rendering with capability/startup fallback | Custom function renderers cannot transfer to the worker |
@@ -3536,11 +4034,46 @@ grid.on("change", ({ transaction }) => {
 
 `initSheetwrite()` is re-entrant. Call it before `createGrid`; concurrent calls share initialization and a failed call can be retried. Destroy the returned grid when its host is permanently removed.
 
+## Add a formula
+
+A formula is a cell value with `kind: "formula"`. The engine calculates it at once, and dependent cells follow every later edit.
+
+```ts
+grid.applyTransaction({
+  patches: [
+    {
+      op: "set",
+      addr: { sheet: "sales", row: 2, col: 1 },
+      value: { kind: "formula", src: "=SUM(B1:B2)" },
+    },
+  ],
+});
+
+console.log(grid.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+```
+
+Users can type the same formula in the cell. To use `GROUPBY`, `LAMBDA`, regression, and the other analysis functions, select the [full formula engine](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) before you create the grid.
+
+## Save and open the document
+
+`exportSnapshot()` returns the complete document: values, formulas, styles, and sheet settings. Store it as JSON, and open it later with `createGridFromSnapshot`. Selection, scroll position, and zoom are session state; they are not in the snapshot.
+
+```ts
+const saved = JSON.stringify(grid.exportSnapshot());
+grid.destroy();
+
+const reopened = createGridFromSnapshot(host, JSON.parse(saved));
+console.log(reopened.store.getCell({ sheet: "sales", row: 2, col: 1 }).resolved); // 16
+```
+
+For a server, save each change as an ordered operation instead of whole snapshots. The [persistence guide](https://sheetwrite.vercel.app/docs/guides/persistence/) explains the adapter and the offline queue.
+
 ## Next steps
 
 - Open the [Vanilla example](https://sheetwrite.vercel.app/vanilla/) to exercise the same lifecycle in a production build.
 - Choose a [framework integration](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/).
 - Learn when the [`Grid` and `Store` own state](https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/).
+- Read [what is new in 0.5.0](https://sheetwrite.vercel.app/docs/start/whats-new/).
 - Browse the generated [`@sheetwrite/core` API](https://sheetwrite.vercel.app/docs/api/core/).
 
 ### Installation
@@ -3656,7 +4189,7 @@ webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node 
 
 ## Full formula engine
 
-By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis functions, for example `NORM.S.DIST` or `T.INV`. It is the same engine with more functions and the same API.
+By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It is the same engine with more functions and the same API, and a larger download. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples, and the [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/#default-and-full-formula-engines) compares both engines.
 
 ```sh
 npm install @sheetwrite/core @sheetwrite/formulas
@@ -3688,6 +4221,99 @@ Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwri
 - [Choose lifecycle ownership](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
 - [Configure Worker rendering](https://sheetwrite.vercel.app/docs/guides/worker-rendering/)
 - [Configure XLSX import and export](https://sheetwrite.vercel.app/docs/guides/xlsx-export/)
+
+### What's new in 0.5.0
+
+Source: https://sheetwrite.vercel.app/docs/start/whats-new/
+
+Sheetwrite 0.5.0 adds an optional full formula engine and makes large documents
+faster to load, edit, and undo. All seven packages release as 0.5.0. Most apps
+upgrade with no code change; read the [upgrade checklist](#upgrade-checklist) if
+you run a persistence server or use `@sheetwrite/wasm` directly.
+
+## Full formula engine
+
+`@sheetwrite/formulas` is the same Rust engine as `@sheetwrite/wasm`, built with
+the analysis families. It has the same API and loaders. Select it one time,
+before you create a Grid:
+
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+It adds grouping and pivot tables (`GROUPBY`, `PIVOTBY`, `PERCENTOF`), `LAMBDA`
+and its helpers, 36 distribution functions, descriptive statistics, regression
+(`LINEST`, `TREND`, `FORECAST.LINEAR`), finance and working-day functions,
+`TEXTSPLIT` and regex, reshaping (`VSTACK`, `WRAPROWS`, `SORTBY`), database
+functions, and matrices. The default engine does not change: its function set
+stays the same, and formula assist suggests only the functions of the selected
+engine.
+
+- [Analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/): one worked task per family.
+- [Formula function contract](https://sheetwrite.vercel.app/docs/reference/formula-functions/): every function and its build.
+- [Formula analysis showcase](https://sheetwrite.vercel.app/showcases/formulas/): thirteen panels recalculate live over 20,000 orders.
+
+## Formulas in both engines
+
+- **Spill references.** `=SUM(A1#)` refers to the current spill of `A1` and
+follows it when it changes size. XLSX files store it as `_xlfn.ANCHORARRAY`.
+See [Spill references](https://sheetwrite.vercel.app/docs/guides/formulas/#spill-references).
+- **Array constants.** `={1,2;3,4}` spills two rows and two columns, and array
+constants work as function arguments. See
+[Array constants](https://sheetwrite.vercel.app/docs/guides/formulas/#array-constants).
+- **Correct spill order.** A spill that reads another spill now shows its
+current values. Spills that read each other show `#CYCLE!`.
+- **Off-screen formula reads.** With a windowed datasource, a visible formula
+that reads an off-screen column no longer stays `#LOADING!`. See
+[Cells that visible formulas read](https://sheetwrite.vercel.app/docs/guides/configuration/#cells-that-visible-formulas-read).
+
+## Large undo
+
+Undo of a very large clear now works and stays one history step. The Grid sends
+the restore as one compressed `restoreBlock` operation. If that still needs more
+than one server version, it uses an atomic batch through the new optional
+`PersistenceAdapter.commitBatch`. An undo above every limit changes nothing and
+emits `mutation-rejected`, and older edits stay undoable. See
+[Undo and redo](https://sheetwrite.vercel.app/docs/guides/interaction/#undo-and-redo).
+
+## Faster loading, editing, and import
+
+- Bulk loading uses packed block writes: loading 100,000 to 1,000,000 rows was
+26–35% faster in the release measurements.
+- Large `setBlock` writes, row inserts through a row bridge, collaboration
+rebase, and scrolling with wrapped text or number formats are faster.
+- XLSX import streams worksheet rows and shared strings, with lower peak memory.
+CSV import writes records straight into columns.
+- Lookups (`VLOOKUP`, `XLOOKUP`, `MATCH`) reuse one decoded range per
+recalculation, and many statistics, array, text, date, and finance functions
+do less work. Results do not change.
+
+The [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/) has the measured
+results and the package sizes of both engines.
+
+## Smaller changes
+
+- The toolbar text and fill colour swatches show the theme's real colours.
+`grid.getTheme()` and the `theme-change` event are new. See
+[Theme](https://sheetwrite.vercel.app/docs/guides/styling/#resolution-order).
+- Sheet tabs no longer scroll the page, and the sheet menu stays open when an
+unrelated part of the page scrolls.
+- Row numbers no longer paint into the header corner while you scroll.
+
+## Upgrade checklist
+
+| You | Do this |
+| --- | --- |
+| Use Sheetwrite through `@sheetwrite/core` or an adapter | Nothing. Upgrade all `@sheetwrite/*` packages to 0.5.0 together. |
+| Want the analysis functions | Install `@sheetwrite/formulas` and select it before you create a Grid. |
+| Run a persistence or collaboration server | Accept `restoreBlock` operations before you accept 0.5.0 clients. Optional: implement `commitBatch` for undo that needs more than one version. See [Large undo and atomic batches](https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches). |
+| Call `CellStore.setBlock` from `@sheetwrite/wasm` directly | **Breaking.** Use `setBlockPacked` (row-major) or `setColumnBlockPacked` (column-major). They take all string cells as one UTF-8 buffer plus byte offsets. |
+| Check dependency licenses or lockfiles | `@sheetwrite/core` now depends on `fflate` 0.8.3 for the restore codec. Your package manager installs it; you do not add it yourself. |
+
+The full list of changes is in each package's `CHANGELOG.md`.
 
 ## Public API declarations
 

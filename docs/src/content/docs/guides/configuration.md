@@ -313,6 +313,16 @@ required pages are loaded. `Store.queryCapability(sheet)` and
 `getCellLoadState(addr)` expose that state.
 Default chunk/cache values and eviction behavior are listed in [Compatibility and limits](/docs/reference/compatibility-limits/#rendering-interaction-and-paged-data).
 
+#### Cells that visible formulas read
+
+A visible formula can read cells outside the visible window, for example a
+variance column that reads a plan column far to the right. The Grid asks the
+engine which same-sheet cells the visible formulas read, also through other
+formulas, and requests those cells with the window. The formula then resolves
+instead of staying `#LOADING!`. A cell budget equal to the prefetch byte limit
+bounds this work, so a whole-column read does not load the full column in one
+window. Reads from other sheets are not loaded this way; return those values
+from the datasource or keep that sheet dense.
 
 ### Serializable documents
 

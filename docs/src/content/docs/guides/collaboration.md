@@ -58,6 +58,7 @@ An HTTP adapter can stay transport-neutral at the core boundary:
 ```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import type {
   PersistenceAdapter,
+  PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   WorkbookSnapshot,
@@ -77,6 +78,20 @@ const persistenceAdapter: PersistenceAdapter = {
     const { signal, ...body } = request;
     const response = await fetch(
       `/api/documents/${encodeURIComponent(request.documentId)}/operations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      },
+    );
+    return responseJson<PersistenceCommitResponse>(response);
+  },
+  // Required for undo of very large edits; see "Large undo and atomic batches".
+  async commitBatch(request: PersistenceBatchCommitRequest) {
+    const { signal, ...body } = request;
+    const response = await fetch(
+      `/api/documents/${encodeURIComponent(request.documentId)}/operation-batches`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -128,12 +143,55 @@ Handle `commit()` in one database transaction:
 5. Periodically fold the log into `snapshot_json`; never rewrite operation
    versions or accept client-authored server timestamps.
 
+Handle `commitBatch()` the same way, with one difference: the request has
+`versionOperationCounts`, and it fills several consecutive versions. In one
+database transaction, check the duplicate and the base version once, validate
+every version, then append all of them or none. Store each version with its
+`batch: { index, count }` position, and acknowledge with the last version.
+
 Normalized cell tables are an alternative for products that need SQL queries
 over cell values. They do not replace the protocol: the host must still
 reconstruct a complete schema-versioned `WorkbookSnapshot`, preserve formula
 source/style/metadata, and serialize structural operations under one document
 version. Mixing independent cell writes with the operation log breaks atomic
 row/column/formula semantics.
+
+## Large undo and atomic batches
+
+Undo of a large clear restores the old cells. When the ordinary `setBlock`
+operation is too large for one version, the Grid sends one `restoreBlock`
+operation instead: the same cells as compressed JSON (`deflate-json-v1`). If
+even that does not fit one version, the Grid splits the restore into an atomic
+batch of up to 16 versions and 64 MiB. Undo stays one history step and one
+`change` event.
+
+Before you accept 0.5.0 clients, make sure that your server:
+
+1. accepts `restoreBlock` wherever it switches over the `DocumentOp` union, and
+   decodes it as untrusted input. `@sheetwrite/core` does not export a server
+   decoder, so your decoder must do these checks, in this order, before it
+   changes the document:
+   - `encoding` is `"deflate-json-v1"`, and `decodedBytes` is a positive
+     integer of at most 64 MiB;
+   - `data` is canonical base64 (it decodes and re-encodes to the same text);
+   - the raw DEFLATE stream inflates into a buffer of exactly `decodedBytes`
+     bytes. Never inflate without that output limit: a small stream can expand
+     to gigabytes. Reject a stream that ends early or has bytes left over;
+   - the bytes are valid UTF-8 JSON of a `PackedCellBlock` whose row and
+     column counts match `range`, with at most 4,000,000 cells;
+   - every value, formula, reference, and style in the block passes the same
+     validation as a `setBlock` operation;
+2. implements `commitBatch` as above, or accepts that `SyncCoordinator`
+   rejects a local step that needs more than one version;
+3. publishes batch members with their `batch` field, so that peers apply the
+   whole batch at once; and
+4. folds `restoreBlock` into snapshots as ordinary cells. Snapshots never
+   store restore streams.
+
+The [document operations reference](/docs/reference/document-operations/#atomic-multi-version-batches)
+has the exact field rules, limits, and error codes. When an undo is above the
+transaction limits even after this, the Grid changes nothing and reports it;
+see [Interaction](/docs/guides/interaction/#undo-and-redo).
 
 ## Durable pending commits
 

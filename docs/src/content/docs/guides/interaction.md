@@ -68,6 +68,34 @@ When the grid is focused and not editing:
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 
+## Undo and redo
+
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step
+through the last 200 recorded transactions. Remote operations from a
+`SyncCoordinator` do not create undo entries.
+
+Undo of a large clear restores every old cell. When the restore is larger than
+one transaction allows, the Grid sends one compressed `restoreBlock` operation.
+If that still needs more than one server version, it uses an atomic batch,
+which needs `PersistenceAdapter.commitBatch`. See
+[Large undo and atomic batches](/docs/guides/collaboration/#large-undo-and-atomic-batches).
+
+If the restore is above the batch ceilings, cannot be split, or needs a
+`commitBatch` that the adapter does not have, `grid.undo()` changes nothing. The
+Grid emits `mutation-rejected` with a `resource-limit` issue and removes that
+entry from the history, so older edits can still be undone. Show the reason to
+the user:
+
+```ts prelude="core" partial="requires surrounding host state" title="Report an undo that is too large"
+grid.on("mutation-rejected", ({ issues }) => {
+  for (const issue of issues) {
+    if (issue.kind === "resource-limit") {
+      console.warn(`Not undone: ${issue.resource} ${issue.actual} is above ${issue.max}.`);
+    }
+  }
+});
+```
+
 ## Inline editing
 
 Editing happens in a single real `<textarea>` overlaid on the active cell. It is

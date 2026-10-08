@@ -34,6 +34,7 @@ The binding is populated before `onReady` and cleared before reset or unmount. A
 <Sheetwrite
   {columns}
   defaultRows={rows}
+  height={420}
   bind:grid
   onGridChange={handleGridChange}
   {onReady}
