@@ -262,7 +262,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     if (connected) {
       while (this.connectedState && this.queued.length > 0) {
         const operation = this.queued.shift();
-        if (operation) this.listener?.(operation);
+        if (operation) this.deliver(operation);
       }
     }
     this.publishState();
@@ -284,7 +284,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
   releaseHeldBroadcasts(): void {
     this.holdNext = false;
     const releasing = this.held.splice(0).sort((a, b) => a.version - b.version);
-    for (const operation of releasing) this.listener?.(operation);
+    for (const operation of releasing) this.deliver(operation);
     this.publishState();
   }
 
@@ -382,11 +382,17 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
       this.publishState();
       return;
     }
-    if (!this.listener) {
-      this.unclaimed.push(operation);
-      return;
-    }
-    this.listener(operation);
+    this.deliver(operation);
+  }
+
+  /**
+   * Hands a broadcast to the subscribed coordinator, or keeps it for the next
+   * one while a client remounts. Versions its snapshot already holds are dropped.
+   */
+  private deliver(operation: VersionedOperation): void {
+    if (operation.version <= this.snapshotVersion) return;
+    if (this.listener) this.listener(operation);
+    else this.unclaimed.push(operation);
   }
 
   private publishState(): void {

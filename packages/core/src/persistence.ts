@@ -179,6 +179,14 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       };
     }
 
+    // Everything that can fail runs before the store changes or inside the
+    // rollback-protected block, so a failed commit changes nothing.
+    const entries: VersionedOperation[] = versions.map((operations, index) => ({
+      version: document.version + index + 1,
+      operations: cloneJsonValue(operations),
+      clientMutationId: request.clientMutationId,
+      ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
+    }));
     const store = document.store;
     try {
       for (const operations of versions) {
@@ -206,12 +214,6 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       });
     }
     const version = document.version + versions.length;
-    const entries: VersionedOperation[] = versions.map((operations, index) => ({
-      version: document.version + index + 1,
-      operations: cloneJsonValue(operations),
-      clientMutationId: request.clientMutationId,
-      ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
-    }));
     document.applied.set(request.clientMutationId, version);
     document.log.push(...entries);
     document.version = version;
