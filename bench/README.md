@@ -284,8 +284,12 @@ and fixture restoration are outside the timed interval; resize includes admissio
 and history, but not undo. Longer samples keep sub-millisecond paths from turning
 process startup and scheduling noise into an apparent regression.
 These are imperative-path timings, not browser paint or input-to-frame latency.
-For comparisons, build each checkout's packages first, run an A/A control, then
-alternate five ABBA rounds on the same CPU under an exclusive lock:
+For comparisons, build each checkout's packages first. Run five A/A ABBA control
+rounds with the same baseline in both slots, then five actual ABBA rounds on the
+same CPU under an exclusive lock. Compare medians of the per-round medians and
+retain every raw round. A broad noise band makes a changed-path comparison
+inconclusive; it does not excuse a slower result. Leave fifteen seconds between
+locked commands so other checkouts can acquire the shared lock.
 
 ```sh
 flock -x /home/vvin/learn/quiet.lock taskset -c 4 bun run bench:interaction-sessions
