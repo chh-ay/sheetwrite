@@ -1,7 +1,9 @@
 import {
+  type ChangeEvent,
   createGridFromSnapshot,
   type DocumentOp,
   type Grid,
+  type HighlightRange,
   initSheetwrite,
   type PersistenceCommitResponse,
   PresenceCoordinator,
@@ -49,7 +51,24 @@ const CHAOS_ROWS: Record<ClientKey, readonly number[]> = {
 const FORECAST_ADJUSTMENT = 500;
 const CHAOS_STORM_MS = 6_000;
 const CHAOS_SETTLE_MS = 15_000;
+/** Chaos leaves both clients with long queues and recoveries; allow them longer to drain. */
+const CHAOS_DRAIN_MS = 30_000;
+/** Storm progress text refreshes at most this often, so it never re-renders the page per tick. */
+const CHAOS_PUBLISH_MS = 400;
 const CHAOS_TICK_MS = 110;
+/** Rows around the Ana/Bram boundary that the chaos test brings on screen. */
+const CHAOS_VIEW_ROWS = {
+  first: COLLABORATION_FORECAST_ROWS / 2 - 6,
+  last: COLLABORATION_FORECAST_ROWS / 2 + 7,
+};
+/** How long an edited cell stays highlighted on each client. */
+const EDIT_FLASH_MS = 900;
+/** Larger edits (paste, restore) are not flashed cell by cell. */
+const EDIT_FLASH_MAX_CELLS = 64;
+const ACTOR_FLASH: Record<ClientKey, string> = {
+  a: "rgba(225, 29, 72, 0.32)",
+  b: "rgba(14, 165, 233, 0.32)",
+};
 /**
  * Demo ceilings for the 0.5.0 batch proof. The 100,000-cell usage restore is
  * far above one version, so the engine splits it into an atomic batch; the
@@ -191,6 +210,76 @@ export default function CollaborationShowcase() {
   const [batchReport, setBatchReport] = useState<BatchReport | null>(null);
   const [restoreRunning, setRestoreRunning] = useState(false);
   const chaosRunRef = useRef(0);
+  const flashesRef = useRef<Record<ClientKey, Map<string, HighlightRange & { until: number }>>>({
+    a: new Map(),
+    b: new Map(),
+  });
+  const flashTimerRef = useRef<Record<ClientKey, number | null>>({ a: null, b: null });
+  /** Rows each client shows, refreshed once per frame while it scrolls. */
+  const shownRowsRef = useRef<Record<ClientKey, { first: number; last: number } | null>>({
+    a: null,
+    b: null,
+  });
+
+  /** Repaint a client's edit highlights and schedule the next expiry. */
+  const paintFlashes = (key: ClientKey) => {
+    const runtime = clientsRef.current[key];
+    const flashes = flashesRef.current[key];
+    const now = performance.now();
+    for (const [id, flash] of flashes) if (flash.until <= now) flashes.delete(id);
+    runtime?.grid.highlightCells(flashes.size > 0 ? [...flashes.values()] : null);
+    const timer = flashTimerRef.current[key];
+    if (timer !== null) window.clearTimeout(timer);
+    flashTimerRef.current[key] = null;
+    if (flashes.size === 0) return;
+    const next = Math.min(...[...flashes.values()].map((flash) => flash.until));
+    flashTimerRef.current[key] = window.setTimeout(() => paintFlashes(key), next - now + 16);
+  };
+
+  /** Highlight the cells an edit changed, in the color of the analyst who made it. */
+  const flashEdit = (key: ClientKey, event: ChangeEvent) => {
+    if (event.transaction.patches.length > EDIT_FLASH_MAX_CELLS) return;
+    const author: ClientKey = event.source === "remote" ? (key === "a" ? "b" : "a") : key;
+    const until = performance.now() + EDIT_FLASH_MS;
+    let flashed = false;
+    for (const patch of event.transaction.patches) {
+      if (patch.op !== "set") continue;
+      const { addr } = patch;
+      flashesRef.current[key].set(`${addr.sheet}:${addr.row}:${addr.col}`, {
+        sheet: addr.sheet,
+        start: { row: addr.row, col: addr.col },
+        end: { row: addr.row, col: addr.col },
+        color: ACTOR_FLASH[author],
+        until,
+      });
+      flashed = true;
+    }
+    if (flashed) paintFlashes(key);
+  };
+
+  /** Rows of the plan sheet the reader can currently see in a client's Grid. */
+  const visibleRows = (key: ClientKey): { first: number; last: number } | null => {
+    const runtime = clientsRef.current[key];
+    const host = hostRefs[key].current;
+    if (!runtime || !host) return null;
+    const rect = host.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const rowAt = (y: number) => runtime.grid.getCellAtPoint(x, y)?.row;
+    let first: number | undefined;
+    for (let y = rect.top + 2; y < rect.top + 120 && first === undefined; y += 6) first = rowAt(y);
+    let last: number | undefined;
+    for (let y = rect.bottom - 2; y > rect.bottom - 160 && last === undefined; y -= 6) {
+      last = rowAt(y);
+    }
+    return first === undefined || last === undefined ? null : { first, last };
+  };
+
+  /** Scroll so rows `first`..`last` are on screen (the Grid scrolls minimally). */
+  const showRows = (key: ClientKey, rows: { first: number; last: number }) => {
+    const grid = clientsRef.current[key]?.grid;
+    grid?.scrollToCell({ sheet: "plan", row: rows.first, col: 0 });
+    grid?.scrollToCell({ sheet: "plan", row: rows.last, col: 0 });
+  };
 
   const patchView = (key: ClientKey, patch: Partial<ClientView>) => {
     setViews((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
@@ -237,6 +326,7 @@ export default function CollaborationShowcase() {
     const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
     const link = new ShowcaseNetworkLink(server);
     const snapshot = await server.load(COLLABORATION_DOCUMENT_ID);
+    link.startFrom(snapshot.version ?? 0);
     if (generation !== bootGenerationRef.current) {
       link.destroy();
       return;
@@ -362,6 +452,22 @@ export default function CollaborationShowcase() {
       }),
     );
     runtime.disposers.push(link.subscribeState((state) => patchView(key, { linkState: state })));
+    runtime.disposers.push(
+      runtime.grid.on("change", (event) => {
+        if (isCurrent()) flashEdit(key, event);
+      }),
+    );
+    let rowsFrame = 0;
+    runtime.disposers.push(
+      runtime.grid.on("scroll", () => {
+        if (rowsFrame !== 0) return;
+        rowsFrame = requestAnimationFrame(() => {
+          rowsFrame = 0;
+          if (isCurrent()) shownRowsRef.current[key] = visibleRows(key);
+        });
+      }),
+      () => cancelAnimationFrame(rowsFrame),
+    );
     runtime.disposers.push(
       presence.on((event) => {
         if (event.type === "updated" || event.type === "expired") {
@@ -526,16 +632,32 @@ export default function CollaborationShowcase() {
       ms: 0,
     };
     const started = performance.now();
-    const publish = () => setChaos({ ...report, ms: performance.now() - started });
+    let publishedAt = 0;
+    const publish = (force = true) => {
+      const now = performance.now();
+      if (!force && now - publishedAt < CHAOS_PUBLISH_MS) return;
+      publishedAt = now;
+      setChaos({ ...report, ms: now - started });
+    };
     publish();
-    for (const key of CLIENT_KEYS) clientsRef.current[key]?.grid.setActiveSheet("plan");
+    // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
+    // every edit and every synced arrival is visible while the storm runs.
+    for (const key of CLIENT_KEYS) {
+      clientsRef.current[key]?.grid.setActiveSheet("plan");
+      showRows(key, CHAOS_VIEW_ROWS);
+      shownRowsRef.current[key] = visibleRows(key);
+    }
     // Seeded per run, so a run's fault sequence can be reproduced exactly.
     const random = seededRandom(run);
 
     while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
       const key: ClientKey = random() < 0.5 ? "a" : "b";
       const runtime = clientsRef.current[key];
-      if (!runtime) break;
+      // A recovering client is being remounted and accepts no new edits.
+      if (!runtime || recoveringRef.current[key]) {
+        await delay(CHAOS_TICK_MS);
+        continue;
+      }
       const roll = random();
       if (roll < 0.1) {
         offline[key] = !offline[key];
@@ -545,7 +667,11 @@ export default function CollaborationShowcase() {
         holdNextBroadcast(key);
         report.reorders += 1;
       } else {
-        const rows = CHAOS_ROWS[key];
+        // Edit a row the reader can see in this analyst's Grid when one exists.
+        const owned = CHAOS_ROWS[key];
+        const view = shownRowsRef.current[key];
+        const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
+        const rows = onScreen.length > 0 ? onScreen : owned;
         const row = rows[Math.floor(random() * rows.length)];
         if (row === undefined) throw new Error("The analyst has no forecast rows.");
         const addr = { sheet: "plan", row, col: 2 };
@@ -560,7 +686,7 @@ export default function CollaborationShowcase() {
         });
         if (outcome.status === "applied") report.edits += 1;
       }
-      publish();
+      publish(false);
       await delay(CHAOS_TICK_MS);
     }
 
@@ -570,13 +696,17 @@ export default function CollaborationShowcase() {
       if (offline[key]) toggleOnline(key, true);
       releaseHeld(key);
     }
-    // Wait until both queues drain and no conflict recovery is still running.
-    const settleBy = performance.now() + CHAOS_SETTLE_MS;
+    // Wait until both queues drain, no conflict recovery is still running, and
+    // both clients sit at the server head: a client stuck on a version gap has
+    // nothing queued but has not caught up.
+    const settleBy = performance.now() + CHAOS_DRAIN_MS;
+    const head = () => serverRef.current?.headVersion(COLLABORATION_DOCUMENT_ID) ?? -1;
     const idle = () =>
       CLIENT_KEYS.every(
         (key) =>
           (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
-          !recoveringRef.current[key],
+          !recoveringRef.current[key] &&
+          clientsRef.current[key]?.sync.serverVersion === head(),
       );
     while (stillRunning() && performance.now() < settleBy && !idle()) {
       for (const key of CLIENT_KEYS) releaseHeld(key);
@@ -766,6 +896,7 @@ export default function CollaborationShowcase() {
   const recoverClient = async (key: ClientKey, response: ConflictResponse) => {
     if (recoveringRef.current[key]) return;
     recoveringRef.current[key] = true;
+    let frozen: Grid | null = null;
     try {
       const runtime = clientsRef.current[key];
       const host = hostRefs[key].current;
@@ -776,6 +907,16 @@ export default function CollaborationShowcase() {
         pushClientLog(key, "error", "Manual review required: no operation tail returned");
         return;
       }
+      // Freeze the client before taking its pending list: an edit made while
+      // recovery awaits would be neither rebased nor removed, and a queue
+      // write still in flight could land after the removal below. Either
+      // would come back on the remounted client with a stale base version.
+      runtime.grid.setReadOnly(true);
+      frozen = runtime.grid;
+      await runtime.sync.ready();
+      if (clientsRef.current[key] !== runtime) return;
+      // Remounting resets the scroll position; keep the reader's place.
+      const shownRows = visibleRows(key);
       const pending = runtime.sync.pendingCommits();
       const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
         ...entry.operations,
@@ -806,7 +947,14 @@ export default function CollaborationShowcase() {
       link.discardParkedBroadcasts();
       clientsRef.current[key] = null;
 
+      // Loading and validating the whole document is the expensive step. Give
+      // the browser a frame before each half so scrolling keeps painting.
+      await delay(0);
       const latest = response.snapshot ?? (await link.load(COLLABORATION_DOCUMENT_ID));
+      // Broadcasts sequenced while the client remounts wait in the link for
+      // the new coordinator; the ones this snapshot already holds are dropped.
+      link.startFrom(latest.version ?? 0);
+      await delay(0);
       host.replaceChildren();
       const grid = createGridFromSnapshot(host, latest, {
         presentation: "data-grid",
@@ -844,6 +992,8 @@ export default function CollaborationShowcase() {
       }
       await sync.flush();
       await presence.publishNow();
+      if (shownRows) showRows(key, shownRows);
+      shownRowsRef.current[key] = visibleRows(key);
       patchView(key, { ready: true, online: true, linkState: link.state() });
       readClient(key);
       pushClientLog(
@@ -854,6 +1004,8 @@ export default function CollaborationShowcase() {
     } catch (error) {
       pushClientLog(key, "error", error instanceof Error ? error.message : String(error));
     } finally {
+      // A recovery that stopped before the remount leaves the old Grid live.
+      if (frozen && clientsRef.current[key]?.grid === frozen) frozen.setReadOnly(false);
       recoveringRef.current[key] = false;
     }
   };
@@ -957,7 +1109,7 @@ export default function CollaborationShowcase() {
               : chaos.phase === "diverged"
                 ? `Not converged: ${chaos.mismatches} of ${chaos.cells} cells differ.`
                 : chaos.phase === "timed-out"
-                  ? "Not settled: work was still queued or recovering after 15 seconds."
+                  ? `Not settled: work was still queued or recovering after ${CHAOS_DRAIN_MS / 1000} seconds.`
                   : `${chaos.edits} edits · ${chaos.disconnects} disconnects · ${chaos.reorders} reordered · ${(chaos.ms / 1000).toFixed(1)} s`}
         </output>
       </header>

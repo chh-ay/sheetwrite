@@ -94,6 +94,11 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
     return () => this.commitListeners.delete(listener);
   }
 
+  /** Latest version the server has sequenced for a document. */
+  headVersion(documentId: string): number {
+    return this.versions.get(documentId) ?? 0;
+  }
+
   subscribe(listener: (operation: VersionedOperation) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -203,14 +208,34 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
   private disposeUpstream?: () => void;
   private readonly queued: VersionedOperation[] = [];
   private readonly held: VersionedOperation[] = [];
+  /** Broadcasts that arrived while no coordinator was subscribed (boot, remount). */
+  private readonly unclaimed: VersionedOperation[] = [];
+  /** Versions at or below this are already in the snapshot the next coordinator mounts. */
+  private snapshotVersion = -1;
   private readonly suppressedEchoes = new Set<string>();
   private readonly stateListeners = new Set<(state: ShowcaseLinkState) => void>();
   private connectedState = true;
   private dropNextAck = false;
   private holdNext = false;
 
-  /** Broadcast-less adapters (e.g. the database proof) are valid servers too. */
-  constructor(private readonly server: PersistenceAdapter & Partial<RemoteOperationSource>) {}
+  /**
+   * Broadcast-less adapters (e.g. the database proof) are valid servers too.
+   * The link listens from construction, so a commit sequenced between a
+   * snapshot load and the coordinator subscribing is kept, not lost.
+   */
+  constructor(private readonly server: PersistenceAdapter & Partial<RemoteOperationSource>) {
+    this.disposeUpstream = this.server.subscribe?.((operation) => this.receive(operation));
+  }
+
+  /**
+   * The next coordinator mounts a snapshot at `version`: drop broadcasts it
+   * already contains, keep newer ones for delivery on subscribe.
+   */
+  startFrom(version: number): void {
+    this.snapshotVersion = version;
+    const newer = this.unclaimed.filter((operation) => operation.version > version);
+    this.unclaimed.splice(0, this.unclaimed.length, ...newer);
+  }
 
   get connected(): boolean {
     return this.connectedState;
@@ -255,8 +280,9 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     this.publishState();
   }
 
-  /** Delivers every held broadcast in version order, closing the gap. */
+  /** Delivers every held broadcast in version order and cancels a pending hold, closing the gap. */
   releaseHeldBroadcasts(): void {
+    this.holdNext = false;
     const releasing = this.held.splice(0).sort((a, b) => a.version - b.version);
     for (const operation of releasing) this.listener?.(operation);
     this.publishState();
@@ -315,7 +341,8 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
 
   subscribe(listener: (operation: VersionedOperation) => void): () => void {
     this.listener = listener;
-    this.disposeUpstream ??= this.server.subscribe?.((operation) => this.receive(operation));
+    const unclaimed = this.unclaimed.splice(0).sort((a, b) => a.version - b.version);
+    for (const operation of unclaimed) this.listener?.(operation);
     return () => {
       if (this.listener === listener) this.listener = undefined;
     };
@@ -326,12 +353,14 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     this.disposeUpstream = undefined;
     this.listener = undefined;
     this.queued.length = 0;
+    this.unclaimed.length = 0;
     this.held.length = 0;
     this.suppressedEchoes.clear();
     this.stateListeners.clear();
   }
 
   private receive(operation: VersionedOperation): void {
+    if (operation.version <= this.snapshotVersion) return;
     if (
       operation.clientMutationId !== undefined &&
       this.suppressedEchoes.has(operation.clientMutationId)
@@ -353,7 +382,11 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
       this.publishState();
       return;
     }
-    this.listener?.(operation);
+    if (!this.listener) {
+      this.unclaimed.push(operation);
+      return;
+    }
+    this.listener(operation);
   }
 
   private publishState(): void {
