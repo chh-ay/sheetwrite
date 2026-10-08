@@ -1,0 +1,17 @@
+```tsx
+import { Sheetwrite, type SimpleColumn } from "@sheetwrite/react";
+import "@sheetwrite/react/styles.css";
+
+type Row = { name: string; amount: number };
+
+export function Sheet(props: { columns: SimpleColumn<Row>[]; rows: Row[] }) {
+  return (
+    <Sheetwrite
+      columns={props.columns}
+      defaultRows={props.rows}
+      height={420}
+      onGridChange={(event) => save(event.transaction)}
+    />
+  );
+}
+```

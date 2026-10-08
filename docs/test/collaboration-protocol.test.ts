@@ -3,9 +3,11 @@ import {
   createGridFromSnapshot,
   type Grid,
   initSheetwrite,
+  type PersistenceBatchCommitRequest,
   PresenceCoordinator,
   SyncCoordinator,
   type SyncCoordinatorEvent,
+  type VersionedOperation,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import {
@@ -20,7 +22,33 @@ import {
   ShowcasePresenceBus,
 } from "../src/showcases/collaboration-protocol.ts";
 
-const SEED_TOTAL = 23;
+/** Forecast column amounts by row straight from the generated seed, independent of the engine. */
+function seedForecastAmounts(): readonly number[] {
+  const sheet = makeCollaborationSnapshot().sheets.find((candidate) => candidate.id === "plan");
+  if (!sheet) throw new Error("The collaboration seed has no plan sheet");
+  const amounts: number[] = [];
+  for (const block of sheet.cells) {
+    for (const cell of block.cells) {
+      if (cell.colOffset !== 2 || cell.value.kind !== "literal") continue;
+      if (typeof cell.value.value === "number") {
+        amounts[block.startRow + cell.rowOffset] = cell.value.value;
+      }
+    }
+  }
+  return amounts;
+}
+
+/** Forecast total straight from the generated seed, independent of the engine. */
+function seedForecastTotal(): number {
+  return seedForecastAmounts().reduce((total, amount) => total + amount, 0);
+}
+
+/** One seed forecast row amount by index. */
+function seedAmount(row: number): number {
+  const amount = seedForecastAmounts()[row];
+  if (amount === undefined) throw new Error(`The collaboration seed has no forecast row ${row}`);
+  return amount;
+}
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -84,7 +112,7 @@ describe("showcase collaboration server", () => {
       documentId: COLLABORATION_DOCUMENT_ID,
       baseVersion: 0,
       clientMutationId: "unit-m1",
-      operations: [pointsEdit(0, 9)],
+      operations: [pointsEdit(0, seedAmount(0) + 1)],
     });
     expect(applied.status).toBe("applied");
     if (applied.status === "applied") expect(applied.version).toBe(1);
@@ -93,7 +121,7 @@ describe("showcase collaboration server", () => {
       documentId: COLLABORATION_DOCUMENT_ID,
       baseVersion: 0,
       clientMutationId: "unit-m1",
-      operations: [pointsEdit(0, 9)],
+      operations: [pointsEdit(0, seedAmount(0) + 1)],
     });
     expect(duplicate.status).toBe("duplicate");
 
@@ -101,7 +129,7 @@ describe("showcase collaboration server", () => {
       documentId: COLLABORATION_DOCUMENT_ID,
       baseVersion: 0,
       clientMutationId: "unit-m2",
-      operations: [pointsEdit(1, 6)],
+      operations: [pointsEdit(1, seedAmount(1) + 1)],
     });
     expect(conflict.status).toBe("conflict");
 
@@ -135,10 +163,92 @@ describe("showcase network link", () => {
   });
 });
 
+describe("atomic batch commits", () => {
+  it("applies every version or none, and the peer applies the whole batch once", async () => {
+    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
+    const a = mountGrid();
+    const b = mountGrid();
+    const linkA = new ShowcaseNetworkLink(server);
+    const linkB = new ShowcaseNetworkLink(server);
+    cleanups.push(
+      () => linkA.destroy(),
+      () => linkB.destroy(),
+    );
+
+    let nextMutation = 1;
+    const syncB = new SyncCoordinator(b.grid, linkB, {
+      documentId: COLLABORATION_DOCUMENT_ID,
+      serverVersion: 0,
+      createMutationId: () => `bram-${nextMutation++}`,
+    });
+    cleanups.push(() => syncB.destroy());
+    syncB.subscribe(linkB);
+
+    const seedTotal = seedForecastTotal();
+    const broadcasts: VersionedOperation[] = [];
+    cleanups.push(server.subscribe((operation) => broadcasts.push(operation)));
+    let peerTransactions = 0;
+    cleanups.push(
+      b.grid.on("change", (event) => {
+        if (event.source === "remote") peerTransactions += 1;
+      }),
+    );
+
+    const valueAt = (row: number) =>
+      Number(a.grid.store.getCell({ sheet: "plan", row, col: 2 }).resolved);
+    const request: PersistenceBatchCommitRequest = {
+      documentId: COLLABORATION_DOCUMENT_ID,
+      baseVersion: 0,
+      clientMutationId: "batch-m1",
+      operations: [pointsEdit(0, valueAt(0) + 1), pointsEdit(1, valueAt(1) + 1)],
+      versionOperationCounts: [1, 1],
+    };
+
+    const peerApplied = onceSyncEvent(
+      syncB,
+      (event) => event.type === "remote-applied" && event.operation.version === 2,
+    );
+    const response = await linkA.commitBatch(request);
+    expect(response.status).toBe("applied");
+    if (response.status === "applied") expect(response.version).toBe(2);
+    await peerApplied;
+    expect(b.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(seedTotal + 2);
+    // One remote transaction for the whole batch, and every member carries its position.
+    expect(peerTransactions).toBe(1);
+    expect(broadcasts.map((operation) => operation.batch)).toEqual([
+      { index: 0, count: 2 },
+      { index: 1, count: 2 },
+    ]);
+
+    // A replayed batch is a duplicate at the last version and applies nothing twice.
+    const duplicate = await linkA.commitBatch(request);
+    expect(duplicate.status).toBe("duplicate");
+    if (duplicate.status === "duplicate") expect(duplicate.version).toBe(2);
+    expect(b.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(seedTotal + 2);
+
+    // A stale base version applies no member at all.
+    const conflict = await linkA.commitBatch({
+      ...request,
+      clientMutationId: "batch-m2",
+      operations: [pointsEdit(2, valueAt(2) + 1), pointsEdit(3, valueAt(3) + 1)],
+    });
+    expect(conflict.status).toBe("conflict");
+    if (conflict.status === "conflict") {
+      expect(conflict.currentVersion).toBe(2);
+      expect(conflict.operationsSinceBase?.map((operation) => operation.batch)).toEqual([
+        { index: 0, count: 2 },
+        { index: 1, count: 2 },
+      ]);
+    }
+    expect(b.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(seedTotal + 2);
+  });
+});
+
 describe("two-client protocol integration", () => {
   it("converges ordered commits, drains an offline durable queue, and buffers version gaps", async () => {
     const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
     const bus = new ShowcasePresenceBus();
+    const seedTotal = seedForecastTotal();
     const a = mountGrid();
     const b = mountGrid();
     const linkA = new ShowcaseNetworkLink(server);
@@ -179,15 +289,15 @@ describe("two-client protocol integration", () => {
       () => presenceB.destroy(),
     );
 
-    // Ordered convergence: Ana raises "Import pipeline" points to 9.
+    // Ordered convergence: Ana raises one forecast row by one unit.
     const bAppliedV1 = onceSyncEvent(
       syncB,
       (event) => event.type === "remote-applied" && event.operation.version === 1,
     );
-    a.grid.applyTransaction({ patches: [pointsEdit(0, 9)] });
+    a.grid.applyTransaction({ patches: [pointsEdit(0, seedAmount(0) + 1)] });
     await syncA.flush();
     await bAppliedV1;
-    expect(b.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(SEED_TOTAL + 1);
+    expect(b.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(seedTotal + 1);
     expect(syncB.serverVersion).toBe(1);
 
     // Presence: Ana's selection is painted inside Bram's grid.
@@ -204,8 +314,8 @@ describe("two-client protocol integration", () => {
     // Offline: Bram queues two local commits, then reconnects and drains in order.
     syncB.setOnline(false);
     linkB.setConnected(false);
-    b.grid.applyTransaction({ patches: [pointsEdit(3, 6)] });
-    b.grid.applyTransaction({ patches: [pointsEdit(4, 3)] });
+    b.grid.applyTransaction({ patches: [pointsEdit(3, seedAmount(3) + 1)] });
+    b.grid.applyTransaction({ patches: [pointsEdit(4, seedAmount(4) + 1)] });
     expect(syncB.pendingCount).toBe(2);
     const aAppliedV3 = onceSyncEvent(
       syncA,
@@ -220,7 +330,7 @@ describe("two-client protocol integration", () => {
     await bDrained;
     expect(syncB.serverVersion).toBe(3);
     await aAppliedV3;
-    expect(a.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(SEED_TOTAL + 3);
+    expect(a.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved).toBe(seedTotal + 3);
 
     // Version gap: hold v4 on Bram's link, deliver v5 first, then close the gap.
     const bSawGap = onceSyncEvent(syncB, (event) => event.type === "reload-required");
@@ -229,9 +339,9 @@ describe("two-client protocol integration", () => {
       (event) => event.type === "remote-applied" && event.operation.version === 5,
     );
     linkB.holdNextBroadcast();
-    a.grid.applyTransaction({ patches: [pointsEdit(0, 10)] });
+    a.grid.applyTransaction({ patches: [pointsEdit(0, seedAmount(0) + 2)] });
     await syncA.flush();
-    a.grid.applyTransaction({ patches: [pointsEdit(1, 6)] });
+    a.grid.applyTransaction({ patches: [pointsEdit(1, seedAmount(1) + 1)] });
     await syncA.flush();
     await bSawGap;
     expect(syncB.serverVersion).toBe(3);
@@ -245,9 +355,11 @@ describe("two-client protocol integration", () => {
     // Conflict: Ana misses the server broadcast, commits on a stale base, and the
     // coordinator retains the conflicted mutation for explicit host recovery.
     linkA.holdNextBroadcast();
-    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(2, 5)]);
+    await server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [
+      pointsEdit(2, seedAmount(2) + 1),
+    ]);
     const aConflicted = onceSyncEvent(syncA, (event) => event.type === "conflict");
-    a.grid.applyTransaction({ patches: [pointsEdit(0, 11)] });
+    a.grid.applyTransaction({ patches: [pointsEdit(0, seedAmount(0) + 3)] });
     await syncA.flush();
     const conflictEvent = (await aConflicted) as Extract<
       SyncCoordinatorEvent,

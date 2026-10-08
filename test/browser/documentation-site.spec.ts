@@ -158,44 +158,52 @@ test("site root serves the product landing", async ({ page }) => {
   await expect(page).toHaveURL(docsUrl("start/installation/"));
 });
 
-test("landing choreography is bounded, replayable, and reduced-motion complete", async ({
+test("landing animations are bounded, replayable, and reduced-motion complete", async ({
   page,
 }) => {
+  // The hero is a scripted timeline: each frame writes styles and text into the SVG.
+  const frameOf = (root: Element) =>
+    [...root.querySelectorAll<SVGElement>("[data-part]")]
+      .map((part) => `${part.style.cssText}|${part.textContent}`)
+      .join("\n");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(siteUrl("/"));
   await waitForHydration(page);
   const story = page.getByTestId("landing-product-story");
-  await expect(story).toHaveAttribute("data-landing-phase", "resolve");
-  const expectCompletedDrawing = async () => {
-    await expect(story.locator(".sw-workbook-stage__reference-range")).toHaveCSS("opacity", "1");
-    await expect
-      .poll(() =>
-        story
-          .locator(".sw-sheet-row > .is-selected")
-          .evaluate((cell) => getComputedStyle(cell, "::after").opacity),
-      )
-      .toBe("1");
-  };
-  await expectCompletedDrawing();
-  const reduced = await story.evaluate((root) => ({
-    running: root
-      .getAnimations({ subtree: true })
-      .filter((animation) => animation.playState === "running").length,
-    nodes: root.querySelectorAll("*").length,
-  }));
-  expect(reduced.running).toBe(0);
+  // Reduced motion: the loop does not run, and the still picture is the finished
+  // edit: the recalculated total shows and the dependency paths are drawn.
+  await expect(story).toHaveAttribute("data-landing-running", "false");
+  await expect(story.locator('[data-part="d6"]')).toHaveText("$20,848");
+  const still = await story.evaluate(frameOf);
+  await page.waitForTimeout(400);
+  expect(await story.evaluate(frameOf)).toBe(still);
+  // Seeking in either direction must work without enabling animation.
+  for (const selector of [".sw-hero-scene__captions", ".sw-arch__steps"]) {
+    const chapters = page.locator(`${selector} button`);
+    for (let index = (await chapters.count()) - 1; index >= 0; index--) {
+      await chapters.nth(index).focus();
+      await page.keyboard.press("Enter");
+      await expect(chapters.nth(index)).toHaveAttribute("aria-current", "step");
+      await expect(page.locator(`${selector} [aria-current="step"]`)).toHaveCount(1);
+    }
+  }
+  await expect(story.locator('[data-part="d6"]')).toHaveText("$19,696");
+  await expect(story).toHaveAttribute("data-landing-running", "false");
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await story.getByRole("button", { name: "Replay visual explanation" }).click();
-  await expect(story).toHaveAttribute("data-landing-phase", /enter|select/);
+  await story.getByRole("button", { name: "Replay animation" }).click();
   await expect(story).toHaveAttribute("data-landing-running", "true");
+  const playing = await story.evaluate(frameOf);
+  await expect.poll(() => story.evaluate(frameOf)).not.toBe(playing);
+  // Off screen, the illustration stops; back on screen, it resumes.
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(story).toHaveAttribute("data-landing-running", "false");
+  const paused = await story.evaluate(frameOf);
+  await page.waitForTimeout(400);
+  expect(await story.evaluate(frameOf)).toBe(paused);
   await story.scrollIntoViewIfNeeded();
   await expect(story).toHaveAttribute("data-landing-running", "true");
-  expect(await story.locator("*").count()).toBe(reduced.nodes);
-  await expectCompletedDrawing();
-  await expect(story).toHaveAttribute("data-landing-running", "false");
+  await expect.poll(() => story.evaluate(frameOf)).not.toBe(paused);
   await page.goto(docsUrl("start/installation/"));
   await expect(story).toHaveCount(0);
   expect(
@@ -204,6 +212,38 @@ test("landing choreography is bounded, replayable, and reduced-motion complete",
         document.getAnimations().filter((animation) => animation.playState === "running").length,
     ),
   ).toBe(0);
+});
+
+test("landing tab lists follow arrow, Home, and End keys", async ({ page }) => {
+  await page.goto(siteUrl("/"));
+  await waitForHydration(page);
+  for (const prefix of ["landing-story-", "landing-tab-"]) {
+    const tabs = page.locator(`[role="tab"][id^="${prefix}"]`);
+    const count = await tabs.count();
+    expect(count).toBeGreaterThan(2);
+    const expectActive = async (index: number) => {
+      const tab = tabs.nth(index);
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      await expect(tab).toBeFocused();
+      await expect(tab).toHaveAttribute("tabindex", "0");
+      await expect(
+        page.locator(`[role="tabpanel"][aria-labelledby="${await tab.getAttribute("id")}"]`),
+      ).toHaveCount(1);
+      await expect(tabs.and(page.locator('[aria-selected="true"]'))).toHaveCount(1);
+    };
+    await tabs.first().click();
+    await expectActive(0);
+    await page.keyboard.press("ArrowRight");
+    await expectActive(1);
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    // Left from the first tab wraps to the last.
+    await expectActive(count - 1);
+    await page.keyboard.press("Home");
+    await expectActive(0);
+    await page.keyboard.press("End");
+    await expectActive(count - 1);
+  }
 });
 
 test.describe("documentation site", () => {

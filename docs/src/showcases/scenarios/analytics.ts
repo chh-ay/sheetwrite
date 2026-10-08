@@ -8,7 +8,7 @@
  */
 
 import type { ColumnarData, DocumentOp, Theme, Workbook } from "@sheetwrite/core";
-import { REACT_SHOWCASE_THEME } from "../revenue.js";
+import { REACT_SHOWCASE_THEME, revenueAccountName } from "../revenue.js";
 
 export const ANALYTICS_ROWS = 100_000;
 export const ANALYTICS_SHEET_ID = "pipeline";
@@ -27,6 +27,9 @@ export const ANALYTICS_MARKETS = [
   "Oslo",
 ] as const;
 export const ANALYTICS_SEGMENTS = ["Enterprise", "Mid-market", "SMB", "Self-serve"] as const;
+const ANNUAL_SEAT_PRICES = [240, 120, 48, 18];
+const SEAT_BASES = [220, 80, 12, 2];
+const SEAT_SPREADS = [1280, 260, 68, 28];
 
 /** Zero-based column coordinates of the pipeline sheet. */
 export const ANALYTICS_COLUMNS = {
@@ -50,12 +53,16 @@ export const ANALYTICS_THEME: Partial<Theme> = {
  * expectations exact (no float drift) across engine and test recomputation.
  */
 export function analyticsArr(row: number): number {
-  return ((row * 7919) % 240_000) + 480;
+  const annualSeatPrice = ANNUAL_SEAT_PRICES[(row * 3) % ANALYTICS_SEGMENTS.length] ?? 240;
+  return analyticsSeats(row) * annualSeatPrice;
 }
 
-/** Deterministic seat count per row, integer for exact aggregate assertions. */
+/** Seat bands follow the customer segment; prices and totals use whole dollars. */
 export function analyticsSeats(row: number): number {
-  return ((row * 31) % 950) + 5;
+  const segment = (row * 3) % ANALYTICS_SEGMENTS.length;
+  const base = SEAT_BASES[segment] ?? 220;
+  const spread = SEAT_SPREADS[segment] ?? 1280;
+  return base + ((row * 31) % spread);
 }
 
 /** Fresh columnar arrays per call so grid resets re-ingest pristine data. */
@@ -69,7 +76,7 @@ export function buildAnalyticsData(): ColumnarData {
 
   for (let row = 0; row < ANALYTICS_ROWS; row++) {
     id[row] = row + 1;
-    account[row] = `Account ${String(row + 1).padStart(6, "0")}`;
+    account[row] = revenueAccountName(row);
     market[row] = ANALYTICS_MARKETS[row % ANALYTICS_MARKETS.length] ?? "";
     segment[row] = ANALYTICS_SEGMENTS[(row * 3) % ANALYTICS_SEGMENTS.length] ?? "";
     seats[row] = analyticsSeats(row);
@@ -96,22 +103,24 @@ export function createAnalyticsWorkbook(): Workbook {
         name: ANALYTICS_SHEET_NAME,
         rowCount: ANALYTICS_ROWS,
         columns: [
-          { key: "id", header: "ID", width: 90, type: "number" },
-          { key: "account", header: "Account", width: 310, type: "text" },
-          { key: "market", header: "Market", width: 180, type: "text" },
-          { key: "segment", header: "Segment", width: 160, type: "text" },
-          { key: "seats", header: "Seats", width: 120, type: "number" },
-          { key: "arr", header: "ARR", width: 180, type: "currency", numberFormat: "$#,##0" },
+          { key: "id", header: "ID", width: 70, type: "number" },
+          { key: "account", header: "Account", width: 280, type: "text" },
+          { key: "market", header: "Market", width: 140, type: "text" },
+          { key: "segment", header: "Segment", width: 140, type: "text" },
+          { key: "seats", header: "Seats", width: 90, type: "number" },
+          { key: "arr", header: "ARR", width: 140, type: "currency", numberFormat: "$#,##0" },
         ],
         conditionalFormats: [
           {
+            // Enterprise contracts draw a tinted, bold value.
             range: arrRange,
             when: { kind: "greaterThan", value: 200_000 },
             style: { backgroundColor: "#58c4dc24", bold: true },
           },
           {
+            // Self-serve bands top out at $522, so red marks floor deals under $1,000.
             range: arrRange,
-            when: { kind: "lessThan", value: 5_000 },
+            when: { kind: "lessThan", value: 1_000 },
             style: { color: "#fb7185" },
           },
         ],
@@ -189,7 +198,11 @@ function computeAnalyticsTotals(): {
 
 /** Observable states browser contracts assert against (exact — integer math). */
 export const ANALYTICS_EXPECTED = {
-  firstDataCell: { row: 0, col: ANALYTICS_COLUMNS.account, text: "Account 000001" },
+  firstDataCell: {
+    row: 0,
+    col: ANALYTICS_COLUMNS.account,
+    text: revenueAccountName(0),
+  },
   rowCount: ANALYTICS_ROWS,
   kpiCount: ANALYTICS_KPIS.length,
   ...computeAnalyticsTotals(),

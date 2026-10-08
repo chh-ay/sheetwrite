@@ -3,6 +3,7 @@ import {
   ANALYTICS_EXPECTED,
   ANALYTICS_ROWS,
   analyticsArr,
+  analyticsSeats,
 } from "../../docs/src/showcases/scenarios/analytics.js";
 import { siteUrl } from "./playwright.config.js";
 
@@ -127,7 +128,7 @@ test.describe("react workbench — controlled analytics", () => {
     await page.keyboard.press("ControlOrMeta+Home");
     for (let col = 0; col < 4; col++) await page.keyboard.press("ArrowRight");
     await expect(page.getByTestId("selection-address")).toHaveText("R1 C5");
-    await expect(page.getByTestId("formula-input")).toHaveValue("5");
+    await expect(page.getByTestId("formula-input")).toHaveValue(String(analyticsSeats(0)));
 
     // A committed formula evaluates against the named range immediately.
     await page.getByTestId("formula-input").fill("=MAX(ANNUAL_ARR)");
@@ -139,12 +140,12 @@ test.describe("react workbench — controlled analytics", () => {
     // Editing an ARR literal recalculates both the formula cell and the KPIs.
     await page.locator(GRID).focus();
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByTestId("formula-input")).toHaveValue("480");
+    await expect(page.getByTestId("formula-input")).toHaveValue(String(analyticsArr(0)));
     await page.getByTestId("formula-input").fill("1000000");
     await page.getByTestId("formula-input").press("Enter");
     await expect(page.getByTestId("kpi-total")).toHaveAttribute(
       "data-raw",
-      String(TOTAL_ARR - 480 + 1_000_000),
+      String(TOTAL_ARR - analyticsArr(0) + 1_000_000),
       { timeout: 15_000 },
     );
     await expect(page.getByTestId("kpi-largest")).toHaveAttribute("data-raw", "1000000");
@@ -165,21 +166,24 @@ test.describe("react workbench — controlled analytics", () => {
     await page.locator(GRID).focus();
     await page.keyboard.press("ControlOrMeta+Home");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByTestId("formula-input")).toHaveValue("Account 000001");
+    await expect(page.getByTestId("formula-input")).toHaveValue("Alder Quay Logistics");
     await page.keyboard.press("ControlOrMeta+c");
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 15_000 })
-      .toContain("Account 000001");
+      .toContain("Alder Quay Logistics");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ControlOrMeta+v");
     await expect
       .poll(
-        async () => (await gridcellTexts(page)).filter((text) => text === "Account 000001").length,
+        async () =>
+          (await gridcellTexts(page)).filter((text) => text === "Alder Quay Logistics").length,
         { timeout: 15_000 },
       )
       .toBeGreaterThanOrEqual(2);
     await editButton(page, "Undo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000002");
+    await expect
+      .poll(() => gridcellTexts(page), { timeout: 15_000 })
+      .toContain("Beacon Quay Logistics");
 
     await expectNoErrors(page, errors);
   });

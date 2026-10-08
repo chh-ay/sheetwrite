@@ -276,9 +276,9 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     status: "partial",
     resultMode: "evaluated",
     semantics:
-      "FILTER, SORT, UNIQUE, TRANSPOSE, SEQUENCE, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, direct range arrays, spill ownership, resizing, obstruction, history, and dependency invalidation are evaluated.",
+      "FILTER, SORT, UNIQUE, TRANSPOSE, SEQUENCE, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, direct range arrays, array constants, spill references (A1#), spill ownership, resizing, obstruction, read order between spills, history, and dependency invalidation are evaluated. The full engine adds SORTBY, reshaping, and LAMBDA array helpers.",
     divergence:
-      "No implicit-intersection operator, spill-reference # syntax, multi-key SORT, higher-order LAMBDA array functions, or general Excel/Sheets dynamic-array family is claimed.",
+      "No implicit-intersection operator or general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.",
     source:
       "https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531",
     evidence: [
@@ -318,21 +318,25 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
   },
   {
     id: "formula.let-lambda",
-    label: "LAMBDA and reusable named functions",
+    label: "LAMBDA and its array helpers",
     area: "formula",
     dialect: "excel",
-    status: "unsupported",
-    resultMode: "unsupported",
+    status: "partial",
+    resultMode: "evaluated",
     semantics:
-      "Formula source is retained, but LAMBDA and higher-order execution are not evaluated.",
+      "The full engine evaluates LAMBDA with lexical parameters, immediate calls, LET-bound functions, ISOMITTED, and the MAP, REDUCE, SCAN, BYROW, BYCOL, and MAKEARRAY helpers, with bounded recursion.",
     divergence:
-      "LET is supported separately; no approximation, reusable named-function runtime, or JavaScript execution fallback is provided.",
+      "Only in the full engine (@sheetwrite/formulas); the default engine returns #NAME?. Calls nest at most 64 deep, and an uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.",
     source:
       "https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67",
-    evidence: ["packages/wasm/src/tests.rs", "docs/src/content/docs/guides/formulas.md"],
+    evidence: [
+      "packages/wasm/src/eval/analysis/lambda.rs",
+      "docs/src/content/docs/guides/analysis-formulas.md",
+    ],
     fixtureIds: ["formula-engine-vectors"],
-    importBehavior: "Source is preserved; evaluation returns an explicit unsupported-name error.",
-    exportBehavior: "Preserved source may be emitted, without a fabricated cached result.",
+    importBehavior:
+      "LAMBDA source evaluates when the full engine is selected; with the default engine the source is preserved and returns #NAME?.",
+    exportBehavior: "The exact formula source is emitted without a fabricated cached result.",
     warningCode: null,
     lastVerifiedProtocolVersion: 3,
   },

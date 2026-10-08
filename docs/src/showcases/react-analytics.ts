@@ -15,6 +15,7 @@ import type {
   Grid,
   SearchResult,
   Selection,
+  Workbook,
 } from "@sheetwrite/core";
 import { downloadBytes, fromCsv, parseCellInput, toCsv } from "@sheetwrite/core";
 import type { GridReadyEvent, GridReadyReason } from "@sheetwrite/core/adapter";
@@ -82,14 +83,103 @@ function columnFormat(col: number): CellFormat {
   return workbookColumn?.type ?? "text";
 }
 
+/** Minimum row-number gutter and label metrics the Grid allocates for it. */
+const ROW_GUTTER_MIN = 48;
+const ROW_LABEL_FONT_PX = 13;
+
+/** Row-number gutter width the Grid paints for a sheet of `rowCount` rows. */
+function rowGutterWidth(rowCount: number): number {
+  const digits = String(Math.max(1, rowCount)).length;
+  return Math.max(ROW_GUTTER_MIN, Math.ceil(digits * ROW_LABEL_FONT_PX * 0.6 + 12));
+}
+
+/** Scenario widths, captured once so repeated fits never compound a scale. */
+const NATURAL_WIDTHS: readonly (readonly number[])[] = createAnalyticsWorkbook().sheets.map(
+  (sheet) => sheet.columns.map((column) => column.width),
+);
+
+/**
+ * Below this share of a sheet's scenario width the columns stop shrinking and
+ * the grid scrolls sideways instead: narrower cells cut the money values.
+ */
+const MIN_COLUMN_SCALE = 0.85;
+
+/**
+ * Fit each sheet's named columns to the measured grid host. Past the declared
+ * schema the Grid pads the host with empty letter columns of its own width, so
+ * the declared widths must end exactly at the host edge: a shorter total leaves
+ * empty letter columns on show, a longer one clips the last named column.
+ * Hosts far too narrow for the columns keep the scenario widths and scroll.
+ */
+export function fitColumnsToHost(workbook: Workbook, hostWidth: number): void {
+  const target = Math.floor(hostWidth) - rowGutterWidth(ANALYTICS_ROWS);
+  if (target <= 0) return;
+  workbook.sheets.forEach((sheet, sheetIndex) => {
+    const natural = NATURAL_WIDTHS[sheetIndex];
+    if (!natural) return;
+    const total = natural.reduce((sum, width) => sum + width, 0);
+    const scale = total > 0 ? target / total : 1;
+    if (scale < MIN_COLUMN_SCALE) return; // keep scenario widths; grid scrolls
+    const widths = natural.map((width) => Math.floor(width * scale));
+    let spare = scale === 1 ? 0 : target - widths.reduce((sum, width) => sum + width, 0);
+    // Rounding pixels go to the widest columns so the total lands on the host
+    // edge exactly instead of short (padding columns) or long (clipping).
+    const byWidth = widths
+      .map((width, index) => ({ width, index }))
+      .sort((a, b) => b.width - a.width);
+    for (const entry of byWidth) {
+      if (spare <= 0) break;
+      widths[entry.index] = entry.width + 1;
+      spare -= 1;
+    }
+    sheet.columns.forEach((column, index) => {
+      column.width = widths[index] ?? column.width;
+    });
+  });
+}
+
+/** Host width the workbench fits its columns to; 0 until the stage is measured. */
+export interface AnalyticsWorkbenchOptions {
+  gridHostWidth?: number;
+}
+
 /** Controlled-analytics workbench state machine over the shared scenario. */
-export function useAnalyticsWorkbench() {
+export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
+  const { gridHostWidth = 0 } = options;
   const gridRef = useRef<Grid>(null);
   const activityId = useRef(0);
   const rendererCleanup = useRef<() => void>(() => {});
   const formulaDirty = useRef(false);
 
-  const workbook = useMemo(() => createAnalyticsWorkbook(), []);
+  // The measured host width is a workbook input: the Grid must be constructed
+  // with fitted widths, so the workbook is rebuilt once the stage reports its
+  // width and the Grid mounts on that render instead of before it.
+  const workbook = useMemo(() => {
+    const next = createAnalyticsWorkbook();
+    fitColumnsToHost(next, gridHostWidth);
+    return next;
+  }, [gridHostWidth]);
+
+  /**
+   * Re-fit the columns after the stage changes width. The workbook object is
+   * the one the Grid's store reads, so writing widths is enough for the next
+   * layout pass — no reset, no new generation, no undo entry. `refresh()` only
+   * repaints and the documented geometry setters commit history, so the theme
+   * is re-derived to rebuild the column index and layout from the store.
+   */
+  const fitGridColumns = useCallback(
+    (hostWidth: number): void => {
+      const grid = gridRef.current;
+      if (!grid || hostWidth <= 0) return;
+      const before = workbook.sheets.map((sheet) => sheet.columns.map((column) => column.width));
+      fitColumnsToHost(workbook, hostWidth);
+      const changed = workbook.sheets.some((sheet, index) =>
+        sheet.columns.some((column, col) => column.width !== before[index]?.[col]),
+      );
+      if (changed) grid.replaceTheme(ANALYTICS_THEME);
+    },
+    [workbook],
+  );
   const [dataset, setDataset] = useState<ColumnarData>(() => buildAnalyticsData());
 
   // Controlled query/view state — the single source of truth the grid is
@@ -339,12 +429,24 @@ export function useAnalyticsWorkbench() {
   }, [market, record, refreshKpis]);
 
   const undo = useCallback((): void => {
-    gridRef.current?.undo();
+    const grid = gridRef.current;
+    if (!grid) return;
+    if (grid.getCommandState("undo").disabled) {
+      record("Nothing to undo");
+      return;
+    }
+    grid.undo();
     record("Undo");
   }, [record]);
 
   const redo = useCallback((): void => {
-    gridRef.current?.redo();
+    const grid = gridRef.current;
+    if (!grid) return;
+    if (grid.getCommandState("redo").disabled) {
+      record("Nothing to redo");
+      return;
+    }
+    grid.redo();
     record("Redo");
   }, [record]);
 
@@ -500,6 +602,7 @@ export function useAnalyticsWorkbench() {
     rendererFallback,
     activity,
     // Actions.
+    fitGridColumns,
     editFormulaDraft,
     commitFormulaDraft,
     chooseMarket,

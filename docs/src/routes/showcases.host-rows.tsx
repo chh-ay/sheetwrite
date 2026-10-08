@@ -9,7 +9,8 @@ export const Route = createFileRoute("/showcases/host-rows")({
     meta: [
       {
         name: "description",
-        content: "Keep app-owned entity rows in step with committed Sheetwrite changes.",
+        content:
+          "Sort and filter host-owned CRM accounts, import 10,000 leads through the row bridge, and watch the live ID-check and cell-load time.",
       },
       { title: "Host-owned rows — Sheetwrite" },
     ],

@@ -1,119 +1,399 @@
 .host-rows-frame {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--sw-surface-0);
-}
-.host-rows-showcase {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: clamp(1.5rem, 3vw, 2.5rem) 24px 72px;
   color: var(--sw-fg);
 }
-.host-rows-showcase header {
-  max-width: 760px;
-  margin-bottom: 1.5rem;
+.host-rows-showcase {
+  width: calc(100% - 2 * var(--sw-page-inset));
+  margin-inline: auto;
+  padding-block: 0.75rem 4rem;
 }
-.host-rows-showcase h1 {
-  margin: 0;
-  color: var(--sw-fg-strong);
-  font: 700 clamp(2rem, 3.4vw, 3rem) / 1.08 var(--sw-font-display);
-  letter-spacing: -0.04em;
+.host-row-stage {
+  overflow: hidden;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: var(--sw-window-radius);
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg);
 }
-.host-rows-showcase .eyebrow {
-  margin: 0 0 0.75rem;
-  color: var(--sw-accent-strong);
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.host-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0 0 1rem;
-}
-.host-row-actions button {
-  min-height: 2.5rem;
-  border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-demo-radius-2);
-  color: var(--sw-fg-strong);
-  background: var(--sw-surface-1);
-  padding: 0 0.9rem;
-  font: 600 var(--sw-type-sm) / 1 var(--sw-font-body);
-  cursor: pointer;
-  transition:
-    border-color var(--sw-demo-transition),
-    background-color var(--sw-demo-transition);
-}
-.host-row-proof {
+.host-row-stage__bar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-  margin-top: 24px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background:
+    radial-gradient(
+      35rem 15rem at 100% 0,
+      color-mix(in srgb, var(--sw-demo-accent) 12%, transparent),
+      transparent
+    ),
+    var(--sw-demo-surface);
 }
-.host-row-proof > div {
-  min-width: 0;
-  border-top: 2px solid var(--sw-border);
-  padding: 18px 0;
+.host-row-stage__bar p,
+.host-row-panel header p {
+  margin: 0 0 0.35rem;
+  font: 600 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sw-demo-accent-strong);
 }
-.host-row-proof h2 {
-  margin-top: 0;
-  font-size: 1rem;
+.host-row-stage__bar h2 {
+  margin: 0;
+  color: var(--sw-demo-fg-strong);
+  font: 650 clamp(1.25rem, 2vw, 1.7rem) / 1.2 var(--sw-font-display);
 }
-.host-row-proof li {
-  margin: 0.45rem 0;
-  overflow-wrap: anywhere;
-  font-family: var(--sw-font-mono);
+.host-row-stage__bar output {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  padding: 1rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-demo-deep);
+}
+.host-row-stage__bar output strong {
+  font: 600 clamp(1.4rem, 3vw, 2rem) / 1.2 var(--sw-font-mono);
+  color: var(--sw-demo-fg-strong);
+}
+.host-row-stage__bar output span,
+.host-row-stage__note {
+  color: var(--sw-demo-muted);
   font-size: var(--sw-type-sm);
 }
-
-.host-rows-showcase header > p:last-child {
-  margin: 0.75rem 0 0;
-  color: var(--sw-fg-muted);
-  font-size: 1rem;
-  line-height: 1.6;
+.host-row-stage :is(.host-row-primary, .host-row-actions button) {
+  height: 2rem;
+  max-width: 100%;
+  padding: 0 0.75rem;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: var(--sw-demo-radius-2);
+  color: var(--sw-demo-fg-strong);
+  background: var(--sw-demo-raised);
+  font: 600 var(--sw-type-sm) / 1 var(--sw-font-body);
+  cursor: pointer;
 }
-
-.host-row-actions button:hover {
-  border-color: var(--sw-accent);
-  background: var(--sw-surface-2);
+.host-row-stage button.host-row-primary {
+  color: var(--sw-demo-ink);
+  background: var(--sw-demo-accent);
+  border-color: var(--sw-demo-accent);
 }
-
-.host-row-actions button:focus-visible {
-  outline: 2px solid var(--sw-accent);
+.host-row-stage button:hover:not(:disabled) {
+  border-color: var(--sw-demo-accent);
+}
+.host-row-stage button:focus-visible {
+  outline: 2px solid var(--sw-demo-accent-strong);
   outline-offset: 3px;
 }
-
-.host-row-proof ul,
-.host-row-proof ol {
-  padding-inline-start: 1.25rem;
+.host-row-stage button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Three labelled groups share the strip: what the host changes, what only the
+   view changes, and the host's write policy. */
+.host-row-actions {
+  display: grid;
+  grid-template-columns: 3fr 3fr 2fr;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  margin: 0;
+  border-block: 1px solid var(--sw-demo-border);
 }
 
-@media (max-width: 32rem) {
-  .host-rows-showcase {
-    padding: 28px 16px 48px;
-  }
+.host-row-actions__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
 
+/* A floated legend is not the fieldset's border legend, so it lays out as an
+   ordinary first row of the flex group. */
+.host-row-actions__group legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  color: var(--sw-demo-muted);
+  font: 600 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.host-row-stage .host-row-actions button {
+  flex: 1 1 auto;
+  min-height: 2.25rem;
+  height: auto;
+  padding: 0.2rem 0.7rem;
+  line-height: 1.25;
+}
+.host-row-stage__note {
+  margin: 0;
+  padding: 0.75rem 1.5rem;
+}
+.host-row-stage {
+  --sw-surface-0: var(--sw-demo-deep);
+  --sw-surface-1: var(--sw-demo-surface);
+  --sw-surface-2: var(--sw-demo-raised);
+  --sw-fg: var(--sw-demo-fg);
+  --sw-fg-muted: var(--sw-demo-muted);
+  --sw-fg-strong: var(--sw-demo-fg-strong);
+  --sw-border: var(--sw-demo-border);
+  --sw-accent: var(--sw-demo-accent);
+}
+
+/* Core declares its canvas palette on the grid root (.sheetwrite) and overrides
+   it again for [data-theme="dark"], so the stage palette only takes effect when
+   it is declared on that same element with higher specificity. This also drives
+   the sheet-tab tokens, which core derives from the resolved canvas theme. */
+.host-rows-showcase .host-row-stage .sheetwrite {
+  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-bg: var(--sw-demo-surface);
+  --sheetwrite-fg: var(--sw-demo-fg);
+  --sheetwrite-grid-line: var(--sw-demo-border);
+  --sheetwrite-header-bg: var(--sw-demo-raised);
+  --sheetwrite-header-fg: var(--sw-demo-fg-strong);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-demo-accent) 15%, transparent);
+  --sheetwrite-selection-border: var(--sw-demo-accent);
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 25%, transparent);
+  --sheetwrite-search-active: var(--sw-demo-warn);
+  --sheetwrite-widget-bg: var(--sw-demo-raised);
+  --sheetwrite-widget-fg: var(--sw-demo-fg);
+  --sheetwrite-widget-border: var(--sw-demo-border);
+}
+/* Both panels share one height: the delta log fills the column beside the
+   account store instead of stopping short of it. */
+.host-row-proof {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+  align-items: stretch;
+}
+.host-row-panel {
+  min-width: 0;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-demo-radius-3);
+  background: var(--sw-surface-1);
+  overflow: hidden;
+}
+.host-row-panel header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+.host-row-panel header p {
+  color: var(--sw-accent-strong);
+}
+.host-row-panel h2 {
+  margin: 0;
+  font: 650 1.2rem / 1.2 var(--sw-font-display);
+  color: var(--sw-fg-strong);
+}
+.host-row-panel header > span {
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-type-xs) var(--sw-font-mono);
+}
+.host-row-table-scroll {
+  max-height: 24rem;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-border-strong) var(--sw-surface-1);
+}
+.host-row-panel table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sw-type-sm);
+}
+.host-row-panel th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+}
+.host-row-panel th,
+.host-row-panel td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid var(--sw-border);
+  vertical-align: top;
+}
+.host-row-panel td strong,
+.host-row-panel td code,
+.host-row-panel td small {
+  display: block;
+}
+.host-row-panel td code,
+.host-row-panel td small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-type-xs);
+  margin-top: 0.25rem;
+}
+.host-row-panel td:nth-child(2) {
+  font-family: var(--sw-font-mono);
+  white-space: nowrap;
+}
+.host-row-stage-pill {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font: 500 var(--sw-type-xs) var(--sw-font-body);
+  color: var(--sw-fg-muted);
+  white-space: nowrap;
+}
+.host-row-stage-pill[data-stage="Renewal"] {
+  color: var(--sw-type-string);
+}
+.host-row-stage-pill[data-stage="Proposal"] {
+  color: var(--sw-type-number);
+}
+.host-row-stage-pill[data-stage="Contract review"] {
+  color: var(--sw-type-name);
+}
+.host-row-stage-pill[data-stage="Qualification"] {
+  color: var(--sw-fg-dim);
+}
+.host-row-events {
+  display: flex;
+  flex-direction: column;
+}
+.host-row-events ol {
+  display: grid;
+  flex: 1 1 0;
+  gap: 0.5rem;
+  align-content: start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-border-strong) var(--sw-surface-1);
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+  margin: 0;
+  list-style: none;
+}
+.host-row-events ol:empty {
+  display: none;
+}
+.host-row-events li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-demo-radius-2);
+  overflow-wrap: anywhere;
+}
+.host-row-events li strong {
+  color: var(--sw-accent-strong);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+}
+.host-row-events li[data-status="rejected"] strong {
+  color: var(--sw-demo-warn);
+}
+.host-row-events li span,
+.host-row-empty {
+  font-size: var(--sw-type-sm);
+  color: var(--sw-fg-muted);
+  line-height: 1.5;
+}
+.host-row-empty {
+  padding: 1rem;
+  margin: 0;
+}
+@media (max-width: 48rem) {
   .host-row-proof {
     grid-template-columns: minmax(0, 1fr);
   }
+  .host-row-stage__bar {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 1rem;
+  }
+  .host-row-stage__bar output {
+    display: grid;
+    gap: 0.3rem;
+  }
+  .host-row-actions {
+    padding: 0.75rem 1rem;
+  }
+  .host-row-stage__bar button {
+    justify-self: start;
+  }
+  .host-row-panel th,
+  .host-row-panel td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+  .host-row-panel td:nth-child(3),
+  .host-row-panel th:nth-child(3) {
+    display: none;
+  }
 }
 
-.host-rows-showcase,
-.host-rows-showcase .sheetwrite {
-  --sheetwrite-bg: var(--sw-surface-0);
-  --sheetwrite-fg: var(--sw-fg);
-  --sheetwrite-grid-line: var(--sw-border);
-  --sheetwrite-header-bg: var(--sw-surface-2);
-  --sheetwrite-header-fg: var(--sw-fg-strong);
-  --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
-  --sheetwrite-selection-border: var(--sw-accent);
-  --sheetwrite-widget-bg: var(--sw-surface-1);
-  --sheetwrite-widget-fg: var(--sw-fg);
-  --sheetwrite-widget-border: var(--sw-border);
-  --sheetwrite-tab-bg: var(--sw-surface-1);
-  --sheetwrite-tab-fg: var(--sw-fg-muted);
-  --sheetwrite-tab-border: var(--sw-border);
-  --sheetwrite-tab-active-bg: var(--sw-surface-2);
-  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+.host-row-stage__bar {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.7fr);
+}
+.host-row-stage__bar > button {
+  justify-self: end;
+}
+.host-row-stage .sheetwrite-tabbar {
+  padding: 0.15rem 0.6rem;
+  border-top: 1px solid var(--sw-demo-border);
+}
+.host-row-stage .sheetwrite-tab {
+  padding: 0 0.7rem;
+  border-radius: var(--sw-demo-radius-1);
+  font: 600 12px / 1 var(--sw-font-body);
+}
+.host-row-stage .sheetwrite-tab-icon {
+  width: 1rem;
+  height: 1rem;
+}
+/* The add-sheet control sits inside the 28px tab bar: keep it on the bar's own
+   height and give it the same chip treatment as the tab beside it. */
+.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add) {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 100%;
+  padding: 0;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: transparent;
+  color: var(--sw-demo-muted);
+}
+.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):hover,
+.host-row-stage .sheetwrite-tab-options-button[aria-expanded="true"] {
+  border-color: var(--sw-demo-accent);
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-accent-strong);
+}
+.host-row-stage :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
+  outline: 2px solid var(--sw-demo-accent);
+  outline-offset: 1px;
+}
+.host-row-panel header > span {
+  text-align: right;
+  line-height: 1.5;
+}
+@media (max-width: 48rem) {
+  .host-row-stage__bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .host-row-stage__bar > button {
+    justify-self: stretch;
+    min-height: 2.5rem;
+  }
+  .host-row-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .host-row-actions button {
+    min-height: 2.5rem;
+    height: auto;
+    line-height: 1.3;
+  }
+  .host-row-stage-pill {
+    white-space: normal;
+  }
 }

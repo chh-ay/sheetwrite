@@ -9,6 +9,8 @@ import showcaseStylesheet from "../styles/showcase.css?url";
 import siteStylesheet from "../styles/site.css?url";
 import siteShellStylesheet from "../styles/site-shell.css?url";
 import tokensStylesheet from "../styles/tokens.css?url";
+// Expressive Code base and theme styles, shared by every page with code.
+import "virtual:expressive-code.css";
 
 const THEME_SCRIPT =
   'document.documentElement.dataset.theme=localStorage.getItem("sheetwrite-theme")??(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")';
@@ -50,6 +52,8 @@ export const Route = createRootRoute({
     const pathname = matches.at(-1)?.pathname ?? "/";
     const canonicalPath = pathname.endsWith("/") ? pathname : `${pathname}/`;
     const canonical = new URL(canonicalPath, SITE_URL).href;
+    // Documentation pages never render showcase chrome; skip its stylesheet.
+    const showcaseChrome = !canonicalPath.startsWith("/docs/");
     return {
       links: [
         // Explicit head links are render-blocking in dev and production. Plain
@@ -59,7 +63,7 @@ export const Route = createRootRoute({
         { rel: "stylesheet", href: siteStylesheet },
         // Shell refinements layer over site.css; link order is the cascade.
         { rel: "stylesheet", href: siteShellStylesheet },
-        { rel: "stylesheet", href: showcaseStylesheet },
+        ...(showcaseChrome ? [{ rel: "stylesheet", href: showcaseStylesheet }] : []),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       ],

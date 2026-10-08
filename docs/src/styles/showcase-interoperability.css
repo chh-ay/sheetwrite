@@ -1,9 +1,5 @@
-/* Route-scoped styles for /showcases/interoperability/. Every selector is
-   prefixed .sw-si- so this sheet can never collide with sibling showcases.
-   Palette contract: everything — page chrome AND the workbench instrument —
-   reads theme-aware --sw-* tokens, so the whole route follows the site
-   light/dark theme. --sw-demo-* is only used for theme-agnostic status
-   colors (warn/danger) and structural tokens (space/radius/transition). */
+/* The live exchange stage stays dark. Secondary evidence follows the site theme.
+   Route-scoped selectors and shared demo tokens keep this page independent. */
 
 @layer components {
   .sw-si-frame {
@@ -17,19 +13,18 @@
   .sw-si-page {
     --sw-si-grid-block-size: clamp(30rem, 60dvh, 36rem);
     --sw-si-split-block-size: clamp(27rem, calc(100dvh - (var(--sw-header-height) * 2)), 46rem);
+    /* The demo danger colour is tuned for the dark instrument; as text on the
+       light page surfaces it mixes toward the theme's strong foreground. */
+    --sw-si-danger: color-mix(in srgb, var(--sw-demo-danger) 68%, var(--sw-fg-strong));
     display: flex;
-    width: min(74rem, 100% - 2.5rem);
+    width: calc(100% - 2 * var(--sw-page-inset));
     flex-direction: column;
     margin: 0 auto;
-    padding: clamp(2.5rem, 6vh, 4.5rem) 0 5rem;
+    padding: 0.75rem 0 4rem;
   }
 
   .sw-si-page > .sw-capability-hero {
     order: 1;
-  }
-
-  .sw-si-page > .sw-si-status {
-    order: 2;
   }
 
   .sw-si-page > #xlsx {
@@ -136,19 +131,6 @@
 
   .sw-si-sectionnav a[aria-current="true"] span {
     color: var(--sw-accent-strong);
-  }
-
-  /* ── Live status readout ── */
-
-  .sw-si-status {
-    max-width: none;
-    margin: 0 0 var(--sw-demo-space-2);
-    padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
-    border-left: 3px solid var(--sw-accent);
-    border-radius: 0 var(--sw-demo-radius-2) var(--sw-demo-radius-2) 0;
-    background: var(--sw-surface-1);
-    color: var(--sw-fg);
-    font: 500 var(--sw-type-xs) / 1.4 var(--font-sans);
   }
 
   /* ── Sections ── */
@@ -285,11 +267,11 @@
 
   .sw-si-btn {
     display: inline-flex;
-    min-height: 2.15rem;
+    min-height: 2rem;
     align-items: center;
     justify-content: center;
     gap: 0.45rem;
-    padding: 0.42rem 0.85rem;
+    padding: 0.3rem 0.75rem;
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-demo-radius-1);
     background: var(--sw-surface-1);
@@ -352,12 +334,12 @@
 
   .sw-si-btn--danger:hover:not(:disabled),
   .sw-si-btn--danger:focus-visible {
-    border-color: var(--sw-demo-danger);
+    border-color: var(--sw-si-danger);
     background: color-mix(in srgb, var(--sw-demo-danger) 20%, var(--sw-surface-1));
   }
 
   .sw-si-btn--danger:focus-visible {
-    outline-color: var(--sw-demo-danger);
+    outline-color: var(--sw-si-danger);
   }
 
   /* The file control is a real <input type=file> behind a button-shaped
@@ -389,9 +371,24 @@
   /* ── Workbench: one dark instrument ── */
 
   .sw-si-workbench {
-    /* Engine chrome adopts the site theme: the canvas reads these seeds via
-       resolveThemeFromCss at mount (and again on replaceTheme when the theme
-       flips); shell widgets, tabs, menus, and editors read them from CSS. */
+    --sw-surface-0: var(--sw-demo-deep);
+    --sw-surface-1: var(--sw-demo-surface);
+    --sw-surface-2: var(--sw-demo-raised);
+    --sw-fg: var(--sw-demo-fg);
+    --sw-fg-strong: var(--sw-demo-fg-strong);
+    --sw-fg-muted: var(--sw-demo-muted);
+    --sw-fg-dim: var(--sw-demo-muted);
+    --sw-border: var(--sw-demo-border);
+    --sw-border-strong: var(--sw-demo-border-strong);
+    --sw-accent: var(--sw-demo-accent);
+    --sw-accent-strong: var(--sw-demo-accent-strong);
+    --sw-accent-ink: var(--sw-demo-ink);
+    /* The light-theme soft/raised tokens would leave pale chips with pale text on
+       the dark instrument; keep them in the demo palette. */
+    --sw-accent-soft: color-mix(in srgb, var(--sw-demo-accent) 18%, transparent);
+    --sw-surface-3: var(--sw-demo-border-strong);
+    /* Danger text sits on the dark instrument here, so it keeps the demo pink. */
+    --sw-si-danger: var(--sw-demo-danger);
     --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
     --sheetwrite-bg: var(--sw-surface-1);
     --sheetwrite-fg: var(--sw-fg);
@@ -423,11 +420,12 @@
 
     display: grid;
     grid-template:
-      "label label" auto
-      "stage ledger" var(--sw-si-grid-block-size)
-      "actions actions" auto
-      "model model" auto /
-      minmax(0, 1fr) minmax(16rem, 20rem);
+      "label" auto
+      "ledger" auto
+      "stage" var(--sw-si-grid-block-size)
+      "actions" auto
+      "model" auto /
+      minmax(0, 1fr);
     overflow: hidden;
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-demo-radius-3);
@@ -480,118 +478,148 @@
   .sw-si-ledger {
     grid-area: ledger;
     min-width: 0;
-    min-height: 0;
-    padding: var(--sw-demo-space-3);
-    overflow-y: auto;
-    border-left: 1px solid var(--sw-border);
-    background: var(--sw-surface-0);
+    padding: 1.25rem 1.5rem 1rem;
+    background:
+      radial-gradient(
+        40rem 12rem at 95% 0%,
+        color-mix(in srgb, var(--sw-demo-accent) 12%, transparent),
+        transparent 75%
+      ),
+      var(--sw-demo-surface);
+    border-bottom: 1px solid var(--sw-demo-border);
   }
 
-  .sw-si-ledger header > p {
-    margin: 0 0 var(--sw-demo-space-1);
+  .sw-si-flight-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .sw-si-flight-head > div > p,
+  .sw-si-release-label {
+    margin: 0 0 0.35rem;
     color: var(--sw-accent-strong);
-    font: 650 var(--sw-type-xs) var(--font-mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+    letter-spacing: 0.1em;
   }
 
-  .sw-si-section .sw-si-ledger h3 {
+  .sw-si-section .sw-si-ledger h2 {
     margin: 0;
-    font-size: var(--sw-type-base);
+    font: 650 clamp(1.25rem, 2vw, 1.7rem) / 1.2 var(--sw-font-display);
+    color: var(--sw-demo-fg-strong);
+    letter-spacing: -0.03em;
   }
 
-  .sw-si-journey {
+  .sw-si-flight-head > button {
+    flex: none;
+  }
+
+  .sw-si-hud {
     display: grid;
-    gap: var(--sw-demo-space-1);
-    margin: var(--sw-demo-space-3) 0;
-    padding: 0;
-    list-style: none;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.2rem 0 0.75rem;
   }
 
-  .sw-si-journey li {
-    display: grid;
-    gap: var(--sw-demo-space-1);
-    padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
-    background: var(--sw-surface-1);
+  .sw-si-hud dt {
+    color: var(--sw-demo-muted);
+    font: 500 var(--sw-type-xs) var(--sw-font-body);
   }
 
-  .sw-si-journey li[data-state="active"] {
-    box-shadow: inset 0 0 0 1px var(--sw-border-strong);
+  .sw-si-hud dd {
+    margin: 0.35rem 0 0;
+    color: var(--sw-demo-accent-strong);
+    font: 650 clamp(1.4rem, 2.2vw, 2.1rem) / 1 var(--sw-font-mono);
+    letter-spacing: -0.04em;
   }
 
-  .sw-si-journey strong {
-    color: var(--sw-fg-strong);
+  /* The page's single live status line, inside the exchange panel. */
+  .sw-si-after-action {
+    margin: 0;
+    padding-left: var(--sw-demo-space-2);
+    border-left: 2px solid var(--sw-demo-accent);
+    color: var(--sw-demo-fg-soft);
     font-size: var(--sw-type-sm);
+    line-height: 1.5;
   }
 
-  .sw-si-ledger__action {
-    width: 100%;
-    margin: 0 0 var(--sw-demo-space-3);
+  .sw-si-workbench[data-dragging] {
+    outline: 3px dashed var(--sw-demo-accent);
+    outline-offset: -3px;
   }
 
-  .sw-si-journey span {
-    overflow: hidden;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-type-xs);
-    text-overflow: ellipsis;
+  .sw-si-model > summary {
+    color: var(--sw-demo-muted);
+    font: 600 var(--sw-type-sm) var(--sw-font-body);
+    cursor: pointer;
   }
 
-  .sw-si-ledger__states {
+  .sw-si-model[open] > summary {
+    margin-bottom: 1rem;
+  }
+
+  .sw-si-release-lab {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--sw-demo-space-1);
-    margin: 0;
-  }
-
-  .sw-si-ledger__states > div {
-    min-width: 0;
-    padding: var(--sw-demo-space-2);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-2);
     background: var(--sw-surface-1);
   }
 
-  .sw-si-ledger__states > div[data-state="evaluated"] {
-    background: color-mix(in srgb, var(--sw-state-resolved) 8%, var(--sw-surface-1));
+  .sw-si-section .sw-si-release-lab h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
   }
 
-  .sw-si-ledger__states > div[data-state="preserved"] {
-    background: color-mix(in srgb, var(--sw-state-requested) 8%, var(--sw-surface-1));
+  .sw-si-release-lab > div > p:last-child {
+    margin: 0;
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-xs);
+    line-height: 1.5;
   }
 
-  .sw-si-ledger__states > div[data-state="warning"] {
-    background: color-mix(in srgb, var(--sw-state-pending) 8%, var(--sw-surface-1));
+  .sw-si-bulk-report {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+    color: var(--sw-fg-muted);
+    font: 500 var(--sw-type-sm) var(--sw-font-mono);
   }
 
-  .sw-si-ledger__states > div[data-state="unsupported"] {
-    background: var(--sw-surface-2);
-  }
-
-  .sw-si-ledger__states dt {
-    color: var(--sw-fg-strong);
-    font: 650 var(--sw-type-xs) var(--font-mono);
-    text-transform: uppercase;
-  }
-
-  .sw-si-ledger__states > div[data-state="evaluated"] dt {
+  .sw-si-bulk-report strong {
     color: var(--sw-accent-strong);
   }
 
-  .sw-si-ledger__states > div[data-state="preserved"] dt {
-    color: var(--sw-state-requested);
+  .sw-si-import-report,
+  .sw-si-source-proof {
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-2);
+    font-size: var(--sw-type-sm);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
-  .sw-si-ledger__states > div[data-state="warning"] dt {
-    color: var(--sw-state-pending);
+  .sw-si-source-proof > summary {
+    cursor: pointer;
+    font-weight: 600;
   }
 
-  .sw-si-ledger__states > div[data-state="unsupported"] dt {
-    color: var(--sw-demo-danger);
+  .sw-si-source-proof td code {
+    white-space: nowrap;
   }
 
-  .sw-si-ledger__states dd {
-    margin: var(--sw-demo-space-1) 0 0;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-type-xs);
-    line-height: 1.45;
+  /* The proof table scrolls sideways on narrow screens; labels stay one line. */
+  .sw-si-source-proof .sw-si-matrix tbody th {
+    white-space: nowrap;
   }
 
   .sw-si-model {
@@ -709,6 +737,8 @@
     background: var(--sw-accent-soft);
     color: var(--sw-accent-strong);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sw-accent) 45%, transparent);
+    /* Weight, not only colour, marks the selected input. */
+    font-weight: 750;
   }
 
   .sw-si-model__segments input:focus-visible + span {
@@ -828,16 +858,100 @@
   }
 
   .sw-si-choice summary {
+    position: relative;
+    display: flex;
+    align-items: center;
     min-width: 11rem;
-    padding: 0.45rem 2rem 0.45rem 0.6rem;
+    height: 2.25rem;
+    padding: 0 2.2rem 0 0.75rem;
     border: 1px solid var(--sw-border-strong);
     border-radius: var(--sw-demo-radius-1);
-    background: var(--sw-surface-0);
+    background: var(--sw-surface-1);
     color: var(--sw-fg);
     font: 550 var(--sw-type-sm) var(--font-sans);
     letter-spacing: 0;
     text-transform: none;
+    list-style: none;
     cursor: pointer;
+  }
+
+  .sw-si-choice summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* A select-style chevron instead of the disclosure triangle. */
+  .sw-si-choice summary::after {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    content: "";
+    opacity: 0.6;
+    transform: translateY(-70%) rotate(45deg);
+    transition: transform var(--sw-demo-transition);
+  }
+
+  .sw-si-choice details[open] summary::after {
+    transform: translateY(-20%) rotate(-135deg);
+  }
+
+  .sw-si-choice summary:hover {
+    border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border-strong));
+  }
+
+  /* Result states as quiet pills; "missing" stays neutral so real states stand out. */
+  .sw-si-compat__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .sw-si-compat__tags i {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-dim);
+    font: 600 0.68rem / 1.5 var(--font-mono);
+    font-style: normal;
+  }
+
+  .sw-si-compat__tags i:is([data-state="local-pass"], [data-state="reviewed-pass"]) {
+    background: color-mix(in srgb, var(--sw-state-resolved) 14%, transparent);
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-si-compat__tags i[data-state="known-difference"] {
+    background: color-mix(in srgb, var(--sw-state-pending) 14%, transparent);
+    color: var(--sw-state-pending);
+  }
+
+  .sw-si-compat__tags i:is([data-state="unsupported"], [data-state="regression"]) {
+    background: color-mix(in srgb, var(--sw-demo-danger) 12%, transparent);
+    color: var(--sw-si-danger);
+  }
+
+  .sw-si-value {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    margin: 0;
+  }
+
+  .sw-si-value code {
+    color: var(--sw-fg-strong);
+    font: 650 1.25rem var(--font-mono);
+  }
+
+  .sw-si-value[data-type="error"] code {
+    color: var(--sw-si-danger);
+  }
+
+  .sw-si-value span {
+    color: var(--sw-fg-dim);
+    font: 600 var(--sw-type-xs) var(--font-mono);
   }
 
   .sw-si-choice summary:focus-visible {
@@ -890,20 +1004,16 @@
   .sw-si-compat {
     display: grid;
     grid-template-columns: minmax(16rem, 0.8fr) minmax(20rem, 1.2fr);
-    block-size: var(--sw-si-split-block-size);
-    max-block-size: calc(100dvh - var(--sw-header-height));
-    min-height: 0;
-    align-items: stretch;
-    overflow: hidden;
+    align-items: start;
     border: 1px solid var(--sw-border);
     border-radius: var(--sw-demo-radius-3);
     background: var(--sw-surface-1);
   }
 
   .sw-si-compat__records {
-    min-height: 0;
-    max-height: none;
-    align-self: stretch;
+    min-height: 15rem;
+    max-height: 36rem;
+    align-self: start;
     margin: 0;
     padding: 0;
     overflow-y: auto;
@@ -961,7 +1071,7 @@
   }
 
   .sw-si-compat__records button[data-status~="regression"] > small {
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-compat__records .sw-si-compat__record-status {
@@ -982,7 +1092,7 @@
   }
 
   .sw-si-compat__records button[data-status="unsupported"] > .sw-si-compat__record-status {
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-compat__records button > strong {
@@ -992,10 +1102,8 @@
 
   .sw-si-compat__detail {
     min-width: 0;
-    min-height: 0;
-    align-self: stretch;
+    align-self: start;
     padding: 1.1rem 1.25rem;
-    overflow-y: auto;
   }
 
   .sw-si-section .sw-si-compat__detail h3 {
@@ -1022,6 +1130,11 @@
     font: 680 var(--sw-type-xs) var(--font-mono);
   }
 
+  .sw-si-compat__mode span[data-state="result-unavailable"] {
+    background: var(--sw-surface-2);
+    color: var(--sw-fg-dim);
+  }
+
   .sw-si-compat__detail[data-status="supported"] .sw-si-compat__mode span:first-child {
     background: color-mix(in srgb, var(--sw-state-resolved) 14%, transparent);
     color: var(--sw-accent-strong);
@@ -1034,7 +1147,7 @@
 
   .sw-si-compat__detail[data-status="unsupported"] .sw-si-compat__mode span:first-child {
     background: color-mix(in srgb, var(--sw-demo-danger) 14%, transparent);
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-compat__mode span[data-state="local-pass"],
@@ -1063,7 +1176,7 @@
   .sw-si-compat__mode span[data-state="regression"] {
     border-left: var(--sw-demo-space-1) solid var(--sw-demo-danger);
     background: var(--sw-surface-2);
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-compat__detail dl {
@@ -1183,7 +1296,7 @@
   }
 
   .sw-si-results__notice[data-state="unsupported"] {
-    border-inline-start-color: var(--sw-demo-danger);
+    border-inline-start-color: var(--sw-si-danger);
     background: color-mix(in srgb, var(--sw-demo-danger) 7%, var(--sw-surface-1));
   }
 
@@ -1460,7 +1573,7 @@
   }
 
   .sw-si-digest[data-state="mismatch"] {
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-digest[data-state="mismatch"]::before {
@@ -1509,7 +1622,7 @@
   }
 
   .sw-si-fixture__load[data-state="failed"] {
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-chips {
@@ -1686,7 +1799,7 @@
 
   .sw-si-verdict[data-state="accepted"] {
     background: color-mix(in srgb, var(--sw-demo-danger) 18%, transparent);
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
   }
 
   .sw-si-errdetail {
@@ -1842,7 +1955,7 @@
 
   .sw-si-error {
     margin: 0.5rem 0 0;
-    color: var(--sw-demo-danger);
+    color: var(--sw-si-danger);
     font: 570 var(--sw-type-sm) var(--font-sans);
   }
 
@@ -1917,7 +2030,6 @@
 
   @media (max-width: 720px) {
     .sw-si-page {
-      width: min(74rem, 100% - 1.5rem);
       padding-top: 1.5rem;
     }
 
@@ -1937,8 +2049,8 @@
     .sw-si-workbench {
       grid-template:
         "label" auto
-        "stage" 22rem
         "ledger" auto
+        "stage" 22rem
         "actions" auto
         "model" auto /
         minmax(0, 1fr);
@@ -1963,6 +2075,30 @@
     .sw-si-stage {
       min-height: 0;
       block-size: 100%;
+    }
+
+    .sw-si-flight-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .sw-si-hud {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .sw-si-ledger {
+      padding: 1rem;
+    }
+
+    .sw-si-release-lab {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-si-flight-head > button,
+    .sw-si-release-lab > button {
+      width: 100%;
+      min-width: 0;
     }
 
     .sw-si-sectionnav {
@@ -2097,7 +2233,7 @@
 }
 
 .sw-si-workbench .sheetwrite-shell-namebox[aria-invalid="true"] {
-  border-color: var(--sw-demo-danger);
+  border-color: var(--sw-si-danger);
   outline: none;
   box-shadow: inset 0 0 0 1px var(--sw-demo-danger);
 }
@@ -2188,7 +2324,7 @@
 
 .sw-si-workbench .sheetwrite-tab-close:hover {
   background: color-mix(in srgb, var(--sw-demo-danger) 14%, transparent);
-  color: var(--sw-demo-danger);
+  color: var(--sw-si-danger);
 }
 
 .sw-si-workbench .sheetwrite-tab-close:focus-visible {
@@ -2216,4 +2352,174 @@
   color: var(--sw-fg-muted);
   font-size: var(--sw-type-sm);
   line-height: 1.5;
+}
+
+.sw-si-page :is(.sw-si-compat__records, .sw-si-filter__options, .sw-si-tablewrap, pre) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-border-strong) var(--sw-surface-1);
+}
+.sw-si-disclosure > summary,
+.sw-si-model > summary,
+.sw-si-source-proof > summary,
+.sw-si-producers summary,
+.sw-si-results__apps summary,
+.sw-si-results__technical > summary {
+  list-style: none;
+}
+.sw-si-page summary::-webkit-details-marker {
+  display: none;
+}
+.sw-si-disclosure > summary > strong::after,
+.sw-si-model > summary::after,
+.sw-si-source-proof > summary::after,
+.sw-si-producers summary::after,
+.sw-si-results__apps summary::after,
+.sw-si-results__technical > summary::after {
+  content: " +";
+  color: var(--sw-accent-strong);
+  font-family: var(--sw-font-mono);
+}
+/* Plain <details> get their marker on the summary; disclosure summaries carry
+   their own marker on <strong>, so they must not mark the summary too (that
+   stray marker landed in the label column). */
+.sw-si-page details:not(.sw-si-disclosure)[open] > summary::after,
+.sw-si-disclosure[open] > summary > strong::after {
+  content: " −";
+}
+.sw-si-hud > div {
+  padding: 0.75rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-demo-deep);
+}
+.sw-si-hud dt {
+  font-size: var(--sw-type-sm);
+}
+.sw-si-model__results dt,
+.sw-si-model__results dd {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.sw-si-model__results dt {
+  font-size: var(--sw-type-xs);
+}
+.sw-si-hud[data-state="ready"] dd {
+  color: var(--sw-demo-muted);
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+/* ── Canvas palette on the grid root ─────────────────────────────────────────
+   Core declares its canvas palette on .sheetwrite itself and overrides it again
+   for [data-theme="dark"], so the workbench palette only takes effect when it
+   is declared on that same element with higher specificity than either rule.
+   The grid therefore keeps the workbench's dark instrument look in both page
+   themes, and the sheet-tab tokens core derives from the resolved theme (and
+   writes inline on the tab bar) follow it. */
+.sw-si-workbench .sw-si-stage .sw-si-grid {
+  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-bg: var(--sw-demo-surface);
+  --sheetwrite-fg: var(--sw-demo-fg);
+  --sheetwrite-grid-line: var(--sw-demo-border);
+  --sheetwrite-header-bg: var(--sw-demo-raised);
+  --sheetwrite-header-fg: var(--sw-demo-accent-strong);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
+  --sheetwrite-selection-border: var(--sw-demo-accent);
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 25%, transparent);
+  --sheetwrite-search-active: var(--sw-demo-warn);
+  --sheetwrite-highlight: color-mix(in srgb, var(--sw-demo-accent) 20%, transparent);
+}
+
+/* The add-sheet control is a chip on the tab bar, not a stray glyph. */
+.sw-si-workbench :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add) {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 100%;
+  padding: 0;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: transparent;
+  color: var(--sw-demo-muted);
+}
+
+.sw-si-workbench :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):hover,
+.sw-si-workbench .sheetwrite-tab-options-button[aria-expanded="true"] {
+  border-color: var(--sw-demo-accent);
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-accent-strong);
+}
+
+.sw-si-workbench :is(.sheetwrite-tab-options-button, .sheetwrite-tab-add):focus-visible {
+  outline: 2px solid var(--sw-demo-accent);
+  outline-offset: 1px;
+}
+
+/* Core derives the tab label colour from the canvas header colour, which is the
+   accent here; keep the accent for the active sheet only. */
+.sw-si-workbench .sheetwrite-tab:not(.sheetwrite-tab-active) {
+  color: var(--sw-demo-fg-soft);
+}
+
+/* Log-style panels span their body. */
+.sw-si-disclosure__body > .sw-si-panel {
+  max-width: none;
+}
+
+/* Lab sections fill their strip: the heading and the intro span it, and the
+   panel pair shares two balanced columns instead of leaving the right half
+   empty. Table panels keep the full width. */
+.sw-si-lab {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-demo-space-4);
+  align-items: start;
+}
+
+.sw-si-lab > :is(h2, p) {
+  grid-column: 1 / -1;
+}
+
+.sw-si-lab > :is(.sw-si-panel, .sw-si-facts) {
+  max-width: none;
+  margin: 0;
+}
+
+.sw-si-lab > .sw-si-panel:has(.sw-si-tablewrap) {
+  grid-column: 1 / -1;
+}
+
+.sw-si-lab > .sw-si-facts {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-surface-1);
+  align-content: start;
+}
+
+@media (max-width: 60rem) {
+  .sw-si-lab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Run state beside the exchange headline: text, not colour alone. */
+.sw-si-flight-head > div > p .sw-si-hud-state {
+  display: inline-block;
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: 999px;
+  color: var(--sw-demo-fg-soft);
+  font: 600 var(--sw-type-xs) / 1.5 var(--sw-font-body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.sw-si-flight-head > div > p .sw-si-hud-state[data-state="complete"] {
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 46%, var(--sw-demo-border));
+  background: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
+  color: var(--sw-demo-accent-strong);
 }

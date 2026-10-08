@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { pageMeta } from "../lib/seo.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
+import { ScaleFlightDeck } from "../showcases/ScaleFlight.js";
 import {
   attemptColumnScan,
   attemptFullCsvExport,
@@ -75,41 +76,6 @@ const LANDMARKS = [
   { label: "100%", ratio: 1 },
 ] as const;
 const SCALE_OVERSCAN = 4;
-/** Smallest visible bar so a capture that is far below its predecessor still reads. */
-const MINIMUM_BAR_PERCENT = 0.5;
-
-/**
- * Width of the current-value bar as a percent of the previous same-schema
- * capture. Without a previous capture the bar states the current value alone.
- */
-function previousShareBar(current: number, previous: number | undefined): number {
-  if (previous === undefined || previous === 0 || !Number.isFinite(previous)) return 100;
-  return Math.min(Math.max((current / previous) * 100, MINIMUM_BAR_PERCENT), 100);
-}
-
-/** Share of the owned long-task ceiling the current capture uses. */
-function ledgerPercent(current: number, ceiling: number): number {
-  if (!Number.isFinite(ceiling) || ceiling <= 0) return 0;
-  return Math.min(Math.max((current / ceiling) * 100, 0), 100);
-}
-
-/**
- * The value line under a card: the change since the previous capture of the
- * same schema when there is one, otherwise what the current value means.
- */
-function interactionNote(
-  current: number,
-  previous: number | undefined,
-  format: (value: number) => string,
-  description: string,
-): string {
-  if (previous === undefined || previous === 0 || !Number.isFinite(previous)) return description;
-  const change = ((previous - current) / previous) * 100;
-  return change >= 0
-    ? `from ${format(previous)} · ${change.toFixed(1)}% lower`
-    : `from ${format(previous)} · ${(-change).toFixed(1)}% higher`;
-}
-
 const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
   ? Math.max(
       1,
@@ -206,6 +172,103 @@ function formatByteDelta(bytes: number): string {
   return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes))}`;
 }
 
+const BYTES_PER_MIB = 1024 * 1024;
+
+/** Below this change, the current value reads as unchanged rather than improved. */
+const DELTA_FLAT_PERCENT = 0.5;
+const DELTA_COARSE_PERCENT = 10;
+
+interface InteractionWin {
+  label: string;
+  value: string;
+  testId?: string;
+  delta: { direction: "better" | "worse" | "flat"; text: string } | null;
+  note: string;
+}
+
+/** Percentage change against the previous release. All four metrics are lower-is-better. */
+function interactionDelta(current: number, previous: number | undefined) {
+  if (previous === undefined || !Number.isFinite(current) || !Number.isFinite(previous)) {
+    return null;
+  }
+  if (previous === 0) {
+    return current === 0
+      ? { direction: "flat" as const, text: "unchanged from the previous release" }
+      : null;
+  }
+  const percent = ((current - previous) / previous) * 100;
+  const magnitude = Math.abs(percent);
+  if (magnitude < DELTA_FLAT_PERCENT) {
+    return { direction: "flat" as const, text: "unchanged from the previous release" };
+  }
+  const shown = magnitude >= DELTA_COARSE_PERCENT ? magnitude.toFixed(0) : magnitude.toFixed(1);
+  return {
+    direction: percent < 0 ? ("better" as const) : ("worse" as const),
+    text: `${shown}% ${percent < 0 ? "lower" : "higher"} than the previous release`,
+  };
+}
+
+/**
+ * The four decision-record cards. Each states the current capture; a change
+ * line appears only when the evidence file records a previous capture of the
+ * same schema.
+ */
+function interactionWinList(): InteractionWin[] {
+  const { current, previous, ceilings } = INTERACTION_EVIDENCE;
+  return [
+    {
+      label: "Lookup latency",
+      value: `${current.lookupMedianNs.toFixed(2)} ns`,
+      delta: interactionDelta(current.lookupMedianNs, previous?.lookupMedianNs),
+      note: `Median address lookup. p95 ${current.lookupP95Ns.toFixed(0)} ns, release ceiling ${ceilings.lookupP95Ns.toLocaleString("en-US")} ns.`,
+    },
+    {
+      label: "Inverse index",
+      value: formatBytes(current.viewIndexBytes),
+      delta: interactionDelta(current.viewIndexBytes, previous?.viewIndexBytes),
+      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatBytes(ceilings.inverseIndexBytes)}.`,
+    },
+    {
+      label: "100 distant edits",
+      value: formatBytes(current.dirty100Bytes),
+      delta: interactionDelta(current.dirty100Bytes, previous?.dirty100Bytes),
+      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatBytes(ceilings.dirty100Bytes)}.`,
+    },
+    {
+      label: "Owned cold long task",
+      value: `${current.coldOwnedLongTaskMs.toFixed(1)} ms`,
+      testId: "scale-evidence-cold",
+      delta: interactionDelta(current.coldOwnedLongTaskMs, previous?.coldOwnedLongTaskMs),
+      note: `Longest Sheetwrite-owned task during a cold page load. Ceiling ${ceilings.ownedColdLongTaskMs} ms.`,
+    },
+  ];
+}
+
+/** Leading-and-trailing throttle: applies a value at once when idle, else at most every `ms`. */
+function throttled<T>(apply: (value: T) => void, ms = 100) {
+  let pending: { value: T } | null = null;
+  let timer = 0;
+  let last = Number.NEGATIVE_INFINITY;
+  const flush = () => {
+    timer = 0;
+    last = performance.now();
+    if (pending) apply(pending.value);
+    pending = null;
+  };
+  return {
+    push(value: T) {
+      pending = { value };
+      if (timer !== 0) return;
+      const wait = last + ms - performance.now();
+      if (wait <= 0) flush();
+      else timer = window.setTimeout(flush, wait);
+    },
+    cancel() {
+      window.clearTimeout(timer);
+    },
+  };
+}
+
 function PerformanceRoute() {
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<Grid | null>(null);
@@ -253,6 +316,12 @@ function PerformanceRoute() {
     let disposed = false;
     let grid: Grid | null = null;
     const unsubscribes: Array<() => void> = [];
+    // Flights fire a scroll event and several tile updates every frame. Each
+    // readout redraws at once when idle and at most ten times a second during
+    // a burst, always ending on the latest value.
+    const visibleUpdates = throttled(setVisible);
+    const telemetryUpdates = throttled(setTelemetry);
+    unsubscribes.push(visibleUpdates.cancel, telemetryUpdates.cancel);
     setGridState("loading");
     setTelemetry(emptyTelemetry());
     setEvictionWatch(null);
@@ -263,7 +332,9 @@ function PerformanceRoute() {
         if (disposed) return;
         grid = createGrid(host, {
           workbook: createScaleWorkbook(),
-          datasource: createScaleDataSource((update) => setTelemetry({ ...update })),
+          datasource: createScaleDataSource((update) => {
+            telemetryUpdates.push({ ...update });
+          }),
           datasourceStorage: activeStorage,
           theme: SCALE_THEME,
           presentation: "data-grid",
@@ -317,7 +388,7 @@ function PerformanceRoute() {
               lastColumn: event.lastVisibleColumn ?? event.firstVisibleColumn ?? 0,
             };
             visibleRef.current = nextVisible;
-            setVisible(nextVisible);
+            visibleUpdates.push(nextVisible);
           }),
           grid.on("selection", ({ selection: next }) => {
             setSelection(selectionA1(next));
@@ -533,7 +604,9 @@ function PerformanceRoute() {
     ((stats.paged?.allocatedBytes ?? 0) / activeStorage.cacheBytes) * 100,
     100,
   );
-  const cacheCeilingMiB = activeStorage.cacheBytes / (1024 * 1024);
+  const cacheCeilingMiB = activeStorage.cacheBytes / BYTES_PER_MIB;
+  const stressCeilingMiB = SCALE_EVICTION_STRESS_STORAGE.cacheBytes / BYTES_PER_MIB;
+  const defaultCeilingMiB = SCALE_STORAGE.cacheBytes / BYTES_PER_MIB;
   const recentTiles = telemetry.recentTiles.map((tile) => ({
     ...tile,
     residence: tileResidence(gridRef.current, tile),
@@ -553,9 +626,7 @@ function PerformanceRoute() {
       (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
     ) ?? [];
   const latestCrossing = crossings[0];
-  const interaction = INTERACTION_EVIDENCE.current;
-  const interactionPrevious = INTERACTION_EVIDENCE.previous;
-  const interactionCeilings = INTERACTION_EVIDENCE.ceilings;
+  const interactionWins = interactionWinList();
 
   const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
   return (
@@ -585,18 +656,36 @@ function PerformanceRoute() {
           id="million-rows"
         >
           <div className="sw-sp-workbench" data-state={gridState}>
+            <ScaleFlightDeck
+              grid={() => gridRef.current}
+              onJump={(row, column) => jumpTo(row, column, "landmark")}
+              onStatus={setStatus}
+              ready={gridState === "ready"}
+              requests={telemetry.requests}
+              resident={{
+                bytes: stats.paged?.allocatedBytes ?? 0,
+                cells: stats.paged?.loadedCells ?? 0,
+              }}
+              tiles={recentTiles}
+              window={{ firstRow, lastRow, firstColumn, lastColumn }}
+            />
             <div className="sw-sp-scale-strip">
               <div className="sw-sp-position">
                 <span>YOUR WINDOW IN {SCALE_ROWS.toLocaleString()} ROWS</span>
                 <strong data-testid="scale-readable-rows">
                   Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
                 </strong>
-                <meter
+                {/* biome-ignore lint/a11y/useSemanticElements: An ARIA meter keeps consistent track geometry across browsers. */}
+                <div
                   aria-label="Position in the million-row sheet"
-                  min={0}
-                  max={SCALE_ROWS - 1}
-                  value={firstRow}
-                />
+                  aria-valuemin={0}
+                  aria-valuemax={SCALE_ROWS - 1}
+                  aria-valuenow={firstRow}
+                  className="sw-sp-position-gauge"
+                  role="meter"
+                >
+                  <span style={{ width: `${(firstRow / (SCALE_ROWS - 1)) * 100}%` }} />
+                </div>
                 <div className="sw-sp-scale-ticks" aria-hidden="true">
                   <span>1</span>
                   <span>{Math.floor(SCALE_ROWS / 2).toLocaleString()}</span>
@@ -829,58 +918,65 @@ function PerformanceRoute() {
                     />
                   </label>
                 </section>
+              </aside>
+            </div>
+            <div className="sw-sp-secondary">
+              <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
+                <div>
+                  <dt>Address / window</dt>
+                  <dd data-testid="scale-current-a1">{selection}</dd>
+                  <dd data-testid="scale-window-a1">{windowA1}</dd>
+                  <dd className="sw-sp-readout__bounds">
+                    <span data-testid="scale-window-rows">
+                      {firstRow + 1}–{lastRow + 1}
+                    </span>
+                    <span data-testid="scale-window-columns">
+                      {colToA1(firstColumn)}–{colToA1(lastColumn)}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Selected cell input</dt>
+                  <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
+                    {selectedFormula ?? "Literal value"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Requests / aborts</dt>
+                  <dd>
+                    {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Resident tiles</dt>
+                  <dd>
+                    {residentTiles} live · {recentEvictions} evicted
+                  </dd>
+                </div>
+                <div>
+                  <dt>Resident tile payload</dt>
+                  <dd>{formatBytes(stats.paged?.allocatedBytes ?? 0)}</dd>
+                  <dd className="sw-sp-readout__context">
+                    {cacheCeilingMiB.toLocaleString()} MiB cache ceiling ·{" "}
+                    {Math.round(cachePercent)}% resident
+                  </dd>
+                </div>
+                <div>
+                  <dt>Renderer</dt>
+                  <dd data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</dd>
+                </div>
+              </dl>
 
-                <dl className="sw-sp-readout" aria-label="Live window and residency instrument">
-                  <div>
-                    <dt>Address / window</dt>
-                    <dd data-testid="scale-current-a1">{selection}</dd>
-                    <dd data-testid="scale-window-a1">{windowA1}</dd>
-                    <dd className="sw-sp-readout__bounds">
-                      <span data-testid="scale-window-rows">
-                        {firstRow + 1}–{lastRow + 1}
-                      </span>
-                      <span data-testid="scale-window-columns">
-                        {colToA1(firstColumn)}–{colToA1(lastColumn)}
-                      </span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Selected cell input</dt>
-                    <dd className="sw-sp-readout__formula" data-testid="scale-selected-formula">
-                      {selectedFormula ?? "Literal value"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Requests / aborts</dt>
-                    <dd>
-                      {telemetry.requests.toLocaleString()} / {telemetry.aborted.toLocaleString()}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Resident tiles</dt>
-                    <dd>
-                      {residentTiles} live · {recentEvictions} evicted
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Resident tile payload</dt>
-                    <dd>{formatBytes(stats.paged?.allocatedBytes ?? 0)}</dd>
-                    <dd className="sw-sp-readout__context">
-                      {cacheCeilingMiB.toLocaleString()} MiB cache ceiling ·{" "}
-                      {Math.round(cachePercent)}% resident
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Renderer</dt>
-                    <dd data-testid="scale-renderer-active">{rendererState?.active ?? renderer}</dd>
-                  </div>
-                </dl>
-
+              <div className="sw-sp-instrument-stack">
                 <details className="sw-sp-render-details">
                   <summary>
-                    <span>Drawing path</span>
-                    <small>{rendererState?.active ?? renderer}</small>
-                    <span aria-hidden="true"> · Diagnostics</span>
+                    <span className="sw-sp-disclosure-copy">
+                      <strong>Drawing path</strong>
+                      <small>{rendererState?.active ?? renderer} renderer</small>
+                    </span>
+                    <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+                      ›
+                    </span>
                   </summary>
                   <fieldset className="sw-sp-render-switch">
                     <legend>Grid drawing path</legend>
@@ -912,6 +1008,11 @@ function PerformanceRoute() {
                   )}
                 </details>
                 <div className="sw-sp-stress">
+                  <h3>Clean-cache ceiling</h3>
+                  <p id="scale-stress-description">
+                    Remounts this Grid with a deliberately tight {stressCeilingMiB} MiB ceiling so
+                    clean tiles evict early; sparse edits survive.
+                  </p>
                   <button
                     aria-describedby="scale-stress-description"
                     aria-pressed={evictionStress}
@@ -920,13 +1021,14 @@ function PerformanceRoute() {
                     onClick={() => setEvictionStress((active) => !active)}
                     type="button"
                   >
-                    Optional 1 MiB eviction stress
+                    {evictionStress ? "Tight ceiling active" : "Use the tight ceiling"}
                   </button>
-                  <small id="scale-stress-description">
-                    Remounts this Grid with a deliberately tight clean-cache ceiling.
+                  <small>
+                    Currently {evictionStress ? stressCeilingMiB : defaultCeilingMiB} MiB (
+                    {evictionStress ? "stress" : "product default"}).
                   </small>
                 </div>
-              </aside>
+              </div>
             </div>
 
             {evictionWatch && (
@@ -966,7 +1068,15 @@ function PerformanceRoute() {
           </p>
 
           <details className="sw-sp-diagnostics">
-            <summary>Inspect live requests, tile memory, and loading history</summary>
+            <summary>
+              <span className="sw-sp-disclosure-copy">
+                <strong>Inspect live requests, tile memory, and loading history</strong>
+                <small>Live source counters</small>
+              </span>
+              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+                ›
+              </span>
+            </summary>
             <dl className="sw-sp-stats" data-testid="scale-stats">
               <div>
                 <dt>Requests / aborts</dt>
@@ -1020,13 +1130,23 @@ function PerformanceRoute() {
               </div>
             </dl>
 
-            <meter
-              aria-label="Resident tile cache use"
-              className="sw-sp-cache-gauge"
-              max={100}
-              min={0}
-              value={Math.round(cachePercent)}
-            />
+            <div className="sw-sp-cache-meter">
+              <span>Cache use</span>
+              {/* biome-ignore lint/a11y/useSemanticElements: An ARIA meter keeps consistent track geometry across browsers. */}
+              <div
+                aria-label="Resident tile cache use"
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={Math.round(cachePercent)}
+                className="sw-sp-cache-gauge"
+                role="meter"
+              >
+                <span style={{ width: `${Math.min(cachePercent, 100)}%` }} />
+              </div>
+              <strong>
+                {Math.round(cachePercent)}% of {cacheCeilingMiB.toLocaleString()} MiB
+              </strong>
+            </div>
 
             <div className="sw-sp-last-tile" data-testid="scale-last-band">
               <span>Last returned tile</span>
@@ -1181,9 +1301,15 @@ function PerformanceRoute() {
                   <thead>
                     <tr>
                       <th scope="col">Owner</th>
-                      <th scope="col">Logical</th>
-                      <th scope="col">Allocated</th>
-                      <th scope="col">Entries</th>
+                      <th className="sw-sp-table__num" scope="col">
+                        Logical
+                      </th>
+                      <th className="sw-sp-table__num" scope="col">
+                        Allocated
+                      </th>
+                      <th className="sw-sp-table__num" scope="col">
+                        Entries
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1192,9 +1318,15 @@ function PerformanceRoute() {
                         <th scope="row">
                           <code>{owner.owner}</code>
                         </th>
-                        <td>{formatBytes(owner.logicalBytes)}</td>
-                        <td>{formatBytes(owner.allocatedBytes)}</td>
-                        <td>{owner.entries.toLocaleString()}</td>
+                        <td className="sw-sp-table__num" data-label="Logical">
+                          {formatBytes(owner.logicalBytes)}
+                        </td>
+                        <td className="sw-sp-table__num" data-label="Allocated">
+                          {formatBytes(owner.allocatedBytes)}
+                        </td>
+                        <td className="sw-sp-table__num" data-label="Entries">
+                          {owner.entries.toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1344,95 +1476,34 @@ function PerformanceRoute() {
             )}
 
             <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
-              <article>
-                <span>Lookup latency</span>
-                <strong>{interaction.lookupMedianNs.toFixed(2)} ns</strong>
-                <div aria-hidden="true">
-                  <i style={{ width: "100%" }} />
-                  <i
-                    style={{
-                      width: `${previousShareBar(interaction.lookupMedianNs, interactionPrevious?.lookupMedianNs)}%`,
-                    }}
-                  />
-                </div>
-                <p>
-                  {interactionNote(
-                    interaction.lookupMedianNs,
-                    interactionPrevious?.lookupMedianNs,
-                    (value) => `${value.toFixed(2)} ns`,
-                    `p95 ${interaction.lookupP95Ns.toFixed(0)} ns · ceiling ${interactionCeilings.lookupP95Ns} ns`,
-                  )}
-                </p>
-              </article>
-              <article>
-                <span>Inverse index</span>
-                <strong>{formatBytes(interaction.viewIndexBytes)}</strong>
-                <div aria-hidden="true">
-                  <i style={{ width: "100%" }} />
-                  <i
-                    style={{
-                      width: `${previousShareBar(interaction.viewIndexBytes, interactionPrevious?.viewIndexBytes)}%`,
-                    }}
-                  />
-                </div>
-                <p>
-                  {interactionNote(
-                    interaction.viewIndexBytes,
-                    interactionPrevious?.viewIndexBytes,
-                    formatBytes,
-                    `ceiling ${formatBytes(interactionCeilings.inverseIndexBytes)}`,
-                  )}
-                </p>
-              </article>
-              <article>
-                <span>100 distant edits</span>
-                <strong>{formatBytes(interaction.dirty100Bytes)}</strong>
-                <div aria-hidden="true">
-                  <i style={{ width: "100%" }} />
-                  <i
-                    style={{
-                      width: `${previousShareBar(interaction.dirty100Bytes, interactionPrevious?.dirty100Bytes)}%`,
-                    }}
-                  />
-                </div>
-                <p>
-                  {interactionNote(
-                    interaction.dirty100Bytes,
-                    interactionPrevious?.dirty100Bytes,
-                    formatBytes,
-                    `sparse cells stay sparse · ceiling ${formatBytes(interactionCeilings.dirty100Bytes)}`,
-                  )}
-                </p>
-              </article>
-              <article>
-                <span>Owned cold long task</span>
-                <strong data-testid="scale-evidence-cold">
-                  {interaction.coldOwnedLongTaskMs.toFixed(1)} ms
-                </strong>
-                <div aria-hidden="true">
-                  <i style={{ width: "100%" }} />
-                  <i
-                    style={{
-                      width: `${ledgerPercent(interaction.coldOwnedLongTaskMs, interactionCeilings.ownedColdLongTaskMs)}%`,
-                    }}
-                  />
-                </div>
-                <p>
-                  {interactionNote(
-                    interaction.coldOwnedLongTaskMs,
-                    interactionPrevious?.coldOwnedLongTaskMs,
-                    (value) => `${value.toFixed(1)} ms`,
-                    `no Sheetwrite-owned long task · ${interaction.coldUnattributedLongTaskMs.toFixed(0)} ms unattributed nearby`,
-                  )}
-                </p>
-              </article>
+              {interactionWins.map((win) => (
+                <article key={win.label}>
+                  <span>{win.label}</span>
+                  <div className="sw-sp-proof-wins__value">
+                    <strong {...(win.testId ? { "data-testid": win.testId } : {})}>
+                      {win.value}
+                    </strong>
+                    {win.delta && (
+                      <span className="sw-sp-evidence-delta" data-direction={win.delta.direction}>
+                        {win.delta.text}
+                      </span>
+                    )}
+                  </div>
+                  <p>{win.note}</p>
+                </article>
+              ))}
             </div>
           </div>
 
           <details className="sw-sp-proof-sources">
             <summary>
-              <span>Inspect sources and methodology</span>
-              <small>3 committed evidence files</small>
+              <span className="sw-sp-disclosure-copy">
+                <strong>Inspect sources and methodology</strong>
+                <small>3 committed evidence files</small>
+              </span>
+              <span aria-hidden="true" className="sw-sp-disclosure-chevron">
+                ›
+              </span>
             </summary>
             <div className="sw-sp-proof-sources__body">
               <section>

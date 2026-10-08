@@ -6,13 +6,18 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import vue from "@vitejs/plugin-vue";
-import rehypeExpressiveCode from "rehype-expressive-code";
+import rehypeExpressiveCode, {
+  createRenderer,
+  type RehypeExpressiveCodeOptions,
+  type RehypeExpressiveCodeRenderer,
+} from "rehype-expressive-code";
 import rehypeRaw from "rehype-raw";
 import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 
 interface HastNode {
@@ -58,6 +63,51 @@ function markResponsiveCodeBlocks() {
   };
 }
 
+const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
+  defaultProps: { wrap: false },
+  styleOverrides: {
+    codeFontFamily: "var(--sw-font-mono)",
+    uiFontFamily: "var(--sw-font-body)",
+  },
+  useDarkModeMediaQuery: false,
+  themeCssSelector: (theme: ExpressiveCodeTheme) => `[data-theme='${theme.type}']`,
+  plugins: [
+    sheetwriteCodeHovers({
+      cwd: new URL(".", import.meta.url).pathname,
+      shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
+    }),
+  ],
+};
+
+let expressiveCodeRenderer: Promise<RehypeExpressiveCodeRenderer> | undefined;
+function sharedExpressiveCodeRenderer(): Promise<RehypeExpressiveCodeRenderer> {
+  expressiveCodeRenderer ??= createRenderer(expressiveCodeOptions);
+  return expressiveCodeRenderer;
+}
+
+const EXPRESSIVE_CODE_STYLES_ID = "virtual:expressive-code.css";
+const RESOLVED_EXPRESSIVE_CODE_STYLES_ID = "/__sheetwrite-expressive-code.css";
+
+/**
+ * Expressive Code would inline the same base and theme stylesheet into the
+ * first code block of every page, in its HTML and its hydration chunk. Pages
+ * render code with empty page styles instead; the root links this module once,
+ * so the stylesheet is downloaded once and cached across the site.
+ */
+function expressiveCodeStyles(): Plugin {
+  return {
+    name: "sheetwrite:expressive-code-styles",
+    resolveId(id) {
+      return id === EXPRESSIVE_CODE_STYLES_ID ? RESOLVED_EXPRESSIVE_CODE_STYLES_ID : undefined;
+    },
+    async load(id) {
+      if (id !== RESOLVED_EXPRESSIVE_CODE_STYLES_ID) return undefined;
+      const { baseStyles, themeStyles } = await sharedExpressiveCodeRenderer();
+      return `${baseStyles}\n${themeStyles}`;
+    },
+  };
+}
+
 export default defineConfig({
   // Keep one document-wide stylesheet. TanStack route transitions otherwise
   // swap route CSS links after the next route has painted, producing a visible
@@ -73,23 +123,17 @@ export default defineConfig({
           [
             rehypeExpressiveCode,
             {
-              defaultProps: { wrap: false },
-              styleOverrides: {
-                codeFontFamily: "var(--sw-font-mono)",
-                uiFontFamily: "var(--sw-font-body)",
-              },
-              useDarkModeMediaQuery: false,
-              themeCssSelector: (theme: ExpressiveCodeTheme) => `[data-theme='${theme.type}']`,
-              plugins: [
-                sheetwriteCodeHovers({
-                  cwd: new URL(".", import.meta.url).pathname,
-                  shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
-                }),
-              ],
+              ...expressiveCodeOptions,
+              customCreateRenderer: async () => ({
+                ...(await sharedExpressiveCodeRenderer()),
+                baseStyles: "",
+                themeStyles: "",
+              }),
             },
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          dedupeCodePopovers,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
           markResponsiveCodeBlocks,
@@ -97,6 +141,7 @@ export default defineConfig({
       }),
       enforce: "pre",
     },
+    expressiveCodeStyles(),
     tailwindcss(),
     tanstackStart({
       pages: [

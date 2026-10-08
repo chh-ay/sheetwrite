@@ -1,11 +1,16 @@
 /* Route-owned composition for /svelte/: a field dispatch surface where the
-   editable Grid and its durable handoff are the first, highest-contrast story. */
+   editable Grid is the story and its durable handoff sits beside it.
 
-.sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__bar {
-  min-height: 2.5rem;
-}
+   Shape: controlbar (identity, connection switch, outbox readout, shell bar,
+   presence) over a workspace of "board first, evidence beside it" — the Grid
+   stage takes the width, one evidence rail holds the handoff panels in normal
+   flow. No panel nests a short scroll region. */
 
+/* The workbench grows with its content; the shared stage viewport keeps the
+   44rem floor that all four framework workbenches share, so the island fills
+   that height from the board instead of padding an empty band. */
 .sw-svw {
+  min-height: 0;
   --sw-demo-surface: var(--sw-surface-1);
   --sw-demo-raised: var(--sw-surface-2);
   --sw-demo-deep: var(--sw-surface-0);
@@ -18,6 +23,8 @@
   --sw-demo-border: var(--sw-border);
   --sw-demo-border-strong: var(--sw-border-strong);
   --sw-demo-accent: var(--sw-demo-svelte-accent);
+  /* The demo accent-strong is tuned for the dark demo surface; mixing keeps
+     accent text readable on whichever site surface is active. */
   --sw-demo-accent-strong: color-mix(
     in srgb,
     var(--sw-demo-svelte-accent) 62%,
@@ -25,17 +32,19 @@
   );
   --sw-demo-shadow: var(--sw-shadow);
   --sw-demo-popup-shadow: var(--sw-shadow);
+  /* On-accent text. The shared shell sets ink to the page surface (white in the
+     light theme), which is unreadable on the amber offline and conflict states;
+     a fixed dark ink reads on the brand orange and the amber in both themes. */
+  --sw-demo-ink: #1a0d06;
   --demo-accent: var(--sw-demo-accent);
   --sw-svw-peer: var(--sw-demo-accent);
-  --sw-scrollbar-thumb: color-mix(in srgb, var(--sw-fg-dim) 60%, transparent);
-  --sw-scrollbar-track: transparent;
 }
 
 .sw-svw .sw-demo-main {
-  height: 44rem;
+  height: auto;
 }
 
-/* ---- Compact field chrome ---------------------------------------------- */
+/* ---- Controlbar --------------------------------------------------------- */
 
 .sw-svw-chrome {
   --sheetwrite-widget-bg: var(--sw-demo-surface);
@@ -43,62 +52,45 @@
   --sheetwrite-widget-border: var(--sw-demo-border);
   --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
   --sheetwrite-widget-accent: var(--sw-demo-accent-strong);
-  display: grid;
-  grid-template-columns: auto auto minmax(15rem, 1fr) auto;
-  gap: var(--sw-demo-space-2);
+  /* The shell bar owns popups (value assist, function list): never clip them. */
   overflow: visible;
 }
 
-.sw-svw-toggle {
-  display: inline-flex;
-  min-height: 2rem;
-  gap: var(--sw-demo-space-1);
-  align-items: center;
-  justify-content: center;
-  padding-inline: var(--sw-demo-space-3);
-  border: 1px solid var(--sw-demo-accent);
-  border-radius: 999px;
-  background: var(--sw-demo-accent);
-  color: var(--sw-demo-ink);
-  font: 700 var(--sw-type-xs) / 1 var(--sw-font-mono);
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    border-color var(--sw-demo-transition),
-    color var(--sw-demo-transition),
-    background var(--sw-demo-transition);
-}
-
-.sw-svw-toggle[aria-checked="false"] {
+/* Connection switch. The shared stage paints the online primary action; the
+   page adds the offline variant and the busy state. */
+.sw-svw-chrome .sw-svw-toggle[aria-checked="false"] {
   border-color: var(--sw-demo-warn);
   background: var(--sw-demo-warn);
+  color: var(--sw-demo-ink);
 }
 
-.sw-svw-toggle:hover:not(:disabled) {
-  border-color: var(--sw-demo-accent-strong);
-  background: var(--sw-demo-accent-strong);
+.sw-svw-chrome .sw-svw-toggle[aria-checked="false"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sw-demo-warn) 78%, var(--sw-fg-strong));
+  background: color-mix(in srgb, var(--sw-demo-warn) 78%, var(--sw-fg-strong));
 }
 
-.sw-svw-toggle[aria-checked="false"]:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
-  background: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
-}
-
-.sw-svw-toggle:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+/* Queue depth reads as one line: the count is the fact, the label explains it.
+   Alignment stays with the shared rule, which drops to the start on narrow
+   screens. */
+.sw-svw-chrome .sw-workbench-readout {
+  display: flex;
+  gap: var(--sw-demo-space-1);
+  align-items: baseline;
+  white-space: nowrap;
 }
 
 .sw-svw-shellbar {
   display: flex;
+  flex: 1 1 22rem;
   min-width: 0;
   gap: var(--sw-demo-space-1);
   align-items: center;
 }
 
 .sw-svw-shellbar .sheetwrite-shell-formula {
-  min-width: 10rem;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
 }
 
 .sw-svw-chrome .sheetwrite-shell-status {
@@ -110,8 +102,9 @@
 
 .sw-svw-collaborators {
   display: flex;
+  flex: 0 1 auto;
   min-width: 0;
-  gap: var(--sw-demo-space-1);
+  gap: var(--sw-demo-space-2);
   align-items: center;
 }
 
@@ -126,15 +119,14 @@
   min-width: 0;
   margin: 0;
   padding: 0;
+  flex-wrap: wrap;
   gap: var(--sw-demo-space-1);
-  overflow-x: auto;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .sw-svw-presence li {
   display: inline-flex;
-  min-height: 2rem;
+  min-height: 1.875rem;
   gap: var(--sw-demo-space-1);
   align-items: center;
   padding-inline: var(--sw-demo-space-2);
@@ -155,16 +147,21 @@
   content: "";
 }
 
-/* ---- Grid-first workspace ---------------------------------------------- */
+/* ---- Workspace: the board first, its evidence beside it ----------------- */
 
 .sw-svw .sw-demo-workspace {
-  grid-template-columns: minmax(0, 1fr) var(--sw-sidebar-width);
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 0;
+  background: var(--sw-demo-surface);
 }
 
 .sw-svw-gridstage {
   display: grid;
   min-width: 0;
-  min-height: 0;
+  /* 44rem viewport − controlbar − status bar: the island fills the shared
+     workbench height with board rows, never with a trailing empty band. */
+  min-height: 34.5rem;
   grid-template-rows: auto minmax(0, 1fr);
   background: var(--sw-demo-surface);
 }
@@ -172,7 +169,7 @@
 .sw-svw-gridstage > header {
   display: flex;
   min-width: 0;
-  min-height: 2rem;
+  min-height: 2.5rem;
   gap: var(--sw-demo-space-2);
   align-items: center;
   justify-content: space-between;
@@ -183,54 +180,66 @@
 
 .sw-svw-gridstage > header strong {
   color: var(--sw-demo-fg-strong);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-mono);
+  font: 700 var(--sw-type-xs) / 1 var(--sw-font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .sw-svw-gridstage > header span {
+  min-width: 0;
   overflow: hidden;
   color: var(--sw-demo-muted);
-  font: 500 var(--sw-type-xs) / 1 var(--sw-font-body);
+  font: 500 var(--sw-type-sm) / 1.3 var(--sw-font-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .sw-svw-rail {
   display: flex;
-  min-height: 0;
-  padding: 0;
-  gap: 0;
-  overflow-y: auto;
-  border-left: 1px solid var(--sw-demo-border);
-  background: var(--sw-demo-raised);
+  min-width: 0;
   flex-direction: column;
-  scrollbar-width: thin;
+  padding: 0;
+  overflow: visible;
+  border-left: 1px solid var(--sw-demo-border-strong);
+  background: var(--sw-demo-deep);
 }
 
 .sw-svw-rail > section,
 .sw-svw-rail > details {
-  flex: none;
+  min-width: 0;
   padding: var(--sw-demo-space-3);
   border-bottom: 1px solid var(--sw-demo-border);
 }
 
+.sw-svw-rail > :last-child {
+  border-bottom: 0;
+}
+
+/* The two list panels absorb the rail's slack so the column ends flush with
+   the board; the mission card and the recovery tools stay their own size. */
+.sw-svw .sw-svw-outbox,
+.sw-svw .sw-svw-feed {
+  flex: 1 1 auto;
+}
+
 .sw-svw-mission {
   display: grid;
+  align-content: start;
   gap: var(--sw-demo-space-2);
-  background: color-mix(in srgb, var(--sw-demo-accent) 7%, var(--sw-demo-surface));
+  background: color-mix(in srgb, var(--sw-demo-accent) 7%, var(--sw-demo-deep));
   box-shadow: inset var(--sw-demo-space-1) 0 0 var(--sw-demo-accent);
 }
 
 .sw-svw-mission[data-state="offline"],
 .sw-svw-mission[data-state="pending"] {
-  background: color-mix(in srgb, var(--sw-demo-warn) 9%, var(--sw-demo-surface));
+  background: color-mix(in srgb, var(--sw-demo-warn) 10%, var(--sw-demo-deep));
   box-shadow: inset var(--sw-demo-space-1) 0 0 var(--sw-demo-warn);
 }
 
 .sw-svw-mission[data-state="conflict"],
 .sw-svw-mission[data-state="error"] {
-  background: color-mix(in srgb, var(--sw-demo-danger) 8%, var(--sw-demo-surface));
+  background: color-mix(in srgb, var(--sw-demo-danger) 10%, var(--sw-demo-deep));
   box-shadow: inset var(--sw-demo-space-1) 0 0 var(--sw-demo-danger);
 }
 
@@ -239,7 +248,7 @@
   display: flex;
   min-width: 0;
   gap: var(--sw-demo-space-2);
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
 }
 
@@ -252,6 +261,11 @@
 .sw-svw-mission[data-state="offline"] .sw-svw-mission__eyebrow,
 .sw-svw-mission[data-state="pending"] .sw-svw-mission__eyebrow {
   color: var(--sw-state-pending);
+}
+
+.sw-svw-mission[data-state="conflict"] .sw-svw-mission__eyebrow,
+.sw-svw-mission[data-state="error"] .sw-svw-mission__eyebrow {
+  color: var(--sw-demo-danger);
 }
 
 .sw-svw-mission__eyebrow span:last-child {
@@ -268,21 +282,23 @@
 }
 
 .sw-svw-mission h3 {
-  font: 650 var(--sw-type-base) / 1.2 var(--sw-font-display);
-  letter-spacing: -0.02em;
+  font: 650 var(--sw-type-base) / 1.25 var(--sw-font-display);
+  letter-spacing: -0.01em;
 }
 
 .sw-svw-mission > strong {
   color: var(--sw-demo-fg);
-  font: 650 var(--sw-type-sm) / 1.35 var(--sw-font-body);
+  font: 650 var(--sw-type-sm) / 1.4 var(--sw-font-body);
 }
 
 .sw-svw-mission > p,
 .sw-svw-tools > p {
   margin: 0;
   color: var(--sw-demo-muted);
-  font: var(--sw-type-xs) / 1.45 var(--sw-font-body);
+  font: var(--sw-type-sm) / 1.5 var(--sw-font-body);
 }
+
+/* ---- Rail actions ------------------------------------------------------- */
 
 .sw-svw-mission > button,
 .sw-svw-actions button,
@@ -292,12 +308,13 @@
   gap: var(--sw-demo-space-1);
   align-items: center;
   justify-content: center;
-  padding-inline: var(--sw-demo-space-2);
+  padding-inline: var(--sw-demo-space-3);
   border: 1px solid var(--sw-demo-border-strong);
-  border-radius: var(--sw-demo-radius-1);
-  background: var(--sw-demo-surface);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-demo-raised);
   color: var(--sw-demo-fg);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-body);
+  font: 650 var(--sw-type-sm) / 1 var(--sw-font-body);
+  white-space: nowrap;
   cursor: pointer;
   transition:
     border-color var(--sw-demo-transition),
@@ -305,28 +322,30 @@
     color var(--sw-demo-transition);
 }
 
-.sw-svw-mission > button[data-variant="primary"] {
-  border-color: var(--sw-demo-warn);
-  background: var(--sw-demo-warn);
-  color: var(--sw-demo-ink);
+/* The mission action is the rail's one clear next step: full width, accent
+   outline, never competing with the connection switch for the filled accent. */
+.sw-svw-mission > button {
+  width: 100%;
+  margin-top: var(--sw-demo-space-1);
+  border-color: color-mix(in srgb, var(--sw-demo-accent) 52%, var(--sw-demo-border-strong));
+  background: color-mix(in srgb, var(--sw-demo-accent) 12%, var(--sw-demo-surface));
+  color: var(--sw-demo-accent-strong);
 }
 
-.sw-svw-mission > button[data-variant="secondary"]:hover:not(:disabled),
+.sw-svw-mission > button:hover:not(:disabled) {
+  border-color: var(--sw-demo-accent);
+  background: color-mix(in srgb, var(--sw-demo-accent) 20%, var(--sw-demo-surface));
+}
+
 .sw-svw-actions button:hover:not(:disabled) {
   border-color: var(--sw-demo-accent);
   background: color-mix(in srgb, var(--sw-demo-accent) 10%, var(--sw-demo-surface));
   color: var(--sw-demo-accent-strong);
 }
 
-.sw-svw-mission > button[data-variant="primary"]:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
-  background: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
-}
-
 .sw-svw
   :is(
-    .sw-svw-toggle,
-    .sw-svw-mission button,
+    .sw-svw-mission > button,
     .sw-svw-actions button,
     .sw-svw-conflict button,
     .sw-svw-tools summary
@@ -336,11 +355,11 @@
 }
 
 .sw-svw :is(.sw-svw-mission button, .sw-svw-actions button, .sw-svw-conflict button):disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* ---- Authoritative adjacent evidence ----------------------------------- */
+/* ---- Durable outbox ----------------------------------------------------- */
 
 .sw-svw-sectionhead h3 {
   font: 700 var(--sw-type-xs) / 1 var(--sw-font-mono);
@@ -348,8 +367,7 @@
   text-transform: uppercase;
 }
 
-.sw-svw-sectionhead > span,
-.sw-svw-outbox .sw-svw-sectionhead > span {
+.sw-svw-sectionhead > span {
   min-width: 1.5rem;
   padding: calc(var(--sw-demo-space-1) / 2) var(--sw-demo-space-1);
   border-radius: 999px;
@@ -361,28 +379,26 @@
 
 .sw-svw-outbox {
   display: grid;
+  align-content: start;
   gap: var(--sw-demo-space-2);
-  background: var(--sw-demo-surface);
 }
 
 .sw-svw-outbox .sw-demo-activity__empty {
   margin: 0;
+  color: var(--sw-demo-muted);
+  font: var(--sw-type-sm) / 1.5 var(--sw-font-body);
 }
 
 .sw-svw-outbox ol,
 .sw-svw-feed ol {
   display: grid;
+  align-content: start;
   min-height: 0;
   margin: 0;
   padding: 0;
   gap: var(--sw-demo-space-1);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   list-style: none;
-}
-
-.sw-svw-outbox ol {
-  max-height: 7rem;
 }
 
 .sw-svw-outbox li {
@@ -391,20 +407,19 @@
   gap: var(--sw-demo-space-2);
   align-items: baseline;
   padding-block: var(--sw-demo-space-1);
-  border-bottom: 1px solid var(--sw-demo-border);
+  border-top: 1px solid var(--sw-demo-border);
   color: var(--sw-demo-muted);
-  font: var(--sw-type-xs) / 1.25 var(--sw-font-mono);
+  font: var(--sw-type-xs) / 1.35 var(--sw-font-mono);
 }
 
-.sw-svw-outbox li:last-child {
-  border-bottom: 0;
+.sw-svw-outbox li::before {
+  content: none;
 }
 
 .sw-svw-outbox li code {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--sw-demo-fg-strong);
-  font: 650 var(--sw-type-xs) / 1.25 var(--sw-font-mono);
-  text-overflow: ellipsis;
+  font: 650 var(--sw-type-sm) / 1.35 var(--sw-font-mono);
 }
 
 .sw-svw-outbox li[data-status="conflicted"] code {
@@ -415,19 +430,18 @@
   color: var(--sw-demo-dim);
 }
 
+/* ---- What happened ------------------------------------------------------ */
+
 .sw-svw-feed {
   display: grid;
+  align-content: start;
   min-height: 0;
   gap: var(--sw-demo-space-2);
 }
 
-.sw-svw-feed ol {
-  max-height: 6rem;
-}
-
 .sw-svw-feed li {
   color: var(--sw-demo-muted);
-  font: var(--sw-type-xs) / 1.35 var(--sw-font-mono);
+  font: var(--sw-type-sm) / 1.45 var(--sw-font-body);
 }
 
 .sw-svw-feed li::before {
@@ -441,6 +455,7 @@
 
 .sw-svw-feed li[data-tone="warn"]::before {
   color: var(--sw-state-pending);
+  content: "! ";
 }
 
 .sw-svw-feed li[data-tone="err"] {
@@ -449,32 +464,37 @@
 
 .sw-svw-feed li[data-tone="err"]::before {
   color: var(--sw-demo-danger);
+  content: "× ";
 }
 
 .sw-svw-feed li[data-tone="ok"]::before {
+  color: var(--sw-demo-accent);
   content: "✓ ";
 }
 
+/* ---- Version conflict --------------------------------------------------- */
+
 .sw-svw-conflict {
   display: grid;
+  align-content: start;
   gap: var(--sw-demo-space-2);
-  border-left: var(--sw-demo-space-1) solid var(--sw-demo-warn);
-  background: color-mix(in srgb, var(--sw-demo-warn) 8%, var(--sw-demo-surface));
+  background: color-mix(in srgb, var(--sw-demo-warn) 10%, var(--sw-demo-deep));
+  box-shadow: inset var(--sw-demo-space-1) 0 0 var(--sw-demo-warn);
 }
 
 .sw-svw-conflict .sw-svw-sectionhead > span {
-  background: color-mix(in srgb, var(--sw-demo-warn) 14%, var(--sw-demo-surface));
+  background: color-mix(in srgb, var(--sw-demo-warn) 18%, var(--sw-demo-surface));
   color: var(--sw-state-pending);
 }
 
 .sw-svw-conflict > strong {
   color: var(--sw-demo-fg);
-  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-body);
+  font: 650 var(--sw-type-sm) / 1.45 var(--sw-font-body);
 }
 
 .sw-svw-conflict strong code {
   color: var(--sw-demo-accent-strong);
-  font: 650 var(--sw-type-xs) var(--sw-font-mono);
+  font: 650 var(--sw-type-sm) var(--sw-font-mono);
 }
 
 .sw-svw-conflict ul {
@@ -487,7 +507,7 @@
 
 .sw-svw-conflict ul li {
   color: var(--sw-demo-muted);
-  font: var(--sw-type-xs) / 1.35 var(--sw-font-mono);
+  font: var(--sw-type-xs) / 1.4 var(--sw-font-mono);
 }
 
 .sw-svw-conflict ul li::before {
@@ -497,7 +517,7 @@
 
 .sw-svw-conflict > span {
   color: var(--sw-demo-fg-soft);
-  font: var(--sw-type-xs) / 1.4 var(--sw-font-body);
+  font: var(--sw-type-xs) / 1.5 var(--sw-font-body);
 }
 
 .sw-svw-conflict button {
@@ -507,19 +527,36 @@
 }
 
 .sw-svw-conflict button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
-  background: color-mix(in srgb, var(--sw-demo-warn) 80%, var(--sw-demo-fg-strong));
+  border-color: color-mix(in srgb, var(--sw-demo-warn) 78%, var(--sw-fg-strong));
+  background: color-mix(in srgb, var(--sw-demo-warn) 78%, var(--sw-fg-strong));
 }
 
-.sw-svw-tools {
-  background: var(--sw-demo-deep);
-}
+/* ---- Recovery scenarios ------------------------------------------------- */
 
 .sw-svw-tools summary {
-  border-radius: var(--sw-demo-radius-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sw-demo-space-2);
+  min-height: 2rem;
   color: var(--sw-demo-fg);
-  font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  font: 650 var(--sw-type-sm) / 1.35 var(--sw-font-body);
   cursor: pointer;
+  list-style: none;
+}
+
+.sw-svw-tools summary::-webkit-details-marker {
+  display: none;
+}
+
+.sw-svw-tools summary::after {
+  content: "+";
+  color: var(--sw-demo-accent-strong);
+  font: 600 1.25rem / 1 var(--sw-font-mono);
+}
+
+.sw-svw-tools[open] summary::after {
+  content: "−";
 }
 
 .sw-svw-tools[open] summary {
@@ -527,13 +564,14 @@
   color: var(--sw-demo-accent-strong);
 }
 
-.sw-svw-tools > p {
-  margin-bottom: var(--sw-demo-space-2);
+.sw-svw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-demo-space-2);
 }
 
-.sw-svw-actions {
-  display: grid;
-  gap: var(--sw-demo-space-1);
+.sw-svw-actions button {
+  flex: 1 1 9rem;
 }
 
 .sw-svw-actions button[data-variant="quiet"] {
@@ -542,51 +580,49 @@
   color: var(--sw-demo-muted);
 }
 
-/* ---- Small screens ------------------------------------------------------ */
+.sw-svw-actions button[data-variant="quiet"]:hover:not(:disabled) {
+  border-color: var(--sw-demo-border);
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-fg);
+}
+
+/* ---- Narrow screens ----------------------------------------------------- */
+
+@media (max-width: 68rem) {
+  .sw-svw .sw-demo-workspace {
+    grid-template-columns: minmax(0, 1fr) 19rem;
+  }
+}
 
 @media (max-width: 48rem) {
-  .sw-svw-chrome {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-content: center;
-  }
-
-  .sw-svw-shellbar,
-  .sw-svw-collaborators {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .sw-svw-shellbar {
-    overflow-x: auto;
-    scrollbar-width: thin;
-  }
-
-  .sw-svw-presence {
-    flex: 1;
-  }
-
-  .sw-svw-presence li {
-    max-width: 10rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* Stacked on narrow screens: the grid keeps a fixed row and the rail shows
-     all of its panels below it, instead of a short inner scroll box. */
-  .sw-svw .sw-demo-main {
-    height: auto;
+  /* Stacked: a fixed viewport floor would only pad the page, and the rail
+     keeps normal flow below the board. */
+  .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__viewport {
+    min-height: 0;
   }
 
   .sw-svw .sw-demo-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 22rem auto;
   }
 
   .sw-svw-rail {
-    display: flex;
-    overflow: visible;
-    border-top: 1px solid var(--sw-demo-border);
+    border-top: 1px solid var(--sw-demo-border-strong);
     border-left: 0;
+  }
+
+  .sw-svw-gridstage {
+    min-height: 25rem;
+  }
+
+  .sw-svw-shellbar,
+  .sw-svw-collaborators {
+    flex: 1 1 100%;
+  }
+
+  /* The shared identity rule pins the title to one line; below 48rem it wraps
+     instead of pushing the connection switch off-screen. */
+  .sw-svw-chrome .sw-demo-controlbar__identity h2 {
+    white-space: normal;
   }
 
   .sw-svw-gridstage > header span {
@@ -595,23 +631,23 @@
 }
 
 @media (max-width: 42rem) {
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__bar {
-    min-height: 2rem;
-  }
-
   .sw-svw-collaborators > span {
     display: none;
   }
 
+  /* Wrap the metrics instead of scrolling them: a clipped word at the strip
+     edge reads as a fault, and the strip has room for two short rows. */
   .sw-svw .sw-demo-status--metrics {
     min-height: 2rem;
     padding-block: var(--sw-demo-space-1);
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sw-svw-toggle,
-  .sw-svw-mission button,
+  .sw-svw-mission > button,
   .sw-svw-actions button,
   .sw-svw-conflict button {
     transition: none;

@@ -38,11 +38,6 @@ interface ImportedDocument {
   label: string;
 }
 
-interface ActivityLine {
-  id: number;
-  message: string;
-}
-
 type WorkbenchScenario = "lifecycle" | "paged" | "xlsx";
 
 const WORKBENCH_SCENARIOS: ReadonlyArray<{
@@ -54,8 +49,6 @@ const WORKBENCH_SCENARIOS: ReadonlyArray<{
   { id: "paged", label: "Paged source", kicker: "Datasource ownership" },
   { id: "xlsx", label: "XLSX", kicker: "Workbook ownership" },
 ];
-
-const ACTIVITY_LINES = 4;
 
 function describeSelection(selection: Selection | null): string {
   if (selection === null) return "No active cell";
@@ -88,7 +81,6 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
   const hostRef = useRef<HTMLDivElement>(null);
   const workbenchRef = useRef<Workbench | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const activityId = useRef(0);
   const readOnlyRef = useRef(false);
 
   const [alive, setAlive] = useState(true);
@@ -98,10 +90,11 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
   const [imported, setImported] = useState<ImportedDocument | null>(null);
   const [readOnly, setReadOnly] = useState(false);
   const [selection, setSelection] = useState("No active cell");
+  const [bootError, setBootError] = useState<string | null>(null);
   const [rendererState, setRendererState] = useState<WorkbenchRendererState | null>(null);
   const [fallbackCount, setFallbackCount] = useState(0);
   const [pagedStats, setPagedStats] = useState<PagedStoreStats | null>(null);
-  const [activity, setActivity] = useState<readonly ActivityLine[]>([]);
+  const [activity, setActivity] = useState<string | null>(null);
   const [scenario, setScenario] = useState<WorkbenchScenario>("lifecycle");
   const scenarioTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -123,9 +116,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     : { renderer: "canvas", data: "columnar" };
 
   const record = useCallback((message: string): void => {
-    activityId.current += 1;
-    const line = { id: activityId.current, message };
-    setActivity((lines) => [line, ...lines].slice(0, ACTIVITY_LINES));
+    setActivity(message);
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: resetCount is an explicit remount token whose value is intentionally opaque.
@@ -137,6 +128,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     let cancelled = false;
     let workbench: Workbench | null = null;
     setPhase("booting");
+    setBootError(null);
     setFallbackCount(0);
     setSelection("No active cell");
 
@@ -172,8 +164,10 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        const message = describeActionError(error);
         setPhase("failed");
-        record(`Grid failed to boot: ${describeActionError(error)}`);
+        setBootError(message);
+        record(`Grid failed to boot: ${message}`);
       });
 
     return () => {
@@ -265,7 +259,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
 
   function addSummary(): void {
     withGrid(({ grid }) => {
-      addSummarySheet(grid);
+      addSummarySheet(grid, hostRef.current?.clientWidth ?? 0);
       record("Summary sheet active — live cross-sheet formulas over the fixture");
     });
   }
@@ -304,15 +298,24 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
   }
 
   const live = alive && phase === "live";
-  const requested = rendererState?.requested ?? spec.renderer;
-  const active = rendererState?.active ?? spec.renderer;
+  // Only a live generation has a store and a paint loop; before that the
+  // instrument reads the requested spec, never the previous generation.
+  const requested = live ? (rendererState?.requested ?? spec.renderer) : spec.renderer;
+  const activeLabel = !alive
+    ? "none"
+    : phase === "live"
+      ? rendererLabel(rendererState?.active ?? spec.renderer)
+      : "starting";
+  /** Allocation stays partial until the host has served every page. */
+  const pagedState: "loading" | "partial" | "complete" =
+    pagedStats === null ? "loading" : pagedStats.fullyLoaded ? "complete" : "partial";
 
   return (
     <section className="sw-vanilla-app sw-vw" data-framework="vanilla">
       <header className="sw-vw-scenarios">
         <div className="sw-vw-scenarios__intro">
-          <span>Imperative Grid laboratory</span>
-          <strong>Choose the ownership boundary to inspect.</strong>
+          <span>Grid ownership</span>
+          <strong>Inspect the renderer, source, or workbook.</strong>
         </div>
         <div className="sw-vw-tabs" role="tablist" aria-label="Vanilla Grid scenarios">
           {WORKBENCH_SCENARIOS.map((item, index) => {
@@ -351,8 +354,17 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               <h2>Revenue pipeline</h2>
             </div>
             <span className="sw-vw-gridstage__selection" data-testid="selection">
-              {selection}
+              {alive ? selection : "No grid mounted"}
             </span>
+            <button
+              className="sw-workbench-primary"
+              type="button"
+              data-tone={alive ? "danger" : undefined}
+              disabled={phase === "booting"}
+              onClick={alive ? destroyWorkbench : () => setAlive(true)}
+            >
+              {alive ? "Destroy grid" : "Create grid"}
+            </button>
           </header>
 
           <div className="sw-vw-stagewrap">
@@ -363,29 +375,65 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               </div>
             ) : null}
             {alive && phase === "failed" ? (
-              <div
-                className="sw-vw-veil sw-vw-veil--destroyed"
-                role="alert"
-                data-testid="boot-failed"
-              >
-                <strong>Grid failed to boot.</strong>
-                <p>The host keeps the failure visible instead of retrying silently.</p>
+              <div className="sw-vw-state" role="alert" data-testid="boot-failed">
+                <strong>Grid failed to boot</strong>
+                <p>
+                  The host reports the failure instead of retrying silently. Create grid starts a
+                  fresh generation from the same construction options.
+                </p>
+                {bootError === null ? null : (
+                  <code className="sw-vw-state__error">{bootError}</code>
+                )}
+                <div className="sw-vw-teardown">
+                  <div>
+                    <span>Kept by the host</span>
+                    <ul>
+                      <li>lifecycle counter</li>
+                      <li>construction options in the URL</li>
+                      <li>host page source</li>
+                      <li>the stage frame</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <span>Next</span>
+                    <ul>
+                      <li>Create grid retries the same spec</li>
+                      <li>Reset generation clears the failure</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             ) : null}
             {!alive ? (
-              <div
-                className="sw-vw-veil sw-vw-veil--destroyed"
-                role="status"
-                data-testid="destroyed"
-              >
-                <strong>Grid destroyed.</strong>
-                <ul className="sw-vw-teardown" aria-label="Removed by destroy()">
-                  <li>canvas</li>
-                  <li>chrome</li>
-                  <li>timers</li>
-                  <li>subscriptions</li>
-                </ul>
-                <p>Create grid starts the next generation.</p>
+              <div className="sw-vw-state" role="status" data-testid="destroyed">
+                <strong>Grid destroyed</strong>
+                <p>
+                  destroy() released every resource this generation created. The host keeps only its
+                  own record of the ownership boundary.
+                </p>
+                <div className="sw-vw-teardown">
+                  <div>
+                    <span>Removed with destroy()</span>
+                    <ul>
+                      <li>canvas and paint loop</li>
+                      <li>toolbar, name box, formula bar</li>
+                      <li>timers and store subscriptions</li>
+                      <li>WASM store and cached pages</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <span>Kept by the host</span>
+                    <ul>
+                      <li>lifecycle counter</li>
+                      <li>construction options in the URL</li>
+                      <li>host page source</li>
+                      <li>the stage frame</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="sw-vw-state__hint">
+                  Create grid in the stage header starts the next generation.
+                </p>
               </div>
             ) : null}
           </div>
@@ -393,7 +441,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
           <footer className="sw-vw-statusbar">
             <span className="sw-vw-statusbar__label">Latest host event</span>
             <span className="sw-vw-activity" role="log" aria-live="polite" data-testid="activity">
-              {activity[0]?.message ?? "Waiting for the first host event"}
+              {activity ?? "Waiting for the first host event"}
             </span>
           </footer>
         </section>
@@ -402,7 +450,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
           <header className="sw-vw-identity">
             <p className="sw-vw-eyebrow">HOST-OWNED LIFECYCLE</p>
             <div>
-              <h2>Generation instrument</h2>
+              <h2>Host state</h2>
               <span
                 className="sw-vw-lifecycle"
                 data-testid="lifecycle"
@@ -424,25 +472,51 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
             <div>
               <dt>Renderer</dt>
               <dd>
-                <output data-testid="renderer" data-fallback-count={fallbackCount}>
-                  Requested: {rendererLabel(requested)} · Active: {rendererLabel(active)}
-                  {rendererState?.fallback != null ? ` · Fallback: ${rendererState.fallback}` : ""}
+                <output
+                  className="sw-vw-readout"
+                  data-testid="renderer"
+                  data-fallback-count={fallbackCount}
+                >
+                  <span>
+                    <span className="sw-vw-readout__key">Requested:</span>{" "}
+                    {rendererLabel(requested)}
+                  </span>{" "}
+                  <span>
+                    <span className="sw-vw-readout__key">Active:</span> {activeLabel}
+                  </span>
+                  {live && rendererState?.fallback != null ? " " : null}
+                  {live && rendererState?.fallback != null ? (
+                    <span className="sw-vw-readout__fallback">
+                      <span className="sw-vw-readout__key">Fallback:</span> {rendererState.fallback}
+                    </span>
+                  ) : null}
                 </output>
               </dd>
             </div>
             <div>
               <dt>Datasource</dt>
               <dd>
-                {spec.data === "paged" && imported === null ? (
+                {!live ? (
+                  "Not mounted"
+                ) : spec.data === "paged" && imported === null ? (
                   <span
                     className="sw-vw-paged"
                     data-testid="paged-stats"
                     data-chunks={pagedStats?.chunks ?? 0}
                     data-fully-loaded={pagedStats?.fullyLoaded ?? false}
                   >
-                    {pagedStats === null
-                      ? "Host pages · warming"
-                      : `${pagedStats.chunks.toLocaleString()} pages · ${kilobytes.format(pagedStats.allocatedBytes / 1024)} KB`}
+                    <span>
+                      {pagedStats === null
+                        ? "Host pages"
+                        : `${pagedStats.chunks.toLocaleString()} pages · ${kilobytes.format(pagedStats.allocatedBytes / 1024)} KB`}
+                    </span>
+                    <span className="sw-vw-load-state" data-state={pagedState}>
+                      {pagedState === "complete"
+                        ? "fully loaded"
+                        : pagedState === "partial"
+                          ? "partially loaded"
+                          : "loading"}
+                    </span>
                   </span>
                 ) : (
                   "Dense columnar · host memory"
@@ -463,8 +537,8 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
             hidden={scenario !== "lifecycle"}
           >
             <header>
-              <span>3-action challenge</span>
-              <strong>Prove the host owns the Grid.</strong>
+              <span>Lifecycle check</span>
+              <strong>Edit, rebuild, then remove the Grid.</strong>
             </header>
             <ol>
               <li>
@@ -478,42 +552,27 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
                 <span>2</span>
                 <div>
                   <strong>Switch its construction option</strong>
-                  <DemoRenderingMode
-                    label="Rendering thread"
-                    mode={spec.renderer}
-                    onModeChange={changeRenderer}
-                  />
+                  <div
+                    className="sw-vw-lifecycle-actions"
+                    role="toolbar"
+                    aria-label="Grid lifecycle"
+                  >
+                    <DemoRenderingMode
+                      label="Rendering thread"
+                      mode={spec.renderer}
+                      onModeChange={changeRenderer}
+                    />
+                  </div>
                 </div>
               </li>
               <li>
                 <span>3</span>
                 <div>
                   <strong>Destroy, then create</strong>
-                  <div
-                    className="sw-vw-lifecycle-actions"
-                    role="toolbar"
-                    aria-label="Grid lifecycle"
-                  >
-                    {alive ? (
-                      <DemoButton
-                        className="sw-vw-destroy"
-                        type="button"
-                        onClick={destroyWorkbench}
-                        disabled={phase === "booting"}
-                      >
-                        Destroy grid
-                      </DemoButton>
-                    ) : (
-                      <DemoButton
-                        className="sw-vw-create"
-                        type="button"
-                        variant="primary"
-                        onClick={() => setAlive(true)}
-                      >
-                        Create grid
-                      </DemoButton>
-                    )}
-                  </div>
+                  <p>
+                    The stage action ends this generation and starts the next one from the same
+                    options.
+                  </p>
                 </div>
               </li>
             </ol>
@@ -543,10 +602,13 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               <DemoButton type="button" onClick={total} disabled={!live}>
                 Total ARR
               </DemoButton>
-              <DemoButton type="button" variant="quiet" onClick={() => changeData("columnar")}>
+              <DemoButton type="button" onClick={() => changeData("columnar")}>
                 Restore dense source
               </DemoButton>
             </div>
+            <p className="sw-vw-note">
+              Summary sheet stays disabled while the store holds only the visited pages.
+            </p>
           </section>
 
           <section
@@ -607,7 +669,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
                   <DemoRadioItem value="paged">Paged</DemoRadioItem>
                 </DemoRadioGroup>
               </div>
-              <div className="sw-vw-field sw-vw-field--toggle">
+              <div className="sw-vw-field">
                 <span className="sw-vw-field__label" aria-hidden="true">
                   Live option
                 </span>
@@ -625,6 +687,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               </DemoButton>
             </div>
             <nav className="sw-vw-proofs" aria-label="Dedicated capability proofs">
+              <span className="sw-vw-proofs__label">Proof pages</span>
               <a href="/showcases/performance/#million-rows">Paging proof</a>
               <a href="/showcases/interoperability/#xlsx">XLSX fidelity</a>
               <a href="/showcases/database/">Persistence</a>

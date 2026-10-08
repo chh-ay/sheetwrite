@@ -14,28 +14,17 @@
   --sw-demo-popup-shadow: var(--sw-shadow);
   --sw-rwb-rail-width: calc(var(--sw-demo-space-4) * 15);
   --sw-rwb-grid-mobile-height: calc(var(--sw-demo-space-4) * 22);
-  --sw-rwb-shelf-height: calc(var(--sw-demo-space-4) * 20);
   --sw-rwb-strong-rule: 0.125rem;
 }
 
-/* The 44rem shared stage is divided around one dominant workspace. */
+/* Each row keeps its natural height; tools expand below the workspace. */
 .sw-rwb__main {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: auto;
+  grid-template-rows: auto auto auto minmax(32rem, auto) auto;
 }
 
-.sw-rwb-commandbar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--sw-demo-space-3);
-  min-height: calc(var(--sw-demo-space-4) * 3.25);
-  padding-block: var(--sw-demo-space-1);
-  background: var(--sw-demo-deep);
-}
-
-.sw-rwb-commandbar .sw-demo-controlbar__controls {
-  overflow: visible;
-}
-
+/* The stage supplies the commandbar chrome (flex strip, gradient, padding);
+   this page only tints the query-cluster labels. */
 .sw-rwb-commandbar .sw-demo-select__label {
   color: var(--sw-demo-fg-soft);
 }
@@ -106,6 +95,19 @@
     color-mix(in srgb, var(--sw-demo-accent) 42%, transparent);
 }
 
+/* Disabled inputs still carry the row's only instruction ("select a cell"),
+   so they stay readable instead of fading into the panel. */
+.sw-rwb .sw-rwb-editrow__field input:disabled,
+.sw-rwb .sw-rwb-tools__field input:disabled {
+  opacity: 0.72;
+}
+
+.sw-rwb-editrow__field input::placeholder,
+.sw-rwb-tools__field input::placeholder {
+  color: var(--sw-demo-muted);
+  opacity: 1;
+}
+
 .sw-rwb :is(input, button):disabled {
   opacity: 0.42;
   cursor: not-allowed;
@@ -171,6 +173,11 @@
   flex: 1 1 auto;
 }
 
+.sw-rwb-toolgroup .sw-rwb-cluster {
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+
 .sw-rwb-cluster + .sw-rwb-cluster {
   margin-inline-start: var(--sw-demo-space-1);
   padding-inline-start: var(--sw-demo-space-2);
@@ -180,7 +187,7 @@
 /* Grid and causal evidence are adjacent, but the Grid retains most of the area. */
 .sw-rwb-workspace {
   display: grid;
-  min-height: 0;
+  min-height: 32rem;
   grid-template-columns: minmax(0, 68.75rem) minmax(var(--sw-rwb-rail-width), 1fr);
   background: var(--sw-demo-surface);
 }
@@ -195,7 +202,7 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: visible;
   background: var(--sw-demo-deep);
 }
 
@@ -290,7 +297,11 @@
 
 .sw-rwb-kpis {
   display: grid;
+  /* The summary list takes the rail's leftover height so the cards reach the
+     footer rule instead of leaving a dead band above it. */
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(min-content, 1fr);
   border-bottom: 1px solid var(--sw-demo-border);
 }
 
@@ -298,6 +309,7 @@
   display: grid;
   min-width: 0;
   gap: var(--sw-demo-space-1);
+  align-content: center;
   padding: var(--sw-demo-space-3);
   border-bottom: 1px solid var(--sw-demo-border);
 }
@@ -313,7 +325,7 @@
 .sw-rwb-kpi dd {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
+  overflow: visible;
   color: var(--sw-demo-fg-strong);
   font: 650 var(--sw-type-sm) / 1.15 var(--sw-font-display);
   font-variant-numeric: tabular-nums;
@@ -333,11 +345,10 @@
 }
 
 .sw-rwb-history__heading strong {
-  overflow: hidden;
+  min-width: 0;
   color: var(--sw-demo-fg-soft);
-  font: 500 var(--sw-type-xs) / 1 var(--sw-font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  overflow-wrap: anywhere;
 }
 
 .sw-rwb-history__actions {
@@ -370,8 +381,7 @@
   color: var(--sw-demo-accent-strong);
 }
 
-/* Secondary capabilities live in a real disclosure shelf. Closed, it costs one
-   compact row; open, it overlays the workspace instead of shrinking the Grid. */
+/* Secondary tools stay in document flow, without covering the editable grid. */
 .sw-rwb-tools {
   position: relative;
   z-index: 4;
@@ -397,11 +407,8 @@
 
 .sw-rwb-tools > summary small {
   flex: 1;
-  overflow: hidden;
   color: var(--sw-demo-muted);
-  font: 500 var(--sw-type-xs) / 1 var(--sw-font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-body);
 }
 
 .sw-rwb-tools > summary::after {
@@ -415,18 +422,11 @@
 }
 
 .sw-rwb-tools__shelf {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
   display: grid;
-  max-height: var(--sw-rwb-shelf-height);
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  overflow-y: auto;
   border-top: 1px solid var(--sw-demo-border-strong);
   background: var(--sw-demo-raised);
-  box-shadow: 0 calc(var(--sw-demo-space-4) * -1) calc(var(--sw-demo-space-4) * 2)
-    color-mix(in srgb, var(--sw-demo-fg-strong) 12%, transparent);
+  align-items: start;
 }
 
 .sw-rwb-toolgroup {
@@ -497,7 +497,8 @@
   cursor: pointer;
 }
 
-.sw-rwb-workflow__import input {
+.sw-rwb-workflow__import input,
+.sw-rwb .sw-rwb-workflow__import input:disabled {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -551,18 +552,6 @@
     min-height: 44rem;
   }
 
-  .sw-rwb-commandbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: var(--sw-demo-space-2);
-  }
-
-  .sw-rwb-commandbar .sw-demo-controlbar__controls {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr);
-    padding: 0;
-  }
-
   .sw-rwb-commandbar .sw-rwb-cluster--view {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -594,6 +583,15 @@
     width: 100%;
   }
 
+  .sw-rwb-cluster--formula {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sw-rwb-cluster--formula > .sw-demo-button {
+    grid-column: 1 / -1;
+  }
+
   .sw-rwb-editrow__address {
     min-width: calc(var(--sw-demo-space-4) * 4.5);
   }
@@ -606,6 +604,7 @@
 
   .sw-rwb-workspace {
     grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
   }
 
   .sw-rwb-workspace > .sw-demo-grid {
@@ -616,6 +615,25 @@
 
   .sw-rwb-state {
     overflow: visible;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-rwb-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sw-rwb-kpi:nth-child(odd) {
+    border-inline-end: 1px solid var(--sw-demo-border);
+  }
+
+  .sw-rwb-kpi {
+    border-bottom: 1px solid var(--sw-demo-border);
+  }
+
+  .sw-rwb-toolgroup .sw-rwb-cluster {
+    flex-wrap: wrap;
+    flex: 1 1 100%;
   }
 
   .sw-rwb-tools__shelf {

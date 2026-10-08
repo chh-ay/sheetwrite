@@ -1,16 +1,14 @@
 import { createFileRoute, notFound, useLocation } from "@tanstack/react-router";
 import { Suspense, useEffect } from "react";
 import { DocsShell } from "../components/DocsShell.js";
-import {
-  documentComponentForSplat,
-  documentForSplat,
-  normalizeDocumentHref,
-} from "../lib/content.js";
+import { documentComponentForSplat, normalizeDocumentHref } from "../lib/content.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { pageMeta } from "../lib/seo.js";
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
+    // Dynamic import: the docs page index ships with docs routes, not every page.
+    const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
     if (document === undefined) throw notFound();
     return { title: document.title, description: document.description };

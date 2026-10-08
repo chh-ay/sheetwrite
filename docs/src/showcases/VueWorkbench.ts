@@ -66,10 +66,18 @@ interface FeedEntry {
 
 /** Hoisted: a stable identity means the adapter never reconfigures chrome per render. */
 const GRID_CONFIG = { toolbar: true } as const;
-const FEED_LIMIT = 9;
+/** The rail log shows the newest entries the 640px rail holds without a scroll. */
+const FEED_LIMIT = 5;
 const ARCHIVE_SHEET_ID = "archive";
 const CHALLENGE_CELL: CellAddress = { sheet: "orders", row: 0, col: 6 };
 const CHALLENGE_VALUE = 999;
+/** One header readout, one word per challenge state. */
+const CHALLENGE_LABELS: Record<ChallengeState, string> = {
+  ready: "Awaiting attempt",
+  rejected: "Rejected",
+  authorized: "Authorized",
+  accepted: "Accepted",
+};
 const TASKS: ReadonlyArray<{ id: TaskId; label: string }> = [
   { id: "validation", label: "Validation" },
   { id: "protection", label: "Protection" },
@@ -89,13 +97,33 @@ function describeValue(value: unknown): string {
   return String(value);
 }
 
+// Declared business columns fill the desktop stage: 1025px of columns plus the
+// 48px row gutter is exactly the 1073px the grid gets beside the 23rem rail, so
+// the protected Total column stays visible without scrolling to it.
+const STAGE_COLUMN_WIDTHS: ReadonlyArray<ReadonlyArray<number>> = [
+  [96, 220, 136, 128, 88, 132, 225],
+  [430, 330, 265],
+];
+const ARCHIVE_COLUMN_WIDTHS = [515, 510] as const;
+
+function createWorkbenchWorkbook() {
+  const workbook = createBusinessWorkbook();
+  for (const [sheetIndex, sheet] of workbook.sheets.entries()) {
+    const widths = STAGE_COLUMN_WIDTHS[sheetIndex];
+    for (const [columnIndex, column] of sheet.columns.entries()) {
+      column.width = widths?.[columnIndex] ?? column.width;
+    }
+  }
+  return workbook;
+}
+
 const App = defineComponent({
   setup() {
     const gridComponent = shallowRef<VueGridHandle | null>(null);
 
     // Reset-bound adapter inputs. Replacing any of them rebuilds the Grid, so
     // they are regenerated together and only while nothing is pending.
-    const workbook = shallowRef(createBusinessWorkbook());
+    const workbook = shallowRef(createWorkbenchWorkbook());
     const data = shallowRef(createBusinessData());
     const mutationPolicy = ref<"atomic" | "partial">("atomic");
     const rendererMode = ref<"canvas" | "worker">("canvas");
@@ -288,7 +316,7 @@ const App = defineComponent({
               : issue.kind === "protection"
                 ? `${issue.protectedRangeId} · ${issue.message}`
                 : issue.message;
-          pushFeed("rejected", "grid.on(mutation-rejected)", detail);
+          pushFeed("rejected", "mutation-rejected", detail);
           challengeIssue.value = detail;
         }
         challengeState.value = "rejected";
@@ -322,7 +350,7 @@ const App = defineComponent({
       );
       if (role.value === "finance-lead" && committedChallenge) {
         challengeState.value = "accepted";
-        challengeIssue.value = `orders!G1 changed from 8 to ${CHALLENGE_VALUE}; host commit queued.`;
+        challengeIssue.value = `orders!G1 now ${CHALLENGE_VALUE}; host commit queued.`;
         activeTask.value = "protection";
       }
     }
@@ -399,8 +427,8 @@ const App = defineComponent({
         name: "Archive FY25",
         rowCount: 20,
         columns: [
-          { key: "po", header: "PO", width: 120, type: "text" },
-          { key: "closed", header: "Closed", width: 140, type: "text" },
+          { key: "po", header: "PO", width: ARCHIVE_COLUMN_WIDTHS[0], type: "text" },
+          { key: "closed", header: "Closed", width: ARCHIVE_COLUMN_WIDTHS[1], type: "text" },
         ],
       });
       if (result.status === "applied") grid.setActiveSheet(result.sheet);
@@ -414,7 +442,7 @@ const App = defineComponent({
       ready.value = false;
       challengeState.value = "ready";
       challengeIssue.value = "Protected totals require the finance-lead role.";
-      workbook.value = createBusinessWorkbook();
+      workbook.value = createWorkbenchWorkbook();
       data.value = createBusinessData();
       pushFeed("lifecycle", code, detail);
     }
@@ -541,7 +569,7 @@ const App = defineComponent({
                 h(FileSpreadsheet, { size: 16 }),
               ]),
               h("div", [
-                h("h2", "Governed purchase orders"),
+                h("h2", "Purchase order review"),
                 h("span", `${integer.format(BUSINESS_ROWS)} live rows · challenge G1`),
               ]),
             ]),
@@ -571,16 +599,28 @@ const App = defineComponent({
               ],
             ),
             h(
-              "span",
+              "output",
               {
-                class: "sw-demo-controlbar__state",
-                role: "status",
-                "data-state": challengeState.value === "accepted" ? "accepted" : "ready",
+                class: "sw-workbench-readout sw-vuewb-readout",
+                "data-state": challengeState.value,
+                "aria-live": "polite",
               },
               [
                 h(ShieldCheck, { size: 14, "aria-hidden": "true" }),
-                challengeState.value === "accepted" ? " Override committed" : " Policy enforced",
+                h("span", { class: "sw-vuewb-readout__label" }, "Challenge"),
+                h("strong", CHALLENGE_LABELS[challengeState.value]),
               ],
+            ),
+            h(
+              "button",
+              {
+                type: "button",
+                class: "sw-workbench-primary",
+                "data-testid": "challenge-attempt",
+                disabled: !ready.value || readOnly.value || challengeState.value === "accepted",
+                onClick: commitChallenge,
+              },
+              role.value === "reviewer" ? "Attempt 999 as reviewer" : "Commit 999 override",
             ),
           ]),
           h("div", { class: "sw-vuewb-workspace" }, [
@@ -652,12 +692,8 @@ const App = defineComponent({
               ]),
               h("section", panelAttrs("protection"), [
                 h("div", { class: "sw-vuewb-challenge__head" }, [
-                  h("span", "ONE LIVE CHALLENGE"),
+                  h("span", "PROTECTED EDIT"),
                   h("strong", "Override the protected G1 total"),
-                  h(
-                    "p",
-                    "Attempt as Reviewer, authorize Finance lead, then commit the same mutation.",
-                  ),
                 ]),
                 h(
                   "dl",
@@ -690,7 +726,7 @@ const App = defineComponent({
                 h("ol", { class: "sw-vuewb-steps", "aria-label": "Protected edit workflow" }, [
                   h("li", { "data-state": challengeState.value === "ready" ? "current" : "done" }, [
                     h("span", "1"),
-                    h("div", [h("strong", "Attempt"), h("small", "Write 999 to G1")]),
+                    h("div", [h("strong", "Attempt"), h("small", "G1 = 999")]),
                   ]),
                   h(
                     "li",
@@ -722,19 +758,7 @@ const App = defineComponent({
                     "button",
                     {
                       type: "button",
-                      "data-testid": "challenge-attempt",
-                      disabled:
-                        !ready.value || readOnly.value || challengeState.value === "accepted",
-                      onClick: commitChallenge,
-                    },
-                    role.value === "reviewer" ? "Attempt 999 as reviewer" : "Commit 999 override",
-                  ),
-                  h(
-                    "button",
-                    {
-                      type: "button",
                       "data-testid": "challenge-authorize",
-                      "data-variant": "primary",
                       disabled:
                         role.value === "finance-lead" || challengeState.value === "accepted",
                       onClick: () => setRole("finance-lead"),
@@ -766,6 +790,11 @@ const App = defineComponent({
                   h("div", [h("dt", "Pending"), h("dd", String(pendingCount.value))]),
                   h("div", [h("dt", "Host"), h("dd", `v${serverVersion.value}`)]),
                 ]),
+                h(
+                  "p",
+                  { class: "sw-vuewb-taskhint" },
+                  "The header action writes 999 into G1. A rejected attempt leaves the cell untouched.",
+                ),
               ]),
               h("section", panelAttrs("notes"), [
                 h("div", { class: "sw-vuewb-section__head" }, [
@@ -799,7 +828,6 @@ const App = defineComponent({
                       {
                         type: "button",
                         "data-testid": "note-save",
-                        "data-variant": "primary",
                         disabled: selected.value === null || readOnly.value,
                         onClick: () => saveNote(false),
                       },
@@ -901,6 +929,11 @@ const App = defineComponent({
                     ),
                   ]),
                 ]),
+                h(
+                  "p",
+                  { class: "sw-vuewb-taskhint" },
+                  "The Grid tab strip above the rows drives the same document model as these controls.",
+                ),
               ]),
               h("section", panelAttrs("persistence"), [
                 h("div", { class: "sw-vuewb-section__head" }, [
@@ -955,6 +988,11 @@ const App = defineComponent({
                     syncBusy.value ? "Committing…" : "Sync to host",
                   ),
                 ]),
+                h(
+                  "p",
+                  { class: "sw-vuewb-taskhint" },
+                  "Sync acknowledges queued commits in order and advances the host version once each.",
+                ),
               ]),
               h("section", panelAttrs("renderer"), [
                 h("div", { class: "sw-vuewb-section__head" }, [
@@ -1031,6 +1069,11 @@ const App = defineComponent({
                     h("div", [h("dt", ":workbook"), h("dd", `generation ${generation.value}`)]),
                   ]),
                 ]),
+                h(
+                  "p",
+                  { class: "sw-vuewb-taskhint" },
+                  "Live props update in place; reset-bound props replace the Grid and restart @ready.",
+                ),
               ]),
               h("section", { class: "sw-vuewb-eventrail", "data-testid": "event-panel" }, [
                 h("header", [
@@ -1043,10 +1086,14 @@ const App = defineComponent({
           ]),
           h("footer", { class: "sw-demo-status sw-demo-status--metrics" }, [
             h("span", `Selection · ${selectedLabel.value}`),
-            h("span", `Role · ${role.value}`),
+            h("span", { class: "sw-vuewb-status--role" }, `Role · ${role.value}`),
             h("span", `Pending · ${pendingCount.value}`),
-            h("span", `Host · v${serverVersion.value}`),
-            h("span", `${rendererMode.value} · gen ${generation.value}`),
+            h("span", { class: "sw-vuewb-status--host" }, `Host · v${serverVersion.value}`),
+            h(
+              "span",
+              { class: "sw-vuewb-status--renderer" },
+              `${rendererMode.value} · gen ${generation.value}`,
+            ),
           ]),
         ]),
       ]);

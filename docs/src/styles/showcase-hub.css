@@ -1,13 +1,50 @@
 /* Route-owned gallery. Static previews do not mount a Grid or runtime. */
 
 .sw-hub-frame {
+  --sw-demo-fg: var(--sw-fg);
+  --sw-demo-fg-strong: var(--sw-fg-strong);
+  --sw-demo-fg-soft: var(--sw-fg-muted);
+  --sw-demo-muted: var(--sw-fg-muted);
+  --sw-demo-border: var(--sw-border);
+  --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-raised: var(--sw-surface-2);
+  --sw-demo-deep: var(--sw-surface-1);
+  --sw-demo-accent-strong: var(--sw-accent-strong);
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  background: var(--sw-surface-0);
+  background:
+    radial-gradient(
+      ellipse at 85% 0%,
+      color-mix(in srgb, var(--sw-accent) 9%, transparent),
+      transparent 45rem
+    ),
+    var(--sw-surface-0);
   color: var(--sw-fg);
 }
 
+/* A quiet blueprint grid that fades out under the gallery. */
+.sw-hub-frame::before {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 56rem;
+  background:
+    linear-gradient(color-mix(in srgb, var(--sw-border) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sw-border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 4rem 4rem;
+  content: "";
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 100%);
+  pointer-events: none;
+}
+
 .sw-hub {
-  width: min(calc(100% - 3rem), 92.5rem);
+  width: calc(100% - 2 * var(--sw-page-inset));
+  max-width: 96rem;
   margin-inline: auto;
   padding: clamp(1.5rem, 3vh, 2rem) 0 3rem;
 }
@@ -21,7 +58,7 @@
 /* A short opening, then straight into the gallery. */
 .sw-hub__hero {
   max-width: 46rem;
-  padding-block: clamp(1.5rem, 4vw, 3rem) 0;
+  padding-block: clamp(2rem, 5vw, 4rem) 0.5rem;
 }
 
 .sw-hub__eyebrow {
@@ -51,6 +88,33 @@
   margin-top: clamp(1.75rem, 3vw, 2.5rem);
 }
 
+.sw-hub__group + .sw-hub__group {
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+
+.sw-hub__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  align-items: baseline;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--sw-border);
+}
+
+.sw-hub__group-head h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 650 1.25rem / 1.3 var(--sw-font-display);
+  letter-spacing: -0.02em;
+}
+
+.sw-hub__group-head p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: 0.875rem;
+}
+
 .sw-hub__visually-hidden {
   position: absolute;
   width: 1px;
@@ -65,7 +129,7 @@
   gap: var(--sw-demo-space-3);
   align-items: center;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: flex-start;
   margin: 0 0 1.25rem;
 }
 
@@ -92,7 +156,7 @@
   min-height: 2.75rem;
   padding-inline: var(--sw-demo-space-3);
   border: 1px solid var(--sw-border-strong);
-  border-radius: var(--sw-demo-radius-1);
+  border-radius: 999px;
   background: var(--sw-surface-1);
   color: var(--sw-fg-muted);
   font: 600 0.8125rem / 1.3 var(--sw-font-body);
@@ -116,17 +180,21 @@
 
 .sw-hub__filter-status {
   flex: none;
-  margin: 0;
+  margin: 0 0 0 var(--sw-demo-space-1);
+  padding-left: var(--sw-demo-space-3);
+  border-left: 1px solid var(--sw-border);
   color: var(--sw-fg-dim);
   font: 600 var(--sw-type-xs) / 1.3 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Four columns on desktop, two on tablet, and one on small screens. */
+/* Desktop, all examples: three featured capability cards (a third of the row),
+   then four capability cards and four adapters (a quarter each). Filtered
+   views keep thirds. Two columns on tablets and one on small screens. */
 .sw-hub-scenes {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: auto;
   gap: 1.25rem;
   margin: 0;
   padding: 0;
@@ -136,6 +204,21 @@
 .sw-hub-scenes > li {
   min-width: 0;
   display: flex;
+  grid-column: span 4;
+}
+
+.sw-hub-scenes > li[data-kind="framework"],
+.sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+  grid-column: span 3;
+}
+
+/* Capability previews share one height so titles line up across a row. */
+.sw-hub-launch:not(.sw-hub-launch--framework) {
+  grid-template-rows: 12rem 1fr;
+}
+
+.sw-hub-launch.sw-hub-launch--framework {
+  grid-template-rows: 8.5rem 1fr;
 }
 
 .sw-hub-launch {
@@ -147,7 +230,9 @@
   width: 100%;
   grid-template-rows: minmax(10rem, auto) 1fr;
   border: 1px solid var(--sw-border);
-  border-radius: var(--sw-demo-radius-2);
+  border-radius: 1.25rem;
+  /* The preview paints its own background; clip it to the rounded corners. */
+  overflow: clip;
   background: var(--sw-surface-1);
   color: var(--sw-fg);
   text-decoration: none;
@@ -171,6 +256,10 @@
   --sw-hub-accent: var(--sw-demo-danger);
 }
 
+.sw-hub-launch[data-owner="engine"] {
+  --sw-hub-accent: #a78bfa;
+}
+
 .sw-hub-launch[data-owner="vue"] {
   --sw-hub-accent: var(--sw-demo-vue-accent);
 }
@@ -184,14 +273,16 @@
   min-width: 0;
   grid-template-rows: auto auto 1fr auto;
   gap: 0.625rem;
-  padding: 1.25rem;
-  border-top: 2px solid var(--sw-hub-accent);
+  padding: clamp(1.25rem, 2vw, 1.75rem);
+  border-top: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
   background: var(--sw-surface-1);
 }
 
 .sw-hub-launch__meta {
   color: var(--sw-hub-accent-ink);
-  font: 600 0.75rem / 1.4 var(--sw-font-body);
+  font: 600 0.6875rem / 1.4 var(--sw-font-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
 .sw-hub-launch__body > strong {
@@ -217,19 +308,30 @@
 .sw-hub-scene,
 .sw-hub-framework-scene {
   display: flex;
+  position: relative;
+  justify-content: center;
   min-width: 0;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1.25rem;
-  border-bottom: 1px solid var(--sw-demo-border);
-  background: var(--sw-demo-panel);
+  padding: 1.5rem 1.25rem 3rem;
+  border-bottom: 0;
+  background:
+    radial-gradient(
+      ellipse at 50% 15%,
+      color-mix(in srgb, var(--sw-hub-accent) 9%, transparent),
+      transparent 85%
+    ),
+    var(--sw-surface-0);
   color: var(--sw-demo-fg);
 }
 
 .sw-hub-scene__caption {
+  position: absolute;
+  bottom: 1rem;
+  left: 1.25rem;
+  right: 1.25rem;
   min-width: 0;
-  width: 100%;
-  margin-top: auto;
+  margin: 0;
   overflow: visible;
   color: var(--sw-demo-muted);
   font: 500 0.75rem / 1.5 var(--sw-font-body);
@@ -237,14 +339,14 @@
 
 .sw-hub-framework-scene {
   justify-content: center;
-  gap: 0.35rem;
-  min-height: 7.5rem;
+  gap: 0.5rem;
+  padding-block: 1.25rem;
 }
 
 .sw-hub-framework-scene code {
   display: block;
-  font: 500 0.78rem / 1.6 var(--sw-font-mono);
-  overflow-wrap: anywhere;
+  font: 500 0.75rem / 1.55 var(--sw-font-mono);
+  text-wrap: balance;
 }
 
 .sw-hub-framework-scene__import {
@@ -252,7 +354,12 @@
 }
 
 .sw-hub-framework-scene__import span {
-  color: #c4b5fd;
+  white-space: nowrap;
+}
+
+.sw-hub-framework-scene__import i {
+  color: var(--sw-hub-accent-ink);
+  font-style: normal;
 }
 
 .sw-hub-framework-scene__import em {
@@ -261,7 +368,7 @@
 }
 
 .sw-hub-framework-scene__mount {
-  color: var(--sw-hub-accent);
+  color: var(--sw-hub-accent-ink);
   font-weight: 600;
 }
 
@@ -328,13 +435,14 @@
   align-items: start;
   gap: 0.25rem;
   margin-block: auto;
+  padding-inline: 0.25rem;
 }
 
 .sw-hub-commits::before {
   position: absolute;
-  top: var(--sw-demo-space-1);
-  right: var(--sw-demo-space-2);
-  left: var(--sw-demo-space-2);
+  top: 0.4375rem;
+  right: 1rem;
+  left: 1rem;
   height: 2px;
   background: var(--sw-demo-border-strong);
   content: "";
@@ -350,10 +458,11 @@
 
 .sw-hub-commits__node i {
   z-index: 1;
-  width: var(--sw-demo-space-2);
-  height: var(--sw-demo-space-2);
+  width: 0.875rem;
+  height: 0.875rem;
   border-radius: 50%;
   background: var(--sw-demo-accent);
+  box-shadow: 0 0 0 4px var(--sw-surface-0);
 }
 
 .sw-hub-commits__node[data-kind="snapshot"] i {
@@ -374,7 +483,7 @@
 
 .sw-hub-commits__node code {
   color: var(--sw-demo-fg-soft);
-  font: 500 0.6875rem / 1.4 var(--sw-font-mono);
+  font: 500 0.75rem / 1.4 var(--sw-font-mono);
   overflow-wrap: anywhere;
   text-align: center;
 }
@@ -453,7 +562,7 @@
 /* Two-client sequencing. */
 .sw-hub-sync {
   display: grid;
-  gap: var(--sw-demo-space-1);
+  gap: 0.625rem;
   margin-block: auto;
 }
 
@@ -477,8 +586,8 @@
 .sw-hub-sync__seq span {
   z-index: 1;
   display: grid;
-  min-width: 1.25rem;
-  min-height: 1.25rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
   place-items: center;
   border-radius: var(--sw-demo-radius-1);
   color: var(--sw-demo-ink);
@@ -499,19 +608,19 @@
 
 .sw-hub-sync__lane code {
   z-index: 1;
-  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
+  padding: 0.3rem 0.5rem;
   border: 1px solid var(--sw-demo-border-strong);
   border-radius: var(--sw-demo-radius-1);
   background: var(--sw-demo-raised);
   color: var(--sw-demo-fg-soft);
-  font: 500 0.6875rem / 1.2 var(--sw-font-mono);
+  font: 500 0.75rem / 1.2 var(--sw-font-mono);
 }
 
 .sw-hub-sync__seq {
   display: flex;
   gap: var(--sw-demo-space-1);
   align-items: center;
-  margin-left: 2rem;
+  margin-left: 2.25rem;
 }
 
 .sw-hub-sync__seq::before {
@@ -520,6 +629,66 @@
   font: 600 0.6875rem / 1 var(--sw-font-mono);
   content: "seq";
   text-transform: uppercase;
+}
+
+/* Formula spill: one formula, a block of results appearing below it. */
+.sw-hub-spill__formula {
+  color: var(--sw-demo-fg-strong);
+  font: 600 0.8rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-hub-spill__formula em {
+  color: var(--sw-demo-accent-strong);
+  font-style: normal;
+}
+
+.sw-hub-spill {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 1px;
+  width: max-content;
+  border: 1px solid color-mix(in srgb, var(--sw-demo-accent) 55%, transparent);
+  background: var(--sw-demo-border);
+}
+
+.sw-hub-spill > span {
+  display: contents;
+}
+
+.sw-hub-spill i,
+.sw-hub-spill b {
+  padding: 0.18rem 0.6rem;
+  background: var(--sw-demo-deep);
+  font: 500 0.72rem / 1.3 var(--sw-font-mono);
+  font-style: normal;
+}
+
+.sw-hub-spill i {
+  color: var(--sw-demo-fg-soft);
+}
+
+.sw-hub-spill b {
+  color: var(--sw-demo-accent-strong);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Engine trace: one public event per line. */
+.sw-hub-trace {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.sw-hub-trace code {
+  color: var(--sw-demo-fg-soft);
+  font: 500 0.72rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-hub-trace i {
+  display: inline-block;
+  min-width: 5.5rem;
+  color: var(--sw-hub-accent-ink);
+  font-style: normal;
 }
 
 @media (hover: hover) {
@@ -531,25 +700,50 @@
 }
 
 @media (max-width: 79.999rem) {
-  .sw-hub-scenes {
+  .sw-hub-scenes > li,
+  .sw-hub-scenes > li[data-kind="framework"],
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+    grid-column: span 6;
+  }
+
+  /* Seven capability cards: the last one takes the full row on tablets. */
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* On tablets the full-row seventh card lays its preview beside its text. */
+@media (min-width: 40rem) and (max-width: 79.999rem) {
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(12rem, auto);
+  }
+
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch__body {
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
   }
 }
 
 @media (max-width: 63.999rem) {
-  .sw-hub__hero {
-    max-width: none;
+  /* The count drops to its own line once the chips fill the row. */
+  .sw-hub__filter-status {
+    flex-basis: 100%;
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
   }
 }
 
 @media (max-width: 39.999rem) {
   .sw-hub {
-    width: calc(100% - 2rem);
     padding-top: 1rem;
   }
 
-  .sw-hub-scenes {
-    grid-template-columns: minmax(0, 1fr);
+  .sw-hub-scenes > li,
+  .sw-hub-scenes > li[data-kind="framework"],
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+    grid-column: 1 / -1;
   }
 
   .sw-hub__toolbar {

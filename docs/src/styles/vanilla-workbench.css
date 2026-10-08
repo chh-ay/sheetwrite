@@ -15,10 +15,13 @@
   --sw-demo-accent-strong: var(--sw-accent-strong);
   --sw-demo-shadow: var(--sw-shadow);
   --sw-demo-popup-shadow: var(--sw-shadow);
-  --sw-vw-instrument-width: 19rem;
+  /* Danger needs a theme-aware ink: --sw-demo-danger is a single value and
+     fails contrast on the light surface. */
+  --sw-vw-danger: color-mix(in srgb, var(--sw-demo-danger) 72%, var(--sw-fg-strong));
+  --sw-vw-instrument-width: 22rem;
   display: grid;
   min-height: 38rem;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   background: var(--sw-demo-surface);
   color: var(--sw-demo-fg);
 }
@@ -101,9 +104,9 @@
   min-width: 0;
   gap: var(--sw-demo-space-1);
   padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
-  border: 1px solid transparent;
+  border: 1px solid var(--sw-demo-border);
   border-radius: var(--sw-demo-radius-2);
-  background: transparent;
+  background: var(--sw-demo-surface);
   color: var(--sw-demo-fg-soft);
   text-align: left;
   cursor: pointer;
@@ -186,10 +189,10 @@
 }
 
 .sw-vw-gridstage__header > div {
-  display: flex;
+  display: grid;
   min-width: 0;
-  gap: var(--sw-demo-space-3);
-  align-items: baseline;
+  gap: var(--sw-demo-space-1);
+  flex: 1 1 16rem;
 }
 
 .sw-vw-gridstage__header h2,
@@ -220,11 +223,18 @@
   overflow: hidden;
 }
 
+/* The live shell, the boot overlay, and the state panel share one cell so a
+   tombstone never clips and never leaves a hole in the stage. */
+.sw-vw-stagewrap > * {
+  grid-area: 1 / 1;
+}
+
 .sw-vw-stage {
   min-width: 0;
   min-height: 0;
 }
 
+/* Visible only while WASM boots; it covers the cell that the shell will fill. */
 .sw-vw-veil {
   position: absolute;
   inset: 0;
@@ -232,44 +242,98 @@
   place-content: center;
   gap: var(--sw-demo-space-2);
   padding: var(--sw-demo-space-4);
-  background: color-mix(in srgb, var(--sw-demo-deep) 92%, transparent);
+  background: var(--sw-demo-deep);
   color: var(--sw-demo-muted);
   font: 500 var(--sw-type-sm) var(--sw-font-mono);
   text-align: center;
 }
 
-.sw-vw-veil--destroyed {
+/* Honest end states: destroyed and boot-failed own the stage instead of
+   floating in it. */
+.sw-vw-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
+  gap: var(--sw-demo-space-3);
+  padding: var(--sw-demo-space-4);
+  background: var(--sw-demo-deep);
   color: var(--sw-demo-fg-soft);
+  text-align: center;
 }
 
-.sw-vw-veil--destroyed strong {
-  color: var(--sw-demo-warn);
-  font: 650 var(--sw-type-base) var(--sw-font-display);
+.sw-vw-state strong {
+  color: var(--sw-state-pending);
+  font: 650 1.15rem var(--sw-font-display);
 }
 
-.sw-vw-veil--destroyed p {
-  max-width: 34rem;
+.sw-vw-state p {
+  max-width: 36rem;
   margin: 0;
   font: 400 var(--sw-type-sm) var(--sw-font-body);
   line-height: 1.5;
 }
 
+.sw-vw-state__error {
+  max-width: 36rem;
+  padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
+  color: var(--sw-state-pending);
+  font: 500 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-vw-state__hint {
+  color: var(--sw-demo-dim);
+  font: 500 var(--sw-type-xs) var(--sw-font-mono);
+}
+
 .sw-vw-teardown {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--sw-demo-space-3);
+  width: 100%;
+  max-width: 44rem;
+  text-align: left;
+}
+
+.sw-vw-teardown > div {
+  display: grid;
+  align-content: start;
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-3);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-demo-surface);
+}
+
+.sw-vw-teardown > div > span {
+  color: var(--sw-demo-dim);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sw-vw-teardown ul {
+  display: grid;
   gap: var(--sw-demo-space-1);
-  justify-content: center;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .sw-vw-teardown li {
-  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
-  border: 1px solid var(--sw-demo-border);
-  border-radius: var(--sw-demo-radius-1);
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
   color: var(--sw-demo-fg-soft);
-  font: 500 var(--sw-type-xs) var(--sw-font-mono);
+  font: 500 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+}
+
+.sw-vw-teardown li::before {
+  content: "·";
+  color: var(--sw-demo-dim);
 }
 
 .sw-vw-statusbar {
@@ -292,11 +356,10 @@
 }
 
 .sw-vw-activity {
-  overflow: hidden;
   min-width: 0;
-  color: var(--sw-demo-fg-soft);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--sw-demo-fg);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
 }
 
 /* Adjacent lifecycle instrument */
@@ -348,7 +411,7 @@
 
 .sw-vw-ownership > div {
   display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr);
+  grid-template-columns: 5.5rem minmax(0, 1fr);
   gap: var(--sw-demo-space-2);
   padding-block: var(--sw-demo-space-1);
 }
@@ -356,25 +419,57 @@
 .sw-vw-ownership :is(dt, dd) {
   min-width: 0;
   margin: 0;
-  font: 500 var(--sw-type-xs) var(--sw-font-mono);
 }
 
 .sw-vw-ownership dt {
   color: var(--sw-demo-dim);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.sw-vw-ownership dd,
-.sw-vw-ownership output {
-  overflow: hidden;
-  color: var(--sw-demo-fg-soft);
-  text-overflow: ellipsis;
+.sw-vw-ownership dd {
+  color: var(--sw-demo-fg);
+  font: 500 var(--sw-type-sm) var(--sw-font-mono);
 }
 
+.sw-vw-readout,
 .sw-vw-paged {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+.sw-vw-readout__key {
+  color: var(--sw-demo-dim);
+}
+
+.sw-vw-readout__fallback {
+  color: var(--sw-state-pending);
+  overflow-wrap: anywhere;
+}
+
+.sw-vw-load-state {
+  padding: 0 var(--sw-demo-space-1);
+  border: 1px solid currentcolor;
+  border-radius: var(--sw-demo-radius-1);
+  color: var(--sw-demo-muted);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sw-vw-load-state[data-state="loading"] {
+  border-style: dotted;
+}
+
+.sw-vw-load-state[data-state="partial"] {
+  border-style: dashed;
   color: var(--sw-state-pending);
 }
 
-.sw-vw-paged[data-fully-loaded="true"] {
+.sw-vw-load-state[data-state="complete"] {
+  border-style: solid;
   color: var(--sw-state-resolved);
 }
 
@@ -388,7 +483,7 @@
 }
 
 .sw-vw-challenge {
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .sw-vw-challenge > header {
@@ -404,6 +499,7 @@
 
 .sw-vw-challenge ol {
   display: grid;
+  align-content: start;
   gap: var(--sw-demo-space-2);
   margin: 0;
   padding: 0;
@@ -443,7 +539,7 @@
 .sw-vw-scenario-panel p {
   margin: 0;
   color: var(--sw-demo-fg-soft);
-  font-size: var(--sw-type-xs);
+  font-size: var(--sw-type-sm);
   line-height: 1.5;
 }
 
@@ -464,16 +560,27 @@
   color: var(--sw-accent-ink);
 }
 
-.sw-vw-lifecycle-actions,
+/* Action clusters sit on a fixed cell grid: no ragged 3+1 wraps, no clipped
+   labels, equal targets at every rail width. An odd last button owns the full
+   row instead of stranding beside an empty cell. */
 .sw-vw-scenario-actions,
 .sw-vw-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-vw-scenario-actions > :last-child:nth-child(odd),
+.sw-vw-actions > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.sw-vw-lifecycle-actions {
+  display: grid;
   gap: var(--sw-demo-space-2);
 }
 
 .sw-vw .sw-demo-button {
-  min-height: 2.25rem;
   padding: 0 var(--sw-demo-space-3);
   border: 1px solid var(--sw-demo-border-strong);
   border-radius: var(--sw-demo-radius-2);
@@ -498,35 +605,31 @@
   opacity: 0.62;
 }
 
-.sw-vw .sw-demo-button[data-variant="primary"] {
-  border-color: var(--sw-demo-accent-strong);
-  background: var(--sw-demo-accent-strong);
-  color: var(--sw-accent-ink);
+/* Rail actions keep a comfortable target and grow with a long label instead
+   of overflowing the shared fixed height. */
+.sw-workbench-stage .sw-vw .sw-demo-button {
+  height: auto;
+  min-height: 2.25rem;
 }
 
-.sw-vw .sw-demo-button[data-variant="quiet"] {
-  border-color: transparent;
-  background: transparent;
-  color: var(--sw-demo-fg-soft);
+/* The stage action keeps one primary slot: accent to create, danger-outline
+   to tear down. The danger tone follows the theme's foreground so the label
+   keeps contrast on both surfaces. */
+.sw-workbench-stage .sw-vw .sw-workbench-primary[data-tone="danger"] {
+  border-color: var(--sw-vw-danger);
+  background: color-mix(in srgb, var(--sw-vw-danger) 10%, var(--sw-demo-surface));
+  color: var(--sw-vw-danger);
 }
 
-.sw-vw .sw-demo-button.sw-vw-destroy {
-  border-color: var(--sw-demo-danger);
-  background: color-mix(in srgb, var(--sw-demo-danger) 12%, var(--sw-demo-surface));
-  color: var(--sw-demo-danger);
-}
-
-.sw-vw .sw-demo-button.sw-vw-destroy:hover:not(:disabled) {
-  border-color: var(--sw-demo-danger);
-  background: color-mix(in srgb, var(--sw-demo-danger) 20%, var(--sw-demo-surface));
-  color: var(--sw-demo-danger);
+.sw-workbench-stage .sw-vw .sw-workbench-primary[data-tone="danger"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sw-vw-danger) 20%, var(--sw-demo-surface));
 }
 
 .sw-vw-scenario-panel {
   display: grid;
   align-content: start;
   gap: var(--sw-demo-space-3);
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .sw-vw-scenario-panel h3 {
@@ -535,25 +638,41 @@
   font: 650 var(--sw-type-base) / 1.3 var(--sw-font-display);
 }
 
-.sw-vw-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.sw-vw-actions .sw-demo-button {
-  padding-inline: var(--sw-demo-space-2);
+.sw-vw .sw-vw-note {
+  margin: 0;
+  color: var(--sw-demo-dim);
+  font-size: var(--sw-type-xs);
+  line-height: 1.5;
 }
 
 .sw-vw-details {
-  margin-top: auto;
+  margin-top: 0;
   border-top: 1px solid var(--sw-demo-border);
 }
 
 .sw-vw-details summary {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-demo-space-2);
   padding: var(--sw-demo-space-3);
   color: var(--sw-demo-fg-soft);
-  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  font: 600 var(--sw-type-sm) var(--sw-font-body);
+  list-style: none;
   cursor: pointer;
+}
+
+.sw-vw-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.sw-vw-details summary::before {
+  content: "+";
+  color: var(--sw-demo-accent-strong);
+  font: 600 var(--sw-type-base) var(--sw-font-mono);
+}
+
+.sw-vw-details[open] summary::before {
+  content: "−";
 }
 
 .sw-vw-details[open] summary {
@@ -594,26 +713,89 @@
 }
 
 .sw-vw-toggle input {
-  accent-color: var(--sw-demo-accent);
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 1px solid var(--sw-demo-border-strong);
+  border-radius: 999px;
+  background: var(--sw-demo-raised);
+  cursor: pointer;
+}
+
+.sw-vw-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  background: var(--sw-demo-muted);
+}
+
+.sw-vw-toggle input:checked {
+  border-color: var(--sw-demo-accent-strong);
+  background: var(--sw-demo-accent-strong);
+}
+
+.sw-vw-toggle input:checked::before {
+  left: calc(100% - 1rem);
+  background: var(--sw-accent-ink);
 }
 
 .sw-vw-proofs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sw-demo-space-2);
   padding: 0 var(--sw-demo-space-3) var(--sw-demo-space-3);
 }
 
+.sw-vw-proofs__label {
+  grid-column: 1 / -1;
+  color: var(--sw-demo-dim);
+  font: 600 var(--sw-type-xs) var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .sw-vw-proofs a {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
+  border: 1px solid var(--sw-demo-border);
+  border-radius: var(--sw-demo-radius-1);
+  background: var(--sw-demo-surface);
   color: var(--sw-demo-fg-soft);
   font: 500 var(--sw-type-xs) var(--sw-font-mono);
-  text-underline-offset: var(--sw-demo-space-1);
+  text-decoration: none;
+}
+
+.sw-vw-proofs a::after {
+  /* Empty alternative text keeps the arrow out of the link's accessible name. */
+  content: "↗" / "";
+  flex: none;
+  color: var(--sw-demo-dim);
 }
 
 .sw-vw-proofs a:hover {
+  border-color: var(--sw-demo-accent-strong);
   color: var(--sw-demo-accent-strong);
 }
 
+.sw-vw .sheetwrite-scroller,
+.sw-vw .sheetwrite-shell-toolbar-row {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-demo-border-strong) var(--sw-demo-deep);
+}
+
+/* The header look (padding, gradient, h2 scale) belongs to the shared
+   workbench-stage.css; this file only supplies the page's own chrome. */
 @media (max-width: 64rem) {
   .sw-vw-workspace {
     grid-template-columns: minmax(0, 1fr) 17rem;
@@ -643,11 +825,11 @@
   }
 
   .sw-vw-tabs {
-    gap: 0;
+    gap: var(--sw-demo-space-1);
   }
 
   .sw-vw-tab {
-    padding: var(--sw-demo-space-2);
+    padding: var(--sw-demo-space-2) var(--sw-demo-space-1);
     text-align: center;
   }
 
@@ -669,32 +851,20 @@
     min-height: 24rem;
   }
 
-  .sw-vw-gridstage__header {
-    align-items: flex-start;
-  }
-
-  .sw-vw-gridstage__header > div {
-    display: grid;
-    gap: var(--sw-demo-space-1);
-  }
-
   .sw-vw-instrument {
     min-height: auto;
-  }
-
-  .sw-vw-panel {
-    overflow: visible;
-  }
-
-  .sw-vw-details {
-    margin-top: 0;
   }
 
   .sw-vw-statusbar__label {
     display: none;
   }
 
-  .sw-vw-activity {
-    white-space: normal;
+  .sw-vw-gridstage__selection {
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .sw-vw-tab strong {
+    font-size: var(--sw-type-xs);
   }
 }

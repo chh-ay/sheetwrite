@@ -2,6 +2,7 @@ import {
   type DocumentOp,
   MemoryPersistenceAdapter,
   type PersistenceAdapter,
+  type PersistenceBatchCommitRequest,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
   type PresenceMessage,
@@ -10,6 +11,7 @@ import {
   type VersionedOperation,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
+import { makeUsageSheet } from "./scenarios/durable-usage.js";
 
 /**
  * In-page stand-in for the collaboration backend a host owns in production.
@@ -55,6 +57,33 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
       status: response.status,
       version: response.status === "conflict" ? response.currentVersion : response.version,
       operationCount: request.operations.length,
+    };
+    for (const listener of this.commitListeners) listener(record);
+    return response;
+  }
+  async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    const response = await this.adapter.commitBatch(request);
+    if (response.status === "applied") {
+      this.versions.set(request.documentId, response.version);
+      let offset = 0;
+      request.versionOperationCounts.forEach((count, index) => {
+        this.broadcast({
+          version: request.baseVersion + index + 1,
+          clientMutationId: request.clientMutationId,
+          operations: request.operations.slice(offset, offset + count),
+          batch: { index, count: request.versionOperationCounts.length },
+        });
+        offset += count;
+      });
+    }
+    const record: ShowcaseCommitRecord = {
+      documentId: request.documentId,
+      clientMutationId: request.clientMutationId,
+      baseVersion: request.baseVersion,
+      status: response.status,
+      version: response.status === "conflict" ? response.currentVersion : response.version,
+      operationCount: request.operations.length,
+      batchVersions: request.versionOperationCounts.length,
     };
     for (const listener of this.commitListeners) listener(record);
     return response;
@@ -133,19 +162,79 @@ export const COLLABORATION_ACTORS: readonly [ShowcaseActor, ShowcaseActor] = [
   { id: "actor-bram", displayName: "Bram", color: "#0ea5e9" },
 ];
 
+export const COLLABORATION_FORECAST_ROWS = 2_000;
+export const COLLABORATION_WORKBOOK_ROWS = COLLABORATION_FORECAST_ROWS + 2;
+export const COLLABORATION_WORKBOOK_COLUMNS = 5;
+
+/** Q3 forecast totals row: forecast and weighted value sum all deal rows. */
+export const COLLABORATION_TOTAL_CELL = {
+  sheet: "plan",
+  row: COLLABORATION_FORECAST_ROWS,
+  col: 2,
+} as const;
+
 /**
- * Canonical sprint-planning workbook for the collaboration proof. The Committed
- * row is a live `=SUM` formula, so remote commits visibly recalculate on every
- * client that receives them.
+ * Two analysts own separate halves of one Q3 pipeline: 2,000 deals across 450
+ * accounts, with the weighted value as a per-row formula.
  */
 export function makeCollaborationSnapshot(): WorkbookSnapshot {
-  const tasks: ReadonlyArray<readonly [task: string, owner: string, points: number]> = [
-    ["Import pipeline", "Ana", 8],
-    ["Conflict review UI", "Bram", 5],
-    ["Presence roster", "Ana", 3],
-    ["Offline drain QA", "Bram", 5],
-    ["Release notes", "Ana", 2],
+  const accountPrefixes = [
+    "Harbor",
+    "Northvale",
+    "Cedar",
+    "Bridgewell",
+    "Summit",
+    "Pinecrest",
+    "Lakeside",
+    "Alder",
+    "Westhaven",
+    "Meadow",
+    "Stonegate",
+    "Fieldstone",
+    "Clearwater",
+    "Oakridge",
+    "Brookfield",
+    "Redwood",
+    "Eastgate",
+    "Silverpine",
+    "Crestwell",
+    "Windward",
+    "Mapleline",
+    "Riverbend",
+    "Hillcrest",
+    "Greenfield",
+    "Birchwood",
+    "Westridge",
+    "Fairhaven",
+    "Ashford",
+    "Parkside",
+    "Elmstead",
   ];
+  const accountSuffixes = [
+    "Studio",
+    "Design",
+    "Systems",
+    "Media",
+    "Analytics",
+    "Works",
+    "Research",
+    "Services",
+    "Supply",
+    "Software",
+    "Labs",
+    "Group",
+    "Digital",
+    "Partners",
+    "Consulting",
+  ];
+  const deals = Array.from({ length: COLLABORATION_FORECAST_ROWS }, (_, index) => ({
+    account: `${accountPrefixes[index % accountPrefixes.length]} ${
+      accountSuffixes[Math.floor(index / accountPrefixes.length) % accountSuffixes.length]
+    }`,
+    owner: index < COLLABORATION_FORECAST_ROWS / 2 ? "Ana" : "Bram",
+    amount: 9_000 + (index % 9) * 1_500 + (Math.floor(index / 90) % 8) * 1_000,
+    probability: 40 + (index % 12) * 5,
+  }));
   return {
     schemaVersion: 1,
     documentId: COLLABORATION_DOCUMENT_ID,
@@ -154,58 +243,81 @@ export function makeCollaborationSnapshot(): WorkbookSnapshot {
     sheets: [
       {
         id: "plan",
-        name: "Sprint plan",
+        name: "Q3 sales forecast",
         order: 0,
-        rowCount: 8,
+        rowCount: COLLABORATION_WORKBOOK_ROWS,
+        // Widths total 467: the exact column space of one client Grid at the
+        // 1568-wide stage (panel 543, gutter 48, cell padding 12 per column).
         columns: [
-          { key: "task", header: "Task", width: 180, type: "text" },
-          { key: "owner", header: "Owner", width: 110, type: "text" },
-          { key: "points", header: "Points", width: 100, type: "number" },
+          { key: "account", header: "Account", width: 155, type: "text" },
+          { key: "analyst", header: "Analyst", width: 60, type: "text" },
+          { key: "forecast", header: "Forecast", width: 90, type: "number" },
+          { key: "probability", header: "Win %", width: 55, type: "number" },
+          { key: "weighted", header: "Weighted", width: 107, type: "number" },
         ],
         cells: [
           {
             startRow: 0,
             startCol: 0,
-            rowCount: 7,
-            colCount: 3,
+            rowCount: COLLABORATION_FORECAST_ROWS + 2,
+            colCount: COLLABORATION_WORKBOOK_COLUMNS,
             cells: [
-              ...tasks.flatMap((entry, row) => [
+              ...deals.flatMap((entry, row) => [
                 {
                   rowOffset: row,
                   colOffset: 0,
-                  value: { kind: "literal" as const, value: entry[0] },
+                  value: { kind: "literal" as const, value: entry.account },
                 },
                 {
                   rowOffset: row,
                   colOffset: 1,
-                  value: { kind: "literal" as const, value: entry[1] },
+                  value: { kind: "literal" as const, value: entry.owner },
                 },
                 {
                   rowOffset: row,
                   colOffset: 2,
-                  value: { kind: "literal" as const, value: entry[2] },
+                  value: { kind: "literal" as const, value: entry.amount },
+                },
+                {
+                  rowOffset: row,
+                  colOffset: 3,
+                  value: { kind: "literal" as const, value: entry.probability },
+                },
+                {
+                  rowOffset: row,
+                  colOffset: 4,
+                  value: { kind: "formula" as const, src: `=C${row + 1}*D${row + 1}/100` },
                 },
               ]),
               {
-                rowOffset: 6,
+                rowOffset: COLLABORATION_TOTAL_CELL.row,
                 colOffset: 0,
-                value: { kind: "literal" as const, value: "Committed" },
+                value: { kind: "literal" as const, value: "Q3 total" },
               },
               {
-                rowOffset: 6,
+                rowOffset: COLLABORATION_TOTAL_CELL.row,
                 colOffset: 2,
-                value: { kind: "formula" as const, src: "=SUM(C1:C5)" },
+                value: {
+                  kind: "formula" as const,
+                  src: `=SUM(C1:C${COLLABORATION_FORECAST_ROWS})`,
+                },
+              },
+              {
+                rowOffset: COLLABORATION_TOTAL_CELL.row,
+                colOffset: 4,
+                value: {
+                  kind: "formula" as const,
+                  src: `=SUM(E1:E${COLLABORATION_FORECAST_ROWS})`,
+                },
               },
             ],
           },
         ],
       },
+      makeUsageSheet(),
     ],
   };
 }
-
-/** Sheet cell holding the live `=SUM` total of the collaboration workbook. */
-export const COLLABORATION_TOTAL_CELL = { sheet: "plan", row: 6, col: 2 } as const;
 
 /** One sequenced commit acknowledgement observed at the demo server. */
 export interface ShowcaseCommitRecord {
@@ -216,6 +328,7 @@ export interface ShowcaseCommitRecord {
   /** Head version after the request: assigned, previously assigned, or current. */
   version: number;
   operationCount: number;
+  batchVersions?: number;
 }
 
 /** Transit fault raised by {@link ShowcaseNetworkLink} fault injection. */
@@ -322,7 +435,21 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     return this.server.load(documentId, signal);
   }
 
-  async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+  commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.send(request, () => this.server.commit(request));
+  }
+
+  commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.send(request, () => {
+      if (!this.server.commitBatch) throw new Error("This adapter cannot commit an atomic batch.");
+      return this.server.commitBatch(request);
+    });
+  }
+
+  private async send(
+    request: PersistenceCommitRequest,
+    commit: () => Promise<PersistenceCommitResponse>,
+  ): Promise<PersistenceCommitResponse> {
     if (!this.connectedState) {
       throw new ShowcaseLinkError("offline", "The client link is offline; the commit never left");
     }
@@ -334,7 +461,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
       this.suppressedEchoes.add(request.clientMutationId);
       this.publishState();
     }
-    const response = await this.server.commit(request);
+    const response = await commit();
     if (dropAck) {
       if (response.status === "applied") {
         throw new ShowcaseLinkError(
@@ -368,8 +495,11 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
   private receive(operation: VersionedOperation): void {
     if (
       operation.clientMutationId !== undefined &&
-      this.suppressedEchoes.delete(operation.clientMutationId)
+      this.suppressedEchoes.has(operation.clientMutationId)
     ) {
+      if (!operation.batch || operation.batch.index === operation.batch.count - 1) {
+        this.suppressedEchoes.delete(operation.clientMutationId);
+      }
       this.publishState();
       return;
     }

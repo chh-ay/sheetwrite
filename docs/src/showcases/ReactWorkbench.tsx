@@ -10,6 +10,7 @@ import workerUrl from "@sheetwrite/core/worker?worker&url";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { FileSpreadsheet, Monitor } from "lucide-react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { money, useAnalyticsWorkbench } from "./react-analytics.js";
 import { ANALYTICS_MARKETS, ANALYTICS_SEGMENTS, ANALYTICS_THEME } from "./scenarios/analytics.js";
 import { DemoButton } from "./ui/DemoButton.js";
@@ -31,9 +32,39 @@ function kpiText(value: number | null): string {
   return value === null ? "—" : money.format(value);
 }
 
+/** Layout effect that also runs through SSR without warnings. */
+const useStageLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 export default function ReactWorkbench() {
-  const bench = useAnalyticsWorkbench();
+  const gridHostRef = useRef<HTMLDivElement | null>(null);
+  const [gridHostWidth, setGridHostWidth] = useState(0);
+  // Column widths follow the real stage: the Grid pads its host with empty
+  // letter columns past the sheet schema, so the workbook is fitted to the
+  // measured host before the Grid is constructed (see fitColumnsToHost).
+  useStageLayoutEffect(() => {
+    const host = gridHostRef.current;
+    if (host) setGridHostWidth(host.clientWidth);
+  }, []);
+  const bench = useAnalyticsWorkbench({ gridHostWidth });
+  const { fitGridColumns } = bench;
   const hasMatches = (bench.matches?.matches.length ?? 0) > 0;
+
+  // A resized stage re-fits the declared columns: at most one fit per frame,
+  // and the fit itself skips the re-layout when no width moved.
+  useEffect(() => {
+    const host = gridHostRef.current;
+    if (!host || gridHostWidth === 0) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => fitGridColumns(host.clientWidth));
+    });
+    observer.observe(host);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [fitGridColumns, gridHostWidth]);
 
   function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.key === "Enter") bench.runSearch(bench.query);
@@ -58,7 +89,7 @@ export default function ReactWorkbench() {
               <FileSpreadsheet size={16} strokeWidth={1.8} />
             </span>
             <div>
-              <h2>Sales pipeline</h2>
+              <h2>Pipeline analytics</h2>
               <span>React-controlled analytics</span>
             </div>
           </div>
@@ -86,6 +117,18 @@ export default function ReactWorkbench() {
               </DemoButton>
             </fieldset>
           </div>
+          <button
+            className="sw-workbench-primary"
+            type="button"
+            disabled={bench.generation === 0}
+            onClick={() => bench.chooseMarket(bench.market === "Tokyo" ? "all" : "Tokyo")}
+          >
+            {bench.market === "Tokyo" ? "Show all markets" : "Focus Tokyo accounts"}
+          </button>
+          <output className="sw-workbench-readout" aria-live="polite">
+            <strong>{bench.visibleRows.toLocaleString()}</strong>
+            <span>accounts in the controlled view</span>
+          </output>
           <span
             className="sw-demo-controlbar__state sw-rwb-sync"
             data-state={bench.generation === 0 ? "pending" : "resolved"}
@@ -95,6 +138,10 @@ export default function ReactWorkbench() {
             {bench.generation === 0 ? "Connecting" : "React synced"}
           </span>
         </header>
+        <div className="sw-workbench-release">
+          <strong>New in 0.5.0</strong> · Toolbar colour swatches follow the live theme. Sheet tabs
+          keep page scroll steady.
+        </div>
 
         <div className="sw-rwb-editrow" role="toolbar" aria-label="Editing controls">
           <span className="sw-rwb-editrow__label">Change selected cell</span>
@@ -111,7 +158,7 @@ export default function ReactWorkbench() {
                 data-testid="formula-input"
                 type="text"
                 value={bench.formulaDraft}
-                placeholder="Select a cell, then enter a value or formula"
+                placeholder="Enter a value or formula"
                 disabled={bench.readOnly || bench.formulaAddress === null}
                 onChange={(event) => bench.editFormulaDraft(event.target.value)}
                 onKeyDown={onFormulaKeyDown}
@@ -119,7 +166,6 @@ export default function ReactWorkbench() {
             </label>
             <DemoButton
               type="button"
-              variant="primary"
               onClick={bench.commitFormulaDraft}
               disabled={bench.readOnly || bench.formulaAddress === null}
             >
@@ -129,29 +175,31 @@ export default function ReactWorkbench() {
         </div>
 
         <div className="sw-rwb-workspace">
-          <div className="sw-demo-grid">
-            <SheetwriteGrid
-              ref={bench.gridRef}
-              workbook={bench.workbook}
-              data={bench.dataset}
-              presentation="data-grid"
-              theme={ANALYTICS_THEME}
-              readOnly={bench.readOnly}
-              renderer={bench.renderer}
-              workerUrl={bench.renderer === "worker" ? workerUrl : undefined}
-              config={GRID_CONFIG}
-              style={{ height: "100%" }}
-              onReady={bench.onReady}
-              onGridChange={bench.onGridChange}
-              onSelectionChange={bench.onSelectionChange}
-            />
+          <div className="sw-demo-grid" ref={gridHostRef}>
+            {gridHostWidth > 0 ? (
+              <SheetwriteGrid
+                ref={bench.gridRef}
+                workbook={bench.workbook}
+                data={bench.dataset}
+                presentation="data-grid"
+                theme={ANALYTICS_THEME}
+                readOnly={bench.readOnly}
+                renderer={bench.renderer}
+                workerUrl={bench.renderer === "worker" ? workerUrl : undefined}
+                config={GRID_CONFIG}
+                style={{ height: "100%" }}
+                onReady={bench.onReady}
+                onGridChange={bench.onGridChange}
+                onSelectionChange={bench.onSelectionChange}
+              />
+            ) : null}
           </div>
 
           <aside className="sw-rwb-state" aria-label="Controlled analytics state">
             <header className="sw-rwb-state__header">
               <div>
                 <span>Controlled output</span>
-                <strong>One state, no shadow copy</strong>
+                <strong>Query and summary values</strong>
               </div>
               <span
                 className="sw-rwb-state__phase"
@@ -251,7 +299,7 @@ export default function ReactWorkbench() {
                       aria-label="Search accounts"
                       type="search"
                       value={bench.query}
-                      placeholder="Account 004812"
+                      placeholder="Beacon Ridge"
                       onChange={(event) => bench.setQuery(event.target.value)}
                       onKeyDown={onSearchKeyDown}
                     />
@@ -259,20 +307,10 @@ export default function ReactWorkbench() {
                   <DemoButton type="button" onClick={() => bench.runSearch(bench.query)}>
                     Find
                   </DemoButton>
-                  <DemoButton
-                    type="button"
-                    variant="quiet"
-                    onClick={bench.findPrev}
-                    disabled={!hasMatches}
-                  >
+                  <DemoButton type="button" onClick={bench.findPrev} disabled={!hasMatches}>
                     Previous
                   </DemoButton>
-                  <DemoButton
-                    type="button"
-                    variant="quiet"
-                    onClick={bench.findNext}
-                    disabled={!hasMatches}
-                  >
+                  <DemoButton type="button" onClick={bench.findNext} disabled={!hasMatches}>
                     Next
                   </DemoButton>
                 </fieldset>

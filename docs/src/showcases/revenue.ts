@@ -13,6 +13,64 @@ export const REVENUE_CITIES = [
 export const REVENUE_REPS = ["Ana", "Bram", "Chen", "Dara", "Eve"] as const;
 export const REVENUE_AMOUNT_COLUMN = 5;
 export const REVENUE_CITY_COLUMN = 3;
+const ACCOUNT_ROOTS = [
+  "Alder",
+  "Beacon",
+  "Juniper",
+  "Cedar",
+  "Orchard",
+  "Willow",
+  "Cobalt",
+  "Marsh",
+  "Birch",
+  "Laurel",
+  "Aspen",
+  "Copper",
+  "Meadow",
+  "Elm",
+  "Fern",
+  "Granite",
+];
+const ACCOUNT_PLACES = [
+  "Quay",
+  "Ridge",
+  "Point",
+  "Vale",
+  "Grove",
+  "Harbor",
+  "Lane",
+  "Creek",
+  "Hill",
+  "Bay",
+  "Field",
+  "Park",
+  "Brook",
+  "Gate",
+  "Reach",
+  "Cove",
+];
+const ACCOUNT_SECTORS = [
+  "Logistics",
+  "Health",
+  "Systems",
+  "Energy",
+  "Foods",
+  "Works",
+  "Supply",
+  "Services",
+];
+
+export function revenueAccountName(row: number): string {
+  const root = ACCOUNT_ROOTS[row % ACCOUNT_ROOTS.length];
+  const place = ACCOUNT_PLACES[Math.floor(row / ACCOUNT_ROOTS.length) % ACCOUNT_PLACES.length];
+  const sector =
+    ACCOUNT_SECTORS[
+      Math.floor(row / (ACCOUNT_ROOTS.length * ACCOUNT_PLACES.length)) % ACCOUNT_SECTORS.length
+    ];
+  const location =
+    Math.floor(row / (ACCOUNT_ROOTS.length * ACCOUNT_PLACES.length * ACCOUNT_SECTORS.length)) + 1;
+  return `${root} ${place} ${sector}${location === 1 ? "" : ` · location ${location}`}`;
+}
 
 function buildRevenueData(): ColumnarData {
   const id = new Float64Array(REVENUE_ROWS);
@@ -25,10 +83,10 @@ function buildRevenueData(): ColumnarData {
   for (let row = 0; row < REVENUE_ROWS; row++) {
     id[row] = row + 1;
     date[row] = new Date(Date.UTC(2024, 0, 1 + (row % 730))).toISOString().slice(0, 10);
-    account[row] = `Account ${String(row + 1).padStart(6, "0")}`;
+    account[row] = revenueAccountName(row);
     city[row] = REVENUE_CITIES[row % REVENUE_CITIES.length] ?? "";
     owner[row] = REVENUE_REPS[(row * 7) % REVENUE_REPS.length] ?? "";
-    arr[row] = Math.round((Math.sin(row) * 0.5 + 0.5) * 2_500_000) / 100;
+    arr[row] = (24 + ((row * 31) % 480)) * (240 + (row % 4) * 120);
   }
 
   return { rowCount: REVENUE_ROWS, columns: { id, date, account, city, owner, arr } };

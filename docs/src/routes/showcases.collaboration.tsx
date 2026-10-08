@@ -66,7 +66,7 @@ function CollaborationProofRoute() {
       ]}
       guideHref="/docs/guides/collaboration/"
       guideLabel="Read the collaboration guide"
-      prompt="Use the sequencing lane: take Bram offline, queue one real Grid edit, then reconnect and watch both clients converge."
+      prompt="Use the sequencing lane: take Bram offline, queue one real Grid edit, then reconnect. Then clear 100,000 usage cells on Ana's client and undo them: Bram applies the batch in one transaction."
       slug="collaboration"
       sourcePath="docs/src/showcases/collaboration-protocol.ts"
       title="Two clients, one shared history, no lost updates."
@@ -90,6 +90,11 @@ function CollaborationProofRoute() {
           title: "Gaps and conflicts stay explicit",
           detail:
             "Out-of-order broadcasts buffer until the gap closes; stale base versions surface as conflicts that recover through the documented rebase loop.",
+        },
+        {
+          title: "Atomic multi-version batches",
+          detail:
+            "A restore that is larger than one server version (0.5.0) becomes one atomic batch: the server stores every version or none, and the peer applies the whole batch in a single transaction.",
         },
       ]}
     >

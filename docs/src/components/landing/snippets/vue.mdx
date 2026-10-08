@@ -1,0 +1,21 @@
+```vue
+<script setup lang="ts">
+import { Sheetwrite, type SimpleColumn } from "@sheetwrite/vue";
+import type { ChangeEvent } from "@sheetwrite/core";
+import "@sheetwrite/vue/styles.css";
+
+type Row = { name: string; amount: number };
+defineProps<{ columns: SimpleColumn<Row>[]; rows: Row[] }>();
+
+const onChange = (event: ChangeEvent) => save(event.transaction);
+</script>
+
+<template>
+  <Sheetwrite
+    :columns="columns"
+    :default-rows="rows"
+    :height="420"
+    @grid-change="onChange"
+  />
+</template>
+```

@@ -198,8 +198,22 @@ test("svelte workbench boots synced, paints the dispatch model, and shows live p
   });
 
   const initialTheme = await page.locator("html").getAttribute("data-theme");
+  const toolbarSwatches = page.locator(".sw-svw .sheetwrite-tb-color");
+  const readSwatches = () =>
+    toolbarSwatches.evaluateAll((inputs) =>
+      inputs.map((input) => (input as HTMLInputElement).value),
+    );
+  const lightSwatches = await readSwatches();
   await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme", initialTheme ?? "");
+  // theme-change reseeds the toolbar swatches with the colours the Grid now paints.
+  await expect.poll(readSwatches).not.toEqual(lightSwatches);
+  const resolvedTheme = await page.evaluate(() => {
+    const theme = window.__sheetwriteSvelteGrid?.getTheme();
+    if (!theme) throw new Error("svelte workbench grid handle missing");
+    return [theme.fg, theme.bg];
+  });
+  expect(await readSwatches()).toEqual(resolvedTheme);
   await assertPresenceGeometry(page);
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await assertPresenceGeometry(page);
