@@ -273,6 +273,21 @@ artifact was a one-off before/after pair, and a release cannot re-measure a
 baseline build. `bench:release` refreshes both captures, and
 `bench:interaction:smoke` rehearses the interaction one.
 
+`bench:interaction-sessions` supplements that browser capture with synchronous
+Grid-interface timings under happy-dom: row and column resize with twenty move
+events followed by release, editor open/commit, pointer selection, and two
+untouched controls (one hundred cell-input reads and a column aggregate).
+It reports nine raw samples in milliseconds per operation after one warmup,
+with one hundred operations per sample. Fixture restoration is outside the
+timed interval; resize includes admission and history, but not undo.
+These are imperative-path timings, not browser paint or input-to-frame latency.
+For comparisons, build each checkout's packages first, run an A/A control, then
+alternate five ABBA rounds on the same CPU under an exclusive lock:
+
+```sh
+flock -x /home/vvin/learn/quiet.lock taskset -c 4 bun run bench:interaction-sessions
+```
+
 A change to a harness source file, to the sampling flags, or to the protocol
 version invalidates the committed render baseline: `bench:check` compares the
 harness hashes, the declared sampling, and the runner (OS, CPU, Bun, Node,

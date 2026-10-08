@@ -423,10 +423,7 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": [
-        "WorkerAcknowledgement",
-        "createWorkerMessageHandler"
-      ]
+      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -559,9 +556,7 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": [
-        "registerXlsxBackends"
-      ]
+      "exports": ["registerXlsxBackends"]
     }
   ]
 }
