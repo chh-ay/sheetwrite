@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+import { deflateSync } from "fflate";
 import {
   resolveTransactionResourceLimits,
   validateTransactionResources,
   validateWorkbookSnapshot,
 } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type {
   ChangeEvent,
@@ -1902,6 +1904,69 @@ describe("validation, protection, and notes metadata", () => {
         });
         expect(result.status).toBe("rejected");
         expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
+  it("uses the callback-revised restore payload and rejects revised invalid envelopes atomically", () => {
+    for (const mutation of ["replacement", "bytes", "sheet"] as const) {
+      const workbook = makeWorkbook(3);
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("fixture is missing its sheet");
+      const range = { sheet: sheet.id, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+      sheet.protectedRanges = [{ id: "locked", range }];
+      const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [11] });
+      const replacement = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [29] });
+      const store = new SheetwriteStore(workbook);
+      store.setProtectionResolver(({ operation }) => {
+        if (operation.op === "restoreBlock") {
+          if (mutation === "replacement") Object.assign(operation, replacement);
+          else if (mutation === "bytes")
+            Object.assign(operation, { decodedBytes: operation.decodedBytes + 1 });
+          else operation.range.sheet = "missing-sheet";
+        }
+        return "allow";
+      });
+      try {
+        const result = store.applyTransaction({ patches: [restore] });
+        expect(result.status).toBe(mutation === "replacement" ? "applied" : "rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBe(mutation === "replacement" ? 29 : null);
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
+  it("rejects restore dimension mismatches and missing style tables before any mutation", () => {
+    for (const malformed of ["dimensions", "styles"] as const) {
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+      const block = {
+        rowCount: 1,
+        colCount: 1,
+        values: [11],
+        ...(malformed === "styles" ? { styleIds: [0] } : {}),
+      };
+      const decoded = new TextEncoder().encode(JSON.stringify(block));
+      const restore: DocumentOp = {
+        op: "restoreBlock",
+        range: malformed === "dimensions" ? { ...range, end: { row: 1, col: 0 } } : range,
+        encoding: "deflate-json-v1",
+        decodedBytes: decoded.byteLength,
+        data: Buffer.from(deflateSync(decoded)).toString("base64"),
+      };
+      const store = new SheetwriteStore(makeWorkbook(3));
+      try {
+        const outcome = store.applyTransaction({
+          patches: [
+            { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 42 } },
+            restore,
+          ],
+        });
+        expect(outcome.status).toBe("rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+        expect(store.getCell(addr(0, 1)).resolved).toBeNull();
       } finally {
         store.dispose();
       }

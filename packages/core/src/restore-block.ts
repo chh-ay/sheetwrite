@@ -1,11 +1,8 @@
 import { deflateSync } from "fflate";
 import { validateDocumentOperationShape } from "./document-protocol.js";
 import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
-import {
-  decodeRestoreBlockPayload,
-  MAX_RESTORE_BLOCK_CELLS,
-  MAX_RESTORE_BLOCK_DECODED_BYTES,
-} from "./restore-block-codec.js";
+import { MAX_RESTORE_BLOCK_CELLS, MAX_RESTORE_BLOCK_DECODED_BYTES } from "./restore-block-codec.js";
+import { preparedRestore } from "./transaction-preparation.js";
 import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
@@ -98,7 +95,14 @@ export function estimateRestoreBlockBytes(block: PackedCellBlock): number {
 }
 
 export function decodeRestoreBlock(operation: RestoreBlock): PackedCellBlock {
-  const block = decodeRestoreBlockPayload(operation);
-  assertBlock(operation.range, block);
+  const prepared = preparedRestore(operation, validateDocumentOperationShape);
+  if (prepared.errors.length > 0) invalid();
+  const block = prepared.block;
+  if (
+    block.rowCount !== Math.abs(operation.range.end.row - operation.range.start.row) + 1 ||
+    block.colCount !== Math.abs(operation.range.end.col - operation.range.start.col) + 1 ||
+    (block.styleIds !== undefined && block.styleTable === undefined)
+  )
+    invalid();
   return block;
 }

@@ -23,6 +23,7 @@ import { cloneCellHyperlink } from "./hyperlink.js";
 import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
+import { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -845,10 +846,12 @@ export class DocumentController {
 
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
+    const preparation = new TransactionPreparation();
     try {
-      const fitted = this.fitHistoryPatches(patches);
+      const fitted = this.fitHistoryPatches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
+      preparation.dispose();
       this.applyingHistory = false;
     }
     if (outcome.status !== "applied") return outcome;
@@ -867,7 +870,10 @@ export class DocumentController {
    * multi-version commit in sync. The returned measurement lets the commit
    * skip a second walk of the payload.
    */
-  private fitHistoryPatches(patches: DocumentOp[]): {
+  private fitHistoryPatches(
+    patches: DocumentOp[],
+    preparation: TransactionPreparation,
+  ): {
     patches: DocumentOp[];
     admitted?: AdmittedTransactionResources;
   } {
@@ -881,7 +887,9 @@ export class DocumentController {
       const compact = patches.map((patch) => {
         if (patch.op !== "setBlock") return patch;
         try {
-          return encodeRestoreBlock(patch.range, patch.block);
+          const operation = encodeRestoreBlock(patch.range, patch.block);
+          preparation.seed(operation, patch.block);
+          return operation;
         } catch (error) {
           // Above the restore block caps the block stays a candidate for splitting.
           if (!(error instanceof RangeError)) throw error;

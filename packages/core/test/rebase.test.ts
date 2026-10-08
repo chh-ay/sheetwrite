@@ -874,6 +874,59 @@ describe("compressed restore rebasing", () => {
     expectConflict([original], [structure("row", "delete", 9, 1)], "structural-overlap");
   });
 
+  it("composes remote transforms into independent serialized restores and uses the latest refs for later conflicts", () => {
+    const local = [
+      encodeRestoreBlock(target, block),
+      encodeRestoreBlock({ ...target, sheet: OTHER_SHEET }, block),
+    ];
+    const remote: DocumentOp[] = [
+      structure("row", "insert", 4, 2),
+      structure("column", "insert", 0, 2),
+      structure("row", "delete", 0, 1),
+      structure("row", "insert", 0, 3, "unrelated"),
+      { op: "renameSheet", sheet: OTHER_SHEET, name: "Renamed" },
+      { op: "removeSheet", sheet: "unrelated" },
+    ];
+    const localBefore = JSON.stringify(local);
+    const remoteBefore = JSON.stringify(remote);
+    deepFreeze(local);
+    deepFreeze(remote);
+
+    const result = rebaseDocumentOperations(local, remote);
+    if (result.status !== "rebased") throw new Error("Expected safe multitransform rebase");
+    // A durable wire round trip must not depend on the live decoded scope.
+    const serialized: DocumentOp[] = JSON.parse(JSON.stringify(result.operations));
+    expect(serialized).toHaveLength(2);
+    for (const [index, restored] of serialized.entries()) {
+      if (restored.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+      expect(restored.encoding).toBe("deflate-json-v1");
+      expect(restored.range).toEqual(
+        index === 0
+          ? {
+              sheet: SHEET,
+              start: { row: 9, col: 3 },
+              end: { row: 9, col: 3 },
+            }
+          : { ...target, sheet: OTHER_SHEET },
+      );
+      expect(decodeRestoreBlock(restored)).toEqual({
+        ...block,
+        refs: [[0, { sheet: SHEET, row: 10, col: 3 }]],
+      });
+    }
+
+    // Row 10 only contains the reference after all preceding transforms.
+    expectConflict(
+      local,
+      [...remote, structure("row", "delete", 10, 1)],
+      "structural-overlap",
+      0,
+      remote.length,
+    );
+    expect(JSON.stringify(local)).toBe(localBefore);
+    expect(JSON.stringify(remote)).toBe(remoteBefore);
+  });
+
   it("keeps conservative formula conflicts and detects restore overlap from either side", () => {
     const formula = encodeRestoreBlock(target, {
       rowCount: 1,
