@@ -75,7 +75,7 @@ export class SelectionModel {
   isCell(row: number, col: number): boolean {
     if (this.regions.length !== 1) return false;
     const region = this.regions[0];
-    if (!region || region.type !== "range") return false;
+    if (region?.type !== "range") return false;
     const { rect } = region;
     return rect.r0 === row && rect.r1 === row && rect.c0 === col && rect.c1 === col;
   }
