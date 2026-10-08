@@ -18,8 +18,14 @@ import type {
   VersionedOperation,
 } from "./types/transaction.js";
 
+/**
+ * One sequenced document. Commits apply to a live store, so a one-cell commit
+ * costs one transaction instead of rebuilding and re-exporting the workbook.
+ * Snapshots are exported on demand; every export is a fresh, caller-owned copy.
+ */
 interface MemoryDocument {
-  snapshot: WorkbookSnapshot;
+  readonly initial: WorkbookSnapshot;
+  store: SheetwriteStore;
   version: number;
   initialVersion: number;
   log: VersionedOperation[];
@@ -107,8 +113,10 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
         throw new PersistenceError("invalid-snapshot", "Memory snapshots require documentId");
       }
       const version = checked.value.version ?? 0;
+      const initial = cloneSnapshot({ ...checked.value, version });
       this.documents.set(checked.value.documentId, {
-        snapshot: cloneSnapshot({ ...checked.value, version }),
+        initial,
+        store: SheetwriteStore.fromSnapshot(initial),
         version,
         initialVersion: version,
         log: [],
@@ -123,7 +131,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     if (!document) throw new PersistenceError("not-found", `Unknown document: ${documentId}`);
     await Promise.resolve();
     throwIfAborted(signal);
-    return cloneSnapshot(document.snapshot);
+    return currentSnapshot(document);
   }
 
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
@@ -167,11 +175,11 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
         ...(operationsSinceBase &&
         operationsSinceBase.length === document.version - request.baseVersion
           ? { operationsSinceBase: cloneJsonValue(operationsSinceBase) }
-          : { snapshot: cloneSnapshot(document.snapshot) }),
+          : { snapshot: currentSnapshot(document) }),
       };
     }
 
-    const store = SheetwriteStore.fromSnapshot(document.snapshot);
+    const store = document.store;
     try {
       for (const operations of versions) {
         const outcome = store.applyTransaction(
@@ -186,33 +194,50 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
           throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
         }
       }
-      const version = document.version + versions.length;
-      const next = cloneSnapshot({ ...store.exportSnapshot(), version });
-      const entries: VersionedOperation[] = versions.map((operations, index) => ({
-        version: document.version + index + 1,
-        operations: cloneJsonValue(operations),
-        clientMutationId: request.clientMutationId,
-        ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
-      }));
       throwIfAborted(request.signal);
-      document.snapshot = next;
-      document.applied.set(request.clientMutationId, version);
-      document.log.push(...entries);
-      document.version = version;
-      return {
-        status: "applied",
-        version,
-        clientMutationId: request.clientMutationId,
-      };
     } catch (error) {
+      // A rejected transaction leaves the store unchanged, but an earlier
+      // member of a batch, an abort, or an unexpected failure may not. Rebuild
+      // the last committed state so a failed commit changes nothing.
+      restoreCommittedStore(document);
       if (error instanceof PersistenceError) throw error;
       throw new PersistenceError("commit-rejected", "Persistence commit could not be applied", {
         cause: error,
       });
-    } finally {
-      store.dispose();
     }
+    const version = document.version + versions.length;
+    const entries: VersionedOperation[] = versions.map((operations, index) => ({
+      version: document.version + index + 1,
+      operations: cloneJsonValue(operations),
+      clientMutationId: request.clientMutationId,
+      ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
+    }));
+    document.applied.set(request.clientMutationId, version);
+    document.log.push(...entries);
+    document.version = version;
+    return {
+      status: "applied",
+      version,
+      clientMutationId: request.clientMutationId,
+    };
   }
+}
+
+function currentSnapshot(document: MemoryDocument): WorkbookSnapshot {
+  return { ...document.store.exportSnapshot(), version: document.version };
+}
+
+/** Replace the live store with the committed state: the initial snapshot plus the log. */
+function restoreCommittedStore(document: MemoryDocument): void {
+  const store = SheetwriteStore.fromSnapshot(document.initial);
+  for (const entry of document.log) {
+    store.applyTransaction(
+      { patches: entry.operations.slice() },
+      { source: "remote", commitReason: "api" },
+    );
+  }
+  document.store.dispose();
+  document.store = store;
 }
 
 /**

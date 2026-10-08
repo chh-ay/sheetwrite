@@ -8,7 +8,7 @@ description: "Grid creation options accepted when hydrating a validated snapshot
 Grid creation options accepted when hydrating a validated snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L30"><code>packages/core/src/persistence.ts#L30</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L36"><code>packages/core/src/persistence.ts#L36</code></a></dd></div>
 </dl>
 
 ## Declaration
