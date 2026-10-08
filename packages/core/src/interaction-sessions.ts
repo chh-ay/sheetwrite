@@ -29,7 +29,9 @@ interface InteractionDependencies {
   highlightCells: (ranges: HighlightRange[] | null) => void;
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
-  notify: <K extends "edit-begin" | "edit-commit">(event: K, payload: GridEvents[K]) => void;
+  editListeners: {
+    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
+  };
   findBar: () => FindBar | null;
   store: Store;
   loadable: SheetwriteStore | null;
@@ -294,9 +296,9 @@ export class InteractionSessions {
     this.deps.scheduleRender();
     if (selectionChanged) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
-    this.deps.notify("edit-begin", {
-      addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col },
-    });
+    for (const listener of this.deps.editListeners["edit-begin"]) {
+      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
+    }
     // edit-begin remains a before-open notification. Reentrant callbacks can
     // replace or invalidate this request, but cannot reopen its stale target.
     if (generation !== this.generation || this.deps.readOnly()) return;
@@ -395,10 +397,12 @@ export class InteractionSessions {
     );
 
     if (outcome.status === "applied") {
-      this.deps.notify("edit-commit", {
-        addr: { sheet: address.sheet, row: viewRow, col: address.col },
-        value,
-      });
+      for (const listener of this.deps.editListeners["edit-commit"]) {
+        listener({
+          addr: { sheet: address.sheet, row: viewRow, col: address.col },
+          value,
+        });
+      }
       this.moveAfterCommit(viewRow, address.col, navigate);
     }
     this.deps.host.focus();

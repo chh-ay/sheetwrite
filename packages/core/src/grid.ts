@@ -690,9 +690,7 @@ export class GridImpl implements Grid {
       highlightCells: (ranges) => this.highlightCells(ranges),
       columnHeader: (col) => this.columnHeader(col),
       toViewRow: (row) => this.toViewRow(row),
-      notify: (event, payload) => {
-        for (const listener of this.listeners[event]) listener(payload);
-      },
+      editListeners: this.listeners,
       findBar: () => this.findBar,
       store: this.store,
       loadable: this.loadable,
