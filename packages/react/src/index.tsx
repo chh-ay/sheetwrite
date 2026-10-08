@@ -1,21 +1,13 @@
+import type { CellScalar, Grid, GridOptions } from "@sheetwrite/core";
 import {
-  type CellScalar,
-  type Grid,
-  type GridOptions,
-  initSheetwrite,
-  isSheetwriteReady,
-  type SheetwriteError,
-} from "@sheetwrite/core";
-import {
-  createGridController,
+  type AdapterGridController,
+  createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
+  extractGridOptions,
   type GridAdapterEventHandlers,
-  type GridController,
   type GridControllerHandlers,
-  type GridReadyReason,
   type GridSizeProps,
-  getGridResetReason,
   gridSizeStyle,
   type RowBridge,
   type RowBridgeHandler,
@@ -150,23 +142,12 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
     } = props;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
-    const controllerRef = useRef<GridController | null>(null);
+    const controllerRef = useRef<AdapterGridController | null>(null);
+    const currentGrid = useRef<Grid | null>(null);
     const publishedRef = useRef<ForwardedRef<Grid> | null>(null);
-    const generationRef = useRef(0);
-    const initializedRef = useRef(isSheetwriteReady());
-    const mountedRef = useRef(false);
     const [initializationState, setInitializationState] = useState<"loading" | "ready" | "error">(
-      initializedRef.current ? "ready" : "loading",
+      "loading",
     );
-    const previousOptionsRef = useRef<GridOptions | null>(null);
-    const liveOptionsRef = useRef({
-      theme,
-      readOnly,
-      overscan,
-      minColumns,
-      config,
-    });
-    liveOptionsRef.current = { theme, readOnly, overscan, minColumns, config };
 
     const handlers = useRef<GridAdapterEventHandlers | null>(null);
     useCommitLayoutEffect(() => {
@@ -213,7 +194,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
       const previous = publishedRef.current;
       if (previous && previous !== ref) publishGrid(previous, null);
       publishedRef.current = ref;
-      publishGrid(ref, controllerRef.current?.grid ?? null);
+      publishGrid(ref, currentGrid.current);
       return () => {
         if (publishedRef.current !== ref) return;
         publishGrid(ref, null);
@@ -221,172 +202,58 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
       };
     }, [ref]);
 
-    useEffect(() => {
-      mountedRef.current = true;
-      return () => {
-        mountedRef.current = false;
-      };
-    }, []);
-
-    useEffect(() => {
-      let current = true;
-      if (isSheetwriteReady()) {
-        initializedRef.current = true;
-        setInitializationState("ready");
-        return;
-      }
-      setInitializationState("loading");
-      void initSheetwrite(wasmSource).then(
-        () => {
-          if (!mountedRef.current || !isSheetwriteReady()) return;
-          initializedRef.current = true;
-          setInitializationState("ready");
-        },
-        (error: SheetwriteError) => {
-          if (!current || !mountedRef.current) return;
-          initializedRef.current = false;
-          setInitializationState("error");
-          handlers.current?.onInitializationError?.(error);
-        },
-      );
-      return () => {
-        current = false;
-      };
-    }, [wasmSource]);
-
-    useEffect(() => {
-      if (initializationState !== "ready") return;
-      const host = hostRef.current;
-      if (!host) return;
-      const options: GridOptions = {
-        workbook,
-        data,
-        datasource,
-        datasourceStorage,
-        renderer,
-        workerUrl,
-        presentation,
-        renderers,
-        editors,
-        protectionResolver,
-        mutationPolicy,
-        transactionResourceLimits,
-        hyperlinkActivation,
-        ...liveOptionsRef.current,
-      };
-      const previousOptions = previousOptionsRef.current;
-      const reason: GridReadyReason =
-        generationRef.current === 0
-          ? "initial"
-          : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
+    if (!controllerRef.current) {
       const forwardCommandStateChange: NonNullable<
         GridControllerHandlers["onCommandStateChange"]
-      > = (event) => {
-        handlers.current?.onCommandStateChange?.(event);
-      };
-      const controller = createGridController(
-        host,
-        options,
+      > = (event) => handlers.current?.onCommandStateChange?.(event);
+      controllerRef.current = createAdapterGridController(
         {
           onGridChange: (event) => handlers.current?.onGridChange?.(event),
-          onRowDelta: (projection) => handlers.current?.onRowDelta?.(projection),
-          onSelectionChange: (selection) => handlers.current?.onSelectionChange?.(selection),
+          onRowDelta: (event) => handlers.current?.onRowDelta?.(event),
+          onSelectionChange: (event) => handlers.current?.onSelectionChange?.(event),
           onViewportChange: (event) => handlers.current?.onViewportChange?.(event),
           onEditBegin: (event) => handlers.current?.onEditBegin?.(event),
           onEditCommit: (event) => handlers.current?.onEditCommit?.(event),
-          onSearch: (result) => handlers.current?.onSearch?.(result),
-          // The controller only subscribes to command state while this is
-          // defined, so absence must be visible instead of an always-present wrapper.
+          onSearch: (event) => handlers.current?.onSearch?.(event),
           get onCommandStateChange() {
-            return handlers.current?.onCommandStateChange === undefined
-              ? undefined
-              : forwardCommandStateChange;
+            return handlers.current?.onCommandStateChange ? forwardCommandStateChange : undefined;
           },
           onActiveSheetChange: (event) => handlers.current?.onActiveSheetChange?.(event),
           onMutationRejected: (event) => handlers.current?.onMutationRejected?.(event),
           onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
           onDatasourceError: (event) => handlers.current?.onDatasourceError?.(event),
           onExportError: (event) => handlers.current?.onExportError?.(event),
+          onReady: (event) => handlers.current?.onReady?.(event),
+          onInitializationError: (error) => handlers.current?.onInitializationError?.(error),
         },
-        rowBridge,
+        {
+          publish(grid) {
+            currentGrid.current = grid;
+            publishGrid(publishedRef.current, grid);
+          },
+          setInitializationState,
+          reportError,
+        },
       );
-      controllerRef.current = controller;
-      generationRef.current += 1;
-      let destroyed = false;
-      const teardown = (detachPublishedRef = false): void => {
-        if (destroyed) return;
-        destroyed = true;
-        if (controllerRef.current === controller) controllerRef.current = null;
-
-        const published = publishedRef.current;
-        let cleanupError: unknown;
-        let cleanupFailed = false;
-        try {
-          publishGrid(published, null);
-        } catch (error) {
-          cleanupError = error;
-          cleanupFailed = true;
-        }
-        if (detachPublishedRef && publishedRef.current === published) publishedRef.current = null;
-
-        try {
-          controller.destroy();
-        } catch (error) {
-          cleanupError = cleanupFailed
-            ? new AggregateError(
-                [cleanupError, error],
-                "Sheetwrite React controller cleanup failed",
-              )
-            : error;
-          cleanupFailed = true;
-        }
-        if (cleanupFailed) throw cleanupError;
-      };
-
-      try {
-        publishGrid(publishedRef.current, controller.grid);
-        handlers.current?.onReady?.({
-          grid: controller.grid,
-          generation: generationRef.current,
-          reason,
-        });
-        previousOptionsRef.current = options;
-      } catch (error) {
-        try {
-          teardown(true);
-        } catch (cleanupError) {
-          throw new AggregateError(
-            [error, cleanupError],
-            "Sheetwrite React controller creation and cleanup failed",
-          );
-        }
-        throw error;
-      }
-
-      return teardown;
-    }, [
-      initializationState,
-      workbook,
-      data,
-      datasource,
-      datasourceStorage,
-      renderer,
-      workerUrl,
-      presentation,
-      protectionResolver,
-      mutationPolicy,
-      transactionResourceLimits,
-      hyperlinkActivation,
-      renderers,
-      editors,
+    }
+    const committedInput = useRef({
+      options: extractGridOptions({ ...props }),
       rowBridge,
-    ]);
-
-    useEffect(() => controllerRef.current?.setReadOnly(readOnly ?? false), [readOnly]);
-    useEffect(() => controllerRef.current?.setConfig(config), [config]);
-    useEffect(() => controllerRef.current?.setTheme(theme), [theme]);
-    useEffect(() => controllerRef.current?.setOverscan(overscan), [overscan]);
-    useEffect(() => controllerRef.current?.setMinColumns(minColumns), [minColumns]);
+      wasmSource,
+    });
+    useCommitLayoutEffect(() => {
+      committedInput.current = { options: extractGridOptions({ ...props }), rowBridge, wasmSource };
+    });
+    useEffect(() => {
+      const controller = controllerRef.current;
+      const host = hostRef.current;
+      if (!controller || !host) return;
+      controller.mount(host, committedInput.current);
+      return () => controller.unmount();
+    }, []);
+    useEffect(() => {
+      controllerRef.current?.update(committedInput.current);
+    });
 
     const hostClassName = className ? `sheetwrite ${className}` : "sheetwrite";
     const sizing = gridSizeStyle({ height, fill });

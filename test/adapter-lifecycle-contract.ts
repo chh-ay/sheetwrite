@@ -302,6 +302,58 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       });
     });
 
+    it("retires a generation when onReady throws without reclassifying the consumer error", async () => {
+      const recorder = createLifecycleRecorder();
+      const failure = new Error("ready consumer failed");
+      const initializationErrors: unknown[] = [];
+      const consumerErrors: unknown[] = [];
+      const originalReportError = globalThis.reportError;
+      globalThis.reportError = (error) => consumerErrors.push(error);
+      let mounted: MountedAdapter | undefined;
+      try {
+        try {
+          mounted = await mount({
+            ...initialProps(recorder),
+            onReady(event) {
+              recorder.onReady(event);
+              throw failure;
+            },
+            onInitializationError: (error) => initializationErrors.push(error),
+          });
+        } catch (error) {
+          consumerErrors.push(error);
+        }
+        await Promise.resolve();
+        expect(consumerErrors).toContain(failure);
+        expect(initializationErrors).toEqual([]);
+        expect(document.querySelector('[role="grid"]')).toBeNull();
+        expect(mounted?.getPublishedGrid() ?? null).toBeNull();
+        expect(recorder.ready).toHaveLength(1);
+        expect([...recorder.destroyCalls.values()]).toEqual([1]);
+      } finally {
+        globalThis.reportError = originalReportError;
+        if (mounted) await mounted.unmount();
+      }
+    });
+
+    it("treats the effective default renderer as unchanged and preserves reset precedence", async () => {
+      const recorder = createLifecycleRecorder();
+      const props = initialProps(recorder);
+      const mounted = await mount(props);
+      const first = mounted.getPublishedGrid();
+      await mounted.render({ ...props, renderer: "canvas" });
+      expect(mounted.getPublishedGrid()).toBe(first);
+      expect(recorder.ready).toHaveLength(1);
+      await mounted.render({
+        ...props,
+        workbook: makeConformanceWorkbook("Replacement"),
+        renderer: "worker",
+      });
+      expect(recorder.ready).toHaveLength(2);
+      expect(recorder.ready[1]?.reason).toBe("input-reset");
+      await mounted.unmount();
+    });
+
     it("publishes exactly one live grid before generation-one readiness and clears it once", async () => {
       const recorder = createLifecycleRecorder();
       const props = initialProps(recorder);
