@@ -533,6 +533,7 @@ export class SheetwriteStore implements Store {
           effectiveTx = { ...tx, patches: policy.patches };
         }
         if (this.protectionResolver) {
+          preparation.bind(effectiveTx.patches);
           // Permission callbacks receive live operations and may edit nested
           // payloads after ingress validation. Do not reuse their measurements.
           const callbackResources = resolveTransactionResourceValidation(

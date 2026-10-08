@@ -3,7 +3,7 @@ import type {
   BoundaryResourceAccounting,
   RuntimeResourceOperation,
 } from "../resource-accounting.js";
-import { decodeRestoreBlock } from "../restore-block.js";
+import { restoreBlockFacts } from "../restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "../sheet-lifecycle.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { DocumentOp, MutationIssue, Workbook } from "../types/document.js";
@@ -590,8 +590,9 @@ export class PagedDirtyPreflight {
           if (referenceSimulationExceeded) return referenceSimulationIssue();
         }
       } else if (patch.op === "setBlock" || patch.op === "restoreBlock") {
-        const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
-        const range = normalizedRange(patch.range);
+        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
+        const range = prepared?.range ?? normalizedRange(patch.range);
         rejection = addRectangle(
           range.sheet,
           range.start.row,

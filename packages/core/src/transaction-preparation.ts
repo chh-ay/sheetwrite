@@ -1,14 +1,17 @@
 import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
+import type { Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
 type Restore = Extract<DocumentOp, { op: "restoreBlock" }>;
 
-interface PreparedRestore {
+export interface PreparedRestore {
   stamp: readonly unknown[];
   block: PackedCellBlock;
+  range: Range;
   errors?: readonly unknown[];
   requiredSheets: readonly string[];
   containsFormula: boolean;
+  containsReference: boolean;
 }
 
 // Sidecars are visible only while their owning synchronous application is live.
@@ -44,8 +47,20 @@ function prepare(
   return {
     stamp: revision,
     block,
+    range: {
+      sheet: operation.range.sheet,
+      start: {
+        row: Math.min(operation.range.start.row, operation.range.end.row),
+        col: Math.min(operation.range.start.col, operation.range.end.col),
+      },
+      end: {
+        row: Math.max(operation.range.start.row, operation.range.end.row),
+        col: Math.max(operation.range.start.col, operation.range.end.col),
+      },
+    },
     requiredSheets: [],
     containsFormula: false,
+    containsReference: false,
   };
 }
 
@@ -105,6 +120,7 @@ export function preparedRestore<E>(
         ...new Set((prepared.block.refs ?? []).map(([, target]) => target.sheet)),
       ];
       prepared.containsFormula = (prepared.block.formulas?.length ?? 0) > 0;
+      prepared.containsReference = (prepared.block.refs?.length ?? 0) > 0;
     }
   }
   return prepared as Omit<PreparedRestore, "errors"> & { errors: readonly E[] };

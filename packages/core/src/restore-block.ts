@@ -94,7 +94,7 @@ export function estimateRestoreBlockBytes(block: PackedCellBlock): number {
   return Math.ceil(((compressed * block.rowCount) / sampleRows) * BASE64_EXPANSION);
 }
 
-export function decodeRestoreBlock(operation: RestoreBlock): PackedCellBlock {
+export function restoreBlockFacts(operation: RestoreBlock) {
   const prepared = preparedRestore(operation, validateDocumentOperationShape);
   if (prepared.errors.length > 0) invalid();
   const block = prepared.block;
@@ -104,5 +104,10 @@ export function decodeRestoreBlock(operation: RestoreBlock): PackedCellBlock {
     (block.styleIds !== undefined && block.styleTable === undefined)
   )
     invalid();
-  return block;
+  return prepared;
+}
+
+/** Return a decoded block for codec consumers and privately owned rebase transforms. */
+export function decodeRestoreBlock(operation: RestoreBlock): PackedCellBlock {
+  return restoreBlockFacts(operation).block;
 }
