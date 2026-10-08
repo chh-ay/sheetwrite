@@ -325,6 +325,66 @@ describe("pointer input: drag lifecycle", () => {
     grid.destroy();
     store.dispose();
   });
+  it("abandons a captured selection when switching sheets", () => {
+    const { grid, store, scroller, workbook, capture } = makeGrid();
+    const sheet = makeWorkbook(10).sheets[0];
+    if (!sheet) throw new Error("second sheet missing");
+    sheet.id = "s2";
+    sheet.name = "Other sheet";
+    grid.applyTransaction({
+      patches: [{ op: "addSheet", sheet: { ...sheet, order: 1, cells: [] } }],
+    });
+    scroller.dispatchEvent(pointer("pointerdown", cellPoint(0, 0, workbook)));
+    grid.setActiveSheet("s2");
+    const selection = grid.getSelection();
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+    expect(grid.getSelection()).toEqual(selection);
+    expect(capture.released).toEqual([1]);
+    grid.destroy();
+    store.dispose();
+  });
+
+  for (const axis of ["column", "row"] as const) {
+    it(`restores ${axis} preview geometry when structural admission rejects release`, () => {
+      const { grid, store, scroller } = makeGrid();
+      grid.setProtectedRange({
+        id: "deny-resize",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 9, col: 2 } },
+      });
+      grid.setProtectionResolver(() => "deny");
+      const original = axis === "column" ? 160 : DEFAULT_THEME.rowHeight;
+      const start =
+        axis === "column"
+          ? { clientX: DEFAULT_THEME.rowHeaderWidth + original, clientY: 10 }
+          : { clientX: 10, clientY: DEFAULT_THEME.headerHeight + original };
+      const end =
+        axis === "column"
+          ? { ...start, clientX: start.clientX + 40 }
+          : { ...start, clientY: start.clientY + 40 };
+      const rejections: string[] = [];
+      grid.on("mutation-rejected", ({ issues }) =>
+        rejections.push(...issues.map((issue) => issue.kind)),
+      );
+      scroller.dispatchEvent(pointer("pointerdown", start));
+      scroller.dispatchEvent(pointer("pointermove", end));
+      scroller.dispatchEvent(pointer("pointerup", end));
+      expect(rejections).toEqual(["protection"]);
+      const sheet = store.getWorkbook().sheets[0];
+      expect(
+        axis === "column"
+          ? sheet?.columns[0]?.width
+          : (sheet?.rowHeights?.get(0) ?? DEFAULT_THEME.rowHeight),
+      ).toBe(original);
+      const address = grid.getCellAtPoint(
+        axis === "column" ? start.clientX + 10 : DEFAULT_THEME.rowHeaderWidth + 20,
+        axis === "row" ? start.clientY + 10 : DEFAULT_THEME.headerHeight + 10,
+      );
+      expect(axis === "column" ? address?.col : address?.row).toBe(1);
+      grid.destroy();
+      store.dispose();
+    });
+  }
 
   it("keeps the source selection when fill admission rejects its values", () => {
     const { grid, store, scroller, workbook } = makeGrid();

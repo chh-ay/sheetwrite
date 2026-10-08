@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "b830162c29ff8e7b08ca0d184c0e03d49074ed44ae687f65ec6254bcfbcac5c1",
+  "sha256": "a5fc7ac2011cb4d7842a6f686f28a547a792d38e8e5bfd0a2bfddf0cafdfc7c7",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -423,7 +423,10 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
+      "exports": [
+        "WorkerAcknowledgement",
+        "createWorkerMessageHandler"
+      ]
     },
     {
       "package": "@sheetwrite/formulas",
@@ -556,7 +559,9 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": ["registerXlsxBackends"]
+      "exports": [
+        "registerXlsxBackends"
+      ]
     }
   ]
 }

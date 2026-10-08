@@ -129,9 +129,10 @@ Commit and navigation keys:
 While the IME is composing, keystrokes belong to the composition and are not
 treated as navigation. Editing emits `edit-begin` and `edit-commit` events.
 
-`beginEdit` selects the requested cell and emits `selection` when that changes
-the selection, then emits `edit-begin` before opening the editor. A synchronous
-handler can replace or cancel the request without the old editor reopening.
+`beginEdit` closes the previous editor, selects the requested cell, and emits
+`selection` when that changes the selection, then emits `edit-begin` before
+opening the editor. A synchronous handler can replace or cancel the request
+without the old editor reopening.
 Successful completion emits `change`, then `edit-commit`, then the navigation's
 `selection` event; rejected completion does not emit `edit-commit` or navigate.
 Event addresses remain view coordinates.

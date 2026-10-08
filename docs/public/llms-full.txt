@@ -2862,6 +2862,18 @@ Row and full-column selections are part of the model. Column selection is wired 
 the top header; **row selection is programmatic only** — there is no row-header
 click gesture, so set it via `setSelection({ kind: "row", sheet, row })`.
 
+Only the pointer that began a drag can change it. Switching sheets, changing
+sheet structure or the sorted/filtered view, or losing pointer capture ends the
+gesture; a later pointer release cannot apply it to a different sheet or view.
+
+## Resizing
+
+Drag a column-header boundary or a row-header boundary to preview its size.
+The preview changes geometry only: the document and undo history remain intact
+until release. Release submits one undoable size change. Cancellation, capture
+loss, or a rejected change restores the document's size. Turning read-only on
+ends an active resize without committing.
+
 ## Keyboard navigation
 
 When the grid is focused and not editing:
@@ -2930,6 +2942,19 @@ Commit and navigation keys:
 
 While the IME is composing, keystrokes belong to the composition and are not
 treated as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+`beginEdit` closes the previous editor, selects the requested cell, and emits
+`selection` when that changes the selection, then emits `edit-begin` before
+opening the editor. A synchronous handler can replace or cancel the request
+without the old editor reopening.
+Successful completion emits `change`, then `edit-commit`, then the navigation's
+`selection` event; rejected completion does not emit `edit-commit` or navigate.
+Event addresses remain view coordinates.
+
+Stock, validation, and custom editors retain the underlying document cell while
+sorting or filtering changes its visible position. Completion writes that same
+cell, not whichever row now occupies the old position. If the cell leaves the
+view, or sheet structure changes, the editor is cancelled.
 
 ## Clipboard interoperability
 
