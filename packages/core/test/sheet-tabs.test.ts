@@ -113,6 +113,31 @@ describe("SheetTabs", () => {
     expect(host.textContent).not.toContain("Secret");
   });
 
+  it("keeps tab scrolling inside the strip during mount and keyboard navigation", () => {
+    expect(scrolled).toEqual([]);
+    const selectedTab = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+    if (!selectedTab) throw new Error("Expected a selected tab");
+    const stripWidth = 100;
+    const nextTabLeft = 150;
+    const nextTabRight = 200;
+    Object.defineProperty(host, "getBoundingClientRect", {
+      value: () => ({ left: 0, right: stripWidth }),
+    });
+    const nextTab = tabButtons(host)[2];
+    if (!nextTab) throw new Error("Expected the next sheet tab");
+    Object.defineProperty(nextTab, "getBoundingClientRect", {
+      value: () => ({
+        left: nextTabLeft - host.scrollLeft,
+        right: nextTabRight - host.scrollLeft,
+      }),
+    });
+    selectedTab.focus();
+    key(selectedTab, "ArrowRight");
+    expect(document.activeElement).toBe(nextTab);
+    expect(host.scrollLeft).toBe(nextTabRight - stripWidth);
+    expect(scrolled).toEqual([]);
+  });
+
   it("renames inline by double-click and F2, committing Enter or changed blur and cancelling Escape", () => {
     const renames: Array<[string, string]> = [];
     tabs.destroy();
@@ -182,6 +207,39 @@ describe("SheetTabs", () => {
     input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "売上" }));
     key(input, "Enter");
     expect(renames).toEqual(["b:売上"]);
+  });
+
+  it("keeps the options menu open for scrolls that do not move its trigger", () => {
+    tabs.destroy();
+    tabs = new SheetTabs(host, { onActivate: () => {}, onRename: (id) => applied(id) });
+    tabs.update(SHEETS, "b");
+    let triggerTop = 500;
+    Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value(this: HTMLElement) {
+        const top = this.classList.contains("sheetwrite-tab-options-button") ? triggerTop : 0;
+        return { left: 40, right: 68, top, bottom: top + 24, width: 28, height: 24 };
+      },
+    });
+    try {
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+      const rename = host.querySelector<HTMLButtonElement>('[aria-label="Rename Sales sheet"]')!;
+      expect(document.activeElement).toBe(rename);
+
+      // Another panel on the page scrolls (for example an event log that grows).
+      const panel = document.createElement("div");
+      document.body.appendChild(panel);
+      panel.dispatchEvent(new Event("scroll"));
+      expect(host.querySelector('[role="menu"]')).not.toBeNull();
+      expect(document.activeElement).toBe(rename);
+
+      // The page scrolls and the trigger moves: the placed menu would be wrong, so it closes.
+      triggerTop = 300;
+      document.dispatchEvent(new Event("scroll"));
+      expect(host.querySelector('[role="menu"]')).toBeNull();
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect");
+    }
   });
 
   it("keeps invalid Enter and blur edits focused with their structured lifecycle error associated", () => {

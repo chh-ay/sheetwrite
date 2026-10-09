@@ -1,5 +1,4 @@
-/* /vanilla owns this composition. Shared Plan 076 tokens remain the only
-   source of color, spacing, type, radius, shadow, and motion. */
+/* The Vanilla workbench uses the shared site tokens. */
 .sw-vw {
   --sw-demo-surface: var(--sw-surface-1);
   --sw-demo-raised: var(--sw-surface-2);
@@ -24,6 +23,20 @@
   color: var(--sw-demo-fg);
 }
 
+.sw-vw .sheetwrite-shell {
+  --sheetwrite-widget-bg: var(--sw-demo-surface);
+  --sheetwrite-widget-fg: var(--sw-demo-fg);
+  --sheetwrite-widget-border: var(--sw-demo-border);
+  --sheetwrite-toolbar-bg: var(--sw-demo-raised);
+  --sheetwrite-toolbar-fg: var(--sw-demo-fg-strong);
+}
+
+.sw-vw .sheetwrite-shell-toolbar {
+  min-width: max-content;
+  gap: 4px;
+  padding-block: 6px;
+}
+
 .sw-vw *,
 .sw-vw *::before,
 .sw-vw *::after {
@@ -33,72 +46,6 @@
 .sw-vw > *,
 .sw-vw-workspace > * {
   min-width: 0;
-}
-
-/* The route hero is intentionally editorial rather than compressed: it gives
-   the ownership story room, then hands the viewport to the live product. */
-.sw-showcase-page[data-framework="vanilla"] {
-  padding-top: var(--sw-demo-space-4);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero {
-  min-height: 20rem;
-  grid-template-columns: minmax(0, 1fr) minmax(21rem, 24rem);
-  gap: calc(var(--sw-demo-space-4) * 3);
-  align-items: center;
-  padding-block: calc(var(--sw-demo-space-4) * 2);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__eyebrow {
-  margin-bottom: var(--sw-demo-space-3);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero h1 {
-  max-width: 16ch;
-  font-size: clamp(3rem, 4vw, 4.5rem);
-  line-height: 0.98;
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero-copy > p:last-of-type {
-  max-width: 50rem;
-  margin-top: var(--sw-demo-space-4);
-  font-size: var(--sw-type-base);
-  line-height: 1.65;
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs {
-  margin-top: calc(var(--sw-demo-space-4) * 2);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs > div {
-  min-width: 9.5rem;
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install {
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--sw-demo-space-4);
-  align-items: stretch;
-  padding: calc(var(--sw-demo-space-4) + var(--sw-demo-space-2));
-  box-shadow: var(--sw-shadow);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install > div {
-  display: grid;
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install > a {
-  white-space: normal;
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-install-command {
-  grid-template-columns: auto minmax(max-content, 1fr) auto;
-  gap: var(--sw-demo-space-2);
-}
-
-.sw-showcase-page[data-framework="vanilla"] .sw-install-command code {
-  min-width: max-content;
-  overflow: visible;
-  text-overflow: clip;
 }
 
 .sw-showcase-page[data-framework="vanilla"] .sw-showcase-stage__viewport {
@@ -683,48 +630,6 @@
 }
 
 @media (max-width: 760px) {
-  .sw-showcase-page[data-framework="vanilla"] {
-    width: min(calc(100% - 2rem), 92rem);
-    padding-top: var(--sw-demo-space-3);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero {
-    min-height: 0;
-    grid-template-columns: minmax(0, 1fr);
-    gap: calc(var(--sw-demo-space-4) * 2);
-    padding-block: var(--sw-demo-space-4) calc(var(--sw-demo-space-4) * 2);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero h1 {
-    max-width: 14ch;
-    font-size: 2.75rem;
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__hero-copy > p:last-of-type {
-    margin-top: var(--sw-demo-space-3);
-    font-size: var(--sw-type-sm);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs {
-    display: flex;
-    margin-top: var(--sw-demo-space-4);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__specs > div {
-    min-width: 6.5rem;
-    padding-inline: var(--sw-demo-space-3);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-page__install {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sw-demo-space-3);
-    padding: var(--sw-demo-space-3);
-  }
-
-  .sw-showcase-page[data-framework="vanilla"] .sw-showcase-stage__bar {
-    min-height: 2.5rem;
-  }
-
   .sw-showcase-page[data-framework="vanilla"] .sw-showcase-stage__viewport,
   .sw-vw {
     min-height: 0;

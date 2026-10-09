@@ -116,17 +116,17 @@
 
 .sw-clb__stats {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  padding: 0;
-  overflow: hidden;
-  border-color: var(--sw-demo-border);
-  background: var(--sw-demo-border);
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-2) 0;
+  border: 0;
+  border-block: 1px solid var(--sw-demo-border);
+  background: transparent;
 }
 
 .sw-clb__stats > div {
   min-width: 0;
-  padding: var(--sw-demo-space-2);
-  background: var(--sw-demo-raised);
+  padding: 0;
+  background: transparent;
 }
 
 .sw-clb__stats dt {
@@ -136,10 +136,8 @@
 .sw-clb__stats dd {
   min-width: 0;
   margin-top: var(--sw-demo-space-1);
-  overflow: hidden;
   font-size: var(--sw-type-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .sw-clb__presence {
@@ -259,13 +257,12 @@
   font-size: var(--sw-type-xs);
 }
 
+/* The lane is narrow; wrap the caption rather than cutting off "broadcast". */
 .sw-clb__direction i {
-  overflow: hidden;
   border-bottom: 1px solid var(--sw-demo-border-strong);
   font-style: normal;
+  line-height: 1.4;
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sw-clb__decisions {
@@ -376,10 +373,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .sw-clb__grid {
-    height: calc(var(--sw-demo-space-4) * 15);
-  }
-
   .sw-clb__sequence {
     min-height: auto;
   }
@@ -395,8 +388,7 @@
     text-align: center;
   }
 
-  .sw-clb__direction,
-  .sw-clb__decisions {
+  .sw-clb__direction {
     display: none;
   }
 
@@ -416,10 +408,7 @@
 @media (max-width: 32rem) {
   .sw-clb__scenario-title {
     align-items: flex-start;
-  }
-
-  .sw-clb__scenario-title > div {
-    display: none;
+    flex-wrap: wrap;
   }
 
   .sw-clb__client-action {

@@ -449,10 +449,10 @@ export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
         order: 0,
         rowCount: 8,
         columns: [
-          { key: "item", header: "Item", width: 170, type: "text" },
-          { key: "qty", header: "Qty", width: 80, type: "number" },
-          { key: "unit", header: "Unit cost", width: 110, type: "number" },
-          { key: "total", header: "Total", width: 110, type: "number" },
+          { key: "item", header: "Item", width: 300, type: "text" },
+          { key: "qty", header: "Qty", width: 120, type: "number" },
+          { key: "unit", header: "Unit cost", width: 170, type: "number" },
+          { key: "total", header: "Total", width: 190, type: "number" },
         ],
         cells: [
           {

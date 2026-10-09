@@ -8,7 +8,7 @@ description: "A bulk window of resolved cells, row-major over nrows x ncols."
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L429"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L429</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L441"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L441</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

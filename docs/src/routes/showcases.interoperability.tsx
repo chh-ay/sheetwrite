@@ -430,6 +430,10 @@ function InteroperabilityRoute() {
               data: source.data,
               ...base,
             });
+      grid.setSelection({
+        kind: "cell",
+        addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+      });
       pieces.push(
         createNameBox(formulaRow, grid, { focusGrid: () => host.focus() }),
         createFormulaBar(formulaRow, grid, { focusGrid: () => host.focus() }),
@@ -1034,6 +1038,10 @@ function InteroperabilityRoute() {
                 />
               </div>
             </div>
+            <p className="sw-si-safety-note">
+              Orders!B5 contains literal text for the CSV injection test. It is not a formula or an
+              active link. Select it to inspect the full source in the formula bar.
+            </p>
             <div aria-label="Workbook interchange actions" className="sw-si-actions" role="toolbar">
               <button
                 className="sw-si-btn sw-si-btn--secondary"

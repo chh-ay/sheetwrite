@@ -589,6 +589,7 @@ const App = defineComponent({
                 ref: gridComponent,
                 workbook: workbook.value,
                 data: data.value,
+                presentation: "data-grid",
                 theme: BUSINESS_THEME,
                 readOnly: readOnly.value,
                 mutationPolicy: mutationPolicy.value,

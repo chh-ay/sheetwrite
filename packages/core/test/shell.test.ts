@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
@@ -152,6 +152,39 @@ describe("createToolbar", () => {
     const button = piece.element.querySelector("button")!;
     expect(button.querySelector("img")).toBeNull();
     expect(button.textContent).toBe("<img src=x onerror=hack()>");
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("shows the theme's text and fill colors until the user picks one", () => {
+    const { grid, store, host } = makeGrid();
+    grid.setTheme({ fg: "#123", bg: "rgb(250, 240, 230)" });
+    const piece = createToolbar(host, grid, {
+      items: [{ action: "textColor" }, { action: "fillColor" }],
+    });
+    const [text, fill] = [...piece.element.querySelectorAll<HTMLInputElement>("input")];
+    // An unseeded color input shows black, which is wrong for an unstyled fill.
+    expect(text!.value).toBe("#112233");
+    expect(fill!.value).toBe("#faf0e6");
+
+    // A theme switch (for example to dark) updates swatches the user has not used.
+    grid.setTheme({ fg: "#e5e7eb", bg: "#0b1220" });
+    expect(text!.value).toBe("#e5e7eb");
+    expect(fill!.value).toBe("#0b1220");
+
+    // Once the user picks a fill, that choice stays when the theme changes.
+    const addr = { sheet: "s1", row: 1, col: 0 };
+    grid.setSelection({ kind: "cell", addr });
+    fill!.value = "#ff0000";
+    fill!.dispatchEvent(new Event("change"));
+    fill!.dispatchEvent(new Event("blur"));
+    expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
+    grid.replaceTheme(undefined);
+    expect(fill!.value).toBe("#ff0000");
+    // The text swatch was never picked, so it follows the reset to the default theme.
+    expect(text!.value).toBe(DEFAULT_THEME.fg);
 
     piece.destroy();
     grid.destroy();

@@ -24,6 +24,8 @@ mod calc;
 #[cfg(feature = "formula-engine")]
 mod eval;
 #[cfg(feature = "formula-engine")]
+mod formula_reads;
+#[cfg(feature = "formula-engine")]
 mod memory;
 #[cfg(feature = "formula-engine")]
 mod query;

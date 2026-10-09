@@ -307,6 +307,7 @@ async function mergeConflict(): Promise<void> {
                 bind:grid
                 workbook={mount.workbook}
                 data={mount.data}
+                presentation="data-grid"
                 theme={OFFLINE_THEME}
                 config={GRID_CONFIG}
                 fill

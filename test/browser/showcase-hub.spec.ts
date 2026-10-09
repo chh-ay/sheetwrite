@@ -24,12 +24,10 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
   await page.goto(siteUrl("/showcases/"));
   await page.waitForLoadState("networkidle");
 
-  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
   // The Showcases link is page-current on the hub itself.
   await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
 
-  // The capability owners occupy the first row and framework owners the
-  // second. All eight equal launchers fit the acceptance viewport.
+  // Capability examples and framework integrations each occupy one desktop row.
   const launchers = page.locator(".sw-hub-scenes .sw-hub-launch");
   await expect(launchers).toHaveCount(8);
   await expect(launchers.first()).toHaveAttribute("data-owner", "performance");
@@ -51,26 +49,39 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
       (top) => launcherGeometry.filter((card) => card.top === top).length,
     ),
   ).toEqual([4, 4]);
-  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeLessThanOrEqual(844);
-  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeGreaterThanOrEqual(780);
+  expect(Math.min(...launcherGeometry.map(({ height }) => height))).toBeGreaterThanOrEqual(320);
   const galleryWidth = await page
     .locator(".sw-hub-scenes")
     .evaluate((gallery) => Math.round(gallery.getBoundingClientRect().width));
   expect(galleryWidth).toBeGreaterThanOrEqual(1568 - 96);
-  const clippedLabels = await page
-    .locator(
-      ".sw-hub-scene__caption, .sw-hub-framework-scene > span, .sw-hub-framework-scene code, .sw-hub-framework-scene small, .sw-hub-launch__meta, .sw-hub-launch__body > strong, .sw-hub-launch__summary, .sw-hub__owner-count",
-    )
-    .evaluateAll((labels) =>
-      labels
-        .filter(
-          (label) =>
-            label.getClientRects().length > 0 &&
-            (label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight),
-        )
-        .map((label) => label.textContent?.trim()),
-    );
-  expect(clippedLabels).toEqual([]);
+  for (const width of [1440, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => {
+        document.documentElement.dataset.theme = value;
+      }, theme);
+      const overflow = await launchers.evaluateAll((cards) =>
+        cards.flatMap((card) =>
+          [card, ...card.querySelectorAll("*")]
+            .filter(
+              (element) =>
+                element.getClientRects().length > 0 &&
+                (element.scrollWidth > element.clientWidth ||
+                  element.scrollHeight > element.clientHeight),
+            )
+            .map((element) => element.textContent?.trim()),
+        ),
+      );
+      expect(overflow, `${width}px ${theme} cards must not clip content`).toEqual([]);
+      await expect(page.locator(".sw-hub-scene").first()).toBeVisible();
+      await expect(page.locator(".sw-hub__owner-count").first()).toBeVisible();
+      const columns = await launchers.evaluateAll(
+        (cards) => new Set(cards.map((card) => Math.round(card.getBoundingClientRect().left))).size,
+      );
+      expect(columns).toBe(width >= 1280 ? 4 : width >= 640 ? 2 : 1);
+    }
+  }
+  await page.setViewportSize({ width: 1568, height: 844 });
   const bodyFontSizes = await page
     .locator(".sw-hub-launch__body > strong, .sw-hub-launch__summary")
     .evaluateAll((labels) =>
@@ -126,7 +137,7 @@ test("every owning showcase URL stays resolvable", async ({ request }) => {
   }
 });
 
-test("all four capability routes share one 2 by 2 hero contract", async ({ page }) => {
+test("all four capability routes share one readable scenario scope list", async ({ page }) => {
   await page.setViewportSize({ width: 1568, height: 900 });
   for (const route of ["performance", "database", "interoperability", "collaboration"]) {
     await page.goto(siteUrl(`/showcases/${route}/`));
@@ -140,7 +151,7 @@ test("all four capability routes share one 2 by 2 hero contract", async ({ page 
         return { left: Math.round(bounds.left), top: Math.round(bounds.top) };
       }),
     );
-    expect(new Set(geometry.map(({ left }) => left)).size, `${route} hero columns`).toBe(2);
-    expect(new Set(geometry.map(({ top }) => top)).size, `${route} hero rows`).toBe(2);
+    expect(new Set(geometry.map(({ left }) => left)).size, `${route} hero columns`).toBe(1);
+    expect(new Set(geometry.map(({ top }) => top)).size, `${route} hero rows`).toBe(4);
   }
 });

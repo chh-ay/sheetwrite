@@ -208,12 +208,12 @@ export function createEngineLiveWorkbook(): Workbook {
         name: "Regional forecast",
         rowCount: ENGINE_LIVE_ROWS,
         columns: [
-          { key: "period", header: "Period", width: 104, type: "text" },
-          { key: "region", header: "Region", width: 104, type: "text" },
-          { key: "actual", header: "Actual", width: 108, type: "number" },
-          { key: "forecast", header: "Forecast", width: 112, type: "number" },
-          { key: "variance", header: "Variance", width: 112, type: "number" },
-          { key: "attainment", header: "Attainment", width: 116, type: "number" },
+          { key: "period", header: "Period", width: 156, type: "text" },
+          { key: "region", header: "Region", width: 156, type: "text" },
+          { key: "actual", header: "Actual", width: 162, type: "number" },
+          { key: "forecast", header: "Forecast", width: 168, type: "number" },
+          { key: "variance", header: "Variance", width: 168, type: "number" },
+          { key: "attainment", header: "Attainment", width: 174, type: "number" },
         ],
       },
     ],
@@ -225,10 +225,10 @@ export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]
     const headerRow: RowData = {
       period: "Period",
       region: "Region",
-      actual: "Actual",
-      forecast: "Forecast",
-      variance: "Variance",
-      attainment: "Attainment",
+      actual: { kind: "literal", value: "Actual" },
+      forecast: { kind: "literal", value: "Forecast" },
+      variance: { kind: "literal", value: "Variance" },
+      attainment: { kind: "literal", value: "Attainment" },
     };
     if (!columns) return headerRow;
     const keys = new Set(columns.flatMap((band) => band.keys));

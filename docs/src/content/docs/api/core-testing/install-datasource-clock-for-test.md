@@ -8,7 +8,7 @@ description: "Installs a deterministic monotonic clock through the public testin
 Installs a deterministic monotonic clock through the public testing entrypoint.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/datasource-controller.ts#L25"><code>packages/core/src/datasource-controller.ts#L25</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/datasource-controller.ts#L27"><code>packages/core/src/datasource-controller.ts#L27</code></a></dd></div>
 </dl>
 
 ## Declaration

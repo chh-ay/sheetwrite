@@ -163,7 +163,6 @@ test("boots product-first, paints, and exposes the ownership instruments", async
   const hero = await page.locator(".sw-showcase-page__hero").boundingBox();
   const installCommand = page.locator(".sw-showcase-page__install .sw-install-command");
   expect(hero).not.toBeNull();
-  expect(hero!.height).toBeGreaterThanOrEqual(300);
   expect(hero!.height).toBeLessThanOrEqual(390);
   await expect(installCommand).toContainText("npm install @sheetwrite/core");
   expect(

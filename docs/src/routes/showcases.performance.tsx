@@ -70,8 +70,9 @@ export const Route = createFileRoute("/showcases/performance")({
 const LANDMARKS = [
   { label: "0%", ratio: 0 },
   { label: "25%", ratio: 0.25 },
-  { label: "74%", ratio: 0.74 },
-  { label: "99%", ratio: 0.99 },
+  { label: "50%", ratio: 0.5 },
+  { label: "75%", ratio: 0.75 },
+  { label: "100%", ratio: 1 },
 ] as const;
 const SCALE_OVERSCAN = 4;
 
@@ -529,9 +530,8 @@ function PerformanceRoute() {
         <CapabilityHero
           description={
             <>
-              Drive a real {SCALE_ROWS.toLocaleString()} × {SCALE_COLUMNS.toLocaleString()}
-              financial operations Grid. Jump deep, edit a cell, then scroll wide—the sheet only
-              loads the rectangle you visit.
+              Explore {SCALE_ROWS.toLocaleString()} rows × {SCALE_COLUMNS.toLocaleString()} columns
+              of financial operations. Visit any cell. Only the tiles you visit load.
             </>
           }
           eyebrow="CAPABILITY / DATA & SCALE"
@@ -541,7 +541,7 @@ function PerformanceRoute() {
             { label: "Address space", value: "1 billion" },
             { label: "Loading", value: "Requested tiles only" },
           ]}
-          title="One billion addresses. One bounded working set."
+          title="A billion cells. Within reach."
         />
 
         <section
@@ -549,11 +549,70 @@ function PerformanceRoute() {
           className="sw-sp-section sw-sp-stage-section"
           id="million-rows"
         >
-          <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
-            {status}
-          </p>
-
           <div className="sw-sp-workbench" data-state={gridState}>
+            <div className="sw-sp-scale-strip">
+              <div className="sw-sp-position">
+                <span>YOUR WINDOW IN {SCALE_ROWS.toLocaleString()} ROWS</span>
+                <strong data-testid="scale-readable-rows">
+                  Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
+                </strong>
+                <meter
+                  aria-label="Position in the million-row sheet"
+                  min={0}
+                  max={SCALE_ROWS - 1}
+                  value={firstRow}
+                />
+                <div className="sw-sp-scale-ticks" aria-hidden="true">
+                  <span>1</span>
+                  <span>{Math.floor(SCALE_ROWS / 2).toLocaleString()}</span>
+                  <span>{SCALE_ROWS.toLocaleString()}</span>
+                </div>
+                <small>
+                  {((firstRow / (SCALE_ROWS - 1)) * 100).toFixed(2)}% through the sheet ·{" "}
+                  {(lastRow - firstRow + 1).toLocaleString()} rows in view
+                </small>
+              </div>
+              <fieldset className="sw-sp-quick-jumps" aria-label="Explore the sheet">
+                {[
+                  { label: "Start", row: 0 },
+                  { label: "Middle", row: Math.floor(SCALE_ROWS / 2) },
+                  { label: "End", row: SCALE_ROWS - 1 },
+                ].map(({ label, row }) => (
+                  <button
+                    disabled={gridState !== "ready"}
+                    key={label}
+                    onClick={() => jumpTo(row, firstColumn, "landmark")}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  disabled={gridState !== "ready"}
+                  onClick={() =>
+                    jumpTo(Math.floor(Math.random() * SCALE_ROWS), firstColumn, "landmark")
+                  }
+                  type="button"
+                >
+                  Random row
+                </button>
+              </fieldset>
+              <div className="sw-sp-live-loading" aria-live="polite">
+                <strong>
+                  {recentTiles.filter((tile) => tile.state === "requested").length > 0
+                    ? "Loading requested tiles…"
+                    : "Visited tiles loaded"}
+                </strong>
+                <span>
+                  {telemetry.requests.toLocaleString()} requests ·{" "}
+                  {telemetry.aborted.toLocaleString()} aborted
+                </span>
+                <span>
+                  {formatBytes(stats.paged?.allocatedBytes ?? 0)} resident /{" "}
+                  {cacheCeilingMiB.toLocaleString()} MiB ceiling
+                </span>
+              </div>
+            </div>
             <div className="sw-sp-stage-body">
               <div className="sw-sp-grid-shell">
                 <div className="sw-sp-grid-instructions">
@@ -564,7 +623,10 @@ function PerformanceRoute() {
                         ? "Grid unavailable"
                         : "Loading Grid"}
                   </span>
-                  <span>Wheel / trackpad · Page Up / Down · Shift-wheel to travel wide</span>
+                  <span>
+                    Columns {colToA1(firstColumn)}–{colToA1(lastColumn)} of{" "}
+                    {colToA1(SCALE_COLUMNS - 1)} · Shift-wheel to scroll wide
+                  </span>
                   <fieldset aria-label="Grid zoom" className="sw-sp-zoom">
                     <button
                       aria-label="Zoom out"
@@ -609,8 +671,8 @@ function PerformanceRoute() {
 
               <aside className="sw-sp-instrument" aria-label="Grid navigator and live instrument">
                 <section className="sw-sp-challenge" aria-labelledby="scale-challenge-title">
-                  <p>Primary challenge</p>
-                  <h3 id="scale-challenge-title">Jump deep. Then scroll wide.</h3>
+                  <p>Go to any address</p>
+                  <h3 id="scale-challenge-title">Choose a row and column</h3>
                   <form
                     className="sw-sp-jump"
                     onSubmit={(event) => {
@@ -655,21 +717,6 @@ function PerformanceRoute() {
                       </button>
                     </fieldset>
                   </form>
-                  <div className="sw-sp-stress">
-                    <button
-                      aria-describedby="scale-stress-description"
-                      aria-pressed={evictionStress}
-                      data-testid="scale-eviction-stress"
-                      disabled={gridState === "loading"}
-                      onClick={() => setEvictionStress((active) => !active)}
-                      type="button"
-                    >
-                      Optional 1 MiB eviction stress
-                    </button>
-                    <small id="scale-stress-description">
-                      Remounts this Grid with a deliberately tight clean-cache ceiling.
-                    </small>
-                  </div>
                 </section>
 
                 <section className="sw-sp-navigator" aria-labelledby="scale-navigator-title">
@@ -798,6 +845,7 @@ function PerformanceRoute() {
                   <summary>
                     <span>Drawing path</span>
                     <small>{rendererState?.active ?? renderer}</small>
+                    <span aria-hidden="true"> · Diagnostics</span>
                   </summary>
                   <fieldset className="sw-sp-render-switch">
                     <legend>Grid drawing path</legend>
@@ -828,6 +876,21 @@ function PerformanceRoute() {
                     </p>
                   )}
                 </details>
+                <div className="sw-sp-stress">
+                  <button
+                    aria-describedby="scale-stress-description"
+                    aria-pressed={evictionStress}
+                    data-testid="scale-eviction-stress"
+                    disabled={gridState === "loading"}
+                    onClick={() => setEvictionStress((active) => !active)}
+                    type="button"
+                  >
+                    Optional 1 MiB eviction stress
+                  </button>
+                  <small id="scale-stress-description">
+                    Remounts this Grid with a deliberately tight clean-cache ceiling.
+                  </small>
+                </div>
               </aside>
             </div>
 
@@ -851,6 +914,9 @@ function PerformanceRoute() {
                 )}
               </p>
             )}
+            <p aria-live="polite" className="sw-sp-status" data-testid="scale-status" role="status">
+              {status}
+            </p>
           </div>
         </section>
 
@@ -864,7 +930,8 @@ function PerformanceRoute() {
             API setting is <code>{`{ protocol: 2, columns: "windowed" }`}</code>.
           </p>
 
-          <div className="sw-sp-diagnostics">
+          <details className="sw-sp-diagnostics">
+            <summary>Inspect live requests, tile memory, and loading history</summary>
             <dl className="sw-sp-stats" data-testid="scale-stats">
               <div>
                 <dt>Requests / aborts</dt>
@@ -903,7 +970,7 @@ function PerformanceRoute() {
                   {formatBytes(stats.paged?.allocatedBytes ?? 0)}
                 </dd>
                 <dd className="sw-sp-stat-context">
-                  {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%
+                  {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
                   resident
                 </dd>
               </div>
@@ -964,7 +1031,7 @@ function PerformanceRoute() {
                 </ol>
               )}
             </div>
-          </div>
+          </details>
 
           <details className="sw-sp-debug-disclosure" data-testid="scale-global-details">
             <summary>

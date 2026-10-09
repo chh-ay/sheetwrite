@@ -461,6 +461,8 @@ export interface GridEvents {
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
   "hyperlink-activate": HyperlinkActivationEvent;
+  /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
+  "theme-change": { theme: Theme };
   /**
    * Emitted once when the worker renderer could not be constructed and the
    * grid fell back to the main-thread canvas renderer.
@@ -503,6 +505,8 @@ export interface Grid {
   getCellInput(row: number, col: number): CellInputSnapshot | null;
   getSelection(): Selection | null;
   setSelection(sel: Selection | null): void;
+  /** Resolved base theme, before zoom scaling. The returned object is a copy. */
+  getTheme(): Theme;
   /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
   /**

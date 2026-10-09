@@ -89,7 +89,7 @@
 .sw-vuewb-tasktabs {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: hidden;
   border-bottom: 1px solid var(--sw-demo-border-strong);
   background: var(--sw-demo-deep);
@@ -99,27 +99,25 @@
   position: relative;
   min-width: 0;
   min-height: 2.5rem;
-  padding-inline: var(--sw-demo-space-1);
-  overflow: hidden;
+  padding: var(--sw-demo-space-2) var(--sw-demo-space-3);
   border: 0;
   border-right: 1px solid var(--sw-demo-border);
   border-bottom: 1px solid var(--sw-demo-border);
   background: transparent;
   color: var(--sw-demo-muted);
-  font: 650 var(--sw-type-xs) / 1 var(--sw-font-body);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: 650 var(--sw-type-sm) / 1.3 var(--sw-font-body);
+  white-space: normal;
   cursor: pointer;
   transition:
     color var(--sw-demo-transition),
     background var(--sw-demo-transition);
 }
 
-.sw-vuewb-tasktabs button:nth-child(4n) {
+.sw-vuewb-tasktabs button:nth-child(2n) {
   border-right: 0;
 }
 
-.sw-vuewb-tasktabs button:nth-child(n + 5) {
+.sw-vuewb-tasktabs button:nth-last-child(-n + 2) {
   border-bottom: 0;
 }
 
@@ -712,10 +710,14 @@
 @media (max-width: 48rem) {
   .sw-vuewb-controlbar {
     min-height: 3.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sw-demo-space-2);
+    padding-block: var(--sw-demo-space-3);
   }
 
   .sw-vuewb-controlbar .sw-demo-controlbar__controls {
-    justify-content: flex-end;
+    justify-content: flex-start;
     overflow: visible;
   }
 

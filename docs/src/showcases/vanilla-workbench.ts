@@ -203,11 +203,30 @@ export function createWorkbench(
   // 2. Construction-bound options are decided here and only here. Changing
   //    any of them means destroying this generation and creating a new one.
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
+    presentation: "data-grid",
     theme: ENGINE_THEME,
     config: WORKBENCH_GRID_CONFIG,
     renderer: spec.renderer,
     ...(spec.renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
   };
+
+  const workbook = createEngineWorkbook();
+  const MIN_ROW_GUTTER_WIDTH = 48;
+  const ROW_LABEL_FONT_SIZE = 13;
+  const ROW_LABEL_DIGIT_WIDTH = 0.6;
+  const ROW_LABEL_PADDING = 12;
+  for (const sheet of workbook.sheets) {
+    const rowGutterWidth = Math.max(
+      ENGINE_THEME.rowHeaderWidth ?? MIN_ROW_GUTTER_WIDTH,
+      Math.ceil(
+        String(sheet.rowCount).length * ROW_LABEL_FONT_SIZE * ROW_LABEL_DIGIT_WIDTH +
+          ROW_LABEL_PADDING,
+      ),
+    );
+    const dataWidth = sheet.columns.reduce((total, column) => total + column.width, 0);
+    const columnScale = Math.max(1, (gridHost.clientWidth - rowGutterWidth) / dataWidth);
+    for (const column of sheet.columns) column.width = Math.ceil(column.width * columnScale);
+  }
 
   let grid: Grid;
   try {
@@ -215,7 +234,7 @@ export function createWorkbench(
       grid = createGridFromSnapshot(gridHost, spec.snapshot, base);
     } else if (spec.data === "paged") {
       grid = createGrid(gridHost, {
-        workbook: createEngineWorkbook(),
+        workbook,
         datasource: createRevenuePageSource((start, end) =>
           events.onActivity(
             `Rows ${(start + 1).toLocaleString()}–${end.toLocaleString()} served by the host page source`,
@@ -227,7 +246,7 @@ export function createWorkbench(
       grid.setFrozen(0, 1);
     } else {
       grid = createGrid(gridHost, {
-        workbook: createEngineWorkbook(),
+        workbook,
         data: ENGINE_DATA,
         ...base,
       });
