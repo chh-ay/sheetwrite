@@ -1,5 +1,8 @@
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
-import type { EditController } from "./editor.js";
+import { cellScalarToText, parseCellInput } from "./cell-input.js";
+import { ContextMenu } from "./context-menu.js";
+import { CustomEditorController } from "./custom-editor.js";
+import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import type { FindBar } from "./find-bar.js";
 import { formatNumber } from "./number-format.js";
@@ -7,20 +10,28 @@ import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } 
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import type { CellValue } from "./types/cell.js";
-import type { CellAddress, SheetId } from "./types/coordinates.js";
+import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet } from "./types/document.js";
+import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
+import type { ApplyTransactionResult } from "./types/transaction.js";
+import { ValidationEditor } from "./validation-editor.js";
 
 const PRINTABLE = /^.$/u;
 
-export interface InputControllerDeps {
+interface InteractionDependencies {
   host: HTMLElement;
   scroller: HTMLDivElement;
   viewportEl: HTMLDivElement;
-  editor: EditController;
-  /** True for the stock, validation, or a host-supplied editor. */
-  isEditing: () => boolean;
+  grid: Grid;
+  customEditors: ReadonlyMap<string, CellEditor>;
+  highlightCells: (ranges: HighlightRange[] | null) => void;
+  columnHeader: (col: number) => string;
+  toViewRow: (dataRow: number) => number | null;
+  editListeners: {
+    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
+  };
   findBar: () => FindBar | null;
   store: Store;
   loadable: SheetwriteStore | null;
@@ -57,8 +68,8 @@ export interface InputControllerDeps {
   visibleRowWindow: () => { start: number; end: number };
   /** Live column-resize preview: set the width and re-lay-out without committing. */
   previewColumnWidth: (col: number, width: number) => void;
-  /** Apply a row height directly (sheet metadata, not undoable). */
-  setRowHeight: (row: number, height: number) => void;
+  previewRowHeight: (row: number, height: number) => void;
+  clearResizePreview: () => void;
   /**
    * Ctrl+Arrow data-edge target for the moved axis (row for vertical, col for
    * horizontal), or null when unsupported (non-columnar store or an active
@@ -78,7 +89,6 @@ export interface InputControllerDeps {
   ) => { x: number; y: number; w: number; h: number };
   anchorCell: (row: number, col: number) => CellRef;
   toDataRow: (viewRow: number) => number;
-  beginEdit: (row: number, col: number, initial: string | undefined, selectAll: boolean) => void;
   clearSelection: () => void;
   emitSelection: () => void;
   scrollToCell: (addr: CellAddress) => void;
@@ -91,7 +101,7 @@ export interface InputControllerDeps {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
-  commit: (patches: DocumentOp[], reason: CommitReason) => void;
+  commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   readOnly: () => boolean;
 }
 
@@ -99,8 +109,15 @@ export interface InputControllerDeps {
  * Owns grid pointer/keyboard input, including formula point-mode and fill-drag
  * interactions, while delegating mutations back through the grid shell.
  */
-export class InputController {
-  private readonly deps: InputControllerDeps;
+export class InteractionSessions {
+  private readonly deps: InteractionDependencies;
+  private readonly editor: EditController;
+  private readonly validationEditor: ValidationEditor;
+  private readonly customEditor: CustomEditorController;
+  private contextMenu: ContextMenu | null = null;
+  private editingAddress: Readonly<CellAddress> | null = null;
+  private activeEditor: EditController | ValidationEditor | CustomEditorController | null = null;
+  private generation = 0;
   private fillTarget: SelRect | null = null;
   private dragMove: ((ev: PointerEvent) => void) | null = null;
   private dragUp: ((ev: PointerEvent) => void) | null = null;
@@ -110,12 +127,300 @@ export class InputController {
   /** Detached 2D context for autofit text measurement; lazily created. */
   private measureCtx: CanvasRenderingContext2D | null = null;
 
-  constructor(deps: InputControllerDeps) {
+  constructor(deps: InteractionDependencies) {
     this.deps = deps;
+    this.editor = new EditController(deps.viewportEl, {
+      highlightCells: deps.highlightCells,
+      sheet: deps.activeSheet,
+    });
+    this.validationEditor = new ValidationEditor(deps.viewportEl);
+    this.customEditor = new CustomEditorController(deps.viewportEl);
+    deps.scroller.addEventListener("contextmenu", this.onContextMenu);
     deps.scroller.addEventListener("pointerdown", this.onPointerDown);
     deps.scroller.addEventListener("dblclick", this.onDblClick);
     deps.scroller.addEventListener("pointermove", this.onHover);
     deps.host.addEventListener("keydown", this.onKeyDown);
+  }
+
+  get isEditing(): boolean {
+    return this.activeEditor !== null;
+  }
+
+  configureMenu(config: GridConfig | undefined, theme: Theme): void {
+    this.contextMenu?.destroy();
+    this.contextMenu =
+      config?.contextMenu === false
+        ? null
+        : new ContextMenu(
+            this.deps.host,
+            config ?? {},
+            theme,
+            this.deps.grid.actions,
+            this.deps.grid,
+          );
+  }
+
+  private readonly onContextMenu = (e: MouseEvent): void => {
+    if (!this.contextMenu) return;
+    e.preventDefault();
+    const cell = this.cellAtPointer(e.clientX, e.clientY);
+    const address = cell ? { sheet: this.deps.activeSheet(), ...cell } : null;
+    const selection = this.deps.selection();
+    if (cell && !selection.contains(cell.row, cell.col)) {
+      selection.selectCell(cell.row, cell.col);
+      this.deps.emitSelection();
+      this.deps.scheduleRender();
+    }
+    this.contextMenu.open({ cell: address, clientX: e.clientX, clientY: e.clientY });
+  };
+
+  reconcile(change: "view" | "sheet" | "structure" | "read-only" | "value"): void {
+    if (change !== "value") this.cancelPointer();
+    if (change === "sheet" || change === "structure" || change === "read-only") {
+      this.cancelEditor();
+      return;
+    }
+    const address = this.editingAddress;
+    if (!address) return;
+    const viewRow = this.deps.toViewRow(address.row);
+    const column = this.deps.sheet().columns[address.col];
+    if (address.sheet !== this.deps.activeSheet() || viewRow === null || !column) {
+      this.cancelEditor();
+      return;
+    }
+    if (this.activeEditor === this.customEditor) {
+      const value = this.deps.store.getCell(address).resolved;
+      const formula =
+        this.deps.loadable?.getFormula(address) ?? this.deps.store.getFormula(address);
+      this.customEditor.update({
+        viewAddress: { sheet: address.sheet, row: viewRow, col: address.col },
+        column,
+        value,
+        text: formula ?? cellScalarToText(value),
+        label: this.editorLabel(viewRow, address.col),
+      });
+    }
+  }
+
+  reposition(contentTop: number, scrollLeft: number): void {
+    const address = this.editingAddress;
+    if (!address) return;
+    const row = this.deps.toViewRow(address.row);
+    if (row === null) return;
+    const rect = this.deps.screenRect(row, address.col, contentTop, scrollLeft);
+    const editor = this.activeEditor;
+    if (editor instanceof CustomEditorController) {
+      editor.position({ x: rect.x, y: rect.y, width: rect.w, height: rect.h });
+    } else {
+      editor?.position(rect);
+    }
+  }
+
+  private editorLabel(row: number, col: number): string {
+    return `Edit ${this.deps.columnHeader(col)}, row ${row + 1}`;
+  }
+
+  private editorRect(
+    row: number,
+    col: number,
+    contentTop: number,
+    scrollLeft: number,
+  ): CellEditorRect {
+    const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
+    return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+  }
+
+  private endEditor(): void {
+    this.editingAddress = null;
+    this.activeEditor = null;
+    this.deps.host.focus();
+    this.deps.scheduleRender();
+  }
+
+  private cancelEditor(): void {
+    ++this.generation;
+    this.editingAddress = null;
+    const editor = this.activeEditor;
+    this.activeEditor = null;
+    editor?.cancel();
+  }
+
+  private finishEdit(
+    address: Readonly<CellAddress>,
+    input: string | CellValue,
+    navigate: EditNavigate,
+  ): void {
+    if (this.editingAddress !== address) return;
+    this.editingAddress = null;
+    this.activeEditor = null;
+    if (address.sheet !== this.deps.activeSheet()) return;
+    const viewRow = this.deps.toViewRow(address.row);
+    if (viewRow === null) return;
+    const column = this.deps.sheet().columns[address.col];
+    const value = typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
+    this.commitCellEditAt(address, viewRow, value, navigate);
+  }
+
+  private cancelPointer(): void {
+    if (this.activePointerId === null) return;
+    const cancel = this.dragCancel;
+    if (cancel) cancel(new PointerEvent("pointercancel", { pointerId: this.activePointerId }));
+    else this.detachDrag();
+  }
+
+  beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
+    if (this.deps.readOnly()) return;
+
+    const editCell = this.deps.anchorCell(row, col);
+    const sheet = this.deps.sheet();
+    const column = sheet.columns[editCell.col];
+    if (!column) return;
+
+    const dataAddr = {
+      sheet: this.deps.activeSheet(),
+      row: this.deps.toDataRow(editCell.row),
+      col: editCell.col,
+    };
+    const formula = this.deps.loadable?.getFormula(dataAddr) ?? null;
+    const current = this.deps.store.getCell(dataAddr).resolved;
+    const text = initial ?? formula ?? (current === null ? "" : String(current));
+    const contentTop = this.deps.contentTop();
+
+    this.cancelPointer();
+    this.cancelEditor();
+    const generation = ++this.generation;
+    this.editingAddress = dataAddr;
+    const selection = this.deps.selection();
+    const selectionChanged = !selection.isCell(editCell.row, editCell.col);
+    selection.selectCell(editCell.row, editCell.col);
+    this.deps.scheduleRender();
+    if (selectionChanged) this.deps.emitSelection();
+    if (generation !== this.generation || this.deps.readOnly()) return;
+    for (const listener of this.deps.editListeners["edit-begin"]) {
+      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
+    }
+    // edit-begin remains a before-open notification. Reentrant callbacks can
+    // replace or invalidate this request, but cannot reopen its stale target.
+    if (generation !== this.generation || this.deps.readOnly()) return;
+
+    const validationRule = sheet.validationRules?.find(
+      (rule) =>
+        rule.range.sheet === dataAddr.sheet &&
+        dataAddr.row >= Math.min(rule.range.start.row, rule.range.end.row) &&
+        dataAddr.row <= Math.max(rule.range.start.row, rule.range.end.row) &&
+        dataAddr.col >= Math.min(rule.range.start.col, rule.range.end.col) &&
+        dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
+        (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
+    );
+    const custom = column.editor ? this.deps.customEditors.get(column.editor) : undefined;
+    if (custom) {
+      this.activeEditor = this.customEditor;
+      this.customEditor.begin({
+        editor: custom,
+        grid: this.deps.grid,
+        address: dataAddr,
+        viewAddress: { sheet: this.deps.activeSheet(), row: editCell.row, col: editCell.col },
+        column,
+        value: current,
+        text,
+        initialInput: initial,
+        selectAll: selectAll || initial === undefined,
+        label: this.editorLabel(editCell.row, editCell.col),
+        rect: this.editorRect(
+          editCell.row,
+          editCell.col,
+          contentTop,
+          this.deps.scroller.scrollLeft,
+        ),
+        onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
+        onCancel: () => this.endEditor(),
+      });
+      return;
+    }
+    if (initial === undefined && validationRule) {
+      this.activeEditor = this.validationEditor;
+      this.validationEditor.begin({
+        row: editCell.row,
+        col: editCell.col,
+        rule: validationRule,
+        current,
+        rect: this.deps.screenRect(
+          editCell.row,
+          editCell.col,
+          contentTop,
+          this.deps.scroller.scrollLeft,
+        ),
+        theme: this.deps.theme(),
+        onCommit: (value, navigate) =>
+          this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
+        onCancel: () => this.endEditor(),
+      });
+      return;
+    }
+    this.activeEditor = this.editor;
+    this.editor.begin({
+      row: editCell.row,
+      col: editCell.col,
+      type: column.type,
+      initial: text,
+      selectAll: selectAll || initial === undefined,
+      rect: this.deps.screenRect(
+        editCell.row,
+        editCell.col,
+        contentTop,
+        this.deps.scroller.scrollLeft,
+      ),
+      label: this.editorLabel(editCell.row, editCell.col),
+      theme: this.deps.theme(),
+      onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
+      onCancel: () => this.endEditor(),
+    });
+  }
+
+  private commitCellEditAt(
+    address: Readonly<CellAddress>,
+    viewRow: number,
+    value: CellValue,
+    navigate: EditNavigate,
+  ): void {
+    const reason: CommitReason =
+      navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
+    const outcome = this.deps.commit(
+      [
+        {
+          op: "set",
+          addr: { ...address },
+          value,
+        },
+      ],
+      reason,
+    );
+
+    if (outcome.status === "applied") {
+      for (const listener of this.deps.editListeners["edit-commit"]) {
+        listener({
+          addr: { sheet: address.sheet, row: viewRow, col: address.col },
+          value,
+        });
+      }
+      this.moveAfterCommit(viewRow, address.col, navigate);
+    }
+    this.deps.host.focus();
+    this.deps.scheduleRender();
+  }
+
+  private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
+    const sheet = this.deps.sheet();
+    if (navigate === "down")
+      this.deps.selection().selectCell(Math.min(sheet.rowCount - 1, row + 1), col);
+    else if (navigate === "right")
+      this.deps.selection().selectCell(row, this.deps.nextVisibleCol(col, 1));
+    else if (navigate === "left")
+      this.deps.selection().selectCell(row, this.deps.nextVisibleCol(col, -1));
+    else this.deps.selection().selectCell(row, col);
+    this.deps.emitSelection();
+    const f = this.deps.selection().focusCell;
+    if (f) this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row: f.row, col: f.col });
   }
 
   get fillPreview(): SelRect | null {
@@ -149,7 +454,13 @@ export class InputController {
   }
 
   destroy(): void {
-    this.detachDrag();
+    this.cancelPointer();
+    this.cancelEditor();
+    this.editor.destroy();
+    this.validationEditor.destroy();
+    this.customEditor.destroy();
+    this.contextMenu?.destroy();
+    this.deps.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.deps.scroller.removeEventListener("pointerdown", this.onPointerDown);
     this.deps.scroller.removeEventListener("dblclick", this.onDblClick);
     this.deps.scroller.removeEventListener("pointermove", this.onHover);
@@ -157,12 +468,13 @@ export class InputController {
   }
 
   private readonly onPointerDown = (e: PointerEvent): void => {
+    if (this.activePointerId !== null) return;
     // Primary button only. Touch contacts always report button 0; a pen barrel
     // button (non-zero) must not select, so the guard covers mouse AND pen.
     if (e.pointerType !== "touch" && e.button !== 0) return;
     const isTouch = e.pointerType === "touch";
 
-    const editor = this.deps.editor;
+    const editor = this.editor;
     // Formula point mode: while editing a "=" formula, clicks/drags pick A1
     // references into the editor instead of moving the grid selection.
     if (editor.isEditing && editor.value.startsWith("=")) {
@@ -178,16 +490,16 @@ export class InputController {
         editor.endReference();
         this.detachDrag();
       };
-      this.attachDrag(e, move, up);
+      this.attachDrag(e, move, up, up);
       return;
     }
     // A selected cell must own subsequent keyboard input across browsers.
     // Keep touch and active-editor gestures focused where they already are.
-    if (!isTouch && !this.deps.isEditing()) this.deps.host.focus({ preventScroll: true });
+    if (!isTouch && !this.isEditing) this.deps.host.focus({ preventScroll: true });
 
     const viewportRect = this.deps.viewportEl.getBoundingClientRect();
     const fillHandle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
-    if (fillHandle && !this.deps.isEditing()) {
+    if (fillHandle && !this.isEditing) {
       const hx = e.clientX - viewportRect.left;
       const hy = e.clientY - viewportRect.top;
       if (Math.abs(hx - fillHandle.x) <= 5 && Math.abs(hy - fillHandle.y) <= 5) {
@@ -199,7 +511,7 @@ export class InputController {
 
     // Resize gesture: near a column boundary in the top header, or a row boundary
     // in the left gutter. Takes priority over selection; disabled while editing.
-    if (!this.deps.isEditing() && !this.deps.readOnly()) {
+    if (!this.isEditing && !this.deps.readOnly()) {
       const resize = this.resizeAt(e);
       if (resize) {
         e.preventDefault();
@@ -314,7 +626,7 @@ export class InputController {
     }
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
-    this.deps.beginEdit(cell.row, cell.col, undefined, true);
+    this.beginEdit(cell.row, cell.col, undefined, true);
   };
 
   private readonly onHover = (e: PointerEvent): void => {
@@ -372,6 +684,7 @@ export class InputController {
     };
     const up = (): void => {
       this.detachDrag();
+      this.deps.clearResizePreview();
       this.deps.commit(
         [
           {
@@ -384,16 +697,37 @@ export class InputController {
         "structure",
       );
     };
-    this.attachDrag(e, move, up);
+    const cancel = (): void => {
+      this.detachDrag();
+      this.deps.clearResizePreview();
+    };
+    this.attachDrag(e, move, up, cancel);
   }
 
   private startRowResize(e: PointerEvent, row: number, startY: number): void {
-    const startHeight = this.deps.rowHeight(row);
+    const sheet = this.deps.activeSheet();
+    const dataRow = this.deps.toDataRow(row);
+    const startHeight = this.deps.rowHeight(row) / this.deps.zoom();
+    let finalHeight = startHeight;
     const move = (ev: PointerEvent): void => {
-      const height = Math.max(MIN_ROW_HEIGHT, Math.round(startHeight + ev.clientY - startY));
-      this.deps.setRowHeight(row, height);
+      finalHeight = Math.max(
+        MIN_ROW_HEIGHT,
+        Math.round(startHeight + (ev.clientY - startY) / this.deps.zoom()),
+      );
+      this.deps.previewRowHeight(row, finalHeight);
     };
-    this.attachDrag(e, move, () => this.detachDrag());
+    const cancel = (): void => {
+      this.detachDrag();
+      this.deps.clearResizePreview();
+    };
+    const up = (): void => {
+      cancel();
+      this.deps.commit(
+        [{ op: "setRowMeta", sheet, row: dataRow, meta: { height: finalHeight } }],
+        "structure",
+      );
+    };
+    this.attachDrag(e, move, up, cancel);
   }
 
   private autofitColumn(col: number): void {
@@ -441,7 +775,7 @@ export class InputController {
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (this.deps.isEditing()) return;
+    if (this.isEditing) return;
     // Keys typed into an editable widget inside the host (find bar, custom
     // toolbar fields) belong to that widget. Without this guard the grid's
     // type-to-edit default steals focus mid-keystroke and Backspace becomes a
@@ -568,7 +902,7 @@ export class InputController {
         break;
       case "Enter":
       case "F2":
-        if (focus) this.deps.beginEdit(focus.row, focus.col, undefined, e.key === "F2");
+        if (focus) this.beginEdit(focus.row, focus.col, undefined, e.key === "F2");
         break;
       case "Delete":
       case "Backspace":
@@ -576,7 +910,7 @@ export class InputController {
         break;
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
-          this.deps.beginEdit(focus.row, focus.col, e.key, false);
+          this.beginEdit(focus.row, focus.col, e.key, false);
         } else {
           return;
         }
@@ -655,6 +989,7 @@ export class InputController {
   private startFillDrag(e: PointerEvent): void {
     const source = this.fillSourceRect();
     if (!source) return;
+    this.fillTarget = null;
     const move = (ev: PointerEvent): void => {
       const c = this.fillCellAt(ev.clientX, ev.clientY);
       this.fillTarget = this.extendFill(source, c);
@@ -664,8 +999,7 @@ export class InputController {
       this.detachDrag();
       const target = this.fillTarget;
       this.fillTarget = null;
-      if (target) {
-        this.commitFill(source, target);
+      if (target && this.commitFill(source, target)) {
         const selection = this.deps.selection();
         selection.selectCell(target.r0, target.c0);
         selection.extendTo(target.r1, target.c1);
@@ -698,8 +1032,8 @@ export class InputController {
     return { r0: source.r0, c0: c.col, r1: source.r1, c1: source.c1 };
   }
 
-  private commitFill(source: SelRect, target: SelRect): void {
-    if (this.deps.readOnly()) return;
+  private commitFill(source: SelRect, target: SelRect): boolean {
+    if (this.deps.readOnly()) return false;
     const srcCols = source.c1 - source.c0 + 1;
     const series = new Map<number, FillSeries>();
     const patches: DocumentOp[] = [];
@@ -714,7 +1048,9 @@ export class InputController {
         if (r >= source.r0 && r <= source.r1 && c >= source.c0 && c <= source.c1) continue;
 
         const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
-        const step = series.get(sc)!.stepAt(r - source.r0);
+        const columnSeries = series.get(sc);
+        if (!columnSeries) throw new Error(`Missing fill series for column ${sc}`);
+        const step = columnSeries.stepAt(r - source.r0);
         const targetDataRow = this.deps.toDataRow(r);
         patches.push({
           op: "set",
@@ -731,7 +1067,7 @@ export class InputController {
         });
       }
     }
-    this.deps.commit(patches, "fill");
+    return this.deps.commit(patches, "fill").status === "applied";
   }
 
   private seriesForColumn(source: SelRect, col: number): FillSeries {
@@ -764,7 +1100,7 @@ export class InputController {
     up: (ev: PointerEvent) => void,
     cancel?: (ev: PointerEvent) => void,
   ): void {
-    this.detachDrag();
+    this.cancelPointer();
     const scroller = this.deps.scroller;
     this.activePointerId = e.pointerId;
 
@@ -784,11 +1120,14 @@ export class InputController {
     scroller.addEventListener("pointermove", this.dragMove);
     scroller.addEventListener("pointerup", this.dragUp);
     scroller.addEventListener("pointercancel", this.dragCancel);
+    scroller.addEventListener("lostpointercapture", this.dragCancel);
     if (typeof scroller.setPointerCapture === "function") {
       try {
         scroller.setPointerCapture(e.pointerId);
-      } catch {
-        // happy-dom / detached elements: capture is a UA nicety, not required.
+      } catch (error) {
+        if (!(error instanceof DOMException) || error.name !== "NotFoundError") throw error;
+        // Detached grids cannot capture; scoped listeners still own termination.
+        console.warn("Pointer capture unavailable for detached grid", error);
       }
     }
   }
@@ -797,7 +1136,10 @@ export class InputController {
     const scroller = this.deps.scroller;
     if (this.dragMove) scroller.removeEventListener("pointermove", this.dragMove);
     if (this.dragUp) scroller.removeEventListener("pointerup", this.dragUp);
-    if (this.dragCancel) scroller.removeEventListener("pointercancel", this.dragCancel);
+    if (this.dragCancel) {
+      scroller.removeEventListener("pointercancel", this.dragCancel);
+      scroller.removeEventListener("lostpointercapture", this.dragCancel);
+    }
     this.dragMove = null;
     this.dragUp = null;
     this.dragCancel = null;

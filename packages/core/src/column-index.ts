@@ -6,7 +6,7 @@ export class ColumnIndex {
   private readonly columns: Int32Array;
   private readonly offsets: Float64Array;
   private readonly positions: Int32Array;
-  private readonly total: number;
+  private total: number;
 
   constructor(columns: readonly number[], widths: ArrayLike<number>) {
     const count = columns.length;
@@ -39,6 +39,19 @@ export class ColumnIndex {
 
   get totalWidth(): number {
     return this.total;
+  }
+
+  /** Update a visible span without reallocating the reverse map or prefix storage. */
+  setWidth(absoluteCol: number, width: number): void {
+    const position = this.positionOf(absoluteCol);
+    if (position === -1) return;
+    const previous = (this.offsets[position + 1] ?? 0) - (this.offsets[position] ?? 0);
+    const delta = width - previous;
+    if (delta === 0) return;
+    for (let i = position + 1; i < this.offsets.length; i++) {
+      this.offsets[i] = (this.offsets[i] ?? 0) + delta;
+    }
+    this.total += delta;
   }
 
   /** Sum of widths of visible columns before `absoluteCol`. */

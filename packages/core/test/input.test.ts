@@ -216,6 +216,195 @@ describe("pointer input: drag lifecycle", () => {
     scroller.dispatchEvent(pointer("pointerup", { ...cellPoint(3, 1, workbook) }));
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(before);
   });
+  for (const axis of ["column", "row"] as const) {
+    it(`${axis} resize previews without mutations and commits one undoable change`, () => {
+      const { grid, store, scroller } = makeGrid();
+      const original = axis === "column" ? 160 : DEFAULT_THEME.rowHeight;
+      const start =
+        axis === "column"
+          ? { clientX: DEFAULT_THEME.rowHeaderWidth + original, clientY: 10 }
+          : { clientX: 10, clientY: DEFAULT_THEME.headerHeight + original };
+      const end =
+        axis === "column"
+          ? { ...start, clientX: start.clientX + 40 }
+          : { ...start, clientY: start.clientY + 40 };
+      const dimension = () =>
+        axis === "column"
+          ? store.getWorkbook().sheets[0]?.columns[0]?.width
+          : (store.getWorkbook().sheets[0]?.rowHeights?.get(0) ?? DEFAULT_THEME.rowHeight);
+      const changes: string[] = [];
+      grid.on("change", (event) => changes.push(event.commitReason));
+      scroller.dispatchEvent(pointer("pointerdown", start));
+      scroller.dispatchEvent(pointer("pointermove", end));
+      scroller.dispatchEvent(pointer("pointermove", end));
+      expect(dimension()).toBe(original);
+      expect(changes).toEqual([]);
+      scroller.dispatchEvent(pointer("pointerup", end));
+      expect(dimension()).toBe(original + 40);
+      expect(changes).toEqual(["structure"]);
+      grid.undo();
+      expect(dimension()).toBe(original);
+      grid.destroy();
+      store.dispose();
+    });
+
+    for (const termination of ["pointercancel", "lostpointercapture", "read-only"] as const) {
+      it(`${axis} resize restores geometry on ${termination}`, () => {
+        const { grid, store, scroller, capture } = makeGrid();
+        const original = axis === "column" ? 160 : DEFAULT_THEME.rowHeight;
+        const start =
+          axis === "column"
+            ? { clientX: DEFAULT_THEME.rowHeaderWidth + original, clientY: 10 }
+            : { clientX: 10, clientY: DEFAULT_THEME.headerHeight + original };
+        const end =
+          axis === "column"
+            ? { ...start, clientX: start.clientX + 40 }
+            : { ...start, clientY: start.clientY + 40 };
+        const changes: string[] = [];
+        grid.on("change", (event) => changes.push(event.commitReason));
+        scroller.dispatchEvent(pointer("pointerdown", start));
+        scroller.dispatchEvent(pointer("pointermove", end));
+        if (termination === "read-only") grid.setReadOnly(true);
+        else scroller.dispatchEvent(pointer(termination, end));
+        scroller.dispatchEvent(pointer("pointerup", end));
+        expect(changes).toEqual([]);
+        expect(capture.released).toEqual([1]);
+        const address = grid.getCellAtPoint(
+          axis === "column" ? start.clientX + 10 : DEFAULT_THEME.rowHeaderWidth + 20,
+          axis === "row" ? start.clientY + 10 : DEFAULT_THEME.headerHeight + 10,
+        );
+        expect(axis === "column" ? address?.col : address?.row).toBe(1);
+        grid.destroy();
+        store.dispose();
+      });
+    }
+  }
+
+  it("ignores another pointerdown before it can replace selection or capture", () => {
+    const { grid, store, scroller, workbook, capture } = makeGrid();
+    scroller.dispatchEvent(pointer("pointerdown", cellPoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerdown", { ...cellPoint(4, 2, workbook), pointerId: 2 }));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+    expect(grid.getSelection()).toMatchObject({
+      kind: "range",
+      range: { start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+    });
+    expect(capture.set).toEqual([1]);
+    expect(capture.released).toEqual([1]);
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("ends a cancelled formula reference span before the next pick", () => {
+    const { grid, store, host, scroller, workbook } = makeGrid();
+    grid.beginEdit(0, 0, "=");
+    const editor = host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+    if (!editor) throw new Error("formula editor missing");
+    scroller.dispatchEvent(pointer("pointerdown", cellPoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointercancel", cellPoint(1, 1, workbook)));
+    editor.value += "+";
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+    scroller.dispatchEvent(pointer("pointerdown", cellPoint(2, 2, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 2, workbook)));
+    expect(editor.value).toBe("=B2+C3");
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("abandons a fill when structure changes before release", () => {
+    const { grid, store, scroller, workbook, capture } = makeGrid();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const before = store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved;
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+    grid.setColumnWidth(0, 200);
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(before);
+    expect(capture.released).toEqual([1]);
+    grid.destroy();
+    store.dispose();
+  });
+  it("abandons a captured selection when switching sheets", () => {
+    const { grid, store, scroller, workbook, capture } = makeGrid();
+    const sheet = makeWorkbook(10).sheets[0];
+    if (!sheet) throw new Error("second sheet missing");
+    sheet.id = "s2";
+    sheet.name = "Other sheet";
+    grid.applyTransaction({
+      patches: [{ op: "addSheet", sheet: { ...sheet, order: 1, cells: [] } }],
+    });
+    scroller.dispatchEvent(pointer("pointerdown", cellPoint(0, 0, workbook)));
+    grid.setActiveSheet("s2");
+    const selection = grid.getSelection();
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+    expect(grid.getSelection()).toEqual(selection);
+    expect(capture.released).toEqual([1]);
+    grid.destroy();
+    store.dispose();
+  });
+
+  for (const axis of ["column", "row"] as const) {
+    it(`restores ${axis} preview geometry when structural admission rejects release`, () => {
+      const { grid, store, scroller } = makeGrid();
+      grid.setProtectedRange({
+        id: "deny-resize",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 9, col: 2 } },
+      });
+      grid.setProtectionResolver(() => "deny");
+      const original = axis === "column" ? 160 : DEFAULT_THEME.rowHeight;
+      const start =
+        axis === "column"
+          ? { clientX: DEFAULT_THEME.rowHeaderWidth + original, clientY: 10 }
+          : { clientX: 10, clientY: DEFAULT_THEME.headerHeight + original };
+      const end =
+        axis === "column"
+          ? { ...start, clientX: start.clientX + 40 }
+          : { ...start, clientY: start.clientY + 40 };
+      const rejections: string[] = [];
+      grid.on("mutation-rejected", ({ issues }) =>
+        rejections.push(...issues.map((issue) => issue.kind)),
+      );
+      scroller.dispatchEvent(pointer("pointerdown", start));
+      scroller.dispatchEvent(pointer("pointermove", end));
+      scroller.dispatchEvent(pointer("pointerup", end));
+      expect(rejections).toEqual(["protection"]);
+      const sheet = store.getWorkbook().sheets[0];
+      expect(
+        axis === "column"
+          ? sheet?.columns[0]?.width
+          : (sheet?.rowHeights?.get(0) ?? DEFAULT_THEME.rowHeight),
+      ).toBe(original);
+      const address = grid.getCellAtPoint(
+        axis === "column" ? start.clientX + 10 : DEFAULT_THEME.rowHeaderWidth + 20,
+        axis === "row" ? start.clientY + 10 : DEFAULT_THEME.headerHeight + 10,
+      );
+      expect(axis === "column" ? address?.col : address?.row).toBe(1);
+      grid.destroy();
+      store.dispose();
+    });
+  }
+
+  it("keeps the source selection when fill admission rejects its values", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    grid.setValidationRule({
+      id: "deny-fill",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+      condition: { kind: "list", values: ["Allowed"] },
+      policy: "reject",
+    });
+    const source = { kind: "cell" as const, addr: { sheet: "s1", row: 0, col: 0 } };
+    grid.setSelection(source);
+    const before = store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved;
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 0, workbook)));
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(before);
+    expect(grid.getSelection()).toEqual(source);
+    grid.destroy();
+    store.dispose();
+  });
 });
 describe("validation through input mutation paths", () => {
   it("rejects invalid external paste at the shared commit boundary", async () => {

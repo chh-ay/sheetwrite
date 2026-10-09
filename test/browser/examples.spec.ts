@@ -323,3 +323,64 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     )
     .toBe(true);
 });
+
+test("pointer selection and row/column resize keep preview out of history until release", async ({
+  page,
+}) => {
+  await page.goto(urlOf("vue"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("Vue grid unavailable");
+    grid.setActiveSheet("orders");
+    // This scenario isolates pointer history; policy rejection has its own
+    // interface regressions and the workbench starts in a restricted role.
+    grid.setProtectionResolver(() => "allow");
+    grid.scrollToCell({ sheet: "orders", row: 0, col: 0 });
+  });
+  const scroller = page.locator(".sw-demo-grid .sheetwrite-scroller");
+  const bounds = await scroller.boundingBox();
+  if (!bounds) throw new Error("Grid scroller bounds unavailable");
+  const gutter = 48;
+  const header = 32;
+  const rowHeight = 30;
+  await page.mouse.move(bounds.x + gutter + 20, bounds.y + header + 10);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + gutter + 20, bounds.y + header + rowHeight * 2 + 10);
+  await page.mouse.up();
+  expect(
+    await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection()),
+  ).toMatchObject({
+    kind: "range",
+    range: { start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+  });
+
+  for (const axis of ["column", "row"] as const) {
+    const original = await page.evaluate(() => {
+      const grid = window.__sheetwriteVueWorkbench?.grid;
+      if (!grid) throw new Error("Vue grid unavailable");
+      return grid.exportSnapshot();
+    });
+    const sheet = original.sheets.find((candidate) => candidate.id === "orders");
+    const column = sheet?.columns[0];
+    if (!column) throw new Error("Orders column unavailable");
+    const x = bounds.x + (axis === "column" ? gutter + column.width : 10);
+    const y = bounds.y + (axis === "row" ? header + rowHeight : 10);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + (axis === "column" ? 40 : 0), y + (axis === "row" ? 40 : 0), {
+      steps: 4,
+    });
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).toEqual(original);
+    await page.mouse.up();
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).not.toEqual(original);
+    await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.undo());
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).toEqual(original);
+  }
+});
