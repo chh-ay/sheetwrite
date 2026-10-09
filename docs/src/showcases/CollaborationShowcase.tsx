@@ -29,11 +29,13 @@ import {
   COLLABORATION_DOCUMENT_ID,
   COLLABORATION_FORECAST_ROWS,
   COLLABORATION_TOTAL_CELL,
+  COLLABORATION_USAGE_DOCUMENT_ID,
   COLLABORATION_WORKBOOK_COLUMNS,
   COLLABORATION_WORKBOOK_ROWS,
   makeCollaborationSnapshot,
+  makeCollaborationUsageSnapshot,
 } from "./collaboration-seed.js";
-import { USAGE_RANGE, USAGE_SHEET_ID, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
+import { USAGE_RANGE, USAGE_TOTAL_CELL } from "./scenarios/durable-usage.js";
 
 const LOG_LIMIT = 10;
 const SERVER_LOG_LIMIT = 12;
@@ -144,6 +146,16 @@ const QUEUE_DATABASE: Record<ClientKey, string> = {
 
 type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" }>;
 
+/**
+ * The two documents both clients can mount. The forecast carries every proof
+ * except the batch drill; the usage document is only loaded for that drill.
+ */
+type ShowcaseDocument = "forecast" | "usage";
+const DOCUMENT_ID: Record<ShowcaseDocument, string> = {
+  forecast: COLLABORATION_DOCUMENT_ID,
+  usage: COLLABORATION_USAGE_DOCUMENT_ID,
+};
+
 interface LogEntry {
   id: number;
   kind: "info" | "commit" | "remote" | "warn" | "error";
@@ -154,6 +166,8 @@ interface ClientRuntime {
   actor: ShowcaseActor;
   /** Boot generation that created this runtime; stale callbacks never touch the queue. */
   generation: number;
+  /** Document this client is mounted on; its link talks to that document's server. */
+  document: ShowcaseDocument;
   link: ShowcaseNetworkLink;
   storage: IndexedDbPendingCommitStorage;
   grid: Grid;
@@ -189,10 +203,25 @@ export default function CollaborationShowcase() {
     a: useRef<HTMLDivElement>(null),
     b: useRef<HTMLDivElement>(null),
   };
-  const serverRef = useRef<ShowcaseCollaborationServer | null>(null);
+  /** One sequencing server per document; the usage server starts on first use. */
+  const serversRef = useRef<Record<ShowcaseDocument, ShowcaseCollaborationServer | null>>({
+    forecast: null,
+    usage: null,
+  });
   const busRef = useRef<ShowcasePresenceBus | null>(null);
   const clientsRef = useRef<Record<ClientKey, ClientRuntime | null>>({ a: null, b: null });
-  const serverDisposerRef = useRef<(() => void) | null>(null);
+  const serverDisposersRef = useRef<Array<() => void>>([]);
+  /** Document both clients show, or are switching to. */
+  const documentRef = useRef<ShowcaseDocument>("forecast");
+  /** Serializes document switches so two never interleave their remounts. */
+  const switchRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  /** True while the batch drill runs: nothing may move the clients off its document. */
+  const drillRef = useRef(false);
+  /** Last account read per client, kept while the clients show the usage document. */
+  const accountRef = useRef<Record<ClientKey, string>>({
+    a: "the first deal",
+    b: "the first deal",
+  });
   const logIdRef = useRef(0);
   const recoveringRef = useRef<Record<ClientKey, boolean>>({ a: false, b: false });
   const bootGenerationRef = useRef(0);
@@ -294,9 +323,14 @@ export default function CollaborationShowcase() {
     }));
   };
 
+  /** The forecast total and sync state; on the usage document the total keeps its last value. */
   const readClient = (key: ClientKey) => {
     const runtime = clientsRef.current[key];
     if (!runtime) return;
+    if (runtime.document !== "forecast") {
+      patchView(key, { syncState: runtime.sync.state });
+      return;
+    }
     const resolved = runtime.grid.store.getCell(COLLABORATION_TOTAL_CELL).resolved;
     patchView(key, {
       total:
@@ -307,25 +341,31 @@ export default function CollaborationShowcase() {
     });
   };
 
-  /** Account behind this client's sample edit; read from the Grid it is mounted on. */
+  /** Account behind this client's sample edit; read from the forecast it is mounted on. */
   const sampleAccount = (key: ClientKey): string => {
     const runtime = clientsRef.current[key];
-    const resolved = runtime?.grid.store.getCell({
+    if (runtime?.document !== "forecast") return accountRef.current[key];
+    const resolved = runtime.grid.store.getCell({
       sheet: "plan",
       row: SAMPLE_ROW[key],
       col: 0,
     }).resolved;
-    return typeof resolved === "string" ? resolved : "the first deal";
+    if (typeof resolved === "string") accountRef.current[key] = resolved;
+    return accountRef.current[key];
   };
 
-  const bootClient = async (key: ClientKey, generation: number): Promise<void> => {
+  const bootClient = async (
+    key: ClientKey,
+    generation: number,
+    target: ShowcaseDocument,
+  ): Promise<void> => {
     const host = hostRefs[key].current;
-    const server = serverRef.current;
+    const server = serversRef.current[target];
     const bus = busRef.current;
     if (!host || !server || !bus || generation !== bootGenerationRef.current) return;
     const actor = key === "a" ? COLLABORATION_ACTORS[0] : COLLABORATION_ACTORS[1];
     const link = new ShowcaseNetworkLink(server);
-    const snapshot = await server.load(COLLABORATION_DOCUMENT_ID);
+    const snapshot = await server.load(DOCUMENT_ID[target]);
     link.startFrom(snapshot.version ?? 0);
     if (generation !== bootGenerationRef.current) {
       link.destroy();
@@ -338,7 +378,7 @@ export default function CollaborationShowcase() {
     });
     const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
     const sync = new SyncCoordinator(grid, link, {
-      documentId: COLLABORATION_DOCUMENT_ID,
+      documentId: DOCUMENT_ID[target],
       serverVersion: snapshot.version ?? 0,
       pendingStorage: storage,
       createMutationId: () => `${actor.id}-${Date.now().toString(36)}-${nextMutation++}`,
@@ -348,6 +388,7 @@ export default function CollaborationShowcase() {
     const runtime: ClientRuntime = {
       actor,
       generation,
+      document: target,
       link,
       storage,
       grid,
@@ -508,6 +549,67 @@ export default function CollaborationShowcase() {
     }
   };
 
+  /** Starts a document's in-page server and logs its sequencing decisions. */
+  const startServer = (target: ShowcaseDocument): ShowcaseCollaborationServer => {
+    const server = new ShowcaseCollaborationServer(
+      target === "forecast" ? makeCollaborationSnapshot() : makeCollaborationUsageSnapshot(),
+    );
+    serversRef.current[target] = server;
+    serverDisposersRef.current.push(
+      server.observeCommits((record: ShowcaseCommitRecord) => {
+        logIdRef.current += 1;
+        const entry = {
+          id: logIdRef.current,
+          kind: "info" as const,
+          status: record.status,
+          text: describeServerDecision(record),
+        };
+        setServerLog((entries) => [entry, ...entries].slice(0, SERVER_LOG_LIMIT));
+        // The head shown is the head of the document the clients are on.
+        if (record.documentId === DOCUMENT_ID[documentRef.current]) {
+          setServerVersion((current) => Math.max(current, record.version));
+        }
+      }),
+    );
+    return server;
+  };
+
+  const stopServers = () => {
+    for (const dispose of serverDisposersRef.current) dispose();
+    serverDisposersRef.current = [];
+    serversRef.current = { forecast: null, usage: null };
+  };
+
+  /**
+   * Remount both clients on another document once their queues drain. Only
+   * the batch drill uses the usage document, so conflict recovery on the
+   * forecast reloads 10,000 cells instead of 110,000. Resolves false if the
+   * clients stayed where they were.
+   */
+  const showDocument = (target: ShowcaseDocument): Promise<boolean> => {
+    const next = switchRef.current.then(async () => {
+      const onTarget = CLIENT_KEYS.every((key) => clientsRef.current[key]?.document === target);
+      if (onTarget) return true;
+      if (drillRef.current && target !== "usage") return false;
+      const generation = bootGenerationRef.current;
+      const settleBy = performance.now() + CHAOS_SETTLE_MS;
+      while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
+      if (clientsBusy() || generation !== bootGenerationRef.current) return false;
+      const server = serversRef.current[target] ?? startServer(target);
+      for (const key of CLIENT_KEYS) disposeClient(key);
+      documentRef.current = target;
+      setServerVersion(server.headVersion(DOCUMENT_ID[target]));
+      await bootClient("a", generation, target);
+      await bootClient("b", generation, target);
+      if (generation !== bootGenerationRef.current) return false;
+      await clientsRef.current.a?.presence.publishNow();
+      await clientsRef.current.b?.presence.publishNow();
+      return CLIENT_KEYS.every((key) => clientsRef.current[key]?.document === target);
+    });
+    switchRef.current = next.catch(() => false);
+    return next;
+  };
+
   const bootAll = async (generation: number) => {
     if (generation !== bootGenerationRef.current) return;
     setStatus("loading");
@@ -517,25 +619,15 @@ export default function CollaborationShowcase() {
       if (generation !== bootGenerationRef.current) return;
       await initSheetwrite();
       if (generation !== bootGenerationRef.current) return;
-      const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
-      serverRef.current = server;
+      stopServers();
       busRef.current = new ShowcasePresenceBus();
+      documentRef.current = "forecast";
       setServerVersion(0);
       setServerLog([]);
-      serverDisposerRef.current = server.observeCommits((record: ShowcaseCommitRecord) => {
-        logIdRef.current += 1;
-        const entry = {
-          id: logIdRef.current,
-          kind: "info" as const,
-          status: record.status,
-          text: describeServerDecision(record),
-        };
-        setServerLog((entries) => [entry, ...entries].slice(0, SERVER_LOG_LIMIT));
-        setServerVersion((current) => Math.max(current, record.version));
-      });
-      await bootClient("a", generation);
+      startServer("forecast");
+      await bootClient("a", generation, "forecast");
       if (generation !== bootGenerationRef.current) return;
-      await bootClient("b", generation);
+      await bootClient("b", generation, "forecast");
       if (generation !== bootGenerationRef.current) return;
       // Both clients are subscribed now; announce presence deterministically.
       await clientsRef.current.a?.presence.publishNow();
@@ -558,9 +650,7 @@ export default function CollaborationShowcase() {
     return () => {
       if (bootGenerationRef.current === generation) bootGenerationRef.current += 1;
       for (const key of CLIENT_KEYS) disposeClient(key);
-      serverDisposerRef.current?.();
-      serverDisposerRef.current = null;
-      serverRef.current = null;
+      stopServers();
       busRef.current = null;
     };
   }, []);
@@ -577,6 +667,13 @@ export default function CollaborationShowcase() {
   }, []);
 
   const sampleEdit = (key: ClientKey) => {
+    void (async () => {
+      if (!(await showDocument("forecast"))) return;
+      editForecast(key);
+    })();
+  };
+
+  const editForecast = (key: ClientKey) => {
     const runtime = clientsRef.current[key];
     if (!runtime) return;
     const row = SAMPLE_ROW[key];
@@ -584,7 +681,6 @@ export default function CollaborationShowcase() {
     const current = runtime.grid.store.getCell(addr).resolved;
     const forecast =
       typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
-    runtime.grid.setActiveSheet("plan");
     runtime.grid.setSelection({ kind: "cell", addr });
     const outcome = runtime.grid.applyTransaction({
       patches: [{ op: "set", addr, value: { kind: "literal", value: forecast } }],
@@ -621,7 +717,6 @@ export default function CollaborationShowcase() {
     chaosRunRef.current = run;
     const stillRunning = () =>
       chaosRunRef.current === run && clientsRef.current.a !== null && clientsRef.current.b !== null;
-    const offline: Record<ClientKey, boolean> = { a: !views.a.online, b: !views.b.online };
     const report: ChaosReport = {
       phase: "storm",
       edits: 0,
@@ -631,7 +726,7 @@ export default function CollaborationShowcase() {
       cells: 0,
       ms: 0,
     };
-    const started = performance.now();
+    let started = performance.now();
     let publishedAt = 0;
     const publish = (force = true) => {
       const now = performance.now();
@@ -639,11 +734,23 @@ export default function CollaborationShowcase() {
       publishedAt = now;
       setChaos({ ...report, ms: now - started });
     };
+    // Publishing first replaces any earlier verdict and keeps the button
+    // disabled while the clients leave the usage document of the batch drill.
     publish();
+    if (!(await showDocument("forecast"))) {
+      report.phase = "timed-out";
+      publish();
+      return;
+    }
+    started = performance.now();
+    // Read after the switch: a remount brings both clients back online.
+    const offline: Record<ClientKey, boolean> = {
+      a: clientsRef.current.a?.link.connected === false,
+      b: clientsRef.current.b?.link.connected === false,
+    };
     // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
     // every edit and every synced arrival is visible while the storm runs.
     for (const key of CLIENT_KEYS) {
-      clientsRef.current[key]?.grid.setActiveSheet("plan");
       showRows(key, CHAOS_VIEW_ROWS);
       shownRowsRef.current[key] = visibleRows(key);
     }
@@ -700,7 +807,7 @@ export default function CollaborationShowcase() {
     // both clients sit at the server head: a client stuck on a version gap has
     // nothing queued but has not caught up.
     const settleBy = performance.now() + CHAOS_DRAIN_MS;
-    const head = () => serverRef.current?.headVersion(COLLABORATION_DOCUMENT_ID) ?? -1;
+    const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
     const idle = () =>
       CLIENT_KEYS.every(
         (key) =>
@@ -752,17 +859,24 @@ export default function CollaborationShowcase() {
    * version in a single transaction or none of them.
    */
   const restoreUsage = () => {
-    const restorer = clientsRef.current.a;
-    const peer = clientsRef.current.b;
-    const server = serverRef.current;
-    if (!restorer || !peer || !server) return;
     const started = performance.now();
     setRestoreRunning(true);
     setBatchReport(null);
-    restorer.grid.setActiveSheet(USAGE_SHEET_ID);
-    peer.grid.setActiveSheet(USAGE_SHEET_ID);
+    drillRef.current = true;
     void (async () => {
       try {
+        if (!(await showDocument("usage"))) {
+          pushClientLog(
+            "a",
+            "warn",
+            "Restore drill stopped: the clients could not open the usage document.",
+          );
+          return;
+        }
+        const restorer = clientsRef.current.a;
+        const peer = clientsRef.current.b;
+        const server = serversRef.current.usage;
+        if (!restorer || !peer || !server) return;
         const settleBy = performance.now() + CHAOS_SETTLE_MS;
         while (performance.now() < settleBy && clientsBusy()) await delay(CHAOS_TICK_MS);
         if (clientsBusy()) {
@@ -837,6 +951,7 @@ export default function CollaborationShowcase() {
       } catch (error) {
         pushClientLog("a", "error", error instanceof Error ? error.message : String(error));
       } finally {
+        drillRef.current = false;
         setRestoreRunning(false);
       }
     })();
@@ -878,18 +993,21 @@ export default function CollaborationShowcase() {
   };
 
   const serverEdit = () => {
-    const server = serverRef.current;
-    if (!server) return;
-    const runtime = clientsRef.current.a ?? clientsRef.current.b;
-    const addr = { sheet: "plan", row: 4, col: 2 };
-    const current = runtime?.grid.store.getCell(addr).resolved;
-    const forecast =
-      typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
-    void server
-      .commitServerOperations(COLLABORATION_DOCUMENT_ID, [
-        { op: "set", addr, value: { kind: "literal", value: forecast } },
-      ])
-      .catch(() => {});
+    void (async () => {
+      if (!(await showDocument("forecast"))) return;
+      const server = serversRef.current.forecast;
+      if (!server) return;
+      const runtime = clientsRef.current.a ?? clientsRef.current.b;
+      const addr = { sheet: "plan", row: 4, col: 2 };
+      const current = runtime?.grid.store.getCell(addr).resolved;
+      const forecast =
+        typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
+      await server
+        .commitServerOperations(DOCUMENT_ID.forecast, [
+          { op: "set", addr, value: { kind: "literal", value: forecast } },
+        ])
+        .catch(() => {});
+    })();
   };
 
   /** Documented host recovery: rebase, clear stale durable ids, remount, resubmit. */
@@ -900,7 +1018,7 @@ export default function CollaborationShowcase() {
     try {
       const runtime = clientsRef.current[key];
       const host = hostRefs[key].current;
-      const server = serverRef.current;
+      const server = runtime ? serversRef.current[runtime.document] : null;
       const bus = busRef.current;
       if (!runtime || !host || !server || !bus) return;
       if (!response.operationsSinceBase) {
@@ -936,9 +1054,9 @@ export default function CollaborationShowcase() {
         `Rebasing ${rebasedBatches.length} pending commit${rebasedBatches.length === 1 ? "" : "s"} over ${response.operationsSinceBase.length} newer server version${response.operationsSinceBase.length === 1 ? "" : "s"}`,
       );
       for (const record of pending) {
-        await runtime.storage.remove(COLLABORATION_DOCUMENT_ID, record.clientMutationId);
+        await runtime.storage.remove(DOCUMENT_ID[runtime.document], record.clientMutationId);
       }
-      const { actor, link, storage } = runtime;
+      const { actor, link, storage, document: target } = runtime;
       for (const dispose of runtime.disposers) dispose();
       runtime.disposers.length = 0;
       runtime.presence.destroy();
@@ -950,7 +1068,7 @@ export default function CollaborationShowcase() {
       // Loading and validating the whole document is the expensive step. Give
       // the browser a frame before each half so scrolling keeps painting.
       await delay(0);
-      const latest = response.snapshot ?? (await link.load(COLLABORATION_DOCUMENT_ID));
+      const latest = response.snapshot ?? (await link.load(DOCUMENT_ID[target]));
       // Broadcasts sequenced while the client remounts wait in the link for
       // the new coordinator; the ones this snapshot already holds are dropped.
       link.startFrom(latest.version ?? 0);
@@ -961,7 +1079,7 @@ export default function CollaborationShowcase() {
         transactionResourceLimits: { maxEncodedBytes: DEMO_TRANSACTION_BYTES },
       });
       const sync = new SyncCoordinator(grid, link, {
-        documentId: COLLABORATION_DOCUMENT_ID,
+        documentId: DOCUMENT_ID[target],
         serverVersion: latest.version ?? 0,
         pendingStorage: storage,
         createMutationId: () => `${actor.id}-${Date.now().toString(36)}-${nextMutation++}`,
@@ -971,6 +1089,7 @@ export default function CollaborationShowcase() {
       const next: ClientRuntime = {
         actor,
         generation: bootGenerationRef.current,
+        document: target,
         link,
         storage,
         grid,
@@ -1015,8 +1134,7 @@ export default function CollaborationShowcase() {
     bootGenerationRef.current = generation;
     void (async () => {
       for (const key of CLIENT_KEYS) disposeClient(key);
-      serverDisposerRef.current?.();
-      serverDisposerRef.current = null;
+      stopServers();
       if (generation !== bootGenerationRef.current) return;
       setViews({ a: EMPTY_CLIENT_VIEW, b: EMPTY_CLIENT_VIEW });
       await bootAll(generation);
