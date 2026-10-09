@@ -1290,9 +1290,23 @@ impl SheetData {
         changed
     }
 
+    /// Remove a cell's formula without hashing when the sheet has none.
+    #[inline]
+    pub(crate) fn remove_formula(&mut self, key: CellKey) -> bool {
+        !self.formulas.is_empty() && self.formulas.remove(&key).is_some()
+    }
+
     /// Detach a direct write from any spill and invalidate every attempted spill
     /// whose destination includes this cell.
     pub(crate) fn prepare_cell_write(&mut self, cell: CellKey) {
+        // No spill metadata means nothing to detach, invalidate or enqueue; the
+        // hash probes below would only pay for empty-map lookups on every write.
+        if self.spill_ranges.is_empty()
+            && self.spill_owners.is_empty()
+            && self.spill_errors.is_empty()
+        {
+            return;
+        }
         let affected: Vec<CellKey> = self
             .spill_ranges
             .iter()

@@ -771,7 +771,7 @@ impl CellStore {
                 return;
             }
 
-            let removed_formula = s.formulas.remove(&key).is_some();
+            let removed_formula = s.remove_formula(key);
             s.dirty_cells.insert(key);
             removed_formula
         };
@@ -803,7 +803,7 @@ impl CellStore {
                 return;
             }
 
-            let removed_formula = s.formulas.remove(&key).is_some();
+            let removed_formula = s.remove_formula(key);
             s.dirty_cells.insert(key);
             removed_formula
         };
@@ -934,7 +934,7 @@ impl CellStore {
             ) {
                 return;
             }
-            let removed_formula = s.formulas.remove(&key).is_some();
+            let removed_formula = s.remove_formula(key);
             s.dirty_cells.insert(key);
             removed_formula
         };
@@ -959,7 +959,7 @@ impl CellStore {
                 return;
             }
 
-            let removed_formula = s.formulas.remove(&key).is_some();
+            let removed_formula = s.remove_formula(key);
             s.dirty_cells.insert(key);
             removed_formula
         };
@@ -1088,8 +1088,13 @@ impl CellStore {
         }
 
         let mut string_ids = vec![NO_STRING; offsets.len()];
+        // Sourceless blocks (the common interactive edit) own no source offsets,
+        // so the containment probe can be skipped for every edited cell.
+        let has_sources = !source_offsets.is_empty();
         for (index, text) in texts.iter().enumerate() {
-            if !source_offsets.contains(&offsets[index]) && kinds[index] == KIND_STRING {
+            if kinds[index] == KIND_STRING
+                && !(has_sources && source_offsets.contains(&offsets[index]))
+            {
                 string_ids[index] = self.intern(text);
             }
         }
@@ -1104,7 +1109,11 @@ impl CellStore {
             let Some(key) = cell_key(row, col) else {
                 return BLOCK_SOURCE_INVALID;
             };
-            let source = prepared_sources.remove(&offset);
+            let source = if prepared_sources.is_empty() {
+                None
+            } else {
+                prepared_sources.remove(&offset)
+            };
             let (kind, payload) = if source.is_some() {
                 (KIND_FORMULA, 0)
             } else {
@@ -1129,7 +1138,7 @@ impl CellStore {
             if !hydrating {
                 data.dirty_cells.insert(key);
             }
-            changed_sources |= data.formulas.remove(&key).is_some();
+            changed_sources |= data.remove_formula(key);
             if let Some(entry) = source {
                 data.formulas.insert(key, entry);
                 changed_sources = true;
@@ -1196,7 +1205,7 @@ impl CellStore {
                 }
                 if contents {
                     if let Some(key) = cell_key(row, col) {
-                        removed_formula |= s.formulas.remove(&key).is_some();
+                        removed_formula |= s.remove_formula(key);
                     }
                 }
             }
@@ -1723,7 +1732,7 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_NUMBER, encode_num(value), style) {
                 continue;
             }
-            removed_formula |= s.formulas.remove(&key).is_some();
+            removed_formula |= s.remove_formula(key);
             wrote = true;
         }
         if wrote {
@@ -1781,7 +1790,7 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_STRING, encode_str_id(id), style) {
                 continue;
             }
-            removed_formula |= s.formulas.remove(&key).is_some();
+            removed_formula |= s.remove_formula(key);
             wrote = true;
         }
         if wrote {
@@ -1832,7 +1841,7 @@ impl CellStore {
                 ) {
                     return;
                 }
-                removed_formula |= s.formulas.remove(&key).is_some();
+                removed_formula |= s.remove_formula(key);
             }
             if limit > 0 {
                 s.all_dirty = true;
@@ -1885,7 +1894,7 @@ impl CellStore {
             ) {
                 return;
             }
-            removed_formula |= s.formulas.remove(&key).is_some();
+            removed_formula |= s.remove_formula(key);
         }
         if limit > 0 {
             self.sheets[sheet].all_dirty = true;
@@ -1942,7 +1951,7 @@ impl CellStore {
             ) {
                 return;
             }
-            removed_formula |= s.formulas.remove(&key).is_some();
+            removed_formula |= s.remove_formula(key);
         }
         if limit > 0 {
             self.sheets[sheet].all_dirty = true;
@@ -2811,7 +2820,7 @@ impl CellStore {
                     return BLOCK_RESOURCE_LIMIT;
                 }
                 if let Some(key) = cell_key(row, col) {
-                    s.formulas.remove(&key);
+                    s.remove_formula(key);
                 }
             }
         }
@@ -3071,7 +3080,7 @@ impl CellStore {
                 })
                 .collect();
             for key in invalid {
-                sheet.formulas.remove(&key);
+                sheet.remove_formula(key);
                 let (row, col) = (key.0 as usize, key.1 as usize);
                 if sheet.contains_cell(row, col) {
                     let style = sheet.style_at(sheet.idx(row, col));
