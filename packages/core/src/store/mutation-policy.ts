@@ -1,4 +1,4 @@
-import { decodeRestoreBlock } from "../restore-block.js";
+import { restoreBlockFacts } from "../restore-block.js";
 import type { CellScalar, CellValue } from "../types/cell.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 import type {
@@ -361,8 +361,9 @@ export class StoreMutationPolicy {
     }
 
     if (patch.op !== "setBlock" && patch.op !== "restoreBlock") return issues;
-    const range = normalizedRange(patch.range);
-    const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
+    const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+    const range = prepared?.range ?? normalizedRange(patch.range);
+    const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
     const formulaOffsets = new Set((block.formulas ?? []).map(([offset]) => offset));
     const refOffsets = new Set((block.refs ?? []).map(([offset]) => offset));
     for (const rule of rules) {

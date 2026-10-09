@@ -17,7 +17,6 @@ import type {
   RuntimeResourceSnapshot,
   TransientResourcePeak,
 } from "./resource-accounting.js";
-import { decodeRestoreBlock } from "./restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "./sheet-lifecycle.js";
 import {
   type CompactRangeHistory,
@@ -31,6 +30,7 @@ import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { patchSheetId } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
+import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { AggregateOp, ColumnarData, DataSourceColumnBand, RowData } from "./types/data.js";
@@ -488,97 +488,117 @@ export class SheetwriteStore implements Store {
     tx: Transaction,
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
-    // A transaction built and measured by an engine layer carries its resource
-    // record; without one, direct callers pay the full payload walk. An
-    // engine-built atomic batch is bounded by the batch ceilings instead.
-    const limits = isAtomicBatch(tx.patches)
-      ? atomicBatchLimits(this.transactionResourceLimits)
-      : this.transactionResourceLimits;
-    const resourceValidation = resolveTransactionResourceValidation(
-      tx.patches,
-      limits,
-      takeAdmittedTransactionResources(tx),
-    ).result;
-    if (!resourceValidation.ok) {
-      return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
-    }
-    const invalidOperations = this.validateTransactionOperations(tx);
-    if (invalidOperations) return invalidOperations;
-    const options =
-      typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
-    const commitReason = options.commitReason ?? "api";
-    const source = options.source ?? "local";
-    if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
-      return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
-    }
-
-    let effectiveTx = tx;
-    let policyWarnings: MutationIssue[] = [];
-    let policyRejections: MutationIssue[] = [];
-    if (source === "local") {
-      const policy = this.policy.evaluate(
+    const preparation = new TransactionPreparation(tx.patches);
+    try {
+      // A transaction built and measured by an engine layer carries its resource
+      // record; without one, direct callers pay the full payload walk. An
+      // engine-built atomic batch is bounded by the batch ceilings instead.
+      const limits = isAtomicBatch(tx.patches)
+        ? atomicBatchLimits(this.transactionResourceLimits)
+        : this.transactionResourceLimits;
+      const resourceValidation = resolveTransactionResourceValidation(
         tx.patches,
-        commitReason,
-        this.protectionResolver,
-        this.mutationPolicy,
-      );
-      policyWarnings = policy.warnings;
-      policyRejections = policy.rejections;
-      if (policy.rejections.length > 0 && policy.patches.length === 0) {
-        return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
+        limits,
+        takeAdmittedTransactionResources(tx),
+      ).result;
+      if (!resourceValidation.ok) {
+        return { status: "rejected", epoch: this.epoch, issues: [resourceValidation.issue] };
       }
-      if (policy.patches.length !== tx.patches.length) {
-        effectiveTx = { ...tx, patches: policy.patches };
+      const invalidOperations = this.validateTransactionOperations(tx);
+      if (invalidOperations) return invalidOperations;
+      const options =
+        typeof reasonOrOptions === "string" ? { commitReason: reasonOrOptions } : reasonOrOptions;
+      const commitReason = options.commitReason ?? "api";
+      const source = options.source ?? "local";
+      if (tx.epoch !== undefined && tx.epoch !== this.epoch) {
+        return { status: "conflict", expectedEpoch: tx.epoch, actualEpoch: this.epoch };
       }
-      if (this.protectionResolver) {
-        // Permission callbacks receive live operations and may edit nested
-        // payloads after ingress validation. Do not reuse their measurements.
-        const callbackResources = resolveTransactionResourceValidation(
-          effectiveTx.patches,
-          limits,
-        ).result;
-        if (!callbackResources.ok) {
-          return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
+
+      let effectiveTx = tx;
+      let policyWarnings: MutationIssue[] = [];
+      let policyRejections: MutationIssue[] = [];
+      if (source === "local") {
+        const policy = this.policy.evaluate(
+          tx.patches,
+          commitReason,
+          this.protectionResolver,
+          this.mutationPolicy,
+        );
+        policyWarnings = policy.warnings;
+        policyRejections = policy.rejections;
+        if (policy.rejections.length > 0 && policy.patches.length === 0) {
+          return { status: "rejected", epoch: this.epoch, issues: policy.rejections };
         }
-        const callbackOperations = this.validateTransactionOperations(effectiveTx);
-        if (callbackOperations) return callbackOperations;
+        if (policy.patches.length !== tx.patches.length) {
+          effectiveTx = { ...tx, patches: policy.patches };
+        }
+        if (this.protectionResolver) {
+          preparation.bind(effectiveTx.patches);
+          // Permission callbacks receive live operations and may edit nested
+          // payloads after ingress validation. Do not reuse their measurements.
+          const callbackResources = resolveTransactionResourceValidation(
+            effectiveTx.patches,
+            limits,
+          ).result;
+          if (!callbackResources.ok) {
+            return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
+          }
+          const callbackOperations = this.validateTransactionOperations(effectiveTx);
+          if (callbackOperations) return callbackOperations;
+        }
       }
-    }
 
-    if (source === "local" || options.localReplay === true) {
-      const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
-      if (dirtyCapacityIssue) {
-        return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
+      if (source === "local" || options.localReplay === true) {
+        const dirtyCapacityIssue = this.engine.pagedDirtyCapacityIssue(effectiveTx.patches);
+        if (dirtyCapacityIssue) {
+          return { status: "rejected", epoch: this.epoch, issues: [dirtyCapacityIssue] };
+        }
       }
-    }
-    if (
-      source === "local" &&
-      effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
-    ) {
-      return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
-    }
-    const hasListeners = this.listeners.size > 0;
-    const effects = this.engine.applyPatches(
-      effectiveTx.patches,
-      source === "remote" && options.localReplay !== true,
-      hasListeners,
-      this.detailedChangeCapture,
-    );
-    if (effects.appliedPatches.length === 0) {
-      return {
-        status: "noop",
+      if (
+        source === "local" &&
+        effectiveTx.patches.some((patch) => !this.engine.canApplyLocally(patch))
+      ) {
+        return { status: "noop", epoch: this.epoch, reason: "incomplete-data" };
+      }
+      const hasListeners = this.listeners.size > 0;
+      const effects = this.engine.applyPatches(
+        effectiveTx.patches,
+        source === "remote" && options.localReplay !== true,
+        hasListeners,
+        this.detailedChangeCapture,
+      );
+      if (effects.appliedPatches.length === 0) {
+        return {
+          status: "noop",
+          epoch: this.epoch,
+          reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
+        };
+      }
+
+      this.epoch += 1;
+      const transaction =
+        effects.appliedPatches.length === effectiveTx.patches.length
+          ? effectiveTx
+          : { ...effectiveTx, patches: effects.appliedPatches };
+      setTransactionStorageRevision(transaction, effects.storageRevision);
+      if (!hasListeners) {
+        return {
+          status: "applied",
+          epoch: this.epoch,
+          transaction,
+          ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
+          ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
+        };
+      }
+
+      const event: ChangeEvent = {
+        transaction,
+        changes: effects.changes ?? [],
+        commitReason,
+        source,
         epoch: this.epoch,
-        reason: effectiveTx.patches.length === 0 ? "empty" : "out-of-bounds",
       };
-    }
-
-    this.epoch += 1;
-    const transaction =
-      effects.appliedPatches.length === effectiveTx.patches.length
-        ? effectiveTx
-        : { ...effectiveTx, patches: effects.appliedPatches };
-    setTransactionStorageRevision(transaction, effects.storageRevision);
-    if (!hasListeners) {
+      for (const listener of this.listeners) listener(event);
       return {
         status: "applied",
         epoch: this.epoch,
@@ -586,23 +606,9 @@ export class SheetwriteStore implements Store {
         ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
         ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
       };
+    } finally {
+      preparation.dispose();
     }
-
-    const event: ChangeEvent = {
-      transaction,
-      changes: effects.changes ?? [],
-      commitReason,
-      source,
-      epoch: this.epoch,
-    };
-    for (const listener of this.listeners) listener(event);
-    return {
-      status: "applied",
-      epoch: this.epoch,
-      transaction,
-      ...(policyWarnings.length > 0 ? { warnings: policyWarnings } : {}),
-      ...(policyRejections.length > 0 ? { rejections: policyRejections } : {}),
-    };
   }
 
   on(_evt: "change", fn: ChangeListener): () => void {
@@ -719,9 +725,13 @@ export class SheetwriteStore implements Store {
             if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
           }
         } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
-          const block =
-            operation.op === "restoreBlock" ? decodeRestoreBlock(operation) : operation.block;
-          for (const [, target] of block.refs ?? []) requiredSheets.push(target.sheet);
+          if (operation.op === "restoreBlock") {
+            requiredSheets.push(
+              ...preparedRestore(operation, validateDocumentOperationShape).requiredSheets,
+            );
+          } else {
+            for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+          }
         } else if (operation.op === "setNamedRange") {
           requiredSheets.push(operation.namedRange.range.sheet);
           if (operation.namedRange.scope !== undefined) {
