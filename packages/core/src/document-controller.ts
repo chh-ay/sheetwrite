@@ -97,7 +97,7 @@ export class DocumentController {
     const patches = operations.slice();
     if (atomic) markAtomicBatch(patches);
     const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
-    return this.options.store.applyTransaction(
+    const outcome = this.options.store.applyTransaction(
       withAdmittedTransactionResources({ patches }, admitted),
       {
         source: "remote",
@@ -105,6 +105,12 @@ export class DocumentController {
         localReplay: options.localReplay,
       },
     );
+    // Undo entries hold addresses from before this change: a remote row or
+    // column insert or delete moves them exactly as a local one does.
+    if (outcome.status === "applied") {
+      for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+    }
+    return outcome;
   }
 
   commit(

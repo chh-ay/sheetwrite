@@ -468,6 +468,55 @@ describe("Grid transaction resource ingress", () => {
     grid.destroy();
   });
 
+  it("undoes a local edit where remote row changes moved it", () => {
+    const amounts = (grid: GridImpl, rows: number) =>
+      Array.from(
+        { length: rows },
+        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 1 }).resolved,
+      );
+    const editRow3 = (grid: GridImpl) =>
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 3, col: 1 },
+            value: { kind: "literal", value: 999 },
+          },
+        ],
+      });
+    const cases: Array<{ remote: DocumentOp; rows: number; expected: CellScalar[] }> = [
+      // A peer inserted a row above: the edited cell is now row 4.
+      {
+        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        rows: 7,
+        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+      },
+      // A peer deleted a row above: the edited cell is now row 2.
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+        rows: 5,
+        expected: [10.5, 20.5, 30.5, 40.5, 50.5],
+      },
+      // A peer deleted the edited row: undo has nothing left to restore and touches no other row.
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
+        rows: 5,
+        expected: [0.5, 10.5, 20.5, 40.5, 50.5],
+      },
+    ];
+    for (const { remote, rows, expected } of cases) {
+      const grid = new GridImpl(mountHost(), {
+        workbook: makeWorkbook(6),
+        data: makeColumnarData(6),
+      });
+      expect(editRow3(grid).status).toBe("applied");
+      expect(grid.applyRemoteOperations([remote]).status).toBe("applied");
+      grid.undo();
+      expect({ remote, amounts: amounts(grid, rows) }).toEqual({ remote, amounts: expected });
+      grid.destroy();
+    }
+  });
+
   it("re-measures payloads that admission guards rewrote before the store applies them", () => {
     const workbook = makeWorkbook(4);
     const grid = new GridImpl(mountHost(), {
