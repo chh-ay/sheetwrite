@@ -62,9 +62,12 @@ pub(crate) enum FormulaError {
     Spill,
     Calc,
     Loading,
+    Null,
 }
 
 impl FormulaError {
+    pub(crate) const COUNT: usize = 11;
+
     pub(crate) fn sentinel(self) -> &'static str {
         match self {
             FormulaError::Cycle => "#CYCLE!",
@@ -77,6 +80,7 @@ impl FormulaError {
             FormulaError::Spill => "#SPILL!",
             FormulaError::Calc => "#CALC!",
             FormulaError::Loading => "#LOADING!",
+            FormulaError::Null => "#NULL!",
         }
     }
 
@@ -93,6 +97,7 @@ impl FormulaError {
             FormulaError::Spill => 7,
             FormulaError::Calc => 8,
             FormulaError::Loading => 9,
+            FormulaError::Null => 10,
         }
     }
 }
@@ -226,7 +231,8 @@ impl ReadSet {
             | Ast::Missing
             | Ast::Name(_)
             | Ast::UnresolvedStructured(_)
-            | Ast::Num(_) => {}
+            | Ast::Num(_)
+            | Ast::Array { .. } => {}
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { .. } => {}
         }

@@ -31,6 +31,12 @@ describe("shiftA1Refs", () => {
     expect(shiftA1Refs("=A1", -5, 0)).toBe("=A1");
     expect(shiftA1Refs("=B2", 0, -10)).toBe("=A2");
   });
+
+  it("preserves array constants and text while shifting adjacent references", () => {
+    expect(shiftA1Refs('=SUM({1,2;3,4})+A1&{"A1","a""B2"}', 2, 1)).toBe(
+      '=SUM({1,2;3,4})+B3&{"A1","a""B2"}',
+    );
+  });
 });
 
 describe("remapFormulaA1Refs", () => {
@@ -38,5 +44,11 @@ describe("remapFormulaA1Refs", () => {
     const removeColumn = (column: number) =>
       column === 1 ? null : column > 1 ? column - 1 : column;
     expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
+  });
+
+  it("preserves array text while remapping adjacent references", () => {
+    expect(remapFormulaA1Refs('=A1&{"A1","B2";"C3","D4"}', "row", (row) => row + 1)).toBe(
+      '=A2&{"A1","B2";"C3","D4"}',
+    );
   });
 });

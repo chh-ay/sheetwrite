@@ -181,4 +181,23 @@ describe("formula behavior matrix", () => {
     restored.dispose();
     store.dispose();
   });
+
+  it("spills an array constant with its row and column shape", () => {
+    const store = new SheetwriteStore(makeWorkbook(12));
+    store.applyTransaction({
+      patches: [{ op: "set", addr: address(0, 0), value: { kind: "formula", src: "={1,2;3,4}" } }],
+    });
+
+    const block = [0, 1, 2].map((row) =>
+      [0, 1, 2].map((col) => store.getCell(address(row, col)).resolved),
+    );
+    expect(block).toEqual([
+      [1, 2, null],
+      [3, 4, null],
+      [null, null, null],
+    ]);
+    expect(store.getSpillAnchor(address(1, 1))).toEqual(address(0, 0));
+    expect(store.getFormula(address(0, 0))).toBe("={1,2;3,4}");
+    store.dispose();
+  });
 });

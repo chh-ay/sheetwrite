@@ -8,8 +8,13 @@
 //!   power      := postfix ('^' postfix)*
 //!   postfix    := unary ('%')*
 //!   unary      := ('+' | '-') unary | primary
-//!   primary    := number | '(' expr ')' | func '(' args ')' | range | cell
-//!   range  := cell ':' cell
+//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell
+//!   range      := cell ':' cell
+//!   array      := '{' row (';' row)* '}'
+//!   row        := constant (',' constant)*
+//!   constant   := ('+' | '-')? number | string | TRUE | FALSE | error
+//!
+//! Every row of an array constant must have the same number of columns.
 //!
 //! Cell references accept optional absolute markers (`$A$1`, `A$1`, `$A1`).
 //! Sheet-qualified references keep the sheet name until `CellStore` resolves it
@@ -19,6 +24,7 @@
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
 use crate::memory::MemoryOwnerStats;
+use crate::types::{FormulaError, Value};
 use std::{borrow::Cow, cmp::Ordering};
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
@@ -260,7 +266,8 @@ macro_rules! define_function_registry {
 
 #[cfg(feature = "analysis")]
 pub(crate) fn function_names() -> Vec<String> {
-    let mut names: Vec<String> = FUNCTION_NAMES.iter()
+    let mut names: Vec<String> = FUNCTION_NAMES
+        .iter()
         .chain(FUNCTION_ALIASES.iter())
         .map(|(name, _)| (*name).to_owned())
         .chain(crate::eval::analysis::names().map(str::to_owned))
@@ -548,6 +555,12 @@ pub enum Ast {
         slot: u32,
         expression: Box<Ast>,
     },
+    /// An array constant such as `{1,2;3,4}`: row-major values with `cols`
+    /// values in each row.
+    Array {
+        cols: u32,
+        values: Vec<Value>,
+    },
 }
 impl Ast {
     /// Heap payload owned below an inline AST root. The root itself is already
@@ -593,6 +606,18 @@ impl Ast {
                 add_boxed_ast_memory(inner, out);
             }
             Ast::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
+            Ast::Array { values, .. } => {
+                let bytes = std::mem::size_of::<Value>();
+                out.add_payload(
+                    values.len().saturating_mul(bytes),
+                    values.capacity().saturating_mul(bytes),
+                );
+                for value in values {
+                    if let Value::Text(text) = value {
+                        out.add_payload(text.len(), text.len());
+                    }
+                }
+            }
             Ast::Num(_)
             | Ast::Bool(_)
             | Ast::Missing
@@ -728,11 +753,28 @@ enum Tok<'a> {
     LParen,
     RParen,
     Comma,
+    Semicolon,
+    LBrace,
+    RBrace,
     Colon,
     Bang,
     Cmp(CmpOp),
-    InvalidRef,
+    Error(FormulaError),
 }
+
+/// Error constants a formula can contain. `#REF!` parses as an invalid
+/// reference; the others are accepted only inside array constants.
+const ERROR_LITERALS: [(&str, FormulaError); 9] = [
+    ("#DIV/0!", FormulaError::DivZero),
+    ("#NULL!", FormulaError::Null),
+    ("#SPILL!", FormulaError::Spill),
+    ("#CALC!", FormulaError::Calc),
+    ("#VALUE!", FormulaError::Value),
+    ("#REF!", FormulaError::Ref),
+    ("#NAME?", FormulaError::Name),
+    ("#NUM!", FormulaError::Num),
+    ("#N/A", FormulaError::Na),
+];
 
 fn quoted_token(
     src: &str,
@@ -807,9 +849,13 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
                 Cow::Owned(quoted_token(src, &mut i, b'\'', "unterminated sheet name")?),
                 true,
             ));
-        } else if bytes[i..].starts_with(b"#REF!") {
-            toks.push(Tok::InvalidRef);
-            i += 5;
+        } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
+            bytes[i..]
+                .get(..literal.len())
+                .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+        }) {
+            toks.push(Tok::Error(*error));
+            i += literal.len();
         } else if c == b'[' {
             let start = i;
             let mut depth = 0usize;
@@ -880,6 +926,18 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
                 }
                 b',' => {
                     toks.push(Tok::Comma);
+                    i += 1;
+                }
+                b';' => {
+                    toks.push(Tok::Semicolon);
+                    i += 1;
+                }
+                b'{' => {
+                    toks.push(Tok::LBrace);
+                    i += 1;
+                }
+                b'}' => {
+                    toks.push(Tok::RBrace);
                     i += 1;
                 }
                 b':' => {
@@ -1089,13 +1147,66 @@ impl<'a> Parser<'a> {
             }
             Some(Tok::Ident(name, quoted)) => self.ident_at(name, quoted, depth),
             Some(Tok::Structured(raw)) => parse_structured_ref(raw, None),
-            Some(Tok::InvalidRef) => Ok(Ast::InvalidRef),
+            Some(Tok::Error(FormulaError::Ref)) => Ok(Ast::InvalidRef),
+            Some(Tok::LBrace) => self.array_constant(),
             other => Err(if other.is_some() {
                 "unexpected token".into()
             } else {
                 "unexpected end".into()
             }),
         }
+    }
+
+    /// Parse the rest of an array constant after `{`.
+    fn array_constant(&mut self) -> Result<Ast, String> {
+        let mut values = Vec::new();
+        let mut cols = 0usize;
+        let mut row_len = 0usize;
+        loop {
+            values.push(self.array_element()?);
+            row_len += 1;
+            match self.next() {
+                Some(Tok::Comma) => continue,
+                Some(separator @ (Tok::Semicolon | Tok::RBrace)) => {
+                    if cols == 0 {
+                        cols = row_len;
+                    } else if row_len != cols {
+                        return Err("array constant rows must have the same length".into());
+                    }
+                    if separator == Tok::RBrace {
+                        break;
+                    }
+                    row_len = 0;
+                }
+                _ => return Err("expected , ; or } in array constant".into()),
+            }
+        }
+        let cols = u32::try_from(cols).map_err(|_| "array constant is too wide".to_string())?;
+        Ok(Ast::Array { cols, values })
+    }
+
+    /// One array-constant element: a number with an optional sign, text, a
+    /// logical value, or an error. References and expressions are rejected.
+    fn array_element(&mut self) -> Result<Value, String> {
+        let value = match self.next() {
+            Some(Tok::Num(number)) => Value::number(number),
+            Some(Tok::Op(sign @ ('+' | '-'))) => match self.next() {
+                Some(Tok::Num(number)) => Value::number(if sign == '-' { -number } else { number }),
+                _ => return Err("expected number after sign in array constant".into()),
+            },
+            Some(Tok::Str(text)) => Value::text(text),
+            Some(Tok::Ident(name, false)) if name.eq_ignore_ascii_case("TRUE") => Value::Bool(true),
+            Some(Tok::Ident(name, false)) if name.eq_ignore_ascii_case("FALSE") => {
+                Value::Bool(false)
+            }
+            Some(Tok::Error(error)) => Value::Error(error),
+            _ => {
+                return Err(
+                    "array constants accept only numbers, text, logical values and errors".into(),
+                )
+            }
+        };
+        Ok(value)
     }
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
@@ -1597,7 +1708,8 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         | Ast::NamedRange(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
-        | Ast::InvalidRef => true,
+        | Ast::InvalidRef
+        | Ast::Array { .. } => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
     }
@@ -1908,11 +2020,7 @@ fn write_structured_ref(
 fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),
-        Ast::Str(value) => {
-            out.push('"');
-            out.push_str(&value.replace('"', "\"\""));
-            out.push('"');
-        }
+        Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
@@ -1962,6 +2070,26 @@ fn write_ast(ast: &Ast, out: &mut String) {
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
         Ast::InvalidRef => out.push_str("#REF!"),
+        Ast::Array { cols, values } => {
+            out.push('{');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    out.push(if index % *cols as usize == 0 {
+                        ';'
+                    } else {
+                        ','
+                    });
+                }
+                match value {
+                    Value::Number(number) => out.push_str(&number.to_string()),
+                    Value::Text(text) => write_text(text, out),
+                    Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+                    Value::Error(error) => out.push_str(error.sentinel()),
+                    Value::Blank => {}
+                }
+            }
+            out.push('}');
+        }
         Ast::LetSlot { expression, .. } => write_ast(expression, out),
         Ast::Func(func, args) => {
             out.push_str(func_name(*func));
@@ -2039,6 +2167,12 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push_str(")%");
         }
     }
+}
+
+fn write_text(value: &str, out: &mut String) {
+    out.push('"');
+    out.push_str(&value.replace('"', "\"\""));
+    out.push('"');
 }
 
 fn write_sheet_name(name: &str, quoted: bool, out: &mut String) {
@@ -2142,6 +2276,73 @@ mod tests {
         assert!(parse("=%2").is_err());
         assert!(parse("=2^").is_err());
         assert!(parse("=2&&3").is_err());
+    }
+
+    #[test]
+    fn array_constants_parse_rows_and_columns_and_round_trip() {
+        let shapes = [
+            ("={1,2,3}", 3, 3, "={1,2,3}"),
+            ("={1;2;3}", 1, 3, "={1;2;3}"),
+            ("={1,2;3,4}", 2, 4, "={1,2;3,4}"),
+            ("={ -1.5 , +2 }", 2, 2, "={-1.5,2}"),
+            (
+                "={\"a\"\"b\",true,False;#n/a,#DIV/0!,#REF!}",
+                3,
+                6,
+                "={\"a\"\"b\",TRUE,FALSE;#N/A,#DIV/0!,#REF!}",
+            ),
+        ];
+        for (source, expected_cols, expected_len, expected_text) in shapes {
+            let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+            let Ast::Array { cols, values } = &ast else {
+                panic!("{source} did not parse as an array constant");
+            };
+            assert_eq!(
+                (*cols, values.len()),
+                (expected_cols, expected_len),
+                "{source}"
+            );
+            assert_eq!(serialize(&ast), expected_text, "{source}");
+            assert_eq!(parse(&serialize(&ast)).as_ref(), Ok(&ast), "{source}");
+        }
+
+        assert_eq!(
+            parse("={\"x\",FALSE,#NAME?}"),
+            Ok(Ast::Array {
+                cols: 3,
+                values: vec![
+                    Value::text("x"),
+                    Value::Bool(false),
+                    Value::Error(FormulaError::Name),
+                ],
+            })
+        );
+        assert_eq!(
+            serialize(&parse("=SUM({1,2},A1)").unwrap()),
+            "=SUM({1,2},A1)"
+        );
+    }
+
+    #[test]
+    fn array_constants_reject_ragged_rows_references_and_expressions() {
+        for source in [
+            "={1,2;3}",
+            "={1;2,3}",
+            "={}",
+            "={1,}",
+            "={1;}",
+            "={1,,2}",
+            "={A1,2}",
+            "={1+1}",
+            "={(1)}",
+            "={SUM(1)}",
+            "={-\"a\"}",
+            "={1,{2}}",
+            "={1,2",
+            "=1;2",
+        ] {
+            assert!(parse(source).is_err(), "{source} should not parse");
+        }
     }
 
     #[test]

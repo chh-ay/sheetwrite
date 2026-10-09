@@ -47,7 +47,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
   if (dRow === 0 && dCol === 0) return src;
 
   return src.replace(
-    /(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
     (
       match: string,
       ca: string,
@@ -57,6 +57,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       offset: number,
       full: string,
     ): string => {
+      if (match.startsWith('"') || match.startsWith("'")) return match;
       const prev = offset > 0 ? full.charAt(offset - 1) : "";
       if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
 
@@ -83,7 +84,7 @@ export function remapFormulaA1Refs(
   remap: (index: number) => number | null,
 ): string {
   return source.replace(
-    /(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
     (
       match: string,
       colAbsolute: string,
@@ -93,6 +94,7 @@ export function remapFormulaA1Refs(
       offset: number,
       full: string,
     ): string => {
+      if (match.startsWith('"') || match.startsWith("'")) return match;
       const previous = offset > 0 ? full.charAt(offset - 1) : "";
       if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
       const col = labelToCol(letters.toUpperCase());
