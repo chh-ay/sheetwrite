@@ -11,6 +11,7 @@ mod functions;
 mod lookup;
 mod math;
 mod matrix;
+mod operators;
 mod range_reader;
 mod statistics;
 mod text;
@@ -21,7 +22,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::calc::{Ast, CmpOp, Func, Op};
+use crate::calc::{Ast, Func};
 use crate::sheet::{spill_ownership_within_budget, SheetData, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
@@ -30,7 +31,8 @@ use crate::types::{
     KIND_FORMULA, KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
-use array::{ast_produces_array, dynamic_recompute_within_limit};
+pub(crate) use array::ast_produces_array;
+use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 pub(crate) use dependency::DepIndex;
 use dependency::{
@@ -46,8 +48,7 @@ pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use range_reader::RangeReader;
 use value::{
-    aggregate_number, bool_from_value, cached_formula_value, compare_values, number_from_value,
-    text_from_value,
+    aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
 };
 
 const LET_BINDING_LIMIT: usize = 126;
@@ -487,6 +488,9 @@ impl CellStore {
                         .get(key.sheet as usize)?
                         .formulas
                         .get(&key.local())?;
+                    if !entry.produces_array {
+                        return None;
+                    }
                     let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()
@@ -559,9 +563,14 @@ impl CellStore {
                         None => Err(FormulaError::Num),
                     },
                     Some(Err(error)) => Err(error),
-                    // A top-level `A1#` whose anchor holds no spill.
-                    None if matches!(ast, Ast::InvalidRef) => Err(FormulaError::Ref),
-                    None => Err(FormulaError::Value),
+                    // Resolving a missing spill removes its array marker.
+                    // Keep the scalar expression's error instead of replacing it.
+                    None => match self.eval_ast(
+                        &ast, output_sheet, &affected, &mut memo, &mut visiting, 0,
+                    ) {
+                        Value::Error(error) => Err(error),
+                        _ => Err(FormulaError::Value),
+                    },
                 };
                 let changed = self.install_spill_result(key, evaluated, &mut memo);
                 // Formulas that use `A1#` read only the anchor cell. The anchor
@@ -1033,99 +1042,27 @@ impl CellStore {
             | Ast::Range(..)
             | Ast::AbsRange(..)
             | Ast::SheetRange(..) => Value::Error(FormulaError::Value),
-            Ast::Neg(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(-value),
-                Err(error) => Value::Error(error),
-            },
-            Ast::Pos(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(value),
-                Err(error) => Value::Error(error),
-            },
-            Ast::Percent(expr) => match number_from_value(&self.eval_ast(
-                expr,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            )) {
-                Ok(value) => Value::number(value / 100.0),
-                Err(error) => Value::Error(error),
-            },
+            Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
+                let op = match ast {
+                    Ast::Neg(_) => operators::UnaryOp::Neg,
+                    Ast::Pos(_) => operators::UnaryOp::Pos,
+                    _ => operators::UnaryOp::Percent,
+                };
+                operators::unary(
+                    op,
+                    &self.eval_ast(expr, sheet, affected, memo, visiting, depth + 1),
+                )
+            }
             Ast::Bin(op, left, right) => {
                 let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
-                if *op == Op::Concat {
-                    let left = match text_from_value(&left) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    };
-                    let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                    let right = match text_from_value(&right) {
-                        Ok(value) => value,
-                        Err(error) => return Value::Error(error),
-                    };
-                    return Value::text(left + &right);
-                }
-                let a = match number_from_value(&left) {
-                    Ok(value) => value,
-                    Err(error) => return Value::Error(error),
-                };
-                let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                let b = match number_from_value(&right) {
-                    Ok(value) => value,
-                    Err(error) => return Value::Error(error),
-                };
-                match op {
-                    Op::Add => Value::number(a + b),
-                    Op::Sub => Value::number(a - b),
-                    Op::Mul => Value::number(a * b),
-                    Op::Div => {
-                        if b == 0.0 {
-                            Value::Error(FormulaError::DivZero)
-                        } else {
-                            Value::number(a / b)
-                        }
-                    }
-                    Op::Pow => {
-                        if a == 0.0 && b < 0.0 {
-                            Value::Error(FormulaError::DivZero)
-                        } else {
-                            Value::number(a.powf(b))
-                        }
-                    }
-                    Op::Concat => unreachable!("concatenation returned before numeric coercion"),
-                }
+                operators::binary(*op, &left, || {
+                    self.eval_ast(right, sheet, affected, memo, visiting, depth + 1)
+                })
             }
             Ast::Cmp(op, left, right) => {
                 let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
                 let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
-                let ord = match compare_values(&left, &right) {
-                    Ok(ord) => ord,
-                    Err(error) => return Value::Error(error),
-                };
-                let res = match op {
-                    CmpOp::Eq => ord == Ordering::Equal,
-                    CmpOp::Ne => ord != Ordering::Equal,
-                    CmpOp::Lt => ord == Ordering::Less,
-                    CmpOp::Gt => ord == Ordering::Greater,
-                    CmpOp::Le => matches!(ord, Ordering::Less | Ordering::Equal),
-                    CmpOp::Ge => matches!(ord, Ordering::Greater | Ordering::Equal),
-                };
-                Value::Bool(res)
+                operators::comparison(*op, &left, &right)
             }
             Ast::Func(
                 Func::Filter

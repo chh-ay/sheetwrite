@@ -2062,6 +2062,149 @@ fn array_constants_act_as_array_arguments() {
 }
 
 #[test]
+fn array_operators_broadcast_each_axis_and_keep_element_errors() {
+    let cases: &[(&str, usize, &[&str])] = &[
+        ("={1,2,3}+{10;20}", 3, &["11", "12", "13", "21", "22", "23"]),
+        ("={1;2}+{10;20;30}", 1, &["11", "22", "#N/A"]),
+        ("={1,2}+{10,20,30}", 3, &["11", "22", "#N/A"]),
+        ("={1,2,3}-{1;2}", 3, &["0", "1", "2", "-1", "0", "1"]),
+        ("={1,2,3}*10", 3, &["10", "20", "30"]),
+        ("={4,6,8}/{2,0,4}", 3, &["2", "#DIV/0!", "2"]),
+        ("={2,0,3}^{3,-1,2}", 3, &["8", "#DIV/0!", "9"]),
+        ("={\"a\",\"b\"}&{1;2}", 2, &["a1", "b1", "a2", "b2"]),
+        ("=-{1,-2,3}%", 3, &["-0.01", "0.02", "-0.03"]),
+        ("=+{1,\"2\",TRUE}", 3, &["1", "2", "1"]),
+        ("={1,#N/A,\"bad\",4}+1", 4, &["2", "#N/A", "#VALUE!", "5"]),
+        ("=SEQUENCE(2,2)*2", 2, &["2", "4", "6", "8"]),
+        ("=FILTER({1;2;3},{TRUE;FALSE;TRUE})+10", 1, &["11", "13"]),
+        ("=-LET(x,SEQUENCE(3),1)", 1, &["-1"]),
+        ("=+LET(x,SEQUENCE(3),2)", 1, &["2"]),
+        ("=LET(x,SEQUENCE(3),25)%", 1, &["0.25"]),
+        ("=H1#*10", 1, &["#REF!"]),
+        ("=-H1#", 1, &["#REF!"]),
+    ];
+    for &(source, cols, expected) in cases {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        store.set_formula(sheet, 0, 0, source, 0);
+        store.recompute(sheet);
+        for (index, expected) in expected.iter().enumerate() {
+            let row = index / cols;
+            let col = index % cols;
+            if let Ok(expected) = expected.parse::<f64>() {
+                assert_eq!(string(&store, sheet, row, col), None, "{source}");
+                assert_close(number(&store, sheet, row, col), expected);
+            } else {
+                assert_eq!(
+                    string(&store, sheet, row, col).as_deref(),
+                    Some(*expected),
+                    "{source}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn array_operators_compare_elements_and_feed_array_functions() {
+    for (source, expected) in [
+        ("=SUM(A1:A3*B1:B3)", 140.0),
+        ("=SUMPRODUCT((A1:A5>2)*B1:B5)", 120.0),
+        ("=MAX(A1:A3*2)", 6.0),
+        ("=AVERAGE(A1:A3*2)", 4.0),
+        ("=COUNT(A1:A3*2)", 3.0),
+        ("=INDEX(A1:A3*2,2)", 4.0),
+        ("=ROWS(A1:A3*2)", 3.0),
+        ("=IF(TRUE,SUM(A1:A3*2),0)", 12.0),
+    ] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        for row in 0..5 {
+            store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+            store.set_number(sheet, row, 1, ((row + 1) * 10) as f64, 0);
+        }
+        store.set_formula(sheet, 0, 3, source, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 3), None, "{source}");
+        assert_close(number(&store, sheet, 0, 3), expected);
+    }
+    for (operator, expected) in [
+        ("=", [false, true, false]),
+        ("<>", [true, false, true]),
+        ("<", [true, false, false]),
+        (">", [false, false, true]),
+        ("<=", [true, true, false]),
+        (">=", [false, true, true]),
+    ] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_formula(sheet, 0, 0, &format!("={{1,2,3}}{operator}2"), 0);
+        store.recompute(sheet);
+        for (col, expected) in expected.into_iter().enumerate() {
+            let value = store.get_cell(sheet, 0, col);
+            assert_eq!(
+                (value.kind(), value.num()),
+                (KIND_BOOL, f64::from(expected))
+            );
+        }
+    }
+}
+
+#[test]
+fn array_operators_refresh_range_and_spill_dependencies_and_obstructions() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(12, 12);
+    for row in 0..5 {
+        store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+        store.set_number(sheet, row, 1, (row + 1) as f64, 0);
+    }
+    store.set_formula(sheet, 0, 3, "=A1:A3*10", 0);
+    store.set_formula(sheet, 0, 4, "=D1#*2", 0);
+    store.set_formula(sheet, 0, 5, "=FILTER(A1:A5,B1:B5>2)", 0);
+    store.set_formula(sheet, 0, 6, "=A1+B1", 0);
+    store.recompute(sheet);
+    for row in 0..3 {
+        assert_close(number(&store, sheet, row, 3), ((row + 1) * 10) as f64);
+        assert_close(number(&store, sheet, row, 4), ((row + 1) * 20) as f64);
+        assert_close(number(&store, sheet, row, 5), (row + 3) as f64);
+    }
+    assert_close(number(&store, sheet, 0, 6), 2.0);
+    store.set_number(sheet, 1, 0, 9.0, 0);
+    store.set_number(sheet, 0, 1, 4.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 3), 90.0);
+    assert_close(number(&store, sheet, 1, 4), 180.0);
+    assert_close(number(&store, sheet, 0, 5), 1.0);
+    assert_close(number(&store, sheet, 3, 5), 5.0);
+    assert_close(number(&store, sheet, 0, 6), 5.0);
+    store.set_number(sheet, 6, 8, 42.0, 0);
+    store.set_formula(sheet, 5, 8, "={1;2}*10", 0);
+    store.set_formula(sheet, 5, 10, "=SEQUENCE(1001)*SEQUENCE(1,1000)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 5, 8).as_deref(), Some("#SPILL!"));
+    assert_close(number(&store, sheet, 6, 8), 42.0);
+    assert_eq!(string(&store, sheet, 5, 10).as_deref(), Some("#NUM!"));
+}
+
+#[cfg(feature = "analysis")]
+#[test]
+fn array_operators_feed_analysis_array_hooks() {
+    for (source, expected) in [
+        ("=INDEX(SORTBY({1;2;3},{1;2;3}*-1),1)", 3.0),
+        ("=SUM(MMULT({1,2}*2,{3;4}))", 22.0),
+        ("=SUM(TOCOL({1,2;3,4}+10))", 50.0),
+        ("=SUM(MAP({1;2;3}*2,LAMBDA(x,x+1)))", 15.0),
+    ] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, 8);
+        store.set_formula(sheet, 0, 0, source, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 0), None, "{source}");
+        assert_close(number(&store, sheet, 0, 0), expected);
+    }
+}
+
+#[test]
 fn array_constants_survive_structural_rewrites() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 4);

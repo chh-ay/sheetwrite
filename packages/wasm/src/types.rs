@@ -330,6 +330,7 @@ pub(crate) struct FormulaEntry {
     /// The formula contains `A1#`. Each evaluation replaces those with the
     /// current spill ranges; other formulas skip that step.
     pub(crate) has_spill_refs: bool,
+    pub(crate) produces_array: bool,
     pub(crate) source_kind: PersistedSourceKind,
 }
 
@@ -343,6 +344,7 @@ impl FormulaEntry {
         let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
             has_spill_refs: ast_contains_spill_ref(&ast),
+            produces_array: crate::eval::ast_produces_array(&ast),
             ast: Some(ast),
             source: source.to_string(),
             reads,
@@ -372,6 +374,7 @@ impl FormulaEntry {
             value_kind: FormulaValueKind::Blank,
             volatile: false,
             has_spill_refs: false,
+            produces_array: false,
             source_kind: PersistedSourceKind::Reference,
         }
     }
@@ -416,6 +419,7 @@ impl FormulaEntry {
             value_kind: FormulaValueKind::Number,
             volatile: false,
             has_spill_refs: false,
+            produces_array: false,
             source_kind: PersistedSourceKind::Formula,
         }
     }

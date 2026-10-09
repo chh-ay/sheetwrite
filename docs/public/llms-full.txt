@@ -2122,7 +2122,17 @@ Put `#` after a cell reference to refer to the whole spill of the formula in tha
 
 `A1#` returns `#REF!` when the cell does not hold a spill: for example, the cell contains a value, or a collision blocks the spill (`#SPILL!`). If you delete the row or column of the anchor cell, the reference becomes `#REF!`. Both engines support spill references. XLSX files store `A1#` as `_xlfn.ANCHORARRAY(A1)`; import and export convert between the two forms.
 
-Arithmetic on a whole spill, such as `=A1#*10`, returns `#VALUE!`, the same as `=A1:A3*10`. Use a function that accepts a range, such as `SUM`, `INDEX`, `SORT`, or `FILTER`.
+Arithmetic on a whole spill applies to each element. For example, `=A1#*10` multiplies each value in the spill by 10 and spills the result.
+
+## Array arithmetic
+
+Operators apply to each element of a range, array constant, spill reference, or dynamic-array result. This includes arithmetic (`+`, `-`, `*`, `/`, `^`), text concatenation (`&`), comparisons, unary `+` and `-`, and `%`.
+
+For example, `=A1:A3*10` spills three results. `=FILTER(A1:A5,B1:B5>2)` uses a comparison array to select rows. `=SUMPRODUCT((A1:A5>2)*B1:B5)` multiplies the comparison results by the values in column B.
+
+A scalar applies to every element. Rows and columns expand separately. A size of one expands to match the other operand. For example, `={1,2,3}+{10;20}` returns `{11,12,13;21,22,23}`. If two sizes differ and neither is one, the result uses the larger size. Positions outside the smaller operand return `#N/A`.
+
+Each element uses the scalar rules for values and errors. An error affects its element, not the whole array. Functions that accept arrays use the results directly. For example, `=SUM(A1:A3*B1:B3)` returns one sum. A top-level array result spills into adjacent cells. A blocked spill returns `#SPILL!`. Array size and memory limits still apply.
 
 ## Operators
 
