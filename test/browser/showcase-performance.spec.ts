@@ -638,3 +638,26 @@ test("@portability mobile touch input, lifecycle, and responsive reflow stay ope
   expect(errors.console).toEqual([]);
   await context.close();
 });
+
+test("the flight deck moves the real Grid to the last row within the cache budget", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await bootScale(page);
+  const cacheBudgetBytes = Number(
+    await page.getByTestId("scale-grid").getAttribute("data-cache-bytes"),
+  );
+
+  await page.getByTestId("scale-flight-depth").click();
+  await expect(page.getByTestId("scale-flight-report")).toContainText("frames", {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("scale-current-a1")).toHaveText(`A${ROWS}`);
+  await expect.poll(async () => (await readWindow(page)).lastRow, { timeout: 10_000 }).toBe(ROWS);
+  const stats = await pagedStats(page);
+  expect(stats?.allocatedBytes ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(cacheBudgetBytes);
+
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});

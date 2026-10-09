@@ -62,7 +62,7 @@ function DatabaseProofRoute() {
       ]}
       guideHref="/docs/guides/persistence/"
       guideLabel="Read the persistence guide"
-      prompt="Edit an amount, pause autosave to inspect the durable pending write, save it, then reopen the session."
+      prompt="Pause autosave, hold unsaved edits, and reload the real page. Then clear 100,000 usage cells and undo them as one step."
       slug="database"
       sourcePath="docs/src/showcases/showcase-database.ts"
       title="Edit once. Reload the same durable document."
@@ -86,6 +86,16 @@ function DatabaseProofRoute() {
           title: "Reload recovery",
           detail:
             "Close and reopen the session (or reload this page): committed state and the durable pending queue come back from IndexedDB exactly once.",
+        },
+        {
+          title: "Large undo (0.5.0)",
+          detail:
+            "Clearing 100,000 cells and undoing once restores them through one compressed restoreBlock commit: one history step, one server version, and the commit journal shows the bytes before and after compression.",
+        },
+        {
+          title: "Oversized undo (0.5.0)",
+          detail:
+            "When an undo exceeds the transaction limits, the Grid emits mutation-rejected with a resource-limit issue, drops that entry, and keeps older history undoable — try it under the 128-byte limit in the failure lab.",
         },
       ]}
     >

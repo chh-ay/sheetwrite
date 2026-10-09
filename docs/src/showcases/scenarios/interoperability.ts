@@ -50,15 +50,77 @@ export const INTEROP_ANALYSIS_SHEET = "analysis";
 /** Literal text that MUST leave the CSV path neutralized, never executable. */
 export const INTEROP_INJECTION_TEXT = '=HYPERLINK("https://evil.example","Q3 total")';
 
-const ORDER_ROWS: ReadonlyArray<readonly [sku: string, item: string, qty: number, price: number]> =
-  [
-    ["OP-1041", "Standing desk", 4, 749.5],
-    ["OP-1042", "Task chair", 12, 289.99],
-    ["OP-1043", "Monitor arm", 18, 74.25],
-    ["OP-1044", "Meeting camera", 3, 1189.0],
-    ["OP-1045", INTEROP_INJECTION_TEXT, 1, 0],
-    ["OP-1046", "Cable spine", 30, 12.8],
+const PRODUCTS = [
+  ["Standing desk", 749.5],
+  ["Task chair", 289.99],
+  ["Monitor arm", 74.25],
+  ["Meeting camera", 1189],
+] as const;
+const CUSTOMERS = ["Alder Design", "Harbor Studio", "Cedar Works", "Maple Agency"] as const;
+const MONTHS = ["January", "February", "March"] as const;
+const ORDERS_PER_MONTH = 16;
+const ORDER_ROWS = Array.from({ length: ORDERS_PER_MONTH * MONTHS.length }, (_, row) => {
+  const product = PRODUCTS[row % PRODUCTS.length];
+  const customer = CUSTOMERS[Math.floor(row / PRODUCTS.length) % CUSTOMERS.length];
+  const month = MONTHS[Math.floor(row / ORDERS_PER_MONTH)];
+  if (!product || !customer || !month) throw new Error("Quarterly sales catalogue is incomplete");
+  return {
+    id: `OP-${1041 + row}`,
+    product: product[0],
+    quantity: 4 + (row % 5) * 2 + Math.floor(row / ORDERS_PER_MONTH) * 2,
+    price: product[1],
+    month,
+    customer,
+  };
+});
+
+export const BULK_SALES_ROWS = 200_000;
+
+/** A declared schema lets the CSV importer write directly into typed columns. */
+export function createBulkSalesCsv(): { text: string; columns: Column[] } {
+  const columns: Column[] = [
+    { key: "order", header: "Order", width: 150, type: "text" },
+    { key: "customer", header: "Customer", width: 200, type: "text" },
+    { key: "product", header: "Product", width: 200, type: "text" },
+    { key: "region", header: "Region", width: 110, type: "text" },
+    { key: "channel", header: "Channel", width: 115, type: "text" },
+    { key: "units", header: "Units", width: 90, type: "number" },
+    ...["Unit price", "Revenue", "Discount", "Net revenue"].map(
+      (header, index): Column => ({
+        key: `amount${index}`,
+        header,
+        width: 140,
+        type: "currency",
+        numberFormat: "$#,##0.00",
+      }),
+    ),
   ];
+  const records = [columns.map((column) => column.header).join(",")];
+  for (let row = 0; row < BULK_SALES_ROWS; row++) {
+    const product = PRODUCTS[row % PRODUCTS.length];
+    const customer = CUSTOMERS[row % CUSTOMERS.length];
+    if (!product || !customer) throw new Error("Sales catalogue is incomplete");
+    const units = 4 + (row % 17);
+    const revenue = units * product[1];
+    const partner = row % 3 === 0;
+    const discount = partner ? revenue * 0.1 : 0;
+    records.push(
+      [
+        `OP-${100_000 + row}`,
+        customer,
+        product[0],
+        row % 2 ? "North" : "South",
+        partner ? "Partner" : "Direct",
+        units,
+        product[1].toFixed(2),
+        revenue.toFixed(2),
+        discount.toFixed(2),
+        (revenue - discount).toFixed(2),
+      ].join(","),
+    );
+  }
+  return { text: records.join("\n"), columns };
+}
 
 function literal(rowOffset: number, colOffset: number, value: string | number) {
   return { rowOffset, colOffset, value: { kind: "literal", value } as const };
@@ -68,12 +130,35 @@ function formula(rowOffset: number, colOffset: number, src: string) {
   return { rowOffset, colOffset, value: { kind: "formula", src } as const };
 }
 
-/**
- * The canonical multi-sheet snapshot the workbench boots from: the original
- * order/invoice interchange fixture plus a compact, bounded analytical model.
- * Its formula sources exercise portable lookup, date, statistics, array, LET,
- * and financial families while retaining every XLSX/CSV fidelity feature.
- */
+/** A literal attack sample is loaded only from the security lab. */
+export function createInjectionSnapshot(): WorkbookSnapshot {
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: INTEROP_ORDERS_SHEET },
+    sheets: [
+      {
+        id: INTEROP_ORDERS_SHEET,
+        name: "Security probe",
+        order: 0,
+        rowCount: 1,
+        columns: [
+          { key: "probe", header: "Untrusted text (not a formula)", width: 480, type: "text" },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 1,
+            colCount: 1,
+            cells: [literal(0, 0, INTEROP_INJECTION_TEXT)],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Q1 sales ledger and its equipment-financing model share one portable workbook. */
 export function createInteropSnapshot(): WorkbookSnapshot {
   return {
     schemaVersion: 1,
@@ -83,51 +168,62 @@ export function createInteropSnapshot(): WorkbookSnapshot {
         id: INTEROP_ORDERS_SHEET,
         name: "Orders",
         order: 0,
-        rowCount: ORDER_ROWS.length,
+        rowCount: ORDER_ROWS.length + 1,
         frozenRows: 1,
         columns: [
-          { key: "sku", header: "SKU", width: 96, type: "text" },
-          { key: "item", header: "Item", width: 230, type: "text" },
-          { key: "qty", header: "Qty", width: 64, type: "number" },
+          { key: "sku", header: "Order", width: 150, type: "text" },
+          { key: "item", header: "Product", width: 300, type: "text" },
+          { key: "qty", header: "Qty", width: 90, type: "number" },
           {
             key: "price",
             header: "Unit price",
-            width: 110,
+            width: 170,
             type: "currency",
             numberFormat: "$#,##0.00",
           },
           {
             key: "total",
             header: "Line total",
-            width: 120,
+            width: 200,
             type: "currency",
             numberFormat: "$#,##0.00",
           },
+          { key: "month", header: "Month", width: 160, type: "text" },
+          { key: "customer", header: "Customer", width: 370, type: "text" },
         ],
         cells: [
           {
             startRow: 0,
             startCol: 0,
-            rowCount: ORDER_ROWS.length,
-            colCount: 5,
-            cells: ORDER_ROWS.flatMap(([sku, item, qty, price], row) => [
-              literal(row, 0, sku),
-              // Keep the injection probe literal and contained, not an active link.
-              { ...literal(row, 1, item), style: { wrap: true } },
-              literal(row, 2, qty),
-              literal(row, 3, price),
-              formula(row, 4, `=C${row + 1}*D${row + 1}`),
-            ]),
+            rowCount: ORDER_ROWS.length + 1,
+            colCount: 7,
+            cells: [
+              ...["Order", "Product", "Qty", "Unit price", "Line total", "Month", "Customer"].map(
+                (header, col) => ({
+                  ...literal(0, col, header),
+                  style: { bold: true },
+                }),
+              ),
+              ...ORDER_ROWS.flatMap((order, row) => [
+                literal(row + 1, 0, order.id),
+                literal(row + 1, 1, order.product),
+                literal(row + 1, 2, order.quantity),
+                literal(row + 1, 3, order.price),
+                formula(row + 1, 4, `=C${row + 2}*D${row + 2}`),
+                literal(row + 1, 5, order.month),
+                literal(row + 1, 6, order.customer),
+              ]),
+            ],
           },
         ],
       },
       {
         id: INTEROP_INVOICE_SHEET,
-        name: "Invoice",
+        name: "Summary",
         order: 1,
-        rowCount: 5,
+        rowCount: 12,
         columns: [
-          { key: "label", header: "Invoice line", width: 240, type: "text" },
+          { key: "label", header: "Q1 2026 sales", width: 240, type: "text" },
           {
             key: "amount",
             header: "Amount",
@@ -135,24 +231,38 @@ export function createInteropSnapshot(): WorkbookSnapshot {
             type: "currency",
             numberFormat: "$#,##0.00",
           },
+          { key: "trend", header: "Monthly revenue trend", width: 220, type: "text" },
         ],
         merges: [{ r0: 4, c0: 0, r1: 4, c1: 1 }],
         cells: [
           {
             startRow: 0,
             startCol: 0,
-            rowCount: 5,
-            colCount: 2,
+            rowCount: 12,
+            colCount: 3,
             cells: [
-              literal(0, 0, "Subtotal"),
-              formula(0, 1, `=SUM(Orders!E1:E${ORDER_ROWS.length})`),
-              literal(1, 0, "Volume discount (10%)"),
+              literal(0, 0, "Gross sales"),
+              formula(0, 1, `=SUM(Orders!E2:E${ORDER_ROWS.length + 1})`),
+              literal(1, 0, "Channel discount (10%)"),
               formula(1, 1, "=B1*0.1"),
-              literal(2, 0, "Net due"),
+              literal(2, 0, "Net sales"),
               formula(2, 1, "=B1-B2"),
-              { ...literal(3, 0, "Terms"), style: { bold: true } },
-              literal(3, 1, "Net 30"),
-              literal(4, 0, "Generated with Sheetwrite — merged footer cell"),
+              { ...literal(3, 0, "Reporting period"), style: { bold: true } },
+              literal(3, 1, "Q1 2026"),
+              literal(4, 0, "48 fulfilled orders · four business customers"),
+              ...MONTHS.flatMap((month, index) => [
+                literal(6 + index, 0, month),
+                formula(
+                  6 + index,
+                  1,
+                  `=SUM(Orders!E${index * ORDERS_PER_MONTH + 2}:E${(index + 1) * ORDERS_PER_MONTH + 1})`,
+                ),
+                formula(6 + index, 2, `=REPT("▰",ROUND(B${7 + index}/MAX(B7:B9)*18,0))`),
+              ]),
+              literal(10, 0, "Order count"),
+              literal(10, 1, ORDER_ROWS.length),
+              literal(11, 0, "Average order"),
+              formula(11, 1, `=AVERAGE(Orders!E2:E${ORDER_ROWS.length + 1})`),
             ],
           },
         ],
@@ -242,7 +352,7 @@ export function createInteropSnapshot(): WorkbookSnapshot {
               formula(1, 0, "=EDATE(A1,12)"),
               literal(1, 1, 3_500),
               literal(1, 2, "Order total standard deviation"),
-              formula(1, 3, "=ROUND(STDEV.S(Orders!E1:E6),2)"),
+              formula(1, 3, `=ROUND(STDEV.S(Orders!E2:E${ORDER_ROWS.length + 1}),2)`),
               formula(2, 0, "=EDATE(A2,12)"),
               literal(2, 1, 3_500),
               literal(2, 2, "Remaining scheduled payments (LET)"),
@@ -263,44 +373,38 @@ export function createInteropSnapshot(): WorkbookSnapshot {
           },
         ],
       },
+      {
+        id: "arrays",
+        name: "Array formulas",
+        order: 4,
+        rowCount: 8,
+        columns: [
+          { key: "west", header: "West allocation", width: 150, type: "number" },
+          { key: "east", header: "East allocation", width: 150, type: "number" },
+          { key: "label", header: "Exchange sample", width: 190, type: "text" },
+          { key: "result", header: "Engine result", width: 130, type: "number" },
+          { key: "sorted", header: "Sorted spill", width: 130, type: "number" },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 8,
+            colCount: 5,
+            cells: [
+              formula(0, 0, "={1,2;3,4}"),
+              literal(0, 2, "Total allocated units"),
+              formula(0, 3, "=SUM(A1#)"),
+              literal(3, 2, "Sorted allocation"),
+              formula(3, 3, "=SORT(A1#)"),
+              literal(6, 0, "Array constant in A1 spills to A1:B2; SUM and SORT read A1#"),
+            ],
+          },
+        ],
+      },
     ],
   };
 }
-
-/** Observable states the browser contract asserts against. */
-export const INTEROP_EXPECTED = {
-  orderRows: ORDER_ROWS.length,
-  sheets: [
-    INTEROP_ORDERS_SHEET,
-    INTEROP_INVOICE_SHEET,
-    INTEROP_ASSUMPTIONS_SHEET,
-    INTEROP_ANALYSIS_SHEET,
-  ],
-  /** Formula source of the first computed line total. */
-  firstTotalFormula: "=C1*D1",
-  /** Cross-sheet subtotal on the invoice sheet. */
-  subtotalFormula: `=SUM(Orders!E1:E${ORDER_ROWS.length})`,
-  lookupFormula: "=XLOOKUP(B1,C1:C3,D1:D3)",
-  paymentFormula: "=-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4)",
-  spillFormula: "=SEQUENCE(Assumptions!B5,1,1,1)",
-  dateFormula: "=EDATE(A4,12)",
-  statisticalFormula: "=ROUND(STDEV.S(Orders!E1:E6),2)",
-  letFormula:
-    "=LET(payment,-PMT(Assumptions!B2/12,Assumptions!B3,Assumptions!B4),ROUND(payment*Assumptions!B3-payment,2))",
-  npvFormula: "=NPV(Assumptions!B2,B2:B5)+B1",
-  irrFormula: "=IRR(B1:B5)",
-  /** Every formula the canonical snapshot ships, for round-trip comparison. */
-  formulaCount: ORDER_ROWS.length + 3 + 1 + 11,
-  selectedRate: 0.06,
-  monthlyPayment: 1032.7971564849884,
-  statisticalResult: 1592.74,
-  letResult: 11360.77,
-  npv: 127.86964444879777,
-  irr: 0.06464423448532142,
-  scheduleEndSerial: 47514,
-  spill: [1, 2, 3, 4],
-  injectionCell: { sheet: INTEROP_ORDERS_SHEET, row: 4, col: 1 },
-} as const;
 
 // ── Optional package boundary ────────────────────────────────────────────────
 
@@ -505,16 +609,176 @@ export async function exportWorkbook(
   return { bytes, warnings };
 }
 
-function formulaSources(snapshot: WorkbookSnapshot): string[] {
-  const sources: string[] = [];
+type SnapshotValue = WorkbookSnapshot["sheets"][number]["cells"][number]["cells"][number]["value"];
+
+function cellsByAddress(snapshot: WorkbookSnapshot): Map<string, SnapshotValue> {
+  const values = new Map<string, SnapshotValue>();
   for (const sheet of snapshot.sheets) {
     for (const block of sheet.cells) {
       for (const cell of block.cells) {
-        if (cell.value.kind === "formula") sources.push(cell.value.src);
+        values.set(
+          `${sheet.name}\0${block.startRow + cell.rowOffset}\0${block.startCol + cell.colOffset}`,
+          cell.value,
+        );
       }
     }
   }
-  return sources.sort();
+  return values;
+}
+
+// ── The exported package, read back ──────────────────────────────────────────
+
+const ZIP_END_SIGNATURE = 0x06054b50;
+const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
+const ZIP_LOCAL_SIGNATURE = 0x04034b50;
+const ZIP_END_MIN_SIZE = 22;
+const ZIP_MAX_COMMENT = 65_557;
+/** Record fields the reader steps over; each name lists the ZIP fields it covers. */
+const ZIP_END_DISK_FIELDS_SIZE = 4;
+const ZIP_CENTRAL_PREFIX_SIZE = 6;
+const ZIP_TIMESTAMP_SIZE = 4;
+const ZIP_CRC_SIZE = 4;
+const ZIP_SIZE_FIELD = 4;
+const ZIP_CENTRAL_TAIL_SIZE = 8;
+const ZIP_LOCAL_PREFIX_SIZE = 6;
+const WORKSHEET_PART = /^xl\/worksheets\/[^/]+\.xml$/iu;
+const FORMULA_ELEMENT = /<f(?:\s[^>]*)?>([\s\S]*?)<\/f>/gu;
+const XML_ENTITY = /&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos));/giu;
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+/** Excel's stored spill form, as the writer emits it for an `A1#` source. */
+const SPILL_IN_FILE = /_xlfn\.ANCHORARRAY\(\s*([A-Za-z]{1,3}[0-9]+)\s*\)/giu;
+const STORED_UTF8 = new TextDecoder();
+
+/** Sequential little-endian reader over one ZIP record. */
+class ZipCursor {
+  offset: number;
+  readonly #view: DataView;
+
+  constructor(view: DataView, start: number) {
+    this.#view = view;
+    this.offset = start;
+  }
+
+  u16(): number {
+    const value = this.#view.getUint16(this.offset, true);
+    this.offset += 2;
+    return value;
+  }
+
+  u32(): number {
+    const value = this.#view.getUint32(this.offset, true);
+    this.offset += 4;
+    return value;
+  }
+}
+
+/** Offset of the trailing end-of-central-directory record. */
+function findEndOfCentralDirectory(view: DataView, byteLength: number): number {
+  const earliest = Math.max(0, byteLength - ZIP_MAX_COMMENT - ZIP_END_MIN_SIZE);
+  for (let offset = byteLength - ZIP_END_MIN_SIZE; offset >= earliest; offset--) {
+    if (view.getUint32(offset, true) === ZIP_END_SIGNATURE) return offset;
+  }
+  throw new Error("Exported workbook is not a ZIP package");
+}
+
+/** Inflate one stored ZIP member with the browser's own decompressor. */
+async function inflateStoredPart(compressed: Uint8Array, method: number): Promise<string> {
+  if (method === 0) return STORED_UTF8.decode(compressed);
+  if (method !== 8) throw new Error(`Exported workbook uses unsupported compression ${method}`);
+  const stream = new Blob([compressed.slice()])
+    .stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"));
+  return await new Response(stream).text();
+}
+
+/** The `<f>` texts of one worksheet part, decoded to source text. */
+function storedFormulasOf(xml: string): string[] {
+  const texts: string[] = [];
+  for (const match of xml.matchAll(FORMULA_ELEMENT)) {
+    texts.push(
+      (match[1] ?? "").replace(
+        XML_ENTITY,
+        (entity, decimal?: string, hex?: string, named?: string) =>
+          named === undefined
+            ? String.fromCodePoint(Number.parseInt(decimal ?? hex ?? "0", decimal ? 10 : 16))
+            : (NAMED_ENTITIES[named] ?? entity),
+      ),
+    );
+  }
+  return texts;
+}
+
+/**
+ * Read the formula texts out of the workbook Sheetwrite just exported. The page
+ * reads its own .xlsx bytes so the `_xlfn.ANCHORARRAY` claim is shown from the
+ * file instead of being asserted in prose. Only worksheet parts are touched.
+ */
+async function storedFormulaTexts(bytes: Uint8Array): Promise<string[]> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const directory = new ZipCursor(view, findEndOfCentralDirectory(view, bytes.byteLength));
+  if (directory.u32() !== ZIP_END_SIGNATURE)
+    throw new Error("Exported workbook lost its end record");
+  directory.offset += ZIP_END_DISK_FIELDS_SIZE;
+  const diskEntries = directory.u16();
+  const entryCount = directory.u16();
+  if (diskEntries !== entryCount) throw new Error("Exported workbook spans multiple disks");
+  const centralSize = directory.u32();
+  const entryCursor = new ZipCursor(view, directory.u32());
+  const texts: string[] = [];
+  for (let index = 0; index < entryCount; index++) {
+    const entryStart = entryCursor.offset;
+    if (entryCursor.u32() !== ZIP_CENTRAL_SIGNATURE) {
+      throw new Error("Exported workbook has an unreadable central directory");
+    }
+    entryCursor.offset += ZIP_CENTRAL_PREFIX_SIZE;
+    const method = entryCursor.u16();
+    entryCursor.offset += ZIP_TIMESTAMP_SIZE + ZIP_CRC_SIZE;
+    const compressedSize = entryCursor.u32();
+    entryCursor.offset += ZIP_SIZE_FIELD;
+    const nameLength = entryCursor.u16();
+    const extraLength = entryCursor.u16();
+    const commentLength = entryCursor.u16();
+    entryCursor.offset += ZIP_CENTRAL_TAIL_SIZE;
+    const localOffset = entryCursor.u32();
+    const name = STORED_UTF8.decode(
+      bytes.subarray(entryCursor.offset, entryCursor.offset + nameLength),
+    );
+    entryCursor.offset += nameLength + extraLength + commentLength;
+    if (entryCursor.offset - entryStart > centralSize) {
+      throw new Error("Exported workbook central directory overran its declared size");
+    }
+    if (!WORKSHEET_PART.test(name)) continue;
+    const local = new ZipCursor(view, localOffset);
+    if (local.u32() !== ZIP_LOCAL_SIGNATURE) {
+      throw new Error(`Exported worksheet part ${name} is unreadable`);
+    }
+    local.offset += ZIP_LOCAL_PREFIX_SIZE + ZIP_TIMESTAMP_SIZE + ZIP_CRC_SIZE + ZIP_SIZE_FIELD * 2;
+    const localNameLength = local.u16();
+    const localExtraLength = local.u16();
+    const dataOffset = local.offset + localNameLength + localExtraLength;
+    texts.push(
+      ...storedFormulasOf(
+        await inflateStoredPart(bytes.subarray(dataOffset, dataOffset + compressedSize), method),
+      ),
+    );
+  }
+  return texts;
+}
+
+/**
+ * Claim the stored text that belongs to one source formula. The stored form may
+ * use Excel's `_xlfn.ANCHORARRAY(A1)`; it reduces to the `A1#` source text.
+ */
+function takeStoredFormula(stored: string[], source: string): string | null {
+  const wanted = source.startsWith("=") ? source.slice(1) : source;
+  const index = stored.findIndex((text) => text.replace(SPILL_IN_FILE, "$1#") === wanted);
+  return index === -1 ? null : (stored.splice(index, 1)[0] ?? null);
 }
 
 export interface RoundTripReport {
@@ -526,30 +790,105 @@ export interface RoundTripReport {
   formulasPreserved: number;
   mergePreserved: boolean;
   frozenRowsPreserved: boolean;
+  cellsCompared: number;
+  cellsMatched: number;
+  elapsedMs: number;
+  formulaExamples: Array<{
+    sheet: string;
+    row: number;
+    col: number;
+    before: string;
+    /** The same formula as stored inside the exported .xlsx file. */
+    exported: string | null;
+    after: string | null;
+  }>;
 }
 
 /** Live export → re-import proof over the current grid document. */
 export async function roundTripWorkbook(
   grid: Pick<Grid, "exportSnapshot">,
 ): Promise<RoundTripReport> {
+  const started = performance.now();
   const before = grid.exportSnapshot();
   const exported = await exportWorkbook(before);
   const imported = await importWorkbook(exported.bytes);
+  const storedFormulas = await storedFormulaTexts(exported.bytes).catch(
+    (error: unknown): string[] => {
+      // The proof table shows "not found in the exported file" per row, so an
+      // unreadable package reports itself there instead of failing the exchange.
+      console.warn("Sheetwrite showcase: exported workbook formulas could not be read", error);
+      return [];
+    },
+  );
 
-  const beforeFormulas = formulaSources(before);
-  const afterFormulas = new Set(formulaSources(imported.snapshot));
-  const invoiceAfter = imported.snapshot.sheets.find((sheet) => sheet.name === "Invoice");
-  const ordersAfter = imported.snapshot.sheets.find((sheet) => sheet.name === "Orders");
+  const beforeCells = cellsByAddress(before);
+  const afterCells = cellsByAddress(imported.snapshot);
+  let formulasBefore = 0;
+  let formulasPreserved = 0;
+  let cellsMatched = 0;
+  const formulaExamples: RoundTripReport["formulaExamples"] = [];
+  for (const [address, value] of beforeCells) {
+    const after = afterCells.get(address);
+    if (value.kind === "formula" && (value.src.includes("#") || value.src.startsWith("={"))) {
+      const [sheet = "", row = "0", col = "0"] = address.split("\0");
+      formulaExamples.push({
+        sheet,
+        row: Number(row),
+        col: Number(col),
+        before: value.src,
+        exported: takeStoredFormula(storedFormulas, value.src),
+        after: after?.kind === "formula" ? after.src : null,
+      });
+    }
+    if (value.kind === "formula") {
+      formulasBefore++;
+      if (after?.kind === "formula" && after.src === value.src) {
+        formulasPreserved++;
+        cellsMatched++;
+      }
+    } else if (
+      value.kind === "literal" &&
+      after?.kind === "literal" &&
+      Object.is(after.value, value.value)
+    ) {
+      cellsMatched++;
+    } else if (
+      value.kind === "ref" &&
+      after?.kind === "ref" &&
+      JSON.stringify(value.target) === JSON.stringify(after.target)
+    ) {
+      cellsMatched++;
+    }
+  }
+  const structureMatches = (
+    matches: (
+      before: WorkbookSnapshot["sheets"][number],
+      after: WorkbookSnapshot["sheets"][number],
+    ) => boolean,
+  ) =>
+    before.sheets.every((sheet) => {
+      const after = imported.snapshot.sheets.find((candidate) => candidate.name === sheet.name);
+      return after !== undefined && matches(sheet, after);
+    });
 
   return {
     exportedBytes: exported.bytes.byteLength,
     exportWarnings: exported.warnings,
     importWarnings: imported.warnings,
-    sheetsPreserved: imported.snapshot.sheets.length === before.sheets.length,
-    formulasBefore: beforeFormulas.length,
-    formulasPreserved: beforeFormulas.filter((src) => afterFormulas.has(src)).length,
-    mergePreserved: (invoiceAfter?.merges?.length ?? 0) > 0,
-    frozenRowsPreserved: (ordersAfter?.frozenRows ?? 0) > 0,
+    sheetsPreserved:
+      imported.snapshot.sheets.length === before.sheets.length && structureMatches(() => true),
+    formulasBefore,
+    formulasPreserved,
+    mergePreserved: structureMatches(
+      (sheet, after) => JSON.stringify(sheet.merges ?? []) === JSON.stringify(after.merges ?? []),
+    ),
+    frozenRowsPreserved: structureMatches(
+      (sheet, after) => (sheet.frozenRows ?? 0) === (after.frozenRows ?? 0),
+    ),
+    cellsCompared: beforeCells.size,
+    cellsMatched,
+    elapsedMs: performance.now() - started,
+    formulaExamples,
   };
 }
 

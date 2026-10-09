@@ -8,7 +8,9 @@
 // this file only wires it to observable workbench state.
 
 import {
+  type Column,
   type ColumnarData,
+  type DocumentOp,
   type Grid,
   type PersistenceCommitResponse,
   PresenceCoordinator,
@@ -81,6 +83,12 @@ export interface WorkbenchCallbacks {
   onConflict(conflict: WorkbenchConflict | null): void;
   onPeers(peers: readonly PresenceMessage[]): void;
   onFeed(entry: WorkbenchFeedEntry): void;
+  /**
+   * Live width of the grid host at mount time. The workbook declares its
+   * columns wide enough to cover the stage, so the Grid never pads the view
+   * with empty positional columns beside the named ones.
+   */
+  measureHostWidth(): number | undefined;
   /** The island must recreate its grid from `mount` (durable queue restores on top). */
   onRemount(mount: WorkbenchMount, note: string): void;
 }
@@ -97,6 +105,52 @@ interface GridLink {
 const COLUMN_HEADERS: readonly string[] = createOfflineWorkbook().sheets[0]!.columns.map(
   (column) => column.header ?? column.key,
 );
+
+// Content-fit design widths for the dispatch columns. Column widths are fixed
+// at mount, so the mount path widens them proportionally to cover the measured
+// stage: a narrower stage keeps these widths and scrolls, a wider stage never
+// shows empty positional columns beside the named headers.
+const DISPATCH_BASE_WIDTHS = [100, 180, 205, 200, 104, 140, 112] as const;
+/** Row-number gutter the Grid reserves before the first data column. */
+const DISPATCH_GUTTER_WIDTH = 48;
+
+/** Widen column weights to cover the measured stage, remainder included. */
+function fitColumnWidths(weights: readonly number[], hostWidth: number | undefined): number[] {
+  const baseSum = weights.reduce((total, width) => total + width, 0);
+  const fill = hostWidth === undefined ? 0 : Math.floor(hostWidth) - DISPATCH_GUTTER_WIDTH;
+  if (baseSum <= 0 || fill <= baseSum) return [...weights];
+  const widths = weights.map(
+    (weight) => weight + Math.floor(((fill - baseSum) * weight) / baseSum),
+  );
+  // Spread the rounding remainder so the declared columns cover the stage exactly.
+  let remainder = fill - widths.reduce((total, width) => total + width, 0);
+  for (let index = 0; remainder > 0; index = (index + 1) % widths.length) {
+    const width = widths[index];
+    if (width === undefined) break;
+    widths[index] = width + 1;
+    remainder -= 1;
+  }
+  return widths;
+}
+
+/**
+ * One sheet's columns, sized to the stage. The dispatch sheet keeps its
+ * content-fit weights; every other sheet scales its declared widths, so a
+ * switch to that tab shows its named columns across the whole board.
+ */
+function fitSheetColumns(
+  sheetId: string,
+  columns: readonly Column[],
+  hostWidth?: number,
+): Column[] {
+  const weights =
+    sheetId === OFFLINE_SHEET_ID ? DISPATCH_BASE_WIDTHS : columns.map((column) => column.width);
+  const widths = fitColumnWidths(weights, hostWidth);
+  return columns.map((column, index) => ({
+    ...column,
+    width: widths[index] ?? column.width,
+  }));
+}
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -129,21 +183,20 @@ async function resetOutbox(databaseName: string): Promise<void> {
  * The scenario scripts only write literal values, so cell styles are the
  * only snapshot detail this mount path does not carry.
  */
-function mountFromSnapshot(snapshot: WorkbookSnapshot): WorkbenchMount {
-  const sheet = snapshot.sheets[0];
+function mountFromSnapshot(snapshot: WorkbookSnapshot, hostWidth?: number): WorkbenchMount {
+  const active = snapshot.sheets.find((entry) => entry.id === snapshot.workbook.activeSheet);
+  const sheet = active ?? snapshot.sheets[0];
   if (!sheet) throw new Error("Offline snapshot lost its dispatch sheet");
   const workbook: Workbook = {
-    activeSheet: snapshot.workbook.activeSheet,
-    sheets: [
-      {
-        id: sheet.id,
-        name: sheet.name,
-        rowCount: sheet.rowCount,
-        columns: sheet.columns,
-        ...(sheet.frozenRows !== undefined ? { frozenRows: sheet.frozenRows } : {}),
-        ...(sheet.frozenCols !== undefined ? { frozenCols: sheet.frozenCols } : {}),
-      },
-    ],
+    activeSheet: sheet.id,
+    sheets: snapshot.sheets.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      rowCount: entry.rowCount,
+      columns: fitSheetColumns(entry.id, entry.columns, hostWidth),
+      ...(entry.frozenRows !== undefined ? { frozenRows: entry.frozenRows } : {}),
+      ...(entry.frozenCols !== undefined ? { frozenCols: entry.frozenCols } : {}),
+    })),
   };
   const keyed = sheet.columns.map(() =>
     new Array<ColumnarData["columns"][string][number]>(sheet.rowCount).fill(null),
@@ -158,13 +211,40 @@ function mountFromSnapshot(snapshot: WorkbookSnapshot): WorkbenchMount {
   }
   const columns: ColumnarData["columns"] = {};
   sheet.columns.forEach((column, index) => {
-    columns[column.key] = keyed[index]!;
+    const values = keyed[index];
+    if (values) columns[column.key] = values;
   });
   return {
     workbook,
     data: { rowCount: sheet.rowCount, columns },
     version: snapshot.version ?? 0,
   };
+}
+
+/**
+ * Cell patches for the document's non-active sheets. The adapter's eager
+ * `data` covers the active sheet only, so every other sheet reaches the store
+ * as host records instead of mounting empty beside its named headers.
+ */
+function secondarySheetPatches(snapshot: WorkbookSnapshot, activeSheetId: string): DocumentOp[] {
+  const patches: DocumentOp[] = [];
+  for (const sheet of snapshot.sheets) {
+    if (sheet.id === activeSheetId) continue;
+    for (const block of sheet.cells) {
+      for (const cell of block.cells) {
+        patches.push({
+          op: "set",
+          addr: {
+            sheet: sheet.id,
+            row: block.startRow + cell.rowOffset,
+            col: block.startCol + cell.colOffset,
+          },
+          value: cell.value,
+        });
+      }
+    }
+  }
+  return patches;
 }
 
 /**
@@ -211,7 +291,31 @@ export class SvelteWorkbenchSession {
 
   /** Pristine construction-bound inputs for the first island generation. */
   initialMount(): WorkbenchMount {
-    return { workbook: createOfflineWorkbook(), data: createOfflineData(), version: 0 };
+    const workbook = createOfflineWorkbook();
+    const hostWidth = this.hostWidth();
+    for (const sheet of workbook.sheets) {
+      sheet.columns = fitSheetColumns(sheet.id, sheet.columns, hostWidth);
+    }
+    return { workbook, data: createOfflineData(), version: 0 };
+  }
+
+  private hostWidth(): number | undefined {
+    const width = this.callbacks.measureHostWidth();
+    return Number.isFinite(width) && (width ?? 0) > 0 ? width : undefined;
+  }
+
+  /**
+   * Eager `data` loads the active sheet only, so the document's other sheets
+   * arrive as host records: one low-level store commit per generation, never a
+   * queued edit and never Grid history.
+   */
+  private hydrateSecondarySheets(grid: Grid): void {
+    const patches = secondarySheetPatches(this.baseSnapshot, OFFLINE_SHEET_ID);
+    if (patches.length === 0) return;
+    const result = grid.store.applyTransaction({ patches }, { commitReason: "api" });
+    if (result.status !== "applied") {
+      this.feed("err", `Crew rota rows were not loaded (${result.status})`);
+    }
   }
 
   /** Wire one grid generation; replaces any previous link. */
@@ -228,6 +332,7 @@ export class SvelteWorkbenchSession {
     });
     const link: GridLink = { grid, sync, presence: null };
     this.link = link;
+    this.hydrateSecondarySheets(grid);
     link.offSync = sync.on((event) => this.handleSyncEvent(link, event));
     if (this.online) {
       link.disposeRemote = sync.subscribe(this.server);
@@ -377,7 +482,7 @@ export class SvelteWorkbenchSession {
       this.callbacks.onConflict(null);
       this.baseSnapshot = head;
       this.feed("info", `Reloading the document at server v${head.version ?? 0}`);
-      this.callbacks.onRemount(mountFromSnapshot(head), "conflict-reload");
+      this.callbacks.onRemount(mountFromSnapshot(head, this.hostWidth()), "conflict-reload");
     } catch (error) {
       this.feed("err", describeError(error));
     }
@@ -393,7 +498,7 @@ export class SvelteWorkbenchSession {
         ? `Remounting — ${pending} durable edit${pending === 1 ? "" : "s"} will restore from IndexedDB`
         : "Remounting the island",
     );
-    this.callbacks.onRemount(mountFromSnapshot(this.baseSnapshot), "manual");
+    this.callbacks.onRemount(mountFromSnapshot(this.baseSnapshot, this.hostWidth()), "manual");
   }
 
   destroy(): void {
@@ -412,12 +517,13 @@ export class SvelteWorkbenchSession {
         this.captureBase(link, event.state);
         break;
       case "restored":
-        if (event.pending.length > 0) {
-          this.feed(
-            "info",
-            `Restored ${event.pending.length} durable edit${event.pending.length === 1 ? "" : "s"} from the IndexedDB outbox`,
-          );
-        }
+        // Honest first entry: hydration ran against the real IndexedDB outbox.
+        this.feed(
+          "info",
+          event.pending.length > 0
+            ? `Restored ${event.pending.length} durable edit${event.pending.length === 1 ? "" : "s"} from the IndexedDB outbox`
+            : `Outbox ready — no durable edits at server v${link.sync.state.serverVersion}`,
+        );
         break;
       case "pending":
         this.feed(
@@ -492,7 +598,7 @@ export class SvelteWorkbenchSession {
       "info",
       `Server moved ahead to v${headVersion} while offline — reloading the document`,
     );
-    this.callbacks.onRemount(mountFromSnapshot(head), "reload");
+    this.callbacks.onRemount(mountFromSnapshot(head, this.hostWidth()), "reload");
   }
 
   private buildConflict(

@@ -21,7 +21,7 @@ const APP = ".sw-vuewb-app";
 const GRID = `${APP} .sheetwrite`;
 
 // Deterministic scenario observables (docs/src/showcases/scenarios/business.ts):
-// status[row] = BUSINESS_STATUSES[(row * 7) % 4]; qty[0] = 1; unitCost[0] = 8.
+// status[row] = BUSINESS_STATUSES[(row * 7) % 4]; qty[0] = 8; unitCost[0] = 96.
 const FIRST_PO = "PO-0001";
 const PROTECTION_ID = "orders-computed-totals";
 const SUPPLIER_BANNER = "Approved supplier directory — FY26";
@@ -121,7 +121,7 @@ test("boots the governed business workbook, paints, and stays accessible", async
   // store below.
   await expect
     .poll(() => page.locator(`${GRID} [role="gridcell"]`).allTextContents(), { timeout: 15_000 })
-    .toContain("Mekong Freight");
+    .toContain("Alder Quay Freight");
   await expect.poll(() => canvasBodyPainted(page), { timeout: 15_000 }).toBe(true);
 
   // The seeded document evaluates formulas and applies its merge.
@@ -137,7 +137,7 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(model.firstPo).toBe(FIRST_PO);
   expect(model.banner).toBe(SUPPLIER_BANNER);
   expect(model.bannerCovered).toBeNull();
-  expect(model.total0).toBe(8); // =E1*F1 evaluated by the engine
+  expect(model.total0).toBe(768); // Eight shipments at $96; evaluated by the engine.
 
   // The governed workflow, not generic controls, is the first visible task.
   const taskTabs = page.getByRole("tablist", { name: "Workbook tasks" });
@@ -177,6 +177,40 @@ test("boots the governed business workbook, paints, and stays accessible", async
   expect(errors.console).toEqual([]);
 });
 
+test("0.5.0 toolbar swatches follow the site theme toggle", async ({ page }) => {
+  const errors = collectErrors(page);
+  await openWorkbench(page);
+
+  const textColor = page.locator(`${GRID} .sheetwrite-tb-textColor`);
+  const fillColor = page.locator(`${GRID} .sheetwrite-tb-fillColor`);
+
+  // Both colour inputs seed from the theme the Grid resolves, not from black.
+  const initialSwatches = await Promise.all([textColor.inputValue(), fillColor.inputValue()]);
+  expect(initialSwatches[0]).toMatch(/^#[0-9a-f]{6}$/);
+  expect(initialSwatches[1]).toMatch(/^#[0-9a-f]{6}$/);
+
+  await page.getByRole("button", { name: /Use (?:light|dark) theme/ }).click();
+  await expect
+    .poll(() => Promise.all([textColor.inputValue(), fillColor.inputValue()]))
+    .not.toEqual(initialSwatches);
+
+  // theme-change reseeds the swatches with the colours the Grid now paints.
+  const resolvedTheme = await page.evaluate(() => {
+    const handle = window.__sheetwriteVueWorkbench;
+    if (!handle) throw new Error("vue workbench grid handle missing");
+    return [handle.grid.getTheme().fg, handle.grid.getTheme().bg];
+  });
+  expect(await Promise.all([textColor.inputValue(), fillColor.inputValue()])).toEqual(
+    resolvedTheme,
+  );
+
+  // The same workbench keeps several sheet tabs reachable from the strip.
+  await expect(page.getByRole("tab", { name: "Orders sheet" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Suppliers sheet" })).toBeVisible();
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
 test("protected totals show rejection, role correction, and accepted mutation in one journey", async ({
   page,
 }) => {
@@ -191,7 +225,7 @@ test("protected totals show rejection, role correction, and accepted mutation in
   await expect(result).toHaveAttribute("data-state", "rejected");
   await expect(result).toContainText(PROTECTION_ID);
   await expect(result).toContainText("Rejected");
-  expect(await cellValue(page, "orders", 0, 6)).toBe(8);
+  expect(await cellValue(page, "orders", 0, 6)).toBe(768);
   await expect(page.getByTestId("pending-count")).toHaveText("0");
 
   await page.getByTestId("challenge-authorize").click();

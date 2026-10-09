@@ -67,6 +67,39 @@ function DocsOverview() {
           </ol>
         </section>
 
+        <section aria-labelledby="new-in-release">
+          <div className="sw-doc-section-head">
+            <h2 id="new-in-release">New in 0.5.0</h2>
+            <a href="/docs/start/whats-new/">Read the release notes →</a>
+          </div>
+          <div className="sw-doc-destinations">
+            <a href="/docs/guides/analysis-formulas/">
+              <span className="sw-doc-eyebrow">Full formula engine</span>
+              <strong>
+                Analyze in the sheet <span aria-hidden="true">→</span>
+              </strong>
+              <span>
+                GROUPBY, PIVOTBY, LAMBDA, regression, finance, and regex in the optional
+                @sheetwrite/formulas engine.
+              </span>
+            </a>
+            <a href="/docs/guides/formulas/#spill-references">
+              <span className="sw-doc-eyebrow">Both engines</span>
+              <strong>
+                Spill references <span aria-hidden="true">→</span>
+              </strong>
+              <span>A1# follows a spill as it grows, and array constants spill in place.</span>
+            </a>
+            <a href="/docs/start/whats-new/#upgrade-checklist">
+              <span className="sw-doc-eyebrow">Upgrade</span>
+              <strong>
+                Upgrade checklist <span aria-hidden="true">→</span>
+              </strong>
+              <span>What a persistence server and direct @sheetwrite/wasm users must change.</span>
+            </a>
+          </div>
+        </section>
+
         <section aria-labelledby="choose-framework">
           <div className="sw-doc-section-head">
             <h2 id="choose-framework">Choose your framework</h2>
@@ -140,9 +173,25 @@ function DocsOverview() {
               <strong>Work with formulas</strong>
               <span>Expressions, references, and functions</span>
             </a>
+            <a href="/docs/guides/analysis-formulas/">
+              <strong>Analyze data</strong>
+              <span>Group, pivot, forecast, and clean text</span>
+            </a>
+            <a href="/docs/guides/host-owned-rows/">
+              <strong>Use your own row store</strong>
+              <span>Host-owned rows and entity IDs</span>
+            </a>
             <a href="/docs/guides/persistence/">
               <strong>Save & recover</strong>
-              <span>Snapshots and pending operations</span>
+              <span>Snapshots, pending work, and large undo</span>
+            </a>
+            <a href="/docs/guides/collaboration/">
+              <strong>Collaborate</strong>
+              <span>Ordered commits, offline work, and rebase</span>
+            </a>
+            <a href="/docs/guides/styling/">
+              <strong>Style the grid</strong>
+              <span>Themes, cell styles, and number formats</span>
             </a>
             <a href="/docs/guides/xlsx-export/">
               <strong>Import & export</strong>

@@ -11,7 +11,7 @@ import { siteUrl } from "./playwright.config.js";
 const VANILLA_URL = siteUrl("/vanilla/");
 const GRID = ".sw-vw-stage .sheetwrite";
 const CANVAS = `${GRID} .sheetwrite-canvas`;
-const FIRST_ACCOUNT = "Account 000001";
+const FIRST_ACCOUNT = "Alder Quay Logistics";
 
 interface BrowserErrors {
   console: string[];
@@ -166,9 +166,9 @@ test("boots product-first, paints, and exposes the ownership instruments", {
   );
   await expect.poll(() => canvasBodyPainted(page)).toBe(true);
 
-  // The live grid is on the first screen, and the install line is complete.
+  // The live grid is on the first screen, and the page's install line is complete.
   await expect(page.locator(GRID)).toBeInViewport();
-  const installCommand = page.locator(".sw-showcase-page__install .sw-install-command");
+  const installCommand = page.locator(".sw-showcase-page .sw-install-command");
   await expect(installCommand).toContainText("npm install @sheetwrite/core");
   expect(
     await installCommand.evaluate((element) => element.scrollWidth - element.clientWidth),
@@ -392,7 +392,9 @@ test("worker repaint keeps a cached non-shared view painted after a sub-row scro
   const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
   await scroller.hover();
   const initialFrame = Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0);
-  await page.mouse.wheel(0, 8);
+  // Two 4 px steps stay inside one row window even when the bottom row is
+  // only half hidden, so the second paint reuses the cached view.
+  await page.mouse.wheel(0, 4);
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await expect
     .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
@@ -406,7 +408,7 @@ test("worker repaint keeps a cached non-shared view painted after a sub-row scro
   );
   const cellsBeforeCachedPaint = await gridCellTexts(page);
   const scrollBeforeCachedPaint = await scroller.evaluate((element) => element.scrollTop);
-  await page.mouse.wheel(0, 8);
+  await page.mouse.wheel(0, 4);
   await expect
     .poll(() => scroller.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(scrollBeforeCachedPaint);

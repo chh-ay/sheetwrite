@@ -41,7 +41,8 @@ export const OFFLINE_TASKS = [
   "Reconnect",
 ] as const;
 export const OFFLINE_STATUSES = ["Queued", "En route", "On site", "Blocked", "Done"] as const;
-export const OFFLINE_CREWS = ["Crew A", "Crew B", "Crew C", "Crew D"] as const;
+export const OFFLINE_CREWS = ["North crew", "River crew", "Harbor crew", "West crew"] as const;
+const TASK_HOURS = [1.5, 3, 6, 2.5, 1];
 
 /** Zero-based column coordinates of the dispatch sheet. */
 export const OFFLINE_COLUMNS = {
@@ -92,7 +93,7 @@ export function createOfflineData(): ColumnarData {
     status[row] = OFFLINE_STATUSES[(row * 7) % OFFLINE_STATUSES.length] ?? "";
     priority[row] = row % 9 === 0 ? "Urgent" : "Routine";
     crew[row] = OFFLINE_CREWS[(row * 5) % OFFLINE_CREWS.length] ?? "";
-    hours[row] = ((row * 13) % 14) + 1;
+    hours[row] = (TASK_HOURS[(row * 3) % OFFLINE_TASKS.length] ?? 1.5) + (row % 3) * 0.5;
   }
 
   return {
@@ -110,15 +111,24 @@ export function createOfflineWorkbook(): Workbook {
         name: OFFLINE_SHEET_NAME,
         rowCount: OFFLINE_ROWS,
         columns: [
-          { key: "ticket", header: "Ticket", width: 110, type: "text" },
-          { key: "site", header: "Site", width: 180, type: "text" },
-          { key: "task", header: "Task", width: 235, type: "text" },
-          { key: "status", header: "Status", width: 140, type: "text" },
-          { key: "priority", header: "Priority", width: 120, type: "text" },
-          { key: "crew", header: "Crew", width: 120, type: "text" },
-          { key: "hours", header: "Est. hours", width: 160, type: "number" },
+          { key: "ticket", header: "Ticket", width: 90, type: "text" },
+          { key: "site", header: "Site", width: 160, type: "text" },
+          { key: "task", header: "Task", width: 210, type: "text" },
+          { key: "status", header: "Status", width: 120, type: "text" },
+          { key: "priority", header: "Priority", width: 100, type: "text" },
+          { key: "crew", header: "Crew", width: 110, type: "text" },
+          { key: "hours", header: "Est. hours", width: 130, type: "number" },
         ],
         frozenCols: 1,
+      },
+      {
+        id: "crew-rota",
+        name: "Crew rota",
+        rowCount: OFFLINE_CREWS.length,
+        columns: [
+          { key: "crew", header: "Crew", width: 180, type: "text" },
+          { key: "base", header: "Shift base", width: 240, type: "text" },
+        ],
       },
     ],
   };
@@ -132,7 +142,8 @@ export function createOfflineSeedSnapshot(): WorkbookSnapshot {
   const data = createOfflineData();
   const workbook = createOfflineWorkbook();
   const sheet = workbook.sheets[0];
-  if (!sheet) throw new Error("offline scenario workbook must define one sheet");
+  const rota = workbook.sheets[1];
+  if (!sheet || !rota) throw new Error("The dispatch workbook must define a crew rota.");
   const columnKeys = sheet.columns.map((column) => column.key);
 
   const cells = [];
@@ -166,6 +177,29 @@ export function createOfflineSeedSnapshot(): WorkbookSnapshot {
             rowCount: OFFLINE_ROWS,
             colCount: columnKeys.length,
             cells,
+          },
+        ],
+      },
+      {
+        id: rota.id,
+        name: rota.name,
+        order: 1,
+        rowCount: rota.rowCount,
+        columns: rota.columns,
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: OFFLINE_CREWS.length,
+            colCount: 2,
+            cells: OFFLINE_CREWS.flatMap((crew, row) => [
+              { rowOffset: row, colOffset: 0, value: { kind: "literal" as const, value: crew } },
+              {
+                rowOffset: row,
+                colOffset: 1,
+                value: { kind: "literal" as const, value: OFFLINE_SITES[row] ?? "Riverside depot" },
+              },
+            ]),
           },
         ],
       },

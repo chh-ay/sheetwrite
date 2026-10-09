@@ -1,0 +1,448 @@
+/* Route-scoped styles for /showcases/formulas/. Every selector starts with .sw-fx-. */
+@layer components {
+  .sw-fx-frame {
+    min-height: 100dvh;
+    background: var(--sw-surface-0);
+    color: var(--sw-fg);
+  }
+
+  .sw-fx-page {
+    width: calc(100% - 2 * var(--sw-page-inset));
+    margin-inline: auto;
+    padding-block: 0.75rem 5rem;
+  }
+
+  .sw-fx-loading {
+    display: grid;
+    min-height: 60dvh;
+    place-items: center;
+    color: var(--sw-fg-muted);
+  }
+
+  .sw-fx-stage {
+    overflow: hidden;
+    border: 1px solid var(--sw-border-strong);
+    border-radius: var(--sw-window-radius);
+    background: var(--sw-surface-1);
+    box-shadow: 0 0.5rem 2rem color-mix(in srgb, var(--sw-fg-strong) 10%, transparent);
+  }
+
+  /* The bar is the same dark instrument as the billion-cell flight deck. */
+  .sw-fx-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem 2rem;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    background:
+      radial-gradient(50rem 14rem at 90% -30%, rgb(52 211 153 / 16%), transparent 70%),
+      var(--sw-demo-surface);
+    color: var(--sw-demo-fg);
+  }
+
+  .sw-fx-bar__title p {
+    margin: 0 0 0.3rem;
+    color: var(--sw-demo-accent-strong);
+    font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .sw-fx-bar__title h2 {
+    margin: 0;
+    color: var(--sw-demo-fg-strong);
+    font: 650 clamp(1.3rem, 2vw, 1.7rem) / 1.15 var(--sw-font-display);
+    letter-spacing: -0.03em;
+  }
+
+  .sw-fx-bar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .sw-fx-bar button {
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--sw-demo-border-strong);
+    border-radius: var(--sw-demo-radius-2);
+    background: var(--sw-demo-raised);
+    color: var(--sw-demo-fg-strong);
+    font: 600 var(--sw-type-sm) / 1.2 var(--sw-font-body);
+    cursor: pointer;
+    transition:
+      border-color var(--sw-demo-transition),
+      background var(--sw-demo-transition);
+  }
+
+  .sw-fx-bar button:hover:not(:disabled) {
+    border-color: var(--sw-demo-accent);
+  }
+
+  .sw-fx-bar button:focus-visible {
+    outline: 2px solid var(--sw-demo-accent-strong);
+    outline-offset: 2px;
+  }
+
+  .sw-fx-bar button:disabled {
+    opacity: 0.5;
+    cursor: progress;
+  }
+
+  .sw-fx-bar [data-testid="formulas-promotion"] {
+    border-color: var(--sw-demo-accent);
+    background: var(--sw-demo-accent);
+    color: var(--sw-demo-ink);
+  }
+
+  .sw-fx-bar [data-testid="formulas-promotion"][aria-pressed="true"] {
+    background: transparent;
+    color: var(--sw-demo-accent-strong);
+  }
+
+  .sw-fx-sheets {
+    display: inline-flex;
+    margin: 0;
+    padding: 0.2rem;
+    border: 1px solid var(--sw-demo-border);
+    border-radius: var(--sw-demo-radius-3);
+    background: var(--sw-demo-deep);
+  }
+
+  .sw-fx-bar .sw-fx-sheets button {
+    border-color: transparent;
+    background: transparent;
+    color: var(--sw-demo-muted);
+  }
+
+  .sw-fx-bar .sw-fx-sheets button[aria-pressed="true"] {
+    background: var(--sw-demo-raised);
+    color: var(--sw-demo-fg-strong);
+  }
+
+  .sw-fx-bar__recalc {
+    display: flex;
+    grid-column: 1 / -1;
+    gap: 0.75rem;
+    align-items: baseline;
+    min-height: 1.6rem;
+    color: var(--sw-demo-fg-soft);
+    font-size: var(--sw-type-sm);
+  }
+
+  .sw-fx-bar__recalc strong {
+    color: var(--sw-demo-accent-strong);
+    font: 650 1.35rem / 1 var(--sw-font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sw-fx-grid {
+    min-width: 0;
+    height: clamp(28rem, 58dvh, 38rem);
+  }
+
+  /* All recipes stay visible; the workbook is the only scroll region. */
+  .sw-fx-recipes {
+    border-bottom: 1px solid var(--sw-border);
+    background: var(--sw-surface-0);
+  }
+
+  .sw-fx-recipes ol {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0.6rem 1rem;
+    list-style: none;
+  }
+
+  .sw-fx-recipes button {
+    display: inline-flex;
+    gap: 0.45rem;
+    align-items: baseline;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--sw-border);
+    border-radius: 999px;
+    background: var(--sw-surface-1);
+    color: var(--sw-fg);
+    font: 600 var(--sw-type-sm) / 1.3 var(--sw-font-body);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .sw-fx-recipes button span {
+    color: var(--sw-accent-strong);
+    font-family: var(--sw-font-mono);
+  }
+
+  .sw-fx-recipes button:hover:not(:disabled) {
+    border-color: var(--sw-accent);
+  }
+
+  .sw-fx-recipes button[aria-pressed="true"] {
+    border-color: var(--sw-accent);
+    background: var(--sw-accent-soft);
+    color: var(--sw-fg-strong);
+  }
+
+  .sw-fx-recipes button:focus-visible {
+    outline: 2px solid var(--sw-accent);
+    outline-offset: 1px;
+  }
+
+  .sw-fx-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    border-top: 1px solid var(--sw-border);
+  }
+
+  .sw-fx-detail {
+    min-width: 0;
+    padding: 1rem 1.5rem 1.25rem;
+    border-right: 1px solid var(--sw-border);
+  }
+
+  .sw-fx-detail__kicker {
+    margin: 0;
+    color: var(--sw-fg-muted);
+    font: 600 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+  }
+
+  .sw-fx-detail__kicker span {
+    color: var(--sw-accent-strong);
+  }
+
+  .sw-fx-detail h3 {
+    margin: 0.35rem 0 0.25rem;
+    color: var(--sw-fg-strong);
+    font: 650 1.05rem / 1.2 var(--sw-font-display);
+  }
+
+  .sw-fx-detail p:not(.sw-fx-detail__kicker) {
+    margin: 0 0 0.6rem;
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-type-sm);
+    line-height: 1.5;
+  }
+
+  .sw-fx-detail code {
+    display: block;
+    padding: 0.6rem;
+    overflow-wrap: anywhere;
+    border-radius: var(--sw-demo-radius-2);
+    background: var(--sw-demo-surface);
+    color: var(--sw-demo-accent-strong);
+    font: 500 0.74rem / 1.5 var(--sw-font-mono);
+  }
+
+  .sw-fx-try {
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+    min-width: 0;
+    padding: 1rem 1.5rem 1.25rem;
+  }
+
+  .sw-fx-try label {
+    color: var(--sw-fg-strong);
+    font: 650 var(--sw-type-sm) / 1.3 var(--sw-font-display);
+  }
+
+  .sw-fx-try > div {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .sw-fx-try input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--sw-border-strong);
+    border-radius: var(--sw-demo-radius-2);
+    background: var(--sw-surface-0);
+    color: var(--sw-fg-strong);
+    font: 500 var(--sw-type-sm) / 1.3 var(--sw-font-mono);
+  }
+
+  .sw-fx-try input:focus-visible {
+    outline: 2px solid var(--sw-accent);
+    outline-offset: 1px;
+  }
+
+  .sw-fx-try button {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--sw-accent);
+    border-radius: var(--sw-demo-radius-2);
+    background: var(--sw-accent);
+    color: var(--sw-accent-ink);
+    font: 650 var(--sw-type-sm) / 1 var(--sw-font-body);
+    cursor: pointer;
+  }
+
+  .sw-fx-try button:focus-visible {
+    outline: 2px solid var(--sw-accent);
+    outline-offset: 2px;
+  }
+
+  .sw-fx-try button:disabled {
+    opacity: 0.5;
+    cursor: progress;
+  }
+
+  .sw-fx-try output {
+    color: var(--sw-fg-muted);
+    font: 500 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .sw-fx-engine {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.5rem 3rem;
+    align-items: start;
+    margin-top: 3rem;
+  }
+
+  .sw-fx-engine__kicker {
+    margin: 0 0 0.4rem;
+    color: var(--sw-accent-strong);
+    font: 650 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .sw-fx-engine h2 {
+    margin: 0 0 0.6rem;
+    color: var(--sw-fg-strong);
+    font: 650 clamp(1.3rem, 2.2vw, 1.8rem) / 1.15 var(--sw-font-display);
+    letter-spacing: -0.03em;
+  }
+
+  .sw-fx-engine p {
+    margin: 0 0 0.8rem;
+    color: var(--sw-fg-muted);
+    line-height: 1.6;
+  }
+
+  .sw-fx-engine a {
+    color: var(--sw-accent-strong);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  /* Expressive Code owns the token colours; this only fits the frame to the card. */
+  .sw-fx-engine__code {
+    min-width: 0;
+  }
+
+  .sw-fx-engine__code .expressive-code {
+    margin: 0;
+  }
+
+  .sw-fx-engine__code .expressive-code figure.frame {
+    overflow: hidden;
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-demo-radius-3);
+    box-shadow: none;
+  }
+
+  .sw-fx-engine__code .expressive-code pre {
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+
+  .sw-fx-engine__families {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sw-fx-engine__families li {
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--sw-border);
+    border-radius: 999px;
+    color: var(--sw-fg);
+    font-size: var(--sw-type-xs);
+  }
+
+  @media (max-width: 64rem) {
+    .sw-fx-footer {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sw-fx-detail {
+      border-right: 0;
+      border-bottom: 1px solid var(--sw-border);
+    }
+
+    .sw-fx-engine {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .sw-fx-bar {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 1rem;
+    }
+
+    .sw-fx-bar__actions {
+      justify-content: flex-start;
+    }
+
+    .sw-fx-try,
+    .sw-fx-detail {
+      padding: 1rem;
+    }
+  }
+}
+
+/* Core's styles.css is unlayered and declares the Grid's custom properties on
+   `.sheetwrite` itself, so a layered rule can never reach the canvas. Declare
+   them here (unlayered, more specific) so the Grid keeps the site palette and
+   font in both themes; the page's MutationObserver re-resolves them on a theme
+   change. */
+.sw-fx-stage .sw-fx-grid.sheetwrite {
+  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-bg: var(--sw-surface-1);
+  --sheetwrite-fg: var(--sw-fg);
+  --sheetwrite-grid-line: var(--sw-border);
+  --sheetwrite-header-bg: var(--sw-surface-2);
+  --sheetwrite-header-fg: var(--sw-fg-strong);
+  --sheetwrite-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
+  --sheetwrite-selection-border: var(--sw-accent);
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 24%, transparent);
+  --sheetwrite-search-active: var(--sw-demo-warn);
+  --sheetwrite-highlight: color-mix(in srgb, var(--sw-accent) 18%, transparent);
+}
+
+/* Core seeds the widget palette as inline properties on the Grid root, which
+   beats any host rule and is not refreshed on a theme change; declaring the
+   same variables on the widgets themselves wins (a declaration beats the
+   inherited value — the mechanism core's styles.css documents). */
+.sw-fx-grid
+:is(
+  .sheetwrite-find,
+  .sheetwrite-context-menu,
+  .sheetwrite-tab-menu,
+  .sheetwrite-tab-unhide-menu,
+  .sheetwrite-assist,
+  .sheetwrite-validation-list,
+  .sheetwrite-validation-checkbox
+) {
+  --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-widget-bg: var(--sw-surface-2);
+  --sheetwrite-widget-fg: var(--sw-fg);
+  --sheetwrite-widget-muted: var(--sw-fg-muted);
+  --sheetwrite-widget-border: var(--sw-border);
+  --sheetwrite-widget-accent: var(--sw-accent-strong);
+  --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 15%, transparent);
+  --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
+  --sheetwrite-menu-shadow: var(--sw-shadow);
+  --sheetwrite-find-shadow: var(--sw-shadow);
+}

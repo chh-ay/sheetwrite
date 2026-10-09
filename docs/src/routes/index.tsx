@@ -1,10 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { InstallCommand } from "../components/InstallCommand.js";
-import { LandingSpreadsheet } from "../components/LandingSpreadsheet.js";
-import { LazyEngineTeaser } from "../components/LazyEngineTeaser.js";
+import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
+import { CodeTabs } from "../components/landing/CodeTabs.js";
+import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
+import { GridGlow } from "../components/landing/GridGlow.js";
+import { HeroScene } from "../components/landing/HeroScene.js";
+import { StoryReel } from "../components/landing/StoryReel.js";
+import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { pageMeta } from "../lib/seo.js";
+import landingStylesheet from "../styles/landing.css?url";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,6 +19,7 @@ export const Route = createFileRoute("/")({
       "Sheetwrite — Spreadsheet, data grid & multi-sheet workbook engine · XLSX/CSV",
       "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.",
     ),
+    links: [{ rel: "stylesheet", href: landingStylesheet }],
   }),
   component: Landing,
 });
@@ -36,77 +44,63 @@ interface LandingBenchData {
   sizes?: LandingBenchSize[];
 }
 
-const CAPABILITY_PROOFS = [
+interface Feature {
+  kind: FeatureGlyphKind;
+  label: string;
+  href: string;
+  summary: string;
+}
+
+const FEATURES: readonly Feature[] = [
   {
-    id: "database",
-    label: "Database & documents",
-    href: "/showcases/database/",
-    headline: "Real IndexedDB commits, conflict recovery, and compaction.",
-  },
-  {
-    id: "interoperability",
-    label: "Interoperability",
-    href: "/showcases/interoperability/",
-    headline: "XLSX and CSV/TSV exchange with honest fidelity boundaries.",
-  },
-  {
-    id: "performance",
+    kind: "scale",
     label: "Performance & scale",
     href: "/showcases/performance/",
-    headline: "A million paged rows with measured Worker evidence.",
+    summary:
+      "Address 1,000,000 rows × 1,000 columns. The Grid requests only the tiles on screen and keeps memory inside a fixed cache.",
   },
   {
-    id: "collaboration",
+    kind: "formulas",
+    label: "Formula analysis",
+    href: "/showcases/formulas/",
+    summary:
+      "GROUPBY, PIVOTBY, FILTER, LAMBDA, statistics and finance. Results spill, and other formulas read the spill with A2#.",
+  },
+  {
+    kind: "collaboration",
     label: "Collaboration",
     href: "/showcases/collaboration/",
-    headline: "Two live clients staying in sync through one shared server.",
+    summary:
+      "Clients commit in order through your server. Duplicates, gaps, and conflicts recover with explicit protocol steps.",
   },
-] as const;
+  {
+    kind: "database",
+    label: "Database & documents",
+    href: "/showcases/database/",
+    summary:
+      "Snapshots and append-only commits in your storage. Pending edits survive a reload and drain in order.",
+  },
+  {
+    kind: "interoperability",
+    label: "XLSX & CSV",
+    href: "/showcases/interoperability/",
+    summary:
+      "Import and export workbooks with formulas and styles. Every lossy case returns a named warning, not a silent change.",
+  },
+  {
+    kind: "host-rows",
+    label: "Host-owned rows",
+    href: "/showcases/host-rows/",
+    summary:
+      "Your store keeps the records. Sort, filter, and edit the Grid, and every delta names the same record ID.",
+  },
+];
 
-const WORKBENCHES = [
-  {
-    id: "vanilla",
-    label: "Vanilla",
-    href: "/vanilla/",
-    headline: "The engine and host boundary, framework-free.",
-  },
-  {
-    id: "react",
-    label: "React",
-    href: "/react/",
-    headline: "Controlled analytics: queries, formulas, aggregates.",
-  },
-  {
-    id: "vue",
-    label: "Vue",
-    href: "/vue/",
-    headline: "Business workflow: validation, protection, notes.",
-  },
-  {
-    id: "svelte",
-    label: "Svelte",
-    href: "/svelte/",
-    headline: "Offline-first collaboration with durable pending work.",
-  },
-] as const;
-
-const OWNERSHIP = [
-  {
-    key: "01 · Host",
-    title: "You own the product.",
-    detail: "Lifecycle, persistence, collaboration, and product UI stay in your codebase.",
-  },
-  {
-    key: "02 · TypeScript core",
-    title: "One narrow seam.",
-    detail:
-      "Grid API, transactions, virtualization, interaction, and renderer coordination — ownership crosses in one place.",
-  },
-  {
-    key: "03 · Rust / WASM",
-    title: "The engine owns the speed.",
-    detail: "Columnar cells, formulas, query scans, snapshots, and packed render windows.",
-  },
+const RELEASE_NOTES = [
+  "Array arithmetic and spill references in both engines",
+  "Large undo through compressed restores and atomic sync batches",
+  "Host-owned rows with stable IDs and per-record deltas",
+  "Faster formula kernels, bulk loading, and streamed CSV and XLSX imports",
 ] as const;
 
 function fmtRows(rows: number): string {
@@ -120,234 +114,309 @@ function ratioWidth(ratio: number, maxRatio: number): string {
   return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
 }
 
+function BenchmarkBars({ evidence }: Readonly<{ evidence: Required<LandingBenchData> }>) {
+  const { ref } = useScenePlayback<HTMLDivElement>();
+  const maxRatio = Math.max(...evidence.sizes.map((entry) => entry.medianRatio));
+  return (
+    <div className="sw-bench" ref={ref}>
+      <ul className="sw-bench__bars">
+        {evidence.sizes.map((entry) => (
+          <li key={entry.size}>
+            <span className="sw-bench__size">{fmtRows(entry.size)} rows</span>
+            <span aria-hidden="true" className="sw-bench__track">
+              <i style={{ width: ratioWidth(entry.medianRatio, maxRatio) }} />
+            </span>
+            <strong>{entry.medianRatio}×</strong>
+            <span className="sw-bench__detail">
+              median of {entry.comparedScenarios} interactions · best {entry.bestRatio}×
+              {entry.handsontableIncomplete > 0
+                ? ` · Handsontable did not finish ${entry.handsontableIncomplete}`
+                : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <dl className="sw-bench__capture">
+        <div>
+          <dt>Browser</dt>
+          <dd>{evidence.capture.browser}</dd>
+        </div>
+        <div>
+          <dt>Rounds</dt>
+          <dd>{evidence.capture.rounds} counterbalanced</dd>
+        </div>
+        <div>
+          <dt>Commit</dt>
+          <dd>
+            <code>{evidence.capture.commit.slice(0, 7)}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>Captured</dt>
+          <dd>{evidence.capture.timestamp.slice(0, 10)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+function FeatureCards() {
+  const { ref } = useScenePlayback<HTMLOListElement>();
+  return (
+    <ol className="sw-features" ref={ref}>
+      {FEATURES.map((feature) => (
+        <li key={feature.kind}>
+          <Link
+            data-feature={feature.kind}
+            // The formula page selects the full engine, so it opens as a fresh page.
+            reloadDocument={feature.kind === "formulas"}
+            to={feature.href}
+          >
+            <span className="sw-features__art">
+              <FeatureGlyph kind={feature.kind} />
+            </span>
+            <strong>{feature.label}</strong>
+            <span className="sw-features__summary">{feature.summary}</span>
+            <span className="sw-features__cta">Open the live example →</span>
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Landing() {
   const bench = landingBench as LandingBenchData;
   const evidence =
     bench.available && bench.sizes && bench.heroStats && bench.capture
-      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
+      ? { available: true, sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
       : undefined;
-  const maxRatio = evidence ? Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) : 1;
+  const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
   return (
     <div className="sw-landing">
+      <GridGlow />
       <SiteTopbar />
 
       <main id="main-content">
-        <section className="sw-hero">
-          <div className="sw-hero__copy">
-            <p className="sw-hero__eyebrow">Canvas spreadsheet engine · Rust/WASM core · MIT</p>
-            <h1>Build web spreadsheets you still own.</h1>
-            <p className="sw-hero__lede">
-              Sheetwrite is a canvas spreadsheet engine with a Rust/WASM data core and first-party
-              Vanilla, React, Vue, and Svelte adapters. Your application owns the document, the
-              persistence, and the chrome — the engine owns the speed.
+        <section aria-labelledby="landing-title" className="sw-lp-hero">
+          <div className="sw-lp-hero__copy">
+            <p className="sw-lp-eyebrow">
+              Open source · MIT · v{corePackage.version} · Rust/WASM engine
             </p>
-          </div>
-          <div className="sw-hero-proof">
-            <LandingSpreadsheet />
-          </div>
-          <div className="sw-hero__conversion">
-            <div className="sw-hero-actions">
-              <a className="sw-cta" href="/docs/start/installation/">
+            <h1 id="landing-title">The spreadsheet engine for your web app.</h1>
+            <p className="sw-lp-hero__lede">
+              A real calculation engine and a canvas Grid in your page. Edit, recalculate, and page
+              through a billion cells. Your application keeps the data, the UI, and the server.
+            </p>
+            <div className="sw-lp-actions">
+              <a className="sw-lp-button" href="/docs/start/installation/">
                 Get started
               </a>
-              <a className="sw-cta sw-cta--ghost" href="#benchmarks">
-                See the numbers
+              <a className="sw-lp-button sw-lp-button--ghost" href="/showcases/">
+                Explore showcases
               </a>
             </div>
-            <div className="sw-hero-install">
+            <div className="sw-lp-hero__install">
               <InstallCommand packageName="@sheetwrite/core" />
             </div>
-            {evidence ? (
-              <dl className="sw-hero-facts" aria-label="Measured product evidence">
+          </div>
+          <HeroScene />
+        </section>
+
+        {evidence ? (
+          <section aria-label="Measured results" className="sw-lp-facts">
+            <dl>
+              <div>
+                <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
+                <dd>median interaction at 1,000,000 rows</dd>
+              </div>
+              {millionRow ? (
                 <div>
-                  <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
-                  <dd>median interaction at one million rows</dd>
+                  <dt>{millionRow.medianRatio}×</dt>
+                  <dd>median speed against Handsontable, same capture</dd>
                 </div>
-                <div>
-                  <dt>{evidence.heroStats.millionRowHeapMb} MB</dt>
-                  <dd>renderer heap in the same capture</dd>
-                </div>
-                <div>
-                  <dt>4</dt>
-                  <dd>first-party framework mounts</dd>
-                </div>
-                <div className="sw-hero-facts__provenance">
-                  <dt>Evidence</dt>
-                  <dd>
-                    Source <code>{evidence.capture.commit.slice(0, 7)}</code>
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
+              ) : null}
+              <div>
+                <dt>1,000,000,000</dt>
+                <dd>addressable cells in the performance example</dd>
+              </div>
+              <div>
+                <dt>4</dt>
+                <dd>adapters: Vanilla, React, Vue, Svelte</dd>
+              </div>
+            </dl>
+            <a href="#benchmarks">How we measured →</a>
+          </section>
+        ) : null}
+
+        <section aria-labelledby="landing-how" className="sw-lp-section">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">How it works</p>
+            <h2 id="landing-how">Three layers. One clear line of ownership.</h2>
+            <p>
+              The Grid handles input and painting. The engine stores cells and recalculates. Your
+              application decides what to save and where.
+            </p>
+          </header>
+          <ArchitectureScene />
+          <a className="sw-lp-more" href="/docs/concepts/runtime-ownership/">
+            Read the runtime-ownership model →
+          </a>
+        </section>
+
+        <section aria-labelledby="landing-features" className="sw-lp-section">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">What you can build</p>
+            <h2 id="landing-features">Real workbooks, not a table with formulas on top.</h2>
+            <p>
+              Every card opens a live example that runs the real engine in your browser.{" "}
+              <Link to="/showcases/">See all showcases →</Link>
+            </p>
+          </header>
+          <FeatureCards />
+        </section>
+
+        <section aria-labelledby="landing-stories" className="sw-lp-section">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">See it happen</p>
+            <h2 id="landing-stories">The hard parts of a spreadsheet, handled.</h2>
+            <p>
+              Three short stories about work that a table component leaves to you. Each one links to
+              the live example that runs it for real.
+            </p>
+          </header>
+          <StoryReel />
+        </section>
+
+        <section aria-labelledby="landing-code" className="sw-lp-section sw-lp-split">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">Start in minutes</p>
+            <h2 id="landing-code">Mount a Grid in the framework you already use.</h2>
+            <p>
+              One engine, four entry points. The adapters share one lifecycle: create on mount,
+              apply live option changes, and destroy on unmount.
+            </p>
+            <a className="sw-lp-more" href="/docs/start/first-grid/">
+              Build your first grid →
+            </a>
+          </header>
+          <CodeTabs />
+        </section>
+
+        <section aria-labelledby="landing-engine" className="sw-lp-section sw-lp-engines">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">New in {corePackage.version.replace(/\.\d+$/, "")}</p>
+            <h2 id="landing-engine">Pick the formula engine that fits your download budget.</h2>
+          </header>
+          <div className="sw-lp-engines__choices">
+            <article>
+              <span>Default</span>
+              <strong>@sheetwrite/wasm</strong>
+              <p>
+                Included by the core package. The standard function set and the smaller download.
+              </p>
+              <code>await initSheetwrite();</code>
+            </article>
+            <article data-variant="full">
+              <span>Full</span>
+              <strong>@sheetwrite/formulas</strong>
+              <p>
+                The same engine with the analysis families: grouping, pivots, LAMBDA, statistics,
+                regression, finance, regex, and matrices.
+              </p>
+              <code>await initSheetwrite(undefined, formulas);</code>
+            </article>
+            <ul aria-label="Also in this release">
+              {RELEASE_NOTES.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+              <li>
+                <a href="/docs/start/whats-new/">Read what is new and the upgrade checklist →</a>
+              </li>
+            </ul>
           </div>
         </section>
 
-        <LazyEngineTeaser />
-
-        <section aria-labelledby="benchmarks-title" className="sw-landing-bench" id="benchmarks">
-          <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Results you can check</p>
-            <h2 id="benchmarks-title">Measured, not promised</h2>
-            {evidence ? (
-              <p className="sw-section-lede">
-                Median speedups over Handsontable, read directly from saved benchmark results. The
-                gap widens as the data grows.
-              </p>
-            ) : null}
+        <section aria-labelledby="landing-bench" className="sw-lp-section" id="benchmarks">
+          <header className="sw-lp-head">
+            <p className="sw-lp-eyebrow">Results you can check</p>
+            <h2 id="landing-bench">Measured, not promised.</h2>
+            <p>
+              Median interaction ratios against Handsontable in one saved browser capture. Every
+              interaction must return the correct result; failed runs stay failed.
+            </p>
           </header>
           {evidence ? (
-            <>
-              <div className="sw-bench-layout">
-                <figure className="sw-bench-figure">
-                  <ul className="sw-bench-stats">
-                    {evidence.sizes.map((entry) => (
-                      <li key={entry.size}>
-                        <div className="sw-bench-stat__head">
-                          <span className="sw-bench-stat__size">{fmtRows(entry.size)} rows</span>
-                          <strong>{entry.medianRatio}× faster</strong>
-                        </div>
-                        <span aria-hidden="true" className="sw-bench-stat__track">
-                          <i style={{ width: ratioWidth(entry.medianRatio, maxRatio) }} />
-                        </span>
-                        <span className="sw-bench-stat__detail">
-                          median of {entry.comparedScenarios} interactions · best {entry.bestRatio}×
-                          in <code>{entry.bestScenario}</code>
-                          {entry.handsontableIncomplete > 0
-                            ? ` · Handsontable did not finish ${entry.handsontableIncomplete} of ${
-                                entry.comparedScenarios + entry.handsontableIncomplete
-                              }`
-                            : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <figcaption>
-                    Bar length maps the median speedup on a shared log scale — ×1 would be parity.
-                  </figcaption>
-                </figure>
-                <aside aria-label="One million row summary" className="sw-bench-aside">
-                  <p className="sw-bench-aside__eyebrow">At 1,000,000 rows</p>
-                  <p className="sw-bench-aside__stat">
-                    <strong>{evidence.heroStats.millionRowMedianMs} ms</strong>
-                    <span>
-                      median interaction across {evidence.heroStats.millionRowScenarios} scenarios
-                    </span>
-                  </p>
-                  <p className="sw-bench-aside__stat">
-                    <strong>{evidence.heroStats.millionRowHeapMb} MB</strong>
-                    <span>renderer heap</span>
-                  </p>
-                  <dl className="sw-bench-capture">
-                    <div>
-                      <dt>Browser</dt>
-                      <dd>{evidence.capture.browser}</dd>
-                    </div>
-                    <div>
-                      <dt>Rounds</dt>
-                      <dd>{evidence.capture.rounds} counterbalanced</dd>
-                    </div>
-                    <div>
-                      <dt>Commit</dt>
-                      <dd>
-                        <code>{evidence.capture.commit.slice(0, 7)}</code>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Captured</dt>
-                      <dd>{evidence.capture.timestamp.slice(0, 10)}</dd>
-                    </div>
-                  </dl>
-                </aside>
-              </div>
-              <p className="sw-bench-footnote">
-                Every interaction must return the correct result; failed runs stay failed.{" "}
-                <a href="/docs/guides/performance-resources/">See how we measured it.</a>
-              </p>
-            </>
+            <BenchmarkBars evidence={evidence} />
           ) : (
-            <p className="sw-bench-footnote">
+            <p className="sw-lp-note">
               No saved benchmark results are available yet. Run{" "}
               <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and then{" "}
               <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
-        </section>
-
-        <section aria-labelledby="proofs-title" className="sw-landing-proofs">
-          <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Live feature examples</p>
-            <h2 id="proofs-title">Try the work you need to do.</h2>
-            <p className="sw-section-lede">
-              Every public feature has one live example, an action to try, and a browser test you
-              can run. <Link to="/showcases/">Browse every feature →</Link>
-            </p>
-          </header>
-          <ol className="sw-proof-ledger">
-            {CAPABILITY_PROOFS.map((proof, index) => (
-              <li key={proof.id}>
-                <Link data-proof={proof.id} to={proof.href}>
-                  <span className="sw-proof-ledger__index">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <span className="sw-proof-ledger__label">{proof.label}</span>
-                  <strong>{proof.headline}</strong>
-                  <span className="sw-proof-ledger__cta">Open the live scenario →</span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section aria-labelledby="adapters-title" className="sw-landing-adapters">
-          <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Framework adapters</p>
-            <h2 id="adapters-title">One engine, four first-party mounts</h2>
-            <p className="sw-section-lede">
-              The same engine mounts four ways — every workbench is a bounded, directly editable
-              product story.
-            </p>
-          </header>
-          <div className="sw-adapter-strip">
-            {WORKBENCHES.map((workbench) => (
-              <Link data-framework={workbench.id} key={workbench.id} to={workbench.href}>
-                <strong>{workbench.label}</strong>
-                <span>{workbench.headline}</span>
-                <span className="sw-adapter-strip__cta">Open the workbench →</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section aria-labelledby="ownership-title" className="sw-landing-own">
-          <header className="sw-section-head">
-            <p className="sw-section-eyebrow">Runtime contract</p>
-            <h2 id="ownership-title">The ownership line is explicit</h2>
-          </header>
-          <ol className="sw-own-grid">
-            {OWNERSHIP.map((layer) => (
-              <li key={layer.key}>
-                <span>{layer.key}</span>
-                <h3>{layer.title}</h3>
-                <p>{layer.detail}</p>
-              </li>
-            ))}
-          </ol>
-          <a className="sw-own-link" href="/docs/concepts/runtime-ownership/">
-            Read the runtime-ownership model →
+          <a className="sw-lp-more" href="/docs/guides/performance-resources/">
+            See the full method and every result →
           </a>
+        </section>
+
+        <section aria-labelledby="landing-close" className="sw-lp-close">
+          <div>
+            <h2 id="landing-close">Put a real spreadsheet in your product.</h2>
+            <p>
+              Start with the core package. Add the full formula engine or XLSX exchange when you
+              need them.
+            </p>
+          </div>
+          <div className="sw-lp-actions">
+            <a className="sw-lp-button" href="/docs/start/installation/">
+              Read the docs
+            </a>
+            <a
+              className="sw-lp-button sw-lp-button--ghost"
+              href="https://github.com/chh-ay/sheetwrite"
+            >
+              View on GitHub
+            </a>
+          </div>
         </section>
       </main>
 
       <footer className="sw-landing-footer">
-        <p className="sw-landing-footer__brand">
-          <strong>Sheetwrite</strong>
-          <span>MIT licensed.</span>
-        </p>
-        <nav aria-label="Footer">
-          <a href="/docs/">Documentation</a>
-          <a href="/docs/guides/performance-resources/">Benchmarks</a>
-          <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
-        </nav>
+        <div className="sw-landing-footer__inner">
+          <div className="sw-landing-footer__brand">
+            <strong>Sheetwrite</strong>
+            <p>A spreadsheet engine for the browser. Rust and WebAssembly, any framework.</p>
+            <span className="sw-landing-footer__meta">v{corePackage.version} · MIT licensed</span>
+          </div>
+          <nav aria-label="Footer" className="sw-landing-footer__nav">
+            <div>
+              <p className="sw-landing-footer__title">Start</p>
+              <a href="/docs/start/installation/">Installation</a>
+              <a href="/docs/start/first-grid/">First grid</a>
+              <a href="/docs/start/whats-new/">What's new</a>
+            </div>
+            <div>
+              <p className="sw-landing-footer__title">Frameworks</p>
+              <a href="/vanilla/">Vanilla</a>
+              <a href="/react/">React</a>
+              <a href="/vue/">Vue</a>
+              <a href="/svelte/">Svelte</a>
+            </div>
+            <div>
+              <p className="sw-landing-footer__title">Explore</p>
+              <a href="/showcases/">Showcases</a>
+              <a href="/docs/reference/formula-functions/">Formula functions</a>
+              <a href="/docs/guides/performance-resources/">Benchmarks</a>
+            </div>
+            <div>
+              <p className="sw-landing-footer__title">Project</p>
+              <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
+              <a href="https://github.com/chh-ay/sheetwrite/issues">Issues</a>
+              <a href="https://www.npmjs.com/package/@sheetwrite/core">npm</a>
+            </div>
+          </nav>
+        </div>
       </footer>
     </div>
   );

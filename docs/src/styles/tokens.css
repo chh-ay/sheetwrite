@@ -31,7 +31,11 @@
   --sw-header-height: 4rem;
   --sw-sidebar-width: 17.5rem;
   --sw-content-width: 51rem;
-  --sw-engine-max-width: 90rem;
+  /* One page frame for the hub, every showcase and the product bar: content and
+     the brand mark share the same left and right edges at every width. */
+  --sw-page-gutter: clamp(1rem, 4vw, 4rem);
+  --sw-page-max: 92rem;
+  --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);

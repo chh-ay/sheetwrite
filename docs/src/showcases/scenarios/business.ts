@@ -33,12 +33,13 @@ export const BUSINESS_SUPPLIERS_SHEET_NAME = "Suppliers";
 export const BUSINESS_STATUSES = ["Draft", "Submitted", "Approved", "Paid"] as const;
 export const BUSINESS_CATEGORIES = ["Logistics", "Hardware", "Packaging", "Services"] as const;
 export const BUSINESS_SUPPLIERS = [
-  "Mekong Freight",
-  "Kampot Mills",
-  "Angkor Packaging",
-  "Tonle Services",
-  "Bassac Hardware",
+  "Alder Quay Freight",
+  "Beacon Ridge Mills",
+  "Orchard Bay Packaging",
+  "Cedar Vale Services",
+  "Cobalt Grove Hardware",
 ] as const;
+const SUPPLIER_CATEGORIES = ["Logistics", "Packaging", "Packaging", "Services", "Hardware"];
 
 /** Zero-based column coordinates of the orders sheet. */
 export const BUSINESS_COLUMNS = {
@@ -59,14 +60,14 @@ export const BUSINESS_THEME: Partial<Theme> = {
   rowHeaderWidth: VUE_SHOWCASE_THEME.rowHeaderWidth,
 };
 
-/** Deterministic integer quantity per row (1..480). */
+/** Order quantities are small batches of 8..487 units. */
 export function businessQty(row: number): number {
-  return ((row * 17) % 480) + 1;
+  return ((row * 17) % 480) + 8;
 }
 
-/** Deterministic unit cost in whole dollars per row (8..2007). */
+/** Deterministic whole-dollar unit cost (96..2095). */
 export function businessUnitCost(row: number): number {
-  return ((row * 271) % 2_000) + 8;
+  return ((row * 271) % 2_000) + 96;
 }
 
 /** Fresh columnar arrays per call so grid resets re-ingest pristine data. */
@@ -82,7 +83,7 @@ export function createBusinessData(): ColumnarData {
   for (let row = 0; row < BUSINESS_ROWS; row++) {
     po[row] = `PO-${String(row + 1).padStart(4, "0")}`;
     supplier[row] = BUSINESS_SUPPLIERS[row % BUSINESS_SUPPLIERS.length] ?? "";
-    category[row] = BUSINESS_CATEGORIES[(row * 3) % BUSINESS_CATEGORIES.length] ?? "";
+    category[row] = SUPPLIER_CATEGORIES[row % BUSINESS_SUPPLIERS.length] ?? "Logistics";
     status[row] = BUSINESS_STATUSES[(row * 7) % BUSINESS_STATUSES.length] ?? "";
     qty[row] = businessQty(row);
     unitCost[row] = businessUnitCost(row);
@@ -150,14 +151,14 @@ export const BUSINESS_ROW_META: ReadonlyArray<[row: number, meta: RowMetadata]> 
   [7, { height: 44 }],
 ];
 
-/** Suppliers directory rows seeded onto the second sheet. */
+/** Suppliers directory rows seeded onto the second sheet, in order-book order. */
 export const BUSINESS_SUPPLIER_ROWS: ReadonlyArray<[name: string, region: string, rating: string]> =
   [
-    ["Mekong Freight", "Phnom Penh", "A"],
-    ["Kampot Mills", "Kampot", "B+"],
-    ["Angkor Packaging", "Siem Reap", "A-"],
-    ["Tonle Services", "Phnom Penh", "B"],
-    ["Bassac Hardware", "Ta Khmau", "A"],
+    ["Alder Quay Freight", "Phnom Penh", "A"],
+    ["Beacon Ridge Mills", "Tokyo", "B+"],
+    ["Orchard Bay Packaging", "Berlin", "A-"],
+    ["Cedar Vale Services", "Lisbon", "B"],
+    ["Cobalt Grove Hardware", "Nairobi", "A"],
   ];
 
 export function createBusinessWorkbook(): Workbook {
@@ -170,15 +171,15 @@ export function createBusinessWorkbook(): Workbook {
         name: BUSINESS_SHEET_NAME,
         rowCount: BUSINESS_ROWS,
         columns: [
-          { key: "po", header: "PO", width: 110, type: "text" },
-          { key: "supplier", header: "Supplier", width: 190, type: "text" },
-          { key: "category", header: "Category", width: 140, type: "text" },
-          { key: "status", header: "Status", width: 140, type: "text" },
-          { key: "qty", header: "Qty", width: 90, type: "number" },
+          { key: "po", header: "PO", width: 100, type: "text" },
+          { key: "supplier", header: "Supplier", width: 180, type: "text" },
+          { key: "category", header: "Category", width: 120, type: "text" },
+          { key: "status", header: "Status", width: 130, type: "text" },
+          { key: "qty", header: "Qty", width: 80, type: "number" },
           {
             key: "unitCost",
             header: "Unit cost",
-            width: 120,
+            width: 100,
             type: "currency",
             numberFormat: "$#,##0",
           },

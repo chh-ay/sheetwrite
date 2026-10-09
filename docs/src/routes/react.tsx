@@ -5,7 +5,7 @@ import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import reactWorkbenchStylesheet from "../styles/react-workbench.css?url";
 
 const description =
-  "Filter the live 100,000-row pipeline or commit a formula. React keeps controlled rows, query state, KPI formulas, and Grid history in lockstep.";
+  "Filter 100,000 pipeline accounts or edit a formula. React controls the query, while the grid calculates workbook KPIs and records edit history.";
 
 export const Route = createFileRoute("/react")({
   head: () => ({
@@ -44,9 +44,9 @@ function ReactWorkbenchRoute() {
             "CSV import lands as one undoable commit; CSV/XLSX exports hand off to the interoperability proofs.",
         },
       ]}
-      prompt="Use the named column headers to find an account or ARR value. Filter a market, then edit an ARR cell. The KPI rail and Grid history update together."
+      prompt="Filter a market, then select an ARR cell and enter a value or formula. Workbook totals include every account; the market KPI reports the selected market. Open Secondary tools for search, CSV import, exports, and renderer controls."
       sourcePath="docs/src/showcases/ReactWorkbench.tsx"
-      title="Controlled analytics, without a shadow copy."
+      title="React-controlled pipeline analytics."
     >
       <ReactWorkbench />
     </ShowcasePage>

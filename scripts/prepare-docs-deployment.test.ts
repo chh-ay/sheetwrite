@@ -11,6 +11,8 @@ const builtFiles = {
   "docs/start/installation/index.html": "<h1>Install</h1>",
   "sitemap.xml": "<urlset />",
   "pagefind/pagefind-entry.json": '{"version":"1.4.0"}',
+  "pagefind/fragment/en_020da39.pf_fragment": "fragment",
+  "pagefind/pagefind.en_6e131784e9.pf_meta": "meta",
   "assets/client.wasm": Buffer.from([0, 97, 115, 109, 255]),
 };
 
@@ -35,9 +37,20 @@ afterEach(async () => {
   );
 });
 
-type OutputRoute = { handle: "filesystem" } | { src: string; dest: string };
+type OutputRoute =
+  | { handle: "filesystem" }
+  | { src: string; dest: string }
+  | { src: string; headers: Record<string, string>; continue: true };
 
-async function requestPackagedFile(root: string, pathname: string): Promise<Buffer | null> {
+interface PackagedResponse {
+  body: Buffer;
+  headers: Record<string, string>;
+}
+
+async function requestPackagedFile(
+  root: string,
+  pathname: string,
+): Promise<PackagedResponse | null> {
   const outputRoot = join(root, ".vercel/output");
   const config: { routes: OutputRoute[] } = JSON.parse(
     await readFile(join(outputRoot, "config.json"), "utf8"),
@@ -46,14 +59,19 @@ async function requestPackagedFile(root: string, pathname: string): Promise<Buff
     const file = Bun.file(join(outputRoot, "static", path));
     return (await file.exists()) ? Buffer.from(await file.arrayBuffer()) : null;
   };
+  const headers: Record<string, string> = {};
+  const respond = (body: Buffer | null) => (body === null ? null : { body, headers });
   // Exercise route matching against the emitted files, not just the JSON shape.
   for (const route of config.routes) {
     if ("handle" in route) {
       const contents = await readStatic(pathname);
-      if (contents !== null) return contents;
+      if (contents !== null) return respond(contents);
+    } else if ("headers" in route) {
+      if (new RegExp(route.src).test(pathname)) Object.assign(headers, route.headers);
     } else {
       const pattern = new RegExp(route.src);
-      if (pattern.test(pathname)) return readStatic(pathname.replace(pattern, route.dest));
+      if (pattern.test(pathname))
+        return respond(await readStatic(pathname.replace(pattern, route.dest)));
     }
   }
   return null;
@@ -81,6 +99,7 @@ describe("prebuilt docs deployment", () => {
         "docs/start",
         "docs/start/installation",
         "pagefind",
+        "pagefind/fragment",
       ].sort(),
     );
     for (const [path, contents] of Object.entries(builtFiles)) {
@@ -134,10 +153,35 @@ describe("prebuilt docs deployment", () => {
       ["/sitemap.xml", builtFiles["sitemap.xml"]],
       ["/pagefind/pagefind-entry.json", builtFiles["pagefind/pagefind-entry.json"]],
     ] as const) {
-      expect(await requestPackagedFile(root, url)).toEqual(Buffer.from(contents));
+      expect((await requestPackagedFile(root, url))?.body).toEqual(Buffer.from(contents));
     }
     for (const url of ["/missing", "/docs/missing/", "/assets/missing.js", "/404.html"]) {
       expect(await requestPackagedFile(root, url)).toBeNull();
+    }
+  });
+
+  it("caches only content-hashed files as immutable", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    const cacheControl = async (url: string) =>
+      (await requestPackagedFile(root, url))?.headers["cache-control"];
+    for (const url of [
+      "/assets/client.wasm",
+      "/pagefind/fragment/en_020da39.pf_fragment",
+      "/pagefind/pagefind.en_6e131784e9.pf_meta",
+    ]) {
+      expect(await cacheControl(url)).toBe("public, max-age=31536000, immutable");
+    }
+    // Stable URLs must revalidate, or a deployment would serve stale pages and search entries.
+    for (const url of [
+      "/",
+      "/docs/",
+      "/docs/start/installation/",
+      "/sitemap.xml",
+      "/pagefind/pagefind-entry.json",
+    ]) {
+      expect(await requestPackagedFile(root, url)).not.toBeNull();
+      expect(await cacheControl(url)).toBeUndefined();
     }
   });
 });

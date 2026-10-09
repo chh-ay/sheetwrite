@@ -1,6 +1,8 @@
 import {
   type DocumentOp,
+  MemoryPersistenceAdapter,
   type PersistenceAdapter,
+  type PersistenceBatchCommitRequest,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
   PersistenceError,
@@ -46,6 +48,7 @@ interface TailRecord {
   clientMutationId: string;
   operations: readonly DocumentOp[];
   bytes: number;
+  batch?: VersionedOperation["batch"];
 }
 
 interface MutationRecord {
@@ -202,8 +205,7 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
         return response;
       }
 
-      const current = this.materialize(document.snapshot, tail);
-      const next = this.apply(current, request.operations, currentVersion + 1);
+      const next = this.materialize(document.snapshot, tail, request.operations);
       throwIfAborted(request.signal);
       await this.persistCommit(request, next, document, tail);
       this.publishStats();
@@ -212,6 +214,68 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
         version: next.version ?? currentVersion + 1,
         clientMutationId: request.clientMutationId,
       };
+    });
+  }
+  commitBatch(commit: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.enqueue(async () => {
+      throwIfAborted(commit.signal);
+      const applied = await this.readMutation(commit.documentId, commit.clientMutationId);
+      if (applied) {
+        return {
+          status: "duplicate",
+          version: applied.version,
+          clientMutationId: commit.clientMutationId,
+        };
+      }
+      const { document, tail } = await this.readDocument(commit.documentId);
+      const currentVersion = tail.at(-1)?.version ?? document.snapshot.version ?? 0;
+      if (commit.baseVersion !== currentVersion) {
+        return this.conflictResponse(commit.baseVersion, document, tail);
+      }
+      // The reference adapter validates every version and applies to a scratch
+      // document before any IndexedDB write can become visible.
+      const scratch = new MemoryPersistenceAdapter(this.materialize(document.snapshot, tail));
+      const response = await scratch.commitBatch(commit);
+      if (response.status !== "applied") return response;
+      const next = await scratch.load(commit.documentId, commit.signal);
+      let offset = 0;
+      const records: TailRecord[] = commit.versionOperationCounts.map((count, index) => {
+        const operations = cloneJson(commit.operations.slice(offset, offset + count));
+        offset += count;
+        return {
+          documentId: commit.documentId,
+          version: currentVersion + index + 1,
+          clientMutationId: commit.clientMutationId,
+          operations,
+          bytes: encoder.encode(JSON.stringify(operations)).length,
+          batch: { index, count: commit.versionOperationCounts.length },
+        };
+      });
+      throwIfAborted(commit.signal);
+      const tx = this.database.transaction([TAIL, MUTATIONS], "readwrite");
+      const complete = new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onabort = () => reject(tx.error ?? new Error("Atomic IndexedDB commit aborted"));
+        tx.onerror = () => reject(tx.error ?? new Error("Atomic IndexedDB commit failed"));
+      });
+      for (const record of records) tx.objectStore(TAIL).put(record);
+      tx.objectStore(MUTATIONS).put({
+        documentId: commit.documentId,
+        clientMutationId: commit.clientMutationId,
+        version: response.version,
+      } satisfies MutationRecord);
+      await complete;
+      this.gauges.writes += records.length + 1;
+      const tailBytes = [...tail, ...records].reduce((bytes, record) => bytes + record.bytes, 0);
+      this.gauges.currentVersion = response.version;
+      this.gauges.tailLength = tail.length + records.length;
+      this.gauges.storedBytes =
+        encoder.encode(JSON.stringify(document.snapshot)).length + tailBytes;
+      if (this.gauges.tailLength > this.maxTailRecords || tailBytes > this.maxTailBytes) {
+        await this.compact(commit.documentId, next);
+      }
+      this.publishStats();
+      return response;
     });
   }
 
@@ -263,6 +327,7 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
           version: record.version,
           clientMutationId: record.clientMutationId,
           operations: cloneJson(record.operations),
+          ...(record.batch ? { batch: { ...record.batch } } : {}),
         }));
       if (operationsSinceBase.length === currentVersion - baseVersion) {
         return { status: "conflict", currentVersion, operationsSinceBase };
@@ -275,33 +340,41 @@ export class ShowcaseIndexedDbAdapter implements PersistenceAdapter {
     };
   }
 
-  /** Replays the durable operation tail over the compacted snapshot. */
-  private materialize(snapshot: WorkbookSnapshot, tail: readonly TailRecord[]): WorkbookSnapshot {
-    if (tail.length === 0) return cloneJson(snapshot);
-    let state = cloneJson(snapshot);
-    for (const record of tail) {
-      state = this.apply(state, record.operations, record.version);
-    }
-    return state;
-  }
-
-  private apply(
+  /**
+   * Replays the tail and an optional new commit in one temporary store. Rebuilding
+   * and exporting the workbook after each version makes a tiny ledger edit pay
+   * for the unrelated 100,000-cell usage sheet once per missed version.
+   */
+  private materialize(
     snapshot: WorkbookSnapshot,
-    operations: readonly DocumentOp[],
-    version: number,
+    tail: readonly TailRecord[],
+    nextOperations?: readonly DocumentOp[],
   ): WorkbookSnapshot {
+    if (tail.length === 0 && nextOperations === undefined) return cloneJson(snapshot);
     const store = SheetwriteStore.fromSnapshot(snapshot);
+    let version = snapshot.version ?? 0;
     try {
-      const outcome = store.applyTransaction(
-        { patches: operations.slice() },
-        { source: "remote", commitReason: "api" },
-      );
-      if (outcome.status === "conflict" || (outcome.status === "noop" && operations.length > 0)) {
-        throw new PersistenceError("commit-rejected", "Database commit was rejected");
+      for (const record of tail) {
+        this.apply(store, record.operations);
+        version = record.version;
+      }
+      if (nextOperations !== undefined) {
+        this.apply(store, nextOperations);
+        version += 1;
       }
       return { ...store.exportSnapshot(), version };
     } finally {
       store.dispose();
+    }
+  }
+
+  private apply(store: SheetwriteStore, operations: readonly DocumentOp[]): void {
+    const outcome = store.applyTransaction(
+      { patches: operations.slice() },
+      { source: "remote", commitReason: "api" },
+    );
+    if (outcome.status === "conflict" || (outcome.status === "noop" && operations.length > 0)) {
+      throw new PersistenceError("commit-rejected", "Database commit was rejected");
     }
   }
 
@@ -416,83 +489,4 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-/** Document id the public database proof persists under. */
-export const DATABASE_DOCUMENT_ID = "showcase-database";
-
-/** Sheet cell holding the live `=SUM` total of the database proof workbook. */
-export const DATABASE_TOTAL_CELL = { sheet: "ledger", row: 6, col: 3 } as const;
-
-/**
- * Canonical expedition ledger for the database proof. Small on purpose: every
- * committed transaction, tail record, and compaction is easy to follow in the
- * live storage gauges.
- */
-export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
-  const lines: ReadonlyArray<readonly [item: string, qty: number, unitCost: number]> = [
-    ["Water filters", 12, 30],
-    ["Solar chargers", 4, 145],
-    ["Ration packs", 90, 11],
-    ["Medical kits", 6, 82],
-    ["Satellite minutes", 300, 1.5],
-  ];
-  return {
-    schemaVersion: 1,
-    documentId: DATABASE_DOCUMENT_ID,
-    version: 0,
-    workbook: { activeSheet: "ledger" },
-    sheets: [
-      {
-        id: "ledger",
-        name: "Ledger",
-        order: 0,
-        rowCount: 8,
-        columns: [
-          { key: "item", header: "Item", width: 300, type: "text" },
-          { key: "qty", header: "Qty", width: 120, type: "number" },
-          { key: "unit", header: "Unit cost", width: 170, type: "number" },
-          { key: "total", header: "Total", width: 190, type: "number" },
-        ],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: 7,
-            colCount: 4,
-            cells: [
-              ...lines.flatMap((line, row) => [
-                {
-                  rowOffset: row,
-                  colOffset: 0,
-                  value: { kind: "literal" as const, value: line[0] },
-                },
-                {
-                  rowOffset: row,
-                  colOffset: 1,
-                  value: { kind: "literal" as const, value: line[1] },
-                },
-                {
-                  rowOffset: row,
-                  colOffset: 2,
-                  value: { kind: "literal" as const, value: line[2] },
-                },
-                {
-                  rowOffset: row,
-                  colOffset: 3,
-                  value: { kind: "formula" as const, src: `=B${row + 1}*C${row + 1}` },
-                },
-              ]),
-              { rowOffset: 6, colOffset: 0, value: { kind: "literal" as const, value: "Total" } },
-              {
-                rowOffset: 6,
-                colOffset: 3,
-                value: { kind: "formula" as const, src: "=SUM(D1:D5)" },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
 }

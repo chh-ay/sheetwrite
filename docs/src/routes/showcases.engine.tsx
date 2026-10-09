@@ -5,7 +5,7 @@ import stylesheet from "../styles/showcase-engine.css?url";
 const EngineShowcase = lazy(() => import("../showcases/EngineShowcase.js"));
 
 const description =
-  "Edit a live 50,000-row regional forecast in a real Grid while public datasource, formula, resource, drawing, and host-save evidence stays aligned beside it.";
+  "Edit a live 50,000-row FY26 regional forecast in a real Grid and watch the requested page, the recalculation, the paint checkpoint, and the host acknowledgement arrive in order, with the off-screen plan column loaded beside them.";
 
 export const Route = createFileRoute("/showcases/engine")({
   head: () => ({

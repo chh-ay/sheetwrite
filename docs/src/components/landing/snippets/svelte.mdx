@@ -1,0 +1,16 @@
+```svelte
+<script lang="ts">
+  import { Sheetwrite, type SimpleColumn } from "@sheetwrite/svelte";
+  import "@sheetwrite/svelte/styles.css";
+
+  type Row = { name: string; amount: number };
+  let { columns, rows }: { columns: SimpleColumn<Row>[]; rows: Row[] } = $props();
+</script>
+
+<Sheetwrite
+  {columns}
+  defaultRows={rows}
+  height={420}
+  onGridChange={(event) => save(event.transaction)}
+/>
+```

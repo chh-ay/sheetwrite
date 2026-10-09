@@ -239,16 +239,19 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
   const errors = collectErrors(page);
   await bootInterop(page);
   await expect(page.locator(".sheetwrite-shell-namebox")).toHaveValue("A1");
-  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("OP-1041");
-  await page.fill(".sheetwrite-shell-namebox", "B5");
-  await page.press(".sheetwrite-shell-namebox", "Enter");
-  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue(
-    '=HYPERLINK("https://evil.example","Q3 total")',
-  );
-  await expect(page.locator(".sw-si-safety-note")).toContainText("not a formula");
+  await expect(page.locator(".sheetwrite-shell-formula")).toHaveValue("Order");
+  await expect(page.getByTestId("interop-source")).toContainText("Q1 2026");
+  expect(
+    await page.evaluate(
+      () =>
+        window.__sheetwriteInteropGrid?.store
+          .getWorkbook()
+          .sheets.find((sheet) => sheet.id === "orders")?.rowCount,
+    ),
+  ).toBe(49);
 
   // Edit through the real shell chrome: name box jump, formula-bar commit.
-  await page.fill(".sheetwrite-shell-namebox", "B2");
+  await page.fill(".sheetwrite-shell-namebox", "B3");
   await page.press(".sheetwrite-shell-namebox", "Enter");
   await page.fill(".sheetwrite-shell-formula", "Edited task chair");
   await page.press(".sheetwrite-shell-formula", "Enter");
@@ -256,7 +259,7 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
     .poll(() =>
       page.evaluate(
         () =>
-          window.__sheetwriteInteropGrid?.store.getCell({ sheet: "orders", row: 1, col: 1 })
+          window.__sheetwriteInteropGrid?.store.getCell({ sheet: "orders", row: 2, col: 1 })
             .resolved,
       ),
     )
@@ -271,6 +274,29 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
   const [kept, total] = (preserved ?? "").split("/").map(Number);
   expect(total).toBeGreaterThan(0);
   expect(kept).toBe(total);
+  const matched = ((await page.getByTestId("interop-roundtrip-cells").textContent()) ?? "")
+    .split("/")
+    .map(Number);
+  expect(matched[0]).toBe(matched[1]);
+  expect(matched[1]).toBeGreaterThan(350);
+  const sourceProof = page.getByTestId("interop-spill-proof");
+  // The bytes the page exported are read back, so the ANCHORARRAY encoding is
+  // shown from the file itself, not from a claim in prose.
+  const spillExamples = [
+    { source: "={1,2;3,4}", stored: "{1,2;3,4}", encoding: "plain" },
+    { source: "=SUM(A1#)", stored: "SUM(_xlfn.ANCHORARRAY(A1))", encoding: "anchorarray" },
+    { source: "=SORT(A1#)", stored: "SORT(_xlfn.ANCHORARRAY(A1))", encoding: "anchorarray" },
+  ];
+  for (const example of spillExamples) {
+    const row = sourceProof.locator("tbody tr").filter({ hasText: example.source });
+    await expect(row.locator("td")).toHaveText([example.source, example.stored, example.source]);
+    await expect(row).toHaveAttribute("data-matched", "true");
+    await expect(row).toHaveAttribute("data-exported", "found");
+    await expect(row).toHaveAttribute("data-spill-encoding", example.encoding);
+  }
+  await expect(page.getByTestId("interop-spill-file-check")).toContainText(
+    "3 of 3 example formulas found in the bytes this page just wrote; 2 stored as _xlfn.ANCHORARRAY(...)",
+  );
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -329,6 +355,10 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   await bootInterop(page);
 
   await openDisclosure(page, "interop-limits-disclosure");
+  await page.getByTestId("interop-injection-load").click();
+  await expect(page.getByTestId("interop-status")).toContainText("Loaded: Security lab");
+  await page.getByTestId("interop-injection-export").click();
+  await expect(page.getByTestId("interop-injection-proof")).toContainText("'=HYPERLINK(");
 
   await page.click('[data-testid="interop-hostile-run"]');
   for (const id of HOSTILE_FIXTURE_IDS) {
@@ -363,20 +393,16 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
   expect(errors.console).toEqual([]);
 });
 
-test("CSV export neutralizes injection payloads and pasted CSV rebuilds the workbench", async ({
-  page,
-}) => {
+test("CSV and TSV export and pasted CSV rebuild the live workbench", async ({ page }) => {
   const errors = collectErrors(page);
   await bootInterop(page);
 
   await openDisclosure(page, "interop-delimited-disclosure");
 
   await page.click('[data-testid="interop-csv-export"]');
-  const proof = page.locator('[data-testid="interop-injection-proof"]');
-  await expect(proof).toBeVisible();
-  // The stored literal starts with `=`; the hardened CSV path prefixes `'`.
-  await expect(proof).toContainText("'=HYPERLINK(");
   await expect(page.locator('[data-testid="interop-csv-output"]')).toBeVisible();
+  await expect(page.locator('[data-testid="interop-csv-output"]')).toContainText("OP-1041");
+  await expect(page.locator('[data-testid="interop-csv-output"]')).not.toContainText("HYPERLINK");
 
   // TSV of the current selection goes through the clipboard-dialect exporter.
   await page.click(".sw-si-grid", { position: { x: 120, y: 80 } });
@@ -412,4 +438,71 @@ test("CSV export neutralizes injection payloads and pasted CSV rebuilds the work
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+});
+
+test("file selection and a stage drop import CSV with a visible fidelity report", async ({
+  page,
+}) => {
+  await bootInterop(page);
+  const csv = "customer,units,revenue\nAlder Design,12,3400\nHarbor Studio,7,2050";
+  await page.getByTestId("interop-file-input").setInputFiles({
+    name: "quarter-sales.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+  await expect(page.getByTestId("interop-status")).toContainText("Loaded: quarter-sales.csv");
+  await expect(page.getByTestId("interop-file-report")).toContainText("6 stored cells");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteInteropGrid?.store.getCell({ sheet: "imported", row: 1, col: 2 })
+            .resolved,
+      ),
+    )
+    .toBe(2050);
+  await page.evaluate((text) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([text], "dropped-sales.csv", { type: "text/csv" }));
+    document
+      .querySelector('[data-testid="interop-drop-stage"]')
+      ?.dispatchEvent(
+        new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }),
+      );
+  }, csv);
+  await expect(page.getByTestId("interop-status")).toContainText("Loaded: dropped-sales.csv");
+  await expect(page.getByTestId("interop-file-report")).toContainText("dropped-sales.csv");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteInteropGrid?.store.getCell({ sheet: "imported", row: 0, col: 0 })
+            .resolved,
+      ),
+    )
+    .toBe("Alder Design");
+});
+
+test("0.5.0 streamed CSV demo loads 200,000 sales records and measures this browser", async ({
+  page,
+}) => {
+  await bootInterop(page);
+  await page.getByTestId("interop-bulk-import").click();
+  await expect(page.getByTestId("interop-bulk-report")).toContainText("200,000 rows × 10 columns", {
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId("interop-bulk-report")).toContainText(/\d+ ms CSV parse/u);
+  await expect(page.getByTestId("interop-status")).toContainText("Loaded: Generated sales ledger", {
+    timeout: 30_000,
+  });
+  const lastOrder = await page.evaluate(() => {
+    const grid = window.__sheetwriteInteropGrid;
+    if (!grid) throw new Error("The imported Grid is not available");
+    return {
+      rows: grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "imported")?.rowCount,
+      order: grid.store.getCell({ sheet: "imported", row: 199_999, col: 0 }).resolved,
+      net: grid.store.getCell({ sheet: "imported", row: 199_999, col: 9 }).resolved,
+    };
+  });
+  expect(lastOrder).toEqual({ rows: 200_000, order: "OP-299999", net: 17_835 });
 });

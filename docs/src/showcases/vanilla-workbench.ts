@@ -364,20 +364,28 @@ export function createWorkbench(
  * live cross-sheet formulas over the fixture data, then rebuild the built-in
  * chrome so the sheet-tab bar reflects the now-multi-sheet workbook.
  */
-export function addSummarySheet(grid: Grid): SheetId {
+export function addSummarySheet(grid: Grid, hostWidth: number): SheetId {
   const existing = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SUMMARY_SHEET);
   if (existing !== undefined) {
     grid.setActiveSheet(SUMMARY_SHEET);
     return SUMMARY_SHEET;
   }
 
+  const width = Math.max(600, hostWidth - 64);
   const result = grid.addSheet({
     id: SUMMARY_SHEET,
     name: "Summary",
     rowCount: 4,
     columns: [
-      { key: "metric", header: "Metric", width: 220, type: "text" },
-      { key: "value", header: "Value", width: 170, type: "currency", numberFormat: "$#,##0.00" },
+      { key: "metric", header: "Metric", width: Math.ceil(width * 0.4), type: "text" },
+      { key: "count", header: "Accounts", width: Math.ceil(width * 0.25), type: "number" },
+      {
+        key: "value",
+        header: "ARR (USD)",
+        width: Math.ceil(width * 0.35),
+        type: "currency",
+        numberFormat: "$#,##0.00",
+      },
     ],
   });
   if (result.status !== "applied") {
@@ -400,7 +408,11 @@ export function addSummarySheet(grid: Grid): SheetId {
         addr: { sheet: id, row, col: 0 },
         value: { kind: "literal", value: label },
       },
-      { op: "set", addr: { sheet: id, row, col: 1 }, value: { kind: "formula", src } },
+      {
+        op: "set",
+        addr: { sheet: id, row, col: row === 0 ? 1 : 2 },
+        value: { kind: "formula", src },
+      },
     ]),
   });
 

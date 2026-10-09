@@ -876,7 +876,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L56",
+              "source": "src/persistence.ts#L64",
               "jsDocTags": [],
               "documentation": "Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes\nthe hydrated store just like one created through `createGrid`.",
               "memberDocs": []
@@ -2229,7 +2229,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L96",
+              "source": "src/persistence.ts#L104",
               "jsDocTags": [],
               "documentation": "Executable database-neutral reference adapter for tests, demos, and local workflows.",
               "memberDocs": [
@@ -2534,7 +2534,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L44",
+              "source": "src/persistence.ts#L52",
               "jsDocTags": [],
               "documentation": "Typed failure raised by persistence and synchronization flows.",
               "memberDocs": []
@@ -2546,7 +2546,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L36",
+              "source": "src/persistence.ts#L44",
               "jsDocTags": [],
               "documentation": "Stable category for a persistence failure.",
               "memberDocs": []
@@ -4030,7 +4030,7 @@
               "owners": [
                 "src/persistence.ts"
               ],
-              "source": "src/persistence.ts#L30",
+              "source": "src/persistence.ts#L38",
               "jsDocTags": [],
               "documentation": "Grid creation options accepted when hydrating a validated snapshot.",
               "memberDocs": []

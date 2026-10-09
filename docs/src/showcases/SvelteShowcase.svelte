@@ -18,7 +18,7 @@ import "@sheetwrite/svelte/styles.css";
 import "@sheetwrite/core/shell.css";
 
 /** Hoisted: a stable identity means the adapter never reconfigures per render. */
-const GRID_CONFIG = { toolbar: false } as const;
+const GRID_CONFIG = { toolbar: true } as const;
 
 let session = $state<SvelteWorkbenchSession>();
 let bootError = $state<string>();
@@ -95,7 +95,7 @@ const journey = $derived.by(() => {
     return {
       state: "error",
       title: "Sync needs attention",
-      detail: "Your local edits remain visible. Review the activity below for the failed step.",
+      detail: "Your local edits remain visible. Review the handoff rail for the failed step.",
     };
   }
   if (!online && queue.length === 0) {
@@ -151,13 +151,16 @@ $effect(() => {
       peers = remote;
     },
     onFeed: (entry) => {
-      feed = [entry, ...feed].slice(0, 7);
+      // Newest first; a bounded list keeps the rail a fixed, readable panel.
+      feed = [entry, ...feed].slice(0, 6);
     },
     onRemount: (nextMount, note) => {
       mount = nextMount;
       remountNote = note;
       generation += 1;
     },
+    // Columns are constructor-bound: the mount path sizes them to the live stage.
+    measureHostWidth: () => gridWrap?.clientWidth,
   }).then(
     (value) => {
       if (cancelled) {
@@ -221,7 +224,7 @@ $effect(() => {
   chrome.querySelector<HTMLInputElement>(".sheetwrite-shell-namebox")?.setAttribute("placeholder", "A1");
   chrome
     .querySelector<HTMLInputElement>(".sheetwrite-shell-formula")
-    ?.setAttribute("placeholder", "Select a ticket cell or enter a value");
+    ?.setAttribute("placeholder", "Select a cell or type a value");
   return () => {
     for (const piece of pieces) piece.destroy();
   };
@@ -252,14 +255,14 @@ async function mergeConflict(): Promise<void> {
           <Radio size={16} strokeWidth={1.8} />
         </span>
         <div>
-          <h2>Field dispatch</h2>
+          <h2>No signal. No lost field work.</h2>
           <span>{OFFLINE_ROWS} live tickets</span>
         </div>
       </div>
 
       <button
         type="button"
-        class="sw-svw-toggle"
+        class="sw-svw-toggle sw-workbench-primary"
         data-state={journey.state}
         data-testid="connection-toggle"
         role="switch"
@@ -270,12 +273,13 @@ async function mergeConflict(): Promise<void> {
       >
         {#if online}
           <Cloud size={15} aria-hidden="true" />
-          {syncState?.activity === "sending" ? "Draining" : "Connected"}
+          {syncState?.activity === "sending" ? "Draining" : "Connected · Go offline"}
         {:else}
           <CloudOff size={15} aria-hidden="true" />
-          {queue.length > 0 ? `Offline · ${queue.length}` : "Offline"}
+          Reconnect · {queue.length} queued
         {/if}
       </button>
+      <output class="sw-workbench-readout" aria-live="polite"><strong>{queue.length}</strong><span>durable edits waiting for HQ</span></output>
 
       <div class="sw-svw-shellbar" bind:this={chromeHost}></div>
 
@@ -328,7 +332,7 @@ async function mergeConflict(): Promise<void> {
           <p>{journey.detail}</p>
           <button
             type="button"
-            data-variant={online ? "secondary" : "primary"}
+            data-variant="secondary"
             data-testid="log-button"
             disabled={!ready}
             onclick={() => session?.logNextEntry()}

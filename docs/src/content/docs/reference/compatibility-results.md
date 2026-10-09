@@ -46,7 +46,7 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 <div><dt>Result</dt><dd>evaluated</dd></div>
 <div><dt>Import</dt><dd>Recognized formulas evaluate; unknown dynamic-array syntax remains preserved source with an explicit formula error.</dd></div>
 <div><dt>Export</dt><dd>Anchor formula source is exported; derived spill cells are not serialized as invented formulas.</dd></div>
-<div><dt>Known boundary</dt><dd>No implicit-intersection operator, spill-reference # syntax, multi-key SORT, higher-order LAMBDA array functions, or general Excel/Sheets dynamic-array family is claimed.</dd></div>
+<div><dt>Known boundary</dt><dd>No implicit-intersection operator or general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.</dd></div>
 <div><dt>Evidence</dt><dd>2 checked evidence records</dd></div>
 </dl>
 <a href="/showcases/interoperability/?compatibility=formula.dynamic-arrays">Open the checked interactive result</a>
@@ -75,20 +75,20 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 </details>
 <details class="compat-result">
 <summary class="compat-result__summary">
-<span class="compat-result__title">LAMBDA and reusable named functions</span>
+<span class="compat-result__title">LAMBDA and its array helpers</span>
 <span class="compat-result__meta">
 <code>formula</code>
 <code>excel</code>
-<span data-status="unsupported">unsupported</span>
+<span data-status="partial">partial</span>
 </span>
 <svg class="compat-result__fold" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
 </summary>
 <div class="compat-result__body">
 <dl>
-<div><dt>Result</dt><dd>unsupported</dd></div>
-<div><dt>Import</dt><dd>Source is preserved; evaluation returns an explicit unsupported-name error.</dd></div>
-<div><dt>Export</dt><dd>Preserved source may be emitted, without a fabricated cached result.</dd></div>
-<div><dt>Known boundary</dt><dd>LET is supported separately; no approximation, reusable named-function runtime, or JavaScript execution fallback is provided.</dd></div>
+<div><dt>Result</dt><dd>evaluated</dd></div>
+<div><dt>Import</dt><dd>LAMBDA source evaluates when the full engine is selected; with the default engine the source is preserved and returns #NAME?.</dd></div>
+<div><dt>Export</dt><dd>The exact formula source is emitted without a fabricated cached result.</dd></div>
+<div><dt>Known boundary</dt><dd>Only in the full engine (@sheetwrite/formulas); the default engine returns #NAME?. Calls nest at most 64 deep, and an uncalled LAMBDA returns #CALC!. No JavaScript execution fallback is provided.</dd></div>
 <div><dt>Evidence</dt><dd>1 checked evidence record</dd></div>
 </dl>
 <a href="/showcases/interoperability/?compatibility=formula.let-lambda">Open the checked interactive result</a>
@@ -585,7 +585,7 @@ Result labels distinguish **evaluated** formulas or structures, **preserved** so
 - Portable arithmetic, comparison, concatenation, and percent operators: [spec/source](https://docs.oasis-open.org/office/OpenDocument/v1.3/os/part4-formula/OpenDocument-v1.3-os-part4-formula.html)
 - Bounded dynamic arrays and spill ranges: [spec/source](https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531)
 - Bounded lexical and lazy LET bindings: [spec/source](https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999)
-- LAMBDA and reusable named functions: [spec/source](https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67)
+- LAMBDA and its array helpers: [spec/source](https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67)
 - Quoted cross-sheet references through stable worksheet identity: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
 - Create, rename, reorder, hide, unhide, remove, and active fallback: [spec/source](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/)
 - veryHidden worksheet preservation: [spec/source](https://learn.microsoft.com/en-us/office/vba/api/excel.xlsheetvisibility)

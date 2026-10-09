@@ -4,45 +4,16 @@
   padding: var(--sw-demo-space-3);
 }
 
-.sw-clb {
-  gap: var(--sw-demo-space-3);
-}
+/* ---------- bar actions ---------- */
 
-.sw-clb__statusbar {
-  min-height: auto;
-  padding-bottom: var(--sw-demo-space-2);
-  border-bottom: 1px solid var(--sw-demo-border);
-}
-
-.sw-clb__scenario-title {
+/* Chaos test: one primary button, its live verdict sits in the bar. */
+.sw-clb__chaos {
   display: flex;
-  gap: var(--sw-demo-space-3);
+  gap: var(--sw-demo-space-2);
   align-items: center;
 }
 
-.sw-clb__scenario-title > div {
-  display: grid;
-  gap: var(--sw-demo-space-1);
-}
-
-.sw-clb__scenario-title strong {
-  color: var(--sw-demo-fg-strong);
-  font-family: var(--sw-font-display);
-  font-size: var(--sw-type-base);
-}
-
-.sw-clb__kicker,
-.sw-clb__challenge-state,
-.sw-clb__sequence > header span {
-  color: var(--sw-demo-dim);
-  font-family: var(--sw-font-mono);
-  font-size: var(--sw-type-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .sw-clb__status {
-  flex: none;
   padding-inline: var(--sw-demo-space-3);
 }
 
@@ -50,20 +21,139 @@
   color: var(--sw-demo-fg-soft);
 }
 
+/* ---------- live HUD ---------- */
+
+.sw-clb__forecast-hud {
+  display: grid;
+  grid-template-columns: minmax(0, 34rem) minmax(12rem, 17rem) minmax(0, 34rem);
+  justify-content: space-between;
+  gap: var(--sw-demo-space-3);
+  padding: var(--sw-demo-space-3) var(--sw-demo-space-4);
+  border-block: 1px solid var(--sw-demo-border);
+  background: var(--sw-demo-deep);
+}
+
+.sw-clb__forecast-card {
+  --sw-clb-head: var(--sw-demo-accent);
+  display: grid;
+  gap: var(--sw-demo-space-2);
+  min-width: 0;
+  padding: var(--sw-demo-space-3);
+  border: 1px solid color-mix(in srgb, var(--sw-clb-head) 35%, var(--sw-demo-border));
+  border-radius: var(--sw-demo-radius-2);
+  background: color-mix(in srgb, var(--sw-clb-head) 5%, var(--sw-demo-surface));
+}
+
+.sw-clb__forecast-card:nth-child(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.sw-clb__forecast-card[data-head="behind"],
+.sw-clb__forecast-card[data-head="queued"] {
+  --sw-clb-head: var(--sw-demo-warn);
+}
+
+.sw-clb__forecast-card header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sw-demo-space-2);
+}
+
+.sw-clb__forecast-hud span {
+  color: var(--sw-demo-fg-soft);
+  font-size: var(--sw-type-sm);
+  font-weight: 600;
+}
+
+.sw-clb__forecast-hud strong {
+  color: var(--sw-demo-fg-strong);
+  font: 650 1.3rem / 1.2 var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-clb__forecast-card output {
+  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sw-clb-head) 12%, var(--sw-demo-surface));
+  color: var(--sw-clb-head);
+  font-size: var(--sw-type-sm);
+  font-weight: 600;
+}
+
+.sw-clb__forecast-card p {
+  margin: 0;
+  color: var(--sw-demo-muted);
+  font-size: var(--sw-type-sm);
+}
+
+.sw-clb__forecast-card b {
+  color: var(--sw-demo-fg-strong);
+  font-family: var(--sw-font-mono);
+}
+
+/* The hub between the two forecast cards: the server head every client syncs to. */
+.sw-clb__convergence {
+  --sw-clb-hub: var(--sw-demo-accent);
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  align-content: center;
+  justify-items: center;
+  gap: var(--sw-demo-space-2);
+  padding: var(--sw-demo-space-3) var(--sw-demo-space-2);
+  border: 1px solid color-mix(in srgb, var(--sw-clb-hub) 32%, var(--sw-demo-border));
+  border-radius: var(--sw-demo-radius-2);
+  background: color-mix(in srgb, var(--sw-clb-hub) 6%, var(--sw-demo-surface));
+  text-align: center;
+}
+
+.sw-clb__convergence[data-state="waiting"] {
+  --sw-clb-hub: var(--sw-demo-warn);
+}
+
+.sw-clb__convergence span {
+  color: var(--sw-demo-dim);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-type-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sw-clb__convergence strong {
+  color: var(--sw-demo-fg-strong);
+  font: 650 1.5rem / 1.1 var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-clb__convergence output {
+  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sw-clb-hub) 14%, var(--sw-demo-surface));
+  color: var(--sw-clb-hub);
+  font-size: var(--sw-type-xs);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* ---------- workbench ---------- */
+
 .sw-clb__workbench {
   display: grid;
-  grid-template-columns:
-    minmax(0, 1fr)
-    minmax(calc(var(--sw-demo-space-4) * 11), calc(var(--sw-demo-space-4) * 13))
-    minmax(0, 1fr);
+  /* Client panels stop at 34rem: wider panels would expose the Grid's empty
+     presentation-padding columns, which read as letter-labelled dead space. */
+  grid-template-columns: minmax(0, 34rem) minmax(15rem, 17rem) minmax(0, 34rem);
+  justify-content: space-between;
   gap: var(--sw-demo-space-3);
   align-items: stretch;
+  padding: var(--sw-demo-space-3) var(--sw-demo-space-4) var(--sw-demo-space-4);
 }
 
 .sw-clb__client {
   gap: var(--sw-demo-space-2);
   padding: var(--sw-demo-space-3);
-  border-top-width: 1px;
   background: var(--sw-demo-surface);
 }
 
@@ -83,8 +173,12 @@
   font-size: var(--sw-type-base);
 }
 
+/* The Grid takes the panel height the lane asks for: the sequencing log needs
+   ~15rem, so both client panels grow with it instead of clipping the log. */
 .sw-clb__grid {
-  height: calc(var(--sw-demo-space-4) * 18);
+  height: auto;
+  min-height: calc(var(--sw-demo-space-4) * 16);
+  flex: 1 1 auto;
   border-color: var(--sw-demo-border-strong);
   background: var(--sw-demo-surface);
 }
@@ -115,8 +209,10 @@
 }
 
 .sw-clb__stats {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sw-demo-space-2);
+  margin: 0;
   padding: var(--sw-demo-space-2) 0;
   border: 0;
   border-block: 1px solid var(--sw-demo-border);
@@ -131,13 +227,23 @@
 
 .sw-clb__stats dt {
   margin: 0;
+  color: var(--sw-demo-dim);
+  font-size: var(--sw-type-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .sw-clb__stats dd {
   min-width: 0;
-  margin-top: var(--sw-demo-space-1);
+  margin: var(--sw-demo-space-1) 0 0;
+  color: var(--sw-demo-fg-strong);
+  font-family: var(--sw-font-mono);
   font-size: var(--sw-type-sm);
   overflow-wrap: anywhere;
+}
+
+.sw-clb__stats dd[data-state="queued"] {
+  color: var(--sw-demo-warn);
 }
 
 .sw-clb__presence {
@@ -161,6 +267,8 @@
   white-space: nowrap;
 }
 
+/* ---------- sequencing lane ---------- */
+
 .sw-clb__sequence {
   display: flex;
   flex-direction: column;
@@ -181,6 +289,14 @@
   border-bottom: 1px solid var(--sw-demo-border);
 }
 
+.sw-clb__sequence > header span {
+  color: var(--sw-demo-dim);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-type-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .sw-clb__sequence > header output {
   color: var(--sw-demo-fg-strong);
   font-family: var(--sw-font-mono);
@@ -194,6 +310,10 @@
 
 .sw-clb__challenge-state {
   color: var(--sw-demo-accent);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-type-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .sw-clb__sequence[data-phase="offline"] .sw-clb__challenge-state,
@@ -247,35 +367,49 @@
   opacity: 0.72;
 }
 
+/* Broadcast direction: the two analysts on one line, the pipeline below it,
+   so the caption never wraps mid-arrow in the narrow lane. */
 .sw-clb__direction {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--sw-demo-space-2);
+  gap: var(--sw-demo-space-1) var(--sw-demo-space-2);
   align-items: center;
-  color: var(--sw-demo-dim);
+  color: var(--sw-demo-fg-soft);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-type-xs);
 }
 
-/* The lane is narrow; wrap the caption rather than cutting off "broadcast". */
+.sw-clb__direction::before {
+  content: "";
+  grid-column: 2;
+  grid-row: 1;
+  border-top: 1px dashed var(--sw-demo-border-strong);
+}
+
 .sw-clb__direction i {
-  border-bottom: 1px solid var(--sw-demo-border-strong);
+  grid-column: 1 / -1;
+  grid-row: 2;
+  color: var(--sw-demo-dim);
   font-style: normal;
   line-height: 1.4;
   text-align: center;
 }
 
+/* The decisions log fills the rest of the lane, so the lane has no dead space
+   beside the taller client panels; long histories scroll inside it. */
 .sw-clb__decisions {
   display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--sw-demo-space-2);
   min-height: 0;
-  margin-top: auto;
   padding-top: var(--sw-demo-space-2);
   border-top: 1px solid var(--sw-demo-border);
 }
 
 .sw-clb__server-log {
-  max-height: calc(var(--sw-demo-space-4) * 8);
+  min-height: 15rem;
+  max-height: 15rem;
   overflow-y: auto;
 }
 
@@ -283,7 +417,10 @@
   padding-block: var(--sw-demo-space-1);
 }
 
+/* ---------- advanced faults ---------- */
+
 .sw-clb__advanced {
+  margin: 0 var(--sw-demo-space-4) var(--sw-demo-space-4);
   border: 1px solid var(--sw-demo-border);
   border-radius: var(--sw-demo-radius-2);
   background: var(--sw-demo-deep);
@@ -344,21 +481,89 @@
 }
 
 .sw-clb__log {
-  max-height: calc(var(--sw-demo-space-4) * 6);
+  max-height: 18rem;
 }
 
 .sw-clb__server-note {
+  display: grid;
+  gap: var(--sw-demo-space-2);
   margin-top: 0;
+  color: var(--sw-demo-muted);
+  font-size: var(--sw-type-xs);
+  line-height: 1.5;
+}
+
+.sw-clb__server-note-tag {
+  justify-self: start;
+  padding: var(--sw-demo-space-1) var(--sw-demo-space-2);
+  border: 1px solid color-mix(in srgb, var(--sw-demo-accent) 32%, var(--sw-demo-border));
+  border-radius: 999px;
+  background: var(--sw-demo-raised);
+  color: var(--sw-demo-accent-strong);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-type-xs);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ---------- responsive ---------- */
+
+/* Middle widths: two client panels side by side, the sequencing lane as a
+   full-width band below them. Each Grid keeps all five named columns, and the
+   lane keeps its log at full height instead of a narrow strip. */
+@media (max-width: 96rem) {
+  .sw-clb__forecast-hud {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.5fr) minmax(0, 1fr);
+  }
+
+  .sw-clb__workbench {
+    grid-template-columns: minmax(0, 34rem) minmax(0, 34rem);
+    grid-template-areas:
+      "ana bram"
+      "lane lane";
+  }
+
+  .sw-clb__client[data-client="a"] {
+    grid-area: ana;
+  }
+
+  .sw-clb__client[data-client="b"] {
+    grid-area: bram;
+  }
+
+  .sw-clb__sequence {
+    grid-area: lane;
+    flex-flow: row wrap;
+  }
+
+  .sw-clb__sequence > header {
+    flex: 1 0 100%;
+  }
+
+  .sw-clb__challenge {
+    flex: 1 1 15rem;
+    align-content: start;
+  }
+
+  .sw-clb__steps {
+    flex: 1 1 17rem;
+    align-content: start;
+  }
+
+  .sw-clb__direction {
+    display: none;
+  }
+
+  .sw-clb__decisions {
+    flex: 2 1 22rem;
+    padding-top: 0;
+    padding-left: var(--sw-demo-space-3);
+    border-top: 0;
+    border-left: 1px solid var(--sw-demo-border);
+  }
 }
 
 @media (max-width: 74rem) {
-  .sw-clb__workbench {
-    grid-template-columns: minmax(0, 1fr) minmax(calc(var(--sw-demo-space-4) * 10), 0.75fr) minmax(
-        0,
-        1fr
-      );
-  }
-
   .sw-clb__status-detail {
     display: none;
   }
@@ -369,12 +574,47 @@
     padding: var(--sw-demo-space-2);
   }
 
-  .sw-clb__workbench {
+  .sw-clb__forecast-hud {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .sw-clb__forecast-card:nth-child(2),
+  .sw-clb__convergence {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .sw-clb__convergence {
+    grid-row: 1;
+  }
+
+  .sw-clb__workbench {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "ana"
+      "lane"
+      "bram";
+    /* Stacked panels stay at the width the Grid columns fill, centred. */
+    max-width: 37rem;
+    margin-inline: auto;
+  }
+
   .sw-clb__sequence {
-    min-height: auto;
+    flex-flow: column;
+  }
+
+  .sw-clb__sequence > header,
+  .sw-clb__challenge,
+  .sw-clb__steps,
+  .sw-clb__decisions {
+    flex: 0 1 auto;
+  }
+
+  .sw-clb__decisions {
+    padding-top: var(--sw-demo-space-2);
+    padding-left: 0;
+    border-top: 1px solid var(--sw-demo-border);
+    border-left: 0;
   }
 
   .sw-clb__steps {
@@ -406,11 +646,6 @@
 }
 
 @media (max-width: 32rem) {
-  .sw-clb__scenario-title {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
   .sw-clb__client-action {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -425,5 +660,9 @@
 
   .sw-clb__steps .sw-clb__button {
     min-height: calc(var(--sw-demo-space-4) * 2);
+  }
+
+  .sw-clb__advanced {
+    margin-inline: var(--sw-demo-space-2);
   }
 }

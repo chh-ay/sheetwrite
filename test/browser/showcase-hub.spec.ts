@@ -31,11 +31,9 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   );
   await expect(page.locator("main h1")).toHaveCount(1);
 
-  // One launcher per showcase owner. The live engine view launches from the landing page.
+  // One launcher per showcase owner.
   const launchers = page.locator("main a[data-owner]");
-  const owners = CAPABILITY_OWNERS.filter((owner) => owner.id !== "engine")
-    .map((owner) => owner.id)
-    .sort();
+  const owners = CAPABILITY_OWNERS.map((owner) => owner.id).sort();
   expect(
     (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
   ).toEqual(owners);
@@ -84,12 +82,20 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
-  await expect(launchers).toHaveCount(2);
+  await expect
+    .poll(async () =>
+      (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+    )
+    .toEqual(["database", "host-rows", "performance"]);
 
   await workbookFilter.click();
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
   await expect(launchers).toHaveCount(1);
   await expect(launchers).toHaveAttribute("data-owner", "interoperability");
+  await page.getByRole("button", { name: "Formulas", exact: true }).click();
+  expect(
+    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+  ).toEqual(["engine", "formulas"]);
   await allFilter.click();
   await expect(launchers).toHaveCount(owners.length);
 

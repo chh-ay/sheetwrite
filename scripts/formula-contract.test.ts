@@ -108,7 +108,7 @@ describe("formula capability contract", () => {
     expect(result.summary).toEqual({
       functions: 299,
       requiredSupported: 100,
-      unsupportedCategories: 7,
+      unsupportedCategories: 5,
       parserSpellings: 156,
       assistSpellings: 156,
       formulasSpellings: 302,

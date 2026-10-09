@@ -1,30 +1,28 @@
 import type {
   ChangeEvent,
   DataSource,
-  DataSourceStorageOptions,
   DocumentOp,
   Grid,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
-  RowData,
   RuntimeResourceOperation,
-  SheetId,
   Theme,
-  Workbook,
 } from "@sheetwrite/core";
 import { SheetwriteStore } from "@sheetwrite/core";
+import {
+  columnLetter,
+  ENGINE_COLUMN_INDEX,
+  ENGINE_LIVE_SHEET,
+  type EngineColumnBand,
+  engineAccountTotalRow,
+  engineLiveRow,
+} from "./engine-live-data.js";
 
-export const ENGINE_LIVE_SHEET = "forecast" satisfies SheetId;
-export const ENGINE_LIVE_ROWS = 50_000;
 export const ENGINE_TRACE_LIMIT = 40;
 export const ENGINE_PENDING_LIMIT = 16;
 
-export const ENGINE_LIVE_STORAGE: Required<DataSourceStorageOptions> = {
-  mode: "paged",
-  chunkRows: 512,
-  cacheBytes: 2 * 1024 * 1024,
-  dirtyCellLimit: 4_096,
-};
+/** What the engine resolves a cell to while its page has not arrived. */
+export const ENGINE_LOADING_MARKER = "#LOADING!";
 
 const ENGINE_THEME_BASE = {
   font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
@@ -63,17 +61,9 @@ export function engineLiveTheme(mode: "light" | "dark"): Partial<Theme> {
       };
 }
 
-const TEAMS = ["North", "West", "South", "East"] as const;
-
 export type EngineRenderer = "canvas" | "worker";
 export type EngineAction = "jump" | "edit" | "undo" | "save" | "renderer";
 export type EngineResourceReason = "load" | "jump" | "edit" | "undo" | "save";
-
-export interface EngineColumnBand {
-  readonly start: number;
-  readonly end: number;
-  readonly keys: readonly string[];
-}
 
 const RESOURCE_OPERATION_BY_REASON: Readonly<
   Record<EngineResourceReason, RuntimeResourceOperation>
@@ -87,6 +77,7 @@ const RESOURCE_OPERATION_BY_REASON: Readonly<
 
 interface EngineEventBase {
   readonly sequence: number;
+  readonly observedAt: number;
 }
 
 export type EngineEvent =
@@ -125,6 +116,8 @@ export type EngineEvent =
       readonly row: number;
       readonly dependencies: readonly {
         readonly address: string;
+        readonly label: string;
+        readonly kind: "money" | "percent";
         readonly formula: string;
         readonly before: string | number | boolean | null;
         readonly after: string | number | boolean | null;
@@ -148,11 +141,21 @@ export type EngineEvent =
       readonly status: PersistenceCommitResponse["status"];
       readonly version: number;
       readonly operations: number;
+    })
+  | (EngineEventBase & {
+      readonly type: "browser-frame";
+      readonly durationMs: number;
+    })
+  | (EngineEventBase & {
+      readonly type: "formula-rewrite";
+      readonly address: string;
+      readonly formula: string;
+      readonly durationMs: number;
     });
 
 export type EngineEventInput = EngineEvent extends infer Event
   ? Event extends EngineEvent
-    ? Omit<Event, "sequence">
+    ? Omit<Event, "sequence" | "observedAt">
     : never
   : never;
 
@@ -175,7 +178,7 @@ export function createEngineTrace(limit = ENGINE_TRACE_LIMIT): EngineTrace {
   return {
     push(input) {
       sequence += 1;
-      const event = { ...input, sequence } as EngineEvent;
+      const event = { ...input, sequence, observedAt: performance.now() } as EngineEvent;
       const index = (start + size) % limit;
       events[index] = event;
       if (size < limit) {
@@ -199,58 +202,6 @@ export function createEngineTrace(limit = ENGINE_TRACE_LIMIT): EngineTrace {
   };
 }
 
-export function createEngineLiveWorkbook(): Workbook {
-  return {
-    activeSheet: ENGINE_LIVE_SHEET,
-    sheets: [
-      {
-        id: ENGINE_LIVE_SHEET,
-        name: "Regional forecast",
-        rowCount: ENGINE_LIVE_ROWS,
-        columns: [
-          { key: "period", header: "Period", width: 156, type: "text" },
-          { key: "region", header: "Region", width: 156, type: "text" },
-          { key: "actual", header: "Actual", width: 162, type: "number" },
-          { key: "forecast", header: "Forecast", width: 168, type: "number" },
-          { key: "variance", header: "Variance", width: 168, type: "number" },
-          { key: "attainment", header: "Attainment", width: 174, type: "number" },
-        ],
-      },
-    ],
-  };
-}
-
-export function engineLiveRow(row: number, columns?: readonly EngineColumnBand[]): RowData {
-  if (row === 0) {
-    const headerRow: RowData = {
-      period: "Period",
-      region: "Region",
-      actual: { kind: "literal", value: "Actual" },
-      forecast: { kind: "literal", value: "Forecast" },
-      variance: { kind: "literal", value: "Variance" },
-      attainment: { kind: "literal", value: "Attainment" },
-    };
-    if (!columns) return headerRow;
-    const keys = new Set(columns.flatMap((band) => band.keys));
-    return Object.fromEntries(Object.entries(headerRow).filter(([key]) => keys.has(key)));
-  }
-  const sheetRow = row + 1;
-  const dataIndex = row - 1;
-  const forecast = 900 + ((dataIndex * 37) % 700);
-  const actual = forecast - 90 + ((dataIndex * 53) % 181);
-  const week = (dataIndex % 52) + 1;
-  const completeRow: RowData = {
-    period: `FY26 W${String(week).padStart(2, "0")}`,
-    region: TEAMS[dataIndex % TEAMS.length] ?? "North",
-    actual,
-    forecast,
-    variance: { kind: "formula", src: `=C${sheetRow}-D${sheetRow}` },
-    attainment: { kind: "formula", src: `=IF(D${sheetRow}=0,0,C${sheetRow}/D${sheetRow})` },
-  };
-  if (!columns) return completeRow;
-  const keys = new Set(columns.flatMap((band) => band.keys));
-  return Object.fromEntries(Object.entries(completeRow).filter(([key]) => keys.has(key)));
-}
 export function createEngineLiveDataSource(
   emit: (event: EngineEventInput) => void,
   onResult?: () => void,
@@ -271,6 +222,26 @@ export function createEngineLiveDataSource(
         end,
         columns: requestedColumns,
       });
+      if (signal.aborted) {
+        throw new DOMException(`Request for ${sheet} was cancelled`, "AbortError");
+      }
+      // Immediate local replies chain page ingestion and formula recomputation
+      // in one microtask checkpoint. Use browser idle tasks to keep page
+      // arrivals out of the next scroll/paint frame; no simulated latency.
+      const delivery = Promise.withResolvers<void>();
+      const useIdleTask = typeof requestIdleCallback === "function";
+      const cancel = () => {
+        if (useIdleTask && typeof task === "number") cancelIdleCallback(task);
+        else clearTimeout(task);
+        delivery.reject(new DOMException(`Request for ${sheet} was cancelled`, "AbortError"));
+      };
+      const deliver = () => {
+        signal.removeEventListener("abort", cancel);
+        delivery.resolve();
+      };
+      const task = useIdleTask ? requestIdleCallback(deliver) : setTimeout(deliver, 0);
+      signal.addEventListener("abort", cancel, { once: true });
+      await delivery.promise;
       if (signal.aborted) {
         throw new DOMException(`Request for ${sheet} was cancelled`, "AbortError");
       }
@@ -314,6 +285,8 @@ function operationKey(operation: DocumentOp, index: number): string {
 
 interface EngineDependencySnapshot {
   readonly address: string;
+  readonly label: string;
+  readonly kind: "money" | "percent";
   readonly formula: string;
   readonly value: string | number | boolean | null;
 }
@@ -397,15 +370,38 @@ export function bindEngineEvents(
     }),
   );
 
-  const dependencySnapshot = (row: number): readonly EngineDependencySnapshot[] =>
-    [4, 5].map((col) => {
-      const address = { sheet: ENGINE_LIVE_SHEET, row, col };
+  const dependencySnapshot = (row: number): readonly EngineDependencySnapshot[] => {
+    const totalRow = engineAccountTotalRow(row);
+    const cells: readonly {
+      readonly row: number;
+      readonly col: number;
+      readonly label: string;
+      readonly kind: "money" | "percent";
+    }[] = [
+      { row, col: ENGINE_COLUMN_INDEX.forecast, label: "Monthly forecast", kind: "money" },
+      { row, col: ENGINE_COLUMN_INDEX.variance, label: "Monthly variance", kind: "money" },
+      { row, col: ENGINE_COLUMN_INDEX.attainment, label: "Monthly attainment", kind: "percent" },
+      { row: totalRow, col: ENGINE_COLUMN_INDEX.forecast, label: "Annual forecast", kind: "money" },
+      { row: totalRow, col: ENGINE_COLUMN_INDEX.actual, label: "Annual actual", kind: "money" },
+      { row: totalRow, col: ENGINE_COLUMN_INDEX.variance, label: "Annual variance", kind: "money" },
+      {
+        row: totalRow,
+        col: ENGINE_COLUMN_INDEX.attainment,
+        label: "Annual attainment",
+        kind: "percent",
+      },
+    ];
+    return cells.map(({ row: dependencyRow, col, label, kind }) => {
+      const address = { sheet: ENGINE_LIVE_SHEET, row: dependencyRow, col };
       return {
-        address: `${String.fromCharCode(65 + col)}${row + 1}`,
+        address: `${columnLetter(col)}${dependencyRow + 1}`,
+        label,
+        kind,
         formula: grid.store.getFormula(address) ?? "",
         value: grid.store.getCell(address).resolved,
       };
     });
+  };
 
   return {
     announceRenderer(requested, fallback = null) {
@@ -419,6 +415,8 @@ export function bindEngineEvents(
       const after = dependencySnapshot(row);
       const dependencies = after.map((dependency, index) => ({
         address: dependency.address,
+        label: dependency.label,
+        kind: dependency.kind,
         formula: dependency.formula,
         before: before[index]?.value ?? null,
         after: dependency.value,
@@ -502,33 +500,54 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
-function formatValue(value: string | number | boolean | null): string {
+const engineMoney = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+/**
+ * One rendering for a formula value, shared by the trace and the dependency
+ * cards: money as currency, rates as percentages, an empty cell spelled out.
+ */
+export function formatEngineValue(
+  kind: "money" | "percent",
+  value: string | number | boolean | null,
+): string {
   if (value === null) return "blank";
-  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  return String(value);
+  if (typeof value !== "number") return String(value);
+  return kind === "percent" ? `${(value * 100).toFixed(1)}%` : engineMoney.format(value);
 }
 
 export function formatEngineEvent(event: EngineEvent): string {
   switch (event.type) {
     case "datasource-request": {
-      const keys = event.columns.flatMap((band) => band.keys).join(", ") || "none";
-      return `Rows requested: ${event.start + 1}–${event.end}; columns ${keys}`;
+      const bands = event.columns.map((band) => band.keys.join(", ")).join(" | ") || "none";
+      return `Rows requested: ${event.start + 1}–${event.end}; columns ${bands}`;
     }
     case "datasource-result": {
-      const keys = event.columns.flatMap((band) => band.keys).join(", ") || "none";
-      return `Rows ready: ${event.rows.toLocaleString()} in ${event.durationMs.toFixed(1)} ms; columns ${keys}`;
+      const bands = event.columns.map((band) => band.keys.join(", ")).join(" | ") || "none";
+      return `Rows ready: ${event.rows.toLocaleString()} in ${event.durationMs.toFixed(1)} ms; columns ${bands}`;
     }
     case "transaction-result":
       return `${event.action === "undo" ? "Undo" : "Edit"}: ${event.status}, ${event.changedCells} cell${event.changedCells === 1 ? "" : "s"} changed`;
     case "page-resource":
       return `Page sample: ${event.loadedCells.toLocaleString()} cells loaded, ${event.dirtyCells.toLocaleString()} changed, ${formatBytes(event.pageBytes)} kept in pages, ${formatBytes(event.engineBytes)} in the calculation engine`;
-    case "formula-update":
-      return `${event.action === "undo" ? "Undo dependencies" : "Recalculated"}: ${event.dependencies
-        .map(
-          (dependency) =>
-            `${dependency.address} ${formatValue(dependency.before)} → ${formatValue(dependency.after)} via ${dependency.formula}`,
-        )
-        .join("; ")}`;
+    case "formula-update": {
+      const changed = event.dependencies.filter(
+        (dependency) => dependency.before !== dependency.after,
+      );
+      const summary =
+        changed.length === 0
+          ? "no value changed"
+          : changed
+              .map(
+                (dependency) =>
+                  `${dependency.address} ${dependency.label.toLowerCase()} ${formatEngineValue(dependency.kind, dependency.before)} → ${formatEngineValue(dependency.kind, dependency.after)}`,
+              )
+              .join("; ");
+      return `${event.action === "undo" ? "Undo reached" : "Recalculation reached"} ${summary}`;
+    }
     case "visible-window":
       return `Visible rows: ${event.firstRow + 1}–${event.lastRow + 1}`;
     case "renderer":
@@ -537,5 +556,9 @@ export function formatEngineEvent(event: EngineEvent): string {
         : `Drawing: ${event.active} active`;
     case "host-save":
       return `Host save: ${event.status} at version ${event.version}, ${event.operations} change${event.operations === 1 ? "" : "s"}`;
+    case "browser-frame":
+      return `Browser paint checkpoint after ${event.durationMs.toFixed(1)} ms; two animation frames, not a renderer acknowledgement`;
+    case "formula-rewrite":
+      return `${event.address} is now ${event.formula}; its reads did not change, and the one-cell transaction took ${event.durationMs.toFixed(2)} ms`;
   }
 }

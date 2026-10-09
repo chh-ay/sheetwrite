@@ -20,6 +20,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Overview", href: "/docs/" },
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
+      { label: "What's new in 0.5.0", href: "/docs/start/whats-new/" },
       { label: "Performance", href: "/docs/guides/performance-resources/" },
     ],
   },
@@ -27,6 +28,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Understand",
     items: [
       { label: "Runtime ownership", href: "/docs/concepts/runtime-ownership/" },
+      { label: "Calculation engine", href: "/docs/concepts/calculation-engine/" },
       { label: "Adapter lifecycle", href: "/docs/frameworks/lifecycle/" },
       { label: "Error handling", href: "/docs/reference/events-errors/" },
     ],
@@ -46,7 +48,9 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Configuration", href: "/docs/guides/configuration/" },
       { label: "Interaction", href: "/docs/guides/interaction/" },
       { label: "Data operations", href: "/docs/guides/data-operations/" },
+      { label: "Host-owned rows", href: "/docs/guides/host-owned-rows/" },
       { label: "Formulas", href: "/docs/guides/formulas/" },
+      { label: "Analysis formulas", href: "/docs/guides/analysis-formulas/" },
       { label: "Styling", href: "/docs/guides/styling/" },
       { label: "Persistence", href: "/docs/guides/persistence/" },
       { label: "Collaboration", href: "/docs/guides/collaboration/" },
@@ -59,6 +63,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     label: "Reference",
     items: [
       { label: "API contract", href: "/docs/reference/api-contract/" },
+      { label: "Formula functions", href: "/docs/reference/formula-functions/" },
       { label: "Document operations", href: "/docs/reference/document-operations/" },
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
       { label: "Compatibility results", href: "/docs/reference/compatibility-results/" },

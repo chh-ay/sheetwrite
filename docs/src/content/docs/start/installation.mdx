@@ -121,7 +121,7 @@ webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node 
 
 ## Full formula engine
 
-By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis functions, for example `NORM.S.DIST` or `T.INV`. It is the same engine with more functions and the same API.
+By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It is the same engine with more functions and the same API, and a larger download. The [analysis formulas guide](/docs/guides/analysis-formulas/) shows each family with examples, and the [performance page](/docs/guides/performance-resources/#default-and-full-formula-engines) compares both engines.
 
 ```sh verify
 npm install @sheetwrite/core @sheetwrite/formulas

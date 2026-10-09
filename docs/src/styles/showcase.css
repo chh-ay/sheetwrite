@@ -1063,7 +1063,7 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 2rem;
     align-items: center;
-    padding: 0.75rem clamp(1rem, 4vw, 4rem);
+    padding: 0.75rem var(--sw-page-inset);
     border-bottom: 1px solid var(--sw-border);
     background: var(--sw-surface-0);
   }
@@ -1124,7 +1124,7 @@
   }
 
   .sw-showcase-page {
-    width: min(calc(100% - 3rem), 92rem);
+    width: calc(100% - 2 * var(--sw-page-inset));
     margin-inline: auto;
     padding: clamp(1rem, 2vw, 1.75rem) 0 4rem;
   }
@@ -1165,6 +1165,7 @@
     color: var(--sw-accent-strong);
     font: 650 0.78rem / 1.4 var(--sw-font-body);
     letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
   .sw-showcase-page__install {
@@ -1321,8 +1322,10 @@
     color: var(--sw-fg-dim);
   }
 
+  /* The proof list's bottom rule separates it from the footer, so the footer
+     needs no rule of its own and the gap stays one rhythm step. */
   .sw-showcase-page__proof {
-    padding: clamp(4rem, 7vw, 6rem) 0;
+    padding: clamp(4rem, 7vw, 6rem) 0 clamp(2rem, 3vw, 2.5rem);
   }
 
   .sw-showcase-page__proof > header {
@@ -1398,59 +1401,87 @@
 
   .sw-showcase-page__footer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2rem;
-    align-items: center;
-    padding: 2rem 0;
-    border-top: 1px solid var(--sw-border);
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 1px;
+    overflow: hidden;
+    margin: 0 0 3rem;
+    border: 1px solid var(--sw-border-strong);
+    border-radius: 1rem;
+    background: var(--sw-border);
   }
 
-  .sw-showcase-page__footer > div {
+  .sw-showcase-page__footer-install {
     display: grid;
-    gap: 0.25rem;
+    align-content: start;
+    gap: 0.4rem;
+    padding: clamp(1.5rem, 3vw, 2.25rem);
+    background:
+      radial-gradient(
+        28rem 12rem at 0 0,
+        color-mix(in srgb, var(--sw-accent) 10%, transparent),
+        transparent 70%
+      ),
+      var(--sw-surface-1);
   }
 
-  .sw-showcase-page__footer > div > span {
+  .sw-showcase-page__footer-install > span {
     color: var(--sw-accent-strong);
     font: 650 0.78rem var(--sw-font-body);
     letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
-  .sw-showcase-page__footer > div > strong {
+  .sw-showcase-page__footer-install > strong {
     color: var(--sw-fg-strong);
-    font: 620 1.375rem var(--sw-font-display);
+    font: 620 1.375rem / 1.25 var(--sw-font-display);
+    overflow-wrap: anywhere;
   }
 
-  .sw-showcase-page__footer p {
-    margin: 0;
+  .sw-showcase-page__footer-install p {
+    margin: 0 0 0.85rem;
     color: var(--sw-fg-muted);
     font-size: var(--sw-type-sm);
+    line-height: 1.55;
   }
 
-  .sw-showcase-page__footer nav {
-    display: flex;
-    gap: 0.5rem;
+  .sw-showcase-page__footer-links {
+    display: grid;
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 1px;
   }
 
-  .sw-showcase-page__footer a {
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: 0.5rem;
+  .sw-showcase-page__footer-links a {
+    display: grid;
+    align-content: center;
+    gap: 0.2rem;
+    padding: 1rem 1.5rem;
+    background: var(--sw-surface-1);
     color: var(--sw-fg);
-    font: 650 var(--sw-type-sm) var(--sw-font-body);
     text-decoration: none;
-    white-space: nowrap;
+    transition: background-color 0.15s ease;
   }
 
-  .sw-showcase-page__footer a:hover {
-    border-color: var(--sw-accent);
+  .sw-showcase-page__footer-links a span {
+    color: var(--sw-fg-dim);
+    font: 600 var(--sw-type-xs) / 1.2 var(--sw-font-mono);
+    text-transform: uppercase;
+  }
+
+  .sw-showcase-page__footer-links a strong {
+    color: var(--sw-fg-strong);
+    font: 620 1rem / 1.35 var(--sw-font-body);
+  }
+
+  .sw-showcase-page__footer-links a:hover {
+    background: color-mix(in srgb, var(--sw-accent) 8%, var(--sw-surface-1));
+  }
+
+  .sw-showcase-page__footer-links a:hover strong {
     color: var(--sw-accent-strong);
   }
 
-  .sw-showcase-page__footer a:first-child {
-    border-color: var(--sw-accent-strong);
-    color: var(--sw-surface-0);
-    background: var(--sw-accent-strong);
+  .sw-showcase-page__footer-links a:focus-visible {
+    outline-offset: -3px;
   }
 
   .sw-vanilla-app {
@@ -1583,17 +1614,13 @@
   }
 
   @media (max-width: 72rem) {
-    .sw-showcase-page__hero {
-      grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
-      gap: 3rem;
-    }
-
     .sw-showcase-page__footer {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .sw-showcase-page__footer nav {
-      flex-wrap: wrap;
+    .sw-showcase-page__hero {
+      grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+      gap: 3rem;
     }
 
     .sw-showcase-page__proof ol {
@@ -1655,7 +1682,6 @@
 
   @media (max-width: 42rem) {
     .sw-showcase-page {
-      width: min(calc(100% - 2rem), 92rem);
       padding-top: 1.5rem;
     }
 
@@ -1704,19 +1730,6 @@
       border-bottom: 0;
     }
 
-    .sw-showcase-page__footer {
-      padding: 1.5rem 0;
-    }
-
-    .sw-showcase-page__footer nav {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .sw-showcase-page__footer a {
-      text-align: center;
-    }
-
     .sw-vanilla-brief {
       align-items: stretch;
       flex-direction: column;
@@ -1739,7 +1752,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sw-install-command {
+    .sw-install-command,
+    .sw-showcase-page__footer-links a {
       transition: none;
     }
   }
@@ -1760,13 +1774,13 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-demo-ink) 58%, transparent);
 }
 
-.sw-showcase-page__footer a:first-child:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-surface-0) 72%, transparent);
-}
-
 /* Live showcase workbench: one compact host control row, with framework-tinted
-   accents sharing the same restrained dark canvas palette. */
-:is(.sw-demo-app, .sw-vanilla-app) {
+   accents sharing the same restrained dark canvas palette. Core declares its
+   own defaults (including the light toolbar, tab, and widget palette) on the
+   grid root, so the palette is also declared on that root at a more specific
+   selector; otherwise the toolbar and menus keep core's light colours. */
+:is(.sw-demo-app, .sw-vanilla-app),
+.sw-showcase-stage__viewport :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite {
   --demo-accent: var(--sw-demo-accent);
   --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
   --sheetwrite-bg: var(--sw-demo-surface);
@@ -1806,23 +1820,6 @@
   --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-demo-accent) 9%, var(--sw-demo-raised));
   --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-demo-accent) 14%, var(--sw-demo-deep));
   --sheetwrite-tab-active-fg: var(--sw-demo-accent-strong);
-}
-
-/* Core's dark-mode defaults are declared on the grid root itself. Reassert the
-   showcase palette at a more specific host selector so editors, validation
-   controls, and other CSS-painted affordances match the explicit canvas theme. */
-.sw-showcase-stage__viewport :is(.sw-demo-app, .sw-vanilla-app) .sheetwrite {
-  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
-  --sheetwrite-bg: var(--sw-demo-surface);
-  --sheetwrite-fg: var(--sw-demo-fg);
-  --sheetwrite-grid-line: var(--sw-demo-border);
-  --sheetwrite-header-bg: var(--sw-demo-raised);
-  --sheetwrite-header-fg: var(--sw-demo-accent-strong);
-  --sheetwrite-selection: color-mix(in srgb, var(--sw-demo-accent) 14%, transparent);
-  --sheetwrite-selection-border: var(--sw-demo-accent);
-  --sheetwrite-search-match: color-mix(in srgb, var(--sw-demo-warn) 25%, transparent);
-  --sheetwrite-search-active: var(--sw-demo-warn);
-  --sheetwrite-highlight: color-mix(in srgb, var(--sw-demo-accent) 20%, transparent);
 }
 
 :is(.sw-demo-app, .sw-vanilla-app) :is(.sheetwrite-toolbar, .sheetwrite-shell-toolbar) {

@@ -32,6 +32,7 @@ const handleReady = (event: GridReadyEvent) => emit("ready", event);
   <Sheetwrite
     :columns="columns"
     :default-rows="rows"
+    :height="420"
     @grid-change="handleGridChange"
     @ready="handleReady"
   />

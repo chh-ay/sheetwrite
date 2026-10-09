@@ -319,10 +319,6 @@ export function DocsShell({
         </div>
       </header>
       <aside className="sw-sidebar">
-        <Link className="sw-sidebar__title" to="/docs/">
-          <span>Documentation</span>
-          <span aria-hidden="true">↗</span>
-        </Link>
         <NavigationSections activeHref={activeHref} />
       </aside>
       <main

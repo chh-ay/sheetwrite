@@ -6,7 +6,7 @@ description: Explicit compatibility boundaries, resource ceilings, tuning defaul
 | Area | Supported contract | Boundary |
 | --- | --- | --- |
 | Data | Eager columnar data or cancellable datasource pages; dense and allocation-lazy paged storage | Full-sheet queries and exports are incomplete until required pages load |
-| Formulas | Persisted formula source, A1/range references, named ranges, the inventory-derived supported function contract, bounded lexical `LET`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external/network/database/cube/LAMBDA categories and automatic volatility beyond the clock barrier are unsupported |
+| Formulas | Persisted formula source, A1/range references, spill references, named ranges, the inventory-derived supported function contract in two engine builds, bounded lexical `LET` and `LAMBDA`, and bounded dynamic-array spills | No blanket Excel/Sheets/OpenFormula claim; external, network, cube, and live-data categories and automatic volatility beyond the clock barrier are unsupported |
 | Protection | Serializable client interaction policy with atomic/partial local mutation behavior | Never server authorization; remote operations bypass local UX policy |
 | Collaboration | Host sequencing, stable mutation IDs, durable optimistic edits, ordered remote operations, presence/comments/revisions, conservative rebase | No bundled server, CRDT, or general OT; ambiguous structural/formula conflicts require host UX |
 | Worker | OffscreenCanvas rendering with capability/startup fallback | Custom function renderers cannot transfer to the worker |
