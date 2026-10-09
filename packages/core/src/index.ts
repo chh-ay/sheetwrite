@@ -200,6 +200,8 @@ export {
   type PendingCommitLoadOptions,
   type PendingCommitStorage,
   type SyncActivityState,
+  type SyncConflictRecovery,
+  type SyncConflictReloadReason,
   type SyncConnectionState,
   SyncCoordinator,
   type SyncCoordinatorEvent,

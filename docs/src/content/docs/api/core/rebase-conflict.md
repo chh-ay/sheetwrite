@@ -86,5 +86,6 @@ export interface RebaseConflict {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/document-rebase-result/"><code>DocumentRebaseResult</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-conflict-recovery/"><code>SyncConflictRecovery</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

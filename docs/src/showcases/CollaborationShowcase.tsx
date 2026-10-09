@@ -1014,7 +1014,11 @@ export default function CollaborationShowcase() {
     })();
   };
 
-  /** Documented host recovery: rebase, clear stale durable ids, remount, resubmit. */
+  /**
+   * Documented host recovery. Recover on the live Grid when the missed server
+   * versions touch other cells; otherwise rebase, clear stale durable ids,
+   * remount, and resubmit.
+   */
   const recoverClient = async (key: ClientKey, response: ConflictResponse) => {
     if (recoveringRef.current[key]) return;
     recoveringRef.current[key] = true;
@@ -1025,6 +1029,19 @@ export default function CollaborationShowcase() {
       const server = runtime ? serversRef.current[runtime.document] : null;
       const bus = busRef.current;
       if (!runtime || !host || !server || !bus) return;
+      const inPlace = await runtime.sync.recoverConflict();
+      if (clientsRef.current[key] !== runtime || inPlace.status === "no-conflict") return;
+      if (inPlace.status === "recovered") {
+        pushClientLog(
+          key,
+          "commit",
+          `Recovered in place at v${inPlace.serverVersion}: pending work resent`,
+        );
+        readClient(key);
+        void runtime.sync.flush().catch(() => {});
+        return;
+      }
+      pushClientLog(key, "info", `Reloading to recover (${inPlace.reason.replaceAll("-", " ")})`);
       if (!response.operationsSinceBase) {
         pushClientLog(key, "error", "Manual review required: no operation tail returned");
         return;

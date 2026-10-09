@@ -1145,7 +1145,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L158",
+              "source": "src/sync.ts#L159",
               "jsDocTags": [],
               "documentation": "Security and durability defaults bound hostile remote versions, recovery\nbuffers, acknowledgement memory, and the offline pending queue independently.",
               "memberDocs": []
@@ -2429,7 +2429,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L39",
+              "source": "src/sync.ts#L40",
               "jsDocTags": [],
               "documentation": "Mandatory bounds for one durable pending-commit restore.",
               "memberDocs": [
@@ -2454,7 +2454,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L50",
+              "source": "src/sync.ts#L51",
               "jsDocTags": [],
               "documentation": "Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.",
               "memberDocs": [
@@ -4278,9 +4278,33 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L69",
+              "source": "src/sync.ts#L70",
               "jsDocTags": [],
               "documentation": "Current persistence activity reported by a sync coordinator.",
+              "memberDocs": []
+            },
+            {
+              "name": "SyncConflictRecovery",
+              "kind": "type",
+              "signature": "export type SyncConflictRecovery = | { status: \"recovered\"; serverVersion: number } | { status: \"reload-required\"; reason: SyncConflictReloadReason; conflict?: RebaseConflict } | { status: \"no-conflict\" };",
+              "owners": [
+                "src/sync.ts"
+              ],
+              "source": "src/sync.ts#L288",
+              "jsDocTags": [],
+              "documentation": "Outcome of `SyncCoordinator.recoverConflict`.",
+              "memberDocs": []
+            },
+            {
+              "name": "SyncConflictReloadReason",
+              "kind": "type",
+              "signature": "export type SyncConflictReloadReason = | \"missing-operations\" | \"structural-change\" | \"overlapping-work\" | \"version-advanced\" | \"own-mutation\" | \"rejected\";",
+              "owners": [
+                "src/sync.ts"
+              ],
+              "source": "src/sync.ts#L273",
+              "jsDocTags": [],
+              "documentation": "Why a conflict cannot be recovered in place; the host reloads the document instead.",
               "memberDocs": []
             },
             {
@@ -4290,7 +4314,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L67",
+              "source": "src/sync.ts#L68",
               "jsDocTags": [],
               "documentation": "Host-controlled online state reported by synchronization.",
               "memberDocs": []
@@ -4298,11 +4322,11 @@
             {
               "name": "SyncCoordinator",
               "kind": "class",
-              "signature": "class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions); applyVersionedOperation: (operation: VersionedOperation) => Promise<void>; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }",
+              "signature": "class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions); applyVersionedOperation: (operation: VersionedOperation) => Promise<void>; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; recoverConflict: () => Promise<SyncConflictRecovery>; resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }",
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L286",
+              "source": "src/sync.ts#L311",
               "jsDocTags": [],
               "documentation": "Deterministic, transport-neutral optimistic sync. Local rendering is never\nblocked: changes queue immediately, while hosts explicitly call `sendNext`\nor `retry` to perform network work.",
               "memberDocs": [
@@ -4313,6 +4337,10 @@
                 {
                   "name": "ready",
                   "documentation": "Resolves after durable work is restored and every startup commit is visible locally."
+                },
+                {
+                  "name": "recoverConflict",
+                  "documentation": "Recover from the outstanding base-version conflict without reloading the\ndocument. This succeeds when the pending work and every server version it\ndid not see change different cells, and neither inserts, deletes, or moves\nrows or columns: the local Grid then already shows the server result plus\nthe pending work, so recovery applies the missed server versions and moves\nthe pending queue onto the new server version. Call `flush` afterwards to\nsend it. In every other case nothing changes and the result names the\nreason; the host then reloads and calls `resumeAfterReload`."
                 },
                 {
                   "name": "resumeAfterReload",
@@ -4331,11 +4359,11 @@
             {
               "name": "SyncCoordinatorEvent",
               "kind": "type",
-              "signature": "export type SyncCoordinatorEvent = | { type: \"state\"; state: SyncStateSnapshot } | { type: \"restored\"; pending: readonly SyncMutationRecord[] } | { type: \"persisting\"; mutation: SyncMutationRecord } | { type: \"pending\"; mutation: SyncMutationRecord } | { type: \"sending\"; mutation: SyncMutationRecord } | { type: \"acknowledged\"; clientMutationId: string; version: number; duplicate: boolean; } | { type: \"conflict\"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: \"conflict\" }>; } | { type: \"remote-applied\"; operation: VersionedOperation } | { type: \"reload-required\"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: \"reloaded\"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: \"storage-error\"; error: SheetwriteError; clientMutationId?: string } | { type: \"error\"; error: SheetwriteError; clientMutationId?: string };",
+              "signature": "export type SyncCoordinatorEvent = | { type: \"state\"; state: SyncStateSnapshot } | { type: \"restored\"; pending: readonly SyncMutationRecord[] } | { type: \"persisting\"; mutation: SyncMutationRecord } | { type: \"pending\"; mutation: SyncMutationRecord } | { type: \"sending\"; mutation: SyncMutationRecord } | { type: \"acknowledged\"; clientMutationId: string; version: number; duplicate: boolean; } | { type: \"conflict\"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: \"conflict\" }>; } | { type: \"remote-applied\"; operation: VersionedOperation } | { type: \"reload-required\"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: \"reloaded\"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: \"recovered\"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: \"storage-error\"; error: SheetwriteError; clientMutationId?: string } | { type: \"error\"; error: SheetwriteError; clientMutationId?: string };",
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L242",
+              "source": "src/sync.ts#L243",
               "jsDocTags": [],
               "documentation": "Queue, version, connection, or error transition emitted by synchronization.",
               "memberDocs": []
@@ -4347,7 +4375,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L121",
+              "source": "src/sync.ts#L122",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied independently to remote collaboration input and local durability.",
               "memberDocs": [
@@ -4412,7 +4440,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L224",
+              "source": "src/sync.ts#L225",
               "jsDocTags": [],
               "documentation": "Document, version, durability, and online options for synchronization.",
               "memberDocs": [
@@ -4462,7 +4490,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L213",
+              "source": "src/sync.ts#L214",
               "jsDocTags": [],
               "documentation": "Typed local transaction rejection produced when the durable queue cannot reserve capacity.",
               "memberDocs": []
@@ -4474,7 +4502,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L79",
+              "source": "src/sync.ts#L80",
               "jsDocTags": [],
               "documentation": "Whether the durable local queue can currently admit another transaction.",
               "memberDocs": []
@@ -4486,7 +4514,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L111",
+              "source": "src/sync.ts#L112",
               "jsDocTags": [],
               "documentation": "Aggregate ceilings for local commits retained until durable acknowledgement.",
               "memberDocs": [
@@ -4511,7 +4539,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L204",
+              "source": "src/sync.ts#L205",
               "jsDocTags": [],
               "documentation": "Typed rejection of malformed or resource-exhausting synchronization input.",
               "memberDocs": []
@@ -4523,7 +4551,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L183",
+              "source": "src/sync.ts#L184",
               "jsDocTags": [],
               "documentation": "Stable category identifying which synchronization protocol bound was violated.",
               "memberDocs": []
@@ -4535,7 +4563,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L87",
+              "source": "src/sync.ts#L88",
               "jsDocTags": [],
               "documentation": "Immutable observable synchronization state.",
               "memberDocs": [
@@ -4568,7 +4596,7 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L103",
+              "source": "src/sync.ts#L104",
               "jsDocTags": [],
               "documentation": "Contiguous-version recovery request produced when remote input skips ahead.",
               "memberDocs": []

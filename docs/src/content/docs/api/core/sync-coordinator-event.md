@@ -8,10 +8,10 @@ description: "Queue, version, connection, or error transition emitted by synchro
 Queue, version, connection, or error transition emitted by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L242"><code>packages/core/src/sync.ts#L242</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L243"><code>packages/core/src/sync.ts#L243</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>12</span>
+## Variants <span class="api-count" data-pagefind-ignore>13</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -106,6 +106,17 @@ Queue, version, connection, or error transition emitted by synchronization.
 
 ```ts generated
 {
+  type: "recovered";
+  serverVersion: number;
+  pending: readonly SyncMutationRecord[];
+}
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
   type: "storage-error";
   error: SheetwriteError;
   clientMutationId?: string;
@@ -181,6 +192,11 @@ export type SyncCoordinatorEvent =
     }
   | {
       type: "reloaded";
+      serverVersion: number;
+      pending: readonly SyncMutationRecord[];
+    }
+  | {
+      type: "recovered";
       serverVersion: number;
       pending: readonly SyncMutationRecord[];
     }

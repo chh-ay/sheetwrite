@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>315</dd></div>
+<div><dt>Exports</dt><dd>317</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -246,7 +246,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>77</span>
+### Types <span class="api-count" data-pagefind-ignore>79</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -312,6 +312,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/snapshot-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotGridOptions</code></span><span class="api-symbol-card__desc">Grid creation options accepted when hydrating a validated snapshot.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/snapshot-storage-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SnapshotStorageMode</code></span><span class="api-symbol-card__desc">Allocation mode used when enforcing snapshot construction capacity.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-activity-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncActivityState</code></span><span class="api-symbol-card__desc">Current persistence activity reported by a sync coordinator.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sync-conflict-recovery/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncConflictRecovery</code></span><span class="api-symbol-card__desc">Outcome of SyncCoordinator.recoverConflict.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/sync-conflict-reload-reason/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncConflictReloadReason</code></span><span class="api-symbol-card__desc">Why a conflict cannot be recovered in place; the host reloads the document instead.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-connection-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncConnectionState</code></span><span class="api-symbol-card__desc">Host-controlled online state reported by synchronization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncCoordinatorEvent</code></span><span class="api-symbol-card__desc">Queue, version, connection, or error transition emitted by synchronization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/sync-mutation-status/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncMutationStatus</code></span><span class="api-symbol-card__desc">Lifecycle state of one local mutation in the synchronization queue.</span></a>
