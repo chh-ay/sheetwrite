@@ -988,6 +988,15 @@ describe("operation sequences", () => {
     );
   });
 
+  it("conflicts when a later local edit follows a local insert inside rows the server deleted", () => {
+    // The server deleted rows 4-5; the local rows inserted between them survive
+    // at row 4, but the deletion no longer maps to one span for the later edit.
+    // The rebaser is conservative here and leaves the merge to the host.
+    expectConflict([addRows(5, 2), set(5, 0, 1)], [removeRows(4, 2)], "structural-overlap", 1, 0);
+    // Without a later operation, the insert alone rebases to the deletion point.
+    expectRebased([addRows(5, 2)], [removeRows(4, 2)], [addRows(4, 2)]);
+  });
+
   it("keeps every rebased edit on the row it targeted", () => {
     // An independent oracle: rows carry identities, each operation's intent is
     // recorded by identity on the client that wrote it, and the server order
@@ -1079,13 +1088,9 @@ describe("operation sequences", () => {
         }
       }
     };
-    /** Values by position; inserted rows compare by position only. */
+    /** Row identities and values by position: a write on the wrong inserted row is visible. */
     const view = (rows: Rows) =>
-      rows.ids.map((id) =>
-        [0, 1, 2].map(
-          (col) => rows.cells.get(`${id}:${col}`) ?? (id.startsWith("b") ? id : "inserted"),
-        ),
-      );
+      rows.ids.map((id) => [id, ...[0, 1, 2].map((col) => rows.cells.get(`${id}:${col}`) ?? null)]);
     const base = (): Rows => ({
       ids: Array.from({ length: ROWS }, (_, row) => `b${row}`),
       cells: new Map(),
