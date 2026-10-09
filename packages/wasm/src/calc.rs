@@ -198,6 +198,9 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+    /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
+    /// reference makes it; the name is not in the function table.
+    AnchorArray,
     #[cfg(feature = "analysis")]
     Analysis(u16),
 }
@@ -257,6 +260,7 @@ macro_rules! define_function_registry {
         fn func_name(func: Func) -> &'static str {
             match func {
                 $(Func::$variant => $canonical,)+
+                Func::AnchorArray => "ANCHORARRAY",
                 #[cfg(feature = "analysis")]
                 Func::Analysis(id) => crate::eval::analysis::name(id),
             }
@@ -760,6 +764,8 @@ enum Tok<'a> {
     Bang,
     Cmp(CmpOp),
     Error(FormulaError),
+    /// The `#` after a cell reference: the whole spill of that anchor.
+    Hash,
 }
 
 /// Error constants a formula can contain. `#REF!` parses as an invalid
@@ -942,6 +948,10 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
                 }
                 b':' => {
                     toks.push(Tok::Colon);
+                    i += 1;
+                }
+                b'#' => {
+                    toks.push(Tok::Hash);
                     i += 1;
                 }
                 _ if !c.is_ascii() => {
@@ -1273,7 +1283,7 @@ impl<'a> Parser<'a> {
                     _ => Err("expected cell after :".into()),
                 }
             } else {
-                Ok(Ast::Cell(row, col, flags))
+                Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
             }
         }
     }
@@ -1298,7 +1308,18 @@ impl<'a> Parser<'a> {
             return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
         }
 
-        Ok(Ast::SheetCell(qualifier, row, col, flags))
+        Ok(self.spill_suffix(Ast::SheetCell(qualifier, row, col, flags)))
+    }
+
+    /// `A1#` refers to the whole spill of the formula in A1. It is stored as
+    /// `ANCHORARRAY(A1)`, the form that XLSX files use.
+    fn spill_suffix(&mut self, anchor: Ast) -> Ast {
+        if self.peek() == Some(&Tok::Hash) {
+            let _ = self.next();
+            Ast::Func(Func::AnchorArray, vec![anchor])
+        } else {
+            anchor
+        }
     }
 
     fn sheet_range_end(
@@ -2091,6 +2112,13 @@ fn write_ast(ast: &Ast, out: &mut String) {
             out.push('}');
         }
         Ast::LetSlot { expression, .. } => write_ast(expression, out),
+        Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
+            write_ast(&args[0], out);
+            // A deleted anchor writes as #REF!, which has no spill suffix.
+            if !matches!(args[0], Ast::InvalidRef) {
+                out.push('#');
+            }
+        }
         Ast::Func(func, args) => {
             out.push_str(func_name(*func));
             out.push('(');
@@ -2213,6 +2241,26 @@ fn write_col(mut col: u32, out: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spill_references_parse_and_serialize_with_a_hash_suffix() {
+        for (source, expected) in [
+            ("=A1#", "=A1#"),
+            ("=sum($b$2#)", "=SUM($B$2#)"),
+            ("=ROWS('My Sheet'!C3#)", "=ROWS('My Sheet'!C3#)"),
+        ] {
+            assert_eq!(serialize(&parse(source).unwrap()), expected, "{source}");
+        }
+        assert_eq!(
+            parse("=A1#").unwrap(),
+            Ast::Func(Func::AnchorArray, vec![Ast::Cell(0, 0, RefFlags::default())])
+        );
+        // `#` only follows a cell, and the function name cannot be typed.
+        for source in ["=A1:B2#", "=#", "=1#"] {
+            assert!(parse(source).is_err(), "{source}");
+        }
+        assert!(matches!(parse("=ANCHORARRAY(A1)"), Ok(Ast::UnknownFunc(..))));
+    }
 
     #[test]
     fn parse_a1_accepts_absolute_markers() {

@@ -353,6 +353,37 @@ pub(super) fn collect_affected_formulas(
     affected
 }
 
+/// Formulas that read any of `cells` directly, by cell or by range. Unlike
+/// [`collect_affected_formulas`], this does not follow dependents further.
+pub(super) fn direct_readers(
+    index: &DepIndex,
+    sheet: usize,
+    cells: &[(u32, u32)],
+) -> HashSet<AbsCellKey> {
+    let mut readers = HashSet::new();
+    let mut range_matches: Vec<usize> = Vec::new();
+    let mut row_matches: Vec<usize> = Vec::new();
+    let mut range_marks = vec![0; index.range_groups.len()];
+    let mut range_stamp = 1;
+    for &cell in cells {
+        let cell = AbsCellKey::from_local(sheet, cell);
+        if let Some(dependents) = index.exact_dependents.get(&cell) {
+            readers.extend(dependents.iter().copied());
+        }
+        index.collect_matching_range_groups(
+            cell,
+            &mut range_matches,
+            &mut row_matches,
+            &mut range_marks,
+            &mut range_stamp,
+        );
+        for &group in &range_matches {
+            readers.extend(index.range_groups[group].dependents.iter().copied());
+        }
+    }
+    readers
+}
+
 fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
     sheets
         .get(key.sheet as usize)

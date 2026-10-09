@@ -5,7 +5,7 @@ use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, RangeFlags, SheetRef};
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
@@ -32,6 +32,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
+        Ast::Func(Func::AnchorArray, _) => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
         #[cfg(feature = "analysis")]
@@ -105,12 +106,68 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
 }
 
 impl CellStore {
+    /// The range that the anchor of `A1#` spills into now, or `#REF!` when
+    /// the anchor holds no spill.
+    fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
+        let (sheet, row, col) = match args {
+            [Ast::Cell(row, col, _)] => (formula_sheet, *row, *col),
+            [Ast::AbsCell(sheet, row, col, _)] => (sheet.handle as usize, *row, *col),
+            _ => return Ast::InvalidRef,
+        };
+        let Some(range) = self
+            .sheets
+            .get(sheet)
+            .and_then(|data| data.installed_spill((row, col)))
+        else {
+            return Ast::InvalidRef;
+        };
+        let sheet = SheetRef {
+            handle: sheet as u32,
+            name: String::new(),
+            quoted: false,
+        };
+        Ast::AbsRange(sheet, row, col, range.row_end, range.col_end, RangeFlags::default())
+    }
+
+    /// A copy of `ast` in which every `A1#` is the range that its anchor
+    /// spills into now. Range functions such as SUMIF, INDEX and ROWS then
+    /// accept spill references without special handling.
+    pub(super) fn resolve_spill_refs(&self, ast: &Ast, sheet: usize) -> Ast {
+        let mut resolved = ast.clone();
+        self.replace_spill_refs(&mut resolved, sheet);
+        resolved
+    }
+
+    fn replace_spill_refs(&self, ast: &mut Ast, sheet: usize) {
+        match ast {
+            Ast::Func(Func::AnchorArray, args) => *ast = self.spill_reference(args, sheet),
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+                for arg in args {
+                    self.replace_spill_refs(arg, sheet);
+                }
+            }
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                self.replace_spill_refs(left, sheet);
+                self.replace_spill_refs(right, sheet);
+            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                self.replace_spill_refs(inner, sheet);
+            }
+            Ast::LetSlot { expression, .. } => self.replace_spill_refs(expression, sheet),
+            _ => {}
+        }
+    }
+
     pub(super) fn dynamic_array_bound(
         &self,
         ast: &Ast,
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            Ast::Func(Func::AnchorArray, args) => {
+                let range = self.spill_reference(args, formula_sheet);
+                Some(self.matrix_shape(&range, formula_sheet).map(|(_, _, cells)| cells))
+            }
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, .. } => Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0)),
             #[cfg(feature = "analysis")]
@@ -220,6 +277,11 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
+            Ast::Func(Func::AnchorArray, args) => {
+                let range = self.spill_reference(args, sheet);
+                return self.eval_dynamic_array(&range, sheet, affected, memo, visiting, depth);
+            }
+            Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, values } => {
                 Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
@@ -319,6 +381,10 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            Ast::Func(Func::AnchorArray, args) => {
+                return self.matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);
+            }
+            Ast::InvalidRef => return Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, .. } => {
                 return Ok((*rows, *cols, EvalMatrix::validate_shape(*rows, *cols, 1, 0)?));

@@ -37,6 +37,10 @@ describe("shiftA1Refs", () => {
       '=SUM({1,2;3,4})+B3&{"A1","a""B2"}',
     );
   });
+
+  it("keeps the spill suffix of a filled reference", () => {
+    expect(shiftA1Refs("=SUM(A1#)+$B$2#", 1, 1)).toBe("=SUM(B2#)+$B$2#");
+  });
 });
 
 describe("remapFormulaA1Refs", () => {
@@ -44,6 +48,12 @@ describe("remapFormulaA1Refs", () => {
     const removeColumn = (column: number) =>
       column === 1 ? null : column > 1 ? column - 1 : column;
     expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
+  });
+
+  it("moves spill references with their anchor and drops the suffix when it is deleted", () => {
+    const removeRow = (row: number) => (row === 1 ? null : row > 1 ? row - 1 : row);
+    expect(remapFormulaA1Refs("=SUM(A3#)", "row", removeRow)).toBe("=SUM(A2#)");
+    expect(remapFormulaA1Refs("=SUM(A2#)", "row", removeRow)).toBe("=SUM(#REF!)");
   });
 
   it("preserves array text while remapping adjacent references", () => {

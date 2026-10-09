@@ -3531,3 +3531,141 @@ fn rejected_packed_text_adds_nothing_to_the_string_pool() {
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("é"));
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("a"));
 }
+
+#[test]
+fn spill_that_reads_a_later_spill_sees_its_current_values() {
+    // B1 is evaluated before C1 in cell order, but must read C1's new spill.
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 8);
+    store.set_number(sheet, 0, 0, 3.0, 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(A1)", 0);
+    store.set_formula(sheet, 0, 1, "=C1:C5", 0);
+    store.recompute(sheet);
+    let column_b = |store: &CellStore| -> Vec<f64> {
+        (0..5).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+    };
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 0.0, 0.0]);
+    store.set_number(sheet, 0, 0, 4.0, 0);
+    store.recompute(sheet);
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 4.0, 0.0]);
+}
+
+#[test]
+fn spills_that_read_each_other_end_as_a_cycle() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 8);
+    store.set_formula(sheet, 0, 0, "=C1:C2", 0);
+    store.set_formula(sheet, 0, 2, "=A1:A2", 0);
+    store.recompute(sheet);
+    let shown = |col| store.get_cell(sheet, 0, col).string();
+    assert_eq!(shown(0).as_deref(), Some("#CYCLE!"));
+    assert_eq!(shown(2).as_deref(), Some("#CYCLE!"));
+}
+
+#[test]
+fn spill_references_follow_the_current_spill_of_their_anchor() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(12, 12);
+    store.set_number(sheet, 0, 9, 3.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(J1)", 0);
+    store.set_formula(sheet, 0, 1, "=A1#", 0);
+    store.set_formula(sheet, 0, 2, "=SUM(A1#)", 0);
+    store.set_formula(sheet, 0, 3, "=ROWS(A1#)", 0);
+    store.set_formula(sheet, 0, 4, "=INDEX(A1#,2)", 0);
+    store.set_formula(sheet, 0, 5, "=COUNTIF(A1#,\">1\")", 0);
+    store.set_formula(sheet, 0, 6, "=SUM(J1#)", 0);
+    store.set_formula(sheet, 0, 7, "=J1#", 0);
+    store.recompute(sheet);
+    let column_b = |store: &CellStore| -> Vec<f64> {
+        (0..6).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+    };
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 0.0, 0.0, 0.0]);
+    let results = |store: &CellStore| -> Vec<f64> {
+        (2..=5).map(|col| store.get_cell(sheet, 0, col).num()).collect()
+    };
+    assert_eq!(results(&store), [6.0, 3.0, 2.0, 2.0]);
+    // J1 holds a value, not a spill.
+    assert_eq!(string(&store, sheet, 0, 6).as_deref(), Some("#REF!"));
+    assert_eq!(string(&store, sheet, 0, 7).as_deref(), Some("#REF!"));
+
+    store.set_number(sheet, 0, 9, 5.0, 0);
+    store.recompute(sheet);
+    assert_eq!(column_b(&store), [1.0, 2.0, 3.0, 4.0, 5.0, 0.0]);
+    assert_eq!(results(&store), [15.0, 5.0, 2.0, 4.0]);
+}
+
+#[test]
+fn spill_references_shift_with_their_anchor_and_break_when_it_is_deleted() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 12);
+    store.set_formula(sheet, 2, 0, "=SEQUENCE(2)", 0);
+    store.set_formula(sheet, 0, 2, "=SUM(A3#)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 2), 3.0);
+
+    store.remove_rows(sheet, 1, 1);
+    store.recompute(sheet);
+    assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some("=SUM(A2#)"));
+    assert_close(number(&store, sheet, 0, 2), 3.0);
+
+    store.remove_rows(sheet, 1, 1);
+    store.recompute(sheet);
+    assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some("=SUM(#REF!)"));
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#REF!"));
+}
+
+#[test]
+fn a_spill_that_reads_a_later_anchor_follows_its_resize() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(10, 10);
+    store.set_number(sheet, 0, 9, 2.0, 0);
+    store.set_formula(sheet, 0, 1, "=SORT(A3#,1,-1)", 0);
+    store.set_formula(sheet, 2, 0, "=SEQUENCE(J1)", 0);
+    store.recompute(sheet);
+    let column_b = |store: &CellStore| -> Vec<f64> {
+        (0..5).map(|row| store.get_cell(sheet, row, 1).num()).collect()
+    };
+    assert_eq!(column_b(&store), [2.0, 1.0, 0.0, 0.0, 0.0]);
+
+    store.set_number(sheet, 0, 9, 4.0, 0);
+    store.recompute(sheet);
+    assert_eq!(column_b(&store), [4.0, 3.0, 2.0, 1.0, 0.0]);
+}
+
+#[test]
+fn a_spill_that_reads_a_later_one_cell_spill_sees_it() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(10, 10);
+    store.set_number(sheet, 0, 9, 1.0, 0);
+    store.set_formula(sheet, 0, 1, "=SORT(A3#,1,-1)", 0);
+    store.set_formula(sheet, 2, 0, "=SEQUENCE(J1)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+
+    // Growing from one cell to two and shrinking back both reach the reader.
+    store.set_number(sheet, 0, 9, 2.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        (number(&store, sheet, 0, 1), number(&store, sheet, 1, 1)),
+        (2.0, 1.0)
+    );
+    store.set_number(sheet, 0, 9, 1.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+    assert_eq!(store.get_cell(sheet, 1, 1).kind(), KIND_EMPTY);
+}
+
+#[test]
+fn a_spill_that_reads_a_later_one_cell_spill_sees_its_new_value() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(10, 10);
+    store.set_number(sheet, 0, 9, 1.0, 0);
+    store.set_formula(sheet, 0, 1, "=SORT(A3#)", 0);
+    store.set_formula(sheet, 2, 0, "=SEQUENCE(1,1,J1)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+
+    store.set_number(sheet, 0, 9, 2.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 2.0);
+}

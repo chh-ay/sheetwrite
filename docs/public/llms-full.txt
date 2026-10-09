@@ -2116,11 +2116,19 @@ Elements can be numbers with an optional sign, quoted text, `TRUE`, `FALSE`, or 
 
 Functions that accept arrays can use these values directly, for example `=SUM({1,2,3})` returns `6` and `=INDEX({1,2;3,4},2,1)` returns `3`. Copy and structural edits preserve constants and their text elements. XLSX import and export preserve the formula source.
 
+## Spill references
+
+Put `#` after a cell reference to refer to the whole spill of the formula in that cell. If `A1` contains `=SEQUENCE(D1)`, then `=SUM(A1#)` adds all the values in the spill, and `=SORT(A1#,1,-1)` spills them in reverse order. When the spill changes size, formulas that use `A1#` use the new range. A sheet name is permitted: `='Report'!B2#`.
+
+`A1#` returns `#REF!` when the cell does not hold a spill: for example, the cell contains a value, or a collision blocks the spill (`#SPILL!`). If you delete the row or column of the anchor cell, the reference becomes `#REF!`. Both engines support spill references. XLSX files store `A1#` as `_xlfn.ANCHORARRAY(A1)`; import and export convert between the two forms.
+
+Arithmetic on a whole spill, such as `=A1#*10`, returns `#VALUE!`, the same as `=A1:A3*10`. Use a function that accepts a range, such as `SUM`, `INDEX`, `SORT`, or `FILTER`.
+
 ## Operators
 
 | Precedence, high to low | Operators | Associativity |
 | --- | --- | --- |
-| Reference | `:` | — |
+| Reference | `:`, postfix `#` (spill) | — |
 | Unary sign | unary `+`, unary `-` | right |
 | Percentage | postfix `%` | left |
 | Exponentiation | `^` | left |

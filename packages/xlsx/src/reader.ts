@@ -30,7 +30,7 @@ import {
   validateSheetName,
   validateWorkbookTableName,
 } from "@sheetwrite/core";
-import { formulaContainsExternalReference } from "./formula.js";
+import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import {
   assertResource,
@@ -1187,7 +1187,7 @@ function parseSheet(
       let value: CellValue | null;
       let sharedFormula: string | undefined;
       if (formulaElement) {
-        const formulaText = decodeXstring(formulaElement.text);
+        const formulaText = spillReferencesFromXlsx(decodeXstring(formulaElement.text));
         const formulaType = xmlAttribute(formulaElement, "t") ?? "normal";
         if (formulaType === "shared") {
           sharedFormula = xmlAttribute(formulaElement, "si");
