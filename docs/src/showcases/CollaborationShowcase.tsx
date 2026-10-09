@@ -121,7 +121,10 @@ function delay(ms: number): Promise<void> {
   return promise;
 }
 
-/** One sequencer decision in plain words; mutation ids stay out of the UI. */
+/**
+ * One sequencer decision in plain words; mutation ids stay out of the UI. Both
+ * documents share the log, so usage-document versions carry their document.
+ */
 function describeServerDecision(record: ShowcaseCommitRecord): string {
   const label =
     record.status === "applied"
@@ -129,7 +132,8 @@ function describeServerDecision(record: ShowcaseCommitRecord): string {
       : record.status === "duplicate"
         ? "duplicate acknowledgement"
         : "rejected · client rebases";
-  return `v${record.version} ${label} · ${record.operationCount} op${
+  const document = record.documentId === COLLABORATION_USAGE_DOCUMENT_ID ? "Usage " : "";
+  return `${document}v${record.version} ${label} · ${record.operationCount} op${
     record.operationCount === 1 ? "" : "s"
   }`;
 }
@@ -1595,7 +1599,7 @@ function ClientPanel({
           </dd>
         </div>
         <div>
-          <dt>Grid total</dt>
+          <dt>Forecast total</dt>
           <dd data-testid={`clb-${slug}-total`}>{view.total}</dd>
         </div>
         <div className="sw-clb__presence">
