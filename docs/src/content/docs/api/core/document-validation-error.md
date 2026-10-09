@@ -8,7 +8,7 @@ description: "Path-qualified validation failure for a document operation."
 Path-qualified validation failure for a document operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L341"><code>packages/core/src/document-protocol.ts#L341</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L342"><code>packages/core/src/document-protocol.ts#L342</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

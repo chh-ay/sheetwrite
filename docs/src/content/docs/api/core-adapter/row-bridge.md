@@ -11,7 +11,7 @@ The bridge only owns compact data-space identity arrays. It never writes to
 `defaultRows`, never renders, and never creates a second document store.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L314"><code>packages/core/src/row-bridge.ts#L314</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L316"><code>packages/core/src/row-bridge.ts#L316</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

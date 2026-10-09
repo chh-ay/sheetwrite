@@ -1,4 +1,5 @@
 import { remapFormulaA1Refs } from "./a1.js";
+import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
@@ -183,6 +184,7 @@ function transformDirectTarget(
     }
     case "setRange":
     case "setBlock":
+    case "restoreBlock":
     case "setRangeStyle":
     case "clearRange": {
       const range = transformRange(operation.range, change);
@@ -372,6 +374,13 @@ function transformEmbeddedReferences(
       return transformSnapshotCells(operation.cells, change);
     case "setBlock":
       return transformPackedBlock(operation.block, change);
+    case "restoreBlock": {
+      const block = decodeRestoreBlock(operation);
+      const failure = transformPackedBlock(block, change);
+      if (failure) return failure;
+      Object.assign(operation, encodeRestoreBlock(operation.range, block));
+      return null;
+    }
     case "addSheet":
       return transformSheetSnapshot(operation.sheet, change);
     default:
@@ -517,6 +526,8 @@ function operationContainsFormula(operation: DocumentOp): boolean {
       return operation.cells.some((cell) => cell.value.kind === "formula");
     case "setBlock":
       return (operation.block.formulas?.length ?? 0) > 0;
+    case "restoreBlock":
+      return (decodeRestoreBlock(operation).formulas?.length ?? 0) > 0;
     case "addSheet":
       return operation.sheet.cells.some((block) =>
         block.cells.some((cell) => cell.value.kind === "formula"),
@@ -601,6 +612,11 @@ function operationTouchesSheet(operation: DocumentOp, sheet: string): boolean {
         operation.range.sheet === sheet ||
         (operation.block.refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
       );
+    case "restoreBlock":
+      return (
+        operation.range.sheet === sheet ||
+        (decodeRestoreBlock(operation).refs?.some((tuple) => tuple[1].sheet === sheet) ?? false)
+      );
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet === sheet;
@@ -656,6 +672,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
       ];
     case "setRange":
     case "setBlock":
+    case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
       return [operation.range];

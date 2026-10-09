@@ -1,3 +1,4 @@
+import { decodeRestoreBlock } from "../restore-block.js";
 import type { CellScalar, CellValue } from "../types/cell.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 import type {
@@ -173,6 +174,7 @@ export class StoreMutationPolicy {
         return [cellRange(patch.addr)];
       case "setRange":
       case "setBlock":
+      case "restoreBlock":
       case "setRangeStyle":
       case "clearRange":
         return [normalizedRange(patch.range)];
@@ -358,10 +360,11 @@ export class StoreMutationPolicy {
       return issues;
     }
 
-    if (patch.op !== "setBlock") return issues;
+    if (patch.op !== "setBlock" && patch.op !== "restoreBlock") return issues;
     const range = normalizedRange(patch.range);
-    const formulaOffsets = new Set((patch.block.formulas ?? []).map(([offset]) => offset));
-    const refOffsets = new Set((patch.block.refs ?? []).map(([offset]) => offset));
+    const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
+    const formulaOffsets = new Set((block.formulas ?? []).map(([offset]) => offset));
+    const refOffsets = new Set((block.refs ?? []).map(([offset]) => offset));
     for (const rule of rules) {
       if (rule.policy === "allow" || rule.range.sheet !== range.sheet) continue;
       const ruleRange = normalizedRange(rule.range);
@@ -372,11 +375,11 @@ export class StoreMutationPolicy {
       if (rowStart > rowEnd || colStart > colEnd) continue;
 
       for (let row = rowStart; row <= rowEnd; row++) {
-        const rowOffset = (row - range.start.row) * patch.block.colCount;
+        const rowOffset = (row - range.start.row) * block.colCount;
         for (let col = colStart; col <= colEnd; col++) {
           const offset = rowOffset + col - range.start.col;
           if (formulaOffsets.has(offset) || refOffsets.has(offset)) continue;
-          const scalar = patch.block.values[offset] ?? null;
+          const scalar = block.values[offset] ?? null;
           if (validationAccepts(rule, scalar)) continue;
           const value: CellValue = { kind: "literal", value: scalar };
           issues.push({

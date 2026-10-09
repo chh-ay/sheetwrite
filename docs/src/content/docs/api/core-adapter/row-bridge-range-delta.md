@@ -1,14 +1,14 @@
 ---
 title: "RowBridgeRangeDelta | @sheetwrite/core/adapter"
-description: "A setRange/setBlock effect expanded to its exact changed cells."
+description: "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells."
 ---
 <!-- api-export:@sheetwrite/core|./adapter|RowBridgeRangeDelta -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core-adapter/">@sheetwrite/core/adapter</a><span class="api-status" data-kind="interface">interface</span></div>
 
-A setRange/setBlock effect expanded to its exact changed cells.
+A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L73"><code>packages/core/src/row-bridge.ts#L73</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L74"><code>packages/core/src/row-bridge.ts#L74</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

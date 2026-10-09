@@ -8,10 +8,10 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L374"><code>packages/core/src/types/document.ts#L374</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L378"><code>packages/core/src/types/document.ts#L378</code></a></dd></div>
 </dl>
 
-## Variants <span class="api-count" data-pagefind-ignore>33</span>
+## Variants <span class="api-count" data-pagefind-ignore>34</span>
 
 <div class="api-variant-list" data-pagefind-ignore>
 <div class="api-variant">
@@ -37,6 +37,19 @@ Exhaustive serializable operation union for workbook mutations.
 
 ```ts generated
 { op: "setBlock"; range: Range; block: PackedCellBlock }
+```
+
+</div>
+<div class="api-variant">
+
+```ts generated
+{
+  op: "restoreBlock";
+  range: Range;
+  encoding: "deflate-json-v1";
+  decodedBytes: number;
+  data: string;
+}
 ```
 
 </div>
@@ -354,6 +367,13 @@ export type DocumentOp =
       block: PackedCellBlock;
     }
   | {
+      op: "restoreBlock";
+      range: Range;
+      encoding: "deflate-json-v1";
+      decodedBytes: number;
+      data: string;
+    }
+  | {
       op: "setRangeStyle";
       range: Range;
       style: Partial<CellStyle> | null;
@@ -544,13 +564,13 @@ export type DocumentOp =
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid-transaction/"><code>GridTransaction</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/pending-commit/"><code>PendingCommit</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/persistence-batch-commit-request/"><code>PersistenceBatchCommitRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/persistence-commit-request/"><code>PersistenceCommitRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/protection-request/"><code>ProtectionRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/rebase-document-operations/"><code>rebaseDocumentOperations</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge/"><code>RowBridge</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-clear-delta/"><code>RowBridgeClearDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-fill-delta/"><code>RowBridgeFillDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/row-bridge-host-action-delta/"><code>RowBridgeHostActionDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 30 more</li>
+<li class="api-consumer-more">and 31 more</li>
 </ul>
 </div>

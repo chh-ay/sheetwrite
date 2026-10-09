@@ -36,7 +36,6 @@ interface PackageSpec {
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const fixtureRoot = join(repositoryRoot, "test/consumer");
-const xlsxCodecPackages = ["fflate"] as const;
 const mitCompatibleLicenses: Record<string, true> = {
   "0BSD": true,
   "Apache-2.0": true,
@@ -310,15 +309,6 @@ async function assertTarball(
   ) {
     throw new Error("@sheetwrite/core tarball still contains the removed XLSX backend");
   }
-  for (const dependency of xlsxCodecPackages) {
-    const ownsDependency = manifest.dependencies?.[dependency] !== undefined;
-    if (manifest.name === "@sheetwrite/xlsx" && !ownsDependency) {
-      throw new Error(`${manifest.name} must declare ${dependency}`);
-    }
-    if (manifest.name !== "@sheetwrite/xlsx" && ownsDependency) {
-      throw new Error(`${manifest.name} must not declare ${dependency}`);
-    }
-  }
 
   await mkdir(extractRoot, { recursive: true });
   await run(["tar", "-xzf", tarballPath, "-C", extractRoot], repositoryRoot);
@@ -365,14 +355,13 @@ async function verifyNoExcelClosure(
   await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
+  // Core and the adapters must install and run without the optional XLSX package.
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  for (const dependency of xlsxCodecPackages) {
-    if (lock.includes(`node_modules/${dependency}`)) {
-      throw new Error(`${packageName} package-lock unexpectedly contains ${dependency}`);
-    }
-    if (await pathExists(join(root, "node_modules", ...dependency.split("/")))) {
-      throw new Error(`${packageName} node_modules unexpectedly contains ${dependency}`);
-    }
+  if (lock.includes("node_modules/@sheetwrite/xlsx")) {
+    throw new Error(`${packageName} package-lock unexpectedly contains @sheetwrite/xlsx`);
+  }
+  if (await pathExists(join(root, "node_modules", "@sheetwrite", "xlsx"))) {
+    throw new Error(`${packageName} node_modules unexpectedly contains @sheetwrite/xlsx`);
   }
 
   const adapterProbe =

@@ -15,6 +15,7 @@ export interface ImportGraphIssue {
 
 const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
   "mutation-policy.ts": [
+    "../restore-block.ts",
     "../types/cell.ts",
     "../types/coordinates.ts",
     "../types/document.ts",
@@ -146,6 +147,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "OperationSource",
       "PendingCommit",
       "PersistenceAdapter",
+      "PersistenceBatchCommitRequest",
       "PersistenceCommitRequest",
       "PersistenceCommitResponse",
       "RemoteOperationOptions",
@@ -156,6 +158,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "TransactionApplicationOptions",
       "TransactionResourceLimits",
       "VersionedOperation",
+      "VersionBatchMember",
     ],
   },
   data: {

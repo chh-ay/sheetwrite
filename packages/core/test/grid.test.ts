@@ -484,7 +484,7 @@ describe("Grid transaction resource ingress", () => {
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(rows),
       data: makeColumnarData(rows),
-      transactionResourceLimits: { maxEncodedBytes: 4_096 },
+      transactionResourceLimits: { maxEncodedBytes: 256 },
     });
     const rejections: Array<{ kind: string; resource?: string }> = [];
     grid.on("mutation-rejected", ({ issues }) => {
@@ -526,6 +526,82 @@ describe("Grid transaction resource ingress", () => {
     expect(rejections).toHaveLength(1);
     grid.destroy();
   });
+
+  it("undo restores every cell of a text clear above the default wire limit", () => {
+    const rows = 1_000;
+    const cols = 300;
+    const columns = Array.from({ length: cols }, (_, col) => ({
+      key: `text${col}`,
+      header: `Text ${col}`,
+      width: 100,
+      type: "text" as const,
+    }));
+    const grid = new GridImpl(mountHost(), {
+      workbook: {
+        activeSheet: "s1",
+        sheets: [{ id: "s1", name: "Text", rowCount: rows, columns }],
+      },
+      data: {
+        rowCount: rows,
+        columns: Object.fromEntries(
+          columns.map((column, col) => [
+            column.key,
+            Array.from(
+              { length: rows },
+              (_, row) =>
+                `Customer record ${String(row * cols + col).padStart(6, "0")} — saved value`,
+            ),
+          ]),
+        ),
+      },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejections = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejections += 1;
+    });
+    try {
+      expect(
+        grid.applyTransaction({
+          patches: [
+            {
+              op: "clearRange",
+              range: {
+                sheet: "s1",
+                start: { row: 0, col: 0 },
+                end: { row: rows - 1, col: cols - 1 },
+              },
+              contents: true,
+              style: false,
+            },
+          ],
+        }).status,
+      ).toBe("applied");
+      expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+      grid.undo();
+      const restored = grid.store.getVisibleWindow(
+        "s1",
+        { start: 0, end: rows },
+        columns.map((_, col) => col),
+      ).values;
+      let mismatches = 0;
+      for (let offset = 0; offset < rows * cols; offset += 1) {
+        if (
+          restored[offset] !== `Customer record ${String(offset).padStart(6, "0")} — saved value`
+        ) {
+          mismatches += 1;
+        }
+      }
+      expect(mismatches).toBe(0);
+      expect(changes.map((event) => event.commitReason)).toEqual(["api", "undo"]);
+      expect(rejections).toBe(0);
+      grid.redo();
+      expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+    } finally {
+      grid.destroy();
+    }
+  }, 30_000);
 });
 
 describe("Grid store lifecycle", () => {

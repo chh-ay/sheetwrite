@@ -8,7 +8,7 @@ description: "Narrow same-realm errors, cross-realm errors, and serialized failu
 Narrow same-realm errors, cross-realm errors, and serialized failure envelopes.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L318"><code>packages/core/src/errors.ts#L318</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L320"><code>packages/core/src/errors.ts#L320</code></a></dd></div>
 </dl>
 
 ## Declaration

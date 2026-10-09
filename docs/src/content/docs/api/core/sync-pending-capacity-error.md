@@ -8,7 +8,7 @@ description: "Typed local transaction rejection produced when the durable queue 
 Typed local transaction rejection produced when the durable queue cannot reserve capacity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L188"><code>packages/core/src/sync.ts#L188</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L213"><code>packages/core/src/sync.ts#L213</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -28,7 +28,7 @@ constructor(issue: Extract<MutationIssue, { kind: "resource-limit"; }>);
 <summary><code>issue</code></summary>
 
 ```ts generated
-issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; };
+issue: { kind: "resource-limit"; severity: "error"; resource: "operations" | "encoded-bytes" | "batch-versions" | "pending-commits" | "pending-operations" | "pending-encoded-bytes" | "paged-dirty-cells" | "paged-reference-simulation"; actual: number; max: number; message: string; };
 ```
 
 </details>
@@ -64,6 +64,7 @@ class SyncPendingCapacityError extends SheetwriteError {
     resource:
       | "operations"
       | "encoded-bytes"
+      | "batch-versions"
       | "pending-commits"
       | "pending-operations"
       | "pending-encoded-bytes"

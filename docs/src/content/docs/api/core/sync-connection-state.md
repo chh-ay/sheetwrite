@@ -8,7 +8,7 @@ description: "Host-controlled online state reported by synchronization."
 Host-controlled online state reported by synchronization.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L58"><code>packages/core/src/sync.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L67"><code>packages/core/src/sync.ts#L67</code></a></dd></div>
 </dl>
 
 ## Declaration

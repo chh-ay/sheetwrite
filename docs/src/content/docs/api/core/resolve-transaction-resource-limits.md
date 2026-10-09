@@ -9,7 +9,7 @@ Validate and merge transaction ceiling overrides without retaining the
 caller-owned object. Every ceiling is an inclusive non-negative safe integer.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L66"><code>packages/core/src/document-protocol.ts#L66</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L67"><code>packages/core/src/document-protocol.ts#L67</code></a></dd></div>
 </dl>
 
 ## Declaration

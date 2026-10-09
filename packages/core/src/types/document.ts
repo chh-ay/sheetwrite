@@ -271,10 +271,14 @@ export type MutationIssue =
   | {
       kind: "resource-limit";
       severity: "error";
-      /** Resource dimension exceeded by the transaction or durable pending queue. */
+      /**
+       * Resource dimension exceeded by the transaction, its server versions,
+       * or the durable pending queue.
+       */
       resource:
         | "operations"
         | "encoded-bytes"
+        | "batch-versions"
         | "pending-commits"
         | "pending-operations"
         | "pending-encoded-bytes"
@@ -375,6 +379,13 @@ export type DocumentOp =
   | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle }
   | { op: "setRange"; range: Range; cells: SnapshotCell[] }
   | { op: "setBlock"; range: Range; block: PackedCellBlock }
+  | {
+      op: "restoreBlock";
+      range: Range;
+      encoding: "deflate-json-v1";
+      decodedBytes: number;
+      data: string;
+    }
   | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null }
   | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean }
   | { op: "addRows"; sheet: SheetId; at: number; count: number }

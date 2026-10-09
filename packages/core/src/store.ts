@@ -1,3 +1,4 @@
+import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -16,6 +17,7 @@ import type {
   RuntimeResourceSnapshot,
   TransientResourcePeak,
 } from "./resource-accounting.js";
+import { decodeRestoreBlock } from "./restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "./sheet-lifecycle.js";
 import {
   type CompactRangeHistory,
@@ -487,10 +489,14 @@ export class SheetwriteStore implements Store {
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
     // A transaction built and measured by an engine layer carries its resource
-    // record; without one, direct callers pay the full payload walk.
+    // record; without one, direct callers pay the full payload walk. An
+    // engine-built atomic batch is bounded by the batch ceilings instead.
+    const limits = isAtomicBatch(tx.patches)
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
     const resourceValidation = resolveTransactionResourceValidation(
       tx.patches,
-      this.transactionResourceLimits,
+      limits,
       takeAdmittedTransactionResources(tx),
     ).result;
     if (!resourceValidation.ok) {
@@ -529,7 +535,7 @@ export class SheetwriteStore implements Store {
         // payloads after ingress validation. Do not reuse their measurements.
         const callbackResources = resolveTransactionResourceValidation(
           effectiveTx.patches,
-          this.transactionResourceLimits,
+          limits,
         ).result;
         if (!callbackResources.ok) {
           return { status: "rejected", epoch: this.epoch, issues: [callbackResources.issue] };
@@ -712,8 +718,10 @@ export class SheetwriteStore implements Store {
           for (const cell of operation.cells) {
             if (cell.value.kind === "ref") requiredSheets.push(cell.value.target.sheet);
           }
-        } else if (operation.op === "setBlock") {
-          for (const [, target] of operation.block.refs ?? []) requiredSheets.push(target.sheet);
+        } else if (operation.op === "setBlock" || operation.op === "restoreBlock") {
+          const block =
+            operation.op === "restoreBlock" ? decodeRestoreBlock(operation) : operation.block;
+          for (const [, target] of block.refs ?? []) requiredSheets.push(target.sheet);
         } else if (operation.op === "setNamedRange") {
           requiredSheets.push(operation.namedRange.range.sheet);
           if (operation.namedRange.scope !== undefined) {

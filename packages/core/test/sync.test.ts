@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import {
   type ApplyTransactionResult,
   type ChangeEvent,
+  createGrid,
   createGridFromSnapshot,
   type DocumentOp,
   initSheetwrite,
@@ -18,6 +19,7 @@ import {
   type VersionedOperation,
   type WorkbookSnapshot,
 } from "../src/index.js";
+import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
@@ -123,6 +125,364 @@ function harness(ids = ["m1", "m2", "m3"], options: Partial<SyncCoordinatorOptio
 }
 
 describe("sync coordinator", () => {
+  it("restores a million-number clear in one version at the server and a synced peer", async () => {
+    const rows = 1_000;
+    const cols = 1_000;
+    const columns = Array.from({ length: cols }, (_, col) => ({
+      key: `number${col}`,
+      header: `Number ${col}`,
+      width: 80,
+      type: "number" as const,
+    }));
+    const workbook = {
+      activeSheet: "s1",
+      sheets: [{ id: "s1", name: "Numbers", rowCount: rows, columns }],
+    };
+    const columnar = {
+      rowCount: rows,
+      columns: Object.fromEntries(
+        columns.map((column, col) => [
+          column.key,
+          Float64Array.from({ length: rows }, (_, row) => row * cols + col),
+        ]),
+      ),
+    };
+    const firstHost = document.createElement("div");
+    const secondHost = document.createElement("div");
+    document.body.append(firstHost, secondHost);
+    const first = createGrid(firstHost, { workbook: structuredClone(workbook), data: columnar });
+    const second = createGrid(secondHost, { workbook: structuredClone(workbook), data: columnar });
+    const server = new SheetwriteStore(structuredClone(workbook), columnar);
+    let serverVersion = 0;
+    const committed: VersionedOperation[] = [];
+    const adapter: PersistenceAdapter = {
+      async load() {
+        return { ...server.exportSnapshot(), documentId: "large-undo", version: serverVersion };
+      },
+      async commit(request) {
+        if (request.baseVersion !== serverVersion) {
+          return { status: "conflict", currentVersion: serverVersion };
+        }
+        // Cross the JSON transport boundary, then apply to a real server store.
+        const operations: DocumentOp[] = JSON.parse(JSON.stringify(request.operations));
+        const outcome = server.applyTransaction({ patches: operations }, { source: "remote" });
+        if (outcome.status !== "applied") throw new Error(`Server rejected ${outcome.status}`);
+        serverVersion += 1;
+        committed.push({
+          version: serverVersion,
+          operations,
+          clientMutationId: request.clientMutationId,
+        });
+        return {
+          status: "applied",
+          version: serverVersion,
+          clientMutationId: request.clientMutationId,
+        };
+      },
+    };
+    const sender = new SyncCoordinator(first, adapter, {
+      documentId: "large-undo",
+      serverVersion: 0,
+    });
+    const receiver = new SyncCoordinator(second, adapter, {
+      documentId: "large-undo",
+      serverVersion: 0,
+    });
+    const changes: ChangeEvent[] = [];
+    first.on("change", (event) => changes.push(event));
+    try {
+      expect(
+        first.applyTransaction({
+          patches: [
+            {
+              op: "clearRange",
+              range: {
+                sheet: "s1",
+                start: { row: 0, col: 0 },
+                end: { row: rows - 1, col: cols - 1 },
+              },
+              contents: true,
+              style: false,
+            },
+          ],
+        }).status,
+      ).toBe("applied");
+      await sender.sendNext();
+      const clearVersion = committed.at(-1);
+      if (!clearVersion) throw new Error("Clear did not reach the server");
+      await receiver.applyVersionedOperation(clearVersion);
+      expect(second.store.getCell({ sheet: "s1", row: 999, col: 999 }).resolved).toBeNull();
+
+      first.undo();
+      expect(sender.pendingCount).toBe(1);
+      await sender.sendNext();
+      expect(committed).toHaveLength(2);
+      const undoVersion = committed.at(-1);
+      if (!undoVersion) throw new Error("Undo did not reach the server");
+      expect(
+        new TextEncoder().encode(JSON.stringify(undoVersion.operations)).byteLength,
+      ).toBeLessThanOrEqual(8 * 1024 * 1024);
+      await receiver.applyVersionedOperation(undoVersion);
+      for (const store of [first.store, server, second.store]) {
+        const restored = store.getVisibleWindow(
+          "s1",
+          { start: 0, end: rows },
+          columns.map((_, col) => col),
+        ).values;
+        let mismatches = 0;
+        for (let offset = 0; offset < rows * cols; offset += 1) {
+          if (restored[offset] !== offset) mismatches += 1;
+        }
+        expect(mismatches).toBe(0);
+      }
+      expect(changes.map((event) => event.commitReason)).toEqual(["api", "undo"]);
+      expect(sender.pendingCount).toBe(0);
+      expect(receiver.serverVersion).toBe(2);
+    } finally {
+      sender.destroy();
+      receiver.destroy();
+      first.destroy();
+      second.destroy();
+      server.dispose();
+    }
+  }, 60_000);
+  it("commits a split local step atomically and publishes one peer change", async () => {
+    const adapter = new MemoryPersistenceAdapter(snapshot());
+    const senderHost = document.createElement("div");
+    const peerHost = document.createElement("div");
+    document.body.append(senderHost, peerHost);
+    const senderGrid = createGridFromSnapshot(senderHost, snapshot());
+    const peerGrid = createGridFromSnapshot(peerHost, snapshot());
+    const options = {
+      documentId: "sync-doc",
+      serverVersion: 7,
+      limits: { maxOperationsPerVersion: 1 },
+    };
+    const sender = new SyncCoordinator(senderGrid, adapter, options);
+    const peer = new SyncCoordinator(peerGrid, adapter, options);
+    const changes: ChangeEvent[] = [];
+    peerGrid.on("change", (event) => changes.push(event));
+    try {
+      const outcome = senderGrid.applyTransaction({
+        patches: [
+          localSet(12),
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 1, col: 0 },
+            value: { kind: "literal", value: 34 },
+          },
+        ],
+      });
+      expect(outcome.status).toBe("applied");
+      const response = await sender.sendNext();
+      expect(response).toMatchObject({ status: "applied", version: 9 });
+      const conflict = await adapter.commit({
+        documentId: "sync-doc",
+        baseVersion: 7,
+        clientMutationId: "read-tail",
+        operations: [],
+      });
+      if (conflict.status !== "conflict" || !conflict.operationsSinceBase)
+        throw new Error("The adapter must return the committed batch");
+      const versions = conflict.operationsSinceBase;
+      expect(versions).toHaveLength(2);
+      const firstVersion = versions[0];
+      const lastVersion = versions[1];
+      if (!firstVersion || !lastVersion) throw new Error("The batch needs two versions");
+      await peer.applyVersionedOperation(firstVersion);
+      expect(peerGrid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+      expect(peer.serverVersion).toBe(7);
+      expect(changes).toHaveLength(0);
+      await peer.applyVersionedOperation(lastVersion);
+      expect(peerGrid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(12);
+      expect(peerGrid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(34);
+      expect(peer.serverVersion).toBe(9);
+      expect(changes).toHaveLength(1);
+      expect((await adapter.load("sync-doc")).version).toBe(9);
+    } finally {
+      sender.destroy();
+      peer.destroy();
+      senderGrid.destroy();
+      peerGrid.destroy();
+    }
+  });
+
+  it("leaves a peer unchanged when one batch member is rejected by the grid", async () => {
+    const { grid, coordinator, events } = harness();
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    try {
+      await coordinator.applyVersionedOperation({
+        version: 8,
+        operations: [localSet(12)],
+        batch: { index: 0, count: 2 },
+      });
+      await coordinator.applyVersionedOperation({
+        version: 9,
+        operations: [
+          {
+            op: "set",
+            addr: { sheet: "missing", row: 0, col: 0 },
+            value: { kind: "literal", value: 34 },
+          },
+        ],
+        batch: { index: 1, count: 2 },
+      });
+      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+      expect(coordinator.serverVersion).toBe(7);
+      expect(changes).toHaveLength(0);
+      expect(
+        events.some(
+          (event) =>
+            event.type === "error" &&
+            event.error instanceof SyncProtocolError &&
+            event.error.code === "remote-operations-rejected",
+        ),
+      ).toBe(true);
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
+  it("keeps the per-version byte limit for remote batch members", async () => {
+    const { grid, coordinator, events } = harness(["m1"], {
+      limits: { maxVersionPayloadBytes: 256 },
+    });
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    try {
+      await coordinator.applyVersionedOperation({
+        version: 8,
+        operations: [localSet(12)],
+        batch: { index: 0, count: 2 },
+      });
+      await coordinator.applyVersionedOperation({
+        version: 9,
+        operations: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 1, col: 0 },
+            value: { kind: "literal", value: "x".repeat(256) },
+          },
+        ],
+        batch: { index: 1, count: 2 },
+      });
+      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+      expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
+      expect(coordinator.serverVersion).toBe(7);
+      expect(changes).toHaveLength(0);
+      expect(
+        events.some(
+          (event) =>
+            event.type === "error" &&
+            event.error instanceof SyncProtocolError &&
+            event.error.code === "payload-limit",
+        ),
+      ).toBe(true);
+    } finally {
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
+  it("syncs a split undo as one local history step and one peer change", async () => {
+    const rowCount = 80;
+    const versionBytes = 2048;
+    let randomState = 17;
+    const values = Array.from({ length: rowCount }, () =>
+      Array.from({ length: 80 }, () => {
+        randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
+        return String.fromCharCode(33 + ((randomState >>> 16) % 90));
+      }).join(""),
+    );
+    const initial = snapshot();
+    const sheet = initial.sheets[0];
+    if (!sheet) throw new Error("The test snapshot needs a sheet");
+    sheet.rowCount = rowCount;
+    sheet.cells = [
+      {
+        startRow: 0,
+        startCol: 0,
+        rowCount,
+        colCount: 1,
+        cells: values.map((value, rowOffset) => ({
+          rowOffset,
+          colOffset: 0,
+          value: { kind: "literal", value },
+        })),
+      },
+    ];
+    const firstHost = document.createElement("div");
+    const peerHost = document.createElement("div");
+    document.body.append(firstHost, peerHost);
+    const gridOptions = { transactionResourceLimits: { maxEncodedBytes: versionBytes } };
+    const first = createGridFromSnapshot(firstHost, initial, gridOptions);
+    const second = createGridFromSnapshot(peerHost, initial, gridOptions);
+    const adapter = new MemoryPersistenceAdapter(initial);
+    const syncOptions = {
+      documentId: "sync-doc",
+      serverVersion: 7,
+      limits: { maxVersionPayloadBytes: versionBytes },
+    };
+    const sender = new SyncCoordinator(first, adapter, syncOptions);
+    const peer = new SyncCoordinator(second, adapter, syncOptions);
+    const localChanges: ChangeEvent[] = [];
+    const peerChanges: ChangeEvent[] = [];
+    first.on("change", (event) => localChanges.push(event));
+    second.on("change", (event) => peerChanges.push(event));
+    try {
+      expect(
+        first.applyTransaction({
+          patches: [
+            {
+              op: "clearRange",
+              range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 0 } },
+              contents: true,
+              style: false,
+            },
+          ],
+        }).status,
+      ).toBe("applied");
+      await sender.sendNext();
+      first.undo();
+      const undo = sender.pendingCommits()[0];
+      if (!undo) throw new Error("Undo must enqueue a commit");
+      expect(undo.versionOperationCounts?.length).toBeGreaterThan(1);
+      expect((await sender.sendNext())?.status).toBe("applied");
+      const tail = await adapter.commit({
+        documentId: "sync-doc",
+        baseVersion: 7,
+        clientMutationId: "read-undo",
+        operations: [],
+      });
+      if (tail.status !== "conflict" || !tail.operationsSinceBase)
+        throw new Error("The server must publish the clear and undo");
+      for (const version of tail.operationsSinceBase) {
+        expect(
+          new TextEncoder().encode(JSON.stringify(version.operations)).length,
+        ).toBeLessThanOrEqual(versionBytes);
+        await peer.applyVersionedOperation(version);
+      }
+      for (let row = 0; row < rowCount; row++) {
+        const expected = values[row];
+        if (expected === undefined) throw new Error("The source value is missing");
+        expect(first.store.getCell({ sheet: "s1", row, col: 0 }).resolved).toBe(expected);
+        expect(second.store.getCell({ sheet: "s1", row, col: 0 }).resolved).toBe(expected);
+      }
+      expect(localChanges.map((event) => event.commitReason)).toEqual(["api", "undo"]);
+      expect(peerChanges).toHaveLength(2);
+      first.redo();
+      expect(first.store.getCell({ sheet: "s1", row: rowCount - 1, col: 0 }).resolved).toBeNull();
+      expect(localChanges.map((event) => event.commitReason)).toEqual(["api", "undo", "redo"]);
+    } finally {
+      sender.destroy();
+      peer.destroy();
+      first.destroy();
+      second.destroy();
+    }
+  });
+
   it("rejects invalid resource-limit overrides at construction", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

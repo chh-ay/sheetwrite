@@ -8,7 +8,7 @@ description: "Result of projection or reconciliation."
 Result of projection or reconciliation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L191"><code>packages/core/src/row-bridge.ts#L191</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L192"><code>packages/core/src/row-bridge.ts#L192</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

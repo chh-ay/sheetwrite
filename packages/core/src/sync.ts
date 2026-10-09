@@ -1,4 +1,12 @@
 import {
+  MAX_ATOMIC_BATCH_ENCODED_BYTES,
+  MAX_ATOMIC_BATCH_VERSIONS,
+  markAtomicBatch,
+  measureOperationBytes,
+  operationArrayBytes,
+  partitionVersionOperations,
+} from "./atomic-batch.js";
+import {
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
   validateDocumentOperationShape,
   validateWorkbookSnapshot,
@@ -23,6 +31,7 @@ import type {
   PersistenceCommitResponse,
   RemoteOperationSource,
   SyncMutationRecord,
+  VersionBatchMember,
   VersionedOperation,
 } from "./types/transaction.js";
 
@@ -130,6 +139,16 @@ export interface SyncCoordinatorLimits extends SyncPendingQueueLimits {
    * reload-requiring protocol violation and its operations are never reapplied.
    */
   maxRecentAcknowledgements: number;
+  /**
+   * Versions in one atomic batch, sent or received; defaults to and cannot
+   * exceed 16. Each member version stays within the per-version limits.
+   */
+  maxBatchVersions: number;
+  /**
+   * Aggregate encoded operation bytes in one atomic batch, sent or received;
+   * defaults to and cannot exceed 64 MiB.
+   */
+  maxBatchBytes: number;
 }
 
 /**
@@ -154,6 +173,10 @@ export const DEFAULT_SYNC_COORDINATOR_LIMITS: Readonly<SyncCoordinatorLimits> = 
   maxPendingCommits: 10_000,
   maxPendingOperations: 100_000,
   maxPendingEncodedBytes: 128 * 1024 * 1024,
+  // A Grid commits an atomic batch as one transaction, so these are also the
+  // largest batch it can apply.
+  maxBatchVersions: MAX_ATOMIC_BATCH_VERSIONS,
+  maxBatchBytes: MAX_ATOMIC_BATCH_ENCODED_BYTES,
 });
 
 /** Stable category identifying which synchronization protocol bound was violated. */
@@ -173,7 +196,9 @@ export type SyncProtocolErrorCode =
   | "pending-operation-limit"
   | "pending-byte-limit"
   | "late-echo"
-  | "remote-operations-rejected";
+  | "remote-operations-rejected"
+  | "invalid-batch"
+  | "batch-limit";
 
 /** Typed rejection of malformed or resource-exhausting synchronization input. */
 export class SyncProtocolError extends SheetwriteError {
@@ -273,6 +298,8 @@ export class SyncCoordinator {
   private readonly storageErrors = new Map<string, unknown>();
   private readonly ambiguousRestores = new Set<string>();
   private readonly gapBuffer = new Map<number, BufferedVersionedOperation>();
+  /** Received members of the atomic batch that starts at `serverVersion + 1`. */
+  private batchAssembly?: BatchAssembly;
   private readonly limits: Readonly<SyncCoordinatorLimits>;
   private readonly disposeGrid: () => void;
   private readonly readyPromise: Promise<void>;
@@ -306,6 +333,7 @@ export class SyncCoordinator {
     this.hydrating = options.pendingStorage !== undefined;
     this.disposeGrid = registerGridTransactionAdmission(grid, {
       reserve: (operations) => this.reserveLocalTransaction(operations),
+      preservesOperations: true,
     });
     this.readyPromise = this.hydrating
       ? Promise.resolve()
@@ -503,13 +531,25 @@ export class SyncCoordinator {
     this.activeSends.set(clientMutationId, controller);
 
     try {
-      const response = await this.adapter.commit({
+      const request = {
         documentId: record.documentId,
         baseVersion: record.baseVersion,
         clientMutationId: record.clientMutationId,
         operations: record.operations,
         signal: controller.signal,
-      });
+      };
+      const versionOperationCounts = record.versionOperationCounts;
+      let response: PersistenceCommitResponse;
+      if (versionOperationCounts === undefined) {
+        response = await this.adapter.commit(request);
+      } else if (this.adapter.commitBatch) {
+        response = await this.adapter.commitBatch({ ...request, versionOperationCounts });
+      } else {
+        throw new SyncProtocolError(
+          "invalid-batch",
+          `Mutation ${clientMutationId} spans several server versions, and the persistence adapter cannot commit an atomic batch`,
+        );
+      }
       await this.handleResponse(response, clientMutationId);
       return response;
     } catch (error) {
@@ -566,6 +606,7 @@ export class SyncCoordinator {
       assertConflictRecovery(response, record.baseVersion);
       record.status = "conflicted";
       this.version = Math.max(this.version, response.currentVersion);
+      this.dropStaleBatchAssembly();
       this.emitState();
       this.emit({ type: "conflict", mutation: cloneRecord(record), response });
       return;
@@ -598,8 +639,10 @@ export class SyncCoordinator {
         ? record.operations
         : undefined;
     if (operations && operations.length > 0) {
-      assertOperations(operations, this.limits);
-      const outcome = this.grid.applyRemoteOperations(operations);
+      assertCommitOperations(record, this.limits);
+      const outcome = this.grid.applyRemoteOperations(
+        record.versionOperationCounts ? markAtomicBatch(operations.slice()) : operations,
+      );
       if (
         outcome.status === "conflict" ||
         outcome.status === "rejected" ||
@@ -637,6 +680,7 @@ export class SyncCoordinator {
     if (this.records.get(id) !== record) return;
 
     if (!this.destroyed) this.version = Math.max(this.version, response.version);
+    this.dropStaleBatchAssembly();
     const encodedBytes = this.recordBytes.get(id);
     if (encodedBytes === undefined) {
       throw new Error(`Pending mutation ${id} is missing resource accounting`);
@@ -704,6 +748,7 @@ export class SyncCoordinator {
           ...(inspected.clientMutationId !== undefined
             ? { clientMutationId: inspected.clientMutationId }
             : {}),
+          ...(inspected.batch !== undefined ? { batch: { ...inspected.batch } } : {}),
         },
         bytes: inspected.bytes,
       };
@@ -740,8 +785,12 @@ export class SyncCoordinator {
         baseVersion,
         clientMutationId: record.clientMutationId,
         operations: record.operations,
+        ...(record.versionOperationCounts
+          ? { versionOperationCounts: record.versionOperationCounts }
+          : {}),
       };
-      baseVersion = incrementVersion(baseVersion);
+      const versions = record.versionOperationCounts?.length ?? 1;
+      for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
       return replacement;
     });
     if (this.options.pendingStorage) {
@@ -832,9 +881,9 @@ export class SyncCoordinator {
       );
     }
 
-    let encodedBytes: number;
+    let sizes: number[];
     try {
-      encodedBytes = boundedJsonByteLength(
+      sizes = measureOperationBytes(
         operations,
         this.limits.maxPendingEncodedBytes - this.pendingEncodedByteTotal,
       );
@@ -850,12 +899,22 @@ export class SyncCoordinator {
       }
       throw error;
     }
+    const encodedBytes = operationArrayBytes(sizes);
+    const versionIssue = this.versionAdmissionIssue(sizes, encodedBytes);
+    if (versionIssue) {
+      this.emitState();
+      this.emit({
+        type: "error",
+        error: new SyncProtocolError("batch-limit", versionIssue.message),
+      });
+      return { ok: false, issue: versionIssue };
+    }
 
-    assertVersion(this.version + this.pendingCommitTotal, "pending baseVersion");
+    const reservedVersions = this.versionOperationCounts(sizes, encodedBytes)?.length ?? 1;
+    assertVersion(this.version + this.pendingVersionCount() + reservedVersions, "pending version");
     const reservation: LocalPendingReservation = {
       status: "reserved",
       clientMutationId: "",
-      operations: immutableOperations(operations),
       operationCount: operations.length,
       encodedBytes,
     };
@@ -902,10 +961,13 @@ export class SyncCoordinator {
           } else {
             reservation.status = "applied";
             reservation.storageRevision = transactionStorageRevision(outcome.transaction);
-            reservation.appliedOperations = immutableOperations(outcome.transaction.patches);
-            reservation.appliedEncodedBytes = boundedJsonByteLength(
-              reservation.appliedOperations,
-              this.limits.maxPendingEncodedBytes,
+            const applied = immutableOperations(outcome.transaction.patches);
+            reservation.appliedOperations = applied.operations;
+            const appliedSizes = applied.sizes;
+            reservation.appliedEncodedBytes = operationArrayBytes(appliedSizes);
+            reservation.appliedVersionOperationCounts = this.versionOperationCounts(
+              appliedSizes,
+              reservation.appliedEncodedBytes,
             );
           }
           this.drainLocalReservations();
@@ -925,15 +987,19 @@ export class SyncCoordinator {
         if (!this.destroyed) this.emitState();
         continue;
       }
-      const operations = reservation.appliedOperations!;
-      const encodedBytes = reservation.appliedEncodedBytes!;
+      const operations = reservation.appliedOperations;
+      const encodedBytes = reservation.appliedEncodedBytes;
+      if (operations === undefined || encodedBytes === undefined)
+        throw new Error("An applied sync reservation has no measured operations");
+      const versionOperationCounts = reservation.appliedVersionOperationCounts;
       this.pendingOperationTotal += operations.length - reservation.operationCount;
       this.pendingEncodedByteTotal += encodedBytes - reservation.encodedBytes;
       const record: SyncMutationRecord = {
         documentId: this.options.documentId,
-        baseVersion: this.version + this.records.size,
+        baseVersion: this.version + this.pendingVersionCount(),
         clientMutationId: reservation.clientMutationId,
         operations,
+        ...(versionOperationCounts ? { versionOperationCounts } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
       this.records.set(record.clientMutationId, record);
@@ -953,6 +1019,116 @@ export class SyncCoordinator {
         this.emit({ type: "pending", mutation: cloneRecord(record) });
       }
     }
+  }
+
+  /** Server versions that the pending commits occupy once acknowledged. */
+  private pendingVersionCount(): number {
+    let versions = 0;
+    for (const record of this.records.values()) {
+      versions += record.versionOperationCounts?.length ?? 1;
+    }
+    return versions;
+  }
+
+  /**
+   * Check before the local apply that a commit fits one server version, or
+   * that the adapter can commit it as one atomic batch within the batch limits.
+   * `sizes` are the JSON bytes of each operation.
+   */
+  private versionAdmissionIssue(
+    sizes: readonly number[],
+    encodedBytes: number,
+  ): Extract<MutationIssue, { kind: "resource-limit" }> | undefined {
+    const limits = this.limits;
+    const fitsOneVersion =
+      sizes.length <= limits.maxOperationsPerVersion &&
+      encodedBytes <= limits.maxVersionPayloadBytes;
+    if (fitsOneVersion) return undefined;
+    const issue = (
+      resource: "operations" | "encoded-bytes" | "batch-versions",
+      actual: number,
+      max: number,
+      message: string,
+    ): Extract<MutationIssue, { kind: "resource-limit" }> => ({
+      kind: "resource-limit",
+      severity: "error",
+      resource,
+      actual,
+      max,
+      message,
+    });
+    if (!this.adapter.commitBatch) {
+      return encodedBytes > limits.maxVersionPayloadBytes
+        ? issue(
+            "encoded-bytes",
+            encodedBytes,
+            limits.maxVersionPayloadBytes,
+            `The commit is larger than one server version (${limits.maxVersionPayloadBytes} bytes), and the persistence adapter cannot commit an atomic batch`,
+          )
+        : issue(
+            "operations",
+            sizes.length,
+            limits.maxOperationsPerVersion,
+            `The commit has more operations than one server version (${limits.maxOperationsPerVersion}), and the persistence adapter cannot commit an atomic batch`,
+          );
+    }
+    if (encodedBytes > limits.maxBatchBytes) {
+      return issue(
+        "encoded-bytes",
+        encodedBytes,
+        limits.maxBatchBytes,
+        `The commit exceeds the ${limits.maxBatchBytes} byte atomic batch limit`,
+      );
+    }
+    const counts = partitionVersionOperations(
+      sizes,
+      limits.maxOperationsPerVersion,
+      limits.maxVersionPayloadBytes,
+    );
+    if (!counts) {
+      return issue(
+        "encoded-bytes",
+        encodedBytes,
+        limits.maxVersionPayloadBytes,
+        `One operation of the commit is larger than one server version (${limits.maxVersionPayloadBytes} bytes)`,
+      );
+    }
+    if (counts.length > limits.maxBatchVersions) {
+      return issue(
+        "batch-versions",
+        counts.length,
+        limits.maxBatchVersions,
+        `The commit needs ${counts.length} server versions, above the ${limits.maxBatchVersions} version atomic batch limit`,
+      );
+    }
+    return undefined;
+  }
+
+  /**
+   * Operation counts of the atomic batch versions for admitted operations, or
+   * `undefined` when they fit one version. Admission already checked the
+   * requested operations; the applied operations are the same or fewer.
+   */
+  private versionOperationCounts(
+    sizes: readonly number[],
+    encodedBytes: number,
+  ): readonly number[] | undefined {
+    const limits = this.limits;
+    if (
+      sizes.length <= limits.maxOperationsPerVersion &&
+      encodedBytes <= limits.maxVersionPayloadBytes
+    ) {
+      return undefined;
+    }
+    const counts = partitionVersionOperations(
+      sizes,
+      limits.maxOperationsPerVersion,
+      limits.maxVersionPayloadBytes,
+    );
+    if (!counts || counts.length < 2 || counts.length > limits.maxBatchVersions) {
+      throw new Error("Applied operations do not fit the admitted atomic batch");
+    }
+    return Object.freeze(counts);
   }
 
   private rejectPendingCapacity(
@@ -1045,7 +1221,10 @@ export class SyncCoordinator {
 
     for (const { record } of prepared) {
       if (ambiguousIds.has(record.clientMutationId)) continue;
-      const outcome = this.grid.applyRemoteOperations(record.operations, { localReplay: true });
+      const replay = record.versionOperationCounts
+        ? markAtomicBatch(record.operations.slice())
+        : record.operations;
+      const outcome = this.grid.applyRemoteOperations(replay, { localReplay: true });
       if (
         outcome.status === "conflict" ||
         outcome.status === "rejected" ||
@@ -1153,11 +1332,14 @@ export class SyncCoordinator {
     const mutationId = operation.clientMutationId;
     if (operation.version <= this.version) {
       if (mutationId && this.records.has(mutationId)) {
-        await this.processResponse({
-          status: "applied",
-          version: operation.version,
-          clientMutationId: mutationId,
-        });
+        // Only the last member of an own batch acknowledges the whole batch.
+        if (operation.batch === undefined || operation.batch.index === operation.batch.count - 1) {
+          await this.processResponse({
+            status: "applied",
+            version: operation.version,
+            clientMutationId: mutationId,
+          });
+        }
       } else if (mutationId && !this.acknowledged.has(mutationId)) {
         this.rejectInbound(
           new SyncProtocolError(
@@ -1170,6 +1352,9 @@ export class SyncCoordinator {
       }
       return;
     }
+    // A source that restarts after a reconnect can deliver members of the
+    // batch being assembled again; the assembly already holds them.
+    if (operation.version <= this.contiguousHead()) return;
 
     if (mutationId && this.acknowledged.has(mutationId)) {
       this.rejectInbound(
@@ -1183,7 +1368,7 @@ export class SyncCoordinator {
       return;
     }
 
-    const expectedVersion = incrementVersion(this.version);
+    const expectedVersion = incrementVersion(this.contiguousHead());
     if (operation.version !== expectedVersion) {
       const distance = operation.version - this.version;
       if (distance > this.limits.maxFutureVersionDistance) {
@@ -1206,12 +1391,16 @@ export class SyncCoordinator {
       return;
     }
 
-    if (await this.applyContiguousOperation(operation)) {
+    if (await this.applyContiguousOperation(input)) {
       await this.drainGapBuffer();
     }
   }
 
-  private async applyContiguousOperation(operation: VersionedOperation): Promise<boolean> {
+  private async applyContiguousOperation(input: BufferedVersionedOperation): Promise<boolean> {
+    const { operation } = input;
+    if (operation.batch !== undefined || this.batchAssembly !== undefined) {
+      return this.assembleBatchMember(input);
+    }
     const mutationId = operation.clientMutationId;
     if (mutationId && this.records.has(mutationId)) {
       await this.processResponse({
@@ -1244,6 +1433,117 @@ export class SyncCoordinator {
     this.emitState();
     this.emit({ type: "remote-applied", operation: cloneVersionedOperation(operation) });
     return true;
+  }
+
+  /**
+   * Hold each contiguous member of an atomic batch without touching the grid
+   * or the server version. The complete batch applies as one transaction.
+   */
+  private async assembleBatchMember(input: BufferedVersionedOperation): Promise<boolean> {
+    const { operation } = input;
+    const member = operation.batch;
+    const assembly = this.batchAssembly;
+    const continuesBatch =
+      member !== undefined &&
+      (member.index === 0
+        ? assembly === undefined
+        : assembly !== undefined &&
+          member.index === assembly.members.length &&
+          member.count === assembly.count &&
+          operation.clientMutationId === assembly.clientMutationId);
+    if (!continuesBatch) {
+      const startVersion = assembly?.members[0]?.version ?? operation.version;
+      this.batchAssembly = undefined;
+      this.rejectInbound(
+        new SyncProtocolError(
+          "invalid-batch",
+          `Remote version ${operation.version} does not continue an atomic batch`,
+        ),
+        startVersion,
+      );
+      return false;
+    }
+    const next: BatchAssembly = assembly ?? {
+      count: member.count,
+      members: [],
+      bytes: 0,
+      ...(operation.clientMutationId !== undefined
+        ? { clientMutationId: operation.clientMutationId }
+        : {}),
+    };
+    if (next.bytes + input.bytes > this.limits.maxBatchBytes) {
+      this.batchAssembly = undefined;
+      this.rejectInbound(
+        new SyncProtocolError(
+          "batch-limit",
+          `Remote atomic batch exceeds the ${this.limits.maxBatchBytes} byte limit`,
+        ),
+        next.members[0]?.version ?? operation.version,
+      );
+      return false;
+    }
+    next.members.push(operation);
+    next.bytes += input.bytes;
+    if (next.members.length < next.count) {
+      this.batchAssembly = next;
+      return true;
+    }
+    this.batchAssembly = undefined;
+    return this.applyCompleteBatch(next);
+  }
+
+  private async applyCompleteBatch(assembly: BatchAssembly): Promise<boolean> {
+    const first = assembly.members[0];
+    const last = assembly.members.at(-1);
+    if (!first || !last) throw new Error("A complete atomic batch has no members");
+    const mutationId = assembly.clientMutationId;
+    if (mutationId && this.records.has(mutationId)) {
+      await this.processResponse({
+        status: "applied",
+        version: last.version,
+        clientMutationId: mutationId,
+      });
+      return this.version >= last.version;
+    }
+
+    const operations = markAtomicBatch(
+      assembly.members.flatMap((member) => member.operations as DocumentOp[]),
+    );
+    if (operations.length > 0) {
+      const outcome = this.grid.applyRemoteOperations(operations);
+      if (
+        outcome.status === "conflict" ||
+        outcome.status === "rejected" ||
+        outcome.status === "noop"
+      ) {
+        this.rejectInbound(
+          new SyncProtocolError(
+            "remote-operations-rejected",
+            `Remote atomic batch ${first.version}-${last.version} was not applied by the grid`,
+          ),
+          first.version,
+        );
+        return false;
+      }
+    }
+
+    this.version = last.version;
+    this.emitState();
+    for (const member of assembly.members) {
+      this.emit({ type: "remote-applied", operation: cloneVersionedOperation(member) });
+    }
+    return true;
+  }
+
+  /** Last contiguous version received: the server version or the last assembled batch member. */
+  private contiguousHead(): number {
+    return this.batchAssembly?.members.at(-1)?.version ?? this.version;
+  }
+
+  /** Drop an assembly that an acknowledgement or conflict moved the server version past. */
+  private dropStaleBatchAssembly(): void {
+    const start = this.batchAssembly?.members[0]?.version;
+    if (start !== undefined && start <= this.version) this.batchAssembly = undefined;
   }
 
   private inboundLimitError(operationCount: number, bytes: number): SyncProtocolError | undefined {
@@ -1281,7 +1581,7 @@ export class SyncCoordinator {
   private emitReloadRequired(receivedVersion: number): void {
     this.emit({
       type: "reload-required",
-      expectedVersion: incrementVersion(this.version),
+      expectedVersion: incrementVersion(this.contiguousHead()),
       receivedVersion,
     });
   }
@@ -1291,7 +1591,7 @@ export class SyncCoordinator {
     this.emit({ type: "error", error });
     if (receivedVersion === undefined) return;
     this.emitReloadRequired(receivedVersion);
-    if (recover && receivedVersion >= incrementVersion(this.version)) {
+    if (recover && receivedVersion >= incrementVersion(this.contiguousHead())) {
       this.requestGapRecovery(receivedVersion);
     }
   }
@@ -1308,12 +1608,13 @@ export class SyncCoordinator {
   private clearGapBuffer(): void {
     for (const input of this.gapBuffer.values()) this.releaseBuffered(input);
     this.gapBuffer.clear();
+    this.batchAssembly = undefined;
   }
 
   private requestGapRecovery(receivedVersion: number): void {
     const recover = this.options.recoverVersionGap;
     if (!recover || this.recoveryPromise || this.destroyed) return;
-    const expectedVersion = incrementVersion(this.version);
+    const expectedVersion = incrementVersion(this.contiguousHead());
     this.recoveryPromise = recover({
       documentId: this.options.documentId,
       expectedVersion,
@@ -1339,7 +1640,7 @@ export class SyncCoordinator {
         const snapshot = recovery as WorkbookSnapshot;
         this.emit({
           type: "reload-required",
-          expectedVersion: incrementVersion(this.version),
+          expectedVersion: incrementVersion(this.contiguousHead()),
           receivedVersion,
           snapshot: cloneJsonValue(snapshot),
         });
@@ -1354,10 +1655,10 @@ export class SyncCoordinator {
 
   private async drainGapBuffer(): Promise<void> {
     while (!this.destroyed) {
-      const expectedVersion = incrementVersion(this.version);
+      const expectedVersion = incrementVersion(this.contiguousHead());
       const next = this.gapBuffer.get(expectedVersion);
       if (!next) return;
-      if (!(await this.applyContiguousOperation(next.operation))) return;
+      if (!(await this.applyContiguousOperation(next))) return;
       this.gapBuffer.delete(expectedVersion);
       this.releaseBuffered(next);
     }
@@ -1446,12 +1747,21 @@ export class SyncCoordinator {
 interface LocalPendingReservation {
   status: "reserved" | "applied" | "cancelled";
   clientMutationId: string;
-  operations: readonly DocumentOp[];
   operationCount: number;
   encodedBytes: number;
   appliedOperations?: readonly DocumentOp[];
   appliedEncodedBytes?: number;
+  appliedVersionOperationCounts?: readonly number[];
   storageRevision?: bigint;
+}
+
+/** Contiguous members of one remote atomic batch received so far. */
+interface BatchAssembly {
+  clientMutationId?: string;
+  count: number;
+  members: VersionedOperation[];
+  /** Encoded operation bytes of the members, bounded by `maxBatchBytes`. */
+  bytes: number;
 }
 
 interface BufferedVersionedOperation {
@@ -1463,6 +1773,7 @@ interface InspectedVersionedOperation {
   version: number;
   operations: readonly DocumentOp[];
   clientMutationId?: string;
+  batch?: VersionBatchMember;
   bytes: number;
 }
 
@@ -1480,12 +1791,15 @@ const LIMIT_KEYS: Record<keyof SyncCoordinatorLimits, true> = {
   maxPendingCommits: true,
   maxPendingOperations: true,
   maxPendingEncodedBytes: true,
+  maxBatchVersions: true,
+  maxBatchBytes: true,
 };
 
 const DOCUMENT_OPERATION_KINDS: Record<DocumentOp["op"], true> = {
   set: true,
   setRange: true,
   setBlock: true,
+  restoreBlock: true,
   setRangeStyle: true,
   clearRange: true,
   addRows: true,
@@ -1532,11 +1846,30 @@ function assertPendingCommit(
   }
   assertVersion(ownDataValue(record, "baseVersion"), "pending baseVersion");
   assertMutationId(ownDataValue(record, "clientMutationId"), limits);
-  return assertOperationResources(
-    ownDataValue(record, "operations"),
+  const operations = ownDataValue(record, "operations");
+  const bytes = assertOperationResources(
+    operations,
     limits.maxPendingOperations,
     limits.maxPendingEncodedBytes,
   );
+  const counts = optionalOwnDataValue(record, "versionOperationCounts");
+  if (counts === undefined) return bytes;
+  const operationCount = (operations as readonly DocumentOp[]).length;
+  if (
+    !Array.isArray(counts) ||
+    counts.length < 2 ||
+    counts.length > limits.maxBatchVersions ||
+    !counts.every((count) => Number.isSafeInteger(count) && count > 0) ||
+    counts.reduce((total: number, count: number) => total + count, 0) !== operationCount ||
+    bytes > limits.maxBatchBytes
+  ) {
+    throw new SyncProtocolError(
+      "invalid-batch",
+      "Durable queue returned invalid atomic batch version operation counts",
+    );
+  }
+  assertCommitOperations(commit, limits);
+  return bytes;
 }
 
 function resolveLimits(
@@ -1557,6 +1890,15 @@ function resolveLimits(
       );
     }
     (resolved as unknown as Record<string, number>)[key] = value as number;
+  }
+  if (
+    resolved.maxBatchVersions > MAX_ATOMIC_BATCH_VERSIONS ||
+    resolved.maxBatchBytes > MAX_ATOMIC_BATCH_ENCODED_BYTES
+  ) {
+    throw new SyncProtocolError(
+      "invalid-limits",
+      `Sync batch limits cannot exceed ${MAX_ATOMIC_BATCH_VERSIONS} versions or ${MAX_ATOMIC_BATCH_ENCODED_BYTES} bytes, the largest batch a Grid applies`,
+    );
   }
   return Object.freeze(resolved);
 }
@@ -1649,12 +1991,63 @@ function inspectVersionedOperation(
   const bytes = assertOperations(operations, limits);
   const mutationId = optionalOwnDataValue(record, "clientMutationId");
   if (mutationId !== undefined) assertMutationId(mutationId, limits);
+  const batchValue = optionalOwnDataValue(record, "batch");
+  const batch = batchValue === undefined ? undefined : assertBatchMember(batchValue, limits);
   return {
     version,
     operations: operations as readonly DocumentOp[],
     ...(mutationId !== undefined ? { clientMutationId: mutationId } : {}),
+    ...(batch !== undefined ? { batch } : {}),
     bytes,
   };
+}
+
+function assertBatchMember(
+  value: unknown,
+  limits: Readonly<SyncCoordinatorLimits>,
+): VersionBatchMember {
+  const record = assertPlainRecord(value, "Versioned operation batch must be a plain object");
+  const index = ownDataValue(record, "index");
+  const count = ownDataValue(record, "count");
+  if (
+    !Number.isSafeInteger(index) ||
+    !Number.isSafeInteger(count) ||
+    (count as number) < 2 ||
+    (index as number) < 0 ||
+    (index as number) >= (count as number)
+  ) {
+    throw new SyncProtocolError(
+      "invalid-batch",
+      "Versioned operation batch needs an index below a count of at least 2",
+    );
+  }
+  if ((count as number) > limits.maxBatchVersions) {
+    throw new SyncProtocolError(
+      "batch-limit",
+      `Atomic batch exceeds the ${limits.maxBatchVersions} version limit`,
+    );
+  }
+  return { index: index as number, count: count as number };
+}
+
+/**
+ * Check that the operations of a pending commit fit its server versions: one
+ * version, or each member version of its atomic batch.
+ */
+function assertCommitOperations(
+  commit: PendingCommit,
+  limits: Readonly<SyncCoordinatorLimits>,
+): void {
+  const counts = commit.versionOperationCounts;
+  if (counts === undefined) {
+    assertOperations(commit.operations, limits);
+    return;
+  }
+  let start = 0;
+  for (const count of counts) {
+    assertOperations(commit.operations.slice(start, start + count), limits);
+    start += count;
+  }
 }
 
 function assertPersistenceResponse(
@@ -1857,6 +2250,9 @@ function clonePendingCommit(commit: PendingCommit): PendingCommit {
     baseVersion: commit.baseVersion,
     clientMutationId: commit.clientMutationId,
     operations: cloneJsonValue(commit.operations),
+    ...(commit.versionOperationCounts
+      ? { versionOperationCounts: [...commit.versionOperationCounts] }
+      : {}),
   };
 }
 
@@ -1866,16 +2262,27 @@ function isAsyncIterable(
   return Symbol.asyncIterator in source;
 }
 
-function immutableOperations(operations: readonly DocumentOp[]): readonly DocumentOp[] {
-  return deepFreeze(cloneJsonValue(operations));
+/**
+ * Deep-frozen JSON copy of applied operations with the exact JSON bytes of
+ * each one, taken from the copy's own encoding instead of a second walk.
+ */
+function immutableOperations(operations: readonly DocumentOp[]): {
+  operations: readonly DocumentOp[];
+  sizes: number[];
+} {
+  const copies: DocumentOp[] = new Array(operations.length);
+  const sizes: number[] = new Array(operations.length);
+  for (let index = 0; index < operations.length; index++) {
+    const json = JSON.stringify(operations[index]);
+    sizes[index] = utf8ByteLength(json, Number.POSITIVE_INFINITY);
+    copies[index] = JSON.parse(json) as DocumentOp;
+  }
+  return { operations: deepFreeze(copies), sizes };
 }
 
 function cloneRecord(record: SyncMutationRecord): SyncMutationRecord {
   return {
-    documentId: record.documentId,
-    baseVersion: record.baseVersion,
-    clientMutationId: record.clientMutationId,
-    operations: cloneJsonValue(record.operations),
+    ...clonePendingCommit(record),
     status: record.status,
   };
 }
@@ -1885,12 +2292,17 @@ function cloneVersionedOperation(operation: VersionedOperation): VersionedOperat
     version: operation.version,
     operations: cloneJsonValue(operation.operations),
     ...(operation.clientMutationId ? { clientMutationId: operation.clientMutationId } : {}),
+    ...(operation.batch ? { batch: { ...operation.batch } } : {}),
   };
 }
 
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    for (const child of Object.values(value)) deepFreeze(child);
+    // Iterate arrays in place: `Object.values` copies a million-cell block.
+    const children = Array.isArray(value) ? value : Object.values(value);
+    for (const child of children) {
+      if (child && typeof child === "object") deepFreeze(child);
+    }
     Object.freeze(value);
   }
   return value;

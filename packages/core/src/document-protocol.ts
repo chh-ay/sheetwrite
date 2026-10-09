@@ -11,6 +11,7 @@ import {
   MAX_HYPERLINK_DISPLAY_LENGTH,
   MAX_HYPERLINKS_PER_SHEET,
 } from "./hyperlink.js";
+import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
 import type {
   DocumentOp,
@@ -1909,6 +1910,7 @@ export function validateDocumentOperationShape(
       } else if (values && cellCount !== undefined && values.length !== cellCount) {
         invalid(errors, `${blockPath}.values`, "Block values must match its dimensions");
       }
+      const sourceOffsets = new Set<number>();
       const formulas = ownValue(block, "formulas");
       if (formulas !== undefined) {
         const entries = arrayAt(formulas, `${blockPath}.formulas`, errors);
@@ -1920,6 +1922,12 @@ export function validateDocumentOperationShape(
           }
           if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
             invalid(errors, `${entryPath}[0]`, "Formula offset is outside the block");
+          }
+          if (typeof entry[0] === "number") {
+            if (sourceOffsets.has(entry[0])) {
+              invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
+            }
+            sourceOffsets.add(entry[0]);
           }
           if (typeof entry[1] !== "string") {
             invalid(errors, `${entryPath}[1]`, "Formula source must be a string");
@@ -1937,6 +1945,12 @@ export function validateDocumentOperationShape(
           }
           if (!nonNegativeInteger(entry[0]) || (cellCount !== undefined && entry[0] >= cellCount)) {
             invalid(errors, `${entryPath}[0]`, "Reference offset is outside the block");
+          }
+          if (typeof entry[0] === "number") {
+            if (sourceOffsets.has(entry[0])) {
+              invalid(errors, `${entryPath}[0]`, "Block source offsets must be unique");
+            }
+            sourceOffsets.add(entry[0]);
           }
           validateAddress(entry[1], `${entryPath}[1]`, errors);
         });
@@ -1963,6 +1977,36 @@ export function validateDocumentOperationShape(
             invalid(errors, `${blockPath}.styleIds[${index}]`, "Block style ID is invalid");
           }
         });
+      }
+      break;
+    }
+    case "restoreBlock": {
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      const encoding = ownValue(operation, "encoding");
+      const decodedBytes = ownValue(operation, "decodedBytes");
+      const data = ownValue(operation, "data");
+      if (encoding !== "deflate-json-v1") {
+        invalid(errors, `${path}.encoding`, "Restore block encoding is invalid");
+      }
+      if (typeof decodedBytes !== "number") {
+        invalid(errors, `${path}.decodedBytes`, "Restore block decoded bytes must be a number");
+      }
+      if (typeof data !== "string") {
+        invalid(errors, `${path}.data`, "Restore block data must be a string");
+      }
+      if (errors.length) break;
+      try {
+        const block = decodeRestoreBlockPayload(
+          operation as unknown as Extract<DocumentOp, { op: "restoreBlock" }>,
+        );
+        errors.push(
+          ...validateDocumentOperationShape(
+            { op: "setBlock", range: ownValue(operation, "range"), block },
+            path,
+          ),
+        );
+      } catch (error) {
+        invalid(errors, path, error instanceof Error ? error.message : "Invalid restore block");
       }
       break;
     }
@@ -2916,6 +2960,7 @@ export function documentOpTarget(operation: DocumentOp): string {
       return operation.addr.sheet;
     case "setRange":
     case "setBlock":
+    case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
       return operation.range.sheet;

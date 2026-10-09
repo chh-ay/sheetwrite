@@ -3,6 +3,7 @@ import type {
   BoundaryResourceAccounting,
   RuntimeResourceOperation,
 } from "../resource-accounting.js";
+import { decodeRestoreBlock } from "../restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "../sheet-lifecycle.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { DocumentOp, MutationIssue, Workbook } from "../types/document.js";
@@ -588,29 +589,30 @@ export class PagedDirtyPreflight {
           setVirtualRef(source, cell.value.kind === "ref" ? cell.value.target : null);
           if (referenceSimulationExceeded) return referenceSimulationIssue();
         }
-      } else if (patch.op === "setBlock") {
+      } else if (patch.op === "setBlock" || patch.op === "restoreBlock") {
+        const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
         const range = normalizedRange(patch.range);
         rejection = addRectangle(
           range.sheet,
           range.start.row,
           range.start.col,
-          patch.block.rowCount,
-          patch.block.colCount,
+          block.rowCount,
+          block.colCount,
         );
         if (
           !rejection &&
-          patch.block.rowCount === range.end.row - range.start.row + 1 &&
-          patch.block.colCount === range.end.col - range.start.col + 1 &&
+          block.rowCount === range.end.row - range.start.row + 1 &&
+          block.colCount === range.end.col - range.start.col + 1 &&
           rectangleApplies(
             range.sheet,
             range.start.row,
             range.start.col,
-            patch.block.rowCount,
-            patch.block.colCount,
+            block.rowCount,
+            block.colCount,
           )
         ) {
-          for (let rowOffset = 0; rowOffset < patch.block.rowCount; rowOffset++) {
-            for (let colOffset = 0; colOffset < patch.block.colCount; colOffset++) {
+          for (let rowOffset = 0; rowOffset < block.rowCount; rowOffset++) {
+            for (let colOffset = 0; colOffset < block.colCount; colOffset++) {
               setVirtualRef(
                 {
                   sheet: range.sheet,
@@ -622,12 +624,12 @@ export class PagedDirtyPreflight {
               if (referenceSimulationExceeded) return referenceSimulationIssue();
             }
           }
-          for (const [offset, target] of patch.block.refs ?? []) {
+          for (const [offset, target] of block.refs ?? []) {
             setVirtualRef(
               {
                 sheet: range.sheet,
-                row: range.start.row + Math.floor(offset / patch.block.colCount),
-                col: range.start.col + (offset % patch.block.colCount),
+                row: range.start.row + Math.floor(offset / block.colCount),
+                col: range.start.col + (offset % block.colCount),
               },
               target,
             );

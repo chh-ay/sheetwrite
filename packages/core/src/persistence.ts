@@ -4,17 +4,27 @@ import {
   SnapshotValidationError,
   validateWorkbookSnapshot,
 } from "./document-protocol.js";
-import { SheetwriteError } from "./errors.js";
+import { boundedJsonByteLength, JsonByteLengthError, SheetwriteError } from "./errors.js";
 import { GridImpl } from "./grid.js";
 import { SheetwriteStore } from "./store.js";
-import type { WorkbookSnapshot } from "./types/document.js";
+import { DEFAULT_SYNC_COORDINATOR_LIMITS } from "./sync.js";
+import type { DocumentOp, WorkbookSnapshot } from "./types/document.js";
 import type { Grid, GridOptions } from "./types/grid.js";
 import type {
   PersistenceAdapter,
+  PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   VersionedOperation,
 } from "./types/transaction.js";
+
+interface MemoryDocument {
+  snapshot: WorkbookSnapshot;
+  version: number;
+  initialVersion: number;
+  log: VersionedOperation[];
+  applied: Map<string, number>;
+}
 
 /** Grid creation options accepted when hydrating a validated snapshot. */
 export type SnapshotGridOptions = Omit<GridOptions, "workbook" | "data"> & {
@@ -84,16 +94,7 @@ export function createGridFromSnapshot(
 
 /** Executable database-neutral reference adapter for tests, demos, and local workflows. */
 export class MemoryPersistenceAdapter implements PersistenceAdapter {
-  private readonly documents = new Map<
-    string,
-    {
-      snapshot: WorkbookSnapshot;
-      version: number;
-      initialVersion: number;
-      log: VersionedOperation[];
-      applied: Map<string, number>;
-    }
-  >();
+  private readonly documents = new Map<string, MemoryDocument>();
 
   constructor(...snapshots: readonly WorkbookSnapshot[]) {
     for (const snapshot of snapshots) {
@@ -126,6 +127,22 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
   }
 
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.commitVersions(request, [request.operations]);
+  }
+
+  /**
+   * Validate every member version against the default sync limits, apply the
+   * members in order to one scratch store, and publish all of them only when
+   * every member applied.
+   */
+  async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.commitVersions(request, splitBatchVersions(request));
+  }
+
+  private async commitVersions(
+    request: PersistenceCommitRequest,
+    versions: readonly (readonly DocumentOp[])[],
+  ): Promise<PersistenceCommitResponse> {
     throwIfAborted(request.signal);
     const document = this.documents.get(request.documentId);
     if (!document) {
@@ -156,36 +173,85 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 
     const store = SheetwriteStore.fromSnapshot(document.snapshot);
     try {
-      const outcome = store.applyTransaction(
-        { patches: request.operations.slice() },
-        { source: "remote", commitReason: "api" },
-      );
-      if (
-        outcome.status === "conflict" ||
-        (outcome.status === "noop" && request.operations.length > 0)
-      ) {
-        throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
+      for (const operations of versions) {
+        const outcome = store.applyTransaction(
+          { patches: operations.slice() },
+          { source: "remote", commitReason: "api" },
+        );
+        if (
+          outcome.status === "conflict" ||
+          outcome.status === "rejected" ||
+          (outcome.status === "noop" && operations.length > 0)
+        ) {
+          throw new PersistenceError("commit-rejected", "Persistence commit was rejected");
+        }
       }
-      const version = document.version + 1;
-      const next = { ...store.exportSnapshot(), version };
-      throwIfAborted(request.signal);
-      document.snapshot = cloneSnapshot(next);
-      document.version = version;
-      document.applied.set(request.clientMutationId, version);
-      document.log.push({
-        version,
-        operations: cloneJsonValue(request.operations),
+      const version = document.version + versions.length;
+      const next = cloneSnapshot({ ...store.exportSnapshot(), version });
+      const entries: VersionedOperation[] = versions.map((operations, index) => ({
+        version: document.version + index + 1,
+        operations: cloneJsonValue(operations),
         clientMutationId: request.clientMutationId,
-      });
+        ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
+      }));
+      throwIfAborted(request.signal);
+      document.snapshot = next;
+      document.applied.set(request.clientMutationId, version);
+      document.log.push(...entries);
+      document.version = version;
       return {
         status: "applied",
         version,
         clientMutationId: request.clientMutationId,
       };
+    } catch (error) {
+      if (error instanceof PersistenceError) throw error;
+      throw new PersistenceError("commit-rejected", "Persistence commit could not be applied", {
+        cause: error,
+      });
     } finally {
       store.dispose();
     }
   }
+}
+
+/**
+ * Split a batch request into its member versions. Each member must fit the
+ * default per-version limits, and the batch must fit the default batch limits.
+ */
+function splitBatchVersions(request: PersistenceBatchCommitRequest): DocumentOp[][] {
+  const limits = DEFAULT_SYNC_COORDINATOR_LIMITS;
+  const counts = request.versionOperationCounts;
+  const reject = (message: string): never => {
+    throw new PersistenceError("commit-rejected", `Atomic batch was rejected: ${message}`);
+  };
+  if (!Array.isArray(counts) || counts.length < 2 || counts.length > limits.maxBatchVersions) {
+    reject(`it needs 2 to ${limits.maxBatchVersions} versions`);
+  }
+  const versions: DocumentOp[][] = [];
+  let start = 0;
+  let batchBytes = 0;
+  for (const count of counts) {
+    if (!Number.isSafeInteger(count) || count <= 0 || count > limits.maxOperationsPerVersion) {
+      reject(`a version needs 1 to ${limits.maxOperationsPerVersion} operations`);
+    }
+    const operations = request.operations.slice(start, start + count);
+    start += count;
+    try {
+      batchBytes += boundedJsonByteLength(operations, limits.maxVersionPayloadBytes);
+    } catch (error) {
+      if (!(error instanceof JsonByteLengthError)) throw error;
+      reject(
+        error.code === "limit"
+          ? `a version exceeds ${limits.maxVersionPayloadBytes} bytes`
+          : "its operations are not JSON",
+      );
+    }
+    versions.push(operations);
+  }
+  if (start !== request.operations.length) reject("the version counts do not cover the operations");
+  if (batchBytes > limits.maxBatchBytes) reject(`it exceeds ${limits.maxBatchBytes} bytes`);
+  return versions;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
