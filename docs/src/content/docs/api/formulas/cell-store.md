@@ -60,6 +60,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
@@ -108,7 +109,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>94</span>
+## Members <span class="api-count" data-pagefind-ignore>95</span>
 
 <div class="api-member-list">
 
@@ -593,6 +594,15 @@ cells and source bytes, never the logical sheet rectangle.</p>
 
 ```ts generated
 pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>pinViewportBands</code> <span class="api-member-summary">Replaces viewport-owned protection independently of transient read pins.</span></summary>
+
+```ts generated
+pinViewportBands: (sheet: number, bands: Uint32Array) => void;
 ```
 
 </details>
@@ -1258,6 +1268,7 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => void;
+  pinViewportBands: (sheet: number, bands: Uint32Array) => void;
   poolStrings: (ids: Uint32Array) => string[];
   queryResourceStats: () => Float64Array;
   rangeFullyLoaded: (

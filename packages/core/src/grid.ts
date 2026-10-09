@@ -28,7 +28,7 @@ import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hy
 import { InteractionSessions } from "./interaction-sessions.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { RenderCoordinator } from "./render-coordinator.js";
+import { ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -374,7 +374,7 @@ export class GridImpl implements Grid {
   private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
   private readonly domOverlay: DomOverlay;
-  private readonly renderCoordinator: RenderCoordinator;
+  private readonly readWindows: ReadWindowController;
   private overscan: number;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
@@ -445,7 +445,7 @@ export class GridImpl implements Grid {
     if (this.destroyed) return;
     this.armResolutionListener();
     this.syncSizer();
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   };
   private readonly onScroll = () => this.scheduleRender();
@@ -711,12 +711,7 @@ export class GridImpl implements Grid {
       colLeftOf: (col) => this.colLeftOf(col),
       rowTop: (row) => this.geometry.rowOffset(row),
       rowHeight: (row) => this.geometry.rowHeight(row),
-      visibleRowWindow: () =>
-        this.geometry.visibleRowWindow(
-          this.geometry.toContent(this.scroller.scrollTop),
-          this.viewportH(),
-          this.overscan,
-        ),
+      visibleRowWindow: () => this.readWindows.sampleRows(),
       previewColumnWidth: (col, width) => {
         this.geometry.previewColumnWidth(col, width);
         this.applyLayout();
@@ -725,7 +720,7 @@ export class GridImpl implements Grid {
       previewRowHeight: (row, height) => {
         this.geometry.previewRowHeight(row, height);
         this.syncSizer();
-        this.renderCoordinator.invalidate();
+        this.readWindows.invalidate();
         this.scheduleRender();
       },
       clearResizePreview: () => {
@@ -788,7 +783,7 @@ export class GridImpl implements Grid {
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
-      geometryVersion: () => this.renderCoordinator.geometryVersion,
+      geometryVersion: () => this.readWindows.geometryVersion,
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -815,13 +810,14 @@ export class GridImpl implements Grid {
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
-    this.renderCoordinator = new RenderCoordinator({
+    this.readWindows = new ReadWindowController({
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,
       ariaMirror: this.ariaMirror,
       geometry: this.geometry,
       datasource: this.datasourceController,
+      datasourceEnabled: Boolean(datasource),
       store: this.store,
       activeSheet: () => this.activeSheet,
       theme: () => this.theme,
@@ -1179,7 +1175,7 @@ export class GridImpl implements Grid {
   }
 
   private applyLayout(): void {
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     const sheet = this.sheet();
     const columns = sheet.columns.map((column, c) => ({
       ...column,
@@ -1244,7 +1240,7 @@ export class GridImpl implements Grid {
 
   private rebuildColumnIndex(): void {
     this.geometry.rebuildColumns();
-    this.renderCoordinator.invalidateColumns();
+    this.readWindows.invalidateColumns();
     this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
   }
 
@@ -1271,11 +1267,11 @@ export class GridImpl implements Grid {
   }
 
   private scheduleRender(): void {
-    this.renderCoordinator.schedule();
+    this.readWindows.schedule();
   }
 
   private render(): void {
-    this.renderCoordinator.renderNow();
+    this.readWindows.renderNow();
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -1772,7 +1768,7 @@ export class GridImpl implements Grid {
     if (next === this.overscan) return;
     this.overscan = next;
     // Read per frame by the window calculations; a repaint picks it up.
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   }
 
@@ -2865,7 +2861,7 @@ export class GridImpl implements Grid {
     // The view permutation lives outside the store, so it must invalidate the
     // data signature itself — a view change with an identical window/scroll
     // (e.g. sorting while already at the top) would otherwise reuse stale rows.
-    this.renderCoordinator.invalidateData();
+    this.readWindows.invalidateData();
     this.syncSizer();
     this.render();
   }
@@ -2896,7 +2892,7 @@ export class GridImpl implements Grid {
     this.cancelAutoFit();
     this.datasourceController.destroy();
     this.mutationRevisions.clear();
-    this.renderCoordinator.destroy();
+    this.readWindows.destroy();
     this.interactions.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.resizeObserver?.disconnect();

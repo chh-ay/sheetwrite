@@ -846,6 +846,13 @@ export class StoreDataEngine {
     );
   }
 
+  /** Empty protection releases remain valid after their sheet has been removed. */
+  pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
+    const handle = this.handles.get(sheet);
+    if (handle === undefined && bands.length === 0) return;
+    this.wasm.pinViewportBands(handle ?? this.handleOf(sheet), bands);
+  }
+
   canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;

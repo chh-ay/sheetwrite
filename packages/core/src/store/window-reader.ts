@@ -8,6 +8,7 @@ import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
@@ -326,13 +327,32 @@ export class StoreWindowReader {
     applyConditionalRules: boolean,
   ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
+    const isPaged = this.wasm.isPaged(handle);
+    try {
+      return this.readPinned(sheet, rows, cols, order, applyConditionalRules, isPaged);
+    } finally {
+      if (isPaged) {
+        this.wasm.pinRange(handle, 0, 0, EMPTY_PIN_COLUMNS);
+      }
+    }
+  }
+
+  private readPinned(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    applyConditionalRules: boolean,
+    isPaged: boolean,
+  ): InstrumentedVisibleWindowView {
+    const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
     let ffiCalls = 1;
     let ffiInputBytes = colsU32.byteLength;
     let ffiLargestTransferBytes = colsU32.byteLength;
-    if (this.wasm.isPaged(handle)) {
+    if (isPaged) {
       this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
-      ffiCalls += 1;
+      ffiCalls += 2;
       ffiInputBytes += colsU32.byteLength;
     }
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;

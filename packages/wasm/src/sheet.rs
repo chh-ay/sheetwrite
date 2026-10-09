@@ -175,6 +175,9 @@ pub(crate) struct PagedStorage {
     dirty: HashMap<(usize, usize), DirtyCell>,
     dirty_by_revision: HashMap<u64, Vec<(usize, usize)>>,
     pinned: HashSet<(usize, usize)>,
+    read_pin_scratch: HashSet<(usize, usize)>,
+    viewport_pinned: HashSet<(usize, usize)>,
+    viewport_pin_scratch: HashSet<(usize, usize)>,
     evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
@@ -191,6 +194,9 @@ impl PagedStorage {
             dirty: HashMap::new(),
             dirty_by_revision: HashMap::new(),
             pinned: HashSet::new(),
+            read_pin_scratch: HashSet::new(),
+            viewport_pinned: HashSet::new(),
+            viewport_pin_scratch: HashSet::new(),
             evictable: RefCell::new(BTreeSet::new()),
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
@@ -219,7 +225,7 @@ impl PagedStorage {
         let Some(chunk) = self.chunks.get(&key) else {
             return;
         };
-        let eligible = !self.pinned.contains(&key);
+        let eligible = !self.pinned.contains(&key) && !self.viewport_pinned.contains(&key);
         let previous = chunk.last_access.get();
         let mut evictable = self.evictable.borrow_mut();
         if eligible {
@@ -254,7 +260,7 @@ impl PagedStorage {
             let access = self.next_access();
             self.chunks
                 .insert(key, CellChunk::new(self.chunk_rows, access));
-            if !self.pinned.contains(&key) {
+            if !self.pinned.contains(&key) && !self.viewport_pinned.contains(&key) {
                 self.evictable.get_mut().insert((access, key.0, key.1));
             }
         } else {
@@ -540,14 +546,62 @@ impl PagedStorage {
     }
 
     fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
-        let mut next = HashSet::new();
-        for &col in cols {
-            for chunk in r0 / self.chunk_rows..=r1 / self.chunk_rows {
-                next.insert((col as usize, chunk));
+        let mut next = std::mem::take(&mut self.read_pin_scratch);
+        if r0 < r1 {
+            for &col in cols {
+                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
+                    next.insert((col as usize, chunk));
+                }
             }
         }
+        self.replace_pins(next);
+    }
 
+    fn pin_viewport_bands(&mut self, bands: &[u32]) {
+        let mut next = std::mem::take(&mut self.viewport_pin_scratch);
+        for band in bands.chunks_exact(4) {
+            let [r0, r1, c0, c1] = [
+                band[0] as usize,
+                band[1] as usize,
+                band[2] as usize,
+                band[3] as usize,
+            ];
+            if r0 >= r1 {
+                continue;
+            }
+            for col in c0..c1 {
+                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
+                    next.insert((col, chunk));
+                }
+            }
+        }
+        for key in self.viewport_pinned.difference(&next) {
+            if self.pinned.contains(key) {
+                continue;
+            }
+            if let Some(chunk) = self.chunks.get(key) {
+                self.evictable
+                    .get_mut()
+                    .insert((chunk.last_access.get(), key.0, key.1));
+            }
+        }
+        for key in next.difference(&self.viewport_pinned) {
+            if let Some(chunk) = self.chunks.get(key) {
+                self.evictable
+                    .get_mut()
+                    .remove(&(chunk.last_access.get(), key.0, key.1));
+            }
+        }
+        let mut previous = std::mem::replace(&mut self.viewport_pinned, next);
+        previous.clear();
+        self.viewport_pin_scratch = previous;
+    }
+
+    fn replace_pins(&mut self, next: HashSet<(usize, usize)>) {
         for key in self.pinned.difference(&next) {
+            if self.viewport_pinned.contains(key) {
+                continue;
+            }
             if let Some(chunk) = self.chunks.get(key) {
                 self.evictable
                     .get_mut()
@@ -561,7 +615,9 @@ impl PagedStorage {
                     .remove(&(chunk.last_access.get(), key.0, key.1));
             }
         }
-        self.pinned = next;
+        let mut previous = std::mem::replace(&mut self.pinned, next);
+        previous.clear();
+        self.read_pin_scratch = previous;
         let access = self.next_access();
         for &key in &self.pinned {
             if let Some(chunk) = self.chunks.get(&key) {
@@ -685,6 +741,18 @@ impl PagedStorage {
         indexes
             .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.read_pin_scratch.len(),
+            self.read_pin_scratch.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.viewport_pinned.len(),
+            self.viewport_pinned.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.viewport_pin_scratch.len(),
+            self.viewport_pin_scratch.capacity(),
+        );
         // `std::collections::BTreeSet` exposes no node capacity. Report its
         // eviction entries without inventing allocator bytes from `size_of_val`.
         indexes.entries = indexes
@@ -1098,9 +1166,13 @@ impl SheetData {
     }
     pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(paged) = &mut self.paged {
-            if start_row < end_row {
-                paged.pin_range(start_row, end_row - 1, cols);
-            }
+            paged.pin_range(start_row, end_row, cols);
+        }
+    }
+
+    pub(crate) fn pin_viewport_bands(&mut self, bands: &[u32]) {
+        if let Some(paged) = &mut self.paged {
+            paged.pin_viewport_bands(bands);
         }
     }
 

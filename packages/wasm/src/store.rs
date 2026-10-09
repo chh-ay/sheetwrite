@@ -602,6 +602,14 @@ impl CellStore {
         }
     }
 
+    /// Replaces viewport-owned protection independently of transient read pins.
+    #[wasm_bindgen(js_name = pinViewportBands)]
+    pub fn pin_viewport_bands(&mut self, sheet: usize, bands: &[u32]) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.pin_viewport_bands(bands);
+        }
+    }
+
     #[wasm_bindgen(js_name = beginMutation)]
     pub fn begin_mutation(&mut self) -> u64 {
         let revision = self.next_mutation_revision();

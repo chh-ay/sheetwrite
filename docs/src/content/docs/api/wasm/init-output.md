@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L460"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L460</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L464"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L464</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -77,6 +77,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
 <a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
 <a href="#init-output-cellstore-pin-range"><code>cellstore_pinRange</code></a>
+<a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
 <a href="#init-output-cellstore-pool-strings"><code>cellstore_poolStrings</code></a>
 <a href="#init-output-cellstore-query-resource-stats"><code>cellstore_queryResourceStats</code></a>
 <a href="#init-output-cellstore-range-fully-loaded"><code>cellstore_rangeFullyLoaded</code></a>
@@ -152,7 +153,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>138</span>
+## Members <span class="api-count" data-pagefind-ignore>139</span>
 
 <div class="api-member-list">
 
@@ -737,6 +738,15 @@ readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]
 
 ```ts generated
 readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>cellstore_pinViewportBands</code></summary>
+
+```ts generated
+readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void;
 ```
 
 </details>
@@ -1695,6 +1705,12 @@ export interface InitOutput {
     d: number,
     e: number,
     f: number,
+  ) => void;
+  readonly cellstore_pinViewportBands: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
   ) => void;
   readonly cellstore_poolStrings: (
     a: number,
