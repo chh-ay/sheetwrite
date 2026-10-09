@@ -21,11 +21,13 @@ import type {
 /**
  * One sequenced document. Commits apply to a live store, so a one-cell commit
  * costs one transaction instead of rebuilding and re-exporting the workbook.
+ * The store is built on the first commit, so constructing the adapter and
+ * loading an uncommitted document do not need the engine to be initialized.
  * Snapshots are exported on demand; every export is a fresh, caller-owned copy.
  */
 interface MemoryDocument {
   readonly initial: WorkbookSnapshot;
-  store: SheetwriteStore;
+  store: SheetwriteStore | undefined;
   version: number;
   initialVersion: number;
   log: VersionedOperation[];
@@ -116,7 +118,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       const initial = cloneSnapshot({ ...checked.value, version });
       this.documents.set(checked.value.documentId, {
         initial,
-        store: SheetwriteStore.fromSnapshot(initial),
+        store: undefined,
         version,
         initialVersion: version,
         log: [],
@@ -187,6 +189,8 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
       clientMutationId: request.clientMutationId,
       ...(versions.length > 1 ? { batch: { index, count: versions.length } } : {}),
     }));
+    // Built before the rollback-protected block: a failed build changes nothing.
+    document.store ??= SheetwriteStore.fromSnapshot(document.initial);
     const store = document.store;
     try {
       for (const operations of versions) {
@@ -226,11 +230,21 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
 }
 
 function currentSnapshot(document: MemoryDocument): WorkbookSnapshot {
+  if (!document.store) return cloneSnapshot({ ...document.initial, version: document.version });
   return { ...document.store.exportSnapshot(), version: document.version };
 }
 
-/** Replace the live store with the committed state: the initial snapshot plus the log. */
+/**
+ * Replace the live store with the committed state: the initial snapshot plus
+ * the log. With nothing committed the document returns to its initial,
+ * store-free state, so loads match an adapter that never committed.
+ */
 function restoreCommittedStore(document: MemoryDocument): void {
+  if (document.log.length === 0) {
+    document.store?.dispose();
+    document.store = undefined;
+    return;
+  }
   const store = SheetwriteStore.fromSnapshot(document.initial);
   for (const entry of document.log) {
     store.applyTransaction(
@@ -238,7 +252,7 @@ function restoreCommittedStore(document: MemoryDocument): void {
       { source: "remote", commitReason: "api" },
     );
   }
-  document.store.dispose();
+  document.store?.dispose();
   document.store = store;
 }
 
