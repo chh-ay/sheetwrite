@@ -70,6 +70,7 @@ function smokeFixture(): PagedBenchmarkResult {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",
     matrixId: MATRIX_IDS.paged.smoke,
+    meta: { commit: "fixture", dirty: false, timestamp: "2026-10-07T00:00:00Z" },
     rows: PAGED_SMOKE_ROWS,
     columns: 5,
     runs: 2,
@@ -115,6 +116,7 @@ function fullFixture(): PagedBenchmarkResult {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "full",
     matrixId: MATRIX_IDS.paged.full,
+    meta: { commit: "fixture", dirty: false, timestamp: "2026-10-07T00:00:00Z" },
     rows: PAGED_FULL_ROWS,
     columns: 5,
     runs: 12,
@@ -185,6 +187,18 @@ describe("paged benchmark exact matrix", () => {
     };
     expect(() => validatePagedBenchmark(staleLoadFlag, "smoke")).toThrow(
       "rows=10000;probe=viewport.fullyLoaded",
+    );
+  });
+
+  test("rejects a capture without a usable provenance stamp", () => {
+    const source = smokeFixture();
+    expect(() => validatePagedBenchmark(source, "smoke")).not.toThrow();
+    const unstamped = {
+      ...source,
+      meta: { ...source.meta, commit: "", timestamp: "not a timestamp" },
+    };
+    expect(() => validatePagedBenchmark(unstamped, "smoke")).toThrow(
+      "paged capture provenance is incomplete",
     );
   });
 });

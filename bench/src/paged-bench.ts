@@ -18,6 +18,7 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
+import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { type Stat, summarize } from "./stats.js";
 
 export const PAGED_FULL_ROWS = 1_000_000;
@@ -114,6 +115,7 @@ export interface PagedTimingResult {
 }
 
 export interface PagedBenchmarkResult extends GateIdentity {
+  readonly meta: ProtocolCaptureMeta;
   readonly rows: number;
   readonly columns: number;
   readonly runs: number;
@@ -169,6 +171,15 @@ export function validatePagedBenchmark(
     result.cacheChurnRetainedChunks !== CACHE_CHURN_RETAINED_CHUNKS
   ) {
     throw new Error(`paged ${expectedMode} configuration does not match its declared protocol`);
+  }
+  if (
+    result.meta.commit.length === 0 ||
+    typeof result.meta.dirty !== "boolean" ||
+    !Number.isFinite(Date.parse(result.meta.timestamp))
+  ) {
+    throw new Error(
+      "paged capture provenance is incomplete: commit, dirty, and timestamp required",
+    );
   }
 
   const observed = [
@@ -727,6 +738,7 @@ async function runBenchmark(
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
     matrixId: MATRIX_IDS.paged[mode],
+    meta: protocolCaptureMeta(),
     rows: rowCount,
     columns: COLUMNS,
     runs,

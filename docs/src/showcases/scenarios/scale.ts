@@ -601,41 +601,93 @@ export const PAGED_EVIDENCE = {
   probes: pagedResults.probes,
 } as const;
 
-function sampleMedian(values: readonly number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.floor(sorted.length / 2)]!;
+/**
+ * The interaction artifact published by `bench/src/interaction-gate.ts`, as the
+ * showcase consumes it. The artifact is annotated here because the page reads a
+ * predecessor that is absent from the first capture of the schema.
+ */
+interface InteractionArtifactPrevious {
+  readonly mode: string;
+  readonly commit: string;
+  readonly timestamp: string;
+  readonly values: {
+    readonly lookupMedianNs: { readonly median: number };
+    readonly inverseIndexBytes: { readonly median: number };
+    readonly dirty100Bytes: { readonly median: number };
+    readonly ownedColdLongTaskMs: { readonly median: number };
+  };
 }
 
-/** Committed five-sample interaction, memory, and cold-route evidence. */
+interface InteractionArtifact {
+  readonly matrixId: string;
+  readonly protocolVersion: number;
+  readonly mode: string;
+  readonly metadata: {
+    readonly commit: string;
+    readonly dirty: boolean;
+    readonly timestamp: string;
+  };
+  readonly runner: { readonly runtime: string; readonly browser: string; readonly cpu: string };
+  readonly samples: { readonly lookupMedianNs: readonly number[] };
+  readonly values: {
+    readonly lookupMedianNs: { readonly median: number };
+    readonly lookupP95Ns: { readonly median: number };
+    readonly inverseIndexBytes: { readonly median: number };
+    readonly dirty100Bytes: { readonly median: number };
+    readonly ownedColdLongTaskMs: { readonly median: number };
+    readonly unattributedColdLongTaskMs: { readonly median: number };
+    readonly usableMs: { readonly median: number };
+  };
+  readonly ceilings: {
+    readonly lookupP95Ns: number;
+    readonly inverseIndexBytes: number;
+    readonly dirty100Bytes: number;
+    readonly ownedColdLongTaskMs: number;
+  };
+  readonly previous: InteractionArtifactPrevious | null;
+}
+
+const interactionArtifact: InteractionArtifact = interactionResults;
+
+/**
+ * Committed interaction evidence for the performance showcase: the current
+ * values of the four published metrics, their release ceilings, and the
+ * same-schema capture that was published before this one, when there was one.
+ */
 export const INTERACTION_EVIDENCE = {
   source: "bench/results/interaction-results.json",
-  protocol: `${interactionResults.matrixId} (protocol v${interactionResults.protocolVersion})`,
-  capture: interactionResults.source,
-  prefetch: interactionResults.directionalPrefetch,
-  before: {
-    lookupMedianNs: sampleMedian(interactionResults.viewIndex.baseline.lookupMedianNsSamples),
-    viewIndexBytes: interactionResults.viewIndex.baseline.retainedBytes,
-    dirty100Bytes: interactionResults.sparseDirty.baseline100Bytes,
-    coldOwnedLongTaskMs: sampleMedian(
-      interactionResults.coldRoute.before.sheetwriteLongTaskMsSamples,
-    ),
+  protocol: `${interactionArtifact.matrixId} (protocol v${interactionArtifact.protocolVersion}, ${interactionArtifact.mode} mode)`,
+  capture: {
+    commit: interactionArtifact.metadata.commit,
+    dirty: interactionArtifact.metadata.dirty,
+    timestamp: interactionArtifact.metadata.timestamp,
+    runtime: interactionArtifact.runner.runtime,
+    browser: interactionArtifact.runner.browser,
+    cpu: interactionArtifact.runner.cpu,
+    samples: interactionArtifact.samples.lookupMedianNs.length,
   },
-  after: {
-    lookupMedianNs: sampleMedian(interactionResults.viewIndex.packed.lookupMedianNsSamples),
-    viewIndexBytes: interactionResults.viewIndex.packed.retainedBytes,
-    dirty100Bytes: interactionResults.sparseDirty.dirty100Bytes,
-    coldOwnedLongTaskMs: sampleMedian(
-      interactionResults.coldRoute.after.sheetwriteLongTaskMsSamples,
-    ),
+  ceilings: interactionArtifact.ceilings,
+  current: {
+    lookupMedianNs: interactionArtifact.values.lookupMedianNs.median,
+    lookupP95Ns: interactionArtifact.values.lookupP95Ns.median,
+    viewIndexBytes: interactionArtifact.values.inverseIndexBytes.median,
+    dirty100Bytes: interactionArtifact.values.dirty100Bytes.median,
+    coldOwnedLongTaskMs: interactionArtifact.values.ownedColdLongTaskMs.median,
+    coldUnattributedLongTaskMs: interactionArtifact.values.unattributedColdLongTaskMs.median,
+    usableMs: interactionArtifact.values.usableMs.median,
   },
-  gains: {
-    lookup: interactionResults.viewIndex.medianLookupImprovementRatio,
-    heap: interactionResults.viewIndex.retainedHeapReductionRatio,
-    sparse: interactionResults.sparseDirty.dirty100ReductionRatio,
-    coldUsable: interactionResults.coldRoute.medianUsableImprovementRatio,
-  },
-  coldUnattributedLongTaskMs:
-    interactionResults.coldRoute.after.reportedUnattributedLongTaskMsSamples,
+  previous:
+    interactionArtifact.previous === null
+      ? null
+      : {
+          commit: interactionArtifact.previous.commit,
+          mode: interactionArtifact.previous.mode,
+          timestamp: interactionArtifact.previous.timestamp,
+          lookupMedianNs: interactionArtifact.previous.values.lookupMedianNs.median,
+          viewIndexBytes: interactionArtifact.previous.values.inverseIndexBytes.median,
+          dirty100Bytes: interactionArtifact.previous.values.dirty100Bytes.median,
+          coldOwnedLongTaskMs: interactionArtifact.previous.values.ownedColdLongTaskMs.median,
+        },
 } as const;
 
 /**

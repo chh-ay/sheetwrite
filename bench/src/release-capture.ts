@@ -48,6 +48,27 @@ const STEPS: readonly CaptureStep[] = [
     ],
   },
   {
+    name: "interaction",
+    artifacts: ["interaction-results.json"],
+    full: [["bench:interaction"]],
+    smoke: [
+      [
+        "src/interaction-bench.ts",
+        "--smoke",
+        "--output",
+        `${SCRATCH_DIRECTORY}/interaction-results.json`,
+      ],
+    ],
+  },
+  {
+    name: "paged",
+    artifacts: ["paged-results.json"],
+    full: [["bench:paged"]],
+    smoke: [
+      ["src/paged-bench.ts", "--smoke", "--output", `${SCRATCH_DIRECTORY}/paged-results.json`],
+    ],
+  },
+  {
     name: "data",
     artifacts: ["data-results.json"],
     full: [["bench:data"]],

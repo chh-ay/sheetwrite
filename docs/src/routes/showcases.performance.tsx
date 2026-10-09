@@ -75,6 +75,40 @@ const LANDMARKS = [
   { label: "100%", ratio: 1 },
 ] as const;
 const SCALE_OVERSCAN = 4;
+/** Smallest visible bar so a capture that is far below its predecessor still reads. */
+const MINIMUM_BAR_PERCENT = 0.5;
+
+/**
+ * Width of the current-value bar as a percent of the previous same-schema
+ * capture. Without a previous capture the bar states the current value alone.
+ */
+function previousShareBar(current: number, previous: number | undefined): number {
+  if (previous === undefined || previous === 0 || !Number.isFinite(previous)) return 100;
+  return Math.min(Math.max((current / previous) * 100, MINIMUM_BAR_PERCENT), 100);
+}
+
+/** Share of the owned long-task ceiling the current capture uses. */
+function ledgerPercent(current: number, ceiling: number): number {
+  if (!Number.isFinite(ceiling) || ceiling <= 0) return 0;
+  return Math.min(Math.max((current / ceiling) * 100, 0), 100);
+}
+
+/**
+ * The value line under a card: the change since the previous capture of the
+ * same schema when there is one, otherwise what the current value means.
+ */
+function interactionNote(
+  current: number,
+  previous: number | undefined,
+  format: (value: number) => string,
+  description: string,
+): string {
+  if (previous === undefined || previous === 0 || !Number.isFinite(previous)) return description;
+  const change = ((previous - current) / previous) * 100;
+  return change >= 0
+    ? `from ${format(previous)} · ${change.toFixed(1)}% lower`
+    : `from ${format(previous)} · ${(-change).toFixed(1)}% higher`;
+}
 
 const COMPARISON_LOG_MAX_EXPONENT = COMPARISON_EVIDENCE.available
   ? Math.max(
@@ -519,8 +553,9 @@ function PerformanceRoute() {
       (owner) => owner.logicalBytes !== 0 || owner.allocatedBytes !== 0 || owner.entries !== 0,
     ) ?? [];
   const latestCrossing = crossings[0];
-  const interactionBefore = INTERACTION_EVIDENCE.before;
-  const interactionAfter = INTERACTION_EVIDENCE.after;
+  const interaction = INTERACTION_EVIDENCE.current;
+  const interactionPrevious = INTERACTION_EVIDENCE.previous;
+  const interactionCeilings = INTERACTION_EVIDENCE.ceilings;
 
   const selectedFormula = gridRef.current?.store.getFormula(selectedAddress) ?? null;
   return (
@@ -1311,72 +1346,85 @@ function PerformanceRoute() {
             <div className="sw-sp-proof-wins" data-testid="scale-evidence-interaction">
               <article>
                 <span>Lookup latency</span>
-                <strong>{interactionAfter.lookupMedianNs.toFixed(2)} ns</strong>
+                <strong>{interaction.lookupMedianNs.toFixed(2)} ns</strong>
                 <div aria-hidden="true">
                   <i style={{ width: "100%" }} />
                   <i
                     style={{
-                      width: `${(interactionAfter.lookupMedianNs / interactionBefore.lookupMedianNs) * 100}%`,
+                      width: `${previousShareBar(interaction.lookupMedianNs, interactionPrevious?.lookupMedianNs)}%`,
                     }}
                   />
                 </div>
                 <p>
-                  from {interactionBefore.lookupMedianNs.toFixed(2)} ns ·{" "}
-                  {(
-                    (1 - interactionAfter.lookupMedianNs / interactionBefore.lookupMedianNs) *
-                    100
-                  ).toFixed(1)}
-                  % lower
+                  {interactionNote(
+                    interaction.lookupMedianNs,
+                    interactionPrevious?.lookupMedianNs,
+                    (value) => `${value.toFixed(2)} ns`,
+                    `p95 ${interaction.lookupP95Ns.toFixed(0)} ns · ceiling ${interactionCeilings.lookupP95Ns} ns`,
+                  )}
                 </p>
               </article>
               <article>
                 <span>Inverse index</span>
-                <strong>{formatBytes(interactionAfter.viewIndexBytes)}</strong>
+                <strong>{formatBytes(interaction.viewIndexBytes)}</strong>
                 <div aria-hidden="true">
                   <i style={{ width: "100%" }} />
                   <i
                     style={{
-                      width: `${(interactionAfter.viewIndexBytes / interactionBefore.viewIndexBytes) * 100}%`,
+                      width: `${previousShareBar(interaction.viewIndexBytes, interactionPrevious?.viewIndexBytes)}%`,
                     }}
                   />
                 </div>
                 <p>
-                  from {formatBytes(interactionBefore.viewIndexBytes)} ·{" "}
-                  {(
-                    (1 - interactionAfter.viewIndexBytes / interactionBefore.viewIndexBytes) *
-                    100
-                  ).toFixed(1)}
-                  % lower
+                  {interactionNote(
+                    interaction.viewIndexBytes,
+                    interactionPrevious?.viewIndexBytes,
+                    formatBytes,
+                    `ceiling ${formatBytes(interactionCeilings.inverseIndexBytes)}`,
+                  )}
                 </p>
               </article>
               <article>
                 <span>100 distant edits</span>
-                <strong>{formatBytes(interactionAfter.dirty100Bytes)}</strong>
+                <strong>{formatBytes(interaction.dirty100Bytes)}</strong>
                 <div aria-hidden="true">
                   <i style={{ width: "100%" }} />
                   <i
                     style={{
-                      width: `${Math.max(
-                        (interactionAfter.dirty100Bytes / interactionBefore.dirty100Bytes) * 100,
-                        0.5,
-                      )}%`,
+                      width: `${previousShareBar(interaction.dirty100Bytes, interactionPrevious?.dirty100Bytes)}%`,
                     }}
                   />
                 </div>
                 <p>
-                  from {formatBytes(interactionBefore.dirty100Bytes)} · sparse cells stay sparse
+                  {interactionNote(
+                    interaction.dirty100Bytes,
+                    interactionPrevious?.dirty100Bytes,
+                    formatBytes,
+                    `sparse cells stay sparse · ceiling ${formatBytes(interactionCeilings.dirty100Bytes)}`,
+                  )}
                 </p>
               </article>
               <article>
                 <span>Owned cold long task</span>
                 <strong data-testid="scale-evidence-cold">
-                  {interactionAfter.coldOwnedLongTaskMs.toFixed(1)} ms
+                  {interaction.coldOwnedLongTaskMs.toFixed(1)} ms
                 </strong>
                 <div aria-hidden="true">
                   <i style={{ width: "100%" }} />
-                  <i style={{ width: "0%" }} />
+                  <i
+                    style={{
+                      width: `${ledgerPercent(interaction.coldOwnedLongTaskMs, interactionCeilings.ownedColdLongTaskMs)}%`,
+                    }}
+                  />
                 </div>
-                <p>from {interactionBefore.coldOwnedLongTaskMs.toFixed(1)} ms median</p>
+                <p>
+                  {interactionNote(
+                    interaction.coldOwnedLongTaskMs,
+                    interactionPrevious?.coldOwnedLongTaskMs,
+                    (value) => `${value.toFixed(1)} ms`,
+                    `no Sheetwrite-owned long task · ${interaction.coldUnattributedLongTaskMs.toFixed(0)} ms unattributed nearby`,
+                  )}
+                </p>
               </article>
             </div>
           </div>
