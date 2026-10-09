@@ -5,9 +5,16 @@ description: "Generated, source-linked formula names, signatures, semantics, dia
 
 # Formula function contract
 
-This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions** and **54 incumbent functions** (154 canonical functions total) without maintaining a second name list. Aliases are shown beside their canonical function.
+This page is generated from the checked version 1 `sheetwrite.formula-capabilities` inventory. It publishes **100 required-supported target functions**, **54 incumbent functions**, and **145 optional analysis functions** (299 canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.
 
 A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.
+
+## Engine builds
+
+- `@sheetwrite/wasm` is the unchanged default engine. All incumbent and required-target functions are available in both builds.
+- `@sheetwrite/formulas` is an opt-in, larger analysis engine that also includes the distribution functions marked below. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.
+- The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.
+- Distribution evaluation is scalar binary64 with function-specific domains and bounded numerical algorithms. The inventory does not claim array broadcasting, unlimited tail accuracy, or complete Excel/Google Sheets/OpenFormula parity.
 
 ## Bounded evaluation contract
 
@@ -25,229 +32,477 @@ No formula throughput or latency number is published here because this contract 
 
 Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `FILTER` | incumbent | [`filter`](#signature-filter) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SORT` | incumbent | [`sort`](#signature-sort) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNIQUE` | incumbent | [`unique`](#signature-unique) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRANSPOSE` | required target | [`array-unary`](#signature-array-unary) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SEQUENCE` | required target | [`sequence`](#signature-sequence) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TAKE` | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DROP` | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSECOLS` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSEROWS` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `FILTER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`filter`](#signature-filter) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SORT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`sort`](#signature-sort) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `UNIQUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unique`](#signature-unique) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TRANSPOSE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`array-unary`](#signature-array-unary) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SEQUENCE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`sequence`](#signature-sequence) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TAKE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DROP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CHOOSECOLS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CHOOSEROWS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EXPAND` | `@sheetwrite/formulas` | optional analysis | [`reshape-expand`](#signature-reshape-expand) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `HSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `SORTBY` | `@sheetwrite/formulas` | optional analysis | [`sort-by`](#signature-sort-by) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `TOCOL` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `TOROW` | `@sheetwrite/formulas` | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `VSTACK` | `@sheetwrite/formulas` | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `WRAPCOLS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `WRAPROWS` | `@sheetwrite/formulas` | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
+| `GROUPBY` | `@sheetwrite/formulas` | optional analysis | [`groupby-groupby`](#signature-groupby-groupby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
+| `PIVOTBY` | `@sheetwrite/formulas` | optional analysis | [`groupby-pivotby`](#signature-groupby-pivotby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
+| `PERCENTOF` | `@sheetwrite/formulas` | optional analysis | [`groupby-percentof`](#signature-groupby-percentof) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
 
 ### Date and time
 
 Taxonomy/source: [Date and time functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `DATE` | incumbent | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DATEVALUE` | incumbent | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAY` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MONTH` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `YEAR` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TODAY` | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NOW` | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TIME` | required target | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TIMEVALUE` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `HOUR` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MINUTE` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SECOND` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAYS` | required target | [`date-pair`](#signature-date-pair) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EDATE` | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EOMONTH` | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WEEKDAY` | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WEEKNUM` | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WORKDAY` | required target | [`workday`](#signature-workday) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NETWORKDAYS` | required target | [`networkdays`](#signature-networkdays) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `YEARFRAC` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAYS360` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `DATE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DATEVALUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DAY` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MONTH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `YEAR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TODAY` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NOW` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TIME` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TIMEVALUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `HOUR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MINUTE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SECOND` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DAYS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`date-pair`](#signature-date-pair) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EDATE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EOMONTH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `WEEKDAY` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `WEEKNUM` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `WORKDAY` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`workday`](#signature-workday) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NETWORKDAYS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`networkdays`](#signature-networkdays) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `YEARFRAC` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DAYS360` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `DATEDIF` | `@sheetwrite/formulas` | optional analysis | [`datedif`](#signature-datedif) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `ISOWEEKNUM` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `NETWORKDAYS.INTL` | `@sheetwrite/formulas` | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+| `WORKDAY.INTL` | `@sheetwrite/formulas` | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
 
 ### Financial
 
 Taxonomy/source: [Financial functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `PV` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FV` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PMT` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NPV` | required target | [`npv`](#signature-npv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IRR` | required target | [`irr`](#signature-irr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RATE` | required target | [`rate`](#signature-rate) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IPMT` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PPMT` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `PV` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `FV` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PMT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NPV` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`npv`](#signature-npv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `IRR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`irr`](#signature-irr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `RATE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`rate`](#signature-rate) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `IPMT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PPMT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CUMIPMT` | `@sheetwrite/formulas` | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `CUMPRINC` | `@sheetwrite/formulas` | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `DB` | `@sheetwrite/formulas` | optional analysis | [`db`](#signature-db) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `DDB` | `@sheetwrite/formulas` | optional analysis | [`ddb`](#signature-ddb) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `EFFECT` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `FVSCHEDULE` | `@sheetwrite/formulas` | optional analysis | [`fvschedule`](#signature-fvschedule) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `MIRR` | `@sheetwrite/formulas` | optional analysis | [`mirr`](#signature-mirr) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `NOMINAL` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `NPER` | `@sheetwrite/formulas` | optional analysis | [`nper`](#signature-nper) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `PDURATION` | `@sheetwrite/formulas` | optional analysis | [`pduration`](#signature-pduration) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `RRI` | `@sheetwrite/formulas` | optional analysis | [`rri`](#signature-rri) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `SLN` | `@sheetwrite/formulas` | optional analysis | [`sln`](#signature-sln) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `SYD` | `@sheetwrite/formulas` | optional analysis | [`syd`](#signature-syd) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `XIRR` | `@sheetwrite/formulas` | optional analysis | [`xirr`](#signature-xirr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+| `XNPV` | `@sheetwrite/formulas` | optional analysis | [`xnpv`](#signature-xnpv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
 
 ### Information and error
 
 Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `IFERROR` | incumbent | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IFNA` | required target | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISBLANK` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISNUMBER` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISTEXT` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISLOGICAL` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISERROR` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISERR` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISNA` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TYPE` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `N` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `T` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NA` | incumbent | [`zero`](#signature-zero) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `IFERROR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `IFNA` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISBLANK` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISNUMBER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISTEXT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISLOGICAL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISERROR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISERR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISNA` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TYPE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `N` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `T` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NA` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`zero`](#signature-zero) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ISOMITTED` | `@sheetwrite/formulas` | optional analysis | [`lambda-isomitted`](#signature-lambda-isomitted) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
 
 ### Logical and control flow
 
 Taxonomy/source: [Logical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `IF` | incumbent | [`if`](#signature-if) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AND` | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `OR` | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NOT` | incumbent | [`unary-value`](#signature-unary-value) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IFS` | required target | [`ifs`](#signature-ifs) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SWITCH` | required target | [`switch`](#signature-switch) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XOR` | required target | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRUE` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FALSE` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LET` | required target | [`let`](#signature-let) | [`let-binding`](#semantics-let-binding) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `IF` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`if`](#signature-if) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `AND` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `OR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NOT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `IFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`ifs`](#signature-ifs) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SWITCH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`switch`](#signature-switch) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `XOR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TRUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `FALSE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LET` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`let`](#signature-let) | [`let-binding`](#semantics-let-binding) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LAMBDA` | `@sheetwrite/formulas` | optional analysis | [`lambda-lambda`](#signature-lambda-lambda) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `MAP` | `@sheetwrite/formulas` | optional analysis | [`lambda-map`](#signature-lambda-map) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `REDUCE` | `@sheetwrite/formulas` | optional analysis | [`lambda-reduce`](#signature-lambda-reduce) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `SCAN` | `@sheetwrite/formulas` | optional analysis | [`lambda-scan`](#signature-lambda-scan) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `BYROW` | `@sheetwrite/formulas` | optional analysis | [`lambda-byrow`](#signature-lambda-byrow) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `BYCOL` | `@sheetwrite/formulas` | optional analysis | [`lambda-bycol`](#signature-lambda-bycol) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+| `MAKEARRAY` | `@sheetwrite/formulas` | optional analysis | [`lambda-makearray`](#signature-lambda-makearray) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
 
 ### Lookup and reference
 
 Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `INDEX` | incumbent | [`index`](#signature-index) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MATCH` | incumbent | [`match`](#signature-match) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VLOOKUP` | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `HLOOKUP` | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XLOOKUP` | incumbent | [`xlookup`](#signature-xlookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XMATCH` | required target | [`xmatch`](#signature-xmatch) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSE` | required target | [`choose`](#signature-choose) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROW` | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROWS` | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COLUMN` | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COLUMNS` | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ADDRESS` | required target | [`address`](#signature-address) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `INDEX` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`index`](#signature-index) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MATCH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`match`](#signature-match) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `VLOOKUP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `HLOOKUP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `XLOOKUP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`xlookup`](#signature-xlookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `XMATCH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`xmatch`](#signature-xmatch) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CHOOSE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`choose`](#signature-choose) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ROW` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ROWS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COLUMN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COLUMNS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ADDRESS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`address`](#signature-address) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 
 ### Math and trigonometry
 
 Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `SUM` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ABS` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUND` | incumbent | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SQRT` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MOD` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `POW` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`parser-assisted-evaluator-declared`](#implementation-parser-assisted-evaluator-declared) |
-| `FLOOR` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CEILING` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `INT` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRUNC` | incumbent | [`trunc`](#signature-trunc) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SIGN` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PI` | incumbent | [`zero`](#signature-zero) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMIF` | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMIFS` | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PRODUCT` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMPRODUCT` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `POWER` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EXP` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LN` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOG` | required target | [`log`](#signature-log) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOG10` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUNDUP` | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUNDDOWN` | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MROUND` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EVEN` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ODD` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `QUOTIENT` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `GCD` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LCM` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUBTOTAL` | required target | [`subtotal`](#signature-subtotal) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `SUM` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ABS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ROUND` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SQRT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MOD` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `POW` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`parser-assisted-evaluator-declared`](#implementation-parser-assisted-evaluator-declared) |
+| `FLOOR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CEILING` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `INT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TRUNC` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`trunc`](#signature-trunc) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SIGN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PI` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`zero`](#signature-zero) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SUMIF` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SUMIFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PRODUCT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SUMPRODUCT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `POWER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EXP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LOG` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`log`](#signature-log) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LOG10` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ROUNDUP` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ROUNDDOWN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MROUND` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EVEN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `ODD` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `QUOTIENT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `GCD` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LCM` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SUBTOTAL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`subtotal`](#signature-subtotal) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `AGGREGATE` | `@sheetwrite/formulas` | optional analysis | [`aggregate`](#signature-aggregate) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `CEILING.MATH` | `@sheetwrite/formulas` | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `COMBIN` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `COMBINA` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FACT` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FACTDOUBLE` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `FLOOR.MATH` | `@sheetwrite/formulas` | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MDETERM` | `@sheetwrite/formulas` | optional analysis | [`array-unary`](#signature-array-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MINVERSE` | `@sheetwrite/formulas` | optional analysis | [`matrix-unary`](#signature-matrix-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MMULT` | `@sheetwrite/formulas` | optional analysis | [`matrix-pair`](#signature-matrix-pair) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MULTINOMIAL` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `MUNIT` | `@sheetwrite/formulas` | optional analysis | [`matrix-unit`](#signature-matrix-unit) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `PERMUT` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `PERMUTATIONA` | `@sheetwrite/formulas` | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SERIESSUM` | `@sheetwrite/formulas` | optional analysis | [`series-sum`](#signature-series-sum) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SQRTPI` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMSQ` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMX2MY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMX2PY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+| `SUMXMY2` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
 
 ### Statistical
 
 Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `AVERAGE` (`AVG`) | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MIN` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MAX` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNT` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTA` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTIF` | incumbent | [`criteria-one`](#signature-criteria-one) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTIFS` | incumbent | [`criteria-many`](#signature-criteria-many) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AVERAGEIF` | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AVERAGEIFS` | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MEDIAN` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MODE.SNGL` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LARGE` | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SMALL` | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RANK.EQ` | required target | [`rank`](#signature-rank) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PERCENTILE.INC` | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `QUARTILE.INC` | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `STDEV.S` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `STDEV.P` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VAR.S` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VAR.P` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `GEOMEAN` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CORREL` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COVARIANCE.S` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COVARIANCE.P` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTBLANK` | required target | [`unary-value`](#signature-unary-value) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MAXIFS` | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MINIFS` | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `AVERAGE` (`AVG`) | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MIN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MAX` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COUNT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COUNTA` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COUNTIF` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`criteria-one`](#signature-criteria-one) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COUNTIFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`criteria-many`](#signature-criteria-many) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `AVERAGEIF` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `AVERAGEIFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MEDIAN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MODE.SNGL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LARGE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SMALL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `RANK.EQ` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`rank`](#signature-rank) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PERCENTILE.INC` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `QUARTILE.INC` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `STDEV.S` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `STDEV.P` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `VAR.S` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `VAR.P` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `GEOMEAN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CORREL` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COVARIANCE.S` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COVARIANCE.P` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `COUNTBLANK` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MAXIFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MINIFS` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NORM.DIST` | `@sheetwrite/formulas` | optional analysis | [`norm-dist`](#signature-norm-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `NORM.INV` | `@sheetwrite/formulas` | optional analysis | [`norm-inv`](#signature-norm-inv) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `NORM.S.DIST` | `@sheetwrite/formulas` | optional analysis | [`norm-s-dist`](#signature-norm-s-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `NORM.S.INV` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `T.DIST` | `@sheetwrite/formulas` | optional analysis | [`t-dist`](#signature-t-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `T.DIST.2T` | `@sheetwrite/formulas` | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `T.DIST.RT` | `@sheetwrite/formulas` | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `T.INV` | `@sheetwrite/formulas` | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `T.INV.2T` | `@sheetwrite/formulas` | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CHISQ.DIST` | `@sheetwrite/formulas` | optional analysis | [`t-dist`](#signature-t-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CHISQ.DIST.RT` | `@sheetwrite/formulas` | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CHISQ.INV` | `@sheetwrite/formulas` | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CHISQ.INV.RT` | `@sheetwrite/formulas` | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `F.DIST` | `@sheetwrite/formulas` | optional analysis | [`f-dist`](#signature-f-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `F.DIST.RT` | `@sheetwrite/formulas` | optional analysis | [`f-tail`](#signature-f-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `F.INV` | `@sheetwrite/formulas` | optional analysis | [`f-inverse`](#signature-f-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `F.INV.RT` | `@sheetwrite/formulas` | optional analysis | [`f-inverse`](#signature-f-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `BINOM.DIST` | `@sheetwrite/formulas` | optional analysis | [`binom-dist`](#signature-binom-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `POISSON.DIST` | `@sheetwrite/formulas` | optional analysis | [`poisson-dist`](#signature-poisson-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `EXPON.DIST` | `@sheetwrite/formulas` | optional analysis | [`expon-dist`](#signature-expon-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `GAMMA` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `GAMMALN` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `GAMMA.DIST` | `@sheetwrite/formulas` | optional analysis | [`gamma-dist`](#signature-gamma-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `GAMMA.INV` | `@sheetwrite/formulas` | optional analysis | [`gamma-inverse`](#signature-gamma-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `BETA.DIST` | `@sheetwrite/formulas` | optional analysis | [`beta-dist`](#signature-beta-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `BETA.INV` | `@sheetwrite/formulas` | optional analysis | [`beta-inverse`](#signature-beta-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `LOGNORM.DIST` | `@sheetwrite/formulas` | optional analysis | [`lognorm-dist`](#signature-lognorm-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `LOGNORM.INV` | `@sheetwrite/formulas` | optional analysis | [`lognorm-inverse`](#signature-lognorm-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `WEIBULL.DIST` | `@sheetwrite/formulas` | optional analysis | [`weibull-dist`](#signature-weibull-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CONFIDENCE.NORM` | `@sheetwrite/formulas` | optional analysis | [`confidence`](#signature-confidence) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `CONFIDENCE.T` | `@sheetwrite/formulas` | optional analysis | [`confidence`](#signature-confidence) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `STANDARDIZE` | `@sheetwrite/formulas` | optional analysis | [`standardize`](#signature-standardize) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `FISHER` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `FISHERINV` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `PHI` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `GAUSS` | `@sheetwrite/formulas` | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
+| `AVEDEV` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `DEVSQ` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `HARMEAN` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `KURT` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `SKEW` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `SKEW.P` | `@sheetwrite/formulas` | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `TRIMMEAN` | `@sheetwrite/formulas` | optional analysis | [`trim-mean`](#signature-trim-mean) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `PERCENTILE.EXC` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `QUARTILE.EXC` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `PERCENTRANK.INC` | `@sheetwrite/formulas` | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `PERCENTRANK.EXC` | `@sheetwrite/formulas` | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `RANK.AVG` | `@sheetwrite/formulas` | optional analysis | [`rank`](#signature-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `PEARSON` | `@sheetwrite/formulas` | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `RSQ` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `SLOPE` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `INTERCEPT` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `STEYX` | `@sheetwrite/formulas` | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `FORECAST.LINEAR` (`FORECAST`) | `@sheetwrite/formulas` | optional analysis | [`forecast`](#signature-forecast) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
+| `FREQUENCY` | `@sheetwrite/formulas` | optional analysis | [`frequency`](#signature-frequency) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `MODE.MULT` | `@sheetwrite/formulas` | optional analysis | [`variadic-values-array`](#signature-variadic-values-array) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `GROWTH` | `@sheetwrite/formulas` | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `LINEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `LOGEST` | `@sheetwrite/formulas` | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PERCENTILE` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PERCENTRANK` | `@sheetwrite/formulas` | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `PROB` | `@sheetwrite/formulas` | optional analysis | [`probability-range`](#signature-probability-range) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `QUARTILE` | `@sheetwrite/formulas` | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `RANK` | `@sheetwrite/formulas` | optional analysis | [`rank`](#signature-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+| `TREND` | `@sheetwrite/formulas` | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
 
 ### Text
 
 Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
-| `LEN` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LEFT` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RIGHT` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MID` | incumbent | [`mid`](#signature-mid) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CONCAT` (`CONCATENATE`) | incumbent | [`variadic-values`](#signature-variadic-values) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UPPER` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOWER` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRIM` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TEXT` | incumbent | [`text-format`](#signature-text-format) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EXACT` | incumbent | [`binary-number`](#signature-binary-number) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TEXTJOIN` | required target | [`text-join`](#signature-text-join) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUBSTITUTE` | required target | [`substitute`](#signature-substitute) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `REPLACE` | required target | [`replace`](#signature-replace) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FIND` | required target | [`find-search`](#signature-find-search) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SEARCH` | required target | [`find-search`](#signature-find-search) | [`text-search`](#semantics-text-search) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VALUE` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CLEAN` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `REPT` | required target | [`repeat-text`](#signature-repeat-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHAR` | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CODE` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNICHAR` | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNICODE` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PROPER` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NUMBERVALUE` | required target | [`number-value`](#signature-number-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ARRAYTOTEXT` | `@sheetwrite/formulas` | optional analysis | [`array-to-text`](#signature-array-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `DOLLAR` | `@sheetwrite/formulas` | optional analysis | [`text-dollar`](#signature-text-dollar) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `FIXED` | `@sheetwrite/formulas` | optional analysis | [`text-fixed`](#signature-text-fixed) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXEXTRACT` | `@sheetwrite/formulas` | optional analysis | [`regex-extract`](#signature-regex-extract) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXREPLACE` | `@sheetwrite/formulas` | optional analysis | [`regex-replace`](#signature-regex-replace) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `REGEXTEST` | `@sheetwrite/formulas` | optional analysis | [`regex-test`](#signature-regex-test) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTAFTER` | `@sheetwrite/formulas` | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTBEFORE` | `@sheetwrite/formulas` | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `TEXTSPLIT` | `@sheetwrite/formulas` | optional analysis | [`text-split`](#signature-text-split) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `VALUETOTEXT` | `@sheetwrite/formulas` | optional analysis | [`value-to-text`](#signature-value-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
+| `LEN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LEFT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `RIGHT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `MID` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`mid`](#signature-mid) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CONCAT` (`CONCATENATE`) | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`variadic-values`](#signature-variadic-values) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `UPPER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `LOWER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TRIM` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TEXT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`text-format`](#signature-text-format) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `EXACT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | incumbent | [`binary-number`](#signature-binary-number) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `TEXTJOIN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`text-join`](#signature-text-join) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SUBSTITUTE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`substitute`](#signature-substitute) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `REPLACE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`replace`](#signature-replace) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `FIND` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`find-search`](#signature-find-search) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `SEARCH` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`find-search`](#signature-find-search) | [`text-search`](#semantics-text-search) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `VALUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CLEAN` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `REPT` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`repeat-text`](#signature-repeat-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CHAR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `CODE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `UNICHAR` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `UNICODE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `PROPER` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+| `NUMBERVALUE` | `@sheetwrite/wasm`, `@sheetwrite/formulas` | required target | [`number-value`](#signature-number-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
 
 ### Formula operators
 
 Taxonomy/source: [Types of operators](https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a).
 
-| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
-| --- | --- | --- | --- | --- | --- |
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+
+### Database
+
+Taxonomy/source: [Database functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
+
+| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |
+| --- | --- | --- | --- | --- | --- | --- |
+| `DAVERAGE` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DCOUNT` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DCOUNTA` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DGET` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DMAX` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DMIN` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DPRODUCT` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSTDEV` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSTDEVP` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DSUM` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DVAR` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+| `DVARP` | `@sheetwrite/formulas` | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
 
 ## Signature profiles
 
 Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.
+
+### Signature: text-delimiter
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `delimiter` | yes | none | `scalar`, `reference` | `once` |
+| `instanceNum` | no | 1 | `scalar`, `reference` | `once` |
+| `matchMode` | no | 0 | `scalar`, `reference` | `once` |
+| `matchEnd` | no | 0 | `scalar`, `reference` | `once` |
+| `ifNotFound` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: text-split
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `colDelimiter` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowDelimiter` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `ignoreEmpty` | no | false | `scalar`, `reference` | `once` |
+| `matchMode` | no | 0 | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: text-fixed
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `decimals` | no | 2 | `scalar`, `reference` | `once` |
+| `noCommas` | no | false | `scalar`, `reference` | `once` |
+
+### Signature: text-dollar
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `decimals` | no | 2 | `scalar`, `reference` | `once` |
+
+### Signature: value-to-text
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `reference` | `once` |
+| `format` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: array-to-text
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `format` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-test
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-extract
+
+Return shape: `contextual`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `returnMode` | no | 0 | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: regex-replace
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `text` | yes | none | `scalar`, `reference` | `once` |
+| `pattern` | yes | none | `scalar`, `reference` | `once` |
+| `replacement` | yes | none | `scalar`, `reference` | `once` |
+| `occurrence` | no | 0 | `scalar`, `reference` | `once` |
+| `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
 
 ### Signature: zero
 
@@ -285,6 +540,14 @@ Return shape: `scalar`.
 ### Signature: variadic-values
 
 Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+
+### Signature: variadic-values-array
+
+Return shape: `array`.
 
 | Argument | Required | Default | Accepts | Repetition |
 | --- | --- | --- | --- | --- |
@@ -761,6 +1024,15 @@ Return shape: `array`.
 | `rows` | yes | none | `scalar`, `reference` | `once` |
 | `columns` | no | all | `scalar`, `reference` | `once` |
 
+### Signature: sort-by
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+| `byArrayAndOrder` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
+
 ### Signature: choose-axis
 
 Return shape: `array`.
@@ -825,6 +1097,675 @@ Return shape: `scalar`.
 | `presentValue` | yes | none | `scalar`, `reference` | `once` |
 | `futureValue` | no | 0 | `scalar`, `reference` | `once` |
 | `type` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: norm-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: norm-inv
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: norm-s-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `z` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: t-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: distribution-tail
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: distribution-inverse
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: f-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom1` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: f-tail
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom1` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: f-inverse
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom1` | yes | none | `scalar`, `reference` | `once` |
+| `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: binom-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `successes` | yes | none | `scalar`, `reference` | `once` |
+| `trials` | yes | none | `scalar`, `reference` | `once` |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: poisson-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: expon-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: gamma-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: gamma-inverse
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: beta-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+| `lower` | no | 0 | `scalar`, `reference` | `once` |
+| `upper` | no | 1 | `scalar`, `reference` | `once` |
+
+### Signature: beta-inverse
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+| `lower` | no | 0 | `scalar`, `reference` | `once` |
+| `upper` | no | 1 | `scalar`, `reference` | `once` |
+
+### Signature: lognorm-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: lognorm-inverse
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `probability` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: weibull-dist
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `beta` | yes | none | `scalar`, `reference` | `once` |
+| `cumulative` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: confidence
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `alpha` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+| `size` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: standardize
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `mean` | yes | none | `scalar`, `reference` | `once` |
+| `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: trim-mean
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+| `percent` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: percent-rank
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `significance` | no | 3 | `scalar`, `reference` | `once` |
+
+### Signature: known-y-x
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `knownYs` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownXs` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: forecast
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `knownYs` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownXs` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: datedif
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `startDate` | yes | none | `scalar`, `reference` | `once` |
+| `endDate` | yes | none | `scalar`, `reference` | `once` |
+| `unit` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: calendar-intl
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `startDate` | yes | none | `scalar`, `reference` | `once` |
+| `endDateOrDays` | yes | none | `scalar`, `reference` | `once` |
+| `weekend` | no | 1 | `scalar`, `reference` | `once` |
+| `holidays` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: nper
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `payment` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | no | 0 | `scalar`, `reference` | `once` |
+| `type` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: xnpv
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: xirr
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `guess` | no | 0.1 | `scalar`, `reference` | `once` |
+
+### Signature: mirr
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `financeRate` | yes | none | `scalar`, `reference` | `once` |
+| `reinvestRate` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: cumulative-payment
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `nper` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `startPeriod` | yes | none | `scalar`, `reference` | `once` |
+| `endPeriod` | yes | none | `scalar`, `reference` | `once` |
+| `type` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: sln
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: syd
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: db
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+| `month` | no | 12 | `scalar`, `reference` | `once` |
+
+### Signature: ddb
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `cost` | yes | none | `scalar`, `reference` | `once` |
+| `salvage` | yes | none | `scalar`, `reference` | `once` |
+| `life` | yes | none | `scalar`, `reference` | `once` |
+| `period` | yes | none | `scalar`, `reference` | `once` |
+| `factor` | no | 2 | `scalar`, `reference` | `once` |
+
+### Signature: rri
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `nper` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: pduration
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rate` | yes | none | `scalar`, `reference` | `once` |
+| `presentValue` | yes | none | `scalar`, `reference` | `once` |
+| `futureValue` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: fvschedule
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `principal` | yes | none | `scalar`, `reference` | `once` |
+| `schedule` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: regression-fit
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `knownY` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownX` | no | 1,2,3,... | `range`, `array`, `reference` | `once` |
+| `const` | no | true | `scalar`, `reference` | `once` |
+| `stats` | no | false | `scalar`, `reference` | `once` |
+
+### Signature: regression-predict
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `knownY` | yes | none | `range`, `array`, `reference` | `once` |
+| `knownX` | no | 1,2,3,... | `range`, `array`, `reference` | `once` |
+| `newX` | no | knownX | `range`, `array`, `reference` | `once` |
+| `const` | no | true | `scalar`, `reference` | `once` |
+
+### Signature: frequency
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `data` | yes | none | `range`, `array`, `reference` | `once` |
+| `bins` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: probability-range
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `xRange` | yes | none | `range`, `array`, `reference` | `once` |
+| `probRange` | yes | none | `range`, `array`, `reference` | `once` |
+| `lowerLimit` | no | 0 | `scalar`, `reference` | `once` |
+| `upperLimit` | no | lowerLimit | `scalar`, `reference` | `once` |
+
+### Signature: database
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `database` | yes | none | `range`, `reference` | `once` |
+| `field` | yes | none | `scalar`, `reference` | `once` |
+| `criteria` | yes | none | `range`, `reference` | `once` |
+
+### Signature: round-math
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `number` | yes | none | `scalar`, `reference` | `once` |
+| `significance` | no | 1 | `scalar`, `reference` | `once` |
+| `mode` | no | 0 | `scalar`, `reference` | `once` |
+
+### Signature: series-sum
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `x` | yes | none | `scalar`, `reference` | `once` |
+| `n` | yes | none | `scalar`, `reference` | `once` |
+| `m` | yes | none | `scalar`, `reference` | `once` |
+| `coefficients` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: aggregate
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `functionNumber` | yes | none | `scalar`, `reference` | `once` |
+| `options` | yes | none | `scalar`, `reference` | `once` |
+| `reference` | yes | none | `range`, `array`, `reference` | `one-or-more` |
+
+### Signature: matrix-pair
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array1` | yes | none | `range`, `array`, `reference` | `once` |
+| `array2` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: matrix-unary
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `range`, `array`, `reference` | `once` |
+
+### Signature: matrix-unit
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `dimension` | yes | none | `scalar`, `reference` | `once` |
+
+### Signature: reshape-flatten
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `ignore` | no | 0 | `scalar`, `reference` | `once` |
+| `scanByColumn` | no | FALSE | `scalar`, `reference` | `once` |
+
+### Signature: reshape-wrap
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `vector` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `wrapCount` | yes | none | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: reshape-expand
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rows` | yes | none | `scalar`, `reference` | `once` |
+| `columns` | no | source columns | `scalar`, `reference` | `once` |
+| `padWith` | no | #N/A | `scalar`, `reference` | `once` |
+
+### Signature: reshape-stack
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+
+### Signature: lambda-lambda
+
+Return shape: `contextual`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `parameter` | no | none | `scalar`, `range`, `array`, `reference` | `zero-or-more` |
+| `calculation` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-map
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-reduce
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `initialValue` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-scan
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `initialValue` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-byrow
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-bycol
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-makearray
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rows` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `columns` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: lambda-isomitted
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: groupby-groupby
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rowFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `function` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldHeaders` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `totalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `sortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldRelationship` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: groupby-pivotby
+
+Return shape: `array`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `rowFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colFields` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `function` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `fieldHeaders` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowTotalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `rowSortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colTotalDepth` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `colSortOrder` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `relativeTo` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
+
+### Signature: groupby-percentof
+
+Return shape: `scalar`.
+
+| Argument | Required | Default | Accepts | Repetition |
+| --- | --- | --- | --- | --- |
+| `dataSubset` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
+| `dataAll` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
 ## Semantic profiles
 
@@ -1022,7 +1963,101 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
+### Semantics: analysis-distributions
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: contextual<br />array: contextual<br />broadcast: none<br />result: scalar |
+| coercion | blank: zero<br />text: number-if-parseable<br />boolean: number<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: bounded<br />iteration: kind: function-defined<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-descriptive
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: scalar |
+| coercion | blank: ignored<br />text: ignored-in-ranges<br />boolean: ignored-in-ranges<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-regression
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-math
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: function-defined |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-database
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: scalar |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: function-defined |
+| text | case: insensitive<br />wildcard: supported |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: none<br />maximum: none |
+| calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-lambda
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: not-applicable<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: bounded<br />maximum: 2000000 |
+| calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
+### Semantics: analysis-groupby
+
+| Dimension | Contract |
+| --- | --- |
+| shape | scalar: accepted<br />range: accepted<br />array: accepted<br />broadcast: none<br />result: contextual |
+| coercion | blank: function-defined<br />text: function-defined<br />boolean: function-defined<br />error: propagate |
+| text | case: insensitive<br />wildcard: not-applicable |
+| environment | locale: invariant<br />dateSystem: not-applicable |
+| numeric | tolerance: binary64<br />domain: function-defined<br />iteration: kind: bounded<br />maximum: 2000000 |
+| calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
+| persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
+
 ## Dialect profiles
+
+### Dialect: regex-lite-subset
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | divergent |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax, not full PCRE2. Lookaround, backreferences, Unicode classes such as \p{L}, and other patterns the engine cannot compile return #VALUE!. \d, \s, and \w use ASCII character classes. \b uses ASCII word boundaries. As in Excel, caseSensitivity is 0 (case-sensitive, the default) or 1 (case-insensitive). Case-insensitive matching and the (?i) flag fold ASCII letters only. If caseSensitivity is 1 or the pattern enables an inline i flag, a pattern with a non-ASCII cased letter or a \x, \u, or \U escape returns #VALUE!. Regex programs are limited to 2 MiB. Text inputs and outputs are limited to 32,767 characters.
 
 ### Dialect: excel-documented
 
@@ -1034,7 +2069,86 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
 
+### Dialect: analysis-distributions
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Scalar binary64 evaluation, not array broadcasting or blanket spreadsheet parity. Domain validation and finite numerical convergence may return #NUM!.
+
+### Dialect: analysis-descriptive
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits.
+
+### Dialect: analysis-regression
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.
+
+### Dialect: analysis-math
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits.
+
+### Dialect: analysis-database
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.
+
+### Dialect: analysis-lambda
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
+
+### Dialect: analysis-groupby
+
+| Dialect | Status |
+| --- | --- |
+| Microsoft Excel | documented |
+| Google Sheets | unverified |
+| OpenFormula | unverified |
+
+Limitations: Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported. Grouping and output use the engine spill and work limits.
+
 ## Implementation profiles
+
+### Implementation: text-analysis
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
+| Formula assist | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
+| Evidence | behavior-tested<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
 
 ### Implementation: implemented-assisted
 
@@ -1062,6 +2176,96 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 | Evaluator | declared |
 | Formula assist | missing<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | registration-tested<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-distributions
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/distributions.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/distributions.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-descriptive
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/descriptive.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/descriptive.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-dates
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/dates.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/dates.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-finance
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/finance.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/finance.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-regression
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/regression.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/regression.rs)<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-math
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/math.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/math.rs)<br />[`packages/wasm/src/eval/analysis/aggregate.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/aggregate.rs)<br />[`packages/wasm/src/eval/analysis/matrices.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/matrices.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-database
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/database.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/database.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
+
+### Implementation: analysis-reshape
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
+
+### Implementation: analysis-lambda
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
+
+### Implementation: analysis-groupby
+
+| Layer | Status and source/evidence |
+| --- | --- |
+| Parser | implemented<br />[`packages/wasm/src/calc.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/calc.rs) |
+| Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
+| Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
+| Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
 
 ## Unsupported categories
 

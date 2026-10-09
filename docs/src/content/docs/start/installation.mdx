@@ -119,6 +119,28 @@ await initSheetwrite("/sheetwrite_wasm_bg.wasm");
 
 webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node filesystem code out of browser graphs.
 
+## Full formula engine
+
+By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis functions, for example `NORM.S.DIST` or `T.INV`. It is the same engine with more functions and the same API.
+
+```sh verify
+npm install @sheetwrite/core @sheetwrite/formulas
+```
+
+Select the engine one time, before the app creates a grid or a store, and before a framework adapter mounts:
+
+```ts compile title="Select the full formula engine"
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+- An app uses one engine. After initialization starts, the engine cannot change. A call that selects a different engine rejects.
+- Later calls to `initSheetwrite()` without an engine keep the selected engine. Framework adapters make this call when they mount.
+- The default engine returns `#NAME?` for the analysis functions, and formula assist does not suggest them. An import of `@sheetwrite/formulas` does not select the engine.
+- The [formula function contract](/docs/reference/formula-functions/) shows which build has each function.
+
 ## Failure UI and retries
 
 React accepts `fallback`; Vue and Svelte use fallback content or slots. Initialization failures reach `onInitializationError` or Vue's `initialization-error`. A changed explicit source or remount can retry after failure.

@@ -1,0 +1,57 @@
+{
+  "name": "@sheetwrite/formulas",
+  "version": "0.4.0",
+  "type": "module",
+  "description": "Sheetwrite full formula engine (Rust/WASM), with analysis functions.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/sheetwrite.git",
+    "directory": "packages/formulas"
+  },
+  "homepage": "https://sheetwrite.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/sheetwrite/issues"
+  },
+  "keywords": [
+    "spreadsheet",
+    "wasm",
+    "rust",
+    "columnar",
+    "formula-engine"
+  ],
+  "main": "./loader.mjs",
+  "module": "./loader.mjs",
+  "types": "./loader.d.ts",
+  "exports": {
+    ".": {
+      "types": "./loader.d.ts",
+      "browser": "./loader-browser.mjs",
+      "node": "./loader-node.mjs",
+      "default": "./loader-browser.mjs"
+    },
+    "./wasm": "./pkg/sheetwrite_wasm_bg.wasm"
+  },
+  "files": [
+    "loader.mjs",
+    "loader-browser.mjs",
+    "loader-node.mjs",
+    "loader-state.mjs",
+    "loader.d.ts",
+    "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm.d.ts",
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "pkg/sheetwrite_wasm_bg.wasm.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf pkg"
+  }
+}

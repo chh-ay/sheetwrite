@@ -65,6 +65,7 @@ export {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
+export type { SheetwriteEngine } from "./engine.js";
 export {
   isSheetwriteError,
   SHEETWRITE_ERROR_CODES,

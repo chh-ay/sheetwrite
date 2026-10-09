@@ -124,6 +124,7 @@ class SourceSnapshot {
 <p class="api-consumers-label">Public exports naming <code>SourceSnapshot</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

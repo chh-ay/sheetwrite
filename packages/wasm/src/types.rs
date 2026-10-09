@@ -227,6 +227,8 @@ impl ReadSet {
             | Ast::Name(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Num(_) => {}
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => {}
         }
     }
 

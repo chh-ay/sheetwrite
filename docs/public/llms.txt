@@ -58,7 +58,8 @@ Sheetwrite packages are released together at version 0.4.0. This index is genera
 ## Public API
 
 - [API reference](https://sheetwrite.vercel.app/docs/api/): Generated reference for every classified Sheetwrite package entry point.
-- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 314 exports across 8 entry points (primary entry point: supported).
+- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 315 exports across 8 entry points (primary entry point: supported).
+- [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/api/formulas/): 14 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://sheetwrite.vercel.app/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://sheetwrite.vercel.app/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://sheetwrite.vercel.app/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).

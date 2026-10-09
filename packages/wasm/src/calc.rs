@@ -192,6 +192,8 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+    #[cfg(feature = "analysis")]
+    Analysis(&'static str),
 }
 
 const fn ascii_upper(byte: u8) -> u8 {
@@ -236,6 +238,10 @@ macro_rules! define_function_registry {
             {
                 return Some(FUNCTION_NAMES[index].1);
             }
+            #[cfg(feature = "analysis")]
+            if let Some(name) = crate::eval::analysis::lookup(name) {
+                return Some(Func::Analysis(name));
+            }
             FUNCTION_ALIASES
                 .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
                 .ok()
@@ -245,9 +251,23 @@ macro_rules! define_function_registry {
         fn func_name(func: Func) -> &'static str {
             match func {
                 $(Func::$variant => $canonical,)+
+                #[cfg(feature = "analysis")]
+                Func::Analysis(name) => name,
             }
         }
     };
+}
+
+#[cfg(feature = "analysis")]
+pub(crate) fn function_names() -> Vec<String> {
+    let mut names: Vec<String> = FUNCTION_NAMES.iter()
+        .chain(FUNCTION_ALIASES.iter())
+        .map(|(name, _)| (*name).to_owned())
+        .chain(crate::eval::analysis::names().map(str::to_owned))
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
 }
 
 define_function_registry! {
@@ -493,6 +513,14 @@ pub enum Ast {
     Str(String),
     Bool(bool),
     Missing,
+    /// A helper parameter value. It exists only during full-engine evaluation.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
+    BoundMatrix {
+        rows: usize,
+        cols: usize,
+        values: std::rc::Rc<Vec<crate::types::Value>>,
+    },
     Name(String),
     NamedRange(NamedRangeRef),
     UnresolvedStructured(UnresolvedStructuredRef),
@@ -526,6 +554,10 @@ impl Ast {
     /// included in its formula hash-table bucket.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { values, .. } => {
+                out.add_vec::<crate::types::Value>(values.len(), values.capacity());
+            }
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             Ast::UnresolvedStructured(value) => {
@@ -997,6 +1029,28 @@ impl<'a> Parser<'a> {
         Self::guard_depth(depth)?;
 
         let mut value = self.unary_at(depth)?;
+        #[cfg(feature = "analysis")]
+        while self.peek() == Some(&Tok::LParen) {
+            let _ = self.next();
+            let mut args = vec![value];
+            if self.peek() != Some(&Tok::RParen) {
+                loop {
+                    args.push(if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                        Ast::Missing
+                    } else {
+                        self.expr_at(depth + 1)?
+                    });
+                    if self.peek() != Some(&Tok::Comma) {
+                        break;
+                    }
+                    let _ = self.next();
+                }
+            }
+            if self.next() != Some(Tok::RParen) {
+                return Err("expected )".into());
+            }
+            value = Ast::UnknownFunc("$LAMBDA_CALL".into(), args);
+        }
         while self.peek() == Some(&Tok::Op('%')) {
             let _ = self.next();
             value = Ast::Percent(Box::new(value));
@@ -1293,6 +1347,16 @@ where
             }
             Ast::Func(Func::Let, resolved)
         }
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis("LAMBDA"), mut args) if !args.is_empty() => {
+            let body = args.pop().expect("nonempty arguments");
+            let mut scoped = locals.to_vec();
+            scoped.extend(args.iter().filter_map(|parameter| {
+                if let Ast::Name(name) = parameter { Some(name.clone()) } else { None }
+            }));
+            args.push(resolve_named_ranges_inner(body, formula_sheet, resolve, &scoped));
+            Ast::Func(Func::Analysis("LAMBDA"), args)
+        }
         Ast::Func(func, args) => Ast::Func(
             func,
             args.into_iter()
@@ -1534,6 +1598,8 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef => true,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => true,
     }
 }
 
@@ -1893,6 +1959,8 @@ fn write_ast(ast: &Ast, out: &mut String) {
             write_a1(*r1, *c1, flags.end, out);
         }
         Ast::Missing => {}
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
         Ast::InvalidRef => out.push_str("#REF!"),
         Ast::LetSlot { expression, .. } => write_ast(expression, out),
         Ast::Func(func, args) => {
@@ -1903,6 +1971,16 @@ fn write_ast(ast: &Ast, out: &mut String) {
                     out.push(',');
                 }
                 write_ast(arg, out);
+            }
+            out.push(')');
+        }
+        #[cfg(feature = "analysis")]
+        Ast::UnknownFunc(name, args) if name == crate::eval::analysis::lambda::CALL => {
+            if let Some(callee) = args.first() { write_ast(callee, out); }
+            out.push('(');
+            for (index, argument) in args.iter().skip(1).enumerate() {
+                if index > 0 { out.push(','); }
+                write_ast(argument, out);
             }
             out.push(')');
         }
@@ -2299,5 +2377,28 @@ mod tests {
         }
         assert_eq!(parse_col(""), None);
         assert_eq!(parse_col("A1"), None);
+    }
+
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn analysis_names_resolve_to_their_family_without_shadowing_built_ins() {
+        let names: Vec<&str> = crate::eval::analysis::names().collect();
+        for name in &names {
+            assert!(
+                name.bytes().all(|byte| !byte.is_ascii_lowercase()),
+                "{name} must be uppercase"
+            );
+            // A built-in or alias with the same spelling would win the lookup.
+            assert_eq!(lookup_func(name), Some(Func::Analysis(name)), "{name}");
+            assert_eq!(lookup_func(&name.to_ascii_lowercase()), Some(Func::Analysis(name)));
+            assert_eq!(func_name(Func::Analysis(name)), *name);
+        }
+        let listed = function_names();
+        assert_eq!(
+            listed.len(),
+            FUNCTION_NAMES.len() + FUNCTION_ALIASES.len() + names.len(),
+            "every spelling is listed once"
+        );
+        assert!(listed.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

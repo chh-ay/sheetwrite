@@ -20,6 +20,7 @@ import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
 import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
 import { Route as TestRenderersRouteImport } from './routes/test.renderers'
 import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
+import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
 import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
@@ -84,6 +85,11 @@ const TestRenderersRoute = TestRenderersRouteImport.update({
 const TestPrefetchRoute = TestPrefetchRouteImport.update({
   id: '/test/prefetch',
   path: '/test/prefetch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestFormulasEngineRoute = TestFormulasEngineRouteImport.update({
+  id: '/test/formulas-engine',
+  path: '/test/formulas-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestCollaborationRoute = TestCollaborationRouteImport.update({
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/showcases/interoperability': typeof ShowcasesInteroperabilityRoute
   '/showcases/performance': typeof ShowcasesPerformanceRoute
   '/test/collaboration': typeof TestCollaborationRoute
+  '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/renderers': typeof TestRenderersRoute
   '/test/semantic-grid': typeof TestSemanticGridRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/formulas-engine'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/formulas-engine'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/showcases/interoperability'
     | '/showcases/performance'
     | '/test/collaboration'
+    | '/test/formulas-engine'
     | '/test/prefetch'
     | '/test/renderers'
     | '/test/semantic-grid'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   ShowcasesInteroperabilityRoute: typeof ShowcasesInteroperabilityRoute
   ShowcasesPerformanceRoute: typeof ShowcasesPerformanceRoute
   TestCollaborationRoute: typeof TestCollaborationRoute
+  TestFormulasEngineRoute: typeof TestFormulasEngineRoute
   TestPrefetchRoute: typeof TestPrefetchRoute
   TestRenderersRoute: typeof TestRenderersRoute
   TestSemanticGridRoute: typeof TestSemanticGridRoute
@@ -382,6 +395,13 @@ declare module '@tanstack/react-router' {
       path: '/test/prefetch'
       fullPath: '/test/prefetch'
       preLoaderRoute: typeof TestPrefetchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/formulas-engine': {
+      id: '/test/formulas-engine'
+      path: '/test/formulas-engine'
+      fullPath: '/test/formulas-engine'
+      preLoaderRoute: typeof TestFormulasEngineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test/collaboration': {
@@ -472,6 +492,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShowcasesInteroperabilityRoute: ShowcasesInteroperabilityRoute,
   ShowcasesPerformanceRoute: ShowcasesPerformanceRoute,
   TestCollaborationRoute: TestCollaborationRoute,
+  TestFormulasEngineRoute: TestFormulasEngineRoute,
   TestPrefetchRoute: TestPrefetchRoute,
   TestRenderersRoute: TestRenderersRoute,
   TestSemanticGridRoute: TestSemanticGridRoute,

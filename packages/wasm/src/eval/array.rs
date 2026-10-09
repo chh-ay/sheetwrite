@@ -32,8 +32,18 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(super) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            super::analysis::lambda::produces_array(name, args)
+        }
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis(name), args) => super::analysis::family(name)
+            .and_then(|family| family.array.as_ref())
+            .is_some_and(|hooks| (hooks.produces_array)(name, args)),
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -94,6 +104,20 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0)),
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                ast_produces_array(ast).then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                Some((hooks.bound)(self, name, args, formula_sheet))
+            }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
@@ -184,6 +208,25 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, values } => {
+                Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                if !ast_produces_array(ast) {
+                    return None;
+                }
+                super::analysis::lambda::evaluate_matrix(self, name, args, sheet, affected, memo, visiting, depth + 1)
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                (hooks.evaluate)(self, name, args, sheet, affected, memo, visiting, depth + 1)
+            }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
             }
@@ -260,6 +303,29 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => {
+                return Ok((*rows, *cols, EvalMatrix::validate_shape(*rows, *cols, 1, 0)?));
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                return super::analysis::lambda::shape(self, name, args, formula_sheet);
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(name), args) => {
+                let hooks = super::analysis::family(name)
+                    .and_then(|family| family.array.as_ref())
+                    .ok_or(FormulaError::Value)?;
+                if !(hooks.produces_array)(name, args) {
+                    return Err(FormulaError::Value);
+                }
+                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet)?;
+                let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+                if cells != validated {
+                    return Err(FormulaError::Value);
+                }
+                return Ok((rows, cols, cells));
+            }
             Ast::Func(Func::Let, args) => {
                 let (expanded, _) = expand_let_ast(args)?;
                 return self.matrix_shape(&expanded, formula_sheet);
@@ -394,7 +460,8 @@ impl CellStore {
         let include =
             self.eval_array_matrix_arg(&args[1], sheet, affected, memo, visiting, depth + 1)?;
         array.validate_copies(2)?;
-        debug_assert_eq!(array.values.len(), array_cells);
+        // Value-dependent arrays can shrink from their static shape bound.
+        debug_assert!(array.values.len() <= array_cells);
 
         let filter_rows = include.rows == array.rows && include.cols == 1;
         let filter_cols = include.rows == 1 && include.cols == array.cols;
@@ -1090,6 +1157,23 @@ mod tests {
         );
         assert_close(number(&store, sheet, 1, 5), 20.0);
         assert_close(number(&store, sheet, 0, 7), 21.0);
+    }
+
+    #[test]
+    fn filter_uses_evaluated_unique_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 6);
+        for (row, value) in [1.0, 1.0, 2.0].into_iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_number(sheet, 0, 1, 1.0, 0);
+        store.set_number(sheet, 1, 1, 1.0, 0);
+        store.set_formula(sheet, 0, 3, "=FILTER(UNIQUE(A1:A3),B1:B2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_eq!(store.spill_anchor_row(sheet, 1, 3), 0);
+        assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
     }
 
     #[test]

@@ -254,7 +254,8 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
 
   const common = ["--manifest-path", "packages/wasm/Cargo.toml"] as const;
   const repositorySources = ["--ignore-filename-regex", String.raw`\.cargo|\.rustup`] as const;
-  await run(["cargo", "llvm-cov", ...common, "--no-report"], root);
+  // The full engine builds every source file; no code is compiled only without it.
+  await run(["cargo", "llvm-cov", ...common, "--features", "analysis", "--no-report"], root);
   await run(
     [
       "cargo",

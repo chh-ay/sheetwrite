@@ -24,6 +24,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
   await mkdir(join(root, "docs"), { recursive: true });
   const dependencies: Readonly<Record<string, readonly string[]>> = {
     "@sheetwrite/wasm": [],
+    "@sheetwrite/formulas": [],
     "@sheetwrite/core": ["@sheetwrite/wasm"],
     "@sheetwrite/xlsx": ["@sheetwrite/core"],
     "@sheetwrite/react": ["@sheetwrite/core"],

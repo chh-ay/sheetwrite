@@ -2100,6 +2100,7 @@ export interface InitOutput {
 <p class="api-consumers-label">Public exports naming <code>InitOutput</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

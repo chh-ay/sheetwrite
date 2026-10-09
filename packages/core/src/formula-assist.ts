@@ -1,4 +1,5 @@
 import { labelToCol } from "./a1.js";
+import { engineFunctionNames } from "./engine.js";
 import type { HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
 
@@ -336,11 +337,14 @@ export class FormulaAssist {
     }
 
     const upper = token.toUpperCase();
-    const matches = FORMULA_FUNCTIONS.filter((fn) => fn.startsWith(upper)).sort((left, right) => {
-      const lengthOrder = left.length - right.length;
-      if (lengthOrder !== 0) return lengthOrder;
-      return left < right ? -1 : left > right ? 1 : 0;
-    });
+    const functions = engineFunctionNames ?? FORMULA_FUNCTIONS;
+    const matches = functions
+      .filter((fn) => fn.startsWith(upper))
+      .sort((left, right) => {
+        const lengthOrder = left.length - right.length;
+        if (lengthOrder !== 0) return lengthOrder;
+        return left < right ? -1 : left > right ? 1 : 0;
+      });
     if (matches.length === 0) {
       this.close();
       return;

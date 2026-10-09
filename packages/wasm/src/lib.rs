@@ -46,6 +46,13 @@ pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]
 pub use window::WindowView;
 
+/// Names accepted by the full engine, including aliases.
+#[cfg(feature = "analysis")]
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = functionNames)]
+pub fn function_names() -> Vec<String> {
+    calc::function_names()
+}
+
 // Test-only preludes: `tests.rs` reaches the whole crate through `use super::*`.
 #[cfg(all(test, feature = "formula-engine"))]
 pub(crate) use sheet::*;

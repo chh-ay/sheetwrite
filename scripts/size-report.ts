@@ -216,6 +216,7 @@ const historyPath = join(import.meta.dir, "size-history.json");
 const XLSX_PACKAGE = "@sheetwrite/xlsx";
 const packageDirectories = [
   "packages/wasm",
+  "packages/formulas",
   "packages/core",
   "packages/xlsx",
   "packages/react",

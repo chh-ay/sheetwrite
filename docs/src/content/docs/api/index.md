@@ -9,7 +9,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <table class="api-entry-table">
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
-<tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>314</td></tr>
+<tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>315</td></tr>
 <tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>51</td></tr>
 <tr><td><a href="/docs/api/core-browser/"><code>@sheetwrite/core/browser</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>4</td></tr>
 <tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>13</td></tr>
@@ -17,6 +17,16 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <tr><td><a href="/docs/api/core-styles-css/"><code>@sheetwrite/core/styles.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 <tr><td><a href="/docs/api/core-testing/"><code>@sheetwrite/core/testing</code></a></td><td><span class="api-status" data-status="test-only">test-only</span></td><td>4</td></tr>
 <tr><td><a href="/docs/api/core-worker/"><code>@sheetwrite/core/worker</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>2</td></tr>
+</tbody>
+</table>
+
+## @sheetwrite/formulas
+
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/formulas/"><code>@sheetwrite/formulas</code></a></td><td><span class="api-status" data-status="internal">internal</span></td><td>14</td></tr>
+<tr><td><a href="/docs/api/formulas-wasm/"><code>@sheetwrite/formulas/wasm</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>
 </tbody>
 </table>
 

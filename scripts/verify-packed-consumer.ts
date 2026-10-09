@@ -112,6 +112,22 @@ const packageSpecs: PackageSpec[] = [
     ],
   },
   {
+    directory: "packages/formulas",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "loader.d.ts",
+      "loader.mjs",
+      "loader-browser.mjs",
+      "loader-node.mjs",
+      "loader-state.mjs",
+      "pkg/sheetwrite_wasm.d.ts",
+      "pkg/sheetwrite_wasm.js",
+      "pkg/sheetwrite_wasm_bg.wasm",
+      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+    ],
+  },
+  {
     directory: "packages/xlsx",
     requiredFiles: [
       "LICENSE",
@@ -324,6 +340,29 @@ async function assertTarball(
   }
 
   await assertWorkerBundle(packageRoot, packedManifest);
+  if (manifest.name === "@sheetwrite/formulas") {
+    await run(
+      [
+        "node",
+        "--input-type=module",
+        "-e",
+        `import { strict as assert } from "node:assert";
+         const engine = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "loader-node.mjs")).href)});
+         await engine.load();
+         assert.equal(engine.isLoaded(), true);
+         const store = new engine.CellStore();
+         try {
+           const sheet = store.addSheet(1, 1);
+           store.setFormula(sheet, 0, 0, "=NORM.DIST(0,0,1,TRUE)", 0);
+           store.recompute(sheet);
+           const cell = store.getCell(sheet, 0, 0);
+           try { assert.ok(Math.abs(cell.num - 0.5) < 1e-12); }
+           finally { cell.free(); }
+         } finally { store.free(); }`,
+      ],
+      packageRoot,
+    );
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -604,7 +643,16 @@ try {
   await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
   await run(
-    ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
+    [
+      "npm",
+      "ls",
+      "@sheetwrite/core",
+      "@sheetwrite/wasm",
+      "@sheetwrite/formulas",
+      "react",
+      "svelte",
+      "vue",
+    ],
     consumerRoot,
   );
   const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
@@ -613,6 +661,7 @@ try {
   await run(["npm", "run", "bundle:frameworks"], consumerRoot);
   await verifyMountedFrameworkConsumers(consumerRoot);
   await run(["npm", "run", "runtime"], consumerRoot);
+  await run(["npm", "run", "runtime:formulas"], consumerRoot);
 
   // The Vite build must have compiled the packed Svelte adapter and retained
   // its operational-event wiring, in addition to the mounted browser proof.

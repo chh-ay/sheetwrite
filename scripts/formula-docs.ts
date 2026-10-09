@@ -22,6 +22,7 @@ interface SignatureProfile {
 interface FormulaRecord {
   readonly canonical: string;
   readonly aliases: readonly string[];
+  readonly builds: readonly string[];
   readonly family: string;
   readonly contractStatus: "required-supported" | "supported";
   readonly signature: string;
@@ -133,6 +134,7 @@ function parseFunctions(value: unknown): FormulaRecord[] {
       canonical: string(formula.canonical, `functions[${index}].canonical`),
       aliases: stringArray(formula.aliases, `functions[${index}].aliases`),
       family: string(formula.family, `functions[${index}].family`),
+      builds: stringArray(formula.builds, `functions[${index}].builds`),
       contractStatus,
       signature: string(formula.signature, `functions[${index}].signature`),
       semantics: string(formula.semantics, `functions[${index}].semantics`),
@@ -189,7 +191,11 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     throw new Error(`duplicate formula names: ${duplicateNames.join(", ")}`);
 
   const required = functions.filter((formula) => formula.contractStatus === "required-supported");
-  const incumbent = functions.filter((formula) => formula.contractStatus === "supported");
+  const incumbent = functions.filter(
+    (formula) =>
+      formula.contractStatus === "supported" && formula.builds.includes("@sheetwrite/wasm"),
+  );
+  const extension = functions.filter((formula) => !formula.builds.includes("@sheetwrite/wasm"));
   if (required.length !== REQUIRED_SUPPORTED_COUNT) {
     throw new Error(
       `formula documentation requires ${REQUIRED_SUPPORTED_COUNT} required-supported functions; found ${required.length}`,
@@ -221,9 +227,16 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     "",
     "# Formula function contract",
     "",
-    `This page is generated from the checked version ${inventory.version} \`${contract}\` inventory. It publishes **${required.length} required-supported target functions** and **${incumbent.length} incumbent functions** (${functions.length} canonical functions total) without maintaining a second name list. Aliases are shown beside their canonical function.`,
+    `This page is generated from the checked version ${inventory.version} \`${contract}\` inventory. It publishes **${required.length} required-supported target functions**, **${incumbent.length} incumbent functions**, and **${extension.length} optional analysis functions** (${functions.length} canonical functions total) without maintaining a second name list. Aliases share their canonical function's build availability.`,
     "",
     "A function's presence means only the signature and semantic profiles linked in its row. Microsoft Excel documentation supplies the naming/family taxonomy; it is not a blanket Excel claim. Google Sheets and OpenFormula behavior is unverified unless a dialect profile says otherwise.",
+    "",
+    "## Engine builds",
+    "",
+    "- `@sheetwrite/wasm` is the unchanged default engine. All incumbent and required-target functions are available in both builds.",
+    '- `@sheetwrite/formulas` is an opt-in, larger analysis engine that also includes the distribution functions marked below. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.',
+    "- The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.",
+    "- Distribution evaluation is scalar binary64 with function-specific domains and bounded numerical algorithms. The inventory does not claim array broadcasting, unlimited tail accuracy, or complete Excel/Google Sheets/OpenFormula parity.",
     "",
     "## Bounded evaluation contract",
     "",
@@ -252,16 +265,20 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
       "",
       `Taxonomy/source: [${section}](${sourceUrl}).`,
       "",
-      "| Function (aliases) | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |",
-      "| --- | --- | --- | --- | --- | --- |",
+      "| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
       ...familyFunctions.map((formula) => {
         const aliases =
           formula.aliases.length > 0
             ? ` (${formula.aliases.map((name) => `\`${name}\``).join(", ")})`
             : "";
         const contractLabel =
-          formula.contractStatus === "required-supported" ? "required target" : "incumbent";
-        return `| \`${formula.canonical}\`${aliases} | ${contractLabel} | [\`${formula.signature}\`](#signature-${anchor(formula.signature)}) | [\`${formula.semantics}\`](#semantics-${anchor(formula.semantics)}) | [\`${formula.dialects}\`](#dialect-${anchor(formula.dialects)}) | [\`${formula.implementation}\`](#implementation-${anchor(formula.implementation)}) |`;
+          formula.contractStatus === "required-supported"
+            ? "required target"
+            : formula.builds.includes("@sheetwrite/wasm")
+              ? "incumbent"
+              : "optional analysis";
+        return `| \`${formula.canonical}\`${aliases} | ${formula.builds.map((build) => `\`${build}\``).join(", ")} | ${contractLabel} | [\`${formula.signature}\`](#signature-${anchor(formula.signature)}) | [\`${formula.semantics}\`](#semantics-${anchor(formula.semantics)}) | [\`${formula.dialects}\`](#dialect-${anchor(formula.dialects)}) | [\`${formula.implementation}\`](#implementation-${anchor(formula.implementation)}) |`;
       }),
       "",
     );

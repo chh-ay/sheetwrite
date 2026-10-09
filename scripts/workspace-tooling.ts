@@ -11,6 +11,7 @@ export const CARGO_LLVM_COV_VERSION = "0.8.7";
 
 export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
+  "@sheetwrite/formulas",
   "@sheetwrite/core",
   "@sheetwrite/xlsx",
   "@sheetwrite/react",
@@ -20,6 +21,7 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
 
 export const PACKAGE_TYPECHECK_ORDER = [
   "@sheetwrite/wasm",
+  "@sheetwrite/formulas",
   "@sheetwrite/core",
   "@sheetwrite/xlsx",
   "@sheetwrite/react",
@@ -138,6 +140,11 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     cwd: "packages/wasm",
   },
   {
+    id: "test:rust:analysis",
+    command: ["cargo", "test", "--features", "analysis"],
+    cwd: "packages/wasm",
+  },
+  {
     id: "audit:rust",
     command: ["cargo", "audit"],
     cwd: "packages/wasm",
@@ -162,6 +169,7 @@ const POST_BUILD_QUALITY_NODES: readonly CommandNode[] = [
       "packages",
       "test/browser/canvas-assertions.test.ts",
       "scripts/public-api.test.ts",
+      "scripts/formula-contract.test.ts",
       "bench/test",
     ],
   },
