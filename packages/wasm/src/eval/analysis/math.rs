@@ -1,6 +1,15 @@
 //! Rounding, factorial, combinatorics, and sum-of-squares functions.
 
+use std::collections::{HashMap, HashSet};
+
+use crate::calc::Ast;
+use crate::sheet::SheetData;
+use crate::store::CellStore;
+use crate::types::{AbsCellKey, CellRange, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_NUMBER};
+
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
+use super::super::matrix::range_from_ast;
+use super::super::range_reader::RangeReader;
 use super::super::value::aggregate_number;
 use crate::types::{EvalResult, FormulaError, Value};
 
@@ -34,6 +43,226 @@ type NumberResult = Result<f64, FormulaError>;
 
 pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
     calculate(name, values).map_or_else(Value::Error, Value::number)
+}
+
+/// Fold a reference directly; literal numbers need no evaluation or value list.
+pub(in crate::eval) fn streamed_sum_squares(
+    store: &CellStore,
+    args: &[Ast],
+    sheet: usize,
+    affected: &HashSet<AbsCellKey>,
+    memo: &mut HashMap<AbsCellKey, EvalResult>,
+    visiting: &mut HashSet<AbsCellKey>,
+    depth: usize,
+) -> Option<EvalResult> {
+    let [argument] = args else {
+        return None;
+    };
+    // Scalar cells and let slots keep the accumulator's coercion rules.
+    if !matches!(
+        argument,
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..)
+    ) {
+        return None;
+    }
+    let range = range_from_ast(argument, sheet)?;
+    let result = (|| {
+        if depth > FORMULA_RECURSION_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        let (rows, cols) = RangeReader::new(store, range, depth)?.shape();
+        let source_sheet = &store.sheets[range.sheet as usize];
+        let mut context = RangeContext {
+            store,
+            affected,
+            memo,
+            visiting,
+            depth,
+        };
+        let mut sum = 0.0;
+        for row in range.row_start as usize..range.row_start as usize + rows {
+            for col in range.col_start as usize..range.col_start as usize + cols {
+                let number = context.number(source_sheet, range.sheet as usize, row, col)?;
+                if let Some(number) = number {
+                    sum += number * number;
+                }
+            }
+        }
+        Ok(sum)
+    })();
+    Some(result.map_or_else(Value::Error, Value::number))
+}
+
+struct RangeContext<'a> {
+    store: &'a CellStore,
+    affected: &'a HashSet<AbsCellKey>,
+    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
+    visiting: &'a mut HashSet<AbsCellKey>,
+    depth: usize,
+}
+
+impl RangeContext<'_> {
+    fn number(
+        &mut self,
+        source: &SheetData,
+        sheet: usize,
+        row: usize,
+        col: usize,
+    ) -> Result<Option<f64>, FormulaError> {
+        if !source.is_loaded(row, col) {
+            return Err(FormulaError::Loading);
+        }
+        let index = source.idx(row, col);
+        match source.kind_at(index) {
+            KIND_EMPTY => Ok(None),
+            KIND_NUMBER => {
+                let number = source.num_at(index);
+                if !number.is_finite() || self.depth + 1 > FORMULA_RECURSION_LIMIT {
+                    return Err(FormulaError::Num);
+                }
+                Ok(Some(number))
+            }
+            _ => aggregate_number(
+                &self.store.eval_at(
+                    sheet,
+                    row,
+                    col,
+                    self.affected,
+                    self.memo,
+                    self.visiting,
+                    self.depth + 1,
+                ),
+                true,
+            ),
+        }
+    }
+}
+
+/// Callers consume at most the validated range length.
+struct NumberCursor<'a> {
+    source: &'a SheetData,
+    sheet: usize,
+    row: usize,
+    col: usize,
+    col_start: usize,
+    col_end: usize,
+}
+
+impl<'a> NumberCursor<'a> {
+    fn new(store: &'a CellStore, range: CellRange, cols: usize) -> Self {
+        Self {
+            source: &store.sheets[range.sheet as usize],
+            sheet: range.sheet as usize,
+            row: range.row_start as usize,
+            col: range.col_start as usize,
+            col_start: range.col_start as usize,
+            col_end: range.col_start as usize + cols - 1,
+        }
+    }
+
+    fn number(&mut self, context: &mut RangeContext<'_>) -> Result<Option<f64>, FormulaError> {
+        let number = context.number(self.source, self.sheet, self.row, self.col)?;
+        self.col += 1;
+        if self.col > self.col_end {
+            self.col = self.col_start;
+            self.row += 1;
+        }
+        Ok(number)
+    }
+}
+
+/// Read both references directly, preserving left-before-right error precedence.
+pub(in crate::eval) fn streamed_paired_squares(
+    store: &CellStore,
+    name: &str,
+    args: &[Ast],
+    sheet: usize,
+    affected: &HashSet<AbsCellKey>,
+    memo: &mut HashMap<AbsCellKey, EvalResult>,
+    visiting: &mut HashSet<AbsCellKey>,
+    depth: usize,
+) -> Option<EvalResult> {
+    let [left, right] = args else {
+        return None;
+    };
+    if !args.iter().all(|argument| {
+        matches!(
+            argument,
+            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..)
+        )
+    }) {
+        return None;
+    }
+    let left_range = range_from_ast(left, sheet)?;
+    let right_range = range_from_ast(right, sheet)?;
+    if depth > FORMULA_RECURSION_LIMIT {
+        return Some(Value::Error(FormulaError::Num));
+    }
+    let (left_rows, left_cols) = match RangeReader::new(store, left_range, depth) {
+        Ok(reader) => reader.shape(),
+        Err(error) => return Some(Value::Error(error)),
+    };
+    let right_shape = RangeReader::new(store, right_range, depth).map(|reader| reader.shape());
+    let left_length = left_rows * left_cols;
+    let right_length = right_shape.as_ref().map_or(0, |&(rows, cols)| rows * cols);
+    if left_length.saturating_add(right_length) > crate::types::RANGE_CELL_LIMIT as usize {
+        return None;
+    }
+    let result = (|| {
+        let mut context = RangeContext {
+            store,
+            affected,
+            memo,
+            visiting,
+            depth,
+        };
+        let mut left_cursor = NumberCursor::new(store, left_range, left_cols);
+        let mut right_cursor = right_shape
+            .as_ref()
+            .ok()
+            .map(|&(_, cols)| NumberCursor::new(store, right_range, cols));
+        let mut right_error = right_shape.as_ref().err().copied();
+        let mut sum = 0.0;
+        for index in 0..left_length {
+            let left_number = left_cursor.number(&mut context)?;
+            // Finish the left argument even if a right cell has already failed.
+            let right_number = if let Some(cursor) = right_cursor
+                .as_mut()
+                .filter(|_| right_error.is_none() && index < right_length)
+            {
+                match cursor.number(&mut context) {
+                    Ok(number) => number,
+                    Err(error) => {
+                        right_error = Some(error);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            if let (Some(x), Some(y)) = (left_number, right_number) {
+                sum += match name {
+                    "SUMX2MY2" => x * x - y * y,
+                    "SUMX2PY2" => x * x + y * y,
+                    _ => (x - y) * (x - y),
+                };
+            }
+        }
+        if let Some(error) = right_error {
+            return Err(error);
+        }
+        // Shape errors follow cell errors, including any unpaired right cells.
+        if let Some(cursor) = right_cursor.as_mut() {
+            for _ in left_length..right_length {
+                cursor.number(&mut context)?;
+            }
+        }
+        if left_length != right_length {
+            return Err(FormulaError::Na);
+        }
+        Ok(sum)
+    })();
+    Some(result.map_or_else(Value::Error, Value::number))
 }
 
 fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {

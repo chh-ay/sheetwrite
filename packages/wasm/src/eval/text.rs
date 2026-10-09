@@ -525,6 +525,9 @@ fn wildcard_prefix(
 }
 
 fn characters_equal_ignore_case(left: char, right: char) -> bool {
+    if left.is_ascii() && right.is_ascii() {
+        return left.eq_ignore_ascii_case(&right);
+    }
     left == right
         || left.to_lowercase().eq(right.to_lowercase())
         || left.to_uppercase().eq(right.to_uppercase())

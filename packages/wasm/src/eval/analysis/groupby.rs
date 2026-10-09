@@ -145,7 +145,7 @@ struct Group {
 }
 struct Axis {
     groups: Vec<Group>,
-    memberships: Vec<Vec<usize>>,
+    memberships: Vec<usize>,
     order: Vec<usize>,
     grand: usize,
     width: usize,
@@ -176,10 +176,20 @@ impl Axis {
             parent: None,
         }];
         let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
-        let mut memberships = vec![Vec::new(); fields.rows];
+        // Every included row belongs to the root and one group per prefix.
+        let membership_width = fields.cols + 1;
+        let mut memberships = vec![
+            0;
+            fields
+                .rows
+                .checked_mul(membership_width)
+                .ok_or(FormulaError::Num)?
+        ];
+        // Reuse the lookup key; only a new bucket needs an owned copy.
+        let mut key = Vec::with_capacity(fields.cols);
         for &row in included {
             groups[0].rows.push(row);
-            memberships[row].push(0);
+            key.clear();
             let mut parent = 0;
             for width in 1..=fields.cols {
                 let values = &fields.values[row * fields.cols..row * fields.cols + width];
@@ -192,14 +202,15 @@ impl Axis {
                     .ok_or(FormulaError::Num)
                 })?;
                 context.charge(width.checked_add(text_work).ok_or(FormulaError::Num)?)?;
-                let key = values.iter().map(key_part).collect::<Result<Vec<_>, _>>()?;
-                let bucket = buckets.entry(key).or_default();
+                key.push(key_part(&values[width - 1])?);
                 let mut found = None;
-                for &group in bucket.iter() {
-                    context.charge(width)?;
-                    if compare_fields(&groups[group].fields, values) == Ordering::Equal {
-                        found = Some(group);
-                        break;
+                if let Some(bucket) = buckets.get(&key) {
+                    for &group in bucket {
+                        context.charge(width)?;
+                        if compare_fields(&groups[group].fields, values) == Ordering::Equal {
+                            found = Some(group);
+                            break;
+                        }
                     }
                 }
                 let group = found.unwrap_or_else(|| {
@@ -209,11 +220,11 @@ impl Axis {
                         rows: Vec::new(),
                         parent: Some(parent),
                     });
-                    bucket.push(index);
+                    buckets.entry(key.clone()).or_default().push(index);
                     index
                 });
                 groups[group].rows.push(row);
-                memberships[row].push(group);
+                memberships[row * membership_width + width] = group;
                 parent = group;
             }
         }
@@ -233,6 +244,10 @@ impl Axis {
             grand: 0,
             width: fields.cols,
         })
+    }
+    fn memberships(&self, row: usize) -> &[usize] {
+        let width = self.width + 1;
+        &self.memberships[row * width..(row + 1) * width]
     }
     fn ancestor(&self, mut group: usize, width: usize) -> usize {
         while self.groups[group].fields.len() > width {
@@ -766,8 +781,8 @@ pub(crate) fn evaluate_matrix(
             &col_aggregates,
         )?;
         for &row in &included {
-            for &row_group in &rows.memberships[row] {
-                for &col_group in &columns.memberships[row] {
+            for &row_group in rows.memberships(row) {
+                for &col_group in columns.memberships(row) {
                     context.charge(1)?;
                     intersections
                         .entry((row_group, col_group))

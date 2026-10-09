@@ -99,11 +99,15 @@ pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
 }
 
 pub(crate) fn capture(expression: &Ast, bindings: &[(&str, Ast)]) -> Result<Ast, FormulaError> {
-    substitute(expression, bindings, &mut 0)
+    let bindings: Vec<_> = bindings
+        .iter()
+        .map(|(name, value)| (*name, value))
+        .collect();
+    substitute(expression, &bindings, &mut 0)
 }
 fn substitute(
     expression: &Ast,
-    bindings: &[(&str, Ast)],
+    bindings: &[(&str, &Ast)],
     nodes: &mut usize,
 ) -> Result<Ast, FormulaError> {
     *nodes += 1;
@@ -116,7 +120,7 @@ fn substitute(
             .iter()
             .rev()
             .find(|(parameter, _)| parameter.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value)
+            .map(|(_, value)| *value)
     };
     Ok(match expression {
         Ast::Name(name) => lookup(name).cloned().unwrap_or_else(|| expression.clone()),
@@ -132,7 +136,7 @@ fn substitute(
         }
         Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) => {
             let (parameters, body) = definition(expression)?;
-            let visible: Vec<_> = bindings.iter().filter(|(name, _)| !parameters.iter().any(|parameter| matches!(parameter, Ast::Name(local) if local.eq_ignore_ascii_case(name)))).cloned().collect();
+            let visible: Vec<_> = bindings.iter().filter(|(name, _)| !parameters.iter().any(|parameter| matches!(parameter, Ast::Name(local) if local.eq_ignore_ascii_case(name)))).copied().collect();
             let mut nested = arguments[..arguments.len() - 1].to_vec();
             nested.push(substitute(body, &visible, nodes)?);
             Ast::Func(Func::Analysis(super::LAMBDA_ID), nested)
@@ -194,6 +198,24 @@ fn apply(function: &Ast, arguments: &[Ast]) -> Result<Ast, FormulaError> {
     if parameters.len() != arguments.len() {
         return Err(FormulaError::Value);
     }
+    // Array helpers use one or two parameters; bind those without a heap buffer.
+    match parameters {
+        [] => return substitute(body, &[], &mut 0),
+        [Ast::Name(name)] => {
+            return substitute(body, &[(name.as_str(), &arguments[0])], &mut 0);
+        }
+        [Ast::Name(first), Ast::Name(second)] => {
+            return substitute(
+                body,
+                &[
+                    (first.as_str(), &arguments[0]),
+                    (second.as_str(), &arguments[1]),
+                ],
+                &mut 0,
+            );
+        }
+        _ => {}
+    }
     let bindings: Vec<_> = parameters
         .iter()
         .zip(arguments)
@@ -201,7 +223,7 @@ fn apply(function: &Ast, arguments: &[Ast]) -> Result<Ast, FormulaError> {
             let Ast::Name(name) = parameter else {
                 unreachable!("definition validates parameters")
             };
-            (name.as_str(), argument.clone())
+            (name.as_str(), argument)
         })
         .collect();
     substitute(body, &bindings, &mut 0)
@@ -429,8 +451,11 @@ pub(crate) fn evaluate(
         depth,
     };
     let result = match name {
-        "LAMBDA" => definition(&Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments.to_vec()))
-            .map(|_| Value::Error(FormulaError::Calc)),
+        "LAMBDA" => definition(&Ast::Func(
+            Func::Analysis(super::LAMBDA_ID),
+            arguments.to_vec(),
+        ))
+        .map(|_| Value::Error(FormulaError::Calc)),
         "ISOMITTED" if arguments.len() == 1 => {
             Ok(Value::Bool(matches!(arguments[0], Ast::Missing)))
         }

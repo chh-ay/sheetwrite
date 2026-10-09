@@ -299,6 +299,7 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
     let mut has_positive = false;
     let mut has_negative = false;
     let mut cash_scale = 0.0;
+    let mut last_date = first_date;
     for (cash, date) in cash_flows.iter().zip(dates) {
         let cash = list_number(cash)?;
         let date = list_number(date)?.trunc();
@@ -311,6 +312,7 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
         has_positive |= cash > 0.0;
         has_negative |= cash < 0.0;
         cash_scale += cash.abs();
+        last_date = last_date.max(date);
     }
     let rate = number_arg(
         arguments,
@@ -324,15 +326,29 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
     if rate <= -1.0 {
         return Err(FormulaError::Num);
     }
+    let date_count = (last_date - first_date) as usize + 1;
+    // Only cache dense date ranges: at least two cash flows per calendar day.
+    let mut cached_powers = (date_count <= cash_flows.len() / 2).then(|| {
+        let years = (0..date_count)
+            .map(|days| days as f64 / DAYS_PER_YEAR)
+            .collect::<Vec<_>>();
+        (years, vec![0.0; date_count])
+    });
+    let mut discount = |rate| match &mut cached_powers {
+        Some((years, powers)) => {
+            discounted_cached(cash_flows, dates, first_date, years, powers, rate)
+        }
+        None => discounted(cash_flows, dates, first_date, rate),
+    };
     if !is_internal {
-        return Ok(discounted(cash_flows, dates, first_date, rate).0);
+        return Ok(discount(rate).0);
     }
     if !has_positive || !has_negative {
         return Err(FormulaError::Num);
     }
     let mut rate = rate;
     for _ in 0..XIRR_MAX_ITERATIONS {
-        let (present, derivative) = discounted(cash_flows, dates, first_date, rate);
+        let (present, derivative) = discount(rate);
         if !present.is_finite() || !derivative.is_finite() || derivative == 0.0 {
             return Err(FormulaError::Num);
         }
@@ -372,6 +388,37 @@ fn discounted(
         let discounted_cash = cash / (1.0 + rate).powf(years);
         present += discounted_cash;
         derivative -= years * discounted_cash / (1.0 + rate);
+    }
+    (present, derivative)
+}
+
+fn discounted_cached(
+    cash_flows: &[FuncValue],
+    dates: &[FuncValue],
+    first_date: f64,
+    years: &[f64],
+    powers: &mut [f64],
+    rate: f64,
+) -> (f64, f64) {
+    // Repeated dates share a power, but cash flows retain their original summation order.
+    for (power, &year) in powers.iter_mut().zip(years) {
+        *power = (1.0 + rate).powf(year);
+    }
+    let mut present = 0.0;
+    let mut derivative = 0.0;
+    for (cash, date) in cash_flows.iter().zip(dates) {
+        let cash = match &cash.value {
+            Value::Number(number) => *number,
+            _ => 0.0,
+        };
+        let date = match &date.value {
+            Value::Number(number) => number.trunc(),
+            _ => 0.0,
+        };
+        let year_index = (date - first_date) as usize;
+        let discounted_cash = cash / powers[year_index];
+        present += discounted_cash;
+        derivative -= years[year_index] * discounted_cash / (1.0 + rate);
     }
     (present, derivative)
 }
