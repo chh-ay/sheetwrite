@@ -468,7 +468,7 @@ describe("Grid transaction resource ingress", () => {
     grid.destroy();
   });
 
-  it("undoes a local edit where remote row changes moved it", () => {
+  it("undoes a local edit where remote row and column changes moved it", () => {
     const amounts = (grid: GridImpl, rows: number) =>
       Array.from(
         { length: rows },
@@ -515,6 +515,26 @@ describe("Grid transaction resource ingress", () => {
       expect({ remote, amounts: amounts(grid, rows) }).toEqual({ remote, amounts: expected });
       grid.destroy();
     }
+
+    // A peer inserted a column on the left: the amount column is now column 2.
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(6),
+      data: makeColumnarData(6),
+    });
+    expect(editRow3(grid).status).toBe("applied");
+    const inserted = { key: "peer", header: "Peer", width: 80, type: "text" as const };
+    expect(
+      grid.applyRemoteOperations([{ op: "addColumns", sheet: "s1", at: 0, columns: [inserted] }])
+        .status,
+    ).toBe("applied");
+    grid.undo();
+    expect(
+      Array.from(
+        { length: 6 },
+        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 2 }).resolved,
+      ),
+    ).toEqual([0.5, 10.5, 20.5, 30.5, 40.5, 50.5]);
+    grid.destroy();
   });
 
   it("re-measures payloads that admission guards rewrote before the store applies them", () => {
