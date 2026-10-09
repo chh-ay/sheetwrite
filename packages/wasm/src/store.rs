@@ -750,66 +750,34 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = setNumber)]
     pub fn set_number(&mut self, sheet: usize, row: usize, col: usize, value: f64, style: u32) {
-        let Some(key) = cell_key(row, col) else {
-            return;
-        };
-        let dirty_revision = self.local_dirty_revision();
-        let removed_formula = {
-            let Some(s) = self.sheets.get_mut(sheet) else {
-                return;
-            };
-            if !s.contains_cell(row, col)
-                || !s.write_cell(
-                    row,
-                    col,
-                    KIND_NUMBER,
-                    encode_num(value),
-                    style,
-                    dirty_revision,
-                )
-            {
-                return;
-            }
-
-            let removed_formula = s.remove_formula(key);
-            s.dirty_cells.insert(key);
-            removed_formula
-        };
-        if removed_formula {
-            self.bump_formula_epoch();
-        }
+        let revision = self.local_dirty_revision();
+        self.replace_cell_source(CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind: KIND_NUMBER,
+            payload: encode_num(value),
+            style,
+            source: None,
+            revision,
+            hydrating: false,
+        });
     }
 
     #[wasm_bindgen(js_name = setBool)]
     pub fn set_bool(&mut self, sheet: usize, row: usize, col: usize, value: bool, style: u32) {
-        let Some(key) = cell_key(row, col) else {
-            return;
-        };
-        let dirty_revision = self.local_dirty_revision();
-        let removed_formula = {
-            let Some(s) = self.sheets.get_mut(sheet) else {
-                return;
-            };
-            if !s.contains_cell(row, col)
-                || !s.write_cell(
-                    row,
-                    col,
-                    KIND_BOOL,
-                    encode_num(f64::from(value)),
-                    style,
-                    dirty_revision,
-                )
-            {
-                return;
-            }
-
-            let removed_formula = s.remove_formula(key);
-            s.dirty_cells.insert(key);
-            removed_formula
-        };
-        if removed_formula {
-            self.bump_formula_epoch();
-        }
+        let revision = self.local_dirty_revision();
+        self.replace_cell_source(CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind: KIND_BOOL,
+            payload: encode_num(f64::from(value)),
+            style,
+            source: None,
+            revision,
+            hydrating: false,
+        });
     }
 
     /// Current style-dictionary id at a cell; `0` when out of bounds. Used by
@@ -908,9 +876,9 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = setString)]
     pub fn set_string(&mut self, sheet: usize, row: usize, col: usize, value: &str, style: u32) {
-        let Some(key) = cell_key(row, col) else {
+        if cell_key(row, col).is_none() {
             return;
-        };
+        }
         let dirty_revision = self.local_dirty_revision();
         let Some(existing) = self.sheets.get(sheet) else {
             return;
@@ -922,50 +890,33 @@ impl CellStore {
         }
 
         let id = self.intern(value);
-        let removed_formula = {
-            let s = &mut self.sheets[sheet];
-            if !s.write_cell(
-                row,
-                col,
-                KIND_STRING,
-                encode_str_id(id),
-                style,
-                dirty_revision,
-            ) {
-                return;
-            }
-            let removed_formula = s.remove_formula(key);
-            s.dirty_cells.insert(key);
-            removed_formula
-        };
-        if removed_formula {
-            self.bump_formula_epoch();
-        }
+        self.replace_cell_source(CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind: KIND_STRING,
+            payload: encode_str_id(id),
+            style,
+            source: None,
+            revision: dirty_revision,
+            hydrating: false,
+        });
     }
 
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
-        let Some(key) = cell_key(row, col) else {
-            return;
-        };
-        let dirty_revision = self.local_dirty_revision();
-        let removed_formula = {
-            let Some(s) = self.sheets.get_mut(sheet) else {
-                return;
-            };
-            if !s.contains_cell(row, col)
-                || !s.write_cell(row, col, KIND_EMPTY, 0, style, dirty_revision)
-            {
-                return;
-            }
-
-            let removed_formula = s.remove_formula(key);
-            s.dirty_cells.insert(key);
-            removed_formula
-        };
-        if removed_formula {
-            self.bump_formula_epoch();
-        }
+        let revision = self.local_dirty_revision();
+        self.replace_cell_source(CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind: KIND_EMPTY,
+            payload: 0,
+            style,
+            source: None,
+            revision,
+            hydrating: false,
+        });
     }
     /// Write one sparse mixed transaction/page/snapshot block without
     /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
@@ -1099,16 +1050,10 @@ impl CellStore {
             }
         }
 
-        let mut wrote = false;
-        let mut changed_sources = false;
-        let data = &mut self.sheets[sheet];
         for (index, &offset) in offsets.iter().enumerate() {
             let offset_usize = offset as usize;
             let row = start_row + offset_usize / cols;
             let col = start_col + offset_usize % cols;
-            let Some(key) = cell_key(row, col) else {
-                return BLOCK_SOURCE_INVALID;
-            };
             let source = if prepared_sources.is_empty() {
                 None
             } else {
@@ -1123,32 +1068,23 @@ impl CellStore {
                     _ => (KIND_EMPTY, 0),
                 }
             };
-            let accepted = if hydrating {
-                data.hydrate_cell(row, col, kind, payload, styles[index])
-            } else {
-                data.write_cell(row, col, kind, payload, styles[index], dirty_revision)
-            };
+            let accepted = self.replace_cell_source(CellSourceWrite {
+                sheet,
+                row,
+                col,
+                kind,
+                payload,
+                style: styles[index],
+                source,
+                revision: dirty_revision,
+                hydrating,
+            });
             if !accepted {
                 if hydrating {
                     continue;
                 }
                 return BLOCK_RESOURCE_LIMIT;
             }
-            wrote = true;
-            if !hydrating {
-                data.dirty_cells.insert(key);
-            }
-            changed_sources |= data.remove_formula(key);
-            if let Some(entry) = source {
-                data.formulas.insert(key, entry);
-                changed_sources = true;
-            }
-        }
-        if wrote && hydrating {
-            data.all_dirty = true;
-        }
-        if changed_sources {
-            self.bump_formula_epoch();
         }
         BLOCK_OK
     }
@@ -1875,32 +1811,33 @@ impl CellStore {
         if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, col, limit, 1) {
             return;
         }
-        let mut removed_formula = false;
         self.sheets[sheet].clear_all_spills();
         for (offset, value) in values.into_iter().take(limit).enumerate() {
             let row = start_row + offset;
-            let Some(key) = cell_key(row, col) else {
+            if cell_key(row, col).is_none() {
                 continue;
-            };
+            }
             let id = self.intern(&value);
-            let s = &mut self.sheets[sheet];
-            if !s.write_cell(
+            if !self.replace_cell_source(CellSourceWrite {
+                sheet,
                 row,
                 col,
-                KIND_STRING,
-                encode_str_id(id),
+                kind: KIND_STRING,
+                payload: encode_str_id(id),
                 style,
-                dirty_revision,
-            ) {
+                source: None,
+                revision: dirty_revision,
+                hydrating: false,
+            }) {
                 return;
             }
-            removed_formula |= s.remove_formula(key);
         }
         if limit > 0 {
-            self.sheets[sheet].all_dirty = true;
-        }
-        if removed_formula {
-            self.bump_formula_epoch();
+            // The load marks the whole sheet dirty; the per-cell marks from the
+            // writes above would only repeat what that flag already covers.
+            let sheet_data = &mut self.sheets[sheet];
+            sheet_data.clear_dirty();
+            sheet_data.all_dirty = true;
         }
     }
 
@@ -2345,36 +2282,27 @@ impl CellStore {
         }
 
         let entry = self.parse_formula_entry(src, sheet as u32, key.0, key.1);
-        let can_reuse_dependency_index = self.sheets[sheet]
-            .formulas
-            .get(&key)
-            .is_some_and(|previous| DepIndex::dependency_graph_unchanged(previous, &entry));
-        let cached_value = {
-            let s = &mut self.sheets[sheet];
-
-            let carried = if entry.error.is_some() {
-                0.0
-            } else {
-                s.num_at(s.idx(row, col))
-            };
-            if !s.write_cell(
-                row,
-                col,
-                KIND_FORMULA,
-                encode_num(carried),
-                style,
-                dirty_revision,
-            ) {
-                return f64::NAN;
-            }
-            s.formulas.insert(key, entry);
-            s.dirty_cells.insert(key);
-            carried
+        let carried = if entry.error.is_some() {
+            0.0
+        } else {
+            let sheet_data = &self.sheets[sheet];
+            sheet_data.num_at(sheet_data.idx(row, col))
         };
-        if !can_reuse_dependency_index {
-            self.bump_formula_epoch();
+        if self.replace_cell_source(CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind: KIND_FORMULA,
+            payload: encode_num(carried),
+            style,
+            source: Some(entry),
+            revision: dirty_revision,
+            hydrating: false,
+        }) {
+            carried
+        } else {
+            f64::NAN
         }
-        cached_value
     }
 
     #[wasm_bindgen(js_name = formulaSource)]
@@ -2725,7 +2653,7 @@ impl CellStore {
             source_kinds[offset] = 2;
         }
 
-        let mut prepared = Vec::with_capacity(seen_offsets.len());
+        let mut prepared = HashMap::with_capacity(seen_offsets.len());
         for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
             let offset = offset as usize;
             let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
@@ -2734,10 +2662,10 @@ impl CellStore {
             let Some(key) = cell_key(row, col) else {
                 return BLOCK_SOURCE_INVALID;
             };
-            prepared.push((
+            prepared.insert(
                 key,
                 self.parse_formula_entry(source, sheet as u32, key.0, key.1),
-            ));
+            );
         }
         for (index, &offset) in reference_offsets.iter().enumerate() {
             let target_index = index * 3;
@@ -2760,10 +2688,10 @@ impl CellStore {
             let Some(key) = cell_key(row, col) else {
                 return BLOCK_SOURCE_INVALID;
             };
-            prepared.push((
+            prepared.insert(
                 key,
                 FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            ));
+            );
         }
 
         // Check every text slice before reserving dirty capacity or interning,
@@ -2800,8 +2728,7 @@ impl CellStore {
             string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
         }
 
-        let s = &mut self.sheets[sheet];
-        s.clear_all_spills();
+        self.sheets[sheet].clear_all_spills();
         for col_offset in 0..cols {
             let col = start_col + col_offset;
             for row_offset in 0..rows {
@@ -2816,20 +2743,34 @@ impl CellStore {
                         _ => (KIND_EMPTY, 0),
                     }
                 };
-                if !s.write_cell(row, col, kind, payload, styles[offset], dirty_revision) {
+                let Some(key) = cell_key(row, col) else {
+                    return BLOCK_SOURCE_INVALID;
+                };
+                let source = if prepared.is_empty() {
+                    None
+                } else {
+                    prepared.remove(&key)
+                };
+                if !self.replace_cell_source(CellSourceWrite {
+                    sheet,
+                    row,
+                    col,
+                    kind,
+                    payload,
+                    style: styles[offset],
+                    source,
+                    revision: dirty_revision,
+                    hydrating: false,
+                }) {
                     return BLOCK_RESOURCE_LIMIT;
-                }
-                if let Some(key) = cell_key(row, col) {
-                    s.remove_formula(key);
                 }
             }
         }
-        for (key, entry) in prepared {
-            s.formulas.insert(key, entry);
-        }
-        s.clear_dirty();
-        s.all_dirty = true;
-        self.bump_formula_epoch();
+        // Packed writes clear every spill, so all anchors must materialize
+        // again; `all_dirty` already covers the cells just written.
+        let sheet_data = &mut self.sheets[sheet];
+        sheet_data.clear_dirty();
+        sheet_data.all_dirty = true;
         BLOCK_OK
     }
 
@@ -2918,7 +2859,81 @@ impl Default for CellStore {
     }
 }
 
+/// One destination cell plus the source that replaces whatever it held.
+///
+/// Every writer — scalar, sparse and packed — builds this and hands it to
+/// [`CellStore::replace_cell_source`], so kind, payload, source, dirty marking
+/// and the dependency epoch are decided in one place.
+struct CellSourceWrite {
+    sheet: usize,
+    row: usize,
+    col: usize,
+    kind: u8,
+    payload: u64,
+    style: u32,
+    /// `Some` installs the entry, `None` removes any formula at the cell.
+    source: Option<FormulaEntry>,
+    revision: Option<u64>,
+    /// Page-load writes hydrate stored cells instead of editing user data.
+    hydrating: bool,
+}
+
 impl CellStore {
+    /// Store one cell write and take the source-replacement decision: replace
+    /// the formula source, mark the destination dirty, and bump the dependency
+    /// epoch only when the replacement reads a different dependency graph.
+    /// Rejected writes leave sources and the epoch untouched.
+    fn replace_cell_source(&mut self, write: CellSourceWrite) -> bool {
+        let CellSourceWrite {
+            sheet,
+            row,
+            col,
+            kind,
+            payload,
+            style,
+            source,
+            revision,
+            hydrating,
+        } = write;
+        let Some(key) = cell_key(row, col) else {
+            return false;
+        };
+        let Some(sheet_data) = self.sheets.get_mut(sheet) else {
+            return false;
+        };
+        if !sheet_data.contains_cell(row, col) {
+            return false;
+        }
+        let written = if hydrating {
+            sheet_data.hydrate_cell(row, col, kind, payload, style)
+        } else {
+            sheet_data.write_cell(row, col, kind, payload, style, revision)
+        };
+        if !written {
+            return false;
+        }
+        let graph_changed = match source {
+            Some(entry) => {
+                let changed = sheet_data
+                    .formulas
+                    .get(&key)
+                    .is_none_or(|previous| !DepIndex::dependency_graph_unchanged(previous, &entry));
+                sheet_data.formulas.insert(key, entry);
+                changed
+            }
+            None => sheet_data.remove_formula(key),
+        };
+        if hydrating {
+            sheet_data.all_dirty = true;
+        } else {
+            sheet_data.dirty_cells.insert(key);
+        }
+        if graph_changed {
+            self.bump_formula_epoch();
+        }
+        true
+    }
+
     fn store_memory_stats(&self) -> StoreMemoryStats {
         let mut stats = StoreMemoryStats::default();
         for sheet in &self.sheets {
