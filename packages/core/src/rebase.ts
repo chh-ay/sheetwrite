@@ -47,6 +47,11 @@ interface TransformFailure {
  * formula, overlapping, sheet-lifecycle, and move cases become explicit
  * conflicts instead of lossy guesses. This is the collaboration design gate;
  * no CRDT dependency is required for the supported cases.
+ *
+ * Each local operation is written after the local operations before it, and
+ * each remote operation after the remote operations before it. A remote
+ * operation is therefore carried forward through the local sequence: before it
+ * is compared with local operation k, it is moved past local operations 0..k-1.
  */
 export function rebaseDocumentOperations(
   localOperations: readonly DocumentOp[],
@@ -68,11 +73,18 @@ export function rebaseDocumentOperations(
 
   for (let remoteIndex = 0; remoteIndex < remoteOperations.length; remoteIndex++) {
     const remote = remoteOperations[remoteIndex]!;
-    const axisChange = structuralChange(remote);
-    if (axisChange && axisChange.kind !== "move") hasStructuralTransforms = true;
-    for (let localIndex = 0; localIndex < operations.length; localIndex++) {
+    // The remote operation in the coordinates of the local operation being
+    // compared. It stays the caller's object until a local row or column change
+    // moves it; only then is a private footprint copied.
+    let carried: DocumentOp | null = remote;
+    let owned = false;
+    let axisChange = structuralChange(remote);
+    for (let localIndex = 0; localIndex < operations.length && carried; localIndex++) {
       const local = operations[localIndex]!;
+      // Read before the transform: the next local operation is written after this one.
+      const localChange = changesStructure(local) ? structuralChange(local) : null;
       if (axisChange) {
+        if (axisChange.kind !== "move") hasStructuralTransforms = true;
         if (
           axisChange.kind === "move" &&
           operationTouchesSheet(local, axisChange.sheet, restoreBlock)
@@ -97,21 +109,34 @@ export function rebaseDocumentOperations(
           return conflict(transformed.code, localIndex, remoteIndex, transformed.message);
         }
         operations[localIndex] = transformed.operation;
-        continue;
+      } else {
+        const lifecycle = lifecycleConflict(local, remote, restoreBlock);
+        if (lifecycle) {
+          return conflict(lifecycle.code, localIndex, remoteIndex, lifecycle.message);
+        }
+        if (operationsOverlap(local, carried)) {
+          return conflict(
+            "overlapping-edit",
+            localIndex,
+            remoteIndex,
+            "Concurrent operations mutate overlapping cells or range metadata",
+          );
+        }
       }
-
-      const lifecycle = lifecycleConflict(local, remote, restoreBlock);
-      if (lifecycle) {
-        return conflict(lifecycle.code, localIndex, remoteIndex, lifecycle.message);
+      // Only a later local operation needs the remote in its coordinates, and
+      // only a local row or column change moves it.
+      if (localIndex + 1 === operations.length || !localChange) continue;
+      const next = carryPastLocal(
+        owned ? carried : remoteFootprint(carried),
+        localChange,
+        restoreBlock,
+      );
+      if (next && "code" in next) {
+        return conflict(next.code, localIndex + 1, remoteIndex, next.message);
       }
-      if (operationsOverlap(local, remote)) {
-        return conflict(
-          "overlapping-edit",
-          localIndex,
-          remoteIndex,
-          "Concurrent operations mutate overlapping cells or range metadata",
-        );
-      }
+      carried = next ? next.operation : null;
+      owned = true;
+      if (carried) axisChange = structuralChange(carried);
     }
   }
 
@@ -134,6 +159,21 @@ function conflict(
     status: "conflict",
     conflict: { code, localOperationIndex, remoteOperationIndex, message },
   };
+}
+
+/** Whether an operation inserts, deletes, or moves rows or columns. */
+function changesStructure(operation: DocumentOp): boolean {
+  switch (operation.op) {
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+      return true;
+    default:
+      return false;
+  }
 }
 
 function structuralChange(operation: DocumentOp): AxisChange | null {
@@ -176,6 +216,90 @@ function structuralChange(operation: DocumentOp): AxisChange | null {
       return { kind: "move", axis: "column", sheet: operation.sheet };
     default:
       return null;
+  }
+}
+
+/**
+ * A private copy of what a remote operation writes and where, for carrying it
+ * through the local sequence. Cell payloads are left behind: a block write
+ * carries only its range, so large restores are neither copied nor decoded.
+ * Transforms replace top-level coordinates with new objects, so a shallow copy
+ * suffices except where a nested range is rewritten in place.
+ */
+function remoteFootprint(operation: DocumentOp): DocumentOp {
+  switch (operation.op) {
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+      return { op: "clearRange", range: operation.range };
+    case "addSheet":
+      // Carries no coordinates; lifecycle checks read the original operation.
+      return operation;
+    case "setHyperlink":
+    case "setValidationRule":
+    case "setProtectedRange":
+    case "setNamedRange":
+    case "addTable":
+    case "updateTable":
+    case "setSheetMeta":
+      return cloneJsonValue(operation);
+    default:
+      return { ...operation };
+  }
+}
+
+/**
+ * Moves a carried remote operation past one local operation, so it is in the
+ * coordinates the next local operation was written in. Returns null when the
+ * local operation deleted the remote target: in server order the remote write
+ * lands first and the local deletion then removes it, so nothing later can
+ * overlap it.
+ */
+function carryPastLocal(
+  remote: DocumentOp,
+  local: AxisChange | null,
+  restoreBlock: RestoreBlockReader,
+): { operation: DocumentOp } | TransformFailure | null {
+  if (!local) return { operation: remote };
+  if (local.kind === "move") {
+    if (!operationTouchesSheet(remote, local.sheet, restoreBlock)) return { operation: remote };
+    return {
+      code: "unsupported-structural",
+      message: "A pending row/column move reorders cells a concurrent operation targets",
+    };
+  }
+  const remoteChange = structuralChange(remote);
+  if (
+    remoteChange &&
+    remoteChange.kind !== "move" &&
+    remoteChange.axis === local.axis &&
+    remoteChange.sheet === local.sheet
+  ) {
+    if (remoteChange.kind === "insert") {
+      // Server order puts remote rows first, so an insert at the same position
+      // stays ahead of the local rows.
+      const at =
+        local.kind === "insert"
+          ? remoteChange.at > local.at
+            ? remoteChange.at + local.count
+            : remoteChange.at
+          : transformPosition(remoteChange.at, local);
+      return { operation: { ...remote, at } as DocumentOp };
+    }
+    const mapped = transformSpan(remoteChange.at, remoteChange.count, local);
+    if (!mapped) return overlappingStructure(remote.op);
+    return { operation: { ...remote, at: mapped.at } as DocumentOp };
+  }
+  const failure = transformDirectTarget(remote, local);
+  if (!failure) return { operation: remote };
+  switch (remote.op) {
+    case "set":
+    case "setNote":
+    case "setColumn":
+    case "setRowMeta":
+      return null;
+    default:
+      return failure;
   }
 }
 

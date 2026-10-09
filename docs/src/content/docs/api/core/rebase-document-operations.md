@@ -11,8 +11,13 @@ formula, overlapping, sheet-lifecycle, and move cases become explicit
 conflicts instead of lossy guesses. This is the collaboration design gate;
 no CRDT dependency is required for the supported cases.
 
+Each local operation is written after the local operations before it, and
+each remote operation after the remote operations before it. A remote
+operation is therefore carried forward through the local sequence: before it
+is compared with local operation k, it is moved past local operations 0..k-1.
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L51"><code>packages/core/src/rebase.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L56"><code>packages/core/src/rebase.ts#L56</code></a></dd></div>
 </dl>
 
 ## Declaration
