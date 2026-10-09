@@ -45,7 +45,15 @@ function makeFakeStore(
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
       const values: CellScalar[] = new Array(n);
       for (let i = 0; i < n; i++) values[i] = `v${i}`;
-      return { sheet, rows, cols, values, styleIds: new Uint32Array(n), styles: [{}] };
+      return {
+        sheet,
+        stringPoolEpoch: 0,
+        rows,
+        cols,
+        values,
+        styleIds: new Uint32Array(n),
+        styles: [{}],
+      };
     },
     ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),

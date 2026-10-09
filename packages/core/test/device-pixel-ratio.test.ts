@@ -44,7 +44,15 @@ function makeStore(workbook: Workbook): Store {
     getVisibleWindow: (sheet, rows, cols) => {
       const size = Math.max(0, (rows.end - rows.start) * cols.length);
       const values: CellScalar[] = new Array(size).fill(null);
-      return { sheet, rows, cols, values, styleIds: new Uint32Array(size), styles: [{}] };
+      return {
+        sheet,
+        stringPoolEpoch: 0,
+        rows,
+        cols,
+        values,
+        styleIds: new Uint32Array(size),
+        styles: [{}],
+      };
     },
     ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),

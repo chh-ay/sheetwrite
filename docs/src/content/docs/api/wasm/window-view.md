@@ -8,10 +8,10 @@ description: "A bulk window of resolved cells, row-major over nrows x ncols."
 A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L441"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L441</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L446"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L446</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -38,6 +38,15 @@ nCols: number;
 
 ```ts generated
 nRows: number;
+```
+
+</details>
+
+<details class="api-member" id="window-view-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>stringPoolEpoch</code></summary>
+
+```ts generated
+stringPoolEpoch: () => number;
 ```
 
 </details>
@@ -73,6 +82,7 @@ class WindowView {
   free: () => void;
   nCols: number;
   nRows: number;
+  stringPoolEpoch: () => number;
   takePacked: () => Uint8Array;
   takeStrings: () => string[];
 }

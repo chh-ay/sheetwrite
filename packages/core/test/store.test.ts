@@ -25,6 +25,43 @@ beforeAll(async () => {
 });
 
 describe("SheetwriteStore", () => {
+  it("refreshes cached window text and restores history after committed string collection", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+    try {
+      store.applyTransaction({
+        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "original" } }],
+      });
+      const before = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+      const issuingEpoch = before.stringPoolEpoch;
+      expect(before.values[0]).toBe("original");
+      const history = store.captureRangeHistory(range);
+      if (!history) throw new Error("Expected captured text history");
+      try {
+        for (let edit = 0; edit < 6_000; edit++) {
+          store.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr: addr(0, 0),
+                value: { kind: "literal", value: `${edit}-${"x".repeat(128)}` },
+              },
+            ],
+          });
+        }
+        const refreshed = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+        expect(refreshed.stringPoolEpoch).toBeGreaterThan(issuingEpoch);
+        expect(refreshed.values[0]).toBe(`5999-${"x".repeat(128)}`);
+        store.applyTransaction({ patches: [history.toDocumentOp(range)] });
+        expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values[0]).toBe("original");
+      } finally {
+        history.dispose();
+      }
+    } finally {
+      store.dispose();
+    }
+  });
+
   it("applies literal set patches and resolves them through the WASM boundary", () => {
     const store = new SheetwriteStore(makeWorkbook(10));
     store.applyTransaction({

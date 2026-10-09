@@ -8,11 +8,11 @@ description: "Opaque, store-local history payload for one dense rectangular cell
 Opaque, store-local history payload for one dense rectangular cell block.
 
 The host may retain this object in undo history, but it is deliberately not
-part of the serialized document protocol. String payloads remain interned in
-the owning `CellStore`, so snapshots must only be restored into that store.
+part of the serialized document protocol. A deduplicated local dictionary
+owns captured text independently of the store's pool epoch.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L408"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L408</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L413"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L413</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

@@ -27,7 +27,7 @@ use crate::sheet::{spill_ownership_within_budget, SheetData, SpillRange};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError,
-    FormulaValueKind, StringPool, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
+    FormulaValueKind, StringStorage, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
     KIND_FORMULA, KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
 };
 
@@ -40,9 +40,9 @@ use dependency::{
 };
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 use lookup::{
-    find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list, remember_result,
-    remember_table, result_reuse, table_reuse, CachedList, CachedResult, CachedTable, LookupPassGuard,
-    ReuseEntry, TablePart,
+    find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
+    remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
+    CachedTable, LookupPassGuard, ReuseEntry, TablePart,
 };
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
@@ -110,7 +110,7 @@ fn current_formula_origin() -> Option<(u32, u32)> {
 }
 
 /// The value of a cell whose stored kind is not `KIND_FORMULA`.
-fn literal_cell_value(data: &SheetData, strings: &StringPool, index: usize, kind: u8) -> Value {
+fn literal_cell_value(data: &SheetData, strings: &StringStorage, index: usize, kind: u8) -> Value {
     match kind {
         KIND_NUMBER => Value::number(data.num_at(index)),
         KIND_STRING => string_from_pool_ref(strings, data.str_id_at(index))
@@ -219,17 +219,22 @@ fn expand_let_node<'a>(
     count_let_node(nodes)?;
     #[cfg(feature = "analysis")]
     if let Ast::UnknownFunc(name, args) = ast {
-        if let Some((_, expression, visible, _)) = bindings.iter().rev()
-            .find(|(binding, ..)| binding.eq_ignore_ascii_case(name)).copied()
+        if let Some((_, expression, visible, _)) = bindings
+            .iter()
+            .rev()
+            .find(|(binding, ..)| binding.eq_ignore_ascii_case(name))
+            .copied()
         {
             let hidden = bindings.split_off(visible);
             let callee = expand_let_node(expression, bindings, nodes, next_slot);
             bindings.extend(hidden);
             let callee = callee?;
             let mut invocation = vec![callee];
-            invocation.extend(args.iter().map(|argument| {
-                expand_let_node(argument, bindings, nodes, next_slot)
-            }).collect::<Result<Vec<_>, _>>()?);
+            invocation.extend(
+                args.iter()
+                    .map(|argument| expand_let_node(argument, bindings, nodes, next_slot))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
             return Ok(Ast::UnknownFunc(analysis::lambda::CALL.into(), invocation));
         }
     }
@@ -243,7 +248,13 @@ fn expand_let_node<'a>(
                 }) { continue; }
                 let mut earlier = bindings[..visible].to_vec();
                 let expanded = expand_let_node(expression, &mut earlier, nodes, next_slot)?;
-                captured.push((name, Ast::LetSlot { slot, expression: Box::new(expanded) }));
+                captured.push((
+                    name,
+                    Ast::LetSlot {
+                        slot,
+                        expression: Box::new(expanded),
+                    },
+                ));
             }
             let mut definition = args[..args.len() - 1].to_vec();
             definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
@@ -565,7 +576,12 @@ impl CellStore {
                     // Resolving a missing spill removes its array marker.
                     // Keep the scalar expression's error instead of replacing it.
                     None => match self.eval_ast(
-                        &ast, output_sheet, &affected, &mut memo, &mut visiting, 0,
+                        &ast,
+                        output_sheet,
+                        &affected,
+                        &mut memo,
+                        &mut visiting,
+                        0,
                     ) {
                         Value::Error(error) => Err(error),
                         _ => Err(FormulaError::Value),
@@ -976,7 +992,16 @@ impl CellStore {
             Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
-                analysis::lambda::evaluate(self, analysis::lambda::CALL, args, sheet, affected, memo, visiting, depth + 1)
+                analysis::lambda::evaluate(
+                    self,
+                    analysis::lambda::CALL,
+                    args,
+                    sheet,
+                    affected,
+                    memo,
+                    visiting,
+                    depth + 1,
+                )
             }
             Ast::Num(n) => Value::number(*n),
             Ast::Str(text) => Value::text(text.as_str()),
@@ -1482,10 +1507,23 @@ impl CellStore {
             let name = analysis::name(id);
             let result = match name {
                 "SUMSQ" => analysis::math::streamed_sum_squares(
-                    self, args, sheet, affected, memo, visiting, depth + 1,
+                    self,
+                    args,
+                    sheet,
+                    affected,
+                    memo,
+                    visiting,
+                    depth + 1,
                 ),
                 "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
-                    self, name, args, sheet, affected, memo, visiting, depth + 1,
+                    self,
+                    name,
+                    args,
+                    sheet,
+                    affected,
+                    memo,
+                    visiting,
+                    depth + 1,
                 ),
                 _ => None,
             };

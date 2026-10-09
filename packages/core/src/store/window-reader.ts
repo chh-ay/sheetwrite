@@ -163,6 +163,8 @@ export class StoreWindowReader {
   private readonly colsU32Cache = new WeakMap<ReadonlyArray<number>, Uint32Array>();
   private valuesScratch: CellScalar[] = [];
   private readonly stringCache = new Map<number, string>();
+  private stringPoolEpoch: number | undefined;
+  private visibleStringPoolEpoch: number | undefined;
   private readonly condRulesSynced = new Map<SheetId, string>();
   private conditionalRuleInputBytes = 0;
   private conditionalRuleLargestInputBytes = 0;
@@ -195,6 +197,7 @@ export class StoreWindowReader {
   }
 
   capturePersistedCells(sheet: SheetId): PersistedCellView {
+    const stringPoolEpoch = this.wasm.stringPoolEpoch();
     const packed = this.wasm.persistedCellData(this.handleOf(sheet));
     const coordinates: number[] = [];
     const values: CellScalar[] = [];
@@ -285,6 +288,7 @@ export class StoreWindowReader {
         throw new Error("Sheetwrite: invalid persisted source kind");
       }
     }
+    this.syncStringPoolEpoch(stringPoolEpoch);
     if (stringIds.length > 0) {
       const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
       if (texts.length !== stringOffsets.length) {
@@ -363,7 +367,9 @@ export class StoreWindowReader {
     let packed: Uint8Array;
     let decoded: DecodedPackedWindow;
     let strings: string[];
+    let stringPoolEpoch: number;
     try {
+      stringPoolEpoch = view.stringPoolEpoch();
       packed = view.takePacked();
       decoded = decodePackedWindow(packed);
       if (
@@ -401,9 +407,16 @@ export class StoreWindowReader {
       view.free();
     }
     const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
+    // Rectangle/history reads may have warmed the host cache without updating the worker.
+    if (this.visibleStringPoolEpoch !== stringPoolEpoch) {
+      this.stringCache.clear();
+      this.visibleStringPoolEpoch = stringPoolEpoch;
+    }
+    ffiCalls += 1;
     const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
     const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
-    let ffiBoundaryCalls = ffiCalls + 2 + stringOutputAllocationEvents;
+    let ffiBoundaryCalls = ffiCalls + 3 + stringOutputAllocationEvents;
     let localStringBytes = 0;
     for (const value of strings) localStringBytes += utf8ByteLength(value);
     let ffiOutputBytes = packed.byteLength + localStringBytes;
@@ -479,6 +492,7 @@ export class StoreWindowReader {
       styles: windowStyles,
       valueKinds: kinds,
       numberValues: numbers,
+      stringPoolEpoch,
       stringPoolIds: stringIds,
       stringLocalIds: stringIndex,
       stringPoolUpdateIds,
@@ -520,7 +534,9 @@ export class StoreWindowReader {
     ) as ConsumingWindowView;
     let decoded: DecodedPackedWindow;
     let strings: string[];
+    let stringPoolEpoch: number;
     try {
+      stringPoolEpoch = view.stringPoolEpoch();
       decoded = decodePackedWindow(view.takePacked());
       if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
         throw new Error("Sheetwrite: invalid packed window shape");
@@ -551,6 +567,7 @@ export class StoreWindowReader {
     }
 
     const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
     if (this.stringCache.size >= STRING_CACHE_CAP) this.stringCache.clear();
     let missingIdSet: Set<number> | null = null;
     for (let index = 0; index < stringIds.length; index++) {
@@ -622,11 +639,23 @@ export class StoreWindowReader {
   clear(): void {
     this.valuesScratch = [];
     this.stringCache.clear();
+    this.stringPoolEpoch = undefined;
+    this.visibleStringPoolEpoch = undefined;
     this.condRulesSynced.clear();
   }
 
   removeSheet(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
+  }
+
+  private syncStringPoolEpoch(epoch: number): void {
+    if (epoch !== this.wasm.stringPoolEpoch()) {
+      throw new Error("Sheetwrite: stale string-pool epoch");
+    }
+    if (epoch !== this.stringPoolEpoch) {
+      this.stringCache.clear();
+      this.stringPoolEpoch = epoch;
+    }
   }
 
   private colsU32For(cols: readonly number[]): Uint32Array {

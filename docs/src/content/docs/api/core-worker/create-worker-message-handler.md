@@ -10,7 +10,7 @@ inside the returned closure lets tests exercise the real message contract
 without booting a browser Worker.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/worker.ts#L259"><code>packages/core/src/worker.ts#L259</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/worker.ts#L268"><code>packages/core/src/worker.ts#L268</code></a></dd></div>
 </dl>
 
 ## Declaration

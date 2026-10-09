@@ -215,7 +215,10 @@ const fn known_id(input: &str) -> u16 {
             let candidate = FAMILIES[family].names[index].as_bytes();
             let requested = input.as_bytes();
             let mut byte = 0;
-            while byte < candidate.len() && byte < requested.len() && candidate[byte] == requested[byte] {
+            while byte < candidate.len()
+                && byte < requested.len()
+                && candidate[byte] == requested[byte]
+            {
                 byte += 1;
             }
             if byte == candidate.len() && byte == requested.len() {
@@ -238,16 +241,19 @@ pub(crate) fn name(id: u16) -> &'static str {
 
 pub(crate) fn lookup(input: &str) -> Option<u16> {
     // Compare bytes without allocating an uppercase copy of the input.
-    FAMILIES.iter().enumerate().find_map(|(family_index, family)| {
-        family
-            .names
-            .binary_search_by(|name| {
-                name.bytes()
-                    .cmp(input.bytes().map(|byte| byte.to_ascii_uppercase()))
-            })
-            .ok()
-            .map(|index| ((family_index as u16) << FAMILY_SHIFT) | index as u16)
-    })
+    FAMILIES
+        .iter()
+        .enumerate()
+        .find_map(|(family_index, family)| {
+            family
+                .names
+                .binary_search_by(|name| {
+                    name.bytes()
+                        .cmp(input.bytes().map(|byte| byte.to_ascii_uppercase()))
+                })
+                .ok()
+                .map(|index| ((family_index as u16) << FAMILY_SHIFT) | index as u16)
+        })
 }
 
 pub(crate) fn names() -> impl Iterator<Item = &'static str> {

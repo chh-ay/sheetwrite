@@ -104,11 +104,12 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
 <a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
 <a href="#cell-store-spill-owner-coordinates"><code>spillOwnerCoordinates</code></a>
+<a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
 <a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>94</span>
+## Members <span class="api-count" data-pagefind-ignore>95</span>
 
 <div class="api-member-list">
 
@@ -289,12 +290,14 @@ columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Ui
 </details>
 
 <details class="api-member" id="cell-store-compact-string-storage" data-pagefind-weight="1">
-<summary><code>compactStringStorage</code> <span class="api-member-summary">Release geometric growth slack after a bounded bulk ingest.</span></summary>
+<summary><code>compactStringStorage</code> <span class="api-member-summary">Reclaim unreachable text and release growth slack at a transaction barrier.</span></summary>
 
 ```ts generated
 compactStringStorage: () => void;
 ```
 
+<p class="api-member-doc">Reclaim unreachable text and release growth slack at a transaction barrier.
+Raw pool IDs must be discarded when `stringPoolEpoch` changes.</p>
 </details>
 
 <details class="api-member" id="cell-store-data-edge" data-pagefind-weight="1">
@@ -1057,6 +1060,15 @@ spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols:
 <p class="api-member-doc">Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.</p>
 </details>
 
+<details class="api-member" id="cell-store-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>stringPoolEpoch</code> <span class="api-member-summary">Raw string IDs are valid only within this epoch, including window IDs.</span></summary>
+
+```ts generated
+stringPoolEpoch: () => number;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-style-id-at" data-pagefind-weight="1">
 <summary><code>styleIdAt</code> <span class="api-member-summary">Current style-dictionary id at a cell; 0 when out of bounds.</span></summary>
 
@@ -1470,6 +1482,7 @@ class CellStore {
     row_end: number,
     cols: Uint32Array,
   ) => Uint32Array;
+  stringPoolEpoch: () => number;
   styleIdAt: (sheet: number, row: number, col: number) => number;
   wasmCommittedBytes: () => number;
 }

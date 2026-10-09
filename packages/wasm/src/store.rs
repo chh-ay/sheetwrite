@@ -1,7 +1,6 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
 
-use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
-use std::hash::{BuildHasherDefault, Hash, Hasher};
+use std::collections::{HashMap, HashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -21,7 +20,7 @@ use crate::sheet::{
 };
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, FormulaValueKind,
-    StringPool, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    StringStorage, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
@@ -50,31 +49,6 @@ fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a s
         slices.push(&buf[start..end]);
     }
     slices
-}
-
-pub(crate) enum InternSlot {
-    One(u32),
-    Many(Vec<u32>),
-}
-
-/// The intern map's keys are already 64-bit string hashes; re-hashing them
-/// through SipHash on every probe is pure waste. This hasher passes the key
-/// through untouched, halving the hashing work per intern.
-#[derive(Default)]
-pub(crate) struct IdentityHasher(u64);
-
-impl Hasher for IdentityHasher {
-    fn finish(&self) -> u64 {
-        self.0
-    }
-
-    fn write(&mut self, _: &[u8]) {
-        unreachable!("IdentityHasher is only used with u64 keys");
-    }
-
-    fn write_u64(&mut self, n: u64) {
-        self.0 = n;
-    }
 }
 
 /// Compact serializable projection of persisted derived-cell sources and spill
@@ -128,8 +102,8 @@ impl SourceSnapshot {
 /// Opaque, store-local history payload for one dense rectangular cell block.
 ///
 /// The host may retain this object in undo history, but it is deliberately not
-/// part of the serialized document protocol. String payloads remain interned in
-/// the owning `CellStore`, so snapshots must only be restored into that store.
+/// part of the serialized document protocol. A deduplicated local dictionary
+/// owns captured text independently of the store's pool epoch.
 #[wasm_bindgen]
 pub struct RangeSnapshot {
     rows: usize,
@@ -138,6 +112,7 @@ pub struct RangeSnapshot {
     payload: Vec<u64>,
     style: Vec<u32>,
     formulas: Vec<(u32, u32, FormulaEntry)>,
+    strings: StringStorage,
 }
 
 #[wasm_bindgen]
@@ -194,6 +169,8 @@ impl RangeSnapshot {
         self.kind.len()
             + self.payload.len() * std::mem::size_of::<u64>()
             + self.style.len() * std::mem::size_of::<u32>()
+            + self.strings.retained_bytes()
+            + self.strings.index_memory_stats().logical_bytes
             + self
                 .formulas
                 .iter()
@@ -252,8 +229,6 @@ struct TableDefinition {
     columns: Vec<TableColumnDefinition>,
 }
 
-type InternMap = HashMap<u64, InternSlot, BuildHasherDefault<IdentityHasher>>;
-
 /// The workbook-wide store: every sheet, one string pool.
 #[wasm_bindgen]
 pub struct CellStore {
@@ -262,8 +237,7 @@ pub struct CellStore {
     pub(crate) sheet_alive: Vec<bool>,
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) sheet_ids: HashMap<String, usize>,
-    pub(crate) strings: StringPool,
-    pub(crate) string_lookup: InternMap,
+    pub(crate) strings: StringStorage,
     pub(crate) formula_epoch: u64,
     pub(crate) dep_index: Option<DepIndex>,
     loading_page: usize,
@@ -318,8 +292,7 @@ impl CellStore {
             sheet_alive: Vec::new(),
             sheet_lookup: HashMap::new(),
             sheet_ids: HashMap::new(),
-            strings: StringPool::new(),
-            string_lookup: InternMap::default(),
+            strings: StringStorage::new(),
             formula_epoch: 0,
             dep_index: None,
             loading_page: 0,
@@ -365,7 +338,7 @@ impl CellStore {
                 if id == NO_STRING {
                     String::new()
                 } else {
-                    string_from_pool(&self.strings, id).unwrap_or_default()
+                    string_from_pool(&snapshot.strings, id).unwrap_or_default()
                 }
             })
             .collect()
@@ -454,10 +427,19 @@ impl CellStore {
         crate::eval::reset_matrix_resource_stats();
     }
 
-    /// Release geometric growth slack after a bounded bulk ingest.
+    /// Reclaim unreachable text and release growth slack at a transaction barrier.
+    /// Raw pool IDs must be discarded when `stringPoolEpoch` changes.
     #[wasm_bindgen(js_name = compactStringStorage)]
     pub fn compact_string_storage(&mut self) {
-        self.strings.shrink_to_fit();
+        if self.active_mutation_revision.is_none() && self.loading_page == 0 {
+            self.collect_strings(true);
+        }
+    }
+
+    /// Raw string IDs are valid only within this epoch, including window IDs.
+    #[wasm_bindgen(js_name = stringPoolEpoch)]
+    pub fn string_pool_epoch(&self) -> u32 {
+        self.strings.epoch
     }
 
     #[wasm_bindgen(js_name = wasmCommittedBytes)]
@@ -612,6 +594,7 @@ impl CellStore {
     #[wasm_bindgen(js_name = endMutation)]
     pub fn end_mutation(&mut self) {
         self.active_mutation_revision = None;
+        self.maybe_collect_strings();
     }
 
     #[wasm_bindgen(js_name = beginPageLoad)]
@@ -730,6 +713,7 @@ impl CellStore {
                 self.recompute(formula_sheet);
             }
         }
+        self.strings.request_collection();
         true
     }
 
@@ -1151,6 +1135,9 @@ impl CellStore {
         if removed_formula {
             self.bump_formula_epoch();
         }
+        if contents && (r1 - r0 + 1).saturating_mul(c1 - c0 + 1) > 1 {
+            self.strings.request_collection();
+        }
         true
     }
 
@@ -1527,6 +1514,7 @@ impl CellStore {
         let mut kind = Vec::with_capacity(cell_count);
         let mut payload = Vec::with_capacity(cell_count);
         let mut style = Vec::with_capacity(cell_count);
+        let mut strings = StringStorage::new();
         for col_offset in 0..cols {
             let col = c0 + col_offset;
             for row_offset in 0..rows {
@@ -1542,7 +1530,7 @@ impl CellStore {
                 payload.push(if derived {
                     0
                 } else if s.str_id_at(index) != NO_STRING {
-                    crate::sheet::encode_str_id(s.str_id_at(index))
+                    encode_str_id(strings.intern(self.strings.get(s.str_id_at(index))?))
                 } else {
                     crate::sheet::encode_num(s.num_at(index))
                 });
@@ -1566,6 +1554,7 @@ impl CellStore {
             payload,
             style,
             formulas,
+            strings,
         })
     }
 
@@ -1592,6 +1581,12 @@ impl CellStore {
         {
             return false;
         }
+        let string_ids: Vec<u32> = (0..snapshot.strings.len())
+            .map(|id| {
+                self.strings
+                    .intern(snapshot.strings.get(id as u32).expect("snapshot text ID"))
+            })
+            .collect();
         s.clear_all_spills();
         s.formulas.retain(|&(row, col), _| {
             let row = row as usize;
@@ -1607,7 +1602,15 @@ impl CellStore {
                     row,
                     col,
                     snapshot.kind[source + row_offset],
-                    snapshot.payload[source + row_offset],
+                    {
+                        let payload = snapshot.payload[source + row_offset];
+                        let id = payload_str_id(payload);
+                        if id == NO_STRING {
+                            payload
+                        } else {
+                            encode_str_id(string_ids[id as usize])
+                        }
+                    },
                     snapshot.style[source + row_offset],
                     dirty_revision,
                 ) {
@@ -2879,6 +2882,35 @@ struct CellSourceWrite {
 }
 
 impl CellStore {
+    pub(crate) fn maybe_collect_strings(&mut self) {
+        if self.active_mutation_revision.is_none()
+            && self.loading_page == 0
+            && self.strings.retained_bytes() >= self.strings.next_collection_bytes
+        {
+            self.collect_strings(false);
+        }
+    }
+
+    fn collect_strings(&mut self, force: bool) {
+        let mut marks = Vec::new();
+        if marks.try_reserve_exact(self.strings.len()).is_err() {
+            self.strings.postpone_collection();
+            return;
+        }
+        marks.resize(self.strings.len(), false);
+        for sheet in &self.sheets {
+            sheet.visit_string_ids(|id| marks[id as usize] = true);
+        }
+        if let Some((replacement, remap)) = self.strings.collection(&marks, force) {
+            for sheet in &mut self.sheets {
+                sheet.remap_string_ids(&remap);
+            }
+            self.strings = replacement;
+        } else {
+            self.strings.postpone_collection();
+        }
+    }
+
     /// Store one cell write and take the source-replacement decision: replace
     /// the formula source, mark the destination dirty, and bump the dependency
     /// epoch only when the replacement reads a different dependency graph.
@@ -2944,19 +2976,9 @@ impl CellStore {
         stats.owner_mut(STRING_POOL_UTF8).add(utf8);
         stats.owner_mut(STRING_POOL_SPANS).add(spans);
 
-        let string_index = stats.owner_mut(STRING_INDEX);
-        string_index.add_hash_table::<u64, InternSlot>(
-            self.string_lookup.len(),
-            self.string_lookup.capacity(),
-        );
-        for slot in self.string_lookup.values() {
-            if let InternSlot::Many(ids) = slot {
-                string_index.add_payload(
-                    ids.len().saturating_mul(std::mem::size_of::<u32>()),
-                    ids.capacity().saturating_mul(std::mem::size_of::<u32>()),
-                );
-            }
-        }
+        stats
+            .owner_mut(STRING_INDEX)
+            .add(self.strings.index_memory_stats());
 
         if let Some(index) = &self.dep_index {
             let (nodes, edges) = index.memory_stats();
@@ -3014,40 +3036,7 @@ impl CellStore {
     }
 
     pub(crate) fn intern(&mut self, s: &str) -> u32 {
-        let hash = string_hash(s);
-        if let Some(slot) = self.string_lookup.get(&hash) {
-            match slot {
-                InternSlot::One(id) => {
-                    if self.strings.get(*id) == Some(s) {
-                        return *id;
-                    }
-                }
-                InternSlot::Many(ids) => {
-                    for &id in ids {
-                        if self.strings.get(id) == Some(s) {
-                            return id;
-                        }
-                    }
-                }
-            }
-        }
-
-        let id = self.strings.push(s);
-        match self.string_lookup.get_mut(&hash) {
-            None => {
-                self.string_lookup.insert(hash, InternSlot::One(id));
-            }
-            Some(slot) => match slot {
-                InternSlot::One(previous) => {
-                    let first = *previous;
-                    *slot = InternSlot::Many(vec![first, id]);
-                }
-                InternSlot::Many(ids) => {
-                    ids.push(id);
-                }
-            },
-        }
-        id
+        self.strings.intern(s)
     }
 
     fn rewrite_formula_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
@@ -3108,12 +3097,6 @@ impl CellStore {
     pub(crate) fn bump_formula_epoch(&mut self) {
         self.formula_epoch += 1;
     }
-}
-
-fn string_hash(s: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    s.hash(&mut hasher);
-    hasher.finish()
 }
 
 fn refresh_structured_reference(
