@@ -4,6 +4,7 @@ import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
+  createGrid,
   DEFAULT_THEME,
   GridImpl,
   initSheetwrite,
@@ -139,6 +140,45 @@ function cellPoint(
 describe("Grid editing (Layer 3)", () => {
   beforeAll(async () => {
     await initSheetwrite();
+  });
+
+  it("pastes across hidden columns without changing them and undoes in one step", async () => {
+    const workbook = makeWorkbook(2);
+    const sheet = workbook.sheets[0];
+    const hiddenColumn = sheet?.columns[1];
+    if (!hiddenColumn) throw new Error("expected the amount column in the fixture");
+    hiddenColumn.visible = false;
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => "Alice\tParis\nBob\tTokyo" },
+    });
+    const grid = createGrid(mountHost(), { workbook, data: makeColumnarData(2) });
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    const readCells = () =>
+      [0, 1].map((row) =>
+        [0, 1, 2].map((col) => grid.store.getCell({ sheet: "s1", row, col }).resolved),
+      );
+    try {
+      expect(grid.store).toBeInstanceOf(SheetwriteStore);
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      expect(await grid.actions.paste()).toBe("done");
+      expect(readCells()).toEqual([
+        ["Alice", 0.5, "Paris"],
+        ["Bob", 10.5, "Tokyo"],
+      ]);
+      grid.undo();
+      expect(readCells()).toEqual([
+        ["Customer 0", 0.5, "Phnom Penh"],
+        ["Customer 1", 10.5, "Tokyo"],
+      ]);
+      expect(changes.map((event) => event.commitReason)).toEqual(["paste", "undo"]);
+    } finally {
+      grid.destroy();
+      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
   });
 
   it("commits a typed edit through the editor into the store", () => {
