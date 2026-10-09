@@ -7,6 +7,17 @@ import {
 } from "../src/number-format.js";
 
 describe("formatNumber", () => {
+  it.each([
+    [-246, "$#,##0", "-$246"],
+    [-1234.5, "$#,##0.00", "-$1,234.50"],
+    [-246, '"€"#,##0', "-€246"],
+    [-246, "[$€-2] #,##0", "-€ 246"],
+    [-246, "$#,##0;($#,##0)", "($246)"],
+  ] as const)("formats %s with %s as %s", (value, code, expected) => {
+    expect(formatNumber(value, code)).toBe(expected);
+    expect(formatNumber(value, code)).toBe(expected);
+  });
+
   it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
     const cases: Array<{ value: number; code: string }> = [
       { value: 1.005, code: "#,##0.00" },
@@ -124,6 +135,13 @@ describe("formatNumber", () => {
       [1234.5, "#,##0.00", "en-US", "1,234.50"],
       [1234.5, "#,##0.0", "en-US", "1,234.5"],
       [-1234.5, "#,##0.00", "en-US", "-1,234.50"],
+      [-0.4, "$#,##0", "en-US", "-$0"],
+      [-0.05, "0.0%", "en-US", "-5.0%"],
+      [-246, '0" USD"', "en-US", "-246 USD"],
+      [-5, "0", "en-US", "-5"],
+      [-0, "$0.00", "en-US", "$-0.00"],
+      [0, "$0.00", "en-US", "$0.00"],
+      [-1, "yyyy-mm-dd", "en-US", "1899-12-30"],
       [-0, undefined, undefined, "-0"],
       [0, undefined, undefined, "0"],
       [-0, "0.00", undefined, "-0.00"],

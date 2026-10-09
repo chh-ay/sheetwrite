@@ -221,6 +221,27 @@ describe("fontFor", () => {
   });
 });
 
+describe("paintFrame number formats", () => {
+  it("paints the automatic minus before a currency prefix", () => {
+    const layout = makeLayout([
+      { key: "amount", header: "Amount", width: 150, type: "currency", numberFormat: "$#,##0" },
+    ]);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      rows: { start: 0, end: 1 },
+      cols: [0],
+      values: [-246],
+      styleIds: new Uint32Array(1),
+      styles: [{}],
+    };
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
+      ["-$246"],
+    );
+  });
+});
+
 describe("paintFrame variable row heights", () => {
   it("positions a cell using the supplied per-row geometry", () => {
     const layout = makeLayout([
