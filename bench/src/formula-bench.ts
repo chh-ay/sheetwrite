@@ -465,6 +465,126 @@ function summarizeAllocations(samples: readonly FormulaAllocationSample[]): Form
   };
 }
 
+/** Untimed fixture runs allowed inside one aggregated sample before it is abandoned. */
+export const AGGREGATED_SAMPLE_MAX_ITERATIONS = 1_000_000;
+/** Default aggregation floor (ms) of the single-sample runner used by the matched engine protocol. */
+export const SAMPLE_AGGREGATE_MS = 50;
+/** Default untimed warm-up fixture runs of the single-sample runner. */
+export const SAMPLE_WARMUP_FIXTURES = 3;
+
+/** Knobs for one aggregated timing sample: a wall-clock total over repeated fixture runs. */
+export interface AggregatedSampleOptions {
+  /** Untimed fixture runs before the timed loop; the first one also checks correctness. */
+  readonly warmupFixtures: number;
+  /** Timed fixture runs repeat until their total wall time reaches this floor. */
+  readonly minimumSampleDurationMs: number;
+}
+
+/**
+ * One aggregated sample. `samplesMs` holds the per-iteration mean so a sample
+ * stays comparable across workloads, while `totalMs` and `iterations` keep the
+ * raw duration and the repetition count auditable.
+ */
+export interface AggregatedWorkloadSample extends CompleteFormulaWorkloadResult {
+  readonly iterations: number;
+  readonly totalMs: number;
+  readonly warmupFixtures: number;
+}
+
+/**
+ * One timed fixture run: a fresh fixture, a monotonic duration around `run`,
+ * the post-run store allocation, and the workload's exact output check. The
+ * duration is proven finite before it can enter an aggregate.
+ */
+function timedFixtureRun(
+  id: string,
+  factory: FixtureFactory,
+  expected: FormulaOutput,
+): { readonly elapsedMs: number; readonly allocation: FormulaAllocationSample } {
+  const fixture = factory();
+  fixture.store.resetFormulaMatrixResourceStats();
+  const started = now();
+  fixture.run();
+  const elapsedMs = now() - started;
+  const allocation = allocationAt(fixture.store);
+  assert(outputsEqual(fixture.check(), expected), `${id} measured output`);
+  fixture.dispose();
+  assert(Number.isFinite(elapsedMs) && elapsedMs >= 0, `${id} measured duration`);
+  return { elapsedMs, allocation };
+}
+
+function warmUpFixtures(
+  id: string,
+  factory: FixtureFactory,
+  warmupFixtures: number,
+  expected: FormulaOutput,
+): FormulaAllocationSample {
+  if (!Number.isInteger(warmupFixtures) || warmupFixtures < 1) {
+    throw new RangeError("warmupFixtures must be a positive integer");
+  }
+  let allocation: FormulaAllocationSample | undefined;
+  for (let index = 0; index < warmupFixtures; index += 1) {
+    const fixture = factory();
+    fixture.store.resetFormulaMatrixResourceStats();
+    fixture.run();
+    assert(outputsEqual(fixture.check(), expected), `${id} warmup output`);
+    allocation = allocationAt(fixture.store);
+    fixture.dispose();
+  }
+  if (allocation === undefined) throw new RangeError("warmupFixtures must run at least once");
+  return allocation;
+}
+
+/**
+ * Collect one aggregated timing sample: untimed warm-up fixtures first, then
+ * repeated timed runs until the total wall time reaches `minimumSampleDurationMs`.
+ * A single run of a cheap workload sits close to timer and scheduler noise; the
+ * aggregate averages that noise away while keeping one auditable sample.
+ */
+export function collectAggregatedSample(
+  id: string,
+  size: number,
+  factory: FixtureFactory,
+  options: AggregatedSampleOptions,
+  expectedOutput?: FormulaOutput,
+): AggregatedWorkloadSample {
+  if (!Number.isFinite(options.minimumSampleDurationMs) || options.minimumSampleDurationMs <= 0) {
+    throw new RangeError("minimumSampleDurationMs must be a positive number");
+  }
+  const expected = expectedOutput ?? expectedFormulaOutput(id, size);
+  let allocation = warmUpFixtures(id, factory, options.warmupFixtures, expected);
+
+  // One forced GC brackets the whole sample: a per-iteration GC would dominate
+  // the cheap workloads the aggregate exists to measure.
+  forceGc();
+  let totalMs = 0;
+  let iterations = 0;
+  while (totalMs < options.minimumSampleDurationMs) {
+    if (iterations >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
+      throw new RangeError(
+        `${id} did not reach ${options.minimumSampleDurationMs} ms within ${AGGREGATED_SAMPLE_MAX_ITERATIONS} fixture runs`,
+      );
+    }
+    const run = timedFixtureRun(id, factory, expected);
+    totalMs += run.elapsedMs;
+    iterations += 1;
+    allocation = run.allocation;
+  }
+  const perIterationMs = totalMs / iterations;
+  return {
+    id,
+    size,
+    samplesMs: [perIterationMs],
+    stat: summarize([perIterationMs]),
+    allocationSamples: [allocation],
+    allocationStat: summarizeAllocations([allocation]),
+    output: expected,
+    iterations,
+    totalMs,
+    warmupFixtures: options.warmupFixtures,
+  };
+}
+
 export function collectFixture(
   id: string,
   size: number,
@@ -2416,8 +2536,26 @@ if (import.meta.main) {
     };
     const factory = id === undefined ? undefined : factories[id];
     assert(id !== undefined && factory, "unknown single-sample workload");
+    const aggregateIndex = process.argv.indexOf("--aggregate-ms");
+    const aggregateMs =
+      aggregateIndex < 0 ? SAMPLE_AGGREGATE_MS : Number(process.argv[aggregateIndex + 1]);
+    assert(Number.isFinite(aggregateMs) && aggregateMs > 0, "invalid sample aggregation floor");
+    const warmupIndex = process.argv.indexOf("--warmup-fixtures");
+    const warmupFixtures =
+      warmupIndex < 0 ? SAMPLE_WARMUP_FIXTURES : Number(process.argv[warmupIndex + 1]);
+    assert(
+      Number.isInteger(warmupFixtures) && warmupFixtures > 0,
+      "invalid sample warm-up fixture count",
+    );
     await initSheetwrite(undefined, engine);
-    process.stdout.write(`${JSON.stringify(collectFixture(id, size, factory, 1))}\n`);
+    process.stdout.write(
+      `${JSON.stringify(
+        collectAggregatedSample(id, size, factory, {
+          warmupFixtures,
+          minimumSampleDurationMs: aggregateMs,
+        }),
+      )}\n`,
+    );
   } else {
     const memoryIndex = process.argv.indexOf("--memory");
     if (memoryIndex >= 0) {

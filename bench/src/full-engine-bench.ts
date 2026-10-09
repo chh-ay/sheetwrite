@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
@@ -11,6 +12,7 @@ import {
 } from "./formula-bench.js";
 import { validateExactMatrix, validateRawStat } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
+import { resultsDirectory } from "./results-dir.js";
 import { type Stat, summarize } from "./stats.js";
 
 const ENGINE_IDS = ["default", "full"] as const;
@@ -260,6 +262,8 @@ function analysisFixture(formula: string) {
 }
 async function capture(): Promise<void> {
   const meta = protocolCaptureMeta();
+  const args = process.argv.slice(2).filter((argument) => argument !== "--");
+  const resultsDir = resultsDirectory(args);
   const engines: EngineCapture[] = [];
   for (const engine of ENGINE_IDS) {
     // Keep tracked results unchanged until both engines and all checks finish.
@@ -336,12 +340,12 @@ async function capture(): Promise<void> {
   validateFullEngineResult(result);
   for (const capture of engines) {
     await Bun.write(
-      new URL(`../results/formula-${capture.engine}-results.json`, import.meta.url),
+      resolve(resultsDir, `formula-${capture.engine}-results.json`),
       `${JSON.stringify(capture.shared, null, 2)}\n`,
     );
   }
   await Bun.write(
-    new URL("../results/full-engine-results.json", import.meta.url),
+    resolve(resultsDir, "full-engine-results.json"),
     `${JSON.stringify(result, null, 2)}\n`,
   );
 }

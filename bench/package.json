@@ -11,7 +11,10 @@
     "bench:range:smoke": "bun run src/range-bench.ts --smoke",
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
-    "bench:core-paths": "bun run src/core-paths-bench.ts",
+    "bench:core-paths": "bun run src/core-paths-bench.ts --output results/core-paths-results.json",
+    "bench:core-paths:smoke": "bun run src/core-paths-bench.ts --smoke",
+    "bench:release": "bun run src/release-capture.ts",
+    "bench:release:smoke": "bun run src/release-capture.ts --smoke",
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
     "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
@@ -33,7 +36,7 @@
     "bench:baseline:candidate": "bun run src/generate-baseline.ts",
     "test:gates": "bun test test",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "bench:render:scale": "bun run src/render-driver.ts --rows 1000,10000,100000,1000000 --rounds 10 --compact-samples --output results/render-scale.json --markdown-output results/render-scale.md"
+    "bench:render:scale": "bun run src/render-driver.ts --rows 1000,10000,100000,1000000 --rounds 10 --samples 5 --warmups 2 --compact-samples --output results/render-scale.json --markdown-output results/render-scale.md"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",

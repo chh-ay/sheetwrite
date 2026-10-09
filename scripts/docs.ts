@@ -1310,6 +1310,10 @@ interface RenderEvidenceResult {
   madMs: number;
   memory: { beforeBytes: number; afterBytes: number; deltaBytes: number };
   validation: Array<{ passed: boolean }>;
+  /** Recorded only on failures: where the scenario stopped and what it reported. */
+  stage?: string;
+  errorClass?: string;
+  message?: string;
 }
 
 interface ValidatedRenderEvidence {
@@ -1528,6 +1532,120 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   );
   if (!valid) return "controlled render results carry non-finite samples";
   return artifact as ValidatedRenderEvidence;
+}
+
+interface CorePathsEvidence {
+  schemaVersion: number;
+  protocol: string;
+  mode: string;
+  metadata: CaptureMeta;
+  toolchain: { bun: string; nodeCompat: string; cpu: string };
+  methodology: { timing: string; scope: string };
+  scale: Record<string, number>;
+  scenarios: Array<{
+    id: string;
+    unit: string;
+    samplesMs: number[];
+    timing: { median: number; p95: number; iters: number };
+    counters: Record<string, number>;
+    observations?: Record<string, string>;
+    variants?: Array<{
+      id: string;
+      samplesMs: number[];
+      timing: { median: number; p95: number; iters: number };
+    }>;
+    validation: string;
+  }>;
+}
+
+/**
+ * Full-mode core-path capture. The artifact is written by `bench:core-paths`;
+ * only a complete scenario matrix with finite timings and a written validation
+ * checkpoint per scenario is publishable.
+ */
+function validateCorePathsArtifact(value: Record<string, unknown>): CorePathsEvidence | string {
+  const artifact = value as unknown as Partial<CorePathsEvidence>;
+  if (
+    artifact.schemaVersion !== 1 ||
+    artifact.protocol !== "sheetwrite-core-paths-v1" ||
+    artifact.mode !== "full"
+  ) {
+    return "artifact is not a full-mode core-path capture";
+  }
+  if (!Array.isArray(artifact.scenarios) || artifact.scenarios.length === 0) {
+    return "artifact carries no core-path scenarios";
+  }
+  for (const scenario of artifact.scenarios) {
+    const timings = [scenario.timing, ...(scenario.variants ?? []).map((entry) => entry.timing)];
+    if (
+      typeof scenario.unit !== "string" ||
+      scenario.unit.length === 0 ||
+      typeof scenario.validation !== "string" ||
+      scenario.validation.length === 0 ||
+      timings.some(
+        (timing) =>
+          !Number.isFinite(timing?.median) ||
+          !Number.isFinite(timing?.p95) ||
+          !Number.isInteger(timing?.iters) ||
+          timing.iters < 1,
+      )
+    ) {
+      return "core-path scenarios carry an unvalidated or non-finite timing";
+    }
+  }
+  return artifact as CorePathsEvidence;
+}
+
+interface XlsxEvidence {
+  protocol: string;
+  mode: string;
+  metadata: CaptureMeta;
+  rounds: number;
+  maxBaselineRatio: number;
+  fixture: { path: string; bytes: number; sha256: string; producer: string };
+  toolchain: { bun: string; node: string; cpu: string; baselineCommit?: string };
+  summaries: Array<{
+    engine: string;
+    operation: string;
+    scenario: string;
+    durationMs: { median: number; p95: number; iters: number };
+    maxRssBytes: { median: number; p95: number; max: number };
+  }>;
+  comparisons: Array<{
+    operation: string;
+    scenario: string;
+    medianWallRatio: number;
+    peakRssRatio: number;
+  }>;
+}
+
+function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | string {
+  const artifact = value as unknown as Partial<XlsxEvidence>;
+  if (artifact.protocol !== "sheetwrite-xlsx-codec-v1" || artifact.mode !== "full") {
+    return "artifact is not a full-mode XLSX codec capture";
+  }
+  const rounds = artifact.rounds;
+  if (
+    typeof rounds !== "number" ||
+    !Number.isInteger(rounds) ||
+    rounds < 1 ||
+    !Array.isArray(artifact.summaries) ||
+    artifact.summaries.length === 0 ||
+    !Array.isArray(artifact.comparisons)
+  ) {
+    return "XLSX capture is missing its rounds, summaries, or comparisons";
+  }
+  if (
+    artifact.summaries.some(
+      (summary) =>
+        !Number.isFinite(summary?.durationMs?.median) ||
+        !Number.isFinite(summary?.durationMs?.p95) ||
+        !Number.isFinite(summary?.maxRssBytes?.max),
+    )
+  ) {
+    return "XLSX summaries carry non-finite samples";
+  }
+  return artifact as XlsxEvidence;
 }
 
 interface DataEvidence {
@@ -1775,7 +1893,8 @@ const RENDER_METHOD = benchMethod(
   "Methodology - what each scenario does",
   [
     "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
-    "Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing.",
+    "Each measured sample repeats one logical action until it covers at least 100 ms of measured time, so timer resolution and scheduler jitter cannot decide a sample. Every raw sample is retained in the artifact.",
+    "Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing. The failure table names the stage and the recorded error behind every missing cell.",
   ],
   [
     [
@@ -2020,6 +2139,265 @@ export function runCompletionSummary(results: ReadonlyArray<{ status: string }>)
   return { successes, total: results.length, failures: results.length - successes };
 }
 
+/** One validated artifact that the page publishes numbers from. */
+interface EvidenceCapture {
+  readonly label: string;
+  readonly source: string;
+  readonly meta: CaptureMeta;
+}
+
+/** Every loaded artifact states its capture stamp as either `meta` or `metadata`. */
+type CapturedEvidence =
+  | { evidence: { meta?: CaptureMeta; metadata?: CaptureMeta }; source: string }
+  | EvidenceState;
+
+function formatCaptureTime(timestamp: string): string {
+  return timestamp.slice(0, 16).replace("T", " ");
+}
+
+/**
+ * One capture header for the whole page. A page assembled from artifacts of one
+ * commit states that single point-in-time capture; a page assembled from
+ * different commits lists every vintage instead of letting each section's own
+ * commit line hide the mismatch.
+ */
+function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
+  const first = captures[0];
+  if (first === undefined) return [];
+  const commits = new Set(captures.map((capture) => capture.meta.commit));
+  const timestamps = captures.map((capture) => capture.meta.timestamp).sort();
+  const earliest = timestamps[0];
+  const latest = timestamps.at(-1);
+  if (earliest === undefined || latest === undefined) return [];
+  const window =
+    formatCaptureTime(earliest) === formatCaptureTime(latest)
+      ? formatCaptureTime(earliest)
+      : `${formatCaptureTime(earliest)} → ${formatCaptureTime(latest)}`;
+  if (commits.size === 1) {
+    return [
+      "## Capture",
+      "",
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${window} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${first.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Artifacts</dt><dd>${captures.length} validated captures from that one commit; each section states its own environment (browser or runtime) and protocol</dd></div>`,
+      "</dl>",
+      "",
+    ];
+  }
+  const vintages = [...captures].sort(
+    (left, right) =>
+      left.meta.timestamp.localeCompare(right.meta.timestamp) ||
+      left.label.localeCompare(right.label),
+  );
+  return [
+    "## Capture",
+    "",
+    '<div class="evidence-mixed" data-pagefind-ignore><strong>Mixed capture vintages.</strong> The sections below were captured at different commits. Each section is internally consistent and each one names its own commit; the page as a whole is not a single point-in-time measurement.</div>',
+    "",
+    "| Section | Artifact | Commit | Captured |",
+    "| --- | --- | --- | --- |",
+    ...vintages.map(
+      (capture) =>
+        `| ${capture.label} | \`${capture.source}\` | <code>${capture.meta.commit.slice(0, 12)}</code> | ${formatCaptureTime(capture.meta.timestamp)} UTC |`,
+    ),
+    "",
+  ];
+}
+
+/**
+ * Failures grouped by the cell that produced them. A run that did not finish is
+ * never converted into a timing, so the failure list is part of the evidence:
+ * it names the stage and the recorded error behind every missing cell.
+ */
+function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
+  const failures = evidence.results.filter((result) => result.status !== "success");
+  if (failures.length === 0) return [];
+  const groups = new Map<
+    string,
+    { engine: string; rows: number; scenario: string; stage: string; error: string; cells: number }
+  >();
+  for (const failure of failures) {
+    const stage = failure.stage ?? "unrecorded";
+    const error = [failure.errorClass, failure.message]
+      .filter((part): part is string => typeof part === "string" && part.length > 0)
+      .join(": ")
+      .replaceAll("|", "\\|");
+    const key = [failure.engine, failure.rows, failure.scenarioId, stage, error].join("\u0000");
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, {
+        engine: failure.engine,
+        rows: failure.rows,
+        scenario: failure.scenarioId,
+        stage,
+        error: error.length > 0 ? error : "not recorded",
+        cells: 1,
+      });
+    } else {
+      group.cells += 1;
+    }
+  }
+  const ordered = [...groups.values()].sort(
+    (left, right) =>
+      left.engine.localeCompare(right.engine) ||
+      left.rows - right.rows ||
+      left.scenario.localeCompare(right.scenario) ||
+      left.stage.localeCompare(right.stage),
+  );
+  return [
+    "",
+    "Every expected cell carries either a timing or its recorded failure. These cells did not finish and have no timing:",
+    "",
+    "| Engine | Size | Scenario | Stage | Recorded error | Cells |",
+    "| --- | ---: | --- | --- | --- | ---: |",
+    ...ordered.map(
+      (group) =>
+        `| ${group.engine} | ${fmtRows(group.rows)} | ${group.scenario} | ${group.stage} | ${group.error} | ${group.cells} |`,
+    ),
+    "",
+  ];
+}
+
+/** Markdown table cells cannot carry a raw pipe. */
+const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
+
+/**
+ * Core write-path evidence: the packed block writes, CSV import, large restore,
+ * and paged residency work that the core hot paths changed. Every scenario
+ * carries the checkpoint it proved, so a timing is never published alone.
+ */
+function renderCorePathsSection(evidence: CorePathsEvidence, source: string): string[] {
+  const counters = evidence.scenarios.filter(
+    (scenario) => Object.keys(scenario.counters).length > 0,
+  );
+  return [
+    "## Core write path",
+    "",
+    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes; every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
+    "",
+    '<dl class="bench-meta" data-pagefind-ignore>',
+    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
+    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node compatibility ${evidence.toolchain.nodeCompat} · ${html(evidence.toolchain.cpu)}</dd></div>`,
+    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+    "</dl>",
+    "",
+    `Scale: ${Object.entries(evidence.scale)
+      .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
+      .join(", ")}.`,
+    "",
+    "| Scenario | One timed iteration | Median | p95 | Samples |",
+    "| --- | --- | ---: | ---: | ---: |",
+    ...evidence.scenarios.flatMap((scenario) => [
+      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${fmtMs(scenario.timing.median)} | ${fmtMs(scenario.timing.p95)} | ${scenario.timing.iters} |`,
+      ...(scenario.variants ?? []).map(
+        (variant) =>
+          `| \`${scenario.id}:${variant.id}\` | variant measured in the same run | ${fmtMs(variant.timing.median)} | ${fmtMs(variant.timing.p95)} | ${variant.timing.iters} |`,
+      ),
+    ]),
+    "",
+    ...(counters.length === 0
+      ? []
+      : [
+          "Counters recorded by the same runs (non-time evidence):",
+          "",
+          ...counters.map(
+            (scenario) =>
+              `- \`${scenario.id}\` — ${Object.entries(scenario.counters)
+                .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
+                .join(", ")}`,
+          ),
+          "",
+        ]),
+    "<details><summary>Per-scenario correctness checkpoint</summary>",
+    "",
+    ...evidence.scenarios.map(
+      (scenario) => `- \`${scenario.id}\` — ${markdownCell(scenario.validation)}`,
+    ),
+    "",
+    "</details>",
+    "",
+    "Reproduce with:",
+    "",
+    '```sh verify title="Core write-path evidence"',
+    "bun run --filter @sheetwrite/bench bench:core-paths",
+    "```",
+    "",
+  ];
+}
+
+/**
+ * XLSX codec evidence: the current tree against the codec at the recorded
+ * baseline commit, both reading the same checked fixture. A ratio below 1 means
+ * the current codec is faster; peak RSS is the largest raw process peak.
+ */
+function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
+  const summaryFor = (
+    engine: string,
+    operation: string,
+    scenario: string,
+  ): XlsxEvidence["summaries"][number] | undefined =>
+    evidence.summaries.find(
+      (summary) =>
+        summary.engine === engine &&
+        summary.operation === operation &&
+        summary.scenario === scenario,
+    );
+  const baselineCommit = evidence.toolchain.baselineCommit;
+  return [
+    "## XLSX codec benchmark",
+    "",
+    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
+    "",
+    '<dl class="bench-meta" data-pagefind-ignore>',
+    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
+    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+    `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
+    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
+    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+    "</dl>",
+    "",
+    ...(baselineCommit === undefined
+      ? [
+          "This capture ran the current tree only, so no codec comparison is published.",
+          "",
+          "| Operation | Scenario | Median | p95 | Peak RSS |",
+          "| --- | --- | ---: | ---: | ---: |",
+          ...evidence.summaries
+            .filter((summary) => summary.engine === "current")
+            .map(
+              (summary) =>
+                `| ${summary.operation} | ${summary.scenario} | ${fmtMs(summary.durationMs.median)} | ${fmtMs(summary.durationMs.p95)} | ${fmtMb(summary.maxRssBytes.max)} |`,
+            ),
+          "",
+        ]
+      : [
+          `The baseline codec is the same operation at commit <code>${baselineCommit.slice(0, 12)}</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster.`,
+          "",
+          "| Operation | Scenario | Current median | Baseline median | Ratio | Current peak RSS | Baseline peak RSS | RSS ratio |",
+          "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+          ...evidence.comparisons.flatMap((comparison) => {
+            const current = summaryFor("current", comparison.operation, comparison.scenario);
+            const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
+            if (current === undefined || baseline === undefined) return [];
+            return [
+              `| ${comparison.operation} | ${comparison.scenario} | ${fmtMs(current.durationMs.median)} | ${fmtMs(baseline.durationMs.median)} | ${comparison.medianWallRatio.toFixed(2)}× | ${fmtMb(current.maxRssBytes.max)} | ${fmtMb(baseline.maxRssBytes.max)} | ${comparison.peakRssRatio.toFixed(2)}× |`,
+            ];
+          }),
+          "",
+        ]),
+    "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
+    "",
+    '```sh verify title="XLSX codec evidence"',
+    `git worktree add ../sheetwrite-xlsx-baseline ${baselineCommit ?? "<baseline commit>"}`,
+    "cd ../sheetwrite-xlsx-baseline && bun install --frozen-lockfile && bun run build:packages",
+    "cd - && bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root ../sheetwrite-xlsx-baseline",
+    "```",
+    "",
+  ];
+}
+
 export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Promise<string> {
   const scale = await loadEvidence(
     "bench/results/render-scale.json",
@@ -2046,6 +2424,32 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "bun run --filter @sheetwrite/bench bench:formula:matched",
     validateMatchedEngineArtifact,
   );
+  const corePaths = await loadEvidence(
+    "bench/results/core-paths-results.json",
+    "bun run --filter @sheetwrite/bench bench:core-paths",
+    validateCorePathsArtifact,
+  );
+  const xlsx = await loadEvidence(
+    "bench/results/xlsx-results.json",
+    "bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>",
+    validateXlsxArtifact,
+  );
+  const captures = (
+    [
+      { label: "Render benchmark", loaded: scale },
+      { label: "Data engine benchmark", loaded: data },
+      { label: "Core write path", loaded: corePaths },
+      { label: "Formula engine benchmark", loaded: formula },
+      { label: "Formula engines (analysis capture)", loaded: fullEngine },
+      { label: "Formula engines (matched capture)", loaded: matchedEngine },
+      { label: "XLSX codec benchmark", loaded: xlsx },
+    ] satisfies Array<{ label: string; loaded: CapturedEvidence }>
+  ).flatMap(({ label, loaded }) => {
+    if (!("evidence" in loaded)) return [];
+    const evidence = loaded.evidence;
+    const captured = "meta" in evidence ? evidence.meta : evidence.metadata;
+    return [{ label, source: loaded.source, meta: captured }];
+  });
   const sizeHistory =
     sizeHistoryOverride ??
     validateSizeHistory(
@@ -2059,6 +2463,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     ).trimEnd(),
     "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
     "",
+    ...renderCaptureHeader(captures),
     "## Matched local regression check",
     "",
     "Timing comparisons run deliberately on a controlled local machine, not as a required CI job. Capture ten fresh matched rounds, retain every raw sample, and compare the fresh artifact with the committed baseline. Any unapproved slowdown fails the local command.",
@@ -2071,6 +2476,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "```",
     "",
     "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
+    "",
+    "The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
     "",
     "## Render benchmark",
     "",
@@ -2092,6 +2499,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "</dl>",
       "",
       renderBenchWidget(evidence),
+      ...renderFailureTable(evidence),
       "",
       RENDER_METHOD,
       "",
@@ -2216,6 +2624,11 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(data);
   }
+  if ("evidence" in corePaths) {
+    lines.push(...renderCorePathsSection(corePaths.evidence, corePaths.source));
+  } else {
+    pending.push(corePaths);
+  }
   lines.push("## Formula engine benchmark", "");
   if ("evidence" in formula) {
     const { evidence, source } = formula;
@@ -2290,11 +2703,22 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(formula);
   }
-  if ("evidence" in fullEngine && "evidence" in matchedEngine) {
-    lines.push(renderFullEngineEvidence(fullEngine.evidence, matchedEngine.evidence));
-  } else {
-    if (!("evidence" in fullEngine)) pending.push(fullEngine);
+  if ("evidence" in fullEngine) {
+    lines.push(
+      renderFullEngineEvidence(
+        fullEngine.evidence,
+        "evidence" in matchedEngine ? matchedEngine.evidence : undefined,
+      ),
+    );
     if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+  } else {
+    pending.push(fullEngine);
+    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+  }
+  if ("evidence" in xlsx) {
+    lines.push(...renderXlsxSection(xlsx.evidence, xlsx.source));
+  } else {
+    pending.push(xlsx);
   }
   lines.push("## Delivery size", "");
   const latestRelease = sizeHistory.releases.at(-1);

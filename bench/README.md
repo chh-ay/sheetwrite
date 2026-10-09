@@ -81,19 +81,32 @@ passed timing regression gate. The legacy shared source keys name the WASM
 role; their hashes use the selected engine. The outer artifact records the
 physical paths and binds each engine to its captured WASM hash.
 
-Build the packages first. Run the capture from `bench/` with one pinned runner:
+Build the packages first. Run one capture at a time from `bench/` on an
+otherwise idle machine, pinned to one CPU. Do not run concurrent builds or
+timing captures: competing work adds scheduler and CPU noise. For example,
+on Linux with CPU 4:
 
 ```sh
-flock -x /home/vvin/learn/sheetwrite-wt/build.lock flock -x /home/vvin/learn/sheetwrite-wt/quiet.lock taskset -c 4 bun run src/full-engine-bench.ts
+taskset -c 4 bun run src/full-engine-bench.ts
 ```
 
 `bench:formula:matched` checks the eight shared rows that were slower in the
-first sequential capture. It runs 51 default/full pairs per row. Each timed
-sample uses a fresh process and one untimed warmup. The artifact retains all
-samples and checksums, median paired ratios, and the p10 to p90 ratio spread.
-The single-sample runner is `bun run src/formula-bench.ts --sample ID SIZE`.
+first sequential capture. It runs 25 default/full pairs per row (`--rounds`
+changes that count, minimum 2). Each timed sample uses a fresh Bun process,
+runs three untimed warm-up fixtures, then repeats the fixture until at least
+50 ms of measured time and records the per-iteration mean. Repeating a short
+operation is what makes the paired ratio usable: a single cold run of a 2 ms
+workload drifted by more than 4x between fresh processes, while the aggregated
+sample stays inside a few percent. The artifact retains all samples and
+checksums, every sample's iteration count and total, median paired ratios, and
+the p10 to p90 ratio spread; the evidence page marks any row whose spread is
+too wide to support a ratio claim.
+The single-sample runner is
+`bun run src/formula-bench.ts --sample ID SIZE [--aggregate-ms 50] [--warmup-fixtures 3]`.
 It supports the matched workload set. Use the same pinned-runner command as
-above with `src/matched-engine-bench.ts`.
+above with `src/matched-engine-bench.ts`. `--results-dir <dir>` redirects every
+artifact write of the engine captures, so a rehearsal never overwrites tracked
+evidence.
 
 The suite covers independent parse/load and first recompute, safe-depth linear
 chains, 100K fan-out, diamonds, shared/distinct ranges, cross-sheet ranges,
@@ -206,7 +219,47 @@ bun run bench:render:smoke -- --engine handsontable
 
 # Fail-closed schema, completeness, and byte-stable Markdown validation:
 bun run bench:render:validate
+
+# Core write-path evidence (packed block writes, CSV import, large restore,
+# paged residency); writes results/core-paths-results.json
+bun run bench:core-paths
 ```
+
+The evidence page at
+`docs/src/content/docs/guides/performance-resources.md` publishes every
+artifact above. One command captures that whole set, in order, from a clean
+tree. Use one pinned CPU on an otherwise idle machine, with no concurrent
+builds or timing captures. The example below uses CPU 4 on Linux:
+
+```sh
+# Build first: every capture needs the built packages and WASM binaries.
+bun run build:packages
+
+# Then, from bench/, with the prepared XLSX comparison checkout:
+taskset -c 4 bun run bench:release --xlsx-baseline-root /path/to/sheetwrite-xlsx-baseline
+```
+
+`bench:release` refuses a dirty tree, runs the captures in page order, stops at
+the first failure, and rejects an artifact that does not stamp the current
+clean commit. The XLSX capture compares the current tree against the
+pre-0.5.0 codec, so the run needs a prepared checkout of that commit
+(`git worktree add ../sheetwrite-xlsx-baseline 87fadb72`, then
+`bun install --frozen-lockfile && bun run build:packages` inside it) passed as
+`--xlsx-baseline-root <checkout path>`. `bench:release:smoke`
+rehearses the same order with the smoke
+matrices of the suites that have one, writing to `results/smoke/` (ignored by
+git) so a rehearsal never overwrites published evidence. Regenerate the page
+after a release capture with `bun run docs:generate`.
+
+A change to a harness source file, to the sampling flags, or to the protocol
+version invalidates the committed render baseline: `bench:check` compares the
+harness hashes, the declared sampling, and the runner (OS, CPU, Bun, Node,
+Chromium, power mode, concurrency) of the fresh capture against
+`results/render-baseline.json` and fails closed on any mismatch. `bench:release`
+therefore ends by re-recording it on the frozen harness: ten controlled rounds
+into `results/render-baseline-raw.json`, then the promotion of that raw artifact
+over the committed baseline. Commit both in the release change; the promotion
+diff is baseline-only and reviewable on its own.
 
 ### Fail-closed gate policy
 

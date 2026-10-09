@@ -24,6 +24,8 @@ class FakeAdapter implements RenderBenchAdapter {
   readonly values: unknown[][];
   private readonly originalValues: unknown[][];
   corruptNavigation = false;
+  /** Mirrors a competitor whose row removal overflows the stack above some size. */
+  failRowRemoval = false;
   private mounted = true;
   private selected: CellSelection | null = null;
   private editing = false;
@@ -137,6 +139,7 @@ class FakeAdapter implements RenderBenchAdapter {
   }
 
   removeRows(at: number, count: number): void {
+    if (this.failRowRemoval) throw new RangeError("Maximum call stack size exceeded");
     this.values.splice(at, count);
   }
 
@@ -265,6 +268,18 @@ describe("scenario correctness checkpoints", () => {
     if (result.status !== "failed") throw new Error("expected failed result");
     expect(result.message).toContain("moves one logical cell");
     expect(result.partialSamples).toHaveLength(1);
+  });
+
+  test("names the failing step when a successful action cannot be undone", () => {
+    const adapter = new FakeAdapter();
+    adapter.failRowRemoval = true;
+    const result = runRenderScenario(adapter, dataset, "altering.insert-5-rows-top", options);
+    expect(result).toMatchObject({ status: "failed", stage: "measure" });
+    if (result.status !== "failed") throw new Error("expected failed result");
+    // The insert itself succeeded; only the untimed cleanup blew the stack, and
+    // the recorded failure must say so instead of blaming the measured action.
+    expect(result.errorClass).toBe("RangeError");
+    expect(result.message).toBe("cleanup step failed: Maximum call stack size exceeded");
   });
 
   test("keeps one-pixel smooth scrolling inside the same logical window", () => {

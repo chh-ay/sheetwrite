@@ -26,6 +26,8 @@ playwright-report/
 bench/results/candidates/
 bench/results/render-fresh.json
 bench/results/render-fresh.md
+# Release-capture rehearsals; never published evidence
+bench/results/smoke/
 .formula-evidence/
 
 # Editor / OS

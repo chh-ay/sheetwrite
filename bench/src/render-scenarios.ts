@@ -1256,6 +1256,23 @@ function scenarioActions(
   };
 }
 
+/** Which part of one logical operation raised: the timed action or its untimed bracket. */
+type ScenarioStep = "prepare" | "action" | "counters" | "cleanup";
+
+/**
+ * Keep the failing step and the original error class visible. A recorded
+ * failure that says only "Maximum call stack size exceeded" hides whether the
+ * measured action or its untimed cleanup produced it; the same error in a
+ * prepare step means the sample never started.
+ */
+function stepFailure(step: ScenarioStep, error: unknown): Error {
+  const cause = error instanceof Error ? error : new Error(String(error));
+  const message = `${step} step failed: ${cause.message}`;
+  const wrapped = cause instanceof RangeError ? new RangeError(message) : new Error(message);
+  wrapped.cause = cause;
+  return wrapped;
+}
+
 function aggregateSample(
   adapter: RenderBenchAdapter,
   actions: ScenarioActions,
@@ -1271,17 +1288,21 @@ function aggregateSample(
     outputAllocationEvents: 0,
   };
   do {
-    actions.prepare();
+    try {
+      actions.prepare();
+    } catch (error) {
+      throw stepFailure("prepare", error);
+    }
     if (actions.measureWindowTransfer) adapter.resetWindowTransferCounters();
     const started = performance.now();
-    let operationError: unknown;
+    let failure: { step: ScenarioStep; error: unknown } | undefined;
     try {
       actions.action();
     } catch (error) {
-      operationError = error;
+      failure = { step: "action", error };
     }
     const elapsed = performance.now() - started;
-    if (actions.measureWindowTransfer && operationError === undefined) {
+    if (actions.measureWindowTransfer && failure === undefined) {
       try {
         const observed = adapter.windowTransferCounters();
         transferCounters.logicalFrames += observed.logicalFrames;
@@ -1290,15 +1311,17 @@ function aggregateSample(
         transferCounters.copiedBytes += observed.copiedBytes;
         transferCounters.outputAllocationEvents += observed.outputAllocationEvents;
       } catch (error) {
-        operationError = error;
+        failure = { step: "counters", error };
       }
     }
     try {
       actions.cleanup();
-    } catch (cleanupError) {
-      if (operationError === undefined) operationError = cleanupError;
+    } catch (error) {
+      // A failing action decides the sample; a failing cleanup only surfaces
+      // when the measured action itself succeeded.
+      failure ??= { step: "cleanup", error };
     }
-    if (operationError !== undefined) throw operationError;
+    if (failure !== undefined) throw stepFailure(failure.step, failure.error);
     if (!Number.isFinite(elapsed) || elapsed < 0) {
       throw new RangeError(`invalid operation duration: ${elapsed}`);
     }
