@@ -1294,7 +1294,7 @@ it("adapts legacy rows through full-width protocol 2 with explicit blank keys", 
       signal: new AbortController().signal,
       revision: 0,
     }),
-  ).rejects.toThrow("undeclared key");
+  ).rejects.toThrow(RangeError);
 
   controller.destroy();
   store.dispose();

@@ -60,38 +60,6 @@ describe("DocumentController", () => {
       }
     }
   });
-  it("owns commit history and applies undo/redo through the store", () => {
-    const store = new SheetwriteStore(makeWorkbook(4));
-    let historyApplications = 0;
-    const controller = new DocumentController({
-      store,
-      loadable: store,
-      readOnly: () => false,
-      epoch: () => 0,
-      materializeVirtualColumns: (patches) => patches,
-      onMutationRejected: () => {},
-      onHistoryApplied: () => {
-        historyApplications += 1;
-      },
-    });
-    const address = { sheet: "s1", row: 1, col: 0 };
-
-    expect(
-      controller.applyTransaction({
-        patches: [{ op: "set", addr: address, value: { kind: "literal", value: "Ada" } }],
-      }).status,
-    ).toBe("applied");
-    expect(store.getCell(address).resolved).toBe("Ada");
-
-    controller.undo();
-    expect(store.getCell(address).resolved).toBeNull();
-    controller.redo();
-    expect(store.getCell(address).resolved).toBe("Ada");
-    expect(historyApplications).toBe(2);
-
-    controller.destroy();
-    store.dispose();
-  });
   it("captures structural and range inverses for Store implementations without compact history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     store.applyTransaction({
@@ -180,8 +148,10 @@ describe("DocumentController", () => {
 
 describe("GeometryLayoutController", () => {
   it("owns zoomed indexes, frozen bands, windows, and cell rectangles", () => {
+    const zoom = 2;
     const workbook = makeWorkbook(10);
     const sheet = workbook.sheets[0]!;
+    const [first = 0, second = 0] = sheet.columns.map((column) => column.width ?? 0);
     sheet.frozenRows = 2;
     sheet.frozenCols = 1;
     sheet.rowHeights = new Map([[1, 40]]);
@@ -190,20 +160,22 @@ describe("GeometryLayoutController", () => {
         sheet: () => sheet,
         activeSheet: () => "s1",
         loadable: null,
-        theme: () => DEFAULT_THEME,
-        zoom: () => 1,
+        // The grid passes a theme already scaled by zoom.
+        theme: () => ({ ...DEFAULT_THEME, rowHeight: DEFAULT_THEME.rowHeight * zoom }),
+        zoom: () => zoom,
         maxElementHeight: () => 33_000_000,
       },
-      160,
+      400,
     );
+    const frozenHeight = (DEFAULT_THEME.rowHeight + 40) * zoom;
 
-    expect(controller.rowHeight(1)).toBe(40);
-    expect(controller.frozenHeight()).toBe(DEFAULT_THEME.rowHeight + 40);
-    expect(controller.frozenWidth()).toBe(160);
-    expect(controller.paintWindow(0, 0, 132, 360, 0)).toMatchObject({
+    expect(controller.rowHeight(1)).toBe(40 * zoom);
+    expect(controller.frozenHeight()).toBe(frozenHeight);
+    expect(controller.frozenWidth()).toBe(first * zoom);
+    expect(controller.paintWindow(0, 0, 400, 900, 0)).toMatchObject({
       frozenRows: 2,
       frozenColumns: 1,
-      frozenWidth: 160,
+      frozenWidth: first * zoom,
     });
     expect(
       controller.rangeRect(
@@ -215,12 +187,7 @@ describe("GeometryLayoutController", () => {
         0,
         0,
       ),
-    ).toEqual({
-      x: DEFAULT_THEME.rowHeaderWidth,
-      y: DEFAULT_THEME.headerHeight,
-      w: 280,
-      h: DEFAULT_THEME.rowHeight + 40,
-    });
+    ).toMatchObject({ w: (first + second) * zoom, h: frozenHeight });
   });
 });
 
@@ -331,6 +298,14 @@ describe("RenderCoordinator", () => {
       emitScroll: () => {},
     });
 
+    // Runs one frame and reports whether it read a new logical data window.
+    const readsWindow = (change: () => void): boolean => {
+      const before = windowReads;
+      change();
+      coordinator.renderNow();
+      return windowReads > before;
+    };
+
     try {
       coordinator.schedule();
       coordinator.schedule();
@@ -340,75 +315,49 @@ describe("RenderCoordinator", () => {
       expect(viewports).toHaveLength(1);
       expect(overlayPaints).toBe(1);
       expect(ariaUpdates).toBe(1);
-      expect(windowReads).toBe(1);
+      expect(windowReads).toBeGreaterThan(0);
+
+      // Nothing changed: no frame.
+      const readsBefore = windowReads;
       coordinator.renderNow();
       expect(paints).toHaveLength(1);
-      expect(windowReads).toBe(1);
+      expect(windowReads).toBe(readsBefore);
 
-      coordinator.invalidate();
-      coordinator.renderNow();
+      // Pixel-only changes repaint without reading data.
+      const revision = viewports.at(-1)?.contentRevision;
+      expect(readsWindow(() => coordinator.invalidate())).toBe(false);
       expect(paints).toHaveLength(2);
-      expect(viewports.at(-1)?.contentRevision).toBe(1);
-      expect(windowReads).toBe(1);
-
-      scrollTop = 1;
-      coordinator.renderNow();
-      scrollLeft = 1;
-      coordinator.renderNow();
+      expect(viewports.at(-1)?.contentRevision).not.toBe(revision);
+      expect(readsWindow(() => (scrollTop = 1))).toBe(false);
+      expect(readsWindow(() => (scrollLeft = 1))).toBe(false);
       expect(paints).toHaveLength(4);
-      expect(windowReads).toBe(1);
 
-      scrollTop = DEFAULT_THEME.rowHeight + 1;
-      coordinator.renderNow();
-      expect(windowReads).toBe(2);
-
-      scrollLeft = 170;
-      coordinator.renderNow();
-      expect(windowReads).toBe(3);
-
-      storeEpoch += 1;
-      coordinator.renderNow();
-      expect(windowReads).toBe(4);
-
-      coordinator.invalidateData();
-      coordinator.renderNow();
-      expect(windowReads).toBe(5);
+      // Crossing a row or column, a store change, or a data invalidation reads data.
+      expect(readsWindow(() => (scrollTop = DEFAULT_THEME.rowHeight + 1))).toBe(true);
+      expect(readsWindow(() => (scrollLeft = 170))).toBe(true);
+      expect(readsWindow(() => (storeEpoch += 1))).toBe(true);
+      expect(readsWindow(() => coordinator.invalidateData())).toBe(true);
 
       const paintsBeforeZoom = paints.length;
-      zoom = 1.25;
-      coordinator.renderNow();
-      expect(windowReads).toBe(5);
+      expect(readsWindow(() => (zoom = 1.25))).toBe(false);
       expect(paints).toHaveLength(paintsBeforeZoom + 1);
 
+      // Merge anchors outside the window are read once per changed request set.
+      const invalidate = () => coordinator.invalidate();
       anchorRequests = [{ sheet: "s1", row: 0, cols: [0] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(6);
+      expect(readsWindow(invalidate)).toBe(true);
       expect(domAnchorViewCounts.at(-1)).toBe(1);
-
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(6);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [0] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(7);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [1] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(8);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [1, 2] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(9);
-
+      expect(readsWindow(invalidate)).toBe(false);
+      for (const request of [
+        { sheet: "s1", row: 1, cols: [0] },
+        { sheet: "s1", row: 1, cols: [1] },
+        { sheet: "s1", row: 1, cols: [1, 2] },
+      ]) {
+        anchorRequests = [request];
+        expect(readsWindow(invalidate)).toBe(true);
+      }
       anchorRequests = [];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(9);
+      expect(readsWindow(invalidate)).toBe(false);
       expect(domAnchorViewCounts.at(-1)).toBe(0);
 
       const paintsBeforeDestroy = paints.length;

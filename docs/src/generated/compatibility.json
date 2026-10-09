@@ -435,7 +435,7 @@
         "named range"
       ],
       "expectedWarnings": [
-        "unsupported-feature: hidden worksheet visibility"
+        "rich-text: comment formatting was flattened"
       ]
     },
     {

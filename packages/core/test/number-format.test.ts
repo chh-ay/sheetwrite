@@ -7,17 +7,6 @@ import {
 } from "../src/number-format.js";
 
 describe("formatNumber", () => {
-  it("applies percent scaling and suffix", () => {
-    expect(formatNumber(0.5, "0%")).toBe("50%");
-    expect(formatNumber(0.123, "0.0%")).toBe("12.3%");
-  });
-
-  it("resolves the locale currency placeholder", () => {
-    resetNumberFormatResourcesForTest();
-    expect(formatNumber(1234.5, "¤#,##0.00")).toBe("$1,234.50");
-    expect(formatNumber(1, "¤0.00")).toBe("$1.00");
-  });
-
   it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
     const cases: Array<{ value: number; code: string }> = [
       { value: 1.005, code: "#,##0.00" },
@@ -119,10 +108,6 @@ describe("formatNumber", () => {
     expect(formatNumber(-12.5, '0.0;"loss "0.0')).toBe("loss 12.5");
   });
 
-  it("uses the configured locale rather than the browser default", () => {
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-  });
-
   it("distinguishes month and minute tokens and renders names and AM/PM", () => {
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
     expect(formatNumber(serial, "mmm d, yyyy h:mm:ss AM/PM")).toBe("Jul 4, 2024 3:06:07 PM");
@@ -133,6 +118,7 @@ describe("formatNumber", () => {
     resetNumberFormatResourcesForTest();
     const cases: ReadonlyArray<[number, string | undefined, string | undefined, string]> = [
       [1234.5, "¤#,##0.00", "en-US", "$1,234.50"],
+      [1, "¤0.00", "en-US", "$1.00"],
       [1234.5, "¤#,##0.00", "de-DE", "$1.234,50"],
       [1234.5, "#,##0.00", "de-DE", "1.234,50"],
       [1234.5, "#,##0.00", "en-US", "1,234.50"],
@@ -152,6 +138,7 @@ describe("formatNumber", () => {
       [45_351, "mmm d, yyyy", undefined, "Feb 29, 2024"],
       [-2.5, "#,##0.00;(#,##0.00)", undefined, "(2.50)"],
       [0.5, "0%", undefined, "50%"],
+      [0.123, "0.0%", undefined, "12.3%"],
       [12_345.6789, "0.00E+00", undefined, "1.23E+04"],
     ];
 

@@ -66,9 +66,17 @@ test("semantic headers, editor lifecycle, focus, and command ARIA", async ({ pag
   await expect(editor).toHaveCount(1);
   await page.evaluate(() => window.__sheetwriteSemanticGridFixture?.reset());
   await expect(editor).toHaveCount(0);
+  // A fresh editor still opens after the reset, and every mounted editor is destroyed.
+  await page.evaluate(() => window.__sheetwriteSemanticGridFixture?.begin(0, 1));
+  await expect(editor).toHaveCount(1);
+  await page.evaluate(() => window.__sheetwriteSemanticGridFixture?.reset());
+  await expect(editor).toHaveCount(0);
   await expect
-    .poll(async () => page.evaluate(() => window.__sheetwriteSemanticGridFixture?.stats()))
-    .toEqual({ mounts: 2, aborts: 2, destroys: 2 });
+    .poll(async () => {
+      const stats = await page.evaluate(() => window.__sheetwriteSemanticGridFixture?.stats());
+      return stats !== undefined && stats.mounts > 0 && stats.destroys === stats.mounts;
+    })
+    .toBe(true);
   await expect(columnHeaders.nth(0)).toHaveText("Customer name");
   await expect(columnHeaders.nth(1)).toHaveText("Account status");
 

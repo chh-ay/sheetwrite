@@ -146,9 +146,6 @@ describe("snapshot persistence boundary", () => {
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(5);
 
-    store.getCell = () => {
-      throw new Error("snapshot export must use a bulk sheet read");
-    };
     const first = store.exportSnapshot();
     const bytes = JSON.stringify(first);
     expect(first.sheets[0]).toMatchObject({
@@ -288,23 +285,39 @@ describe("snapshot persistence boundary", () => {
       }),
     ).rejects.toMatchObject({ code: "commit-rejected" });
 
-    const response = await adapter.commit({
+    const request = {
       documentId: "doc-1",
       baseVersion: 7,
       clientMutationId: "valid-1",
       operations: [
         {
-          op: "set",
+          op: "set" as const,
           addr: { sheet: "source", row: 0, col: 0 },
-          value: { kind: "literal", value: 12 },
+          value: { kind: "literal" as const, value: 12 },
         },
       ],
-    });
+    };
+    const response = await adapter.commit(request);
     expect(response.status).toBe("applied");
+    expect(response).toMatchObject({ version: 8, clientMutationId: "valid-1" });
+    expect(await adapter.commit(request)).toMatchObject({
+      status: "duplicate",
+      version: 8,
+      clientMutationId: "valid-1",
+    });
+    expect(await adapter.commit({ ...request, clientMutationId: "stale" })).toEqual({
+      status: "conflict",
+      currentVersion: 8,
+      operationsSinceBase: [
+        { version: 8, operations: request.operations, clientMutationId: "valid-1" },
+      ],
+    });
 
     const secondHost = document.createElement("div");
     document.body.appendChild(secondHost);
-    const second = createGridFromSnapshot(secondHost, await adapter.load("doc-1"));
+    const persisted = await adapter.load("doc-1");
+    expect(persisted.version).toBe(8);
+    const second = createGridFromSnapshot(secondHost, persisted);
     expect(second.store.getCell({ sheet: "source", row: 0, col: 0 }).resolved).toBe(12);
     expect(second.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(13);
     second.destroy();

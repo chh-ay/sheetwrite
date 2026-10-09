@@ -160,7 +160,7 @@ describe("changeset workspace contract", () => {
     }
   });
 
-  it("runs the release-aware Changesets status command", () => {
+  it("routes release and package-size-history branches", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
     expect(releaseVersionFromHeadRef("release/version-0.4.0")).toBe("0.4.0");
     expect(releaseVersionFromHeadRef("feature/docs")).toBeUndefined();
@@ -198,18 +198,40 @@ describe("changeset workspace contract", () => {
         "scripts/size-history.json",
       ]),
     ).toBeFalse();
-    expect(() => validateReleasePackageVersions("0.4.0")).not.toThrow();
-    expect(() => validateReleasePackageVersions("0.4.1")).toThrow(
-      "Release branch 0.4.1 requires @sheetwrite/wasm@0.4.1",
-    );
-    const root = resolve(import.meta.dir, "..");
+  });
+
+  it("requires every publishable package to match the release branch version", async () => {
+    const root = await mkdtemp(join(tmpdir(), "sheetwrite-release-versions-"));
+    fixtureRoots.push(root);
+    const writeVersions = async (versionOf: (name: string) => string) => {
+      for (const name of PUBLISHABLE_PACKAGE_ORDER) {
+        const directory = join(root, "packages", name.slice("@sheetwrite/".length));
+        await mkdir(directory, { recursive: true });
+        await writeFile(
+          join(directory, "package.json"),
+          JSON.stringify({ name, version: versionOf(name) }),
+        );
+      }
+    };
+
+    await writeVersions(() => "7.8.9");
+    expect(() => validateReleasePackageVersions("7.8.9", root)).not.toThrow();
+    expect(() => validateReleasePackageVersions("7.8.10", root)).toThrow("7.8.10");
+    const last = PUBLISHABLE_PACKAGE_ORDER.at(-1)!;
+    await writeVersions((name) => (name === last ? "7.8.8" : "7.8.9"));
+    expect(() => validateReleasePackageVersions("7.8.9", root)).toThrow(last);
+
+    // The CLI takes the release shortcut for the checkout's own version.
+    const repository = resolve(import.meta.dir, "..");
+    const { version } = JSON.parse(
+      await readFile(join(repository, "packages/core/package.json"), "utf8"),
+    ) as { version: string };
     const result = Bun.spawnSync(["bun", "run", "changeset:ci"], {
-      cwd: root,
-      env: { ...process.env, GITHUB_HEAD_REF: "0.4.0" },
+      cwd: repository,
+      env: { ...process.env, GITHUB_HEAD_REF: version },
       stderr: "pipe",
       stdout: "pipe",
     });
     expect(result.exitCode, result.stderr.toString()).toBe(0);
-    expect(result.stdout.toString()).toContain("Release package versions match branch 0.4.0");
   });
 });

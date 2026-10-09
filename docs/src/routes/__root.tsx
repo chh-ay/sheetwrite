@@ -2,6 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect } from "react";
+import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import showcaseStylesheet from "../styles/showcase.css?url";
@@ -39,7 +40,7 @@ const STRUCTURED_DATA = JSON.stringify({
       license: "https://opensource.org/license/mit",
       programmingLanguage: ["TypeScript", "Rust"],
       runtimePlatform: ["Web", "WebAssembly"],
-      version: "0.1.0",
+      version: corePackage.version,
     },
   ],
 });

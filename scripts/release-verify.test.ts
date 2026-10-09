@@ -77,6 +77,10 @@ describe("canonical artifact consumer graph", () => {
         );
       }),
     ).toBeTrue();
+    // Each consumer is followed by a fresh verification, so a consumer cannot alter artifacts.
+    for (const consumer of consumers) {
+      expect(events[events.indexOf(consumer) + 1]).toEqual({ kind: "verify", root: artifactRoot });
+    }
 
     const capabilityRuns: Record<string, number> = {
       "release audit": 0,
@@ -101,6 +105,29 @@ describe("canonical artifact consumer graph", () => {
       "bundler consumer": 1,
       "delivery size": 1,
     });
+  });
+
+  it("stops at the first consumer that changes the verified artifacts", async () => {
+    let verifications = 0;
+    let consumerRuns = 0;
+    const runner: ReleaseVerificationRunner = {
+      async buildArtifacts() {},
+      async verifyArtifacts() {
+        verifications += 1;
+        if (verifications === 2) throw new Error("artifact bytes changed");
+      },
+      async runConsumer() {
+        consumerRuns += 1;
+      },
+    };
+    await expect(
+      runReleaseVerification(
+        resolve(repositoryRoot, "test-results/release-mutation"),
+        true,
+        runner,
+      ),
+    ).rejects.toThrow("artifact bytes changed");
+    expect(consumerRuns).toBe(1);
   });
 
   it("forbids every consumer's standalone packing fallback in artifact-only mode", () => {

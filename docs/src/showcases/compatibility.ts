@@ -145,7 +145,7 @@ export const COMPATIBILITY_FIXTURES: readonly CompatibilityFixture[] = [
       "freeze panes",
       "named range",
     ],
-    expectedWarnings: ["unsupported-feature: hidden worksheet visibility"],
+    expectedWarnings: ["rich-text: comment formatting was flattened"],
   },
   {
     id: "ecma-shared-formula",

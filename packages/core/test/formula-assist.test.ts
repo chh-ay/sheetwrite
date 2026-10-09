@@ -1,13 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { EditController } from "../src/editor.js";
-import {
-  type AssistDeps,
-  FORMULA_FUNCTIONS,
-  FormulaAssist,
-  functionTokenAt,
-  parseFormulaRefs,
-  REF_PALETTE,
-} from "../src/formula-assist.js";
+import { type AssistDeps, FormulaAssist } from "../src/formula-assist.js";
 import type { HighlightRange, Theme } from "../src/types.js";
 
 // A full Theme so `attach`/`begin` type-check; only the color fields matter here.
@@ -47,11 +40,18 @@ function mountTextarea(): { host: HTMLElement; ta: HTMLTextAreaElement } {
 }
 
 function itemsOf(host: HTMLElement): string[] {
-  return [...host.querySelectorAll(".sheetwrite-assist-item")].map((el) => el.textContent ?? "");
+  return [...host.querySelectorAll('[role="option"]')].map((el) => el.textContent ?? "");
 }
 
 function selectedItem(host: HTMLElement): string | null {
-  return host.querySelector('.sheetwrite-assist-item[aria-selected="true"]')?.textContent ?? null;
+  return host.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
+}
+
+/** Highlight colors must be visible and tell different references apart. */
+function expectDistinctColors(ranges: readonly HighlightRange[]): void {
+  const colors = ranges.map((range) => range.color);
+  for (const color of colors) expect(color).toBeTruthy();
+  expect(new Set(colors).size).toBe(colors.length);
 }
 
 const noopDeps = (): AssistDeps => ({ highlightCells: () => {}, sheet: () => "s1" });
@@ -60,64 +60,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-// ── pure helpers ─────────────────────────────────────────────────────────────
-
-// ── pure helpers ───────────────────────────────────────────────────
-
-describe("FORMULA_FUNCTIONS catalog", () => {
-  it("matches the function names accepted by the calc.rs parser", async () => {
-    const source = await Bun.file(new URL("../../wasm/src/calc.rs", import.meta.url)).text();
-    const parserRegistry = source.match(
-      /define_function_registry!\s*\{\s*canonical\s*\{([\s\S]*?)\n\s*\}\s*aliases\s*\{([\s\S]*?)\n\s*\}\s*\}/,
-    );
-    if (!parserRegistry?.[1] || parserRegistry[2] === undefined) {
-      throw new Error("calc.rs parser function registry not found");
-    }
-
-    const engineFunctions = [parserRegistry[1], parserRegistry[2]].flatMap((block, index) =>
-      block
-        .split("\n")
-        .filter((line) => line.trim().length > 0)
-        .map((line) => {
-          const arm =
-            index === 0
-              ? line.match(/^\s*[A-Za-z][A-Za-z0-9_]*\s*=>\s*"([A-Z][A-Z0-9.]*)";\s*$/)
-              : line.match(/^\s*"([A-Z][A-Z0-9.]*)"\s*=>\s*[A-Za-z][A-Za-z0-9_]*;\s*$/);
-          if (!arm?.[1]) throw new Error(`unrecognized calc.rs function registry arm: ${line}`);
-          return arm[1];
-        }),
-    );
-
-    expect(new Set(FORMULA_FUNCTIONS).size).toBe(FORMULA_FUNCTIONS.length);
-    expect([...FORMULA_FUNCTIONS]).toEqual([...FORMULA_FUNCTIONS].sort());
-    expect(new Set(engineFunctions).size).toBe(engineFunctions.length);
-    expect([...FORMULA_FUNCTIONS]).toEqual(engineFunctions.sort());
-  });
-});
-
-describe("functionTokenAt", () => {
-  it("rejects tokens that do not begin with an identifier letter", () => {
-    expect(functionTokenAt("=SUM(A1:B2)+C3", 14)).toBe("C3");
-    expect(functionTokenAt("=.5", 3)).toBeNull();
-    expect(functionTokenAt("=SUM(", 5)).toBeNull();
-    expect(functionTokenAt("=", 1)).toBeNull();
-  });
-});
-
-describe("parseFormulaRefs", () => {
-  it("parses cells and ranges with cycling palette colors", () => {
-    expect(parseFormulaRefs("=SUM(A1:B2)+C3", "s1")).toEqual([
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 }, color: REF_PALETTE[0] },
-      { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 }, color: REF_PALETTE[1] },
-    ]);
-  });
-
-  it("honors absolute markers when resolving the cell", () => {
-    expect(parseFormulaRefs("=$A$1", "s1")).toEqual([
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 }, color: REF_PALETTE[0] },
-    ]);
-  });
-});
+// The parser and assist name lists are kept in step by scripts/formula-contract.test.ts.
 
 // ── autocomplete popup ───────────────────────────────────────────────────────
 
@@ -131,33 +74,27 @@ describe("FormulaAssist autocomplete", () => {
     assist.attach(ta, THEME);
 
     expect(assist.isOpen).toBe(true);
-    expect(itemsOf(host)).toEqual([
-      "SUM",
-      "SUMIF",
-      "SUMIFS",
-      "SUBTOTAL",
-      "SUBSTITUTE",
-      "SUMPRODUCT",
-    ]);
+    const su = itemsOf(host);
+    expect(su).toContain("SUM");
+    expect(su.every((name) => name.startsWith("SU"))).toBe(true);
 
     ta.value = "=CO";
     ta.setSelectionRange(3, 3);
     assist.update();
-    expect(itemsOf(host)).toEqual([
-      "CODE",
-      "COUNT",
-      "COLUMN",
-      "CONCAT",
-      "CORREL",
-      "COUNTA",
-      "COLUMNS",
-      "COUNTIF",
-      "COUNTIFS",
-      "COUNTBLANK",
-      "CONCATENATE",
-      "COVARIANCE.P",
-      "COVARIANCE.S",
-    ]);
+    const co = itemsOf(host);
+    expect(co).toContain("COUNT");
+    expect(co.every((name) => name.startsWith("CO"))).toBe(true);
+
+    // No name to complete: right after "(", or an empty formula.
+    for (const [text, caret] of [
+      ["=SUM(", 5],
+      ["=", 1],
+    ] as const) {
+      ta.value = text;
+      ta.setSelectionRange(caret, caret);
+      assist.update();
+      expect(assist.isOpen).toBe(false);
+    }
   });
 
   it("completes dotted parser names without treating leading decimals as names", () => {
@@ -197,31 +134,24 @@ describe("FormulaAssist autocomplete", () => {
     ta.value = "=CO";
     ta.setSelectionRange(3, 3);
     assist.attach(ta, THEME);
-    expect(selectedItem(host)).toBe("CODE");
+    const items = itemsOf(host);
+    expect(items.length).toBeGreaterThan(2);
+    expect(selectedItem(host)).toBe(items[0]!);
 
     expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(true);
-    expect(selectedItem(host)).toBe("COUNT");
+    expect(selectedItem(host)).toBe(items[1]!);
 
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true);
     expect(assist.handleKeyDown(keydown("ArrowUp"))).toBe(true); // wraps to last
-    expect(selectedItem(host)).toBe("COVARIANCE.S");
+    expect(selectedItem(host)).toBe(items.at(-1)!);
 
     assist.handleKeyDown(keydown("Enter"));
-    expect(ta.value).toBe("=COVARIANCE.S(");
-  });
+    expect(ta.value).toBe(`=${items.at(-1)}(`);
 
-  it("Esc closes the popup first (handled), then falls through (unhandled)", () => {
-    const { host, ta } = mountTextarea();
-    const assist = new FormulaAssist(host, noopDeps());
-
-    ta.value = "=SU";
-    ta.setSelectionRange(3, 3);
-    assist.attach(ta, THEME);
-    expect(assist.isOpen).toBe(true);
-
-    expect(assist.handleKeyDown(keydown("Escape"))).toBe(true); // first Esc closes popup
+    // Closed: arrow keys belong to the editor again.
     expect(assist.isOpen).toBe(false);
-    expect(assist.handleKeyDown(keydown("Escape"))).toBe(false); // second Esc not consumed
+    expect(assist.handleKeyDown(keydown("ArrowDown"))).toBe(false);
+    expect(ta.value).toBe(`=${items.at(-1)}(`);
   });
 });
 
@@ -236,14 +166,17 @@ describe("FormulaAssist ref highlighting", () => {
       sheet: () => "s1",
     });
 
-    ta.value = "=SUM(A1:B2)+C3";
-    ta.setSelectionRange(14, 14);
+    ta.value = "=SUM(A1:B2)+C3+$D$4";
+    ta.setSelectionRange(ta.value.length, ta.value.length);
     assist.attach(ta, THEME);
 
-    expect(calls.at(-1)).toEqual([
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 }, color: REF_PALETTE[0] },
-      { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 }, color: REF_PALETTE[1] },
+    const ranges = calls.at(-1) ?? [];
+    expect(ranges.map(({ sheet, start, end }) => ({ sheet, start, end }))).toEqual([
+      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+      { sheet: "s1", start: { row: 2, col: 2 }, end: { row: 2, col: 2 } },
+      { sheet: "s1", start: { row: 3, col: 3 }, end: { row: 3, col: 3 } },
     ]);
+    expectDistinctColors(ranges);
 
     assist.detach();
     expect(calls.at(-1)).toBeNull();
@@ -304,22 +237,17 @@ describe("EditController with assist deps", () => {
     ta.value = "=SUM(A1)";
     ta.setSelectionRange(5, 5); // after "=SUM(", token empty → no popup, but refs highlight
     ta.dispatchEvent(new Event("input"));
-    expect(state.highlights.at(-1)).toEqual([
-      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 }, color: REF_PALETTE[0] },
+    const ranges = state.highlights.at(-1) ?? [];
+    expect(ranges.map(({ sheet, start, end }) => ({ sheet, start, end }))).toEqual([
+      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
     ]);
+    expectDistinctColors(ranges);
 
     ta.value = "=SU";
     ta.setSelectionRange(3, 3);
     ta.dispatchEvent(new Event("input"));
-    expect(host.querySelector(".sheetwrite-assist")).not.toBeNull();
-    expect(itemsOf(host)).toEqual([
-      "SUM",
-      "SUMIF",
-      "SUMIFS",
-      "SUBTOTAL",
-      "SUBSTITUTE",
-      "SUMPRODUCT",
-    ]);
+    expect(host.querySelector('[role="listbox"]')).not.toBeNull();
+    expect(itemsOf(host)).toContain("SUM");
   });
 
   it("first Escape closes the popup, second cancels the edit and clears highlights", () => {

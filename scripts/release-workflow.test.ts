@@ -87,7 +87,6 @@ describe("CI-completion package release workflow", () => {
     );
     expect(privileged).toHaveLength(1);
     const [publishName, publishJob] = privileged[0]!;
-    expect(publishName).toBe("publish");
     expect(publishJob.environment).toBe("npm-release");
     expect(publishJob.permissions).toEqual({
       actions: "read",
@@ -96,24 +95,12 @@ describe("CI-completion package release workflow", () => {
       "pull-requests": "write",
     });
 
-    const pending = [
-      ...(Array.isArray(publishJob.needs)
-        ? publishJob.needs
-        : publishJob.needs
-          ? [publishJob.needs]
-          : []),
-    ];
-    const prerequisites = new Set<string>();
-    while (pending.length > 0) {
-      const name = pending.pop()!;
-      if (prerequisites.has(name)) continue;
-      prerequisites.add(name);
-      const needs = jobs[name]?.needs;
-      pending.push(...(Array.isArray(needs) ? needs : needs ? [needs] : []));
-    }
-    for (const name of prerequisites) {
-      expect(jobs[name]?.permissions?.["id-token"]).toBeUndefined();
-      expect(jobs[name]?.permissions?.contents).not.toBe("write");
+    // No other job may get OIDC or any write scope, whether or not it gates publication.
+    for (const [name, job] of Object.entries(jobs)) {
+      if (name === publishName) continue;
+      for (const [scope, access] of Object.entries(job.permissions ?? {})) {
+        expect(access, `${name} ${scope}`).not.toBe("write");
+      }
     }
   });
 

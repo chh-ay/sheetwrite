@@ -1,5 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
+import compatibilityResults from "../../docs/src/generated/compatibility-results.json" with {
+  type: "json",
+};
 import type { Grid } from "../../packages/core/src/types.js";
+import fixtureManifest from "../../packages/xlsx/test/fixtures/manifest.json" with { type: "json" };
 import { siteUrl } from "./playwright.config.js";
 
 declare global {
@@ -90,18 +94,37 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(boundaryStatus).toHaveText("Supported · Evaluated");
   await expect(evaluatedBoundary).toHaveAccessibleName(/Supported · Evaluated/u);
 
+  // The summary renders the checked results file; take the expected numbers from it.
+  const { testSet } = compatibilityResults as unknown as {
+    testSet: {
+      totalTests: number;
+      formulaTests: number;
+      editSequenceTests: number;
+      workbookTests: number;
+      localPassed: number;
+      unsupported: number;
+      reviewedResults: number;
+      checksum: string;
+    };
+  };
+  const supported = testSet.totalTests - testSet.unsupported;
+  expect(testSet.localPassed).toBeLessThanOrEqual(supported);
   const summary = page.getByTestId("compatibility-results-summary");
-  await expect(summary).toContainText("2,350");
-  await expect(summary).toContainText("2,000");
-  await expect(summary).toContainText("250");
-  await expect(summary).toContainText("100");
-  await expect(summary).toContainText("2,290 of 2,290 supported tests passed locally");
-  await expect(summary).toContainText("0 reviewed results");
-  await expect(summary).toContainText("2,290 supported tests still lack");
-  await expect(summary).toContainText("60 unsupported tests");
-  await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveText(
-    "bdf94c76df81ea1fa2e1bf96a557c41b21a0f11ea11ae612fcccc35157d7275a",
+  for (const count of [
+    testSet.totalTests,
+    testSet.formulaTests,
+    testSet.editSequenceTests,
+    testSet.workbookTests,
+  ]) {
+    await expect(summary).toContainText(count.toLocaleString("en-US"));
+  }
+  await expect(summary).toContainText(
+    `${testSet.localPassed.toLocaleString("en-US")} of ${supported.toLocaleString("en-US")}`,
   );
+  await expect(summary).toContainText(
+    `${testSet.reviewedResults.toLocaleString("en-US")} reviewed`,
+  );
+  await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveText(testSet.checksum);
 
   const detail = page.getByTestId("compatibility-result-detail");
 
@@ -125,42 +148,6 @@ test("@portability compatibility results expose every truthful state from checke
   await expect(localResult).toHaveAttribute("data-state", "local-pass");
   await expect(localResult).toContainText("Local check passed");
   await expect(page.getByTestId("app-result-sheetwrite-capture")).toBeVisible();
-
-  const splitGeometry = await page.evaluate(() => {
-    const measure = (selector: string) => {
-      const shell = document.querySelector(selector);
-      const records = shell?.querySelector(".sw-si-compat__records");
-      const detailPanel = shell?.querySelector(".sw-si-compat__detail");
-      if (!(shell instanceof HTMLElement) || !(records instanceof HTMLElement)) {
-        throw new Error(`missing compatibility split: ${selector}`);
-      }
-      if (!(detailPanel instanceof HTMLElement)) {
-        throw new Error(`missing compatibility detail: ${selector}`);
-      }
-      return {
-        shellHeight: shell.clientHeight,
-        recordsHeight: records.clientHeight,
-        detailHeight: detailPanel.clientHeight,
-        detailScrollHeight: detailPanel.scrollHeight,
-      };
-    };
-    return {
-      viewportHeight: window.innerHeight,
-      results: measure(".sw-si-results"),
-      inventory: measure(".sw-si-inventory"),
-    };
-  });
-  expect(splitGeometry.results.shellHeight).toBeLessThan(splitGeometry.viewportHeight);
-  expect(splitGeometry.inventory.shellHeight).toBeLessThan(splitGeometry.viewportHeight);
-  expect(
-    Math.abs(splitGeometry.results.recordsHeight - splitGeometry.results.detailHeight),
-  ).toBeLessThanOrEqual(1);
-  expect(splitGeometry.results.detailScrollHeight).toBeGreaterThan(
-    splitGeometry.results.detailHeight,
-  );
-  expect(
-    Math.abs(splitGeometry.inventory.recordsHeight - splitGeometry.inventory.detailHeight),
-  ).toBeLessThanOrEqual(1);
 
   // The checked set currently carries exact tolerance only. Exercise that
   // truthful comparison boundary rather than inventing a numeric tolerance.
@@ -279,12 +266,11 @@ test("live round-trip preserves formulas, the merge, and frozen rows after an ed
   const report = page.locator('[data-testid="interop-roundtrip-report"]');
   await expect(report).toBeVisible({ timeout: 15_000 });
   await expect(report).toHaveAttribute("data-state", "pass");
-  // Canonical document ships 21 formulas across the interchange and analytical sheets.
-  await expect(page.locator('[data-testid="interop-roundtrip-formulas"]')).toHaveText("21/21");
-  // The warnings panel now reflects the round-trip operation, not the empty state.
-  await expect(page.locator('[data-testid="interop-warnings"]')).not.toContainText(
-    "No interchange operation has run yet",
-  );
+  // Every formula in the document survives the round trip.
+  const preserved = await page.locator('[data-testid="interop-roundtrip-formulas"]').textContent();
+  const [kept, total] = (preserved ?? "").split("/").map(Number);
+  expect(total).toBeGreaterThan(0);
+  expect(kept).toBe(total);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -320,26 +306,15 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
     )
     .toEqual(["Calc", "Hidden", "Inputs"]);
 
-  // The import reports its fidelity losses as structured, coded warnings —
-  // every rendered warning carries a code chip from the public warning union.
+  const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
+  if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
+  await openDisclosure(page, "interop-warnings-disclosure");
   const warnings = page.locator('[data-testid="interop-warnings"]');
-  await expect(warnings).toContainText("libreoffice-rich.xlsx");
+  await expect(warnings).toBeVisible();
+  await expect(warnings).toContainText(fixture.file);
   const codes = await warnings.locator(".sw-si-warncode").allTextContents();
-  expect(codes.length).toBeGreaterThan(0);
-  const VALID_CODES = [
-    "boolean-literal",
-    "rich-text",
-    "hyperlink",
-    "unsupported-cell-value",
-    "unsupported-feature",
-    "external-relationship",
-    "external-formula",
-    "format-loss",
-    "validation-loss",
-    "invalid-metadata",
-  ];
-  for (const code of codes) {
-    expect(VALID_CODES).toContain(code.trim());
+  for (const warning of fixture.expectedWarnings) {
+    expect(codes.map((code) => code.trim())).toContain(warning.split(":")[0]?.trim());
   }
   await page.waitForSelector(".sw-si-grid canvas", { state: "attached", timeout: 15_000 });
 

@@ -21,12 +21,17 @@ test("host-owned rows keep stable identity across view and reconciliation change
 
   await page.getByRole("button", { name: "Delete row" }).click();
   await expect(page.getByTestId("host-entity-list").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByTestId("host-entity-list")).not.toContainText("account-4");
 
+  // A rejected edit leaves the entity unchanged.
   await page.getByRole("button", { name: "Reject next edit" }).click();
-  await expect(page.getByTestId("host-delta-log")).toContainText("rejected · rejected-showcase");
+  await expect(page.getByTestId("host-delta-log")).toContainText("rejected");
+  await expect(page.getByTestId("host-entity-list")).toContainText("account-a: Ada · 120 · North");
 
+  // A transformed acceptance applies the server's value to the entity behind data row 1.
   await page.getByRole("button", { name: "Transformed accept" }).click();
-  await expect(page.getByTestId("host-delta-log")).toContainText("transformed · server-normalized");
+  await expect(page.getByTestId("host-delta-log")).toContainText("transformed");
+  await expect(page.getByTestId("host-entity-list")).toContainText("account-b: Lin · 80 · South");
 
   await page.getByRole("button", { name: "Remote update" }).click();
   await expect(page.getByTestId("host-delta-log")).toContainText("remote");

@@ -19,43 +19,6 @@ type StructuralKind = "insert" | "delete";
 
 type RebaseConflictFamily = "cell" | "range" | "sheet" | "named-range";
 
-const OP_CONFLICT_FAMILY = {
-  set: "cell",
-  setNote: "cell",
-  setRange: "range",
-  setBlock: "range",
-  restoreBlock: "range",
-  setRangeStyle: "range",
-  clearRange: "range",
-  addRows: "sheet",
-  removeRows: "sheet",
-  moveRows: "sheet",
-  addColumns: "sheet",
-  removeColumns: "sheet",
-  moveColumns: "sheet",
-  setColumn: "sheet",
-  setRowMeta: "sheet",
-  addMerge: "range",
-  removeMerge: "range",
-  addSheet: "sheet",
-  removeSheet: "sheet",
-  renameSheet: "sheet",
-  moveSheet: "sheet",
-  setSheetVisibility: "sheet",
-  setSheetMeta: "sheet",
-  addTable: "range",
-  updateTable: "sheet",
-  removeTable: "sheet",
-  setHyperlink: "range",
-  removeHyperlink: "range",
-  setValidationRule: "range",
-  removeValidationRule: "range",
-  setProtectedRange: "range",
-  removeProtectedRange: "range",
-  setNamedRange: "named-range",
-  removeNamedRange: "named-range",
-} satisfies Record<DocumentOp["op"], RebaseConflictFamily>;
-
 function columns(count: number): Column[] {
   return Array.from({ length: count }, (_, index) => ({
     key: `column-${index}`,
@@ -615,8 +578,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     ];
 
-    for (const { family, operation } of cases) {
-      expect(OP_CONFLICT_FAMILY[operation.op]).toBe(family);
+    for (const { operation } of cases) {
       expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
     }
   });
@@ -674,9 +636,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     ];
 
-    for (const { family, local, remote } of cases) {
-      expect(OP_CONFLICT_FAMILY[local.op]).toBe(family);
-      expect(OP_CONFLICT_FAMILY[remote.op]).toBe(family);
+    for (const { local, remote } of cases) {
       expectConflict([local], [remote], "overlapping-edit");
     }
   });

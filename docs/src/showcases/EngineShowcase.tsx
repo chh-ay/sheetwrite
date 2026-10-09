@@ -31,7 +31,6 @@ interface EngineShowcaseHandle {
   run(action: EngineAction): Promise<void>;
   reset(): void;
   traceLength(): number;
-  timerCount(): number;
 }
 
 declare global {
@@ -359,7 +358,6 @@ export default function EngineShowcase() {
       run: (action) => runAction(action),
       reset,
       traceLength: () => traceRef.current!.size,
-      timerCount: () => 0,
     };
     window.__sheetwriteEngineShowcase = handle;
     return () => {

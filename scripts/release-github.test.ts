@@ -77,26 +77,39 @@ describe("independent package GitHub releases", () => {
   it("accepts an older attested commit for a previously published package", async () => {
     const previousCommit = "b".repeat(40);
     const identity = { name: "@sheetwrite/core", version: "0.2.0" };
-    await ensurePackageReleases(
-      [identity],
-      [],
-      sha,
-      async (command) => {
-        if (command.includes("rev-parse")) return result(0, previousCommit);
-        if (command.includes("view")) {
-          return result(
-            0,
-            JSON.stringify({
-              tagName: "@sheetwrite/core@0.2.0",
-              isDraft: false,
-              isPrerelease: false,
-            }),
-          );
-        }
-        throw new Error(`Unexpected command ${command.join(" ")}`);
-      },
-      async () => previousCommit,
-    );
+    const run = (attested: string) => {
+      const commands: string[] = [];
+      const done = ensurePackageReleases(
+        [identity],
+        [],
+        sha,
+        async (command) => {
+          commands.push(command.join(" "));
+          if (command.includes("rev-parse")) return result(0, previousCommit);
+          if (command.includes("view")) {
+            return result(
+              0,
+              JSON.stringify({
+                tagName: "@sheetwrite/core@0.2.0",
+                isDraft: false,
+                isPrerelease: false,
+              }),
+            );
+          }
+          throw new Error(`Unexpected command ${command.join(" ")}`);
+        },
+        async () => attested,
+      );
+      return { done, commands };
+    };
+
+    const accepted = run(previousCommit);
+    await accepted.done;
+    expect(accepted.commands.some((command) => command.includes("rev-parse"))).toBe(true);
+    expect(accepted.commands.some((command) => command.includes("view"))).toBe(true);
+
+    // The existing tag must still match the attested commit.
+    await expect(run("c".repeat(40)).done).rejects.toThrow("c".repeat(40));
   });
 
   it("fails closed when an existing package tag targets another commit", async () => {

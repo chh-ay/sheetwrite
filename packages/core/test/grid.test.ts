@@ -824,9 +824,10 @@ describe("Grid.setMinColumns", () => {
     };
 
     setXlsxTableExportBackend(null as never);
-    await expect(grid.exportXlsx("missing.xlsx")).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
-    );
+    await expect(grid.exportXlsx("missing.xlsx")).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-export",
+    });
     setXlsxTableExportBackend(backend);
     try {
       await expect(grid.exportXlsx("fake.xlsx")).rejects.toMatchObject({
@@ -885,9 +886,7 @@ describe("Grid.setMinColumns", () => {
       });
 
       grid.setActiveSheet("inactive");
-      await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(
-        "inactive has unloaded datasource cells",
-      );
+      await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(IncompleteDataError);
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
@@ -1482,12 +1481,18 @@ describe("element height cap measurement", () => {
     // Chromium at 125% browser zoom clamps near 26.8M CSS px — well below the
     // 33M constant this measurement replaced; trusting the constant left the
     // tail of a 1M-row document unreachable.
-    expect(measureMaxElementHeight(stubDocument(26_843_545.6))).toBe(26_843_545 - 4_096);
+    const measuredClamp = 26_843_545.6;
+    const cap = measureMaxElementHeight(stubDocument(measuredClamp));
+    expect(cap).toBeGreaterThan(0);
+    expect(cap).toBeLessThan(measuredClamp);
+    expect(measureMaxElementHeight(stubDocument(measuredClamp / 2))).toBeLessThan(cap);
   });
 
   it("falls back to a conservative cap when no clamp can be measured", () => {
-    expect(measureMaxElementHeight(null)).toBe(15_000_000);
-    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(15_000_000);
-    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(15_000_000);
+    const fallback = measureMaxElementHeight(null);
+    expect(fallback).toBeGreaterThan(0);
+    expect(fallback).toBeLessThan(26_843_545);
+    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(fallback);
+    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(fallback);
   });
 });

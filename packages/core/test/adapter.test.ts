@@ -159,27 +159,21 @@ describe("simple data conversion", () => {
     expect(rows).toEqual(before);
   });
 
-  it("rejects duplicate and missing keys with actionable messages", () => {
-    expect(() =>
-      createSimpleGridInput({
-        columns: [
-          { key: "name", title: "Name" },
-          { key: "name", title: "Again" },
-        ],
-        defaultRows: [{ name: "A" }],
-      }),
-    ).toThrow('duplicate simple column key "name"');
-    expect(() =>
-      createSimpleGridInput({
-        columns: [{ key: "", title: "Missing" }],
-        defaultRows: [{ "": "A" }],
-      }),
-    ).toThrow("requires a non-empty key");
-    expect(() =>
-      createSimpleGridInput({
-        columns: [{ key: "name", title: "" }],
-        defaultRows: [{ name: "A" }],
-      }),
-    ).toThrow("requires a title");
+  it("rejects duplicate keys, empty keys, and empty titles", () => {
+    type Row = Record<string, string>;
+    const defaultRows: Row[] = [{ name: "A", "": "A" }];
+    const valid = { columns: [{ key: "name", title: "Name" }], defaultRows };
+    expect(() => createSimpleGridInput(valid)).not.toThrow();
+    const invalid: Array<Array<{ key: string; title: string }>> = [
+      [
+        { key: "name", title: "Name" },
+        { key: "name", title: "Again" },
+      ],
+      [{ key: "", title: "Missing" }],
+      [{ key: "name", title: "" }],
+    ];
+    for (const columns of invalid) {
+      expect(() => createSimpleGridInput({ ...valid, columns })).toThrow(Error);
+    }
   });
 });

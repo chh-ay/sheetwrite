@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   FIRST_PAINT_BROTLI_GATE_BYTES,
   FIRST_PAINT_DEFERRED_MODULE,
+  type FirstPaintTiming,
   firstPaintGate,
   validateFirstPaintEvidence,
 } from "./first-paint-evidence.js";
@@ -310,37 +311,50 @@ describe("first-paint counterfactual evidence", () => {
     }
   });
 
-  it("fails closed on either insufficient reduction or slower first paint", () => {
-    const evidence = firstPaintEvidence();
-    const vite = (evidence.fixtures as Array<Record<string, unknown>>)[1]!;
-    const baseline = vite.baseline as Record<string, unknown>;
-    const candidate = vite.candidate as Record<string, unknown>;
-    candidate.initialJavaScript = {
-      rawBytes: 210_000,
-      gzipBytes: 75_000,
-      brotliBytes: 62_000,
+  it("blocks admission when any one size or timing gate fails", () => {
+    const timing = (samplesMs: number[]): FirstPaintTiming => {
+      const sorted = [...samplesMs].sort((left, right) => left - right);
+      const rank = (fraction: number) => sorted[Math.ceil(sorted.length * fraction) - 1]!;
+      return { samplesMs, medianMs: rank(0.5), p95Ms: rank(0.95) };
     };
-    vite.delta = {
-      rawBytes: -10_000,
-      gzipBytes: -5_000,
-      brotliBytes: -2_000,
-      brotliPercent: (-2_000 / 60_000) * 100,
-    };
-    candidate.timing = {
-      samplesMs: new Array(10).fill(21),
-      medianMs: 21,
-      p95Ms: 21,
-    };
-    baseline.timing = {
-      samplesMs: new Array(10).fill(20),
-      medianMs: 20,
-      p95Ms: 20,
-    };
-    const decision = firstPaintGate(evidence);
-    expect(decision.admitted).toBe(false);
-    expect(decision.reasons).toContain("vite Brotli reduction is below 7680 bytes");
-    expect(decision.reasons).toContain("vite Brotli reduction is below 10%");
-    expect(decision.reasons).toContain("vite candidate median first paint is slower");
-    expect(decision.reasons).toContain("vite candidate p95 first paint is slower");
+    const steady = (ms: number) => new Array(10).fill(ms);
+    // Each case changes the vite fixture so that exactly one gate fails.
+    const cases: Array<{
+      gate: string;
+      baselineBrotli?: number;
+      candidateBrotli?: number;
+      baselineMs?: number[];
+      candidateMs?: number[];
+    }> = [
+      { gate: "bytes", candidateBrotli: 60_000 - (FIRST_PAINT_BROTLI_GATE_BYTES - 1) },
+      { gate: "percent", baselineBrotli: 100_000, candidateBrotli: 92_000 },
+      { gate: "median", baselineMs: [...steady(20).slice(1), 40], candidateMs: steady(21) },
+      { gate: "p95", candidateMs: [...steady(19).slice(1), 25] },
+    ];
+    for (const { gate, baselineBrotli, candidateBrotli, baselineMs, candidateMs } of cases) {
+      const evidence = firstPaintEvidence();
+      type Variant = { initialJavaScript: { brotliBytes: number }; timing: FirstPaintTiming };
+      const vite = (
+        evidence.fixtures as Array<{
+          baseline: Variant;
+          candidate: Variant;
+          delta: { brotliBytes: number; brotliPercent: number };
+        }>
+      )[1]!;
+      if (baselineBrotli !== undefined)
+        vite.baseline.initialJavaScript.brotliBytes = baselineBrotli;
+      if (candidateBrotli !== undefined)
+        vite.candidate.initialJavaScript.brotliBytes = candidateBrotli;
+      if (baselineMs) vite.baseline.timing = timing(baselineMs);
+      if (candidateMs) vite.candidate.timing = timing(candidateMs);
+      const baselineBytes = vite.baseline.initialJavaScript.brotliBytes;
+      const reduction = baselineBytes - vite.candidate.initialJavaScript.brotliBytes;
+      vite.delta.brotliBytes = reduction;
+      vite.delta.brotliPercent = (reduction / baselineBytes) * 100;
+
+      const decision = firstPaintGate(evidence);
+      expect(decision.admitted, gate).toBe(false);
+      expect(decision.reasons, gate).toHaveLength(1);
+    }
   });
 });

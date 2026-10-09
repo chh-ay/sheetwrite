@@ -7,12 +7,14 @@ import type {
 } from "../packages/core/src/adapter.js";
 import type {
   CellEditor,
+  ChangeEvent,
   ColumnarData,
   DataSource,
   DataSourcePage,
   Grid,
   GridEvents,
   GridOptions,
+  Selection,
   Workbook,
 } from "../packages/core/src/index.js";
 
@@ -317,7 +319,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(mounted.host.childElementCount).toBe(0);
     });
 
-    it("uses current callbacks and applies theme, overscan, and minColumns live", async () => {
+    it("uses current callbacks, applies theme and minColumns live, and keeps the grid on overscan change", async () => {
       const recorder = createLifecycleRecorder();
       const oldCalls: string[] = [];
       const newCalls: string[] = [];
@@ -375,6 +377,78 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 0, col: 0 } });
       expect(first).toHaveLength(1);
       expect(second).toHaveLength(1);
+
+      await mounted.unmount();
+    });
+
+    it("forwards change, selection, and active-sheet events to the current callbacks", async () => {
+      const recorder = createLifecycleRecorder();
+      const first = {
+        changes: [] as ChangeEvent[],
+        selections: [] as Array<Selection | null>,
+        sheets: [] as Array<GridEvents["active-sheet"]>,
+      };
+      const second = {
+        changes: [] as ChangeEvent[],
+        selections: [] as Array<Selection | null>,
+        sheets: [] as Array<GridEvents["active-sheet"]>,
+      };
+      const base = initialProps(recorder);
+      const workbook = makeConformanceWorkbook();
+      workbook.sheets.push({ ...workbook.sheets[0]!, id: "second", name: "Second" });
+      const handlersFor = (sink: typeof first): Partial<AdapterConformanceProps> => ({
+        onGridChange: (event) => sink.changes.push(event),
+        onSelectionChange: (selection) => sink.selections.push(selection),
+        onActiveSheetChange: (event) => sink.sheets.push(event),
+      });
+      const props: AdapterConformanceProps = { ...base, workbook, ...handlersFor(first) };
+      const mounted = await mount(props);
+      const grid = mounted.getPublishedGrid()!;
+      // Select on the active sheet, then switch to `next`.
+      const exercise = (value: string, row: number, active: string, next: string) => {
+        grid.store.applyTransaction({
+          patches: [
+            {
+              op: "set",
+              addr: { sheet: "lifecycle", row: 0, col: 0 },
+              value: { kind: "literal", value },
+            },
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: { sheet: active, row, col: 0 } });
+        grid.setActiveSheet(next);
+      };
+
+      exercise("first", 1, "lifecycle", "second");
+      expect(first.changes.map((event) => event.transaction.patches)).toEqual([
+        [
+          {
+            op: "set",
+            addr: { sheet: "lifecycle", row: 0, col: 0 },
+            value: { kind: "literal", value: "first" },
+          },
+        ],
+      ]);
+      expect(first.selections).toContainEqual({
+        kind: "cell",
+        addr: { sheet: "lifecycle", row: 1, col: 0 },
+      });
+      expect(first.sheets).toEqual([{ sheet: "second" }]);
+      const firstSelectionCount = first.selections.length;
+
+      await mounted.render({ ...props, ...handlersFor(second) });
+      expect(mounted.getPublishedGrid()).toBe(grid);
+      expect(recorder.ready).toHaveLength(1);
+      exercise("second", 2, "second", "lifecycle");
+      expect(first.changes).toHaveLength(1);
+      expect(first.selections).toHaveLength(firstSelectionCount);
+      expect(first.sheets).toHaveLength(1);
+      expect(second.changes).toHaveLength(1);
+      expect(second.selections).toContainEqual({
+        kind: "cell",
+        addr: { sheet: "second", row: 2, col: 0 },
+      });
+      expect(second.sheets).toEqual([{ sheet: "lifecycle" }]);
 
       await mounted.unmount();
     });
