@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
-import { CellStore, initSync } from "@sheetwrite/wasm";
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+import * as defaultEngine from "@sheetwrite/wasm";
+
+const engine = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? formulas : defaultEngine;
+const { CellStore, initSync } = engine;
+type CellStore = defaultEngine.CellStore;
+
 import {
   dependencyClosureFormulas,
   diamondFormulas,
@@ -25,7 +32,12 @@ import {
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, type Stat, summarize } from "./stats.js";
 
-const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
+const WASM_PATH = new URL(
+  process.env.SHEETWRITE_BENCH_ENGINE === "full"
+    ? "../../packages/formulas/pkg/sheetwrite_wasm_bg.wasm"
+    : "../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
+  import.meta.url,
+);
 const FORMULA_SOURCE_URLS = {
   "bench/package.json": new URL("../package.json", import.meta.url),
   "bench/src/formula-bench.ts": new URL("./formula-bench.ts", import.meta.url),
@@ -35,7 +47,9 @@ const FORMULA_SOURCE_URLS = {
   "bench/src/stats.ts": new URL("./stats.ts", import.meta.url),
   "bun.lock": new URL("../../bun.lock", import.meta.url),
   "packages/wasm/pkg/sheetwrite_wasm.js": new URL(
-    "../../packages/wasm/pkg/sheetwrite_wasm.js",
+    process.env.SHEETWRITE_BENCH_ENGINE === "full"
+      ? "../../packages/formulas/pkg/sheetwrite_wasm.js"
+      : "../../packages/wasm/pkg/sheetwrite_wasm.js",
     import.meta.url,
   ),
   "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": WASM_PATH,
@@ -413,14 +427,6 @@ function outputsEqual(actual: FormulaOutput, expected: FormulaOutput): boolean {
   return Math.abs(actual - expected) <= tolerance;
 }
 
-function assertExpectedOutput(id: string, size: number, actual: FormulaOutput): void {
-  const expected = expectedFormulaOutput(id, size);
-  assert(
-    outputsEqual(actual, expected),
-    `${formulaWorkloadKey({ id, size })} expected ${String(expected)}, observed ${String(actual)}`,
-  );
-}
-
 function exactInteger(value: number, path: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${path} must be a non-negative safe integer`);
@@ -459,17 +465,18 @@ function summarizeAllocations(samples: readonly FormulaAllocationSample[]): Form
   };
 }
 
-function collectFixture(
+export function collectFixture(
   id: string,
   size: number,
   factory: FixtureFactory,
   samples = DEFAULT_SAMPLES,
+  expectedOutput?: FormulaOutput,
 ): CompleteFormulaWorkloadResult {
-  const expected = expectedFormulaOutput(id, size);
+  const expected = expectedOutput ?? expectedFormulaOutput(id, size);
   const warm = factory();
   warm.store.resetFormulaMatrixResourceStats();
   warm.run();
-  assertExpectedOutput(id, size, warm.check());
+  assert(outputsEqual(warm.check(), expected), `${id} warmup output`);
   allocationAt(warm.store);
   warm.dispose();
 
@@ -485,7 +492,7 @@ function collectFixture(
     raw[index] = now() - started;
     allocationSamples[index] = allocationAt(fixture.store);
     output = fixture.check();
-    assertExpectedOutput(id, size, output);
+    assert(outputsEqual(output, expected), `${id} measured output`);
     fixture.dispose();
   }
   return {
@@ -2331,7 +2338,7 @@ async function runBenchmark(
     baseline = parsedBaseline;
   }
 
-  initSync({ module: readFileSync(WASM_PATH) });
+  await initSheetwrite(undefined, engine);
   const capture = protocolCaptureMeta();
   const workloads = runWorkloads(smoke);
   const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
@@ -2378,7 +2385,9 @@ async function runBenchmark(
   validateCurrentCaptureProvenance(result, captureKind, outputPath);
   validateFormulaCapture(result, baseline);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
-  if (outputPath !== undefined) {
+  if (outputPath === "-") {
+    process.stdout.write(serialized);
+  } else if (outputPath !== undefined) {
     await Bun.write(outputPath, serialized);
   } else if (!smoke) {
     await Bun.write(new URL("../results/formula-results.json", import.meta.url), serialized);
@@ -2388,23 +2397,46 @@ async function runBenchmark(
 }
 
 if (import.meta.main) {
-  const memoryIndex = process.argv.indexOf("--memory");
-  if (memoryIndex >= 0) {
-    const formulas = Number(process.argv[memoryIndex + 1]);
-    assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
-    console.log(JSON.stringify(runMemoryMode(formulas)));
+  const sampleIndex = process.argv.indexOf("--sample");
+  if (sampleIndex >= 0) {
+    const id = process.argv[sampleIndex + 1];
+    const size = Number(process.argv[sampleIndex + 2]);
+    assert(Number.isInteger(size) && size > 0, "invalid sample size");
+    const factories: Record<string, FixtureFactory> = {
+      "independent-parse-load": () => independentLoadFixture(size),
+      "independent-first-recompute": () => independentRecomputeFixture(size),
+      "linear-chain": () => chainFixture(size),
+      "wide-fan-out-edit": () => fanOutEditFixture(size),
+      "scalar-edit-affects-0": () => fanOutEditFixture(size, true),
+      "vlookup-many": () => {
+        const variant = LOOKUP_VARIANTS.find((candidate) => candidate.id === "vlookup-many");
+        assert(variant, "missing VLOOKUP variant");
+        return lookupFixture(size, "first-recompute", variant);
+      },
+    };
+    const factory = id === undefined ? undefined : factories[id];
+    assert(id !== undefined && factory, "unknown single-sample workload");
+    await initSheetwrite(undefined, engine);
+    process.stdout.write(`${JSON.stringify(collectFixture(id, size, factory, 1))}\n`);
   } else {
-    const args = process.argv.slice(2).filter((argument) => argument !== "--");
-    const outputIndex = args.indexOf("--output");
-    const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
-    if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
-      throw new Error("--output requires a path");
+    const memoryIndex = process.argv.indexOf("--memory");
+    if (memoryIndex >= 0) {
+      const formulas = Number(process.argv[memoryIndex + 1]);
+      assert(Number.isInteger(formulas) && formulas > 0, "invalid memory formula count");
+      console.log(JSON.stringify(runMemoryMode(formulas)));
+    } else {
+      const args = process.argv.slice(2).filter((argument) => argument !== "--");
+      const outputIndex = args.indexOf("--output");
+      const outputPath = outputIndex < 0 ? undefined : args[outputIndex + 1];
+      if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
+        throw new Error("--output requires a path");
+      }
+      // A capture written outside the tracked results file is recorded as an output capture; it
+      // skips the baseline comparison too, so the gate stays blocked.
+      let captureKind: FormulaCaptureKind = "gated";
+      if (outputPath !== undefined) captureKind = "output";
+      else if (args.includes("--preliminary")) captureKind = "preliminary";
+      await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
     }
-    // A capture written outside the tracked results file is recorded as an output capture; it
-    // skips the baseline comparison too, so the gate stays blocked.
-    let captureKind: FormulaCaptureKind = "gated";
-    if (outputPath !== undefined) captureKind = "output";
-    else if (args.includes("--preliminary")) captureKind = "preliminary";
-    await runBenchmark(args.includes("--smoke"), captureKind, outputPath);
   }
 }

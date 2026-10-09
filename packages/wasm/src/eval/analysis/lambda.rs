@@ -73,7 +73,7 @@ fn definition(mut expression: &Ast) -> Result<(&[Ast], &Ast), FormulaError> {
     {
         expression = inner;
     }
-    let Ast::Func(Func::Analysis("LAMBDA"), arguments) = expression else {
+    let Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) = expression else {
         return Err(FormulaError::Value);
     };
     let (body, parameters) = arguments.split_last().ok_or(FormulaError::Value)?;
@@ -130,12 +130,12 @@ fn substitute(
             );
             Ast::UnknownFunc(CALL.into(), invocation)
         }
-        Ast::Func(Func::Analysis("LAMBDA"), arguments) => {
+        Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) => {
             let (parameters, body) = definition(expression)?;
             let visible: Vec<_> = bindings.iter().filter(|(name, _)| !parameters.iter().any(|parameter| matches!(parameter, Ast::Name(local) if local.eq_ignore_ascii_case(name)))).cloned().collect();
             let mut nested = arguments[..arguments.len() - 1].to_vec();
             nested.push(substitute(body, &visible, nodes)?);
-            Ast::Func(Func::Analysis("LAMBDA"), nested)
+            Ast::Func(Func::Analysis(super::LAMBDA_ID), nested)
         }
         Ast::Func(Func::Let, arguments) => {
             if arguments.len() < 3 || arguments.len().is_multiple_of(2) {
@@ -429,7 +429,7 @@ pub(crate) fn evaluate(
         depth,
     };
     let result = match name {
-        "LAMBDA" => definition(&Ast::Func(Func::Analysis("LAMBDA"), arguments.to_vec()))
+        "LAMBDA" => definition(&Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments.to_vec()))
             .map(|_| Value::Error(FormulaError::Calc)),
         "ISOMITTED" if arguments.len() == 1 => {
             Ok(Value::Bool(matches!(arguments[0], Ast::Missing)))

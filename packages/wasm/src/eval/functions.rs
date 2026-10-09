@@ -171,7 +171,7 @@ struct NumericAggregate {
 pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
     match func {
         #[cfg(feature = "analysis")]
-        Func::Analysis(name) => super::analysis::evaluate_scalar(name, values),
+        Func::Analysis(id) => super::analysis::evaluate_scalar(super::analysis::name(id), values),
         Func::Count => Value::number(count_numeric(values) as f64),
         Func::CountA => Value::number(
             values
@@ -574,7 +574,7 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
         | Func::Npv
         | Func::Irr => true,
         #[cfg(feature = "analysis")]
-        Func::Analysis(name) => super::analysis::treats_cell_as_reference(name),
+        Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
         _ => false,
     }
 }

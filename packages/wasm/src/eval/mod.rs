@@ -232,7 +232,7 @@ fn expand_let_node<'a>(
     }
     Ok(match ast {
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis("LAMBDA"), args) if !args.is_empty() => {
+        Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) if !args.is_empty() => {
             let mut captured = Vec::with_capacity(bindings.len());
             for (name, expression, visible, slot) in bindings.iter().copied() {
                 if args[..args.len() - 1].iter().any(|parameter| {
@@ -244,7 +244,7 @@ fn expand_let_node<'a>(
             }
             let mut definition = args[..args.len() - 1].to_vec();
             definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
-            Ast::Func(Func::Analysis("LAMBDA"), definition)
+            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition)
         }
         Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
         Ast::Func(func, args) => Ast::Func(
@@ -1101,7 +1101,8 @@ impl CellStore {
         }
 
         #[cfg(feature = "analysis")]
-        if let Func::Analysis(name) = func {
+        if let Func::Analysis(id) = func {
+            let name = analysis::name(id);
             if let Some(family) = analysis::family(name) {
                 if let Some(hooks) = &family.array {
                     if (hooks.produces_array)(name, args) {

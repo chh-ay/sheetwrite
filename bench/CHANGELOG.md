@@ -1,5 +1,10 @@
 # @sheetwrite/bench
 
+## Unreleased
+
+- Add default and full formula engine measurements. Keep raw time and allocation samples, output checks, and source hashes.
+- Add analysis workloads, WASM file sizes, and fresh Node initialization samples.
+
 ## 0.0.2
 
 ### Patch Changes

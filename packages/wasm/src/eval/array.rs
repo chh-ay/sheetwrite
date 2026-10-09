@@ -41,9 +41,12 @@ pub(super) fn ast_produces_array(ast: &Ast) -> bool {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(name), args) => super::analysis::family(name)
-            .and_then(|family| family.array.as_ref())
-            .is_some_and(|hooks| (hooks.produces_array)(name, args)),
+        Ast::Func(Func::Analysis(id), args) => {
+            let name = super::analysis::name(*id);
+            super::analysis::family(name)
+                .and_then(|family| family.array.as_ref())
+                .is_some_and(|hooks| (hooks.produces_array)(name, args))
+        }
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -111,7 +114,8 @@ impl CellStore {
                 ast_produces_array(ast).then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
             }
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(name), args) => {
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
                 if !(hooks.produces_array)(name, args) {
                     return None;
@@ -220,7 +224,8 @@ impl CellStore {
                 super::analysis::lambda::evaluate_matrix(self, name, args, sheet, affected, memo, visiting, depth + 1)
             }
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(name), args) => {
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
                 if !(hooks.produces_array)(name, args) {
                     return None;
@@ -312,7 +317,8 @@ impl CellStore {
                 return super::analysis::lambda::shape(self, name, args, formula_sheet);
             }
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(name), args) => {
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(name)
                     .and_then(|family| family.array.as_ref())
                     .ok_or(FormulaError::Value)?;

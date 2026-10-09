@@ -70,6 +70,31 @@ and preserves all five raw samples plus median/p95 in
 `results/formula-results.json`. Formula memory is the exact WASM linear-memory
 delta from isolated 1K/10K/100K-formula subprocesses.
 
+`bench:formula:engines` runs the same full workload matrix on the default and
+full engines in separate processes. It writes `formula-default-results.json`,
+`formula-full-results.json`, and `full-engine-results.json` under `results/`.
+The last file adds an engine dimension, checked analysis workloads, WASM raw
+and Brotli quality 11 sizes, and five fresh Node initialization samples.
+The shared captures keep the schema-v2 validator and use output mode. Their
+baseline gates stay blocked. These results are local measurements, not a
+passed timing regression gate. The legacy shared source keys name the WASM
+role; their hashes use the selected engine. The outer artifact records the
+physical paths and binds each engine to its captured WASM hash.
+
+Build the packages first. Run the capture from `bench/` with one pinned runner:
+
+```sh
+flock -x /home/vvin/learn/sheetwrite-wt/build.lock flock -x /home/vvin/learn/sheetwrite-wt/quiet.lock taskset -c 4 bun run src/full-engine-bench.ts
+```
+
+`bench:formula:matched` checks the eight shared rows that were slower in the
+first sequential capture. It runs 51 default/full pairs per row. Each timed
+sample uses a fresh process and one untimed warmup. The artifact retains all
+samples and checksums, median paired ratios, and the p10 to p90 ratio spread.
+The single-sample runner is `bun run src/formula-bench.ts --sample ID SIZE`.
+It supports the matched workload set. Use the same pinned-runner command as
+above with `src/matched-engine-bench.ts`.
+
 The suite covers independent parse/load and first recompute, safe-depth linear
 chains, 100K fan-out, diamonds, shared/distinct ranges, cross-sheet ranges,
 scalar edits affecting 0/1/1K/100K formulas, topology removal/addition, cycles,

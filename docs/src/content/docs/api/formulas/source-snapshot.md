@@ -116,6 +116,7 @@ class SourceSnapshot {
 <p class="api-consumers-label">Workspace packages depending on <code>@sheetwrite/formulas</code></p>
 
 <ul class="api-consumer-list">
+<li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 

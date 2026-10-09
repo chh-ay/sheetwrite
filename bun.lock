@@ -29,6 +29,7 @@
       "version": "0.0.2",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
+        "@sheetwrite/formulas": "workspace:*",
         "@sheetwrite/wasm": "workspace:*",
         "handsontable": "^18.0.0",
       },
