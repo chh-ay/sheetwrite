@@ -2767,9 +2767,9 @@
               "owners": [
                 "src/rebase.ts"
               ],
-              "source": "src/rebase.ts#L51",
+              "source": "src/rebase.ts#L56",
               "jsDocTags": [],
-              "documentation": "Conservative server-ordered rebase for pending offline work. Non-overlapping\nliteral edits are shifted across row/column insertion and deletion. Ambiguous\nformula, overlapping, sheet-lifecycle, and move cases become explicit\nconflicts instead of lossy guesses. This is the collaboration design gate;\nno CRDT dependency is required for the supported cases.",
+              "documentation": "Conservative server-ordered rebase for pending offline work. Non-overlapping\nliteral edits are shifted across row/column insertion and deletion. Ambiguous\nformula, overlapping, sheet-lifecycle, and move cases become explicit\nconflicts instead of lossy guesses. This is the collaboration design gate;\nno CRDT dependency is required for the supported cases.\n\nEach local operation is written after the local operations before it, and\neach remote operation after the remote operations before it. A remote\noperation is therefore carried forward through the local sequence: before it\nis compared with local operation k, it is moved past local operations 0..k-1.",
               "memberDocs": []
             },
             {
