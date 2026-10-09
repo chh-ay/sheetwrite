@@ -8,7 +8,7 @@ description: "Whether initSheetwrite has completed — the single readiness sour
 Whether `initSheetwrite` has completed — the single readiness source.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L301"><code>packages/core/src/grid.ts#L301</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L302"><code>packages/core/src/grid.ts#L302</code></a></dd></div>
 </dl>
 
 ## Declaration
