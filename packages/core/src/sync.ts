@@ -18,6 +18,7 @@ import {
   SheetwriteError,
   type SheetwriteErrorContext,
 } from "./errors.js";
+import { type RebaseConflict, rebaseDocumentOperations } from "./rebase.js";
 import {
   type GridTransactionAdmissionDecision,
   registerGridTransactionAdmission,
@@ -264,8 +265,32 @@ export type SyncCoordinatorEvent =
       snapshot?: WorkbookSnapshot;
     }
   | { type: "reloaded"; serverVersion: number; pending: readonly SyncMutationRecord[] }
+  | { type: "recovered"; serverVersion: number; pending: readonly SyncMutationRecord[] }
   | { type: "storage-error"; error: SheetwriteError; clientMutationId?: string }
   | { type: "error"; error: SheetwriteError; clientMutationId?: string };
+
+/** Why a conflict cannot be recovered in place; the host reloads the document instead. */
+export type SyncConflictReloadReason =
+  /** The conflict response carried no `operationsSinceBase` tail. */
+  | "missing-operations"
+  /** Pending work or a missed server version inserts, deletes, or moves rows or columns. */
+  | "structural-change"
+  /** Pending work and a server version it did not see touch the same cells or sheets. */
+  | "overlapping-work"
+  /** The server version moved past the conflict before recovery ran. */
+  | "version-advanced"
+  /** A pending mutation of this client is already in the server history. */
+  | "own-mutation"
+  /** The grid did not apply a missed server version. */
+  | "rejected";
+
+/** Outcome of `SyncCoordinator.recoverConflict`. */
+export type SyncConflictRecovery =
+  | { status: "recovered"; serverVersion: number }
+  | { status: "reload-required"; reason: SyncConflictReloadReason; conflict?: RebaseConflict }
+  | { status: "no-conflict" };
+
+type ConflictResponse = Extract<PersistenceCommitResponse, { status: "conflict" }>;
 
 type SyncListener = (event: SyncCoordinatorEvent) => void;
 function syncFailure(error: unknown, context?: SheetwriteErrorContext): SheetwriteError {
@@ -300,6 +325,12 @@ export class SyncCoordinator {
   private readonly gapBuffer = new Map<number, BufferedVersionedOperation>();
   /** Received members of the atomic batch that starts at `serverVersion + 1`. */
   private batchAssembly?: BatchAssembly;
+  /**
+   * The latest unrecovered base-version conflict, and the server version the
+   * Grid had applied when the first one arrived: a conflict moves `version` to
+   * the server head without applying the versions in between.
+   */
+  private outstandingConflict?: { response: ConflictResponse; appliedVersion: number };
   private readonly limits: Readonly<SyncCoordinatorLimits>;
   private readonly disposeGrid: () => void;
   private readonly readyPromise: Promise<void>;
@@ -605,6 +636,10 @@ export class SyncCoordinator {
       }
       assertConflictRecovery(response, record.baseVersion);
       record.status = "conflicted";
+      this.outstandingConflict = {
+        response,
+        appliedVersion: this.outstandingConflict?.appliedVersion ?? this.version,
+      };
       this.version = Math.max(this.version, response.currentVersion);
       this.dropStaleBatchAssembly();
       this.emitState();
@@ -775,6 +810,120 @@ export class SyncCoordinator {
     if (this.destroyed) return;
     const version = snapshot.version ?? 0;
     assertVersion(version, "snapshot.version");
+    const queue = await this.persistQueueOnto(version);
+    if (this.destroyed) return;
+    this.version = version;
+    this.outstandingConflict = undefined;
+    this.clearGapBuffer();
+    adoptQueueBase(queue);
+    this.emitState();
+    this.emit({
+      type: "reloaded",
+      serverVersion: this.version,
+      pending: this.pendingCommits(),
+    });
+  }
+
+  /**
+   * Recover from the outstanding base-version conflict without reloading the
+   * document. This succeeds when the pending work and every server version it
+   * did not see change different cells, and neither inserts, deletes, or moves
+   * rows or columns: the local Grid then already shows the server result plus
+   * the pending work, so recovery applies the missed server versions and moves
+   * the pending queue onto the new server version. Call `flush` afterwards to
+   * send it. In every other case nothing changes and the result names the
+   * reason; the host then reloads and calls `resumeAfterReload`.
+   */
+  async recoverConflict(): Promise<SyncConflictRecovery> {
+    await this.ready();
+    let result: SyncConflictRecovery = { status: "no-conflict" };
+    await this.enqueueInbound(async () => {
+      result = await this.recoverConflictInPlace();
+    });
+    return result;
+  }
+
+  private async recoverConflictInPlace(): Promise<SyncConflictRecovery> {
+    const conflict = this.outstandingConflict;
+    if (!conflict) return { status: "no-conflict" };
+    const { response, appliedVersion } = conflict;
+    const reload = (
+      reason: SyncConflictReloadReason,
+      rebaseConflict?: RebaseConflict,
+    ): SyncConflictRecovery => ({
+      status: "reload-required",
+      reason,
+      ...(rebaseConflict ? { conflict: rebaseConflict } : {}),
+    });
+    const tail = response.operationsSinceBase;
+    if (!tail) return reload("missing-operations");
+    if (this.version !== response.currentVersion || this.batchAssembly) {
+      return reload("version-advanced");
+    }
+    const records = this.order
+      .map((id) => this.records.get(id))
+      .filter((record): record is SyncMutationRecord => record !== undefined);
+    if (tail.some((entry) => entry.clientMutationId && this.records.has(entry.clientMutationId))) {
+      return reload("own-mutation");
+    }
+    // Acknowledged versions of this client are already in the Grid, in server order.
+    const missed = tail.filter(
+      (entry) => !(entry.clientMutationId && this.acknowledged.has(entry.clientMutationId)),
+    );
+    if (
+      tail.some((entry) => entry.operations.some(changesStructure)) ||
+      records.some((record) => record.operations.some(changesStructure))
+    ) {
+      return reload("structural-change");
+    }
+    // Without structural changes no coordinate moves: each pending commit only
+    // needs to touch other cells and sheets than the server versions it did not
+    // see. Work queued after the conflict has the head as its base but saw only
+    // what the Grid applied.
+    for (const record of records) {
+      const seen = Math.min(record.baseVersion, appliedVersion);
+      const unseen = missed
+        .filter((entry) => entry.version > seen)
+        .flatMap((entry) => entry.operations);
+      if (unseen.length === 0) continue;
+      for (const result of [
+        rebaseDocumentOperations(record.operations, unseen),
+        rebaseDocumentOperations(unseen, record.operations),
+      ]) {
+        if (result.status === "conflict") return reload("overlapping-work", result.conflict);
+      }
+    }
+
+    const queue = await this.persistQueueOnto(response.currentVersion);
+    if (this.destroyed) return reload("rejected");
+    for (const group of groupAtomicBatches(
+      missed.filter((entry) => entry.version > appliedVersion),
+    )) {
+      const operations = group.flatMap((entry) => entry.operations as DocumentOp[]);
+      if (operations.length === 0) continue;
+      const outcome = this.grid.applyRemoteOperations(
+        group.length > 1 ? markAtomicBatch(operations) : operations,
+      );
+      if (outcome.status !== "applied") return reload("rejected");
+      for (const entry of group) {
+        this.emit({ type: "remote-applied", operation: cloneVersionedOperation(entry) });
+      }
+    }
+    this.outstandingConflict = undefined;
+    adoptQueueBase(queue);
+    for (const [version, input] of this.gapBuffer) {
+      if (version > this.version) continue;
+      this.gapBuffer.delete(version);
+      this.releaseBuffered(input);
+    }
+    this.emitState();
+    this.emit({ type: "recovered", serverVersion: this.version, pending: this.pendingCommits() });
+    await this.drainGapBuffer();
+    return { status: "recovered", serverVersion: this.version };
+  }
+
+  /** Durably moves every pending commit onto `version`, in queue order. */
+  private async persistQueueOnto(version: number): Promise<QueueBase> {
     const records = this.order
       .map((id) => this.records.get(id))
       .filter((record): record is SyncMutationRecord => record !== undefined);
@@ -805,19 +954,7 @@ export class SyncCoordinator {
         throw failure;
       }
     }
-    if (this.destroyed) return;
-    this.version = version;
-    this.clearGapBuffer();
-    for (let index = 0; index < records.length; index++) {
-      records[index]!.baseVersion = replacements[index]!.baseVersion;
-      records[index]!.status = "pending";
-    }
-    this.emitState();
-    this.emit({
-      type: "reloaded",
-      serverVersion: this.version,
-      pending: this.pendingCommits(),
-    });
+    return { records, replacements };
   }
 
   destroy(): void {
@@ -1762,6 +1899,55 @@ interface BatchAssembly {
   members: VersionedOperation[];
   /** Encoded operation bytes of the members, bounded by `maxBatchBytes`. */
   bytes: number;
+}
+
+/** Pending records in queue order and their commits moved onto a new server version. */
+interface QueueBase {
+  records: SyncMutationRecord[];
+  replacements: PendingCommit[];
+}
+
+/** Adopts durably persisted queue bases; every record becomes sendable again. */
+function adoptQueueBase({ records, replacements }: QueueBase): void {
+  for (let index = 0; index < records.length; index++) {
+    records[index]!.baseVersion = replacements[index]!.baseVersion;
+    records[index]!.status = "pending";
+  }
+}
+
+/** Whether an operation inserts, deletes, or moves rows or columns. */
+function changesStructure(operation: DocumentOp): boolean {
+  switch (operation.op) {
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Groups consecutive versions so each atomic batch applies as one transaction. */
+function groupAtomicBatches(versions: readonly VersionedOperation[]): VersionedOperation[][] {
+  const groups: VersionedOperation[][] = [];
+  let open: VersionedOperation[] | undefined;
+  for (const version of versions) {
+    if (version.batch === undefined) {
+      open = undefined;
+      groups.push([version]);
+      continue;
+    }
+    if (version.batch.index === 0 || !open) {
+      open = [];
+      groups.push(open);
+    }
+    open.push(version);
+    if (version.batch.index === version.batch.count - 1) open = undefined;
+  }
+  return groups;
 }
 
 interface BufferedVersionedOperation {

@@ -1,14 +1,14 @@
 ---
-title: "SyncPendingCapacityState | @sheetwrite/core"
-description: "Whether the durable local queue can currently admit another transaction."
+title: "SyncConflictReloadReason | @sheetwrite/core"
+description: "Why a conflict cannot be recovered in place; the host reloads the document instead."
 ---
-<!-- api-export:@sheetwrite/core|.|SyncPendingCapacityState -->
+<!-- api-export:@sheetwrite/core|.|SyncConflictReloadReason -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-Whether the durable local queue can currently admit another transaction.
+Why a conflict cannot be recovered in place; the host reloads the document instead.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L80"><code>packages/core/src/sync.ts#L80</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L273"><code>packages/core/src/sync.ts#L273</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -16,8 +16,13 @@ Whether the durable local queue can currently admit another transaction.
 <div class="api-declaration-open" data-pagefind-ignore>
 
 ```ts generated
-export type SyncPendingCapacityState =
-  "hydrating" | "available" | "full" | "restore-error" | "destroyed";
+export type SyncConflictReloadReason =
+  | "missing-operations"
+  | "structural-change"
+  | "overlapping-work"
+  | "version-advanced"
+  | "own-mutation"
+  | "rejected";
 ```
 
 </div>
@@ -36,9 +41,9 @@ export type SyncPendingCapacityState =
 <li><code>@sheetwrite/xlsx</code><span class="api-consumer-kind">dependency</span></li>
 </ul>
 
-<p class="api-consumers-label">Public exports naming <code>SyncPendingCapacityState</code></p>
+<p class="api-consumers-label">Public exports naming <code>SyncConflictReloadReason</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/sync-state-snapshot/"><code>SyncStateSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/sync-conflict-recovery/"><code>SyncConflictRecovery</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

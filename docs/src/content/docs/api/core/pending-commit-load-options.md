@@ -8,7 +8,7 @@ description: "Mandatory bounds for one durable pending-commit restore."
 Mandatory bounds for one durable pending-commit restore.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L39"><code>packages/core/src/sync.ts#L39</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L40"><code>packages/core/src/sync.ts#L40</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
