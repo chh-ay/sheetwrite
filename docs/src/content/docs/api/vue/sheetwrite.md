@@ -8,7 +8,7 @@ description: "Convenience component for local object rows with live option updat
 Convenience component for local object rows with live option updates.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L513"><code>packages/vue/src/index.ts#L513</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L532"><code>packages/vue/src/index.ts#L532</code></a></dd></div>
 </dl>
 
 ## Declaration

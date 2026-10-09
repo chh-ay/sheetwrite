@@ -64,6 +64,11 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
   return { kind: "literal", value: raw };
 }
 
+/** Spreadsheet booleans; ASCII-only, matching the interactive input rule. */
+const BOOLEAN_TEXT = /^(TRUE|FALSE)$/i;
+/** UTF-16 code unit of `=`, which starts a formula in interactive entry. */
+const EQUALS_CODE_UNIT = 0x3d;
+
 /**
  * Parse imported text as a literal using the same boolean, number, date, and
  * currency rules as {@link parseCellInput}. Unlike interactive entry, a leading
@@ -71,14 +76,28 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
  * date serial so delimited export/import preserves numeric dates.
  */
 export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar {
+  // Imports call this once per field, so the rules are applied directly here
+  // instead of building a `CellValue` through `parseCellInput` and trimming twice.
   const trimmed = raw.trim();
   if (trimmed === "") return null;
-  if (type === "date") {
-    const serial = Number(trimmed);
-    if (Number.isFinite(serial)) return serial;
+  // Interactive entry turns this into a formula; imports keep the raw text.
+  if (trimmed.length > 1 && trimmed.charCodeAt(0) === EQUALS_CODE_UNIT) return raw;
+  if ((trimmed.length === 4 || trimmed.length === 5) && BOOLEAN_TEXT.test(trimmed)) {
+    return trimmed.toUpperCase() === "TRUE";
   }
-  const parsed = parseCellInput(raw, type);
-  return parsed.kind === "literal" ? parsed.value : raw;
+  if (type === "number" || type === "currency" || type === "date") {
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (type === "date") {
+    const serial = parseDateInput(trimmed);
+    if (serial !== null) return serial;
+  }
+  if (type === "currency") {
+    const amount = parseCurrencyInput(trimmed);
+    if (amount !== null) return amount;
+  }
+  return raw;
 }
 
 /**

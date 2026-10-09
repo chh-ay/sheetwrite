@@ -352,6 +352,33 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(recorder.destroyCalls.get(first)).toBe(1);
     });
 
+    it("delivers command state only to the currently attached handler", async () => {
+      const recorder = createLifecycleRecorder();
+      const first: Array<GridEvents["command-state-change"]> = [];
+      const second: Array<GridEvents["command-state-change"]> = [];
+      const props: AdapterConformanceProps = {
+        ...initialProps(recorder),
+        onCommandStateChange: (event) => first.push(event),
+      };
+      const mounted = await mount(props);
+      const grid = mounted.getPublishedGrid()!;
+
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 1, col: 0 } });
+      expect(first).toHaveLength(1);
+
+      await mounted.render({ ...props, onCommandStateChange: (event) => second.push(event) });
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 2, col: 0 } });
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+
+      await mounted.render({ ...props, onCommandStateChange: undefined });
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 0, col: 0 } });
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+
+      await mounted.unmount();
+    });
+
     it("forwards every operational event with typed payloads and current callbacks", async () => {
       const recorder = createLifecycleRecorder();
       const mutationEvents: Array<GridEvents["mutation-rejected"]> = [];

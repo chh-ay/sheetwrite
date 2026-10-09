@@ -485,6 +485,9 @@ clearView(): void;
 undo(): void;
 ```
 
+<p class="api-member-doc">Undo the last recorded cell edit. If the restored data is above the
+transaction resource limits, nothing changes: the Grid emits
+`mutation-rejected` and removes that entry, so older edits stay undoable.</p>
 </details>
 
 <details class="api-member" id="grid-redo" data-pagefind-weight="1">

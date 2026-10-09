@@ -10,7 +10,7 @@ emitted events exposed as `on*` listener props, and the exposed instance
 surface reachable through a template ref.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L159"><code>packages/vue/src/index.ts#L159</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L160"><code>packages/vue/src/index.ts#L160</code></a></dd></div>
 </dl>
 
 ## Declaration

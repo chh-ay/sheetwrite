@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const BUN_VERSION = "1.4.2";
-export const RUST_VERSION = "1.98.1";
+export const RUST_VERSION = "1.99.0";
 export const NODE_VERSION = "26.9.0";
 export const NPM_VERSION = "11.19.1";
 export const WASM_TARGET = "wasm32-unknown-unknown";

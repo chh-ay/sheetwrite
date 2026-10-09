@@ -136,6 +136,15 @@ function expectConflict(
   });
 }
 
+/** Freezes every object reachable from `value`; a write to it throws in strict mode. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    Object.freeze(value);
+    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  }
+  return value;
+}
+
 interface PointFactory {
   name: string;
   make(axis: Axis, index: number, sheet?: string): DocumentOp;
@@ -810,5 +819,49 @@ describe("server ordering, immutability, and determinism", () => {
         },
       },
     ]);
+  });
+
+  it("rebases deeply frozen local and remote operations", () => {
+    const local: DocumentOp[] = [
+      {
+        op: "set",
+        addr: address("row", 4),
+        value: { kind: "ref", target: address("row", 7) },
+        style: { bold: true },
+      },
+      {
+        op: "setRange",
+        range: range("row", 7, 8),
+        cells: [
+          { rowOffset: 0, colOffset: 0, value: literal("frozen"), style: { italic: true } },
+          { rowOffset: 2, colOffset: 0, value: { kind: "ref", target: address("row", 3) } },
+        ],
+      },
+    ];
+    const remote: DocumentOp[] = [structure("row", "insert", 2, 2)];
+    deepFreeze(local);
+    deepFreeze(remote);
+
+    const result = rebaseDocumentOperations(local, remote);
+
+    expect(result).toEqual({
+      status: "rebased",
+      operations: [
+        {
+          op: "set",
+          addr: address("row", 6),
+          value: { kind: "ref", target: address("row", 9) },
+          style: { bold: true },
+        },
+        {
+          op: "setRange",
+          range: range("row", 9, 10),
+          cells: [
+            { rowOffset: 0, colOffset: 0, value: literal("frozen"), style: { italic: true } },
+            { rowOffset: 2, colOffset: 0, value: { kind: "ref", target: address("row", 5) } },
+          ],
+        },
+      ],
+    });
   });
 });

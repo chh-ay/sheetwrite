@@ -8,7 +8,7 @@ description: "Structured fidelity warning emitted during XLSX conversion."
 Structured fidelity warning emitted during XLSX conversion.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L388"><code>packages/core/src/export.ts#L388</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L412"><code>packages/core/src/export.ts#L412</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

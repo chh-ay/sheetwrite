@@ -12,7 +12,7 @@ grouping (`,`), and whitespace, and reads accounting-style parentheses
 renderer uses.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L91"><code>packages/core/src/cell-input.ts#L91</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/cell-input.ts#L110"><code>packages/core/src/cell-input.ts#L110</code></a></dd></div>
 </dl>
 
 ## Declaration

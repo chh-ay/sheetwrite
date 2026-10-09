@@ -8,7 +8,7 @@ description: "Resource dimensions bounded by every XLSX import and export path."
 Resource dimensions bounded by every XLSX import and export path.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L211"><code>packages/core/src/export.ts#L211</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L235"><code>packages/core/src/export.ts#L235</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

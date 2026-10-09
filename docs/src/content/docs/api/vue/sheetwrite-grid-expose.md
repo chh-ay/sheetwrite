@@ -8,7 +8,7 @@ description: "Imperative Grid handle exposed by the Vue advanced component."
 Imperative Grid handle exposed by the Vue advanced component.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L51"><code>packages/vue/src/index.ts#L51</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L52"><code>packages/vue/src/index.ts#L52</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

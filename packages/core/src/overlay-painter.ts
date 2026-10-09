@@ -3,13 +3,155 @@ import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
-import type { Sheet } from "./types/document.js";
+import type { CellNote, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 
 const PRESENCE_LABEL_HEIGHT = 18;
 const PRESENCE_LABEL_MAX_WIDTH = 160;
 const PRESENCE_LABEL_MAX_CHARS = 80;
 const PRESENCE_MARKER_SIZE = 8;
+const NOTE_INDICATOR_SIZE = 8;
+const NOTE_INDICATOR_COLOR = "#f59e0b";
+
+const EMPTY_VIEW_ROWS = new Int32Array(0);
+const EMPTY_VIEW_ITEMS = new Uint32Array(0);
+
+/** Sort the accepted prefix of `items` by `rows`, keeping equal rows in item order. */
+function sortByViewRow(rows: Int32Array, items: Uint32Array, length: number): void {
+  const order = new Uint32Array(length);
+  for (let position = 0; position < length; position++) order[position] = position;
+  order.sort((left, right) => (rows[left] ?? 0) - (rows[right] ?? 0) || left - right);
+
+  const rowsInOrder = new Int32Array(length);
+  const itemsInOrder = new Uint32Array(length);
+  for (let position = 0; position < length; position++) {
+    const source = order[position] ?? 0;
+    rowsInOrder[position] = rows[source] ?? 0;
+    itemsInOrder[position] = items[source] ?? 0;
+  }
+  rows.set(rowsInOrder);
+  items.set(itemsInOrder);
+}
+
+/**
+ * Ascending view-row index over a list of items (search matches, notes). A
+ * repaint only needs the rows inside the painted band, so it binary-searches
+ * this index instead of mapping every item on each frame. Items whose data row
+ * the current view filters out are dropped, exactly as the inline mapping did.
+ */
+class ViewRowIndex {
+  private rows = EMPTY_VIEW_ROWS;
+  private items = EMPTY_VIEW_ITEMS;
+  private length = 0;
+  private isViewRowOrdered = true;
+
+  get count(): number {
+    return this.length;
+  }
+
+  /** True when the accepted items were already in ascending view-row order. */
+  get isOrdered(): boolean {
+    return this.isViewRowOrdered;
+  }
+
+  rowAt(position: number): number {
+    return this.rows[position] ?? 0;
+  }
+
+  itemAt(position: number): number {
+    return this.items[position] ?? 0;
+  }
+
+  /** Rebuild from a search match set; `toViewRow` maps rows to the current view. */
+  buildFromMatches(matches: SearchMatchSet, toViewRow: (dataRow: number) => number | null): void {
+    if (this.rows.length < matches.length) {
+      this.rows = new Int32Array(matches.length);
+      this.items = new Uint32Array(matches.length);
+    }
+    const rows = this.rows;
+    const items = this.items;
+    let accepted = 0;
+    let isOrdered = true;
+    for (let item = 0; item < matches.length; item++) {
+      const viewRow = toViewRow(matches.rowAt(item));
+      if (viewRow === null) continue;
+      if (accepted > 0 && viewRow < (rows[accepted - 1] ?? 0)) isOrdered = false;
+      rows[accepted] = viewRow;
+      items[accepted] = item;
+      accepted += 1;
+    }
+    this.commit(accepted, isOrdered);
+  }
+
+  /** Rebuild from a sheet's notes; `toViewRow` maps rows to the current view. */
+  buildFromNotes(notes: readonly CellNote[], toViewRow: (dataRow: number) => number | null): void {
+    if (this.rows.length < notes.length) {
+      this.rows = new Int32Array(notes.length);
+      this.items = new Uint32Array(notes.length);
+    }
+    const rows = this.rows;
+    const items = this.items;
+    let accepted = 0;
+    let isOrdered = true;
+    for (let item = 0; item < notes.length; item++) {
+      const note = notes[item];
+      const viewRow = note ? toViewRow(note.addr.row) : null;
+      if (viewRow === null) continue;
+      if (accepted > 0 && viewRow < (rows[accepted - 1] ?? 0)) isOrdered = false;
+      rows[accepted] = viewRow;
+      items[accepted] = item;
+      accepted += 1;
+    }
+    this.commit(accepted, isOrdered);
+  }
+
+  /** Accept the filled prefix, sorting it when the source was out of order. */
+  private commit(accepted: number, isOrdered: boolean): void {
+    if (!isOrdered) sortByViewRow(this.rows, this.items, accepted);
+    this.length = accepted;
+    this.isViewRowOrdered = isOrdered;
+    if (accepted === 0 && this.rows.length > 0) {
+      this.rows = EMPTY_VIEW_ROWS;
+      this.items = EMPTY_VIEW_ITEMS;
+    }
+  }
+
+  /** First position whose view row is not below `viewRow`. */
+  lowerBoundRow(viewRow: number): number {
+    const rows = this.rows;
+    let low = 0;
+    let high = this.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if ((rows[mid] ?? 0) < viewRow) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  }
+
+  /** First position whose content offset reaches `contentOffset` (offsets ascend). */
+  lowerBoundOffset(contentOffset: number, offsetOf: (viewRow: number) => number): number {
+    const rows = this.rows;
+    let low = 0;
+    let high = this.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (offsetOf(rows[mid] ?? 0) < contentOffset) low = mid + 1;
+      else high = mid;
+    }
+    return low;
+  }
+
+  /**
+   * First position whose row can still be visible at `contentOffset`: the
+   * first item of the row that starts before the offset (that row may be
+   * partly visible), so every item on it is kept, not only the last one.
+   */
+  bandStart(contentOffset: number, offsetOf: (viewRow: number) => number): number {
+    const reached = this.lowerBoundOffset(contentOffset, offsetOf);
+    return reached === 0 ? 0 : this.lowerBoundRow(this.rowAt(reached - 1));
+  }
+}
 
 interface PresenceColor {
   readonly css: string;
@@ -145,6 +287,22 @@ export class OverlayPainter {
   private highlightVersion = 0;
   private presenceVersion = 0;
 
+  // ── Match and note row indexes ─────────────────────────────────────────
+  // Repaints look up only the rows in the painted band. Each index rebuilds
+  // when its items or the view order change, never on scroll.
+  private readonly matchIndex = new ViewRowIndex();
+  private matchIndexSet: SearchMatchSet | null = null;
+  private matchIndexSheet: SheetId | null = null;
+  private matchIndexVersion = -1;
+  private matchIndexGeometry = -1;
+  /** Match indices of the painted band, kept in match order. */
+  private readonly matchPaintOrder: number[] = [];
+  private readonly noteIndex = new ViewRowIndex();
+  private noteIndexNotes: readonly CellNote[] | null = null;
+  private noteIndexGeometry = -1;
+  /** Note indices of the painted band, kept in note order. */
+  private readonly notePaintOrder: number[] = [];
+
   // ── Cached paint signature ─────────────────────────────────────────────
   // `paint` skips when every field below is unchanged and the theme identity
   // still matches — the same skip semantics as the old join('|') signature.
@@ -233,7 +391,7 @@ export class OverlayPainter {
     this.presenceLabelBoundsCount = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintNotes(sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintNotes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
 
     const selection = this.deps.selection();
     if (!selection.isEmpty) {
@@ -363,21 +521,66 @@ export class OverlayPainter {
     }
 
     const searchMatches = this.deps.searchMatches();
-    const searchActive = this.deps.searchActive();
-    if (searchMatches.sheet === activeSheet) {
-      for (let i = 0; i < searchMatches.length; i++) {
-        const row = searchMatches.rowAt(i);
-        const viewRow = this.deps.toViewRow(row);
-        if (viewRow === null) continue;
+    if (searchMatches.sheet !== activeSheet) return;
+    this.ensureMatchIndex(searchMatches, activeSheet);
+    this.paintSearchMatches(searchMatches, theme, sheet, contentTop, scrollLeft, clientW, clientH);
+  }
 
-        const border = i === searchActive ? theme.searchActiveMatch : "transparent";
-        this.appendRange(
-          viewRow,
-          searchMatches.colAt(i),
-          viewRow,
-          searchMatches.colAt(i),
-          theme.searchMatch,
-          border,
+  /**
+   * Rebuild the match row index when the match set or the view order changed.
+   * The mapping is one `toViewRow` per match, the same work a single repaint
+   * used to do, but it now runs only on search, sort, filter and geometry
+   * changes instead of on every scroll step.
+   */
+  private ensureMatchIndex(matches: SearchMatchSet, sheet: SheetId): void {
+    const searchVersion = this.deps.searchVersion();
+    const geometryVersion = this.deps.geometryVersion();
+    if (
+      this.matchIndexSet === matches &&
+      this.matchIndexSheet === sheet &&
+      this.matchIndexVersion === searchVersion &&
+      this.matchIndexGeometry === geometryVersion
+    ) {
+      return;
+    }
+    this.matchIndex.buildFromMatches(matches, this.deps.toViewRow);
+    this.matchIndexSet = matches;
+    this.matchIndexSheet = sheet;
+    this.matchIndexVersion = searchVersion;
+    this.matchIndexGeometry = geometryVersion;
+  }
+
+  /**
+   * Append the match rects the painted band covers: every match in a frozen row
+   * plus the body rows between the freeze boundary and the viewport bottom. The
+   * band lookup is two binary searches, and the rects keep match order so a
+   * sorted view paints the same DOM order a full scan produced.
+   */
+  private paintSearchMatches(
+    matches: SearchMatchSet,
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const index = this.matchIndex;
+    if (index.count === 0) return;
+
+    const active = this.deps.searchActive();
+    const { fr, frozenH } = this.deps.freeze();
+    const offsetOf = this.deps.rowOffsetOf;
+    const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
+    const bodyStart = Math.max(frozenEnd, index.bandStart(contentTop + frozenH, offsetOf));
+    const bodyEnd = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
+
+    if (index.isOrdered) {
+      for (let position = 0; position < frozenEnd; position++) {
+        this.appendSearchMatch(
+          matches,
+          position,
+          active,
           theme,
           sheet,
           contentTop,
@@ -386,7 +589,71 @@ export class OverlayPainter {
           clientH,
         );
       }
+      for (let position = bodyStart; position < bodyEnd; position++) {
+        this.appendSearchMatch(
+          matches,
+          position,
+          active,
+          theme,
+          sheet,
+          contentTop,
+          scrollLeft,
+          clientW,
+          clientH,
+        );
+      }
+      return;
     }
+
+    const order = this.matchPaintOrder;
+    order.length = 0;
+    for (let position = 0; position < frozenEnd; position++) order.push(position);
+    for (let position = bodyStart; position < bodyEnd; position++) order.push(position);
+    order.sort((left, right) => index.itemAt(left) - index.itemAt(right));
+    for (const position of order) {
+      this.appendSearchMatch(
+        matches,
+        position,
+        active,
+        theme,
+        sheet,
+        contentTop,
+        scrollLeft,
+        clientW,
+        clientH,
+      );
+    }
+  }
+
+  private appendSearchMatch(
+    matches: SearchMatchSet,
+    position: number,
+    active: number,
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const viewRow = this.matchIndex.rowAt(position);
+    const matchIndex = this.matchIndex.itemAt(position);
+    const col = matches.colAt(matchIndex);
+    const border = matchIndex === active ? theme.searchActiveMatch : "transparent";
+    this.appendRange(
+      viewRow,
+      col,
+      viewRow,
+      col,
+      theme.searchMatch,
+      border,
+      theme,
+      sheet,
+      contentTop,
+      scrollLeft,
+      clientW,
+      clientH,
+    );
   }
 
   private appendRange(
@@ -739,31 +1006,91 @@ export class OverlayPainter {
     label.style.whiteSpace = "nowrap";
   }
 
+  /**
+   * Note indicators for the rows the viewport reaches. The note index rebuilds
+   * when the note list or the view order changes, never on scroll, and the band
+   * lookup keeps the indicators in note order.
+   */
   private paintNotes(
+    theme: Theme,
     sheet: Sheet,
     contentTop: number,
     scrollLeft: number,
     clientW: number,
     clientH: number,
   ): void {
-    for (const note of sheet.notes ?? []) {
-      const row = this.deps.toViewRow(note.addr.row);
-      if (row === null) continue;
-      const rect = this.deps.screenRect(row, note.addr.col, contentTop, scrollLeft);
-      if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= clientW || rect.y >= clientH) {
-        continue;
-      }
-      const size = Math.min(8, rect.w, rect.h);
-      const indicator = this.acquireRect(
-        rect.x + rect.w - size,
-        rect.y,
-        size,
-        size,
-        "#f59e0b",
-        "transparent",
-      );
-      indicator.style.clipPath = "polygon(0 0, 100% 0, 100% 100%)";
+    const notes = sheet.notes;
+    if (!notes || notes.length === 0) return;
+
+    const geometryVersion = this.deps.geometryVersion();
+    if (this.noteIndexNotes !== notes || this.noteIndexGeometry !== geometryVersion) {
+      this.noteIndex.buildFromNotes(notes, this.deps.toViewRow);
+      this.noteIndexNotes = notes;
+      this.noteIndexGeometry = geometryVersion;
     }
+
+    const index = this.noteIndex;
+    if (index.count === 0) return;
+
+    // Notes in pinned rows stay at their pinned position, so they are always in
+    // the painted band; body notes are found by their scrolled content offset.
+    const { fr } = this.deps.freeze();
+    const offsetOf = this.deps.rowOffsetOf;
+    const frozenEnd = fr > 0 ? index.lowerBoundRow(fr) : 0;
+    // Indicators draw over the header band, so the upper edge of the searched
+    // range sits one header height above the scroll offset.
+    const start = Math.max(frozenEnd, index.bandStart(contentTop - theme.headerHeight, offsetOf));
+    const end = index.lowerBoundOffset(contentTop + clientH - theme.headerHeight, offsetOf);
+
+    if (index.isOrdered) {
+      for (let position = 0; position < frozenEnd; position++) {
+        this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+      }
+      for (let position = start; position < end; position++) {
+        this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+      }
+      return;
+    }
+
+    const order = this.notePaintOrder;
+    order.length = 0;
+    for (let position = 0; position < frozenEnd; position++) order.push(position);
+    for (let position = start; position < end; position++) order.push(position);
+    order.sort((left, right) => index.itemAt(left) - index.itemAt(right));
+    for (const position of order) {
+      this.appendNoteIndicator(notes, position, contentTop, scrollLeft, clientW, clientH);
+    }
+  }
+
+  private appendNoteIndicator(
+    notes: readonly CellNote[],
+    position: number,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const note = notes[this.noteIndex.itemAt(position)];
+    if (!note) return;
+    const rect = this.deps.screenRect(
+      this.noteIndex.rowAt(position),
+      note.addr.col,
+      contentTop,
+      scrollLeft,
+    );
+    if (rect.x + rect.w <= 0 || rect.y + rect.h <= 0 || rect.x >= clientW || rect.y >= clientH) {
+      return;
+    }
+    const size = Math.min(NOTE_INDICATOR_SIZE, rect.w, rect.h);
+    const indicator = this.acquireRect(
+      rect.x + rect.w - size,
+      rect.y,
+      size,
+      size,
+      NOTE_INDICATOR_COLOR,
+      "transparent",
+    );
+    indicator.style.clipPath = "polygon(0 0, 100% 0, 100% 100%)";
   }
 
   private readonly appendSelectionRect = (rect: SelRect): void => {

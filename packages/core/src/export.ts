@@ -6,6 +6,7 @@ import {
   encodeDelimitedText,
   parseDelimitedText,
   resolveDelimitedTextResourceLimits,
+  scanDelimitedText,
 } from "./delimited-text.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { IncompleteDataError } from "./store.js";
@@ -153,21 +154,44 @@ export function fromCsv(
   options: DelimitedTextOptions = {},
 ): ColumnarData {
   const limits = resolveDelimitedTextResourceLimits(options);
-  const grid = parseDelimitedText(text, ",", options);
-  const rowCount = Math.max(0, grid.length - 1);
+  const projected = columns.filter((column) => column.visible !== false);
+  const values: CellScalar[][] = Array.from({ length: projected.length }, () => []);
+  let scannedRows = 0;
+  let cursor = 0;
+  scanDelimitedText(text, ",", limits, {
+    fieldLimit: projected.length,
+    field: (row, column, value) => {
+      if (row === 0) return;
+      const target = projected[column];
+      if (target === undefined) return;
+      while (cursor < column) {
+        values[cursor]?.push(null);
+        cursor += 1;
+      }
+      values[column]?.push(parseCellLiteralInput(value, target.type));
+      cursor = column + 1;
+    },
+    row: (row) => {
+      if (row > 0) {
+        while (cursor < projected.length) {
+          values[cursor]?.push(null);
+          cursor += 1;
+        }
+        cursor = 0;
+      }
+      scannedRows = row + 1;
+    },
+  });
+
+  const rowCount = Math.max(0, scannedRows - 1);
   assertDelimitedTextDimensions(rowCount, columns.length, limits, "import");
 
   const result: Record<string, CellScalar[]> = Object.create(null);
   for (const column of columns) result[column.key] = new Array<CellScalar>(rowCount).fill(null);
-
-  const projected = columns.filter((column) => column.visible !== false);
-  for (let row = 0; row < rowCount; row++) {
-    const fields = grid[row + 1]!;
-    for (let column = 0; column < projected.length; column++) {
-      const target = projected[column]!;
-      result[target.key]![row] =
-        fields[column] === undefined ? null : parseCellLiteralInput(fields[column]!, target.type);
-    }
+  for (let index = 0; index < projected.length; index++) {
+    const column = projected[index];
+    const bucket = values[index];
+    if (column !== undefined && bucket !== undefined) result[column.key] = bucket;
   }
 
   return { rowCount, columns: result };

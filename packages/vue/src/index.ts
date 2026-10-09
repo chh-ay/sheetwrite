@@ -36,6 +36,7 @@ import {
   type AllowedComponentProps,
   type ComponentPublicInstance,
   defineComponent,
+  getCurrentInstance,
   h,
   nextTick,
   onBeforeUnmount,
@@ -267,6 +268,12 @@ const SheetwriteGridComponent = defineComponent({
     let mounted = false;
     let initializationToken = 0;
 
+    const instance = getCurrentInstance();
+    const forwardCommandStateChange: NonNullable<GridControllerHandlers["onCommandStateChange"]> = (
+      event,
+    ) => {
+      emit("command-state-change", event);
+    };
     const handlers: GridControllerHandlers = {
       onGridChange: (event) => emit("grid-change", event),
       onRowDelta: (projection) => emit("row-delta", projection),
@@ -275,7 +282,19 @@ const SheetwriteGridComponent = defineComponent({
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
-      onCommandStateChange: (event) => emit("command-state-change", event),
+      // The controller only subscribes to command state while this is defined.
+      // Vue removes declared emit listeners from `attrs`, so presence is read
+      // from the vnode props under the same keys `emit` itself looks up. An
+      // unreadable listener table keeps the subscription instead of risking a
+      // dropped event.
+      get onCommandStateChange() {
+        const listenerProps = instance?.vnode.props;
+        if (!listenerProps) return forwardCommandStateChange;
+        return listenerProps.onCommandStateChange === undefined &&
+          listenerProps["onCommand-state-change"] === undefined
+          ? undefined
+          : forwardCommandStateChange;
+      },
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
       onMutationRejected: (event) => emit("mutation-rejected", event),
       onRendererFallback: (event) => emit("renderer-fallback", event),

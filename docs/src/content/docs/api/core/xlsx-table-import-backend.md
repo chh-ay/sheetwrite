@@ -10,7 +10,7 @@ Pluggable table import backend. Parses raw `.xlsx` bytes into the same
 format-agnostic.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L348"><code>packages/core/src/export.ts#L348</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L372"><code>packages/core/src/export.ts#L372</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -85,6 +85,20 @@ pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
     }
 }
 
+/// Case-insensitive text order. ASCII text folds byte by byte without
+/// allocating, which is the common case for sheet text; anything else keeps
+/// the lowercase mapping, whose length can change and which is what the
+/// engine has always compared.
+pub(super) fn compare_text_case_insensitive(left: &str, right: &str) -> Ordering {
+    if left.is_ascii() && right.is_ascii() {
+        return left
+            .bytes()
+            .map(|byte| byte.to_ascii_lowercase())
+            .cmp(right.bytes().map(|byte| byte.to_ascii_lowercase()));
+    }
+    left.to_lowercase().cmp(&right.to_lowercase())
+}
+
 pub(super) fn compare_values(left: &Value, right: &Value) -> Result<Ordering, FormulaError> {
     match (left, right) {
         (Value::Blank, Value::Blank) => Ok(Ordering::Equal),
@@ -98,9 +112,7 @@ pub(super) fn compare_values(left: &Value, right: &Value) -> Result<Ordering, Fo
         (Value::Number(left), Value::Number(right)) => {
             left.partial_cmp(right).ok_or(FormulaError::Num)
         }
-        (Value::Text(left), Value::Text(right)) => {
-            Ok(left.to_lowercase().cmp(&right.to_lowercase()))
-        }
+        (Value::Text(left), Value::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
         (Value::Bool(left), Value::Bool(right)) => Ok(left.cmp(right)),
         _ => Ok(value_rank(left).cmp(&value_rank(right))),
     }

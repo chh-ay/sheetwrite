@@ -201,6 +201,8 @@ export type RowBridgeHandler<Id extends RowBridgeId = RowBridgeId> = (
 
 interface MutableSheetState<Id extends RowBridgeId> {
   readonly rowIds: Array<Id | null>;
+  /** Membership mirror of `rowIds`, so an insert can reject duplicates without scanning it. */
+  readonly rowIdSet: Set<Id>;
   readonly columns: string[];
 }
 
@@ -326,7 +328,7 @@ export class RowBridge<
       throw new TypeError("Sheetwrite: row bridge columns must have unique semantic keys");
     }
     const rowIds: Array<Id | null> = [];
-    const identities = new Set<Id>();
+    const rowIdSet = new Set<Id>();
     for (let index = 0; index < options.defaultRows.length; index += 1) {
       const id = options.getRowId(options.defaultRows[index]!, index);
       if (id === undefined || id === null || (typeof id !== "string" && typeof id !== "number")) {
@@ -334,11 +336,11 @@ export class RowBridge<
           `Sheetwrite: getRowId must return a stable string or number at row ${index}`,
         );
       }
-      if (identities.has(id)) throw new TypeError(`Sheetwrite: duplicate row ID "${String(id)}"`);
-      identities.add(id);
+      if (rowIdSet.has(id)) throw new TypeError(`Sheetwrite: duplicate row ID "${String(id)}"`);
+      rowIdSet.add(id);
       rowIds.push(id);
     }
-    this.sheets.set(options.sheet ?? DEFAULT_SHEET, { rowIds, columns: columnKeys });
+    this.sheets.set(options.sheet ?? DEFAULT_SHEET, { rowIds, rowIdSet, columns: columnKeys });
     this.createRowId = options.createRowId;
   }
 
@@ -667,7 +669,7 @@ export class RowBridge<
             if (typeof id !== "string" && typeof id !== "number") {
               throw new TypeError("Sheetwrite: createRowId must return a stable string or number");
             }
-            if (state?.rowIds.includes(id) || insertedIds.has(id)) {
+            if (state?.rowIdSet.has(id) || insertedIds.has(id)) {
               throw new TypeError(`Sheetwrite: duplicate inserted row ID "${String(id)}"`);
             }
             insertedIds.add(id);
@@ -675,6 +677,7 @@ export class RowBridge<
           inserted.push(id);
         }
         state?.rowIds.splice(operation.at, 0, ...inserted);
+        for (const id of insertedIds) state?.rowIdSet.add(id);
         const base = this.base(transaction, operation, [], inserted, inserted);
         return [
           {
@@ -692,6 +695,7 @@ export class RowBridge<
       case "removeRows": {
         const state = this.state(operation.sheet);
         const removed = state?.rowIds.splice(operation.at, operation.count) ?? [];
+        for (const id of removed) if (id !== null) state?.rowIdSet.delete(id);
         const base = this.base(transaction, operation, removed, [], removed);
         return [
           {
@@ -707,6 +711,7 @@ export class RowBridge<
         ];
       }
       case "moveRows": {
+        // Reordering keeps the same identities, so `rowIdSet` needs no update.
         const state = this.state(operation.sheet);
         const moved = state?.rowIds.splice(operation.from, operation.count) ?? [];
         state?.rowIds.splice(operation.to, 0, ...moved);
@@ -835,6 +840,7 @@ export class RowBridge<
   private sheetStateForSnapshot(snapshot: SheetSnapshot): MutableSheetState<Id> {
     return {
       rowIds: new Array<Id | null>(snapshot.rowCount).fill(null),
+      rowIdSet: new Set<Id>(),
       columns: snapshot.columns.map((column) => column.key),
     };
   }
