@@ -11,7 +11,7 @@ Options for the framework-neutral, opt-in row bridge.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L24"><code>packages/core/src/row-bridge.ts#L24</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -60,6 +60,16 @@ readonly createRowId?: (context: RowBridgeInsertContext) => Id;
 ```
 
 </details>
+
+<details class="api-member" id="row-bridge-options-max-recent-transactions" data-pagefind-weight="1">
+<summary><code>maxRecentTransactions</code> <span class="api-member-summary">Maximum entries in each recent identity window; defaults to 8,192.</span></summary>
+
+```ts generated
+readonly maxRecentTransactions?: number;
+```
+
+<p class="api-member-doc">Maximum entries in each recent identity window; defaults to 8,192. Must be a positive safe integer.</p>
+</details>
 </div>
 
 ## Declaration
@@ -77,6 +87,7 @@ export interface RowBridgeOptions<
   readonly getRowId: (row: Row, index: number) => Id;
   readonly sheet?: SheetId;
   readonly createRowId?: (context: RowBridgeInsertContext) => Id;
+  readonly maxRecentTransactions?: number;
 }
 ```
 

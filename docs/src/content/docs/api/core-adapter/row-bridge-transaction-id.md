@@ -8,7 +8,7 @@ description: "Compute a deterministic identity for a canonical transaction."
 Compute a deterministic identity for a canonical transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L877"><code>packages/core/src/row-bridge.ts#L877</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L961"><code>packages/core/src/row-bridge.ts#L961</code></a></dd></div>
 </dl>
 
 ## Declaration

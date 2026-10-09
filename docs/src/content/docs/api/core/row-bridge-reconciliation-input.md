@@ -8,7 +8,7 @@ description: "Input to RowBridge.reconcile."
 Input to [`RowBridge.reconcile`](/docs/api/core/row-bridge/#row-bridge-reconcile).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L177"><code>packages/core/src/row-bridge.ts#L177</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L179"><code>packages/core/src/row-bridge.ts#L179</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

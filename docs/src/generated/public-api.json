@@ -888,7 +888,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L869",
+              "source": "src/row-bridge.ts#L953",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -3011,7 +3011,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L316",
+              "source": "src/row-bridge.ts#L387",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -3040,7 +3040,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L38",
+              "source": "src/row-bridge.ts#L40",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -3052,7 +3052,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L82",
+              "source": "src/row-bridge.ts#L84",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -3076,7 +3076,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L156",
+              "source": "src/row-bridge.ts#L158",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -3088,7 +3088,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L98",
+              "source": "src/row-bridge.ts#L100",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -3100,7 +3100,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L199",
+              "source": "src/row-bridge.ts#L201",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -3112,7 +3112,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L137",
+              "source": "src/row-bridge.ts#L139",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -3148,7 +3148,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L120",
+              "source": "src/row-bridge.ts#L122",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -3156,7 +3156,7 @@
             {
               "name": "RowBridgeOptions",
               "kind": "interface",
-              "signature": "export interface RowBridgeOptions< Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId, > { readonly columns: readonly RowBridgeColumn<Row>[]; readonly defaultRows: readonly Row[]; readonly getRowId: (row: Row, index: number) => Id; readonly sheet?: SheetId; readonly createRowId?: (context: RowBridgeInsertContext) => Id; }",
+              "signature": "export interface RowBridgeOptions< Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId, > { readonly columns: readonly RowBridgeColumn<Row>[]; readonly defaultRows: readonly Row[]; readonly getRowId: (row: Row, index: number) => Id; readonly sheet?: SheetId; readonly createRowId?: (context: RowBridgeInsertContext) => Id; readonly maxRecentTransactions?: number; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -3167,6 +3167,10 @@
                 {
                   "name": "createRowId",
                   "documentation": "Optional identity factory for rows created by an addRows operation."
+                },
+                {
+                  "name": "maxRecentTransactions",
+                  "documentation": "Maximum entries in each recent identity window; defaults to 8,192. Must be a positive safe integer."
                 },
                 {
                   "name": "sheet",
@@ -3181,7 +3185,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L90",
+              "source": "src/row-bridge.ts#L92",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -3193,7 +3197,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L194",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -3205,7 +3209,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L74",
+              "source": "src/row-bridge.ts#L76",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -3217,7 +3221,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L177",
+              "source": "src/row-bridge.ts#L179",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -3238,7 +3242,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L168",
+              "source": "src/row-bridge.ts#L170",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -3250,7 +3254,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L108",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -3262,7 +3266,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L49",
+              "source": "src/row-bridge.ts#L51",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -3274,7 +3278,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L877",
+              "source": "src/row-bridge.ts#L961",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -3286,7 +3290,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L149",
+              "source": "src/row-bridge.ts#L151",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -5470,7 +5474,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L869",
+              "source": "src/row-bridge.ts#L953",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -5830,7 +5834,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L316",
+              "source": "src/row-bridge.ts#L387",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -5859,7 +5863,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L38",
+              "source": "src/row-bridge.ts#L40",
               "jsDocTags": [],
               "documentation": "A cell effect with semantic column and host row identity.",
               "memberDocs": []
@@ -5871,7 +5875,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L82",
+              "source": "src/row-bridge.ts#L84",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -5895,7 +5899,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L156",
+              "source": "src/row-bridge.ts#L158",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -5907,7 +5911,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L98",
+              "source": "src/row-bridge.ts#L100",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -5919,7 +5923,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L199",
+              "source": "src/row-bridge.ts#L201",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -5931,7 +5935,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L137",
+              "source": "src/row-bridge.ts#L139",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -5967,7 +5971,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L120",
+              "source": "src/row-bridge.ts#L122",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -5975,7 +5979,7 @@
             {
               "name": "RowBridgeOptions",
               "kind": "interface",
-              "signature": "export interface RowBridgeOptions< Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId, > { readonly columns: readonly RowBridgeColumn<Row>[]; readonly defaultRows: readonly Row[]; readonly getRowId: (row: Row, index: number) => Id; readonly sheet?: SheetId; readonly createRowId?: (context: RowBridgeInsertContext) => Id; }",
+              "signature": "export interface RowBridgeOptions< Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId, > { readonly columns: readonly RowBridgeColumn<Row>[]; readonly defaultRows: readonly Row[]; readonly getRowId: (row: Row, index: number) => Id; readonly sheet?: SheetId; readonly createRowId?: (context: RowBridgeInsertContext) => Id; readonly maxRecentTransactions?: number; }",
               "owners": [
                 "src/row-bridge.ts"
               ],
@@ -5986,6 +5990,10 @@
                 {
                   "name": "createRowId",
                   "documentation": "Optional identity factory for rows created by an addRows operation."
+                },
+                {
+                  "name": "maxRecentTransactions",
+                  "documentation": "Maximum entries in each recent identity window; defaults to 8,192. Must be a positive safe integer."
                 },
                 {
                   "name": "sheet",
@@ -6000,7 +6008,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L90",
+              "source": "src/row-bridge.ts#L92",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -6012,7 +6020,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L194",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -6024,7 +6032,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L74",
+              "source": "src/row-bridge.ts#L76",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock/restoreBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -6036,7 +6044,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L177",
+              "source": "src/row-bridge.ts#L179",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -6057,7 +6065,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L168",
+              "source": "src/row-bridge.ts#L170",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -6069,7 +6077,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L108",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -6081,7 +6089,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L49",
+              "source": "src/row-bridge.ts#L51",
               "jsDocTags": [],
               "documentation": "The canonical transaction identity carried by each projected delta.",
               "memberDocs": []
@@ -6093,7 +6101,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L877",
+              "source": "src/row-bridge.ts#L961",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -6105,7 +6113,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L149",
+              "source": "src/row-bridge.ts#L151",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -7499,7 +7507,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L143",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -7528,7 +7536,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L112",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -7540,7 +7548,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L136",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -7564,7 +7572,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L130",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -8433,7 +8441,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L143",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -8462,7 +8470,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L112",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -8474,7 +8482,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L136",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -8498,7 +8506,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L130",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -9359,7 +9367,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L143",
+              "source": "../core/dist/row-bridge.d.ts#L145",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -9388,7 +9396,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L112",
+              "source": "../core/dist/row-bridge.d.ts#L114",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -9400,7 +9408,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L136",
+              "source": "../core/dist/row-bridge.d.ts#L138",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -9424,7 +9432,7 @@
               "owners": [
                 "../core/dist/row-bridge.d.ts"
               ],
-              "source": "../core/dist/row-bridge.d.ts#L130",
+              "source": "../core/dist/row-bridge.d.ts#L132",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []

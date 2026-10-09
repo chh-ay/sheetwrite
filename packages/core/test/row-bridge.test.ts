@@ -119,6 +119,117 @@ describe("RowBridge", () => {
     expect(remote.deltas).toHaveLength(1);
   });
 
+  for (const maxRecentTransactions of [1, 8, undefined]) {
+    const echoWindowSize = maxRecentTransactions ?? 8192;
+    for (const identity of ["transaction ID", "operation fingerprint"] as const) {
+      for (const laterTransactions of [echoWindowSize - 1, echoWindowSize]) {
+        it(`recognizes ${identity} echoes at the ${maxRecentTransactions ?? "default"} window boundary (${laterTransactions} later transactions)`, () => {
+          const bridge = createRowBridge({
+            columns,
+            defaultRows: rows,
+            getRowId: (row) => row.id,
+            ...(maxRecentTransactions === undefined ? {} : { maxRecentTransactions }),
+          });
+          const addr = { sheet: "sheet1", row: 0, col: 1 };
+          const operations: DocumentOp[] = [{ op: "set", addr, value: literal(0) }];
+          // Use explicit IDs without epochs so version ordering cannot mask identity eviction.
+          bridge.project(event(operations), undefined, "original");
+          for (let index = 1; index <= laterTransactions; index += 1) {
+            bridge.project(
+              event([{ op: "set", addr, value: literal(index) }]),
+              undefined,
+              `later-${index}`,
+            );
+          }
+          const echoValue = identity === "transaction ID" ? -1 : 0;
+          const echo = bridge.project(
+            event(
+              [{ op: "set", addr, value: literal(echoValue) }],
+              [{ addr, oldValue: literal(laterTransactions), newValue: literal(echoValue) }],
+              "remote",
+            ),
+            undefined,
+            identity === "transaction ID" ? "original" : "server-echo",
+          );
+          if (laterTransactions < echoWindowSize) {
+            expect(echo.status).toBe("duplicate");
+            expect(echo.deltas).toEqual([]);
+          } else {
+            expect(echo.status).toBe("remote");
+            expect(echo.deltas).toEqual([
+              expect.objectContaining({
+                kind: "cell",
+                source: "remote",
+                cell: expect.objectContaining({
+                  rowId: "row-a",
+                  columnKey: "amount",
+                  previous: literal(laterTransactions),
+                  next: literal(echoValue),
+                }),
+              }),
+            ]);
+          }
+        });
+      }
+    }
+  }
+
+  it("refreshes repeated local fingerprints and retains other echoes after consuming one", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      maxRecentTransactions: 3,
+    });
+    const addr = { sheet: "sheet1", row: 0, col: 1 };
+    for (const [index, value] of [0, 1, 0, 2, 3].entries()) {
+      bridge.project(
+        event([{ op: "set", addr, value: literal(value) }]),
+        undefined,
+        `local-${index}`,
+      );
+    }
+    // Consume the middle entry, then fill the free slot without evicting the oldest.
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(2) }], [], "remote")).status,
+    ).toBe("duplicate");
+    bridge.project(event([{ op: "set", addr, value: literal(4) }]), undefined, "local-4-new");
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(0) }], [], "remote")).status,
+    ).toBe("duplicate");
+    // Consume the newest entry and then add two new identities.
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(4) }], [], "remote")).status,
+    ).toBe("duplicate");
+    for (const value of [5, 6]) {
+      bridge.project(
+        event([{ op: "set", addr, value: literal(value) }]),
+        undefined,
+        `local-${value}-new`,
+      );
+    }
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(3) }], [], "remote")).status,
+    ).toBe("duplicate");
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(1) }], [], "remote")).status,
+    ).toBe("remote");
+  });
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects an invalid recent transaction limit (%s)",
+    (maxRecentTransactions) => {
+      expect(() =>
+        createRowBridge({
+          columns,
+          defaultRows: rows,
+          getRowId: (row) => row.id,
+          maxRecentTransactions,
+        }),
+      ).toThrow("Sheetwrite: maxRecentTransactions must be a positive safe integer");
+    },
+  );
+
   it("rejects an inserted identity that already exists and releases it when removed", () => {
     const bridge = createRowBridge({
       columns,

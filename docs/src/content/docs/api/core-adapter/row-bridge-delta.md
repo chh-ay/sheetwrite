@@ -8,7 +8,7 @@ description: "Every possible projection produced by a row bridge."
 Every possible projection produced by a row bridge.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L156"><code>packages/core/src/row-bridge.ts#L156</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L158"><code>packages/core/src/row-bridge.ts#L158</code></a></dd></div>
 </dl>
 
 ## Declaration

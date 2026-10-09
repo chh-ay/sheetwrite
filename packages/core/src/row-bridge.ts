@@ -32,6 +32,8 @@ export interface RowBridgeOptions<
   readonly sheet?: SheetId;
   /** Optional identity factory for rows created by an addRows operation. */
   readonly createRowId?: (context: RowBridgeInsertContext) => Id;
+  /** Maximum entries in each recent identity window; defaults to 8,192. Must be a positive safe integer. */
+  readonly maxRecentTransactions?: number;
 }
 
 /** A cell effect with semantic column and host row identity. */
@@ -307,6 +309,75 @@ function operationColumns(operation: DocumentOp): string[] {
   }
 }
 
+// Direct-echo hosts need a recent echo window. It can exceed SyncCoordinator's
+// 4,096 acknowledgement window because SyncCoordinator removes its echoes first.
+const DEFAULT_MAX_RECENT_TRANSACTIONS = 8192;
+
+interface RecentIdentity {
+  identity: string;
+  previous: RecentIdentity | undefined;
+  next: RecentIdentity | undefined;
+}
+
+// A linked order avoids scanning deleted Set slots when the window is full.
+// Reuse removed entries so sustained projection needs no new list nodes.
+class RecentIdentities {
+  private readonly entries = new Map<string, RecentIdentity>();
+  private oldest: RecentIdentity | undefined;
+  private newest: RecentIdentity | undefined;
+  private unused: RecentIdentity | undefined;
+
+  constructor(private readonly capacity: number) {}
+
+  has(identity: string): boolean {
+    return this.entries.has(identity);
+  }
+
+  delete(identity: string): void {
+    const entry = this.entries.get(identity);
+    if (entry === undefined) return;
+    this.entries.delete(identity);
+    this.unlink(entry);
+    entry.identity = "";
+    entry.next = this.unused;
+    this.unused = entry;
+  }
+
+  remember(identity: string): void {
+    let entry = this.entries.get(identity);
+    if (entry !== undefined) {
+      this.unlink(entry);
+    } else {
+      if (this.entries.size === this.capacity && this.oldest !== undefined) {
+        entry = this.oldest;
+        this.entries.delete(entry.identity);
+        this.unlink(entry);
+      } else if (this.unused !== undefined) {
+        entry = this.unused;
+        this.unused = entry.next;
+      } else {
+        entry = { identity, previous: undefined, next: undefined };
+      }
+      entry.identity = identity;
+      this.entries.set(identity, entry);
+    }
+    entry.previous = this.newest;
+    entry.next = undefined;
+    if (this.newest === undefined) this.oldest = entry;
+    else this.newest.next = entry;
+    this.newest = entry;
+  }
+
+  private unlink(entry: RecentIdentity): void {
+    if (entry.previous === undefined) this.oldest = entry.next;
+    else entry.previous.next = entry.next;
+    if (entry.next === undefined) this.newest = entry.previous;
+    else entry.next.previous = entry.previous;
+    entry.previous = undefined;
+    entry.next = undefined;
+  }
+}
+
 /**
  * Projects canonical document transactions into host-owned row changes.
  *
@@ -319,12 +390,20 @@ export class RowBridge<
 > {
   private readonly sheets = new Map<SheetId, MutableSheetState<Id>>();
   private readonly createRowId: RowBridgeOptions<Row, Id>["createRowId"];
-  private readonly seenFingerprints = new Set<string>();
-  private readonly localFingerprints = new Set<string>();
-  private readonly seenTransactionIds = new Set<string>();
+  private readonly localFingerprints: RecentIdentities;
+  private readonly seenTransactionIds: RecentIdentities;
   private latestVersion = -Infinity;
 
   constructor(options: RowBridgeOptions<Row, Id>) {
+    const maxRecentTransactions =
+      options.maxRecentTransactions === undefined
+        ? DEFAULT_MAX_RECENT_TRANSACTIONS
+        : options.maxRecentTransactions;
+    if (!Number.isSafeInteger(maxRecentTransactions) || maxRecentTransactions <= 0) {
+      throw new RangeError("Sheetwrite: maxRecentTransactions must be a positive safe integer");
+    }
+    this.localFingerprints = new RecentIdentities(maxRecentTransactions);
+    this.seenTransactionIds = new RecentIdentities(maxRecentTransactions);
     const columnKeys = options.columns.map((column) => column.key);
     if (new Set(columnKeys).size !== columnKeys.length) {
       throw new TypeError("Sheetwrite: row bridge columns must have unique semantic keys");
@@ -453,16 +532,21 @@ export class RowBridge<
     }
     if (event.source === "remote" && this.localFingerprints.has(fingerprint)) {
       this.localFingerprints.delete(fingerprint);
-      if (hasTransactionIdentity) this.seenTransactionIds.add(transaction.id);
+      if (hasTransactionIdentity) {
+        this.seenTransactionIds.remember(transaction.id);
+      }
       return { status: "duplicate", transaction, deltas: [] };
     }
     if (event.epoch !== undefined && event.epoch < this.latestVersion) {
       return { status: "out-of-order", transaction, deltas: [] };
     }
     if (event.epoch !== undefined) this.latestVersion = Math.max(this.latestVersion, event.epoch);
-    if (hasTransactionIdentity) this.seenTransactionIds.add(transaction.id);
-    this.seenFingerprints.add(fingerprint);
-    if (event.source === "local") this.localFingerprints.add(fingerprint);
+    if (hasTransactionIdentity) {
+      this.seenTransactionIds.remember(transaction.id);
+    }
+    if (event.source === "local") {
+      this.localFingerprints.remember(fingerprint);
+    }
     const changeQueues = new Map<string, CellChange[]>();
     for (const change of event.changes) {
       const key = cellAddressKey(change.addr);

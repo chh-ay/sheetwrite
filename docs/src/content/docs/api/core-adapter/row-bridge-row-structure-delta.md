@@ -8,7 +8,7 @@ description: "Stable row identity effects for insert, delete, and move operation
 Stable row identity effects for insert, delete, and move operations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L106"><code>packages/core/src/row-bridge.ts#L106</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L108"><code>packages/core/src/row-bridge.ts#L108</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

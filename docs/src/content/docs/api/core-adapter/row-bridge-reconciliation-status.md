@@ -8,7 +8,7 @@ description: "Reconciliation status for a canonical transaction response."
 Reconciliation status for a canonical transaction response.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L168"><code>packages/core/src/row-bridge.ts#L168</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L170"><code>packages/core/src/row-bridge.ts#L170</code></a></dd></div>
 </dl>
 
 ## Declaration
