@@ -1494,7 +1494,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `editors` | `Record<string, CellEditor>` | `{}` | Host-owned cell editors registered up front; reference one by name via `Column.editor`. |
 | `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
-| `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
+| `minColumns` | `number` | workbook width | Minimum rendered/store column count. A spreadsheet also adds empty columns to fill the host width; a `data-grid` shows only its own columns unless you set `minColumns`. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
 Framework adapters classify every `GridOptions` field centrally. `workbook`,
@@ -3771,7 +3771,7 @@ The tables below describe the owning source definition, not generated API signat
 | `GridOptions.overscan` / `DEFAULT_OVERSCAN` | 6 row and visible-column positions per viewport edge | Interaction tuning: keep the virtual paint and ARIA windows close to the viewport | It is not a document ceiling; the window is clipped to available rows/columns | `GridOptions.overscan` or `grid.setOverscan()`; `0` disables the buffer |
 | `measureMaxElementHeight` | Measured browser clamp minus 4,096 CSS px; 15,000,000 CSS px fallback | Compatibility: browser layout and scroll-offset clamps vary | Taller logical sheets use scaled scrolling while the DOM sizer stays at the safe clamp | Not configurable |
 | `AUTO_FIT_CHUNK_CELLS` | 16,384 cells per store read | Resource defense: bound one synchronous auto-fit read | Larger scans continue in frame-scheduled chunks and commit after the scan | Not configurable |
-| `DEFAULT_COL_WIDTH` | 100 CSS px | Interaction tuning: keep synthesized sheet and padding columns consistent | Used for generated columns; it is not a width ceiling | No global setting; supply or update individual column widths |
+| `DEFAULT_COL_WIDTH` | 100 CSS px | Interaction tuning: keep synthesized sheet and spreadsheet padding columns consistent | Used for generated columns; it is not a width ceiling | No global setting; supply or update individual column widths |
 | [`DEFAULT_SIMPLE_COLUMN_WIDTH`](https://sheetwrite.vercel.app/docs/api/core-adapter/default-simple-column-width/) | 120 CSS px | Interaction tuning: give adapter-created schemas an explicit usable width | Used only when a simple column omits `width` | `SimpleColumn.width` |
 | `DataSourceStorageOptions.chunkRows` / `DEFAULT_PAGE_CHUNK_ROWS` | 4,096 rows per chunk | Resource defense: allocation-lazy page granularity | Chunks allocate on load/edit; a positive non-power-of-two value is rounded up to a power of two | `GridOptions.datasourceStorage.chunkRows` or `SheetwriteStoreOptions.chunkRows` |
 | `DataSourceStorageOptions.cacheBytes` / `DEFAULT_PAGED_CACHE_BYTES` | 32 MiB per paged sheet | Resource defense: bound clean cached chunks | Before a new chunk would exceed the budget, the least-recent clean, unpinned chunks are evicted; dirty chunks, painted/frozen cells, reached merge anchors, and their bounded formula closure may exceed it. Bulk reads do not replace viewport protection | `GridOptions.datasourceStorage.cacheBytes` or `SheetwriteStoreOptions.cacheBytes`; `0` disables eviction |
@@ -4212,6 +4212,10 @@ structure, or read-only state changes, and a second pointer cannot take over
 a drag.
 - **Selection before edit.** Selection changes are reported before
 `edit-begin`.
+- **Data grids show only their own columns.** A Grid with
+`presentation: "data-grid"` no longer adds empty, unnamed columns to fill
+its width. A spreadsheet still does. Set `minColumns` to keep empty columns
+in a data grid.
 - **Negative currency.** The minus sign comes before a currency prefix
 (`-$246`), as in Excel.
 - **Smaller packages.** Published packages no longer include source maps, and
@@ -5657,7 +5661,9 @@ Members:
 - `hyperlinkActivation` — Hyperlink activation never opens a browser URL. `event-only` (default)
 emits a safe resolved target; `internal-navigation` additionally moves to
 stable internal destinations; `disabled` rejects every activation request.
-- `minColumns` — Render at least this many columns (empty padding columns past the data, like a spreadsheet).
+- `minColumns` — Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.
 - `mutationPolicy` — Atomic rejects the transaction; partial skips denied operation objects.
 - `overscan` — Extra row and visible-column positions painted on each viewport edge.
 Defaults to 6; use 0 to disable the buffer.
@@ -9301,7 +9307,9 @@ emits a safe resolved target; `internal-navigation` additionally moves to
 stable internal destinations; `disabled` rejects every activation request.
 - `inputMode` — Hints at the type of data that might be entered by the user while editing the element or its contents
 - `is` — Specify that a standard HTML element should behave like a defined custom built-in element
-- `minColumns` — Render at least this many columns (empty padding columns past the data, like a spreadsheet).
+- `minColumns` — Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.
 - `mutationPolicy` — Atomic rejects the transaction; partial skips denied operation objects.
 - `onActiveSheetChange` — Fires after the visible sheet changes.
 - `onCommandStateChange` — Receives observable undo/redo and formatting command state.

@@ -19,6 +19,7 @@ import type {
   DataSourcePage,
   DataSourceRequest,
   DocumentOp,
+  GridOptions,
   RowData,
   Store,
   Workbook,
@@ -946,6 +947,29 @@ describe("Grid.setMinColumns", () => {
 
     grid.destroy();
     store.dispose();
+  });
+
+  it("fills the host width with empty columns only for a spreadsheet", () => {
+    const columnCount = (options: Partial<GridOptions>) => {
+      const host = mountHost();
+      const grid = new GridImpl(host, { workbook: makeWorkbook(5), ...options });
+      const count = host.getAttribute("aria-colcount");
+      grid.destroy();
+      return count;
+    };
+    // The 800 px test host fits 9 default-width columns.
+    expect(columnCount({})).toBe("9");
+    // A data grid shows its own three columns, and pads only on request.
+    expect(columnCount({ presentation: "data-grid" })).toBe("3");
+    expect(columnCount({ presentation: "data-grid", minColumns: 6 })).toBe("6");
+
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook: makeWorkbook(5), presentation: "data-grid" });
+    grid.setMinColumns(5);
+    expect(host.getAttribute("aria-colcount")).toBe("5");
+    grid.setMinColumns(undefined);
+    expect(host.getAttribute("aria-colcount")).toBe("3");
+    grid.destroy();
   });
 
   it("routes Grid.exportXlsx through the registered table backend", async () => {

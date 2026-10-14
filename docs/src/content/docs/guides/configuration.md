@@ -31,7 +31,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `editors` | `Record<string, CellEditor>` | `{}` | Host-owned cell editors registered up front; reference one by name via `Column.editor`. |
 | `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
-| `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
+| `minColumns` | `number` | workbook width | Minimum rendered/store column count. A spreadsheet also adds empty columns to fill the host width; a `data-grid` shows only its own columns unless you set `minColumns`. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
 Framework adapters classify every `GridOptions` field centrally. `workbook`,

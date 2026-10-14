@@ -378,7 +378,11 @@ export interface GridOptions {
    * Defaults to 6; use 0 to disable the buffer.
    */
   overscan?: number;
-  /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
+  /**
+   * Render at least this many columns, adding empty columns past the data. A
+   * spreadsheet also adds empty columns to fill the host width; a data grid
+   * adds them only through this option.
+   */
   minColumns?: number;
   /** Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false. */
   config?: GridConfig;

@@ -490,7 +490,7 @@ export class GridImpl implements Grid {
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
-    const virtualTarget = padTarget(host, opts.minColumns);
+    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
@@ -1755,7 +1755,10 @@ export class GridImpl implements Grid {
   setMinColumns(minColumns?: number): void {
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
     if (!stored) return;
-    const target = Math.max(stored.columns.length, padTarget(this.host, minColumns));
+    const target = Math.max(
+      stored.columns.length,
+      padTarget(this.host, minColumns, this.presentation),
+    );
     if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
     this.virtualColumnTargets.set(this.activeSheet, target);
     this.activeSheetCache = null;
@@ -2939,8 +2942,17 @@ function appendPadColumns(columns: Column[], target: number): void {
   }
 }
 
-/** Columns needed to satisfy `minColumns` and fill the host width. */
-function padTarget(host: HTMLElement, minColumns: number | undefined): number {
+/**
+ * Columns needed to satisfy `minColumns` and, for a spreadsheet, to fill the
+ * host width. A data grid's columns come from the data, so it adds empty
+ * columns only when the host asks for them with `minColumns`.
+ */
+function padTarget(
+  host: HTMLElement,
+  minColumns: number | undefined,
+  presentation: GridPresentation,
+): number {
+  if (presentation === "data-grid") return minColumns ?? 0;
   const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
   const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
   return Math.max(minColumns ?? 0, fillCols);
