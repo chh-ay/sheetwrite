@@ -38,6 +38,7 @@ describe("SheetwriteStore", () => {
       const history = store.captureRangeHistory(range);
       if (!history) throw new Error("Expected captured text history");
       try {
+        let observedSweep = false;
         for (let edit = 0; edit < 6_000; edit++) {
           store.applyTransaction({
             patches: [
@@ -48,10 +49,15 @@ describe("SheetwriteStore", () => {
               },
             ],
           });
+          const refreshed = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+          if (refreshed.stringPoolEpoch !== issuingEpoch) {
+            expect(refreshed.stringPoolIds?.[0]).toBe(before.stringPoolIds?.[0]);
+            expect(refreshed.values[0]).toBe(`${edit}-${"x".repeat(128)}`);
+            observedSweep = true;
+            break;
+          }
         }
-        const refreshed = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
-        expect(refreshed.stringPoolEpoch).toBeGreaterThan(issuingEpoch);
-        expect(refreshed.values[0]).toBe(`5999-${"x".repeat(128)}`);
+        expect(observedSweep).toBe(true);
         store.applyTransaction({ patches: [history.toDocumentOp(range)] });
         expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values[0]).toBe("original");
       } finally {

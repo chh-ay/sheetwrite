@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "4997890",
+  "implementationCommit": "bc7bc53",
+  "engineIsolationProof": {
+    "method": "After default initSheetwrite(), require getEngine().CellStore === the CellStore imported from STRING_POOL_CHECKOUT/packages/wasm/loader-node.mjs; reject mismatches before any sample",
+    "baseline": {
+      "checkout": "/home/vvin/learn/sheetwrite-wt/adapter-lifetime-base",
+      "matchesSelectedCheckout": true,
+      "hasPoolEpoch": false
+    },
+    "candidate": {
+      "checkout": "/home/vvin/learn/sheetwrite-wt/string-pool/",
+      "matchesSelectedCheckout": true,
+      "hasPoolEpoch": true
+    },
+    "interpretation": "Both execution-level default-loader probes selected their own checkout and different engine interfaces. These subsequent diagnostic executions are not additional matched performance rounds."
+  },
+  "methodology": {
+    "execution": "Exclusive quiet.lock, user systemd scope MemoryMax=6G/MemorySwapMax=1G, CPU 4, sequential fresh Bun processes",
+    "samplesPerProcess": 7,
+    "discardedWarmupSamples": 1,
+    "aaRounds": 3,
+    "comparisonRoundOrders": ["ABBA", "BAAB", "ABBA", "BAAB", "ABBA"],
+    "roundReduction": "Median of the two process medians for each implementation; overall median of five round medians",
+    "noiseReduction": "Maximum absolute relative difference between outer and inner pair medians in the three A/A rounds",
+    "units": "Milliseconds per complete workload, not per operation",
+    "evidence": "Per-round medians recovered from completed tool output; individual timing samples from the first capture were not retained after runtime reset. Fresh sweep samples are retained below.",
+    "workloads": {
+      "repeatedTextIngest": "1M rows, 100 repeated categories, 10k-row column batches",
+      "edit": "100k committed scalar text edits over the existing 100 categories, without history",
+      "wasmRead": "10k 64-row packed windows with consuming accessors",
+      "distinct": "20 full distinct-values scans over 1M categorical rows",
+      "publicRead": "30k 64-row public getVisibleWindow calls over 100k categorical rows; checked first-cell text",
+      "distinctIngest": "1M distinct text rows in 10k-row batches; checked final-cell text",
+      "lifetime": "1M distinct live strings, explicit all-live sweeps, clear and explicit compaction, then 100k unique 128-byte-suffix committed overwrites of one cell without history"
+    }
+  },
+  "metrics": {
+    "repeatedTextIngest": {
+      "aaRoundPairsMs": [
+        [203.272318, 201.431545],
+        [218.243768, 202.608653],
+        [205.0465715, 203.3258905]
+      ],
+      "abRoundPairsMs": [
+        [205.657366, 204.17945],
+        [204.787394, 206.74609],
+        [205.984611, 206.3616635],
+        [199.7763365, 204.796711],
+        [201.652478, 200.568155]
+      ],
+      "baselineMedianMs": 204.787394,
+      "candidateMedianMs": 204.796711,
+      "changePercent": 0.004549596446357107,
+      "aaNoisePercent": 7.16406023561702,
+      "verdict": "pass"
+    },
+    "edit": {
+      "aaRoundPairsMs": [[12.235586, 11.9842215], [12.380111, 12.17739], [12.339801, 11.9119705]],
+      "abRoundPairsMs": [
+        [12.1355915, 12.31385],
+        [12.0401015, 12.670105],
+        [12.2005025, 12.3457325],
+        [12.109369, 12.1563985],
+        [12.159186, 12.0473435]
+      ],
+      "baselineMedianMs": 12.1355915,
+      "candidateMedianMs": 12.31385,
+      "changePercent": 1.4688900825328366,
+      "aaNoisePercent": 3.4670777916131046,
+      "verdict": "pass"
+    },
+    "wasmRead": {
+      "aaRoundPairsMs": [[15.787877, 15.4491115], [15.3543495, 15.3772775], [15.976187, 15.365689]],
+      "abRoundPairsMs": [
+        [15.88631, 15.763643],
+        [15.869528, 15.755138],
+        [15.664009, 16.056825],
+        [15.6474325, 15.697544],
+        [15.435223, 15.398889]
+      ],
+      "baselineMedianMs": 15.664009,
+      "candidateMedianMs": 15.755138,
+      "changePercent": 0.5817731590926245,
+      "aaNoisePercent": 3.8212997882418165,
+      "verdict": "pass"
+    },
+    "distinct": {
+      "aaRoundPairsMs": [
+        [88.9301135, 88.0925615],
+        [89.0150785, 89.715928],
+        [88.657348, 88.5576135]
+      ],
+      "abRoundPairsMs": [
+        [90.134203, 89.0801485],
+        [90.1545255, 91.2720785],
+        [90.0509365, 90.456842],
+        [88.832602, 89.676974],
+        [87.978465, 88.7096545]
+      ],
+      "baselineMedianMs": 90.0509365,
+      "candidateMedianMs": 89.676974,
+      "changePercent": -0.4152788572056365,
+      "aaNoisePercent": 0.9418092106674436,
+      "verdict": "pass"
+    },
+    "publicRead": {
+      "aaRoundPairsMs": [
+        [110.069276, 109.8856095],
+        [110.896639, 109.0980215],
+        [112.172103, 113.1588395]
+      ],
+      "abRoundPairsMs": [
+        [113.7548735, 112.4941355],
+        [111.7754445, 112.9748015],
+        [106.779, 108.0764145],
+        [109.48355, 107.740227],
+        [109.3900655, 111.797579]
+      ],
+      "baselineMedianMs": 109.48355,
+      "candidateMedianMs": 111.797579,
+      "changePercent": 2.1135860136067164,
+      "aaNoisePercent": 1.6218863945913542,
+      "verdict": "pass"
+    },
+    "distinctIngest": {
+      "aaRoundPairsMs": [
+        [302.020953, 307.6926525],
+        [305.6376465, 307.108138],
+        [311.360539, 310.3341475]
+      ],
+      "abRoundPairsMs": [
+        [308.136321, 304.152802],
+        [306.1996415, 309.025963],
+        [309.21303, 304.0206005],
+        [308.050675, 302.4899185],
+        [301.783657, 300.7253765]
+      ],
+      "baselineMedianMs": 308.050675,
+      "candidateMedianMs": 304.0206005,
+      "changePercent": -1.3082505013176982,
+      "aaNoisePercent": 1.8779159007554114,
+      "verdict": "pass"
+    }
+  },
+  "sweep": {
+    "distinctLiveStrings": 1000000,
+    "originalColdPauseMs": 68.617255,
+    "freshColdPauseMs": 67.978125,
+    "freshPostWarmupSamplesMs": [
+      45.230203, 43.900431, 44.403165, 43.94561, 44.247287, 43.891432, 43.861292
+    ],
+    "maximumObservedPauseMs": 68.617255,
+    "interpretation": "All-live rebuild is the maximal surviving-text-copy workload at this 1M-cell scale. Observed maximum is not a universal latency guarantee. Sweeps scan physical roots and rebuild the live index; memory and pause still scale with retained roots and historical metadata."
+  },
+  "retainedStringOwnersAfterLifetimeWorkload": {
+    "baseline": { "logicalBytes": 61377780, "allocatedBytes": 84312948 },
+    "candidate": { "logicalBytes": 192675, "allocatedBytes": 353024 },
+    "owners": ["wasm.string-pool.utf8", "wasm.string-pool.spans", "wasm.string-index"],
+    "interpretation": "Rust-owned text/index allocation, excluding unchanged dense cell buffers, history and committed WASM page high-water marks. Baseline retains dead text from the initial cleared 1M-row import as well as subsequent unique edits; candidate reclaims both."
+  },
+  "verdict": "pass: all six steady-state changes are below 3%; the 1M distinct all-live sweep and retained ownership reduction are reported separately"
+}
