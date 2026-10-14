@@ -4230,6 +4230,10 @@ removed; use `setBlockPacked` or `setColumnBlockPacked`.
 each other show `#CYCLE!`.
 - With a windowed datasource, a visible formula that reads an off-screen column
 no longer stays `#LOADING!`.
+- With a windowed datasource, a visible formula that reads a frozen row or a
+merged cell no longer shows a loading marker or a stale value, and the cells
+visible formulas read stay loaded while they are on screen.
+- Exports, `getRange`, and find no longer unload cells that are on screen.
 - `FILTER` works in debug builds when its input is smaller than its size bound.
 - Decoded lookup ranges are released when recalculation ends.
 
