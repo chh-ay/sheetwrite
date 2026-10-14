@@ -81,8 +81,14 @@ export class ReadWindowController {
   private formulaBands = EMPTY_BANDS;
   private pinnedSheet: SheetId | null = null;
   private destroyed = false;
+  private readonly stopMemoryRelease: (() => void) | undefined;
 
-  constructor(private readonly options: ReadWindowControllerOptions) {}
+  constructor(private readonly options: ReadWindowControllerOptions) {
+    this.stopMemoryRelease = storeEngine(options.store)?.onMemoryRelease(() => {
+      this.invalidateData();
+      this.schedule();
+    });
+  }
 
   get geometryVersion(): number {
     return this.options.storeEpoch() + this.paintInvalidationEpoch + this.dataInvalidationEpoch;
@@ -140,6 +146,7 @@ export class ReadWindowController {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.stopMemoryRelease?.();
     if (this.pinnedSheet !== null) {
       storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
       this.pinnedSheet = null;

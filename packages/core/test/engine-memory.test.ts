@@ -55,7 +55,9 @@ describe("explicit engine memory release", () => {
       expect(report.wasmBytesAfter).toBeGreaterThan(0);
       expect(report.pauseMs).toBeGreaterThanOrEqual(0);
       expect(first.exportSnapshot()).toEqual(snapshot);
-      expect(first.getVisibleWindow("s1", { start: 0, end: 8 }, [0, 1, 2]).values).toEqual(values);
+      const refreshed = first.getVisibleWindow("s1", { start: 0, end: 8 }, [0, 1, 2]);
+      expect(refreshed.values).toEqual(values);
+      expect(refreshed.stringPoolEpoch).not.toBe(window.stringPoolEpoch);
       expect(changes).toBe(0);
       expect(second.getCell(address(0, 0)).resolved).toBe("other workbook");
       first.applyTransaction({
@@ -102,4 +104,18 @@ describe("explicit engine memory release", () => {
       store.dispose();
     }
   });
+
+  for (const engine of ["wasm", "formulas"]) {
+    it(`keeps ${engine} stores and history atomic on failure and waits for datasource loads`, async () => {
+      const probe = new URL("./engine-memory-probe.ts", import.meta.url).pathname;
+      const process = Bun.spawn(["bun", probe, engine], { stdout: "pipe", stderr: "pipe" });
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(process.stdout).text(),
+        new Response(process.stderr).text(),
+        process.exited,
+      ]);
+      expect(exitCode, `Memory release probe failed:\n${stderr}`).toBe(0);
+      expect(JSON.parse(stdout)).toEqual({ engine, atomic: true, waitedForPage: true });
+    });
+  }
 });

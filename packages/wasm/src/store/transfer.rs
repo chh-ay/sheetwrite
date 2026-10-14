@@ -55,6 +55,7 @@ impl CellStore {
         let mut input = Reader::new(bytes, STORE_TAG)?;
         let mut store = Self::new();
         store.strings = input.strings()?;
+        store.strings.epoch = store.strings.epoch.wrapping_add(1);
         for _ in 0..input.count()? { store.sheet_names.push(input.text()?); store.sheet_alive.push(input.bool()?); }
         store.sheet_lookup = read_names(&mut input)?;
         store.sheet_ids = read_names(&mut input)?;
@@ -94,8 +95,8 @@ impl CellStore {
 impl CellStore {
     /// Export only live state, not allocator slack or a dependency-index cache.
     #[wasm_bindgen(js_name = exportMemoryState)]
-    pub fn export_memory_state(&self) -> Result<Vec<u8>, JsError> {
-        if self.loading_page != 0 || self.active_mutation_revision.is_some() { return Err(JsError::new("engine memory release requires an idle store")); }
+    pub fn export_memory_state(&self) -> Vec<u8> {
+        if self.loading_page != 0 || self.active_mutation_revision.is_some() { wasm_bindgen::throw_str("engine memory release requires an idle store"); }
         let mut out = Writer::new(STORE_TAG);
         out.strings(&self.strings);
         out.usize(self.sheet_names.len());
@@ -120,12 +121,48 @@ impl CellStore {
             out.usize(data.formulas.len());
             for (&(row, col), entry) in &data.formulas { out.u32(row); out.u32(col); write_formula(&mut out, entry, sheet as u32); }
         }
-        Ok(out.0)
+        out.0
     }
 
     /// Import into a fresh instance; failure never mutates the source store.
     #[wasm_bindgen(js_name = importMemoryState)]
-    pub fn import_memory_state(bytes: &[u8]) -> Result<CellStore, JsError> {
-        Self::read_memory_state(bytes).map_err(|error| JsError::new(&error))
+    pub fn import_memory_state(bytes: &[u8]) -> CellStore {
+        Self::read_memory_state(bytes).unwrap_or_else(|error| wasm_bindgen::throw_str(&error))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn memory_transfer_preserves_cached_results_and_rebuilds_dependencies() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 5);
+        original.set_number(0, 0, 0, 41.0, 7);
+        original.set_formula(0, 0, 1, "=A1+1", 3);
+        original.set_formula(0, 1, 1, "=NOW()", 0);
+        original.recompute_changed();
+        let cached_time = original.get_cell(0, 1, 1).num();
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::import_memory_state(&bytes);
+        assert_eq!(replacement.get_cell(0, 0, 0).style(), 7);
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 42.0);
+        assert_eq!(replacement.get_cell(0, 1, 1).num().to_bits(), cached_time.to_bits());
+        replacement.set_number(0, 0, 0, 99.0, 7);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
+        assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_rejects_partial_payloads() {
+        let mut original = CellStore::new();
+        original.add_sheet(1, 1);
+        original.set_number(0, 0, 0, 5.0, 0);
+        let bytes = original.export_memory_state();
+        for length in 0..bytes.len() {
+            assert!(CellStore::read_memory_state(&bytes[..length]).is_err());
+        }
     }
 }

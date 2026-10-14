@@ -351,6 +351,9 @@ export class StoreDataEngine {
     CompactRangeHistory,
     { sheetHandle: number; replace(resource: RangeSnapshot): void }
   >();
+  private pendingPageRequests = 0;
+  private pageIdleWaiters: Array<() => void> | undefined;
+  private readonly memoryReleaseListeners = new Set<() => void>();
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
@@ -3145,6 +3148,35 @@ export class StoreDataEngine {
     this.wasm.recomputeChanged();
   }
 
+  beginPageRequest(): void {
+    this.pendingPageRequests += 1;
+  }
+
+  endPageRequest(): void {
+    this.pendingPageRequests -= 1;
+    if (this.pendingPageRequests === 0) {
+      const waiters = this.pageIdleWaiters;
+      this.pageIdleWaiters = undefined;
+      if (waiters) for (const resolve of waiters) resolve();
+    }
+  }
+
+  waitForPageLoads(): Promise<void> | undefined {
+    if (this.disposed || this.pendingPageRequests === 0) return undefined;
+    const { promise, resolve } = Promise.withResolvers<void>();
+    (this.pageIdleWaiters ??= []).push(resolve);
+    return promise;
+  }
+
+  onMemoryRelease(listener: () => void): () => void {
+    this.memoryReleaseListeners.add(listener);
+    return () => this.memoryReleaseListeners.delete(listener);
+  }
+
+  notifyMemoryRelease(): void {
+    for (const listener of this.memoryReleaseListeners) listener();
+  }
+
   /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
   prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
     if (this.disposed) return null;
@@ -3196,6 +3228,7 @@ export class StoreDataEngine {
     this.committedBytesAfterDispose = committed > 0 ? committed : null;
     this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
     for (const history of this.rangeHistory.keys()) history.dispose();
+    this.memoryReleaseListeners.clear();
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();

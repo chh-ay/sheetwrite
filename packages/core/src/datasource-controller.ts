@@ -1388,6 +1388,7 @@ export class DatasourceController {
     };
     this.activeIds.set(id, activeRequest);
     this.requests.add(activeRequest);
+    storeEngine(loadable)?.beginPageRequest();
 
     const requestedRows = end - start;
     this.telemetry.requests += 1;
@@ -1807,6 +1808,7 @@ export class DatasourceController {
     request.released = true;
     this.requests.delete(request);
     this.activeIds.delete(request.id);
+    if (this.options.loadable) storeEngine(this.options.loadable)?.endPageRequest();
     request.releaseRevision();
   }
 

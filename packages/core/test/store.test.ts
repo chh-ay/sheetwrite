@@ -5,6 +5,7 @@ import {
   validateTransactionResources,
   validateWorkbookSnapshot,
 } from "../src/document-protocol.js";
+import { releaseEngineMemory } from "../src/engine-memory.js";
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
@@ -1345,7 +1346,7 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
-  it("allocates no cell buffers up front and keeps dirty chunks resident", () => {
+  it("migrates resident paged chunks and dirty overlays without loading absent clean pages", async () => {
     const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
       storage: "paged",
       chunkRows: 4,
@@ -1389,6 +1390,17 @@ describe("paged datasource storage", () => {
     // One viewport-pinned chunk, one dirty chunk, and at most one clean victim.
     expect(store.getPagedStats("s1").chunks).toBeLessThanOrEqual(3);
     expect(store.getCellLoadState(addr(4, 0))).toBe("unloaded");
+    const stats = store.getPagedStats("s1");
+    await releaseEngineMemory();
+    expect(store.getPagedStats("s1")).toEqual(stats);
+    expect(store.getCell(addr(0, 1)).resolved).toBe(99);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("local-edit");
+    expect(store.getCellLoadState(addr(4, 0))).toBe("unloaded");
+    expect(store.getCell(addr(12, 2)).resolved).toBe("B");
+    expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
+    store.loadPage("s1", 4, NAME_SOURCE_COLUMN_BAND, [{ name: "reloaded after release" }]);
+    expect(store.getCell(addr(4, 0)).resolved).toBe("reloaded after release");
+    expect(store.getCell(addr(0, 1)).resolved).toBe(99);
 
     store.acknowledgeOperations([
       { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } },

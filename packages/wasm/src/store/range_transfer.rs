@@ -44,7 +44,7 @@ impl CellStore {
 #[wasm_bindgen]
 impl CellStore {
     #[wasm_bindgen(js_name = importRangeMemoryState)]
-    pub fn import_range_memory_state(&self, bytes: &[u8], sheet: u32, row_start: u32, col_start: u32) -> Result<RangeSnapshot, JsError> {
-        self.read_range_memory(bytes, sheet, row_start, col_start).map_err(|error| JsError::new(&error))
+    pub fn import_range_memory_state(&self, bytes: &[u8], sheet: u32, row_start: u32, col_start: u32) -> RangeSnapshot {
+        self.read_range_memory(bytes, sheet, row_start, col_start).unwrap_or_else(|error| wasm_bindgen::throw_str(&error))
     }
 }
