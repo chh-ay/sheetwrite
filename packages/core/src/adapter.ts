@@ -223,13 +223,17 @@ export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> {
   wasmSource?: SheetwriteInitializationProps["wasmSource"];
 }
 
-/** Framework scheduling and imperative-handle publication. */
+/** Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication. */
 export interface GridPublicationAdapter {
   /** Resolves only after the imperative handle is visible to consumers. */
   publish(grid: Grid | null): void | Promise<void>;
   setInitializationState(state: "loading" | "ready" | "error"): void;
-  /** Receives asynchronous construction and consumer errors, never initialization errors. */
-  reportError(error: unknown): void;
+  /**
+   * Receives asynchronous construction or consumer failures unchanged.
+   * The value may be any thrown value, including a SheetwriteError from construction;
+   * it is never reclassified as an initialization error.
+   */
+  reportConsumerFailure(thrown: unknown): void;
 }
 
 /** Owns adapter attachment and monotonically numbered Grid generations. */
@@ -263,7 +267,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     let failed = false;
     try {
       const pending = publication.publish(null);
-      if (pending) void pending.catch(publication.reportError);
+      if (pending) void pending.catch(publication.reportConsumerFailure);
     } catch (error) {
       failure = error;
       failed = true;
@@ -309,7 +313,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
     try {
       const pending = publication.publish(created.grid);
       if (pending) {
-        void pending.then(ready, failed).catch(publication.reportError);
+        void pending.then(ready, failed).catch(publication.reportConsumerFailure);
       } else {
         ready();
       }
@@ -332,7 +336,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
           try {
             create();
           } catch (error) {
-            publication.reportError(error);
+            publication.reportConsumerFailure(error);
           }
         },
         (error: SheetwriteError) => {
@@ -341,7 +345,7 @@ export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId
           handlers.onInitializationError?.(error);
         },
       )
-      .catch(publication.reportError);
+      .catch(publication.reportConsumerFailure);
     create();
   }
 

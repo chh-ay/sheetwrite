@@ -22,33 +22,33 @@ it("only announces a still-current published generation and applies live changes
   const publication = Promise.withResolvers<void>();
   const ready: GridReadyEvent[] = [];
   const errors: unknown[] = [];
-  let published: Grid | null = null;
+  const published: { grid: Grid | null } = { grid: null };
   const lifetime = createAdapterGridController(
     { onReady: (event) => ready.push(event) },
     {
       publish(grid) {
-        published = grid;
+        published.grid = grid;
         if (grid) return publication.promise;
       },
       setInitializationState() {},
-      reportError: (error) => errors.push(error),
+      reportConsumerFailure: (error) => errors.push(error),
     },
   );
   const options = { workbook: makeWorkbook(10) };
   lifetime.mount(host, { options });
   lifetime.update({ options: { ...options, theme: { bg: "#102030" } } });
-  expect(published?.getEffectiveTheme().bg).toBe("#102030");
+  expect(published.grid?.getEffectiveTheme().bg).toBe("#102030");
   lifetime.unmount();
   lifetime.mount(host, { options });
   publication.resolve();
   await Promise.resolve();
   await Promise.resolve();
   expect(ready.map((event) => event.generation)).toEqual([2]);
-  expect(ready[0]?.grid).toBe(published);
+  expect(ready[0]?.grid ?? null).toBe(published.grid);
   expect(errors).toEqual([]);
   lifetime.unmount();
   lifetime.unmount();
-  expect(published).toBeNull();
+  expect(published.grid).toBeNull();
   expect(host.childElementCount).toBe(0);
 });
 
@@ -72,7 +72,7 @@ for (const failureAt of ["publication", "ready"] as const) {
           if (grid && failureAt === "publication") throw failure;
         },
         setInitializationState() {},
-        reportError(error) {
+        reportConsumerFailure(error) {
           throw error;
         },
       },

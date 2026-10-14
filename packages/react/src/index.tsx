@@ -1,12 +1,14 @@
 import type { CellScalar, Grid, GridOptions } from "@sheetwrite/core";
 import {
   type AdapterGridController,
+  type AdapterGridInput,
   createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
   extractGridOptions,
   type GridAdapterEventHandlers,
   type GridControllerHandlers,
+  type GridPublicationAdapter,
   type GridSizeProps,
   gridSizeStyle,
   type RowBridge,
@@ -232,11 +234,13 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
             publishGrid(publishedRef.current, grid);
           },
           setInitializationState,
-          reportError,
-        },
+          reportConsumerFailure(thrown) {
+            reportError(thrown);
+          },
+        } satisfies GridPublicationAdapter,
       );
     }
-    const committedInput = useRef({
+    const committedInput = useRef<AdapterGridInput>({
       options: extractGridOptions({ ...props }),
       rowBridge,
       wasmSource,

@@ -8,7 +8,7 @@ description: "Converts adapter size props into a host element style object."
 Converts adapter size props into a host element style object.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L169"><code>packages/core/src/adapter.ts#L169</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L170"><code>packages/core/src/adapter.ts#L170</code></a></dd></div>
 </dl>
 
 ## Declaration

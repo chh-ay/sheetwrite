@@ -1,6 +1,12 @@
 <script lang="ts">
 import { isSheetwriteReady } from "@sheetwrite/core";
-import { createAdapterGridController, gridSizeStyle } from "@sheetwrite/core/adapter";
+import {
+  type AdapterGridInput,
+  createAdapterGridController,
+  type GridAdapterEventHandlers,
+  type GridPublicationAdapter,
+  gridSizeStyle,
+} from "@sheetwrite/core/adapter";
 import { untrack } from "svelte";
 import type { SheetwriteGridProps as Props } from "./props.js";
 
@@ -57,7 +63,7 @@ function forwardCommandStateChange(
   onCommandStateChange?.(event);
 }
 
-const handlers = {
+const handlers: GridAdapterEventHandlers = {
   onGridChange: (event: Parameters<NonNullable<typeof onGridChange>>[0]) => onGridChange?.(event),
   onRowDelta: (event: Parameters<NonNullable<typeof onRowDelta>>[0]) => onRowDelta?.(event),
   onSelectionChange: (event: Parameters<NonNullable<typeof onSelectionChange>>[0]) =>
@@ -94,11 +100,13 @@ const lifetime = createAdapterGridController(handlers, {
   setInitializationState(state) {
     loading = state !== "ready";
   },
-  reportError,
-});
+  reportConsumerFailure(thrown) {
+    reportError(thrown);
+  },
+} satisfies GridPublicationAdapter);
 let attached = false;
 $effect(() => {
-  const input = {
+  const input: AdapterGridInput = {
     options: {
       workbook, data, datasource, datasourceStorage, renderer, workerUrl, presentation,
       protectionResolver, mutationPolicy, transactionResourceLimits, hyperlinkActivation,

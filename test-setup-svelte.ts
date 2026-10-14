@@ -1,8 +1,12 @@
+import { realpathSync } from "node:fs";
 import { compile } from "svelte/compiler";
 
 const typescript = new Bun.Transpiler({ loader: "ts", target: "browser" });
-const svelteClient = new URL("./src/index-client.js", import.meta.resolve("svelte/package.json"))
-  .pathname;
+// Bun may cache the server entry before this preload's resolver runs. Compiled
+// components must explicitly import the client entry so untrack is not a no-op.
+const svelteClient = realpathSync(
+  new URL("./src/index-client.js", import.meta.resolve("svelte/package.json")).pathname,
+);
 
 Bun.plugin({
   name: "svelte-test-compiler",
@@ -21,7 +25,13 @@ Bun.plugin({
         dev: true,
         accessors: true,
       });
-      return { contents: result.js.code, loader: "js" };
+      return {
+        contents: result.js.code.replace(
+          /from (["'])svelte\1/g,
+          `from ${JSON.stringify(svelteClient)}`,
+        ),
+        loader: "js",
+      };
     });
   },
 });

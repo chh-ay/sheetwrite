@@ -14,12 +14,14 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import {
+  type AdapterGridInput,
   createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
   extractGridOptions,
   type GridAdapterEventHandlers,
   type GridControllerHandlers,
+  type GridPublicationAdapter,
   type GridReadyEvent,
   gridSizeStyle,
   type RowBridge,
@@ -320,8 +322,10 @@ const SheetwriteGridComponent = defineComponent({
       setInitializationState() {
         // Fallback follows exposed Grid availability in Vue.
       },
-      reportError,
-    });
+      reportConsumerFailure(thrown) {
+        reportError(thrown);
+      },
+    } satisfies GridPublicationAdapter);
     onMounted(() => {
       if (host.value) {
         lifetime.mount(host.value, {
@@ -333,7 +337,7 @@ const SheetwriteGridComponent = defineComponent({
     });
     onBeforeUnmount(() => lifetime.unmount());
     watch(
-      () => ({
+      (): AdapterGridInput => ({
         options: extractGridOptions({ ...props }),
         rowBridge: props.rowBridge,
         wasmSource: props.wasmSource,

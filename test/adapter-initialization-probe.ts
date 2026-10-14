@@ -9,7 +9,7 @@ import type { GridReadyEvent } from "../packages/core/dist/adapter.js";
 import { type Grid, SheetwriteError } from "../packages/core/dist/index.js";
 import { installCanvasTestStubs } from "../packages/core/src/testing.js";
 import { SheetwriteGrid as ReactSheetwriteGrid } from "../packages/react/src/index.js";
-import SvelteLifecycleHarness from "../packages/svelte/test/LifecycleHarness.svelte";
+import SvelteLifecycleHarness from "../packages/svelte/test/InitializationHarness.svelte";
 import {
   type SheetwriteGridExpose,
   SheetwriteGrid as VueSheetwriteGrid,
@@ -37,16 +37,20 @@ interface InitializationDriver {
 const workbook = makeConformanceWorkbook();
 
 function assertPendingLiveOptionsAtReady(grid: Grid): void {
-  const addr = { sheet: "lifecycle", row: 0, col: 0 };
-  const before = grid.store.getCell(addr).resolved;
-  grid.applyTransaction({
-    patches: [{ op: "set", addr, value: { kind: "literal", value: "must not write" } }],
+  let edits = 0;
+  const unsubscribe = grid.on("edit-begin", () => {
+    edits += 1;
   });
-  assert.equal(
-    grid.store.getCell(addr).resolved,
-    before,
-    "pending readOnly must be applied before ready",
-  );
+  try {
+    grid.beginEdit(1, 0, "must not write");
+    assert.equal(edits, 0, "pending readOnly must be applied before ready");
+    grid.setReadOnly(false);
+    grid.beginEdit(1, 0, "positive control");
+    assert.equal(edits, 1, "the ready grid must have an editable cell");
+    grid.setReadOnly(true);
+  } finally {
+    unsubscribe();
+  }
 }
 
 async function mountReact(
@@ -156,6 +160,7 @@ async function mountVue(
 
 interface SvelteLifecycleHarnessApi {
   update(props: SvelteInitializationProps): void;
+  updateReadOnly(readOnly: boolean): void;
   getGrid(): Grid | undefined;
   getPublishedAtReady(): Array<Grid | null | undefined>;
 }
@@ -180,6 +185,7 @@ async function mountSvelte(
     workbook,
     wasmSource: source,
     fallbackLabel: "loading",
+    readOnly: false,
     onInitializationError: handler,
     onReady: (event) => {
       assertPendingLiveOptionsAtReady(event.grid);
@@ -193,6 +199,8 @@ async function mountSvelte(
   flushSync();
   await Promise.resolve();
   flushSync();
+  let committedSource = source;
+  let committedHandler = handler;
 
   return {
     host,
@@ -200,12 +208,18 @@ async function mountSvelte(
     publishedAtReady: component.getPublishedAtReady(),
     getPublishedGrid: () => component.getGrid(),
     update: async (nextSource, nextHandler, readOnly = false) => {
-      component.update({
-        ...initialProps,
-        wasmSource: nextSource,
-        onInitializationError: nextHandler,
-        readOnly,
-      });
+      if (nextSource === committedSource && nextHandler === committedHandler) {
+        component.updateReadOnly(readOnly);
+      } else {
+        component.update({
+          ...initialProps,
+          wasmSource: nextSource,
+          onInitializationError: nextHandler,
+          readOnly,
+        });
+        committedSource = nextSource;
+        committedHandler = nextHandler;
+      }
       flushSync();
       await Promise.resolve();
       flushSync();
@@ -234,6 +248,25 @@ const restoreCanvas = installCanvasTestStubs();
 // used only at this test seam to make stale asynchronous work deterministic.
 
 try {
+  if (process.env.ADAPTER_PENDING_LIVE_ONLY === "1") {
+    const source = Promise.withResolvers<ArrayBuffer>();
+    const errorHandler: InitializationErrorHandler = (error) => {
+      throw error;
+    };
+    const pending = await mountAdapter(source.promise, errorHandler);
+    await pending.update(source.promise, errorHandler, true);
+    source.resolve(
+      await Bun.file(
+        new URL("../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url),
+      ).arrayBuffer(),
+    );
+    await waitFor(() => pending.ready.length === 1, "pending live options were not ready");
+    assert.equal(pending.publishedAtReady[0], pending.ready[0]?.grid);
+    await pending.unmount();
+    restoreCanvas();
+    process.stdout.write('{"pendingLiveOptions":true}\n');
+    process.exit(0);
+  }
   const staleSource = Promise.withResolvers<ArrayBuffer>();
   let staleErrors = 0;
   const stale = await mountAdapter(staleSource.promise, () => {
@@ -315,8 +348,17 @@ try {
       },
     ],
   });
-  await replacement.update(new Uint8Array([2]), reportCurrentFailure);
-  await Bun.sleep(10);
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...arguments_) => warnings.push(arguments_);
+  try {
+    await replacement.update(new Uint8Array([2]), reportCurrentFailure);
+    await Bun.sleep(10);
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(warnings.length, 1, "changed explicit source must retain loader diagnostics");
+  assert.match(String(warnings[0]?.[0]), /keeping the first module/);
   assert.equal(replacement.getPublishedGrid(), liveGrid);
   assert.deepEqual(liveGrid.getSelection(), selection);
   assert.equal(liveGrid.store.getCell(selectedAddress).resolved, "preserved edit");

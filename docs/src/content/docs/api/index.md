@@ -10,7 +10,7 @@ The package `exports` maps define this inventory. Supported, internal, asset, an
 <thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
 <tbody>
 <tr><td><a href="/docs/api/core/"><code>@sheetwrite/core</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>315</td></tr>
-<tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>51</td></tr>
+<tr><td><a href="/docs/api/core-adapter/"><code>@sheetwrite/core/adapter</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>55</td></tr>
 <tr><td><a href="/docs/api/core-browser/"><code>@sheetwrite/core/browser</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>4</td></tr>
 <tr><td><a href="/docs/api/core-shell/"><code>@sheetwrite/core/shell</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>13</td></tr>
 <tr><td><a href="/docs/api/core-shell-css/"><code>@sheetwrite/core/shell.css</code></a></td><td><span class="api-status" data-status="asset">asset</span></td><td>0</td></tr>

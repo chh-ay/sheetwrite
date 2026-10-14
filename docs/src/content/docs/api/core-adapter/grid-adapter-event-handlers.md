@@ -8,7 +8,7 @@ description: "Framework-neutral readiness, change, and error callbacks shared by
 Framework-neutral readiness, change, and error callbacks shared by adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L106"><code>packages/core/src/adapter.ts#L106</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L107"><code>packages/core/src/adapter.ts#L107</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -215,6 +215,7 @@ export interface GridAdapterEventHandlers<
 <p class="api-consumers-label">Public exports naming <code>GridAdapterEventHandlers</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-adapter/create-adapter-grid-controller/"><code>createAdapterGridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
 <li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
 </ul>

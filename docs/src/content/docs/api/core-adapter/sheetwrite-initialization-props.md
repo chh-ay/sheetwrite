@@ -8,7 +8,7 @@ description: "Optional explicit WASM source and initialization error callback fo
 Optional explicit WASM source and initialization error callback for adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L140"><code>packages/core/src/adapter.ts#L140</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L141"><code>packages/core/src/adapter.ts#L141</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
@@ -65,6 +65,7 @@ export interface SheetwriteInitializationProps {
 <p class="api-consumers-label">Public exports naming <code>SheetwriteInitializationProps</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-adapter/adapter-grid-input/"><code>AdapterGridInput</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/vue/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>

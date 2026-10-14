@@ -8,7 +8,7 @@ description: "Returns the first reset-sensitive adapter input that changed, if a
 Returns the first reset-sensitive adapter input that changed, if any.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L192"><code>packages/core/src/adapter.ts#L192</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L193"><code>packages/core/src/adapter.ts#L193</code></a></dd></div>
 </dl>
 
 ## Declaration

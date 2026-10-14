@@ -262,7 +262,10 @@ interface InitializationProbeResult {
   editPreserved: boolean;
 }
 
-async function runInitializationProbe(adapter: string): Promise<InitializationProbeResult> {
+async function runInitializationProbe(
+  adapter: string,
+  pendingLive = false,
+): Promise<InitializationProbeResult | { pendingLiveOptions: true }> {
   const repositoryRoot = new URL("../", import.meta.url).pathname;
   const probe = new URL("./adapter-initialization-probe.ts", import.meta.url).pathname;
   const domSetup = new URL("../test-setup.ts", import.meta.url).pathname;
@@ -271,6 +274,7 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
     ["bun", "--preload", domSetup, "--preload", svelteSetup, probe, adapter],
     {
       cwd: repositoryRoot,
+      env: { ...Bun.env, ADAPTER_PENDING_LIVE_ONLY: pendingLive ? "1" : "0" },
       stdout: "pipe",
       stderr: "pipe",
     },
@@ -286,6 +290,12 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
 
 export function runSharedAdapterLifecycleContract(adapter: string, mount: MountAdapter): void {
   describe(`${adapter} shared lifecycle contract`, () => {
+    it("applies pending committed live options before publishing readiness", async () => {
+      expect(await runInitializationProbe(adapter.toLowerCase(), true)).toEqual({
+        pendingLiveOptions: true,
+      });
+    });
+
     it("shares fallback, current-error, retry, and stale-generation semantics", async () => {
       expect(await runInitializationProbe(adapter.toLowerCase())).toEqual({
         adapter: adapter.toLowerCase(),
