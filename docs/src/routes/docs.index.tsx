@@ -70,7 +70,7 @@ function DocsOverview() {
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
             <h2 id="new-in-release">New in 0.5.0</h2>
-            <a href="/docs/start/whats-new/">Read the release notes →</a>
+            <a href="/docs/releases/0.5.0/">Read the release notes →</a>
           </div>
           <div className="sw-doc-destinations">
             <a href="/docs/guides/analysis-formulas/">
@@ -90,7 +90,7 @@ function DocsOverview() {
               </strong>
               <span>A1# follows a spill as it grows, and array constants spill in place.</span>
             </a>
-            <a href="/docs/start/whats-new/#upgrade-checklist">
+            <a href="/docs/releases/0.5.0/#upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>

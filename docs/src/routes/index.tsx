@@ -331,7 +331,7 @@ function Landing() {
                 <li key={note}>{note}</li>
               ))}
               <li>
-                <a href="/docs/start/whats-new/">Read what is new and the upgrade checklist →</a>
+                <a href="/docs/releases/0.5.0/">Read what is new and the upgrade checklist →</a>
               </li>
             </ul>
           </div>
@@ -394,7 +394,7 @@ function Landing() {
               <p className="sw-landing-footer__title">Start</p>
               <a href="/docs/start/installation/">Installation</a>
               <a href="/docs/start/first-grid/">First grid</a>
-              <a href="/docs/start/whats-new/">What's new</a>
+              <a href="/docs/releases/0.5.0/">What's new</a>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>
