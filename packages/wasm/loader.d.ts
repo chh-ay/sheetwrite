@@ -1,3 +1,5 @@
+import type * as WasmExports from "./pkg/sheetwrite_wasm.js";
+
 export * from "./pkg/sheetwrite_wasm.js";
 
 /** Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`. */
@@ -22,3 +24,13 @@ export declare function load(
 
 /** Whether the WASM module has finished initializing. */
 export declare function isLoaded(): boolean;
+
+/** Engine objects and caches owned by one independently collectible WASM instance. */
+export type EngineInstance = Omit<typeof WasmExports, "default"> & {
+  getModule(): WebAssembly.Module;
+  getMemory(): WebAssembly.Memory;
+  functionNames?: () => string[];
+};
+
+/** Initialize a fresh engine; a compiled module can be reused without retaining its memory. */
+export declare function createEngine(source?: Parameters<typeof load>[0]): Promise<EngineInstance>;

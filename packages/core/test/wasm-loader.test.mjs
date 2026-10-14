@@ -70,4 +70,36 @@ describe("WASM loader lifecycle", () => {
     await loader.load(module);
     expect(loader.isLoaded()).toBe(true);
   });
+
+  for (const name of ["wasm", "formulas"]) {
+    it(`creates isolated ${name} instances from the first instance's compiled module`, async () => {
+      const { createEngine } = await import(`../../${name}/loader-node.mjs`);
+      const first = await createEngine();
+      const module = first.getModule();
+      expect(module).toBeInstanceOf(WebAssembly.Module);
+      const second = await createEngine(module);
+      expect(second.getModule()).toBe(module);
+      expect(second.getMemory()).not.toBe(first.getMemory());
+      const left = new first.CellStore();
+      const right = new second.CellStore();
+      try {
+        left.addSheet(1, 10);
+        right.addSheet(1, 10);
+        left.setNumber(0, 0, 0, 42);
+        right.setNumber(0, 0, 0, 7);
+        const a = left.getCell(0, 0, 0);
+        const b = right.getCell(0, 0, 0);
+        try {
+          expect(a.num).toBe(42);
+          expect(b.num).toBe(7);
+        } finally {
+          a.free();
+          b.free();
+        }
+      } finally {
+        left.free();
+        right.free();
+      }
+    });
+  }
 });

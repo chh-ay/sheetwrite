@@ -39,6 +39,7 @@
     "loader-state.mjs",
     "loader.d.ts",
     "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm_factory.js",
     "pkg/sheetwrite_wasm.d.ts",
     "pkg/sheetwrite_wasm_bg.wasm",
     "pkg/sheetwrite_wasm_bg.wasm.d.ts"
@@ -49,7 +50,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis",
+    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis && bun ../../scripts/wasm-factory.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf pkg"
