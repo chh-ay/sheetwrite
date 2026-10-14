@@ -9,43 +9,33 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VueRouteImport } from './routes/vue'
-import { Route as VanillaRouteImport } from './routes/vanilla'
-import { Route as SvelteRouteImport } from './routes/svelte'
-import { Route as ReactRouteImport } from './routes/react'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
+import { Route as ReactRouteImport } from './routes/react'
+import { Route as SvelteRouteImport } from './routes/svelte'
+import { Route as VanillaRouteImport } from './routes/vanilla'
+import { Route as VueRouteImport } from './routes/vue'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
-import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
-import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
-import { Route as TestRenderersRouteImport } from './routes/test.renderers'
-import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
-import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
-import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
-import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
-import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
-import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
-import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
-import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
-import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
-import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
-import { Route as DocsProofRouteImport } from './routes/docs.proof'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
+import { Route as DocsProofRouteImport } from './routes/docs.proof'
+import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
+import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
+import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
+import { Route as ShowcasesEngineRouteImport } from './routes/showcases.engine'
+import { Route as ShowcasesFormulasRouteImport } from './routes/showcases.formulas'
+import { Route as ShowcasesHostRowsRouteImport } from './routes/showcases.host-rows'
+import { Route as ShowcasesInteroperabilityRouteImport } from './routes/showcases.interoperability'
+import { Route as ShowcasesPerformanceRouteImport } from './routes/showcases.performance'
+import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
+import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
+import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
+import { Route as TestRenderersRouteImport } from './routes/test.renderers'
+import { Route as TestSemanticGridRouteImport } from './routes/test.semantic-grid'
+import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
 import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
 
-const VueRoute = VueRouteImport.update({
-  id: '/vue',
-  path: '/vue',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VanillaRoute = VanillaRouteImport.update({
-  id: '/vanilla',
-  path: '/vanilla',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SvelteRoute = SvelteRouteImport.update({
-  id: '/svelte',
-  path: '/svelte',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReactRoute = ReactRouteImport.update({
@@ -53,14 +43,19 @@ const ReactRoute = ReactRouteImport.update({
   path: '/react',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SvelteRoute = SvelteRouteImport.update({
+  id: '/svelte',
+  path: '/svelte',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
-  id: '/showcases/',
-  path: '/showcases/',
+const VanillaRoute = VanillaRouteImport.update({
+  id: '/vanilla',
+  path: '/vanilla',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VueRoute = VueRouteImport.update({
+  id: '/vue',
+  path: '/vue',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
@@ -68,39 +63,44 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
   path: '/docs/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestXlsxRoute = TestXlsxRouteImport.update({
-  id: '/test/xlsx',
-  path: '/test/xlsx',
+const DocsSplatRoute = DocsSplatRouteImport.update({
+  id: '/docs/$',
+  path: '/docs/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestSemanticGridRoute = TestSemanticGridRouteImport.update({
-  id: '/test/semantic-grid',
-  path: '/test/semantic-grid',
+const DocsProofRoute = DocsProofRouteImport.update({
+  id: '/docs/proof',
+  path: '/docs/proof',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestRenderersRoute = TestRenderersRouteImport.update({
-  id: '/test/renderers',
-  path: '/test/renderers',
+const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
+  id: '/showcases/',
+  path: '/showcases/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestPrefetchRoute = TestPrefetchRouteImport.update({
-  id: '/test/prefetch',
-  path: '/test/prefetch',
+const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
+  id: '/showcases/collaboration',
+  path: '/showcases/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestFormulasEngineRoute = TestFormulasEngineRouteImport.update({
-  id: '/test/formulas-engine',
-  path: '/test/formulas-engine',
+const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
+  id: '/showcases/database',
+  path: '/showcases/database',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TestCollaborationRoute = TestCollaborationRouteImport.update({
-  id: '/test/collaboration',
-  path: '/test/collaboration',
+const ShowcasesEngineRoute = ShowcasesEngineRouteImport.update({
+  id: '/showcases/engine',
+  path: '/showcases/engine',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
-  id: '/showcases/performance',
-  path: '/showcases/performance',
+const ShowcasesFormulasRoute = ShowcasesFormulasRouteImport.update({
+  id: '/showcases/formulas',
+  path: '/showcases/formulas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShowcasesHostRowsRoute = ShowcasesHostRowsRouteImport.update({
+  id: '/showcases/host-rows',
+  path: '/showcases/host-rows',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesInteroperabilityRoute =
@@ -109,39 +109,39 @@ const ShowcasesInteroperabilityRoute =
     path: '/showcases/interoperability',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ShowcasesHostRowsRoute = ShowcasesHostRowsRouteImport.update({
-  id: '/showcases/host-rows',
-  path: '/showcases/host-rows',
+const ShowcasesPerformanceRoute = ShowcasesPerformanceRouteImport.update({
+  id: '/showcases/performance',
+  path: '/showcases/performance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesFormulasRoute = ShowcasesFormulasRouteImport.update({
-  id: '/showcases/formulas',
-  path: '/showcases/formulas',
+const TestCollaborationRoute = TestCollaborationRouteImport.update({
+  id: '/test/collaboration',
+  path: '/test/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesEngineRoute = ShowcasesEngineRouteImport.update({
-  id: '/showcases/engine',
-  path: '/showcases/engine',
+const TestFormulasEngineRoute = TestFormulasEngineRouteImport.update({
+  id: '/test/formulas-engine',
+  path: '/test/formulas-engine',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesDatabaseRoute = ShowcasesDatabaseRouteImport.update({
-  id: '/showcases/database',
-  path: '/showcases/database',
+const TestPrefetchRoute = TestPrefetchRouteImport.update({
+  id: '/test/prefetch',
+  path: '/test/prefetch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ShowcasesCollaborationRoute = ShowcasesCollaborationRouteImport.update({
-  id: '/showcases/collaboration',
-  path: '/showcases/collaboration',
+const TestRenderersRoute = TestRenderersRouteImport.update({
+  id: '/test/renderers',
+  path: '/test/renderers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DocsProofRoute = DocsProofRouteImport.update({
-  id: '/docs/proof',
-  path: '/docs/proof',
+const TestSemanticGridRoute = TestSemanticGridRouteImport.update({
+  id: '/test/semantic-grid',
+  path: '/test/semantic-grid',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DocsSplatRoute = DocsSplatRouteImport.update({
-  id: '/docs/$',
-  path: '/docs/$',
+const TestXlsxRoute = TestXlsxRouteImport.update({
+  id: '/test/xlsx',
+  path: '/test/xlsx',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestFrameworkLifecycleFrameworkRoute =
@@ -333,25 +333,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vue': {
-      id: '/vue'
-      path: '/vue'
-      fullPath: '/vue'
-      preLoaderRoute: typeof VueRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/vanilla': {
-      id: '/vanilla'
-      path: '/vanilla'
-      fullPath: '/vanilla'
-      preLoaderRoute: typeof VanillaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/svelte': {
-      id: '/svelte'
-      path: '/svelte'
-      fullPath: '/svelte'
-      preLoaderRoute: typeof SvelteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/react': {
@@ -361,18 +347,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReactRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/svelte': {
+      id: '/svelte'
+      path: '/svelte'
+      fullPath: '/svelte'
+      preLoaderRoute: typeof SvelteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/showcases/': {
-      id: '/showcases/'
-      path: '/showcases'
-      fullPath: '/showcases/'
-      preLoaderRoute: typeof ShowcasesIndexRouteImport
+    '/vanilla': {
+      id: '/vanilla'
+      path: '/vanilla'
+      fullPath: '/vanilla'
+      preLoaderRoute: typeof VanillaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vue': {
+      id: '/vue'
+      path: '/vue'
+      fullPath: '/vue'
+      preLoaderRoute: typeof VueRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/': {
@@ -382,95 +375,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/test/xlsx': {
-      id: '/test/xlsx'
-      path: '/test/xlsx'
-      fullPath: '/test/xlsx'
-      preLoaderRoute: typeof TestXlsxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/semantic-grid': {
-      id: '/test/semantic-grid'
-      path: '/test/semantic-grid'
-      fullPath: '/test/semantic-grid'
-      preLoaderRoute: typeof TestSemanticGridRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/renderers': {
-      id: '/test/renderers'
-      path: '/test/renderers'
-      fullPath: '/test/renderers'
-      preLoaderRoute: typeof TestRenderersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/prefetch': {
-      id: '/test/prefetch'
-      path: '/test/prefetch'
-      fullPath: '/test/prefetch'
-      preLoaderRoute: typeof TestPrefetchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/formulas-engine': {
-      id: '/test/formulas-engine'
-      path: '/test/formulas-engine'
-      fullPath: '/test/formulas-engine'
-      preLoaderRoute: typeof TestFormulasEngineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test/collaboration': {
-      id: '/test/collaboration'
-      path: '/test/collaboration'
-      fullPath: '/test/collaboration'
-      preLoaderRoute: typeof TestCollaborationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/performance': {
-      id: '/showcases/performance'
-      path: '/showcases/performance'
-      fullPath: '/showcases/performance'
-      preLoaderRoute: typeof ShowcasesPerformanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/interoperability': {
-      id: '/showcases/interoperability'
-      path: '/showcases/interoperability'
-      fullPath: '/showcases/interoperability'
-      preLoaderRoute: typeof ShowcasesInteroperabilityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/host-rows': {
-      id: '/showcases/host-rows'
-      path: '/showcases/host-rows'
-      fullPath: '/showcases/host-rows'
-      preLoaderRoute: typeof ShowcasesHostRowsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/formulas': {
-      id: '/showcases/formulas'
-      path: '/showcases/formulas'
-      fullPath: '/showcases/formulas'
-      preLoaderRoute: typeof ShowcasesFormulasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/engine': {
-      id: '/showcases/engine'
-      path: '/showcases/engine'
-      fullPath: '/showcases/engine'
-      preLoaderRoute: typeof ShowcasesEngineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/database': {
-      id: '/showcases/database'
-      path: '/showcases/database'
-      fullPath: '/showcases/database'
-      preLoaderRoute: typeof ShowcasesDatabaseRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/showcases/collaboration': {
-      id: '/showcases/collaboration'
-      path: '/showcases/collaboration'
-      fullPath: '/showcases/collaboration'
-      preLoaderRoute: typeof ShowcasesCollaborationRouteImport
+    '/docs/$': {
+      id: '/docs/$'
+      path: '/docs/$'
+      fullPath: '/docs/$'
+      preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/proof': {
@@ -480,11 +389,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsProofRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/docs/$': {
-      id: '/docs/$'
-      path: '/docs/$'
-      fullPath: '/docs/$'
-      preLoaderRoute: typeof DocsSplatRouteImport
+    '/showcases/': {
+      id: '/showcases/'
+      path: '/showcases'
+      fullPath: '/showcases/'
+      preLoaderRoute: typeof ShowcasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/collaboration': {
+      id: '/showcases/collaboration'
+      path: '/showcases/collaboration'
+      fullPath: '/showcases/collaboration'
+      preLoaderRoute: typeof ShowcasesCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/database': {
+      id: '/showcases/database'
+      path: '/showcases/database'
+      fullPath: '/showcases/database'
+      preLoaderRoute: typeof ShowcasesDatabaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/engine': {
+      id: '/showcases/engine'
+      path: '/showcases/engine'
+      fullPath: '/showcases/engine'
+      preLoaderRoute: typeof ShowcasesEngineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/formulas': {
+      id: '/showcases/formulas'
+      path: '/showcases/formulas'
+      fullPath: '/showcases/formulas'
+      preLoaderRoute: typeof ShowcasesFormulasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/host-rows': {
+      id: '/showcases/host-rows'
+      path: '/showcases/host-rows'
+      fullPath: '/showcases/host-rows'
+      preLoaderRoute: typeof ShowcasesHostRowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/interoperability': {
+      id: '/showcases/interoperability'
+      path: '/showcases/interoperability'
+      fullPath: '/showcases/interoperability'
+      preLoaderRoute: typeof ShowcasesInteroperabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/showcases/performance': {
+      id: '/showcases/performance'
+      path: '/showcases/performance'
+      fullPath: '/showcases/performance'
+      preLoaderRoute: typeof ShowcasesPerformanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/collaboration': {
+      id: '/test/collaboration'
+      path: '/test/collaboration'
+      fullPath: '/test/collaboration'
+      preLoaderRoute: typeof TestCollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/formulas-engine': {
+      id: '/test/formulas-engine'
+      path: '/test/formulas-engine'
+      fullPath: '/test/formulas-engine'
+      preLoaderRoute: typeof TestFormulasEngineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/prefetch': {
+      id: '/test/prefetch'
+      path: '/test/prefetch'
+      fullPath: '/test/prefetch'
+      preLoaderRoute: typeof TestPrefetchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/renderers': {
+      id: '/test/renderers'
+      path: '/test/renderers'
+      fullPath: '/test/renderers'
+      preLoaderRoute: typeof TestRenderersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/semantic-grid': {
+      id: '/test/semantic-grid'
+      path: '/test/semantic-grid'
+      fullPath: '/test/semantic-grid'
+      preLoaderRoute: typeof TestSemanticGridRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/xlsx': {
+      id: '/test/xlsx'
+      path: '/test/xlsx'
+      fullPath: '/test/xlsx'
+      preLoaderRoute: typeof TestXlsxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test/framework-lifecycle/$framework': {
