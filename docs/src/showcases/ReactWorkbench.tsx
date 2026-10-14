@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 /**
  * React controlled-analytics workbench. Consumes the shared analytics scenario
  * through `useAnalyticsWorkbench`: query/filter controls, formula entry with
@@ -383,13 +384,13 @@ export default function ReactWorkbench() {
                       onChange={onImportChange}
                     />
                   </label>
-                  <a
+                  <Link
                     className="sw-rwb-workflow__link"
                     data-testid="interop-link"
-                    href="/showcases/interoperability/"
+                    to="/showcases/interoperability/"
                   >
                     Fidelity proofs
-                  </a>
+                  </Link>
                 </fieldset>
               </div>
             </section>

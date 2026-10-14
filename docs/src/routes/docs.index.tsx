@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { DocsShell } from "../components/DocsShell.js";
 import { pageMeta } from "../lib/seo.js";
 
@@ -35,12 +35,20 @@ function DocsOverview() {
               Choose a package, mount a workbook, and listen for changes. Start with the setup guide
               for your framework.
             </p>
-            <a className="sw-doc-primary" href="/docs/start/installation/">
+            <Link
+              className="sw-doc-primary"
+              to="/docs/$/"
+              params={{ _splat: "start/installation" }}
+            >
               Install Sheetwrite <span aria-hidden="true">→</span>
-            </a>
-            <a className="sw-doc-secondary" href="/docs/start/first-grid/">
+            </Link>
+            <Link
+              className="sw-doc-secondary"
+              to="/docs/$/"
+              params={{ _splat: "start/first-grid" }}
+            >
               Read the quickstart
-            </a>
+            </Link>
           </div>
           <ol className="sw-doc-steps">
             <li>
@@ -70,10 +78,12 @@ function DocsOverview() {
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
             <h2 id="new-in-release">New in 0.5.0</h2>
-            <a href="/docs/releases/0.5.0/">Read the release notes →</a>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+              Read the release notes →
+            </Link>
           </div>
           <div className="sw-doc-destinations">
-            <a href="/docs/guides/analysis-formulas/">
+            <Link to="/docs/$/" params={{ _splat: "guides/analysis-formulas" }}>
               <span className="sw-doc-eyebrow">Full formula engine</span>
               <strong>
                 Analyze in the sheet <span aria-hidden="true">→</span>
@@ -82,28 +92,30 @@ function DocsOverview() {
                 GROUPBY, PIVOTBY, LAMBDA, regression, finance, and regex in the optional
                 @sheetwrite/formulas engine.
               </span>
-            </a>
-            <a href="/docs/guides/formulas/#spill-references">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/formulas" }} hash="spill-references">
               <span className="sw-doc-eyebrow">Both engines</span>
               <strong>
                 Spill references <span aria-hidden="true">→</span>
               </strong>
               <span>A1# follows a spill as it grows, and array constants spill in place.</span>
-            </a>
-            <a href="/docs/releases/0.5.0/#upgrade-checklist">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
               </strong>
               <span>What a persistence server and direct @sheetwrite/wasm users must change.</span>
-            </a>
+            </Link>
           </div>
         </section>
 
         <section aria-labelledby="choose-framework">
           <div className="sw-doc-section-head">
             <h2 id="choose-framework">Choose your framework</h2>
-            <a href="/docs/frameworks/lifecycle/">Compare lifecycles →</a>
+            <Link to="/docs/$/" params={{ _splat: "frameworks/lifecycle" }}>
+              Compare lifecycles →
+            </Link>
           </div>
           <div className="sw-doc-frameworks">
             {frameworks.map((framework) => (
@@ -124,14 +136,14 @@ function DocsOverview() {
             <h2 id="find-answer">Find what you need</h2>
           </div>
           <div className="sw-doc-destinations">
-            <a href="/docs/api/">
+            <Link to="/docs/$/" params={{ _splat: "api" }}>
               <span className="sw-doc-eyebrow">Reference</span>
               <strong>
                 Explore the API <span aria-hidden="true">→</span>
               </strong>
               <span>Browse packages, filter exports, and inspect exact TypeScript signatures.</span>
-            </a>
-            <a href="/docs/concepts/runtime-ownership/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "concepts/runtime-ownership" }}>
               <span className="sw-doc-eyebrow">Concepts</span>
               <strong>
                 Understand ownership <span aria-hidden="true">→</span>
@@ -139,8 +151,8 @@ function DocsOverview() {
               <span>
                 Know what belongs to your application, the adapter, the grid, and the engine.
               </span>
-            </a>
-            <a href="/showcases/">
+            </Link>
+            <Link to="/showcases/">
               <span className="sw-doc-eyebrow">Live examples</span>
               <strong>
                 See it in action <span aria-hidden="true">→</span>
@@ -148,7 +160,7 @@ function DocsOverview() {
               <span>
                 Try real workbooks, framework integrations, and capability demonstrations.
               </span>
-            </a>
+            </Link>
           </div>
         </section>
 
@@ -157,46 +169,46 @@ function DocsOverview() {
             <h2 id="build-features">Build a feature</h2>
           </div>
           <div className="sw-doc-recipes">
-            <a href="/docs/guides/configuration/">
+            <Link to="/docs/$/" params={{ _splat: "guides/configuration" }}>
               <strong>Configure a grid</strong>
               <span>Options, shell, and rendering</span>
-            </a>
-            <a href="/docs/guides/interaction/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/interaction" }}>
               <strong>Editing & interaction</strong>
               <span>Selection, clipboard, and validation</span>
-            </a>
-            <a href="/docs/guides/data-operations/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/data-operations" }}>
               <strong>Connect your data</strong>
               <span>Rows, transactions, and datasources</span>
-            </a>
-            <a href="/docs/guides/formulas/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/formulas" }}>
               <strong>Work with formulas</strong>
               <span>Expressions, references, and functions</span>
-            </a>
-            <a href="/docs/guides/analysis-formulas/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/analysis-formulas" }}>
               <strong>Analyze data</strong>
               <span>Group, pivot, forecast, and clean text</span>
-            </a>
-            <a href="/docs/guides/host-owned-rows/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/host-owned-rows" }}>
               <strong>Use your own row store</strong>
               <span>Host-owned rows and entity IDs</span>
-            </a>
-            <a href="/docs/guides/persistence/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/persistence" }}>
               <strong>Save & recover</strong>
               <span>Snapshots, pending work, and large undo</span>
-            </a>
-            <a href="/docs/guides/collaboration/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/collaboration" }}>
               <strong>Collaborate</strong>
               <span>Ordered commits, offline work, and rebase</span>
-            </a>
-            <a href="/docs/guides/styling/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/styling" }}>
               <strong>Style the grid</strong>
               <span>Themes, cell styles, and number formats</span>
-            </a>
-            <a href="/docs/guides/xlsx-export/">
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
               <strong>Import & export</strong>
               <span>XLSX, CSV, and workbook interchange</span>
-            </a>
+            </Link>
           </div>
         </section>
 

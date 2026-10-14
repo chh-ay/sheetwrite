@@ -20,7 +20,7 @@ import {
   createSelectionStatus,
   type ShellPiece,
 } from "@sheetwrite/core/shell";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityData from "../generated/compatibility.json";
@@ -77,6 +77,9 @@ export const Route = createFileRoute("/showcases/interoperability")({
     meta: pageMeta("Spreadsheet interoperability — Sheetwrite showcases", description),
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),
+  // `?compatibility=<record id>` opens one compatibility record.
+  validateSearch: (search: Record<string, unknown>): { compatibility?: string } =>
+    typeof search.compatibility === "string" ? { compatibility: search.compatibility } : {},
   component: InteroperabilityRoute,
 });
 
@@ -434,13 +437,13 @@ function InteroperabilityRoute() {
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
   const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
 
+  const { compatibility: requestedCompatibility } = Route.useSearch();
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("compatibility");
-    if (compatibilityData.records.some((record) => record.id === requested)) {
-      setSelectedCompatibilityId(requested);
+    if (compatibilityData.records.some((record) => record.id === requestedCompatibility)) {
+      setSelectedCompatibilityId(requestedCompatibility ?? null);
       document.getElementById("contract")?.scrollIntoView();
     }
-  }, []);
+  }, [requestedCompatibility]);
 
   const fixtureBytes = useCallback(async (fixture: InteropFixture): Promise<Uint8Array> => {
     const cached = bytesCache.current.get(fixture.file);
@@ -918,7 +921,9 @@ function InteroperabilityRoute() {
             <>
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
-              <a href="/docs/guides/xlsx-export/">XLSX interchange guide →</a>
+              <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+                XLSX interchange guide →
+              </Link>
             </>
           }
           eyebrow="CAPABILITY / SPREADSHEET INTEROPERABILITY"
@@ -1409,9 +1414,9 @@ function InteroperabilityRoute() {
                 This page publishes a fixed, checked test set and the product&apos;s declared
                 feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
                 OpenFormula compatibility.{" "}
-                <a href="/docs/reference/compatibility-results/">
+                <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
                   Read the detailed checked results →
-                </a>
+                </Link>
               </p>
 
               <section
@@ -2129,7 +2134,9 @@ function InteroperabilityRoute() {
               <p>
                 Every import and export reports what it could not preserve as structured{" "}
                 <code>XlsxWorkbookWarning</code> records — coded, per sheet, per cell.{" "}
-                <a href="/docs/api/core/xlsx-workbook-warning/">Warning codes →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-workbook-warning" }}>
+                  Warning codes →
+                </Link>
               </p>
               <div className="sw-si-panel sw-si-warnings" data-testid="interop-warnings">
                 {warningLog === null ? (
@@ -2292,7 +2299,9 @@ function InteroperabilityRoute() {
               <p>
                 Ceilings are enforced before anything allocates, and hand-authored hostile
                 OPC/SpreadsheetML packages are rejected with typed errors.{" "}
-                <a href="/docs/api/core/xlsx-resource-limits/">Resource limits →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-resource-limits" }}>
+                  Resource limits →
+                </Link>
               </p>
               <div className="sw-si-panel">
                 <h3>Formula-injection probe</h3>

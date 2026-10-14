@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as R404RouteImport } from './routes/404'
 import { Route as ReactRouteImport } from './routes/react'
 import { Route as SvelteRouteImport } from './routes/svelte'
 import { Route as VanillaRouteImport } from './routes/vanilla'
@@ -36,6 +37,11 @@ import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/te
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const R404Route = R404RouteImport.update({
+  id: '/404',
+  path: '/404',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReactRoute = ReactRouteImport.update({
@@ -153,6 +159,7 @@ const TestFrameworkLifecycleFrameworkRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/404': typeof R404Route
   '/react': typeof ReactRoute
   '/svelte': typeof SvelteRoute
   '/vanilla': typeof VanillaRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/404': typeof R404Route
   '/react': typeof ReactRoute
   '/svelte': typeof SvelteRoute
   '/vanilla': typeof VanillaRoute
@@ -204,6 +212,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/404': typeof R404Route
   '/react': typeof ReactRoute
   '/svelte': typeof SvelteRoute
   '/vanilla': typeof VanillaRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/404'
     | '/react'
     | '/svelte'
     | '/vanilla'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/404'
     | '/react'
     | '/svelte'
     | '/vanilla'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/404'
     | '/react'
     | '/svelte'
     | '/vanilla'
@@ -307,6 +319,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  R404Route: typeof R404Route
   ReactRoute: typeof ReactRoute
   SvelteRoute: typeof SvelteRoute
   VanillaRoute: typeof VanillaRoute
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/404': {
+      id: '/404'
+      path: '/404'
+      fullPath: '/404'
+      preLoaderRoute: typeof R404RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/react': {
@@ -499,6 +519,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  R404Route: R404Route,
   ReactRoute: ReactRoute,
   SvelteRoute: SvelteRoute,
   VanillaRoute: VanillaRoute,

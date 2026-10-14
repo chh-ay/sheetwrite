@@ -120,3 +120,15 @@ export const SHOWCASE_NAVIGATION: readonly NavigationItem[] = [
   { label: "Vue", href: "/vue/" },
   { label: "Svelte", href: "/svelte/" },
 ];
+
+/**
+ * Pages that select the full formula engine. A page can select its engine only
+ * before the first engine loads, so links to these pages always open a fresh
+ * document instead of a client-side navigation.
+ */
+const FULL_ENGINE_PATHS: readonly string[] = ["/showcases/formulas/", "/test/formulas-engine/"];
+
+export function opensFreshDocument(href: string): boolean {
+  const path = href.split(/[?#]/, 1)[0] ?? href;
+  return FULL_ENGINE_PATHS.includes(path.endsWith("/") ? path : `${path}/`);
+}

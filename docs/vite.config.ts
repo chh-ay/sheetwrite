@@ -155,6 +155,13 @@ export default defineConfig({
         { path: "/showcases/performance/" },
         { path: "/showcases/collaboration/" },
         { path: "/docs/proof/", sitemap: { exclude: true } },
+        // Static hosts serve /404.html for every URL without a page: the
+        // root notFoundComponent prerendered for an unknown path.
+        {
+          path: "/404/",
+          prerender: { enabled: true, outputPath: "/404.html" },
+          sitemap: { exclude: true },
+        },
         // Test fixtures stay reachable for Playwright but out of search surfaces.
         { path: "/test/xlsx/", sitemap: { exclude: true } },
         { path: "/test/collaboration/", sitemap: { exclude: true } },

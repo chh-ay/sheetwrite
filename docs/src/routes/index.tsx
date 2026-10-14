@@ -10,6 +10,7 @@ import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
+import { opensFreshDocument } from "../lib/navigation.js";
 import { pageMeta } from "../lib/seo.js";
 import landingStylesheet from "../styles/landing.css?url";
 
@@ -168,8 +169,7 @@ function FeatureCards() {
         <li key={feature.kind}>
           <Link
             data-feature={feature.kind}
-            // The formula page selects the full engine, so it opens as a fresh page.
-            reloadDocument={feature.kind === "formulas"}
+            reloadDocument={opensFreshDocument(feature.href)}
             to={feature.href}
           >
             <span className="sw-features__art">
@@ -209,12 +209,16 @@ function Landing() {
               through a billion cells. Your application keeps the data, the UI, and the server.
             </p>
             <div className="sw-lp-actions">
-              <a className="sw-lp-button" href="/docs/start/installation/">
+              <Link
+                className="sw-lp-button"
+                to="/docs/$/"
+                params={{ _splat: "start/installation" }}
+              >
                 Get started
-              </a>
-              <a className="sw-lp-button sw-lp-button--ghost" href="/showcases/">
+              </Link>
+              <Link className="sw-lp-button sw-lp-button--ghost" to="/showcases/">
                 Explore showcases
-              </a>
+              </Link>
             </div>
             <div className="sw-lp-hero__install">
               <InstallCommand packageName="@sheetwrite/core" />
@@ -259,9 +263,13 @@ function Landing() {
             </p>
           </header>
           <ArchitectureScene />
-          <a className="sw-lp-more" href="/docs/concepts/runtime-ownership/">
+          <Link
+            className="sw-lp-more"
+            to="/docs/$/"
+            params={{ _splat: "concepts/runtime-ownership" }}
+          >
             Read the runtime-ownership model →
-          </a>
+          </Link>
         </section>
 
         <section aria-labelledby="landing-features" className="sw-lp-section">
@@ -296,9 +304,9 @@ function Landing() {
               One engine, four entry points. The adapters share one lifecycle: create on mount,
               apply live option changes, and destroy on unmount.
             </p>
-            <a className="sw-lp-more" href="/docs/start/first-grid/">
+            <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "start/first-grid" }}>
               Build your first grid →
-            </a>
+            </Link>
           </header>
           <CodeTabs />
         </section>
@@ -331,7 +339,9 @@ function Landing() {
                 <li key={note}>{note}</li>
               ))}
               <li>
-                <a href="/docs/releases/0.5.0/">Read what is new and the upgrade checklist →</a>
+                <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+                  Read what is new and the upgrade checklist →
+                </Link>
               </li>
             </ul>
           </div>
@@ -355,9 +365,13 @@ function Landing() {
               <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
-          <a className="sw-lp-more" href="/docs/guides/performance-resources/">
+          <Link
+            className="sw-lp-more"
+            to="/docs/$/"
+            params={{ _splat: "guides/performance-resources" }}
+          >
             See the full method and every result →
-          </a>
+          </Link>
         </section>
 
         <section aria-labelledby="landing-close" className="sw-lp-close">
@@ -369,9 +383,9 @@ function Landing() {
             </p>
           </div>
           <div className="sw-lp-actions">
-            <a className="sw-lp-button" href="/docs/start/installation/">
+            <Link className="sw-lp-button" to="/docs/$/" params={{ _splat: "start/installation" }}>
               Read the docs
-            </a>
+            </Link>
             <a
               className="sw-lp-button sw-lp-button--ghost"
               href="https://github.com/chh-ay/sheetwrite"
@@ -392,22 +406,32 @@ function Landing() {
           <nav aria-label="Footer" className="sw-landing-footer__nav">
             <div>
               <p className="sw-landing-footer__title">Start</p>
-              <a href="/docs/start/installation/">Installation</a>
-              <a href="/docs/start/first-grid/">First grid</a>
-              <a href="/docs/releases/0.5.0/">What's new</a>
+              <Link to="/docs/$/" params={{ _splat: "start/installation" }}>
+                Installation
+              </Link>
+              <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
+                First grid
+              </Link>
+              <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+                What's new
+              </Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>
-              <a href="/vanilla/">Vanilla</a>
-              <a href="/react/">React</a>
-              <a href="/vue/">Vue</a>
-              <a href="/svelte/">Svelte</a>
+              <Link to="/vanilla/">Vanilla</Link>
+              <Link to="/react/">React</Link>
+              <Link to="/vue/">Vue</Link>
+              <Link to="/svelte/">Svelte</Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Explore</p>
-              <a href="/showcases/">Showcases</a>
-              <a href="/docs/reference/formula-functions/">Formula functions</a>
-              <a href="/docs/guides/performance-resources/">Benchmarks</a>
+              <Link to="/showcases/">Showcases</Link>
+              <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
+                Formula functions
+              </Link>
+              <Link to="/docs/$/" params={{ _splat: "guides/performance-resources" }}>
+                Benchmarks
+              </Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Project</p>
