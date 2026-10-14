@@ -23,6 +23,8 @@ const SETTLE_TURNS = 20;
 const READ_COLUMNS = 8;
 const READ_LOADED_ROWS = 256;
 const READ_CYCLE_ROWS = 128;
+const OFFSCREEN_MERGE_COUNT = 10_000;
+const OFFSCREEN_MERGE_FIRST_ROW = 10_000;
 const columns = Array.from({ length: COLUMN_COUNT }, (_, column) => ({
   key: `c${column}`,
   header: `C${column}`,
@@ -31,7 +33,20 @@ const columns = Array.from({ length: COLUMN_COUNT }, (_, column) => ({
 }));
 const workbook: Workbook = {
   activeSheet: "s1",
-  sheets: [{ id: "s1", name: "Windows", rowCount: ROW_COUNT, columns }],
+  sheets: [
+    {
+      id: "s1",
+      name: "Windows",
+      rowCount: ROW_COUNT,
+      columns,
+      merges: Array.from({ length: OFFSCREEN_MERGE_COUNT }, (_, index) => ({
+        r0: OFFSCREEN_MERGE_FIRST_ROW + index * 2,
+        r1: OFFSCREEN_MERGE_FIRST_ROW + index * 2,
+        c0: 0,
+        c1: 1,
+      })),
+    },
+  ],
 };
 
 await initSheetwrite();
@@ -163,6 +178,9 @@ try {
     `${JSON.stringify({
       unit: "ms/operation",
       warmups: WARMUPS,
+      rows: ROW_COUNT,
+      columns: COLUMN_COUNT,
+      offscreenMerges: OFFSCREEN_MERGE_COUNT,
       samples,
       residency,
       prefetchEvidence,

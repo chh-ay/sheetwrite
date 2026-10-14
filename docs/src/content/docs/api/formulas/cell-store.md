@@ -60,6 +60,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
 <a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
@@ -109,7 +110,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>95</span>
+## Members <span class="api-count" data-pagefind-ignore>96</span>
 
 <div class="api-member-list">
 
@@ -590,12 +591,23 @@ cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
-<summary><code>pinRange</code></summary>
+<summary><code>pinRange</code> <span class="api-member-summary">Replaces caller-owned persistent pins; empty row ranges leave them unchanged.</span></summary>
 
 ```ts generated
 pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-pin-read-window" data-pagefind-weight="1">
+<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing explicit or viewport pins.</span></summary>
+
+```ts generated
+pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Replaces transient read protection without changing explicit or viewport pins.
+Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-viewport-bands" data-pagefind-weight="1">
@@ -1266,6 +1278,13 @@ class CellStore {
     sheet: number,
     start_row: number,
     end_row: number,
+    cols: Uint32Array,
+  ) => void;
+  pinReadWindow: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    rows: Uint32Array,
     cols: Uint32Array,
   ) => void;
   pinViewportBands: (sheet: number, bands: Uint32Array) => void;

@@ -595,10 +595,27 @@ impl CellStore {
         }
     }
 
+    /// Replaces caller-owned persistent pins; empty row ranges leave them unchanged.
     #[wasm_bindgen(js_name = pinRange)]
     pub fn pin_range(&mut self, sheet: usize, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(data) = self.sheets.get_mut(sheet) {
             data.pin_range(start_row, end_row, cols);
+        }
+    }
+
+    /// Replaces transient read protection without changing explicit or viewport pins.
+    /// Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.
+    #[wasm_bindgen(js_name = pinReadWindow)]
+    pub fn pin_read_window(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        end_row: usize,
+        rows: &[u32],
+        cols: &[u32],
+    ) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.pin_read_window(start_row, end_row, rows, cols);
         }
     }
 

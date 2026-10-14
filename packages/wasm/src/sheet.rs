@@ -167,6 +167,11 @@ struct StorageEntry {
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 
+enum PinOwner {
+    Explicit,
+    Read,
+}
+
 pub(crate) struct PagedStorage {
     chunk_rows: usize,
     byte_budget: usize,
@@ -175,7 +180,8 @@ pub(crate) struct PagedStorage {
     dirty: HashMap<(usize, usize), DirtyCell>,
     dirty_by_revision: HashMap<u64, Vec<(usize, usize)>>,
     pinned: HashSet<(usize, usize)>,
-    read_pin_scratch: HashSet<(usize, usize)>,
+    read_pinned: HashSet<(usize, usize)>,
+    pin_scratch: HashSet<(usize, usize)>,
     viewport_pinned: HashSet<(usize, usize)>,
     viewport_pin_scratch: HashSet<(usize, usize)>,
     evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
@@ -194,7 +200,8 @@ impl PagedStorage {
             dirty: HashMap::new(),
             dirty_by_revision: HashMap::new(),
             pinned: HashSet::new(),
-            read_pin_scratch: HashSet::new(),
+            read_pinned: HashSet::new(),
+            pin_scratch: HashSet::new(),
             viewport_pinned: HashSet::new(),
             viewport_pin_scratch: HashSet::new(),
             evictable: RefCell::new(BTreeSet::new()),
@@ -225,7 +232,9 @@ impl PagedStorage {
         let Some(chunk) = self.chunks.get(&key) else {
             return;
         };
-        let eligible = !self.pinned.contains(&key) && !self.viewport_pinned.contains(&key);
+        let eligible = !self.read_pinned.contains(&key)
+            && !self.viewport_pinned.contains(&key)
+            && !self.pinned.contains(&key);
         let previous = chunk.last_access.get();
         let mut evictable = self.evictable.borrow_mut();
         if eligible {
@@ -260,7 +269,10 @@ impl PagedStorage {
             let access = self.next_access();
             self.chunks
                 .insert(key, CellChunk::new(self.chunk_rows, access));
-            if !self.pinned.contains(&key) && !self.viewport_pinned.contains(&key) {
+            if !self.read_pinned.contains(&key)
+                && !self.viewport_pinned.contains(&key)
+                && !self.pinned.contains(&key)
+            {
                 self.evictable.get_mut().insert((access, key.0, key.1));
             }
         } else {
@@ -546,7 +558,7 @@ impl PagedStorage {
     }
 
     fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
-        let mut next = std::mem::take(&mut self.read_pin_scratch);
+        let mut next = std::mem::take(&mut self.pin_scratch);
         if r0 < r1 {
             for &col in cols {
                 for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
@@ -554,7 +566,25 @@ impl PagedStorage {
                 }
             }
         }
-        self.replace_pins(next);
+        self.replace_pins(next, PinOwner::Explicit);
+    }
+
+    fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
+        let mut next = std::mem::take(&mut self.pin_scratch);
+        for &col in cols {
+            if rows.is_empty() {
+                if start < end {
+                    for chunk in start / self.chunk_rows..=(end - 1) / self.chunk_rows {
+                        next.insert((col as usize, chunk));
+                    }
+                }
+            } else {
+                for &row in rows {
+                    next.insert((col as usize, row as usize / self.chunk_rows));
+                }
+            }
+        }
+        self.replace_pins(next, PinOwner::Read);
     }
 
     fn pin_viewport_bands(&mut self, bands: &[u32]) {
@@ -576,7 +606,7 @@ impl PagedStorage {
             }
         }
         for key in self.viewport_pinned.difference(&next) {
-            if self.pinned.contains(key) {
+            if self.pinned.contains(key) || self.read_pinned.contains(key) {
                 continue;
             }
             if let Some(chunk) = self.chunks.get(key) {
@@ -597,9 +627,14 @@ impl PagedStorage {
         self.viewport_pin_scratch = previous;
     }
 
-    fn replace_pins(&mut self, next: HashSet<(usize, usize)>) {
-        for key in self.pinned.difference(&next) {
-            if self.viewport_pinned.contains(key) {
+    fn replace_pins(&mut self, next: HashSet<(usize, usize)>, owner: PinOwner) {
+        let access = self.next_access();
+        let (current, other) = match owner {
+            PinOwner::Explicit => (&mut self.pinned, &self.read_pinned),
+            PinOwner::Read => (&mut self.read_pinned, &self.pinned),
+        };
+        for key in current.difference(&next) {
+            if self.viewport_pinned.contains(key) || other.contains(key) {
                 continue;
             }
             if let Some(chunk) = self.chunks.get(key) {
@@ -608,18 +643,17 @@ impl PagedStorage {
                     .insert((chunk.last_access.get(), key.0, key.1));
             }
         }
-        for key in next.difference(&self.pinned) {
+        for key in next.difference(current) {
             if let Some(chunk) = self.chunks.get(key) {
                 self.evictable
                     .get_mut()
                     .remove(&(chunk.last_access.get(), key.0, key.1));
             }
         }
-        let mut previous = std::mem::replace(&mut self.pinned, next);
+        let mut previous = std::mem::replace(current, next);
         previous.clear();
-        self.read_pin_scratch = previous;
-        let access = self.next_access();
-        for &key in &self.pinned {
+        self.pin_scratch = previous;
+        for &key in current.iter() {
             if let Some(chunk) = self.chunks.get(&key) {
                 chunk.last_access.set(access);
             }
@@ -742,8 +776,12 @@ impl PagedStorage {
             .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(
-            self.read_pin_scratch.len(),
-            self.read_pin_scratch.capacity(),
+            self.read_pinned.len(),
+            self.read_pinned.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.pin_scratch.len(),
+            self.pin_scratch.capacity(),
         );
         indexes.add_hash_table::<(usize, usize), ()>(
             self.viewport_pinned.len(),
@@ -1166,7 +1204,15 @@ impl SheetData {
     }
     pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(paged) = &mut self.paged {
-            paged.pin_range(start_row, end_row, cols);
+            if start_row < end_row {
+                paged.pin_range(start_row, end_row, cols);
+            }
+        }
+    }
+
+    pub(crate) fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
+        if let Some(paged) = &mut self.paged {
+            paged.pin_read_window(start, end, rows, cols);
         }
     }
 

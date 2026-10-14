@@ -332,7 +332,7 @@ export class StoreWindowReader {
       return this.readPinned(sheet, rows, cols, order, applyConditionalRules, isPaged);
     } finally {
       if (isPaged) {
-        this.wasm.pinRange(handle, 0, 0, EMPTY_PIN_COLUMNS);
+        this.wasm.pinReadWindow(handle, 0, 0, EMPTY_PIN_COLUMNS, EMPTY_PIN_COLUMNS);
       }
     }
   }
@@ -347,13 +347,22 @@ export class StoreWindowReader {
   ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    const dataRows = order?.subarray(rows.start, Math.min(rows.end, order.length));
     let ffiCalls = 1;
     let ffiInputBytes = colsU32.byteLength;
     let ffiLargestTransferBytes = colsU32.byteLength;
     if (isPaged) {
-      this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
+      this.wasm.pinReadWindow(
+        handle,
+        dataRows ? 0 : rows.start,
+        dataRows ? 0 : rows.end,
+        dataRows ?? EMPTY_PIN_COLUMNS,
+        colsU32,
+      );
       ffiCalls += 2;
       ffiInputBytes += colsU32.byteLength;
+      ffiInputBytes += dataRows?.byteLength ?? 0;
+      ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows?.byteLength ?? 0);
     }
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
     const hasCondRules = (conditionalSync & 1) !== 0;
@@ -368,8 +377,7 @@ export class StoreWindowReader {
 
     let view: ConsumingWindowView;
     let expectedRows: number;
-    if (order) {
-      const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+    if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);

@@ -198,6 +198,13 @@ export type RecomputingCellStore = CellStore & {
   ): Uint32Array;
   cellSnapshots(sheet: number, rows: Uint32Array, cols: Uint32Array): CellSnapshot | undefined;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
+  pinReadWindow(
+    sheet: number,
+    startRow: number,
+    endRow: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ): void;
   pinViewportBands(sheet: number, bands: Uint32Array): void;
   beginPageLoad(): void;
   endPageLoad(): void;

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
+import { createGrid } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
@@ -424,49 +425,43 @@ describe("datasource repaint invalidation", () => {
       else sheet.merges = [{ r0: rootRow, c0: 0, r1: 220, c1: 0 }];
       const requests: DataSourceRequest[] = [];
       const host = mountHost();
-      const store = new SheetwriteStore(workbook, undefined, {
-        storage: "paged",
-        chunkRows: 4,
-        cacheBytes: 1024 * 1024,
-      });
-      // The source anchor is already resident; only its off-screen dependency is missing.
-      store.loadPage(
-        "s1",
-        rootRow,
-        [{ start: 0, end: 1, keys: ["c0"] }],
-        [{ c0: { kind: "formula", src: "=T901+1" } }],
-      );
-      const grid = new GridImpl(
-        host,
-        {
-          workbook,
-          overscan: 0,
-          datasource: {
-            capabilities: WINDOWED_DATASOURCE,
-            getRows: async (request) => {
-              requests.push(request);
-              return coveredPage(
-                request,
-                Array.from({ length: request.end - request.start }, (_, offset) => {
-                  const row = request.start + offset;
-                  const values: RowData = {};
-                  for (let column = 0; column < 20; column++) {
-                    values[`c${column}`] =
-                      row === rootRow && column === 0
-                        ? { kind: "formula", src: "=T901+1" }
-                        : row === 900 && column === 19
-                          ? 41
-                          : row;
-                  }
-                  return values;
-                }),
-              );
-            },
+      const grid = createGrid(host, {
+        workbook,
+        overscan: 0,
+        datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 1024 * 1024 },
+        datasource: {
+          capabilities: WINDOWED_DATASOURCE,
+          getRows: async (request) => {
+            requests.push(request);
+            return coveredPage(
+              request,
+              Array.from({ length: request.end - request.start }, (_, offset) => {
+                const row = request.start + offset;
+                const values: RowData = {};
+                for (let column = 0; column < 20; column++) {
+                  values[`c${column}`] =
+                    row === rootRow && column === 0
+                      ? { kind: "formula", src: "=T901+1" }
+                      : row === 900 && column === 19
+                        ? 41
+                        : row;
+                }
+                return values;
+              }),
+            );
           },
         },
-        store,
-      );
+      });
       try {
+        const store = grid.store;
+        if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
+        // Only the off-screen dependency is missing, not the source formula.
+        store.loadPage(
+          "s1",
+          rootRow,
+          [{ start: 0, end: 1, keys: ["c0"] }],
+          [{ c0: { kind: "formula", src: "=T901+1" } }],
+        );
         const scroller = scrollerOf(host);
         scroller.scrollTop = 200 * DEFAULT_THEME.rowHeight;
         scroller.dispatchEvent(new Event("scroll"));
@@ -484,7 +479,6 @@ describe("datasource repaint invalidation", () => {
         expect(store.getCellLoadState({ sheet: "s1", row: 900, col: 19 })).toBe("loaded-value");
       } finally {
         grid.destroy();
-        store.dispose();
       }
     },
   );
@@ -495,14 +489,15 @@ describe("datasource repaint invalidation", () => {
     if (!sheet) throw new Error("expected fixture sheet");
     sheet.columns = sheet.columns.slice(0, 1);
     sheet.frozenRows = 1;
-    const store = new SheetwriteStore(workbook, undefined, {
-      storage: "paged",
-      chunkRows: 4,
-      cacheBytes: 64,
-    });
     const host = mountHost();
-    const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
+    const grid = createGrid(host, {
+      workbook,
+      overscan: 0,
+      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 64 },
+    });
     try {
+      const store = grid.store;
+      if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
       const scroller = scrollerOf(host);
       scroller.scrollTop = 100 * DEFAULT_THEME.rowHeight;
       scroller.dispatchEvent(new Event("scroll"));
@@ -517,22 +512,16 @@ describe("datasource repaint invalidation", () => {
         expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("frozen");
       }
       expect(store.getCellLoadState({ sheet: "s1", row: 400, col: 0 })).toBe("unloaded");
-      grid.destroy();
-      store.loadPage("s1", 800, columns, [{ name: "after-destroy" }]);
+      grid.addSheet({ id: "other", name: "Other", rowCount: 1 });
+      grid.setActiveSheet("other");
+      store.loadPage("s1", 800, columns, [{ name: "after-switch" }]);
       expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("unloaded");
       expect(store.getCellLoadState({ sheet: "s1", row: 100, col: 0 })).toBe("unloaded");
-      const replacement = new GridImpl(mountHost(), { workbook, overscan: 0 }, store);
-      try {
-        replacement.addSheet({ id: "other", name: "Other", rowCount: 1 });
-        replacement.setActiveSheet("s1");
-        replacement.removeSheet("s1");
-        expect(replacement.getActiveSheet()).toBe("other");
-      } finally {
-        replacement.destroy();
-      }
+      grid.setActiveSheet("s1");
+      grid.removeSheet("s1");
+      expect(grid.getActiveSheet()).toBe("other");
     } finally {
       grid.destroy();
-      store.dispose();
     }
   });
   it("retains a visible formula dependency closure under clean-cache pressure", () => {
@@ -541,14 +530,15 @@ describe("datasource repaint invalidation", () => {
     if (!sheet) throw new Error("expected fixture sheet");
     sheet.columns = sheet.columns.slice(0, 1);
     sheet.frozenRows = 1;
-    const store = new SheetwriteStore(workbook, undefined, {
-      storage: "paged",
-      chunkRows: 4,
-      cacheBytes: 64,
-    });
     const host = mountHost();
-    const grid = new GridImpl(host, { workbook, overscan: 0 }, store);
+    const grid = createGrid(host, {
+      workbook,
+      overscan: 0,
+      datasourceStorage: { mode: "paged", chunkRows: 4, cacheBytes: 64 },
+    });
     try {
+      const store = grid.store;
+      if (!(store instanceof SheetwriteStore)) throw new Error("expected public paged store");
       const columns = [{ start: 0, end: 1, keys: ["name"] }];
       store.loadPage("s1", 0, columns, [{ name: { kind: "formula", src: "=A901+1" } }]);
       store.loadPage("s1", 900, columns, [{ name: 41 }]);
@@ -560,7 +550,6 @@ describe("datasource repaint invalidation", () => {
       expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(42);
     } finally {
       grid.destroy();
-      store.dispose();
     }
   });
 });

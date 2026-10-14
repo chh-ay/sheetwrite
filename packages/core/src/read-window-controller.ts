@@ -1,4 +1,5 @@
 import type { AriaMirror } from "./aria-mirror.js";
+import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import type { DatasourceController } from "./datasource-controller.js";
 import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
@@ -530,14 +531,22 @@ export class ReadWindowController {
       const merges =
         this.options.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)
           ?.merges ?? [];
-      for (const merge of merges) {
-        const reachesRows =
-          (merge.r0 < paintRows.end && merge.r1 >= paintRows.start) ||
-          (frozenRows > 0 && merge.r0 < frozenRows);
-        if (
-          reachesRows &&
-          this.datasourceColumnIndices.some((col) => col >= merge.c0 && col <= merge.c1)
-        ) {
+      if (merges.length > 0) {
+        const index = prepareMergeIndex(merges);
+        const reached = new Set(
+          intersectingMerges(index, paintRows.start, paintRows.end, this.datasourceColumnIndices),
+        );
+        if (frozenRows > 0) {
+          for (const merge of intersectingMerges(
+            index,
+            0,
+            frozenRows,
+            this.datasourceColumnIndices,
+          )) {
+            reached.add(merge);
+          }
+        }
+        for (const merge of reached) {
           anchors.push({ sheet, row: merge.r0, cols: [merge.c0] });
         }
       }
