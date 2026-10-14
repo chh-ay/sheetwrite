@@ -1096,7 +1096,10 @@ mod tests {
         for (formula, expected) in cases {
             assert_eq!(evaluate(data, formula), grid(&[&[expected]]), "{formula}");
         }
-        assert_eq!(evaluate(data, "=VSTACK(B2,A1)+0"), grid(&[&["4"], &["1"]]));
+        assert_eq!(
+            evaluate(data, "=VSTACK(B2,A1)+0"),
+            grid(&[&["4"], &["1"]])
+        );
         assert_eq!(
             evaluate(data, "=TRANSPOSE(TOCOL(A1:B2))"),
             grid(&[&["1", "2", "3", "4"]])

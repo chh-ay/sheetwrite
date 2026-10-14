@@ -1480,24 +1480,13 @@ where
             Ast::Func(Func::Let, resolved)
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), mut args)
-            if !args.is_empty() =>
-        {
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), mut args) if !args.is_empty() => {
             let body = args.pop().expect("nonempty arguments");
             let mut scoped = locals.to_vec();
             scoped.extend(args.iter().filter_map(|parameter| {
-                if let Ast::Name(name) = parameter {
-                    Some(name.clone())
-                } else {
-                    None
-                }
+                if let Ast::Name(name) = parameter { Some(name.clone()) } else { None }
             }));
-            args.push(resolve_named_ranges_inner(
-                body,
-                formula_sheet,
-                resolve,
-                &scoped,
-            ));
+            args.push(resolve_named_ranges_inner(body, formula_sheet, resolve, &scoped));
             Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args)
         }
         Ast::Func(func, args) => Ast::Func(
@@ -2143,14 +2132,10 @@ fn write_ast(ast: &Ast, out: &mut String) {
         }
         #[cfg(feature = "analysis")]
         Ast::UnknownFunc(name, args) if name == crate::eval::analysis::lambda::CALL => {
-            if let Some(callee) = args.first() {
-                write_ast(callee, out);
-            }
+            if let Some(callee) = args.first() { write_ast(callee, out); }
             out.push('(');
             for (index, argument) in args.iter().skip(1).enumerate() {
-                if index > 0 {
-                    out.push(',');
-                }
+                if index > 0 { out.push(','); }
                 write_ast(argument, out);
             }
             out.push(')');
@@ -2268,19 +2253,13 @@ mod tests {
         }
         assert_eq!(
             parse("=A1#").unwrap(),
-            Ast::Func(
-                Func::AnchorArray,
-                vec![Ast::Cell(0, 0, RefFlags::default())]
-            )
+            Ast::Func(Func::AnchorArray, vec![Ast::Cell(0, 0, RefFlags::default())])
         );
         // `#` only follows a cell, and the function name cannot be typed.
         for source in ["=A1:B2#", "=#", "=1#"] {
             assert!(parse(source).is_err(), "{source}");
         }
-        assert!(matches!(
-            parse("=ANCHORARRAY(A1)"),
-            Ok(Ast::UnknownFunc(..))
-        ));
+        assert!(matches!(parse("=ANCHORARRAY(A1)"), Ok(Ast::UnknownFunc(..))));
     }
 
     #[test]
@@ -2661,10 +2640,7 @@ mod tests {
             // A built-in or alias with the same spelling would win the lookup.
             let id = crate::eval::analysis::lookup(name).expect("registered analysis name");
             assert_eq!(lookup_func(name), Some(Func::Analysis(id)), "{name}");
-            assert_eq!(
-                lookup_func(&name.to_ascii_lowercase()),
-                Some(Func::Analysis(id))
-            );
+            assert_eq!(lookup_func(&name.to_ascii_lowercase()), Some(Func::Analysis(id)));
             assert_eq!(func_name(Func::Analysis(id)), *name);
         }
         let listed = function_names();
