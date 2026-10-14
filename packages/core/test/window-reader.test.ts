@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { decodePackedWindow } from "../src/store/window-reader.js";
+import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
+import { decodePackedWindow, StoreWindowReader } from "../src/store/window-reader.js";
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING } from "../src/store/wire-tags.js";
+import { StyleDictionary } from "../src/style-dictionary.js";
+import { makeWorkbook } from "./fixtures.js";
 
 const HEADER_BYTES = 40;
 
@@ -73,5 +76,86 @@ describe("packed window decoding", () => {
     const shifted = new Uint8Array(valid.byteLength + 1);
     shifted.set(valid, 1);
     expect(() => decodePackedWindow(shifted.subarray(1))).toThrow(Error);
+  });
+});
+
+function makeEpochReader() {
+  const pool = { epoch: 0, text: "before collection" };
+  const wasm = {
+    stringPoolEpoch: () => pool.epoch,
+    isPaged: () => false,
+    getWindow: () => {
+      const epoch = pool.epoch;
+      const packed = makePackedWindow();
+      const decoded = decodePackedWindow(packed);
+      decoded.stringIds[2] = 0;
+      decoded.stringIndex[2] = -1;
+      new DataView(packed.buffer).setUint32(36, 0, true);
+      return {
+        stringPoolEpoch: () => epoch,
+        takePacked: () => packed,
+        free: () => {},
+      };
+    },
+    poolStrings: (ids: Uint32Array) =>
+      Array.from(ids, (id) => {
+        if (id !== 0) throw new Error(`Unexpected fixture pool ID ${id}`);
+        return pool.text;
+      }),
+    persistedCellData: () => new Float64Array([1, 0, KIND_STRING, 0, 0, 0, 0, 0]),
+  };
+  const reader = new StoreWindowReader(
+    wasm as unknown as RecomputingCellStore,
+    makeWorkbook(2),
+    new Map([["s1", 0]]),
+    new StyleDictionary(),
+  );
+  const readVisible = () => reader.read("s1", { start: 0, end: 2 }, [0, 1], undefined, false);
+  return { pool, wasm, reader, readVisible };
+}
+
+describe("string-pool epoch lifetime", () => {
+  for (const boundary of ["visible window", "rectangle", "persisted cells"] as const) {
+    it(`resolves reused IDs after collection through ${boundary} and rewarms worker updates`, () => {
+      const { pool, reader, readVisible } = makeEpochReader();
+      expect(Array.from(readVisible().values)).toEqual([null, 42.5, "before collection", true]);
+      pool.epoch += 1;
+      pool.text = "after collection";
+
+      if (boundary === "rectangle") {
+        expect(reader.readRectangle("s1", 0, 2, [0, 1]).values).toEqual([
+          null,
+          42.5,
+          "after collection",
+          true,
+        ]);
+      } else if (boundary === "persisted cells") {
+        expect(reader.capturePersistedCells("s1").values).toEqual(["after collection"]);
+      }
+      const refreshed = readVisible();
+      expect(Array.from(refreshed.values)).toEqual([null, 42.5, "after collection", true]);
+      expect(refreshed.stringPoolEpoch).toBe(pool.epoch);
+      expect(refreshed.stringPoolUpdateIds).toEqual(new Uint32Array([0]));
+      expect(refreshed.stringPoolUpdateValues).toEqual(["after collection"]);
+      expect(readVisible().stringPoolUpdateIds).toBeUndefined();
+    });
+  }
+
+  it("rejects stale window and persisted projections before resolving their IDs", () => {
+    const { pool, wasm, reader, readVisible } = makeEpochReader();
+    const retained = wasm.getWindow();
+    pool.epoch += 1;
+    pool.text = "replacement text";
+    wasm.getWindow = () => retained;
+    expect(readVisible).toThrow("stale string-pool epoch");
+    expect(() => reader.readRectangle("s1", 0, 2, [0, 1])).toThrow("stale string-pool epoch");
+
+    const persistedCellData = wasm.persistedCellData;
+    wasm.persistedCellData = () => {
+      const packed = persistedCellData();
+      pool.epoch += 1;
+      return packed;
+    };
+    expect(() => reader.capturePersistedCells("s1")).toThrow("stale string-pool epoch");
   });
 });

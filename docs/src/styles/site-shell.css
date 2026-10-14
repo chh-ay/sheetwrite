@@ -870,3 +870,37 @@ html:has(.sw-nav-dialog[open]) {
     grid-template-columns: 1fr;
   }
 }
+
+/* Site 404 and route error pages. This sheet loads on every page, including
+   documentation pages, which skip the showcase stylesheet. */
+.sw-route-fallback {
+  display: grid;
+  gap: 1rem;
+  max-width: 40rem;
+  padding-block: 4rem;
+}
+.sw-route-fallback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 0;
+}
+.sw-route-fallback__actions button {
+  padding: 0.65rem 0.95rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--sw-accent);
+  color: var(--sw-accent-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.sw-route-fallback__actions button:hover {
+  filter: brightness(1.08);
+}
+.sw-route-fallback__actions button:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}

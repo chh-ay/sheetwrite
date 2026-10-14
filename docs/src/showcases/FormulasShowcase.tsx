@@ -1,4 +1,5 @@
 import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
@@ -411,7 +412,9 @@ export default function FormulasShowcase() {
               is the same engine with the full function set. Select it once, before you create a
               Grid. Everything else stays the same.
             </p>
-            <a href="/docs/reference/formula-functions/">See every supported function →</a>
+            <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
+              See every supported function →
+            </Link>
           </div>
           <div className="sw-fx-engine__code">
             <FormulasSetupSnippet />

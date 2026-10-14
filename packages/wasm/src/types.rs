@@ -540,7 +540,40 @@ pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
     Some((u32::try_from(row).ok()?, u32::try_from(col).ok()?))
 }
 
+pub(crate) enum InternSlot {
+    One(u32),
+    Many(Vec<u32>),
+}
+
+/// The intern map's keys are already 64-bit string hashes; re-hashing them
+/// through SipHash on every probe is pure waste. This hasher passes the key
+/// through untouched, halving the hashing work per intern.
+#[derive(Default)]
+pub(crate) struct IdentityHasher(u64);
+
+impl Hasher for IdentityHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("IdentityHasher is only used with u64 keys");
+    }
+
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+}
+fn string_hash(s: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    s.hash(&mut hasher);
+    hasher.finish()
+}
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 // ── String pool ──────────────────────────────────────────────────────────────
+const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 
 /// Dictionary-encoded string pool backed by one contiguous UTF-8 arena.
 ///
@@ -549,9 +582,13 @@ pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
 /// headers and allocator slack. The arena stores every string back to back in
 /// one buffer with an 8-byte `(offset, len)` span per id, keeps pool text
 /// cache-contiguous for filter/search scans, and frees in two deallocations.
-pub(crate) struct StringPool {
+pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    lookup:
+        std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
+    pub(crate) epoch: u32,
+    pub(crate) next_collection_bytes: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -560,11 +597,14 @@ struct PoolSpan {
     len: u32,
 }
 
-impl StringPool {
+impl StringStorage {
     pub(crate) fn new() -> Self {
         Self {
             bytes: Vec::new(),
             spans: Vec::new(),
+            lookup: Default::default(),
+            epoch: 0,
+            next_collection_bytes: STRING_COLLECTION_FLOOR_BYTES,
         }
     }
 
@@ -578,26 +618,114 @@ impl StringPool {
         Some(unsafe { std::str::from_utf8_unchecked(bytes) })
     }
 
-    /// Append a string and return its id. Dedup is the interner's job; the
-    /// pool itself is append-only.
-    pub(crate) fn push(&mut self, s: &str) -> u32 {
+    fn push(&mut self, text: &str) -> u32 {
         let id = self.spans.len() as u32;
         let offset = self.bytes.len() as u32;
-        self.bytes.extend_from_slice(s.as_bytes());
+        self.bytes.extend_from_slice(text.as_bytes());
         self.spans.push(PoolSpan {
             offset,
-            len: s.len() as u32,
+            len: text.len() as u32,
         });
         id
     }
 
-    pub(crate) fn shrink_to_fit(&mut self) {
-        self.bytes.shrink_to_fit();
-        self.spans.shrink_to_fit();
+    pub(crate) fn intern(&mut self, text: &str) -> u32 {
+        let hash = string_hash(text);
+        if let Some(slot) = self.lookup.get(&hash) {
+            match slot {
+                InternSlot::One(id) if self.get(*id) == Some(text) => return *id,
+                InternSlot::Many(ids) => {
+                    for &id in ids {
+                        if self.get(id) == Some(text) {
+                            return id;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let id = self.push(text);
+        match self.lookup.get_mut(&hash) {
+            None => {
+                self.lookup.insert(hash, InternSlot::One(id));
+            }
+            Some(slot) => match slot {
+                InternSlot::One(previous) => *slot = InternSlot::Many(vec![*previous, id]),
+                InternSlot::Many(ids) => ids.push(id),
+            },
+        }
+        id
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.spans.len()
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.bytes.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
+    }
+
+    /// Build before remapping roots: reservation failure leaves the old epoch intact.
+    pub(crate) fn collection(&self, marks: &[bool], force: bool) -> Option<(Self, Vec<u32>)> {
+        let live_count = marks.iter().filter(|&&marked| marked).count();
+        let live_utf8 = self
+            .spans
+            .iter()
+            .zip(marks)
+            .filter(|(_, marked)| **marked)
+            .map(|(span, _)| span.len as usize)
+            .sum::<usize>();
+        let live_bytes = live_utf8 + live_count * std::mem::size_of::<PoolSpan>();
+        if !force
+            && (self.retained_bytes() <= live_bytes.saturating_mul(2)
+                || self.retained_bytes() - live_bytes < STRING_COLLECTION_FLOOR_BYTES)
+        {
+            return None;
+        }
+        let mut replacement = Self::new();
+        replacement.bytes.try_reserve_exact(live_utf8).ok()?;
+        replacement.spans.try_reserve_exact(live_count).ok()?;
+        replacement.lookup.try_reserve(live_count).ok()?;
+        let mut remap = Vec::new();
+        remap.try_reserve_exact(self.len()).ok()?;
+        remap.resize(self.len(), NO_STRING);
+        for (id, &marked) in marks.iter().enumerate() {
+            if marked {
+                remap[id] = replacement.intern(self.get(id as u32)?);
+            }
+        }
+        replacement.epoch = self.epoch.wrapping_add(1);
+        replacement.next_collection_bytes = live_bytes
+            .saturating_mul(2)
+            .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
+        Some((replacement, remap))
+    }
+
+    pub(crate) fn postpone_collection(&mut self) {
+        self.next_collection_bytes = self
+            .retained_bytes()
+            .saturating_mul(2)
+            .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
+    }
+
+    pub(crate) fn index_memory_stats(&self) -> MemoryOwnerStats {
+        let mut stats = MemoryOwnerStats::default();
+        stats.add_hash_table::<u64, InternSlot>(self.lookup.len(), self.lookup.capacity());
+        for slot in self.lookup.values() {
+            if let InternSlot::Many(ids) = slot {
+                stats.add_vec::<u32>(ids.len(), ids.capacity());
+            }
+        }
+        stats
+    }
+
+    /// Destructive bulk changes may leave no subsequent unique-string growth.
+    pub(crate) fn request_collection(&mut self) {
+        self.next_collection_bytes = STRING_COLLECTION_FLOOR_BYTES;
     }
 }
 
-impl StringPool {
+impl StringStorage {
     pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
         let mut utf8 = MemoryOwnerStats::default();
         utf8.add_vec::<u8>(self.bytes.len(), self.bytes.capacity());
@@ -607,11 +735,11 @@ impl StringPool {
     }
 }
 
-pub(crate) fn string_from_pool(strings: &StringPool, pool_id: u32) -> Option<String> {
+pub(crate) fn string_from_pool(strings: &StringStorage, pool_id: u32) -> Option<String> {
     string_from_pool_ref(strings, pool_id).map(str::to_owned)
 }
 
-pub(crate) fn string_from_pool_ref(strings: &StringPool, pool_id: u32) -> Option<&str> {
+pub(crate) fn string_from_pool_ref(strings: &StringStorage, pool_id: u32) -> Option<&str> {
     if pool_id == NO_STRING {
         return None;
     }

@@ -492,6 +492,38 @@ quoting a result; do not treat an unavailable comparator as a Sheetwrite win.
 
 ─────────────────────────────────────────────────────────────────────────────
 
+## String-pool lifetime controls
+
+`src/string-pool-bench.ts` measures a 1M-row repeated-text ingest, 100k
+committed edits, packed window reads, and distinct-value scans. Set
+`STRING_POOL_BENCH_MODE=lifetime` for the 1M-distinct-string all-live rebuild
+and retained text ownership after clearing and unique edits. That mode records
+the cold sweep and seven additional sweeps; its maximum includes the cold
+sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
+ingest and the public cached `getVisibleWindow` path.
+
+Run each sample in a fresh process. To select a built baseline without changing
+its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
+the first harness, and `STRING_POOL_CHECKOUT` to its checkout for the public
+read harness. For example, from the repository root:
+
+```sh
+bun bench/src/string-pool-bench.ts
+STRING_POOL_BENCH_MODE=lifetime bun bench/src/string-pool-bench.ts
+bun bench/src/string-pool-read-bench.ts
+```
+
+The architecture review capture in
+[`results/string-pool-lifetime-results.json`](./results/string-pool-lifetime-results.json)
+used exclusive, memory-capped execution pinned to one CPU, three A/A control
+rounds, and five alternating ABBA/BAAB rounds. Each process discarded one
+warmup before seven samples. Reported comparisons use medians of per-round
+medians; the evidence records the raw round reductions and A/A noise bands.
+The maximum observed 1M-distinct all-live sweep was **68.62 ms**, not a
+cross-device latency guarantee. Post-loop text/index allocation fell from
+84,312,948 bytes to 353,024 bytes; this excludes dense cell buffers and does
+not claim that committed WebAssembly memory shrinks.
+
 ## Files
 
 ```

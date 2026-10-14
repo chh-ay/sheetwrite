@@ -739,13 +739,13 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       expect(single.values.length).toBe(1);
       expect(large.values.length).toBe(10_000);
       expect(single.ffiCalls).toBe(large.ffiCalls);
-      expect(large.ffiCalls).toBe(3);
+      expect(large.ffiCalls).toBe(4);
       expect(large.transferredElements).toBeGreaterThanOrEqual(20_000);
       expect(large.spillDerived).toHaveLength(0);
       expect(large.transferredElements).toBeLessThanOrEqual(30_032);
 
       const pooledStrings = store.getClipboardWindow("s1", { start: 0, end: 10_000 }, [0]);
-      expect(pooledStrings.ffiCalls).toBe(4);
+      expect(pooledStrings.ffiCalls).toBe(5);
       expect(pooledStrings.spillDerived).toHaveLength(0);
       expect(pooledStrings.transferredElements).toBeLessThanOrEqual(30_032);
     } finally {
@@ -782,7 +782,7 @@ describe("SheetwriteStore clipboard bulk reads", () => {
       const sorted = store.getClipboardWindow("s1", { start: 0, end: 10 }, [1]);
       expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(sorted.values).toHaveLength(10);
-      expect(sorted.ffiCalls).toBe(4);
+      expect(sorted.ffiCalls).toBe(5);
       const sortedRows = Array.from(sorted.dataRows);
       expect(sorted.formulas).toEqual([{ offset: sortedRows.indexOf(0), source: "=1+1" }]);
       expect(sorted.refs).toEqual([

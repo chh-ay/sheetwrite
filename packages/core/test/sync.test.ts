@@ -649,6 +649,143 @@ describe("sync coordinator", () => {
     grid.destroy();
   });
 
+  it("recovers a cell-level conflict in place and resends the queue on the server head", async () => {
+    const { grid, adapter, coordinator, events } = harness(["m1", "m2"]);
+    const cell = (row: number) => grid.store.getCell({ sheet: "s1", row, col: 0 }).resolved;
+    const set = (row: number, value: number) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col: 0 },
+      value: { kind: "literal" as const, value },
+    });
+    const remoteChanges: ChangeEvent[] = [];
+    grid.on("change", (event) => {
+      if (event.source === "remote") remoteChanges.push(event);
+    });
+    grid.applyTransaction({ patches: [set(0, 2)] });
+    const sending = coordinator.sendNext();
+    // A peer's atomic batch landed first, on rows this client did not edit.
+    adapter.responses[0]!.resolve({
+      status: "conflict",
+      currentVersion: 9,
+      operationsSinceBase: [
+        {
+          version: 8,
+          operations: [set(1, 81)],
+          clientMutationId: "peer",
+          batch: { index: 0, count: 2 },
+        },
+        {
+          version: 9,
+          operations: [set(2, 92)],
+          clientMutationId: "peer",
+          batch: { index: 1, count: 2 },
+        },
+      ],
+    });
+    await sending;
+    // Work queued before recovery runs is carried along.
+    grid.applyTransaction({ patches: [set(0, 3)] });
+
+    expect(await coordinator.recoverConflict()).toEqual({ status: "recovered", serverVersion: 9 });
+    // Same Grid, no reload: the missed batch applied as one transaction.
+    expect([cell(0), cell(1), cell(2)]).toEqual([3, 81, 92]);
+    expect(remoteChanges).toHaveLength(1);
+    expect(
+      coordinator.pendingCommits().map(({ clientMutationId, baseVersion, status }) => ({
+        clientMutationId,
+        baseVersion,
+        status,
+      })),
+    ).toEqual([
+      { clientMutationId: "m1", baseVersion: 9, status: "pending" },
+      { clientMutationId: "m2", baseVersion: 10, status: "pending" },
+    ]);
+    expect(events.some((event) => event.type === "recovered")).toBe(true);
+    const resend = coordinator.sendNext();
+    expect(adapter.requests[1]).toMatchObject({ clientMutationId: "m1", baseVersion: 9 });
+    adapter.responses[1]!.resolve({ status: "applied", version: 10, clientMutationId: "m1" });
+    await resend;
+    expect(await coordinator.recoverConflict()).toEqual({ status: "no-conflict" });
+    coordinator.destroy();
+    grid.destroy();
+  });
+
+  it("leaves the conflict for a reload when in-place recovery is not safe", async () => {
+    const set = (row: number, value: number) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col: 0 },
+      value: { kind: "literal" as const, value },
+    });
+    const cases: Array<{
+      name: string;
+      response: Extract<PersistenceCommitResponse, { status: "conflict" }>;
+      afterConflict?: ReturnType<typeof set>;
+      reason: string;
+    }> = [
+      {
+        name: "a missed version edits the pending cell",
+        response: {
+          status: "conflict",
+          currentVersion: 8,
+          operationsSinceBase: [{ version: 8, operations: [set(0, 80)] }],
+        },
+        reason: "overlapping-work",
+      },
+      {
+        name: "work queued after the conflict edits a missed cell",
+        response: {
+          status: "conflict",
+          currentVersion: 8,
+          operationsSinceBase: [{ version: 8, operations: [set(1, 80)] }],
+        },
+        afterConflict: set(1, 5),
+        reason: "overlapping-work",
+      },
+      {
+        name: "a missed version inserts rows",
+        response: {
+          status: "conflict",
+          currentVersion: 8,
+          operationsSinceBase: [
+            { version: 8, operations: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }] },
+          ],
+        },
+        reason: "structural-change",
+      },
+      {
+        name: "the response has only a snapshot",
+        response: {
+          status: "conflict",
+          currentVersion: 8,
+          snapshot: { ...snapshot(), version: 8 },
+        },
+        reason: "missing-operations",
+      },
+    ];
+    for (const testCase of cases) {
+      const { grid, coordinator } = harness(["m1", "m2"]);
+      const column = () =>
+        [0, 1, 2].map((row) => grid.store.getCell({ sheet: "s1", row, col: 0 }).resolved);
+      grid.applyTransaction({ patches: [set(0, 2)] });
+      await coordinator.handleResponse(testCase.response, "m1");
+      if (testCase.afterConflict) grid.applyTransaction({ patches: [testCase.afterConflict] });
+      const before = column();
+      const result = await coordinator.recoverConflict();
+      expect({ name: testCase.name, result }).toMatchObject({
+        name: testCase.name,
+        result: { status: "reload-required", reason: testCase.reason },
+      });
+      // Nothing changed: the host reloads exactly as before.
+      expect(column()).toEqual(before);
+      expect(coordinator.pendingCommits()[0]).toMatchObject({
+        baseVersion: 7,
+        status: "conflicted",
+      });
+      coordinator.destroy();
+      grid.destroy();
+    }
+  });
+
   it("rejects malformed and oversized conflict recovery before publishing conflict", async () => {
     const cases: Array<{
       response: Extract<PersistenceCommitResponse, { status: "conflict" }>;

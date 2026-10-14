@@ -9,8 +9,8 @@ use crate::query::matches_needle;
 use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringPool, Value, KIND_BOOL,
-    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringStorage, Value,
+    KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
@@ -28,14 +28,14 @@ impl CellStore {
         cols: &[u32],
     ) -> WindowView {
         let Some(s) = self.sheets.get(sheet) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
         let row_start = row_start.min(s.row_count);
         let row_end = row_end.min(s.row_count);
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
         let Some(cells) = n_rows.checked_mul(n_cols) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
 
         let mut kind = vec![KIND_EMPTY; cells];
@@ -90,6 +90,7 @@ impl CellStore {
         );
 
         WindowView::new(
+            self.strings.epoch,
             n_rows,
             n_cols,
             kind,
@@ -108,12 +109,12 @@ impl CellStore {
     #[wasm_bindgen(js_name = getWindowRows)]
     pub fn get_window_rows(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> WindowView {
         let Some(s) = self.sheets.get(sheet) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
         let n_rows = rows.len();
         let n_cols = cols.len();
         let Some(cells) = n_rows.checked_mul(n_cols) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
 
         let mut kind = vec![KIND_EMPTY; cells];
@@ -170,6 +171,7 @@ impl CellStore {
         );
 
         WindowView::new(
+            self.strings.epoch,
             n_rows,
             n_cols,
             kind,
@@ -387,7 +389,7 @@ fn cond_pred_matches(pred: &CondPred, kind: u8, num: f64, text: Option<&str>) ->
 fn cell_text<'a>(
     pool_id: u32,
     local_id: i32,
-    pool: &'a StringPool,
+    pool: &'a StringStorage,
     local_strings: &'a [String],
 ) -> Option<&'a str> {
     if pool_id != NO_STRING {
@@ -406,6 +408,7 @@ const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 #[wasm_bindgen]
 pub struct WindowView {
+    string_pool_epoch: u32,
     n_rows: u32,
     n_cols: u32,
     packed: Vec<u8>,
@@ -415,6 +418,7 @@ pub struct WindowView {
 impl WindowView {
     #[allow(clippy::too_many_arguments)]
     fn new(
+        string_pool_epoch: u32,
         n_rows: usize,
         n_cols: usize,
         kind: Vec<u8>,
@@ -440,6 +444,7 @@ impl WindowView {
         )
         .unwrap_or_default();
         Self {
+            string_pool_epoch,
             n_rows: n_rows.try_into().unwrap_or_default(),
             n_cols: n_cols.try_into().unwrap_or_default(),
             packed,
@@ -447,8 +452,9 @@ impl WindowView {
         }
     }
 
-    pub(crate) fn empty() -> Self {
+    pub(crate) fn empty(epoch: u32) -> Self {
         Self::new(
+            epoch,
             0,
             0,
             Vec::new(),
@@ -541,6 +547,11 @@ fn align_to_8(value: usize) -> Option<usize> {
 
 #[wasm_bindgen]
 impl WindowView {
+    #[wasm_bindgen(js_name = stringPoolEpoch)]
+    pub fn string_pool_epoch(&self) -> u32 {
+        self.string_pool_epoch
+    }
+
     #[wasm_bindgen(getter, js_name = nRows)]
     pub fn n_rows(&self) -> u32 {
         self.n_rows

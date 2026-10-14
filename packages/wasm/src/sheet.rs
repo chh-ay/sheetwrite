@@ -924,6 +924,51 @@ pub(crate) struct SheetData {
 }
 
 impl SheetData {
+    /// Physical roots include shadowed clean pages: acknowledgement can expose them.
+    pub(crate) fn visit_string_ids(&self, mut visit: impl FnMut(u32)) {
+        let mut visit_payload = |payload: u64| {
+            let id = payload_str_id(payload);
+            if id != NO_STRING {
+                visit(id);
+            }
+        };
+        for &payload in &self.payload {
+            visit_payload(payload);
+        }
+        if let Some(paged) = &self.paged {
+            for chunk in paged.chunks.values() {
+                for &payload in &chunk.payload {
+                    visit_payload(payload);
+                }
+            }
+            for dirty in paged.dirty.values() {
+                visit_payload(dirty.payload);
+            }
+        }
+    }
+
+    pub(crate) fn remap_string_ids(&mut self, remap: &[u32]) {
+        let remap_payload = |payload: &mut u64| {
+            let id = payload_str_id(*payload);
+            if id != NO_STRING {
+                *payload = encode_str_id(remap[id as usize]);
+            }
+        };
+        for payload in &mut self.payload {
+            remap_payload(payload);
+        }
+        if let Some(paged) = &mut self.paged {
+            for chunk in paged.chunks.values_mut() {
+                for payload in &mut chunk.payload {
+                    remap_payload(payload);
+                }
+            }
+            for dirty in paged.dirty.values_mut() {
+                remap_payload(&mut dirty.payload);
+            }
+        }
+    }
+
     pub(crate) fn new(n_cols: usize, row_count: usize) -> Self {
         Self::try_new(n_cols, row_count).expect("trusted dense sheet dimensions")
     }

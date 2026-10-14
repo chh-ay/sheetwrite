@@ -9,8 +9,8 @@ use wasm_bindgen::prelude::*;
 use crate::sheet::{formula_error_at, payload_is_str, payload_num, payload_str_id, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringPool, KIND_BOOL,
-    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
+    KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[derive(Hash, Eq, PartialEq)]
@@ -858,7 +858,11 @@ fn boolean_cell_value(sheet: &SheetData, index: usize) -> Option<bool> {
     }
 }
 
-fn resolved_text<'a>(sheet: &SheetData, strings: &'a StringPool, index: usize) -> Option<&'a str> {
+fn resolved_text<'a>(
+    sheet: &SheetData,
+    strings: &'a StringStorage,
+    index: usize,
+) -> Option<&'a str> {
     if let Some(value) = boolean_cell_value(sheet, index) {
         return Some(boolean_text(value));
     }
@@ -1078,7 +1082,7 @@ impl MatchCache {
     /// still holds this id. `needle`/flags are constant for a given scan.
     pub(crate) fn matches(
         &mut self,
-        strings: &StringPool,
+        strings: &StringStorage,
         id: u32,
         needle: &str,
         case_insensitive: bool,
@@ -1098,7 +1102,7 @@ impl MatchCache {
 
 pub(crate) fn cell_matches_text(
     sheet: &SheetData,
-    strings: &StringPool,
+    strings: &StringStorage,
     index: usize,
     needle: &str,
     case_insensitive: bool,
@@ -1323,7 +1327,11 @@ pub(crate) enum ComparableCell<'a> {
 }
 
 impl<'a> ComparableCell<'a> {
-    pub(crate) fn from_cell(sheet: &'a SheetData, strings: &'a StringPool, index: usize) -> Self {
+    pub(crate) fn from_cell(
+        sheet: &'a SheetData,
+        strings: &'a StringStorage,
+        index: usize,
+    ) -> Self {
         match sheet.kind_at(index) {
             KIND_NUMBER => ComparableCell::Number(OrderedNumber(sheet.num_at(index))),
             KIND_BOOL => ComparableCell::Bool(sheet.num_at(index) != 0.0),
@@ -1359,7 +1367,7 @@ impl<'a> ComparableCell<'a> {
 
     pub(crate) unsafe fn from_cell_unchecked(
         sheet: &'a SheetData,
-        strings: &'a StringPool,
+        strings: &'a StringStorage,
         index: usize,
     ) -> Self {
         // SAFETY: caller guarantees `index` is a valid cell-vector index.

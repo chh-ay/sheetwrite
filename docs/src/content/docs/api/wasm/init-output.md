@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L472"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L472</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L466"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L466</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -77,8 +77,6 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
 <a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
 <a href="#init-output-cellstore-pin-range"><code>cellstore_pinRange</code></a>
-<a href="#init-output-cellstore-pin-read-window"><code>cellstore_pinReadWindow</code></a>
-<a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
 <a href="#init-output-cellstore-pool-strings"><code>cellstore_poolStrings</code></a>
 <a href="#init-output-cellstore-query-resource-stats"><code>cellstore_queryResourceStats</code></a>
 <a href="#init-output-cellstore-range-fully-loaded"><code>cellstore_rangeFullyLoaded</code></a>
@@ -123,6 +121,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-spill-anchor-row"><code>cellstore_spillAnchorRow</code></a>
 <a href="#init-output-cellstore-spill-derived-mask"><code>cellstore_spillDerivedMask</code></a>
 <a href="#init-output-cellstore-spill-owner-coordinates"><code>cellstore_spillOwnerCoordinates</code></a>
+<a href="#init-output-cellstore-string-pool-epoch"><code>cellstore_stringPoolEpoch</code></a>
 <a href="#init-output-cellstore-style-id-at"><code>cellstore_styleIdAt</code></a>
 <a href="#init-output-cellstore-wasm-committed-bytes"><code>cellstore_wasmCommittedBytes</code></a>
 <a href="#init-output-distinctcolumn-take-kinds"><code>distinctcolumn_takeKinds</code></a>
@@ -142,8 +141,9 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-sourcesnapshot-reference-targets"><code>sourcesnapshot_referenceTargets</code></a>
 <a href="#init-output-sourcesnapshot-spill-derived"><code>sourcesnapshot_spillDerived</code></a>
 <a href="#init-output-windowview-n-cols"><code>windowview_nCols</code></a>
-<a href="#init-output-windowview-take-strings"><code>windowview_takeStrings</code></a>
 <a href="#init-output-windowview-n-rows"><code>windowview_nRows</code></a>
+<a href="#init-output-windowview-take-strings"><code>windowview_takeStrings</code></a>
+<a href="#init-output-windowview-string-pool-epoch"><code>windowview_stringPoolEpoch</code></a>
 <a href="#init-output-windowview-take-packed"><code>windowview_takePacked</code></a>
 <a href="#init-output-wbindgen-malloc"><code>__wbindgen_malloc</code></a>
 <a href="#init-output-wbindgen-realloc"><code>__wbindgen_realloc</code></a>
@@ -743,24 +743,6 @@ readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: num
 
 </details>
 
-<details class="api-member" id="init-output-cellstore-pin-read-window" data-pagefind-weight="1">
-<summary><code>cellstore_pinReadWindow</code></summary>
-
-```ts generated
-readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
-```
-
-</details>
-
-<details class="api-member" id="init-output-cellstore-pin-viewport-bands" data-pagefind-weight="1">
-<summary><code>cellstore_pinViewportBands</code></summary>
-
-```ts generated
-readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void;
-```
-
-</details>
-
 <details class="api-member" id="init-output-cellstore-pool-strings" data-pagefind-weight="1">
 <summary><code>cellstore_poolStrings</code></summary>
 
@@ -1157,6 +1139,15 @@ readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: n
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>cellstore_stringPoolEpoch</code></summary>
+
+```ts generated
+readonly cellstore_stringPoolEpoch: (a: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-style-id-at" data-pagefind-weight="1">
 <summary><code>cellstore_styleIdAt</code></summary>
 
@@ -1328,6 +1319,15 @@ readonly windowview_nCols: (a: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-windowview-n-rows" data-pagefind-weight="1">
+<summary><code>windowview_nRows</code></summary>
+
+```ts generated
+readonly windowview_nRows: (a: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-windowview-take-strings" data-pagefind-weight="1">
 <summary><code>windowview_takeStrings</code></summary>
 
@@ -1337,11 +1337,11 @@ readonly windowview_takeStrings: (a: number) => [number, number];
 
 </details>
 
-<details class="api-member" id="init-output-windowview-n-rows" data-pagefind-weight="1">
-<summary><code>windowview_nRows</code></summary>
+<details class="api-member" id="init-output-windowview-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>windowview_stringPoolEpoch</code></summary>
 
 ```ts generated
-readonly windowview_nRows: (a: number) => number;
+readonly windowview_stringPoolEpoch: (a: number) => number;
 ```
 
 </details>
@@ -1716,22 +1716,6 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
-  readonly cellstore_pinReadWindow: (
-    a: number,
-    b: number,
-    c: number,
-    d: number,
-    e: number,
-    f: number,
-    g: number,
-    h: number,
-  ) => void;
-  readonly cellstore_pinViewportBands: (
-    a: number,
-    b: number,
-    c: number,
-    d: number,
-  ) => void;
   readonly cellstore_poolStrings: (
     a: number,
     b: number,
@@ -2078,6 +2062,7 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => [number, number];
+  readonly cellstore_stringPoolEpoch: (a: number) => number;
   readonly cellstore_styleIdAt: (
     a: number,
     b: number,
@@ -2102,8 +2087,9 @@ export interface InitOutput {
   readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
   readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
   readonly windowview_nCols: (a: number) => number;
-  readonly windowview_takeStrings: (a: number) => [number, number];
   readonly windowview_nRows: (a: number) => number;
+  readonly windowview_takeStrings: (a: number) => [number, number];
+  readonly windowview_stringPoolEpoch: (a: number) => number;
   readonly windowview_takePacked: (a: number) => [number, number];
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (

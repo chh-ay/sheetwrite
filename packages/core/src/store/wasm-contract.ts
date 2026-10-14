@@ -63,6 +63,7 @@ export type RecomputingCellStore = CellStore & {
   ): void;
   removeCols(sheet: number, at: number, count: number): void;
   poolStrings(ids: Uint32Array): string[];
+  stringPoolEpoch(): number;
   styleIdAt(sheet: number, row: number, col: number): number;
   setConditionalRules(
     sheet: number,
@@ -237,6 +238,7 @@ export type RecomputingCellStore = CellStore & {
 
 /** Consuming accessors transfer one packed numeric payload and any strings once. */
 export type ConsumingWindowView = WindowView & {
+  stringPoolEpoch(): number;
   takePacked(): Uint8Array;
   takeStrings(): string[];
 };

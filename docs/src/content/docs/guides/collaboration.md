@@ -231,7 +231,7 @@ IndexedDB record migration is versioned. Unsupported future schemas, blocked upg
 
 ## Remote operations and version gaps
 
-`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries.
+`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries. Remote row and column inserts and deletes move existing undo entries, so a later undo restores the cell the user edited.
 
 A gap emits `reload-required`. Prefer fetching missing ordered operations through
 `recoverVersionGap`; the coordinator applies them in sequence. A returned
@@ -242,10 +242,37 @@ grid or attach the coordinator to a newly created grid.
 
 ### Conflict and snapshot reload
 
-Never acknowledge or discard a conflicted mutation implicitly. If the server
-returns both `operationsSinceBase` and a current snapshot, the host can gate
-every pending transaction through the conservative rebaser, clear the old
-durable IDs, remount, and submit the safe results as new mutations:
+Never acknowledge or discard a conflicted mutation implicitly. First call
+`sync.recoverConflict()`. It recovers on the live Grid, without a reload, when
+the server returns `operationsSinceBase`, the pending work and the server
+versions it did not see change different cells and sheets, and neither side
+inserts, deletes, or moves rows or columns. It applies the missed versions,
+moves the queue onto the server head, and emits `recovered`; call
+`sync.flush()` to resend:
+
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
+import type { PersistenceCommitResponse, SyncConflictReloadReason } from "@sheetwrite/core";
+
+/** Host fallback: the rebase-and-remount recipe below. */
+declare function reloadSession(
+  response: Extract<PersistenceCommitResponse, { status: "conflict" }>,
+  reason: SyncConflictReloadReason,
+): Promise<void>;
+
+sync.on((event) => {
+  if (event.type !== "conflict") return;
+  void sync.recoverConflict().then((result) => {
+    if (result.status === "recovered") return sync.flush();
+    if (result.status === "reload-required") return reloadSession(event.response, result.reason);
+  });
+});
+```
+
+Otherwise the result is `reload-required` with a reason and nothing changes.
+If the server returns both `operationsSinceBase` and a current snapshot, the
+host can then gate every pending transaction through the conservative rebaser,
+clear the old durable IDs, remount, and submit the safe results as new
+mutations:
 
 ```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import {

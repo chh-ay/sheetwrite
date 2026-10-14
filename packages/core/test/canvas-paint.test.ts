@@ -175,7 +175,7 @@ function makeView(
   const rows = { start: 0, end: 3 };
   const cellCount = (rows.end - rows.start) * cols.length;
   const values = new Array<string>(cellCount).fill("x");
-  return { sheet: "s1", rows, cols, values, styleIds, styles };
+  return { sheet: "s1", stringPoolEpoch: 0, rows, cols, values, styleIds, styles };
 }
 
 /** Paint `view` against a fresh recording context and return it for inspection. */
@@ -228,6 +228,7 @@ describe("paintFrame number formats", () => {
     ]);
     const view: VisibleWindowView = {
       sheet: "s1",
+      stringPoolEpoch: 0,
       rows: { start: 0, end: 1 },
       cols: [0],
       values: [-246],
@@ -540,6 +541,7 @@ describe("paintFrame compiled number formats", () => {
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
     const view: VisibleWindowView = {
       sheet: "s1",
+      stringPoolEpoch: 0,
       rows: { start: 0, end: 3 },
       cols: [0, 1],
       values: [1234.5, serial, 1234.5, serial, 1234.5, serial],

@@ -1454,7 +1454,8 @@ export class StoreDataEngine {
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
     const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
-    const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
+    const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
+    const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
@@ -1493,22 +1494,21 @@ export class StoreDataEngine {
           hasStructuralPatch = true;
         }
       }
+      if (hasStructuralPatch) {
+        for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
+      }
+      this.flushSpillBlockers();
+      if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
+      this.rangeMutationStats.documentOperations += appliedPatches.length;
+      this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
+
+      this.noteRangeMutationFfi();
+      this.wasm.recomputeChanged();
+      return { appliedPatches, changes, storageRevision };
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
-      else if (tracksPagedRevision) this.wasm.endMutation();
+      else this.wasm.endMutation();
     }
-
-    if (hasStructuralPatch) {
-      for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
-    }
-    this.flushSpillBlockers();
-    if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
-    this.rangeMutationStats.documentOperations += appliedPatches.length;
-    this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
-
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
-    return { appliedPatches, changes, storageRevision };
   }
 
   private applyPatch(

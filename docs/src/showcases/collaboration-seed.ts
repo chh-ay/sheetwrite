@@ -1,9 +1,14 @@
 import type { WorkbookSnapshot } from "@sheetwrite/core";
-import { makeUsageSheet } from "./scenarios/durable-usage.js";
+import { makeUsageSheet, USAGE_SHEET_ID } from "./scenarios/durable-usage.js";
 
 // Pure seed data shared by the showcase and prebuilt-site browser specs.
-/** Document every collaboration proof client loads and commits against. */
+/** Forecast document: the chaos, conflict and offline proofs run against it. */
 export const COLLABORATION_DOCUMENT_ID = "showcase-collaboration";
+/**
+ * Usage document for the 100,000-cell batch proof. It is a separate document,
+ * so conflict recovery on the forecast never reloads its 10 MB of receipts.
+ */
+export const COLLABORATION_USAGE_DOCUMENT_ID = "showcase-collaboration-usage";
 export const COLLABORATION_FORECAST_ROWS = 2_000;
 export const COLLABORATION_WORKBOOK_ROWS = COLLABORATION_FORECAST_ROWS + 2;
 export const COLLABORATION_WORKBOOK_COLUMNS = 5;
@@ -156,7 +161,17 @@ export function makeCollaborationSnapshot(): WorkbookSnapshot {
           },
         ],
       },
-      makeUsageSheet(),
     ],
+  };
+}
+
+/** The metered-usage sheet as its own document. */
+export function makeCollaborationUsageSnapshot(): WorkbookSnapshot {
+  return {
+    schemaVersion: 1,
+    documentId: COLLABORATION_USAGE_DOCUMENT_ID,
+    version: 0,
+    workbook: { activeSheet: USAGE_SHEET_ID },
+    sheets: [{ ...makeUsageSheet(), order: 0 }],
   };
 }
