@@ -13,6 +13,7 @@
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
     "bench:interaction": "bun run src/interaction-bench.ts",
     "bench:interaction:smoke": "bun run src/interaction-bench.ts --smoke",
+    "bench:interaction-sessions": "bun run src/interaction-sessions-bench.ts",
     "bench:core-paths": "bun run src/core-paths-bench.ts --output results/core-paths-results.json",
     "bench:core-paths:smoke": "bun run src/core-paths-bench.ts --smoke",
     "bench:release": "bun run src/release-capture.ts",

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "9d9224d0e9de2b44b85ebde3b40707b58372bef2cc3cd7a447cbdba16e3e8f3a",
+  "sha256": "bed41272c5c91cb0047a02b0017e6ec35b26c86ac80ed108949f8eb79b73e82d",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -215,6 +215,8 @@
         "Store",
         "StoreMemoryBreakdown",
         "SyncActivityState",
+        "SyncConflictRecovery",
+        "SyncConflictReloadReason",
         "SyncConnectionState",
         "SyncCoordinator",
         "SyncCoordinatorEvent",

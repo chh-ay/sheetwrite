@@ -8,7 +8,7 @@ description: "Stable category identifying which synchronization protocol bound w
 Stable category identifying which synchronization protocol bound was violated.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L183"><code>packages/core/src/sync.ts#L183</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L184"><code>packages/core/src/sync.ts#L184</code></a></dd></div>
 </dl>
 
 ## Declaration

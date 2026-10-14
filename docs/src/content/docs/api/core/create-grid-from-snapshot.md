@@ -9,7 +9,7 @@ Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes
 the hydrated store just like one created through `createGrid`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L56"><code>packages/core/src/persistence.ts#L56</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/persistence.ts#L64"><code>packages/core/src/persistence.ts#L64</code></a></dd></div>
 </dl>
 
 ## Declaration

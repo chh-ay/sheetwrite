@@ -163,6 +163,32 @@ describe("showcase network link", () => {
     expect(retry.status).toBe("duplicate");
     if (retry.status === "duplicate") expect(retry.version).toBe(1);
   });
+
+  it("hands every broadcast a remount missed to the next subscriber, in order", async () => {
+    const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
+    const link = new ShowcaseNetworkLink(server);
+    cleanups.push(() => link.destroy());
+    const edit = (row: number) =>
+      server.commitServerOperations(COLLABORATION_DOCUMENT_ID, [pointsEdit(row, 12)]);
+    const unsubscribe = link.subscribe(() => {});
+    await edit(0); // v1, delivered to the old subscriber
+    link.setConnected(false);
+    await edit(1); // v2, queued while offline
+    link.holdNextBroadcast();
+    link.setConnected(true); // delivers v2 to the old subscriber
+    await edit(2); // v3, held
+    unsubscribe(); // the client starts remounting
+    link.releaseHeldBroadcasts(); // v3 released with nobody subscribed
+    link.setConnected(false);
+    await edit(3); // v4, queued while offline
+    link.setConnected(true); // v4 drained with nobody subscribed
+    await edit(4); // v5, arrives with nobody subscribed
+    link.startFrom(3); // the remounted snapshot already holds v1-v3
+    const delivered: number[] = [];
+    link.subscribe((operation) => delivered.push(operation.version));
+    await edit(5); // v6, live
+    expect(delivered).toEqual([4, 5, 6]);
+  });
 });
 
 describe("atomic batch commits", () => {

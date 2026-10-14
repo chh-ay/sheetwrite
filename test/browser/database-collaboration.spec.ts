@@ -16,7 +16,8 @@ import { siteUrl } from "./playwright.config.js";
 const DATABASE_URL = siteUrl("/showcases/database/");
 const COLLABORATION_URL = siteUrl("/showcases/collaboration/");
 const READY_TIMEOUT = 30_000;
-const CHAOS_TIMEOUT = 40_000;
+/** Covers the showcase's 6 s storm and 30 s drain window, plus remount time. */
+const CHAOS_TIMEOUT = 50_000;
 const CONFLICT_RECOVERY_TIMEOUT = 2_000;
 
 /** Seed revenue: every ledger row's seats × rate, straight from the seed snapshot. */
@@ -355,6 +356,7 @@ test.describe("collaboration proof", () => {
   test("converges after a storm of edits, disconnects, and reordered broadcasts", async ({
     page,
   }) => {
+    test.setTimeout(CHAOS_TIMEOUT + READY_TIMEOUT);
     const errors = collectErrors(page);
     await page.goto(COLLABORATION_URL);
     await collaborationReady(page);

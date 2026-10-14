@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellValue } from "../src/types/cell.js";
@@ -43,6 +44,49 @@ beforeAll(async () => {
 });
 
 describe("RowBridge", () => {
+  it("projects revised restores during nested callbacks and after the event lifetime", () => {
+    const workbook: Workbook = {
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount: 3,
+          columns: [
+            { key: "name", header: "Name", width: 100, type: "text" },
+            { key: "amount", header: "Amount", width: 100, type: "number" },
+          ],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const range = { sheet: "sheet1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } };
+    const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [10] });
+    let retained: ChangeEvent | undefined;
+    let projected: unknown;
+    store.on("change", (change) => {
+      if (change.transaction.patches[0]?.op !== "restoreBlock") return;
+      retained = change;
+      Object.assign(restore, encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [20] }));
+      store.applyTransaction({
+        patches: [{ op: "set", addr: { sheet: "sheet1", row: 2, col: 1 }, value: literal(99) }],
+      });
+      projected = bridge.project(change).deltas[0]?.next;
+    });
+    try {
+      expect(store.applyTransaction({ patches: [restore] }).status).toBe("applied");
+      expect(projected).toEqual([literal(20)]);
+      expect(store.getCell({ sheet: "sheet1", row: 0, col: 1 }).resolved).toBe(10);
+      if (!retained) throw new Error("restore event was not emitted");
+      Object.assign(restore, encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [30] }));
+      const delayed = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+      expect(delayed.project(retained).deltas[0]?.next).toEqual([literal(30)]);
+    } finally {
+      store.dispose();
+    }
+  });
+
   it("keeps data-space identities through insert, move, and delete", () => {
     const bridge = createRowBridge({
       columns,

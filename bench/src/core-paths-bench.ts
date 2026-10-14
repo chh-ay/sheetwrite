@@ -60,6 +60,7 @@ import {
 import { createGridController, type GridControllerHandlers } from "@sheetwrite/core/adapter";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { initSync } from "@sheetwrite/wasm";
+import { encodeRestoreBlock } from "../../packages/core/src/restore-block.js";
 
 import { assertFiniteNonNegative, type BenchmarkMode, validateRawStat } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
@@ -108,6 +109,7 @@ export const CORE_PATH_SCENARIOS = [
   "validation-sparse",
   "csv-import",
   "undo-large-clear",
+  "restore-near-ceiling",
   "paged-evicted-revisit",
   "node-cold-init",
 ] as const;
@@ -153,11 +155,9 @@ const FULL_SCALE: CorePathScale = {
   validationRules: 100,
   csvRows: 200_000,
   csvColumns: 10,
-  // Undo restores the cleared numbers as one transaction. 500,000 cells stay
-  // under the default 8 MiB payload limit; 1,000,000 cells are just above it,
-  // and the Grid then rejects that undo by design.
+  // A million-cell clear exceeds ordinary wire admission and must compact on undo.
   clearRows: 1_000,
-  clearColumns: 500,
+  clearColumns: 1_000,
   pagedRows: 200_000,
 };
 
@@ -208,6 +208,7 @@ function samplePlan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
     case "csv-import":
       return { warmup: 1, iters: smoke ? 3 : 2, gcBetween: true };
     case "undo-large-clear":
+    case "restore-near-ceiling":
       return { warmup: 1, iters: 3, gcBetween: true };
     case "paged-evicted-revisit":
       return { warmup: 1, iters: 3, gcBetween: false };
@@ -1049,6 +1050,38 @@ function importCsvText(scale: CorePathScale, plan: SamplePlan): CorePathScenario
   );
 }
 
+// A repetitive 60 MiB decoded payload is valid under both restore ceilings.
+// Encoding and initial sheet construction are deliberately outside the samples.
+function restoreNearCeiling(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
+  const rows = scale === FULL_SCALE ? 4_000 : 100;
+  const columns = scale === FULL_SCALE ? 1_000 : 100;
+  const value = "restore-text";
+  const operation = encodeRestoreBlock(sheetRange(rows, columns), {
+    rowCount: rows,
+    colCount: columns,
+    values: new Array<CellScalar>(rows * columns).fill(value),
+  });
+  const mounted = mountGrid({ workbook: workbook(rows, numberColumns(columns)) });
+  const samplesMs = collect(() => {
+    assertApplied(mounted.grid.applyRemoteOperations([operation]).status, "restoreBlock");
+  }, plan);
+  if (resolvedCell(mounted.grid, rows - 1, columns - 1) !== value) {
+    fail("near-ceiling restore did not apply the final cell");
+  }
+  mounted.destroy();
+  return scenarioResult(
+    "restore-near-ceiling",
+    `one restoreBlock with ${operation.decodedBytes} decoded bytes`,
+    samplesMs,
+    {
+      restoredCells: rows * columns,
+      decodedBytes: operation.decodedBytes,
+      peakRssBytes: process.resourceUsage().maxRSS * 1024,
+    },
+    "a valid near-ceiling compressed restore applies its complete block",
+  );
+}
+
 // ── undo-large-clear ────────────────────────────────────────────────────────
 
 function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
@@ -1067,6 +1100,14 @@ function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenari
     data,
   });
   const { grid } = mounted;
+  let compactRestores = 0;
+  grid.on("change", (event) => {
+    if (event.commitReason === "undo") {
+      compactRestores += event.transaction.patches.filter(
+        (operation) => operation.op === "restoreBlock",
+      ).length;
+    }
+  });
   const clearOperation: DocumentOp = {
     op: "clearRange",
     range: sheetRange(scale.clearRows, scale.clearColumns),
@@ -1105,13 +1146,20 @@ function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenari
   // Every cell is compared against its original value after timing: a partial
   // restore fails here even though each undo returned normally.
   assertWindowedValues(grid, scale.clearRows, scale.clearColumns, 0, "undo restore");
+  if (scale === FULL_SCALE && compactRestores === 0) fail("large-clear undo did not compact");
   mounted.destroy();
 
   return scenarioResult(
     "undo-large-clear",
     `one undo of a ${cellCount.toLocaleString("en-US")}-cell clearRange`,
     samplesMs,
-    { clearedCells: cellCount, clears, restoredCells: cellCount },
+    {
+      clearedCells: cellCount,
+      clears,
+      restoredCells: cellCount,
+      compactRestores,
+      peakRssBytes: process.resourceUsage().maxRSS * 1024,
+    },
     "the clear empties the block and the undos restore every original cell value",
   );
 }
@@ -1398,6 +1446,7 @@ export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   "validation-sparse": writeSparseRangeWithRules,
   "csv-import": importCsvText,
   "undo-large-clear": undoLargeClear,
+  "restore-near-ceiling": restoreNearCeiling,
   "paged-evicted-revisit": revisitEvictedBand,
   "node-cold-init": (_scale, plan) => loadWasmInFreshNode(plan),
 };

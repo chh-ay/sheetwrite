@@ -1285,7 +1285,7 @@ IndexedDB record migration is versioned. Unsupported future schemas, blocked upg
 
 ## Remote operations and version gaps
 
-`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries.
+`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries. Remote row and column inserts and deletes move existing undo entries, so a later undo restores the cell the user edited.
 
 A gap emits `reload-required`. Prefer fetching missing ordered operations through
 `recoverVersionGap`; the coordinator applies them in sequence. A returned
@@ -1296,10 +1296,37 @@ grid or attach the coordinator to a newly created grid.
 
 ### Conflict and snapshot reload
 
-Never acknowledge or discard a conflicted mutation implicitly. If the server
-returns both `operationsSinceBase` and a current snapshot, the host can gate
-every pending transaction through the conservative rebaser, clear the old
-durable IDs, remount, and submit the safe results as new mutations:
+Never acknowledge or discard a conflicted mutation implicitly. First call
+`sync.recoverConflict()`. It recovers on the live Grid, without a reload, when
+the server returns `operationsSinceBase`, the pending work and the server
+versions it did not see change different cells and sheets, and neither side
+inserts, deletes, or moves rows or columns. It applies the missed versions,
+moves the queue onto the server head, and emits `recovered`; call
+`sync.flush()` to resend:
+
+```ts
+import type { PersistenceCommitResponse, SyncConflictReloadReason } from "@sheetwrite/core";
+
+/** Host fallback: the rebase-and-remount recipe below. */
+declare function reloadSession(
+  response: Extract<PersistenceCommitResponse, { status: "conflict" }>,
+  reason: SyncConflictReloadReason,
+): Promise<void>;
+
+sync.on((event) => {
+  if (event.type !== "conflict") return;
+  void sync.recoverConflict().then((result) => {
+    if (result.status === "recovered") return sync.flush();
+    if (result.status === "reload-required") return reloadSession(event.response, result.reason);
+  });
+});
+```
+
+Otherwise the result is `reload-required` with a reason and nothing changes.
+If the server returns both `operationsSinceBase` and a current snapshot, the
+host can then gate every pending transaction through the conservative rebaser,
+clear the old durable IDs, remount, and submit the safe results as new
+mutations:
 
 ```ts
 import {
@@ -1326,6 +1353,9 @@ async function reloadAfterConflict(
     return session;
   }
 
+  // Freeze local edits and let queued writes finish before reading the queue.
+  session.grid.setReadOnly(true);
+  await session.sync.ready();
   const pending = session.sync.pendingCommits();
   const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
     ...entry.operations,
@@ -1338,6 +1368,7 @@ async function reloadAfterConflict(
     const result = rebaseDocumentOperations(record.operations, remoteOperations);
     if (result.status === "conflict") {
       console.error("Manual conflict review required", result.conflict);
+      session.grid.setReadOnly(false);
       return session; // old queue and grid remain intact
     }
     safeBatches.push(result);
@@ -1379,6 +1410,18 @@ product-specific conflict UI. If the server returns only a snapshot, the host
 cannot infer a safe transform; offer explicit discard/export/manual re-entry
 instead. Reloading a snapshot over pending edits without this decision loses
 intent.
+
+Two ordering rules keep recovery from losing work:
+
+- Freeze the Grid and await `sync.ready()` before reading `pendingCommits()`.
+An edit made while recovery awaits would be neither rebased nor removed, and
+a queue write still in flight could land after its removal. Either comes back
+on the remounted client with a stale base version.
+- Keep remote operations that arrive between loading `latest` and
+`sync.subscribe(...)`, and deliver them to the new coordinator. Drop versions
+at or below `latest.version`, which the snapshot already contains. A
+transport that only forwards to the current subscriber loses them, and the
+client then waits on a version gap that never closes.
 
 ## Presence
 
@@ -2862,6 +2905,18 @@ Row and full-column selections are part of the model. Column selection is wired 
 the top header; **row selection is programmatic only** — there is no row-header
 click gesture, so set it via `setSelection({ kind: "row", sheet, row })`.
 
+Only the pointer that began a drag can change it. Switching sheets, changing
+sheet structure or the sorted/filtered view, or losing pointer capture ends the
+gesture; a later pointer release cannot apply it to a different sheet or view.
+
+## Resizing
+
+Drag a column-header boundary or a row-header boundary to preview its size.
+The preview changes geometry only: the document and undo history remain intact
+until release. Release submits one undoable size change. Cancellation, capture
+loss, or a rejected change restores the document's size. Turning read-only on
+ends an active resize without committing.
+
 ## Keyboard navigation
 
 When the grid is focused and not editing:
@@ -2930,6 +2985,19 @@ Commit and navigation keys:
 
 While the IME is composing, keystrokes belong to the composition and are not
 treated as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+`beginEdit` closes the previous editor, selects the requested cell, and emits
+`selection` when that changes the selection, then emits `edit-begin` before
+opening the editor. A synchronous handler can replace or cancel the request
+without the old editor reopening.
+Successful completion emits `change`, then `edit-commit`, then the navigation's
+`selection` event; rejected completion does not emit `edit-commit` or navigate.
+Event addresses remain view coordinates.
+
+Stock, validation, and custom editors retain the underlying document cell while
+sorting or filtering changes its visible position. Completion writes that same
+cell, not whichever row now occupies the old position. If the cell leaves the
+view, or sheet structure changes, the editor is cancelled.
 
 ## Clipboard interoperability
 
@@ -6072,6 +6140,11 @@ formula, overlapping, sheet-lifecycle, and move cases become explicit
 conflicts instead of lossy guesses. This is the collaboration design gate;
 no CRDT dependency is required for the supported cases.
 
+Each local operation is written after the local operations before it, and
+each remote operation after the remote operations before it. A remote
+operation is therefore carried forward through the local sequence: before it
+is compared with local operation k, it is moved past local operations 0..k-1.
+
 ##### `REF_CYCLE` — variable
 
 ```ts
@@ -6972,6 +7045,22 @@ export type SyncActivityState = | "hydrating" | "idle" | "persisting" | "pending
 
 Current persistence activity reported by a sync coordinator.
 
+##### `SyncConflictRecovery` — type
+
+```ts
+export type SyncConflictRecovery = | { status: "recovered"; serverVersion: number } | { status: "reload-required"; reason: SyncConflictReloadReason; conflict?: RebaseConflict } | { status: "no-conflict" };
+```
+
+Outcome of `SyncCoordinator.recoverConflict`.
+
+##### `SyncConflictReloadReason` — type
+
+```ts
+export type SyncConflictReloadReason = | "missing-operations" | "structural-change" | "overlapping-work" | "version-advanced" | "own-mutation" | "rejected";
+```
+
+Why a conflict cannot be recovered in place; the host reloads the document instead.
+
 ##### `SyncConnectionState` — type
 
 ```ts
@@ -6983,7 +7072,7 @@ Host-controlled online state reported by synchronization.
 ##### `SyncCoordinator` — class
 
 ```ts
-class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions); applyVersionedOperation: (operation: VersionedOperation) => Promise<void>; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }
+class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, options: SyncCoordinatorOptions); applyVersionedOperation: (operation: VersionedOperation) => Promise<void>; destroy: () => void; flush: () => Promise<readonly PersistenceCommitResponse[]>; handleResponse: (response: PersistenceCommitResponse, requestedMutationId?: string) => Promise<void>; on: (listener: SyncListener) => () => void; pendingCommits: () => readonly SyncMutationRecord[]; pendingCount: number; ready: () => Promise<void>; recoverConflict: () => Promise<SyncConflictRecovery>; resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>; retry: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; retryPersistence: (clientMutationId: string) => Promise<boolean>; send: (clientMutationId: string) => Promise<PersistenceCommitResponse | null>; sendNext: () => Promise<PersistenceCommitResponse | null>; serverVersion: number; setOnline: (online: boolean) => void; state: SyncStateSnapshot; subscribe: (source: RemoteOperationSource | AsyncIterable<VersionedOperation>) => () => void }
 ```
 
 Deterministic, transport-neutral optimistic sync. Local rendering is never
@@ -6993,6 +7082,14 @@ or `retry` to perform network work.
 Members:
 - `handleResponse` — Public for transports that deliver responses independently of send promises.
 - `ready` — Resolves after durable work is restored and every startup commit is visible locally.
+- `recoverConflict` — Recover from the outstanding base-version conflict without reloading the
+document. This succeeds when the pending work and every server version it
+did not see change different cells, and neither inserts, deletes, or moves
+rows or columns: the local Grid then already shows the server result plus
+the pending work, so recovery applies the missed server versions and moves
+the pending queue onto the new server version. Call `flush` afterwards to
+send it. In every other case nothing changes and the result names the
+reason; the host then reloads and calls `resumeAfterReload`.
 - `resumeAfterReload` — Resume only after the host remounted/reloaded document state and reapplied
 retained local operations. No lossy structural merge is attempted here.
 - `retry` — Explicit retry; the original mutation ID and durable record are retained.
@@ -7002,7 +7099,7 @@ offline aborts in-flight requests so retries retain their mutation IDs.
 ##### `SyncCoordinatorEvent` — type
 
 ```ts
-export type SyncCoordinatorEvent = | { type: "state"; state: SyncStateSnapshot } | { type: "restored"; pending: readonly SyncMutationRecord[] } | { type: "persisting"; mutation: SyncMutationRecord } | { type: "pending"; mutation: SyncMutationRecord } | { type: "sending"; mutation: SyncMutationRecord } | { type: "acknowledged"; clientMutationId: string; version: number; duplicate: boolean; } | { type: "conflict"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: "conflict" }>; } | { type: "remote-applied"; operation: VersionedOperation } | { type: "reload-required"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: "reloaded"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: "storage-error"; error: SheetwriteError; clientMutationId?: string } | { type: "error"; error: SheetwriteError; clientMutationId?: string };
+export type SyncCoordinatorEvent = | { type: "state"; state: SyncStateSnapshot } | { type: "restored"; pending: readonly SyncMutationRecord[] } | { type: "persisting"; mutation: SyncMutationRecord } | { type: "pending"; mutation: SyncMutationRecord } | { type: "sending"; mutation: SyncMutationRecord } | { type: "acknowledged"; clientMutationId: string; version: number; duplicate: boolean; } | { type: "conflict"; mutation: SyncMutationRecord; response: Extract<PersistenceCommitResponse, { status: "conflict" }>; } | { type: "remote-applied"; operation: VersionedOperation } | { type: "reload-required"; expectedVersion: number; receivedVersion: number; snapshot?: WorkbookSnapshot; } | { type: "reloaded"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: "recovered"; serverVersion: number; pending: readonly SyncMutationRecord[] } | { type: "storage-error"; error: SheetwriteError; clientMutationId?: string } | { type: "error"; error: SheetwriteError; clientMutationId?: string };
 ```
 
 Queue, version, connection, or error transition emitted by synchronization.
