@@ -2344,13 +2344,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
-@layer components {
-  /* Site 404 and route error pages. */
-  .sw-route-fallback {
-    display: grid;
-    gap: 1rem;
-    max-width: 40rem;
-    padding-block: 4rem;
-  }
-}
