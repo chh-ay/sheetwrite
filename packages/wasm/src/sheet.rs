@@ -11,6 +11,8 @@ use crate::memory::{
 };
 use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
 
+mod transfer;
+
 /// One conditional-format predicate, mirroring the host's rule kinds. String
 /// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
 /// formula ASTs are parsed once and translated from their stored anchor per cell.

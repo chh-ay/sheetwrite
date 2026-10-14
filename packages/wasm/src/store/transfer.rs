@@ -1,0 +1,131 @@
+//! Same-build instance migration; never exposed as the document persistence format.
+use super::*;
+use crate::transfer::{Reader, TransferResult, Writer};
+use crate::types::{CellRange, ReadSet};
+
+const STORE_TAG: u32 = 0x31524d53;
+
+fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
+    out.usize(names.len());
+    for (name, &handle) in names { out.text(name); out.usize(handle); }
+}
+fn read_names(input: &mut Reader<'_>) -> TransferResult<HashMap<String, usize>> {
+    (0..input.count()?).map(|_| Ok((input.text()?, input.usize()?))).collect()
+}
+
+pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
+    out.text(&entry.source);
+    out.bool(entry.is_reference());
+    if entry.is_reference() {
+        let target = entry.reference_target(sheet).expect("reference target");
+        out.u32(target.sheet); out.u32(target.row); out.u32(target.col);
+    }
+    out.bool(entry.ast.is_some());
+    out.error(entry.error);
+    out.u32(match entry.value_kind { FormulaValueKind::Number => 0, FormulaValueKind::Text => 1, FormulaValueKind::Bool => 2, FormulaValueKind::Blank => 3 });
+    out.bool(entry.volatile); out.bool(entry.has_spill_refs); out.bool(entry.produces_array);
+    out.usize(entry.reads.cells.len());
+    for key in &entry.reads.cells { out.u32(key.sheet); out.u32(key.row); out.u32(key.col); }
+    out.usize(entry.reads.ranges.len());
+    for range in &entry.reads.ranges { out.u32(range.sheet); out.u32(range.row_start); out.u32(range.col_start); out.u32(range.row_end); out.u32(range.col_end); }
+}
+
+impl CellStore {
+    pub(super) fn read_transfer_formula(&self, input: &mut Reader<'_>, sheet: u32, row: u32, col: u32) -> TransferResult<FormulaEntry> {
+        let source = input.text()?;
+        let mut entry = if input.bool()? {
+            let target = AbsCellKey { sheet: input.u32()?, row: input.u32()?, col: input.u32()? };
+            FormulaEntry::reference(target, self.sheet_names.get(target.sheet as usize).map_or("", String::as_str), sheet)
+        } else { self.parse_formula_entry(&source, sheet, row, col) };
+        entry.source = source;
+        if !input.bool()? { entry.ast = None; }
+        entry.error = input.error()?;
+        entry.value_kind = match input.u32()? {
+            0 => FormulaValueKind::Number, 1 => FormulaValueKind::Text, 2 => FormulaValueKind::Bool, 3 => FormulaValueKind::Blank,
+            _ => return Err("invalid transferred value kind".into()),
+        };
+        entry.volatile = input.bool()?; entry.has_spill_refs = input.bool()?; entry.produces_array = input.bool()?;
+        let cells = (0..input.count()?).map(|_| Ok(AbsCellKey { sheet: input.u32()?, row: input.u32()?, col: input.u32()? })).collect::<TransferResult<Vec<_>>>()?;
+        let ranges = (0..input.count()?).map(|_| Ok(CellRange { sheet: input.u32()?, row_start: input.u32()?, col_start: input.u32()?, row_end: input.u32()?, col_end: input.u32()? })).collect::<TransferResult<Vec<_>>>()?;
+        entry.reads = ReadSet { cells, ranges };
+        Ok(entry)
+    }
+
+    fn read_memory_state(bytes: &[u8]) -> TransferResult<Self> {
+        let mut input = Reader::new(bytes, STORE_TAG)?;
+        let mut store = Self::new();
+        store.strings = input.strings()?;
+        for _ in 0..input.count()? { store.sheet_names.push(input.text()?); store.sheet_alive.push(input.bool()?); }
+        store.sheet_lookup = read_names(&mut input)?;
+        store.sheet_ids = read_names(&mut input)?;
+        for _ in 0..input.count()? {
+            let scope = if input.bool()? { Some(input.u32()?) } else { None };
+            let key = input.text()?;
+            let range = NamedRangeRef { name: input.text()?, scope, sheet: input.u32()?, row_start: input.u32()?, col_start: input.u32()?, row_end: input.u32()?, col_end: input.u32()? };
+            store.named_ranges.insert((scope, key), range);
+        }
+        for _ in 0..input.count()? {
+            let key = input.text()?;
+            let mut table = TableDefinition { id: input.text()?, name: input.text()?, sheet: input.u32()?, row_start: input.u32()?, col_start: input.u32()?, row_end: input.u32()?, col_end: input.u32()?, header_row: input.bool()?, totals_row: input.bool()?, columns: Vec::new() };
+            for _ in 0..input.count()? { table.columns.push(TableColumnDefinition { id: input.text()?, name: input.text()?, col: input.u32()? }); }
+            store.tables.insert(key, table);
+        }
+        store.formula_epoch = input.u64()?;
+        store.mutation_revision = input.u64()?;
+        store.volatile_serial = f64::from_bits(input.u64()?);
+        store.spill_owner_cell_limit = input.usize()?;
+        let sheets = input.count()?;
+        if sheets != store.sheet_names.len() { return Err("invalid transferred sheet handles".into()); }
+        for sheet in 0..sheets {
+            let mut data = SheetData::read_transfer(&mut input)?;
+            for _ in 0..input.count()? {
+                let row = input.u32()?; let col = input.u32()?;
+                let entry = store.read_transfer_formula(&mut input, sheet as u32, row, col)?;
+                data.formulas.insert((row, col), entry);
+            }
+            store.sheets.push(data);
+        }
+        input.finish()?;
+        Ok(store)
+    }
+}
+
+#[wasm_bindgen]
+impl CellStore {
+    /// Export only live state, not allocator slack or a dependency-index cache.
+    #[wasm_bindgen(js_name = exportMemoryState)]
+    pub fn export_memory_state(&self) -> Result<Vec<u8>, JsError> {
+        if self.loading_page != 0 || self.active_mutation_revision.is_some() { return Err(JsError::new("engine memory release requires an idle store")); }
+        let mut out = Writer::new(STORE_TAG);
+        out.strings(&self.strings);
+        out.usize(self.sheet_names.len());
+        for (name, &alive) in self.sheet_names.iter().zip(&self.sheet_alive) { out.text(name); out.bool(alive); }
+        write_names(&mut out, &self.sheet_lookup); write_names(&mut out, &self.sheet_ids);
+        out.usize(self.named_ranges.len());
+        for ((scope, key), range) in &self.named_ranges {
+            out.bool(scope.is_some()); if let Some(scope) = scope { out.u32(*scope); }
+            out.text(key); out.text(&range.name); out.u32(range.sheet); out.u32(range.row_start); out.u32(range.col_start); out.u32(range.row_end); out.u32(range.col_end);
+        }
+        out.usize(self.tables.len());
+        for (key, table) in &self.tables {
+            out.text(key); out.text(&table.id); out.text(&table.name); out.u32(table.sheet);
+            out.u32(table.row_start); out.u32(table.col_start); out.u32(table.row_end); out.u32(table.col_end);
+            out.bool(table.header_row); out.bool(table.totals_row); out.usize(table.columns.len());
+            for column in &table.columns { out.text(&column.id); out.text(&column.name); out.u32(column.col); }
+        }
+        out.u64(self.formula_epoch); out.u64(self.mutation_revision); out.u64(self.volatile_serial.to_bits()); out.usize(self.spill_owner_cell_limit);
+        out.usize(self.sheets.len());
+        for (sheet, data) in self.sheets.iter().enumerate() {
+            data.write_transfer(&mut out);
+            out.usize(data.formulas.len());
+            for (&(row, col), entry) in &data.formulas { out.u32(row); out.u32(col); write_formula(&mut out, entry, sheet as u32); }
+        }
+        Ok(out.0)
+    }
+
+    /// Import into a fresh instance; failure never mutates the source store.
+    #[wasm_bindgen(js_name = importMemoryState)]
+    pub fn import_memory_state(bytes: &[u8]) -> Result<CellStore, JsError> {
+        Self::read_memory_state(bytes).map_err(|error| JsError::new(&error))
+    }
+}

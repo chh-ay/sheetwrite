@@ -40,7 +40,7 @@ function parseCellKey(key: string): CellAddress {
 /** Simulates paged dirty-cell and reference admission before a transaction mutates the store. */
 export class PagedDirtyPreflight {
   constructor(
-    private readonly wasm: RecomputingCellStore,
+    private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
     private readonly sheetIdsByHandle: readonly SheetId[],
@@ -49,6 +49,10 @@ export class PagedDirtyPreflight {
     private readonly dirtyCellLimit: number,
     private readonly referenceSimulationLimit: number,
   ) {}
+
+  replaceEngine(wasm: RecomputingCellStore): void {
+    this.wasm = wasm;
+  }
 
   private handleOf(sheet: SheetId): number {
     const handle = this.handles.get(sheet);

@@ -36,6 +36,8 @@ mod store;
 #[cfg(feature = "formula-engine")]
 mod types;
 #[cfg(feature = "formula-engine")]
+mod transfer;
+#[cfg(feature = "formula-engine")]
 mod window;
 
 #[cfg(all(test, feature = "formula-engine"))]

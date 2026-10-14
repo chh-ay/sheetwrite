@@ -63,10 +63,14 @@ export class StoreViewState {
   private readonly stateBySheet = new Map<SheetId, ViewState>();
 
   constructor(
-    private readonly wasm: RecomputingCellStore,
+    private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
   ) {}
+
+  replaceEngine(wasm: RecomputingCellStore): void {
+    this.wasm = wasm;
+  }
 
   order(sheet: SheetId): Uint32Array | undefined {
     return this.orderBySheet.get(sheet);

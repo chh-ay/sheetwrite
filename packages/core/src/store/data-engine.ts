@@ -1,4 +1,4 @@
-import type { CellSnapshot, RangeSnapshot } from "@sheetwrite/wasm";
+import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wasm";
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
@@ -130,6 +130,11 @@ export interface CompactRangeHistory {
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
   toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
+}
+
+export interface PreparedEngineMemoryRelease {
+  commit(): void;
+  abort(): void;
 }
 
 export interface RangeMutationAllocationStats {
@@ -327,7 +332,7 @@ class PackedTextBuffer {
  * transaction facade. It never owns public listeners, epochs, or policy.
  */
 export class StoreDataEngine {
-  private readonly wasm: RecomputingCellStore;
+  private wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
   private readonly storageOptions: SheetwriteStoreOptions;
   private readonly handles = new Map<SheetId, number>();
@@ -3121,6 +3126,25 @@ export class StoreDataEngine {
     for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
     this.noteRangeMutationFfi();
     this.wasm.recomputeChanged();
+  }
+
+  /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
+  prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
+    if (this.disposed) return null;
+    const replacement = instance.CellStore.importMemoryState(
+      this.wasm.exportMemoryState(),
+    ) as RecomputingCellStore;
+    return {
+      abort: () => replacement.free(),
+      commit: () => {
+        const previous = this.wasm;
+        this.wasm = replacement;
+        this.view.replaceEngine(replacement);
+        this.windowReader.replaceEngine(replacement);
+        this.pagedDirtyPreflight?.replaceEngine(replacement);
+        previous.free();
+      },
+    };
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */

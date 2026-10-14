@@ -171,11 +171,16 @@ export class StoreWindowReader {
   private conditionalRuleLargestInputBytes = 0;
 
   constructor(
-    private readonly wasm: RecomputingCellStore,
+    private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
     private readonly styles: StyleDictionary,
   ) {}
+
+  replaceEngine(wasm: RecomputingCellStore): void {
+    this.clear();
+    this.wasm = wasm;
+  }
   spillDerivedMask(
     sheet: SheetId,
     rows: { start: number; end: number },

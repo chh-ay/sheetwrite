@@ -23,6 +23,8 @@ use crate::types::{
     StringStorage, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
+mod transfer;
+
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);
     if buf.is_ascii() {
