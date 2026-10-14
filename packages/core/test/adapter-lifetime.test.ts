@@ -1,5 +1,9 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
-import { createAdapterGridController, type GridReadyEvent } from "../src/adapter.js";
+import {
+  createAdapterGridController,
+  type GridReadyEvent,
+  SheetwriteError,
+} from "../src/adapter.js";
 import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid } from "../src/types.js";
@@ -86,3 +90,43 @@ for (const failureAt of ["publication", "ready"] as const) {
     lifetime.unmount();
   });
 }
+
+it("reports asynchronous publication failures unchanged, including non-Errors and construction errors", async () => {
+  for (const thrown of [
+    undefined,
+    "consumer failed",
+    new SheetwriteError("invalid-limits", "create-grid", "invalid limits"),
+  ]) {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const reported: unknown[] = [];
+    const initializationErrors: unknown[] = [];
+    const ready: GridReadyEvent[] = [];
+    const publication: { grid: Grid | null } = { grid: null };
+    const lifetime = createAdapterGridController(
+      {
+        onReady: (event) => ready.push(event),
+        onInitializationError: (error) => initializationErrors.push(error),
+      },
+      {
+        publish(grid) {
+          publication.grid = grid;
+          if (grid) return Promise.reject(thrown);
+        },
+        setInitializationState() {},
+        reportConsumerFailure: (failure) => reported.push(failure),
+      },
+    );
+    lifetime.mount(host, { options: { workbook: makeWorkbook(10) } });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(reported).toHaveLength(1);
+    expect(reported[0]).toBe(thrown);
+    expect(initializationErrors).toEqual([]);
+    expect(ready).toEqual([]);
+    expect(publication.grid).toBeNull();
+    expect(host.childElementCount).toBe(0);
+    lifetime.unmount();
+    host.remove();
+  }
+});

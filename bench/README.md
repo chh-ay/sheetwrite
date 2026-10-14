@@ -28,6 +28,31 @@ constants, checks the computed value after each edit, and reports ten samples
 after two warmups. The scalar `formula-constant-edit` workload remains available
 through `--sample formula-constant-edit 100000` for comparison.
 
+The adapter lifetime microbenchmark measures real React, Vue, and Svelte
+mount/unmount and mount/reset/unmount commits, with direct Grid mounting and
+selection controls. Each workload runs in a fresh process to prevent queued
+rendering from contaminating other workloads. Initialization is excluded; each
+workload discards 30 warmup iterations and reports the median of seven
+150-iteration samples in microseconds. Run from the repository root (increase
+`ADAPTER_BENCH_ITERATIONS` to reduce noise, or set `ADAPTER_BENCH_WORKLOAD` to run
+one named workload):
+
+```sh
+/home/vvin/learn/bench-run --slot 4 timeout 1200 bun \
+  --preload ./test-setup.ts --preload ./test-setup-svelte.ts \
+  bench/src/adapter-lifetime-bench.ts
+```
+
+Compare the same harness on both revisions using A/A control captures followed
+by alternating ABBA rounds; compare medians of each round's paired medians.
+Use the same Svelte client-runtime preload in the baseline checkout: a server
+`untrack` implementation changes reactive scheduling and invalidates comparison.
+The recorded gate in `results/adapter-lifetime-gate.json` includes two A/A controls
+and five alternating ABBA rounds on CPU 4. Control medians changed by -0.1% and
+-0.5%; adapter medians improved by 15.8–37.8%. A/A spread reached 16.2%, so these
+captures establish no regression rather than a precise speedup claim.
+
+
 ─────────────────────────────────────────────────────────────────────────────
 
 ## Methodology
