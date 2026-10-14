@@ -349,12 +349,15 @@ Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-min-columns" data-pagefind-weight="1">
-<summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns (empty padding columns past the data, like a spreadsheet).</span></summary>
+<summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns, adding empty columns past the data.</span></summary>
 
 ```ts generated
 minColumns?: number;
 ```
 
+<p class="api-member-doc">Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-config" data-pagefind-weight="1">

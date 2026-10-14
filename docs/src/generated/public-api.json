@@ -288,7 +288,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L424",
+              "source": "src/types/grid.ts#L428",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -1443,7 +1443,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L480",
+              "source": "src/types/grid.ts#L484",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -1842,7 +1842,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L444",
+              "source": "src/types/grid.ts#L448",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -1905,7 +1905,7 @@
                 },
                 {
                   "name": "minColumns",
-                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
+                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
                 },
                 {
                   "name": "mutationPolicy",
@@ -2820,7 +2820,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L410",
+              "source": "src/types/grid.ts#L414",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -3434,7 +3434,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L388",
+              "source": "src/types/grid.ts#L392",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3463,7 +3463,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L400",
+              "source": "src/types/grid.ts#L404",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -3661,7 +3661,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L434",
+              "source": "src/types/grid.ts#L438",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -7315,7 +7315,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -7980,7 +7980,7 @@
                 },
                 {
                   "name": "minColumns",
-                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
+                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
                 },
                 {
                   "name": "mutationPolicy",
@@ -8249,7 +8249,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -9175,7 +9175,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
