@@ -20,7 +20,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Overview", href: "/docs/" },
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
-      { label: "What's new in 0.5.0", href: "/docs/start/whats-new/" },
+      { label: "What's new in 0.5.0", href: "/docs/releases/0.5.0/" },
       { label: "Performance", href: "/docs/guides/performance-resources/" },
     ],
   },
@@ -68,6 +68,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
       { label: "Compatibility results", href: "/docs/reference/compatibility-results/" },
       { label: "Moved guides", href: "/docs/reference/moved-guides/" },
+      { label: "All releases", href: "/docs/releases/" },
     ],
   },
   {
@@ -119,3 +120,15 @@ export const SHOWCASE_NAVIGATION: readonly NavigationItem[] = [
   { label: "Vue", href: "/vue/" },
   { label: "Svelte", href: "/svelte/" },
 ];
+
+/**
+ * Pages that select the full formula engine. A page can select its engine only
+ * before the first engine loads, so links to these pages always open a fresh
+ * document instead of a client-side navigation.
+ */
+const FULL_ENGINE_PATHS: readonly string[] = ["/showcases/formulas/", "/test/formulas-engine/"];
+
+export function opensFreshDocument(href: string): boolean {
+  const path = href.split(/[?#]/, 1)[0] ?? href;
+  return FULL_ENGINE_PATHS.includes(path.endsWith("/") ? path : `${path}/`);
+}

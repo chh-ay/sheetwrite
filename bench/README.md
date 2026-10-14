@@ -298,6 +298,28 @@ artifact was a one-off before/after pair, and a release cannot re-measure a
 baseline build. `bench:release` refreshes both captures, and
 `bench:interaction:smoke` rehearses the interaction one.
 
+`bench:interaction-sessions` supplements that browser capture with synchronous
+Grid-interface timings under happy-dom: row and column resize with twenty move
+events followed by release, editor open/commit, pointer selection, and two
+untouched controls (one hundred cell-input reads and a column aggregate).
+It reports eleven raw samples in milliseconds per operation after three discarded
+warmups. Each sample runs two thousand resize/edit operations, ten thousand
+selection/read operations, or two hundred thousand aggregates. Garbage collection
+and fixture restoration are outside the timed interval; resize includes admission
+and history, but not undo. Longer samples keep sub-millisecond paths from turning
+process startup and scheduling noise into an apparent regression.
+These are imperative-path timings, not browser paint or input-to-frame latency.
+For comparisons, build each checkout's packages first. Run five A/A ABBA control
+rounds with the same baseline in both slots, then five actual ABBA rounds on the
+same CPU under an exclusive lock. Compare medians of the per-round medians and
+retain every raw round. A broad noise band makes a changed-path comparison
+inconclusive; it does not excuse a slower result. Leave fifteen seconds between
+locked commands so other checkouts can acquire the shared lock.
+
+```sh
+flock -x /home/vvin/learn/quiet.lock taskset -c 4 bun run bench:interaction-sessions
+```
+
 A change to a harness source file, to the sampling flags, or to the protocol
 version invalidates the committed render baseline: `bench:check` compares the
 harness hashes, the declared sampling, and the runner (OS, CPU, Bun, Node,
@@ -494,6 +516,38 @@ quoting a result; do not treat an unavailable comparator as a Sheetwrite win.
   relative performance claim is made.
 
 ─────────────────────────────────────────────────────────────────────────────
+
+## String-pool lifetime controls
+
+`src/string-pool-bench.ts` measures a 1M-row repeated-text ingest, 100k
+committed edits, packed window reads, and distinct-value scans. Set
+`STRING_POOL_BENCH_MODE=lifetime` for the 1M-distinct-string all-live rebuild
+and retained text ownership after clearing and unique edits. That mode records
+the cold sweep and seven additional sweeps; its maximum includes the cold
+sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
+ingest and the public cached `getVisibleWindow` path.
+
+Run each sample in a fresh process. To select a built baseline without changing
+its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
+the first harness, and `STRING_POOL_CHECKOUT` to its checkout for the public
+read harness. For example, from the repository root:
+
+```sh
+bun bench/src/string-pool-bench.ts
+STRING_POOL_BENCH_MODE=lifetime bun bench/src/string-pool-bench.ts
+bun bench/src/string-pool-read-bench.ts
+```
+
+The architecture review capture in
+[`results/string-pool-lifetime-results.json`](./results/string-pool-lifetime-results.json)
+used exclusive, memory-capped execution pinned to one CPU, three A/A control
+rounds, and five alternating ABBA/BAAB rounds. Each process discarded one
+warmup before seven samples. Reported comparisons use medians of per-round
+medians; the evidence records the raw round reductions and A/A noise bands.
+The maximum observed 1M-distinct all-live sweep was **68.62 ms**, not a
+cross-device latency guarantee. Post-loop text/index allocation fell from
+84,312,948 bytes to 353,024 bytes; this excludes dense cell buffers and does
+not claim that committed WebAssembly memory shrinks.
 
 ## Files
 

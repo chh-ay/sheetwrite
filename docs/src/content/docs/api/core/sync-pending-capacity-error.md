@@ -8,7 +8,7 @@ description: "Typed local transaction rejection produced when the durable queue 
 Typed local transaction rejection produced when the durable queue cannot reserve capacity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L213"><code>packages/core/src/sync.ts#L213</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L214"><code>packages/core/src/sync.ts#L214</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

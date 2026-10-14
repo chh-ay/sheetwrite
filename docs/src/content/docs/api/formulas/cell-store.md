@@ -60,6 +60,8 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
+<a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
@@ -104,11 +106,12 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
 <a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
 <a href="#cell-store-spill-owner-coordinates"><code>spillOwnerCoordinates</code></a>
+<a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
 <a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>94</span>
+## Members <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-member-list">
 
@@ -289,12 +292,14 @@ columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Ui
 </details>
 
 <details class="api-member" id="cell-store-compact-string-storage" data-pagefind-weight="1">
-<summary><code>compactStringStorage</code> <span class="api-member-summary">Release geometric growth slack after a bounded bulk ingest.</span></summary>
+<summary><code>compactStringStorage</code> <span class="api-member-summary">Reclaim unreachable text and release growth slack at a transaction barrier.</span></summary>
 
 ```ts generated
 compactStringStorage: () => void;
 ```
 
+<p class="api-member-doc">Reclaim unreachable text and release growth slack at a transaction barrier.
+Raw pool IDs must be discarded when `stringPoolEpoch` changes.</p>
 </details>
 
 <details class="api-member" id="cell-store-data-edge" data-pagefind-weight="1">
@@ -589,10 +594,30 @@ cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
-<summary><code>pinRange</code></summary>
+<summary><code>pinRange</code> <span class="api-member-summary">Replaces caller-owned persistent pins; empty row ranges leave them unchanged.</span></summary>
 
 ```ts generated
 pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-pin-read-window" data-pagefind-weight="1">
+<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing explicit or viewport pins.</span></summary>
+
+```ts generated
+pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Replaces transient read protection without changing explicit or viewport pins.
+Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.</p>
+</details>
+
+<details class="api-member" id="cell-store-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>pinViewportBands</code> <span class="api-member-summary">Replaces viewport-owned protection independently of transient read pins.</span></summary>
+
+```ts generated
+pinViewportBands: (sheet: number, bands: Uint32Array) => void;
 ```
 
 </details>
@@ -1057,6 +1082,15 @@ spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols:
 <p class="api-member-doc">Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.</p>
 </details>
 
+<details class="api-member" id="cell-store-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>stringPoolEpoch</code> <span class="api-member-summary">Raw string IDs are valid only within this epoch, including window IDs.</span></summary>
+
+```ts generated
+stringPoolEpoch: () => number;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-style-id-at" data-pagefind-weight="1">
 <summary><code>styleIdAt</code> <span class="api-member-summary">Current style-dictionary id at a cell; 0 when out of bounds.</span></summary>
 
@@ -1258,6 +1292,14 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => void;
+  pinReadWindow: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => void;
+  pinViewportBands: (sheet: number, bands: Uint32Array) => void;
   poolStrings: (ids: Uint32Array) => string[];
   queryResourceStats: () => Float64Array;
   rangeFullyLoaded: (
@@ -1470,6 +1512,7 @@ class CellStore {
     row_end: number,
     cols: Uint32Array,
   ) => Uint32Array;
+  stringPoolEpoch: () => number;
   styleIdAt: (sheet: number, row: number, col: number) => number;
   wasmCommittedBytes: () => number;
 }

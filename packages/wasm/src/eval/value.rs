@@ -4,14 +4,14 @@ use std::cmp::Ordering;
 
 use crate::sheet::SheetData;
 use crate::types::{
-    string_from_pool_ref, FormulaEntry, FormulaError, FormulaValueKind, StringPool, Value,
+    string_from_pool_ref, FormulaEntry, FormulaError, FormulaValueKind, StringStorage, Value,
 };
 
 use super::date::format_date_serial;
 
 pub(super) fn cached_formula_value(
     sheet: &SheetData,
-    strings: &StringPool,
+    strings: &StringStorage,
     index: usize,
     entry: &FormulaEntry,
 ) -> Value {
@@ -192,12 +192,12 @@ mod tests {
     use super::cached_formula_value;
     use crate::calc::Ast;
     use crate::sheet::SheetData;
-    use crate::types::{FormulaEntry, FormulaError, FormulaValueKind, StringPool, Value};
+    use crate::types::{FormulaEntry, FormulaError, FormulaValueKind, StringStorage, Value};
 
     #[test]
     fn reads_each_cached_formula_value_kind_and_prior_errors() {
         let mut sheet = SheetData::new(1, 1);
-        let mut strings = StringPool::new();
+        let mut strings = StringStorage::new();
         let mut entry = FormulaEntry::parsed(Ast::Num(0.0), 0, "=0");
 
         entry.error = Some(FormulaError::Ref);
@@ -214,7 +214,7 @@ mod tests {
         );
 
         entry.value_kind = FormulaValueKind::Text;
-        let text_id = strings.push("cached");
+        let text_id = strings.intern("cached");
         sheet.set_str(0, text_id);
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, &entry),

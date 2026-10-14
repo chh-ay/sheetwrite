@@ -8,6 +8,7 @@ import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
@@ -163,6 +164,8 @@ export class StoreWindowReader {
   private readonly colsU32Cache = new WeakMap<ReadonlyArray<number>, Uint32Array>();
   private valuesScratch: CellScalar[] = [];
   private readonly stringCache = new Map<number, string>();
+  private stringPoolEpoch: number | undefined;
+  private visibleStringPoolEpoch: number | undefined;
   private readonly condRulesSynced = new Map<SheetId, string>();
   private conditionalRuleInputBytes = 0;
   private conditionalRuleLargestInputBytes = 0;
@@ -195,6 +198,7 @@ export class StoreWindowReader {
   }
 
   capturePersistedCells(sheet: SheetId): PersistedCellView {
+    const stringPoolEpoch = this.wasm.stringPoolEpoch();
     const packed = this.wasm.persistedCellData(this.handleOf(sheet));
     const coordinates: number[] = [];
     const values: CellScalar[] = [];
@@ -285,6 +289,7 @@ export class StoreWindowReader {
         throw new Error("Sheetwrite: invalid persisted source kind");
       }
     }
+    this.syncStringPoolEpoch(stringPoolEpoch);
     if (stringIds.length > 0) {
       const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
       if (texts.length !== stringOffsets.length) {
@@ -326,14 +331,42 @@ export class StoreWindowReader {
     applyConditionalRules: boolean,
   ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
+    const isPaged = this.wasm.isPaged(handle);
+    try {
+      return this.readPinned(sheet, rows, cols, order, applyConditionalRules, isPaged);
+    } finally {
+      if (isPaged) {
+        this.wasm.pinReadWindow(handle, 0, 0, EMPTY_PIN_COLUMNS, EMPTY_PIN_COLUMNS);
+      }
+    }
+  }
+
+  private readPinned(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    applyConditionalRules: boolean,
+    isPaged: boolean,
+  ): InstrumentedVisibleWindowView {
+    const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    const dataRows = order?.subarray(rows.start, Math.min(rows.end, order.length));
     let ffiCalls = 1;
     let ffiInputBytes = colsU32.byteLength;
     let ffiLargestTransferBytes = colsU32.byteLength;
-    if (this.wasm.isPaged(handle)) {
-      this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
-      ffiCalls += 1;
+    if (isPaged) {
+      this.wasm.pinReadWindow(
+        handle,
+        dataRows ? 0 : rows.start,
+        dataRows ? 0 : rows.end,
+        dataRows ?? EMPTY_PIN_COLUMNS,
+        colsU32,
+      );
+      ffiCalls += 2;
       ffiInputBytes += colsU32.byteLength;
+      ffiInputBytes += dataRows?.byteLength ?? 0;
+      ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows?.byteLength ?? 0);
     }
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
     const hasCondRules = (conditionalSync & 1) !== 0;
@@ -348,8 +381,7 @@ export class StoreWindowReader {
 
     let view: ConsumingWindowView;
     let expectedRows: number;
-    if (order) {
-      const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+    if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
@@ -363,7 +395,9 @@ export class StoreWindowReader {
     let packed: Uint8Array;
     let decoded: DecodedPackedWindow;
     let strings: string[];
+    let stringPoolEpoch: number;
     try {
+      stringPoolEpoch = view.stringPoolEpoch();
       packed = view.takePacked();
       decoded = decodePackedWindow(packed);
       if (
@@ -401,9 +435,16 @@ export class StoreWindowReader {
       view.free();
     }
     const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
+    // Rectangle/history reads may have warmed the host cache without updating the worker.
+    if (this.visibleStringPoolEpoch !== stringPoolEpoch) {
+      this.stringCache.clear();
+      this.visibleStringPoolEpoch = stringPoolEpoch;
+    }
+    ffiCalls += 1;
     const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
     const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
-    let ffiBoundaryCalls = ffiCalls + 2 + stringOutputAllocationEvents;
+    let ffiBoundaryCalls = ffiCalls + 3 + stringOutputAllocationEvents;
     let localStringBytes = 0;
     for (const value of strings) localStringBytes += utf8ByteLength(value);
     let ffiOutputBytes = packed.byteLength + localStringBytes;
@@ -479,6 +520,7 @@ export class StoreWindowReader {
       styles: windowStyles,
       valueKinds: kinds,
       numberValues: numbers,
+      stringPoolEpoch,
       stringPoolIds: stringIds,
       stringLocalIds: stringIndex,
       stringPoolUpdateIds,
@@ -520,7 +562,9 @@ export class StoreWindowReader {
     ) as ConsumingWindowView;
     let decoded: DecodedPackedWindow;
     let strings: string[];
+    let stringPoolEpoch: number;
     try {
+      stringPoolEpoch = view.stringPoolEpoch();
       decoded = decodePackedWindow(view.takePacked());
       if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
         throw new Error("Sheetwrite: invalid packed window shape");
@@ -551,6 +595,7 @@ export class StoreWindowReader {
     }
 
     const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
     if (this.stringCache.size >= STRING_CACHE_CAP) this.stringCache.clear();
     let missingIdSet: Set<number> | null = null;
     for (let index = 0; index < stringIds.length; index++) {
@@ -622,11 +667,23 @@ export class StoreWindowReader {
   clear(): void {
     this.valuesScratch = [];
     this.stringCache.clear();
+    this.stringPoolEpoch = undefined;
+    this.visibleStringPoolEpoch = undefined;
     this.condRulesSynced.clear();
   }
 
   removeSheet(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
+  }
+
+  private syncStringPoolEpoch(epoch: number): void {
+    if (epoch !== this.wasm.stringPoolEpoch()) {
+      throw new Error("Sheetwrite: stale string-pool epoch");
+    }
+    if (epoch !== this.stringPoolEpoch) {
+      this.stringCache.clear();
+      this.stringPoolEpoch = epoch;
+    }
   }
 
   private colsU32For(cols: readonly number[]): Uint32Array {

@@ -17,9 +17,8 @@ export const DATASOURCE_MAX_ACTIVE_REQUESTS = 6;
 export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 const DATASOURCE_NO_PROGRESS_RETRIES = 1;
 const ESTIMATED_CELL_BYTES = 16;
-/** Formula reads outside the viewport share the prefetch byte horizon. */
-const DATASOURCE_FORMULA_READ_MAX_CELLS = DATASOURCE_PREFETCH_MAX_BYTES / ESTIMATED_CELL_BYTES;
 const LOGICAL_FRAME_MS = 16.7;
+const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
 let datasourceClockForTest: (() => number) | undefined;
 
@@ -729,14 +728,23 @@ export class DatasourceController {
    * Records the viewport, starts visible work and the off-viewport cells its
    * formulas read, then bounded row-direction speculation.
    */
-  updateViewport(start: number, end: number, indices: readonly number[]): void {
+  updateViewport(
+    start: number,
+    end: number,
+    indices: readonly number[],
+    formulaBands: Uint32Array = EMPTY_FORMULA_BANDS,
+  ): void {
     if (this.destroyed) return;
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) {
       this.viewportDemand = null;
-      this.formulaReadDemand.length = 0;
+      this.formulaReadDemand =
+        this.options.datasource && this.options.loadable
+          ? this.formulaReadDemands(formulaBands)
+          : [];
       this.speculativeDemand.length = 0;
       this.visibleWaitStarted.clear();
+      this.drainDemand();
       return;
     }
     const columns = this.requestColumns(indices);
@@ -764,7 +772,7 @@ export class DatasourceController {
       columns.length,
     );
     this.lastViewport = { ...bounds, columns, at: now };
-    const formulaReads = this.formulaReadDemands(bounds.start, bounds.end, columns);
+    const formulaReads = this.formulaReadDemands(formulaBands);
     this.cancelObsoleteSpeculation(
       { ...bounds, columns },
       speculative,
@@ -1085,23 +1093,10 @@ export class DatasourceController {
    * `#LOADING!` until every cell it reads is loaded, and the column window does
    * not include a column that is off screen.
    */
-  private formulaReadDemands(
-    start: number,
-    end: number,
-    columns: readonly number[],
-  ): PendingDemand[] {
-    const loadable = this.options.loadable;
+  private formulaReadDemands(bands: Uint32Array): PendingDemand[] {
+    if (bands.length === 0) return [];
     const datasource = this.options.datasource;
-    const engine = loadable && datasource ? storeEngine(loadable) : undefined;
-    if (!engine) return [];
     const schema = this.schema();
-    const bands = engine.formulaReadBands(
-      schema.sheet,
-      start,
-      end,
-      columns,
-      DATASOURCE_FORMULA_READ_MAX_CELLS,
-    );
     const demands: PendingDemand[] = [];
     for (let index = 0; index < bands.length; index += 4) {
       const rowStart = bands[index];

@@ -8,7 +8,7 @@ description: "Datasource loading state for a resolved cell."
 Datasource loading state for a resolved cell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L117"><code>packages/core/src/types/store.ts#L117</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/store.ts#L119"><code>packages/core/src/types/store.ts#L119</code></a></dd></div>
 </dl>
 
 ## Declaration

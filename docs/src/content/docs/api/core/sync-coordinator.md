@@ -10,7 +10,7 @@ blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L286"><code>packages/core/src/sync.ts#L286</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L311"><code>packages/core/src/sync.ts#L311</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -23,6 +23,7 @@ or `retry` to perform network work.
 <a href="#sync-coordinator-pending-commits"><code>pendingCommits</code></a>
 <a href="#sync-coordinator-pending-count"><code>pendingCount</code></a>
 <a href="#sync-coordinator-ready"><code>ready</code></a>
+<a href="#sync-coordinator-recover-conflict"><code>recoverConflict</code></a>
 <a href="#sync-coordinator-resume-after-reload"><code>resumeAfterReload</code></a>
 <a href="#sync-coordinator-retry"><code>retry</code></a>
 <a href="#sync-coordinator-retry-persistence"><code>retryPersistence</code></a>
@@ -34,7 +35,7 @@ or `retry` to perform network work.
 <a href="#sync-coordinator-subscribe"><code>subscribe</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -117,6 +118,23 @@ pendingCount: number;
 ready: () => Promise<void>;
 ```
 
+</details>
+
+<details class="api-member" id="sync-coordinator-recover-conflict" data-pagefind-weight="1">
+<summary><code>recoverConflict</code> <span class="api-member-summary">Recover from the outstanding base-version conflict without reloading the document.</span></summary>
+
+```ts generated
+recoverConflict: () => Promise<SyncConflictRecovery>;
+```
+
+<p class="api-member-doc">Recover from the outstanding base-version conflict without reloading the
+document. This succeeds when the pending work and every server version it
+did not see change different cells, and neither inserts, deletes, or moves
+rows or columns: the local Grid then already shows the server result plus
+the pending work, so recovery applies the missed server versions and moves
+the pending queue onto the new server version. Call `flush` afterwards to
+send it. In every other case nothing changes and the result names the
+reason; the host then reloads and calls `resumeAfterReload`.</p>
 </details>
 
 <details class="api-member" id="sync-coordinator-resume-after-reload" data-pagefind-weight="1">
@@ -226,6 +244,7 @@ class SyncCoordinator {
   pendingCommits: () => readonly SyncMutationRecord[];
   pendingCount: number;
   ready: () => Promise<void>;
+  recoverConflict: () => Promise<SyncConflictRecovery>;
   resumeAfterReload: (snapshot: WorkbookSnapshot) => Promise<void>;
   retry: (
     clientMutationId: string,

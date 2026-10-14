@@ -26,6 +26,7 @@ Lifetime: valid until the next store mutation or window refresh.
 <a href="#visible-window-view-styles"><code>styles</code></a>
 <a href="#visible-window-view-value-kinds"><code>valueKinds</code></a>
 <a href="#visible-window-view-number-values"><code>numberValues</code></a>
+<a href="#visible-window-view-string-pool-epoch"><code>stringPoolEpoch</code></a>
 <a href="#visible-window-view-string-pool-ids"><code>stringPoolIds</code></a>
 <a href="#visible-window-view-string-local-ids"><code>stringLocalIds</code></a>
 <a href="#visible-window-view-string-pool-update-ids"><code>stringPoolUpdateIds</code></a>
@@ -38,7 +39,7 @@ Lifetime: valid until the next store mutation or window refresh.
 <a href="#visible-window-view-ffi-largest-transfer-bytes"><code>ffiLargestTransferBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>18</span>
+## Members <span class="api-count" data-pagefind-ignore>19</span>
 
 <div class="api-member-list">
 
@@ -115,8 +116,17 @@ numberValues?: Float64Array;
 
 </details>
 
+<details class="api-member" id="visible-window-view-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>stringPoolEpoch</code> <span class="api-member-summary">Store-wide u32 epoch issuing the raw IDs; clear ID caches whenever it changes.</span></summary>
+
+```ts generated
+stringPoolEpoch: number;
+```
+
+</details>
+
 <details class="api-member" id="visible-window-view-string-pool-ids" data-pagefind-weight="1">
-<summary><code>stringPoolIds</code> <span class="api-member-summary">Raw global string-pool ids for worker transfer; 0xffffffff means none.</span></summary>
+<summary><code>stringPoolIds</code> <span class="api-member-summary">Raw string-pool ids valid only in stringPoolEpoch; 0xffffffff means none.</span></summary>
 
 ```ts generated
 stringPoolIds?: Uint32Array;
@@ -134,7 +144,7 @@ stringLocalIds?: Int32Array;
 </details>
 
 <details class="api-member" id="visible-window-view-string-pool-update-ids" data-pagefind-weight="1">
-<summary><code>stringPoolUpdateIds</code> <span class="api-member-summary">String-pool ids resolved by this window and safe for worker cache updates.</span></summary>
+<summary><code>stringPoolUpdateIds</code> <span class="api-member-summary">IDs resolved in stringPoolEpoch, safe for cache updates after epoch invalidation.</span></summary>
 
 ```ts generated
 stringPoolUpdateIds?: Uint32Array;
@@ -224,6 +234,7 @@ export interface VisibleWindowView {
   styles: readonly CellStyle[];
   valueKinds?: Uint8Array;
   numberValues?: Float64Array;
+  stringPoolEpoch: number;
   stringPoolIds?: Uint32Array;
   stringLocalIds?: Int32Array;
   stringPoolUpdateIds?: Uint32Array;

@@ -86,6 +86,26 @@ if (grid.rendererKind() !== "worker") {
   the store produces, so it is cheap to transfer.
 - Painting therefore continues smoothly even when the main thread is busy.
 
+### Raw string IDs and epochs
+
+Every `VisibleWindowView` carries a store-wide `stringPoolEpoch` (a u32 exposed
+as a JavaScript number). Its `stringPoolIds` and `stringPoolUpdateIds` are valid
+only in that epoch. Committed string collection can remap IDs: the same numeric
+ID may name different text afterward. Never persist raw pool IDs as document
+values or retain an ID-to-text cache across an epoch change.
+
+Both transferable and shared-memory frames, including frozen panes, carry the
+issuing epoch. The host reader and paint worker invalidate their own caches
+before resolving IDs or applying that epoch's string updates. Resolved `values`
+and window-local error strings do not require pool lookup; the view still has
+its normal lifetime until the next store mutation or window refresh.
+
+Direct WASM readers must compare `WindowView.stringPoolEpoch()` with
+`CellStore.stringPoolEpoch()` before passing IDs to `poolStrings`. For raw
+`persistedCellData` projections, capture the store epoch alongside the read and
+resolve those IDs before any operation that can collect strings. If the epoch
+has changed, discard the raw projection and read it again.
+
 ## Automatic fallback
 
 The worker is constructed **first**, before the canvas is transferred. If

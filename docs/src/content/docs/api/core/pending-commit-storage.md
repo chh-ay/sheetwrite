@@ -8,7 +8,7 @@ description: "Host-owned durable queue."
 Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L50"><code>packages/core/src/sync.ts#L50</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L51"><code>packages/core/src/sync.ts#L51</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

@@ -63,6 +63,7 @@ export type RecomputingCellStore = CellStore & {
   ): void;
   removeCols(sheet: number, at: number, count: number): void;
   poolStrings(ids: Uint32Array): string[];
+  stringPoolEpoch(): number;
   styleIdAt(sheet: number, row: number, col: number): number;
   setConditionalRules(
     sheet: number,
@@ -198,6 +199,14 @@ export type RecomputingCellStore = CellStore & {
   ): Uint32Array;
   cellSnapshots(sheet: number, rows: Uint32Array, cols: Uint32Array): CellSnapshot | undefined;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
+  pinReadWindow(
+    sheet: number,
+    startRow: number,
+    endRow: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ): void;
+  pinViewportBands(sheet: number, bands: Uint32Array): void;
   beginPageLoad(): void;
   endPageLoad(): void;
   hydratePageNumbers(
@@ -229,6 +238,7 @@ export type RecomputingCellStore = CellStore & {
 
 /** Consuming accessors transfer one packed numeric payload and any strings once. */
 export type ConsumingWindowView = WindowView & {
+  stringPoolEpoch(): number;
   takePacked(): Uint8Array;
   takeStrings(): string[];
 };

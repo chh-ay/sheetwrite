@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
+import { opensFreshDocument } from "../lib/navigation.js";
 import { pageMeta } from "../lib/seo.js";
 import { CAPABILITY_OWNERS, type CapabilityOwnerId } from "../showcases/hub-inventory.js";
 import hubStylesheet from "../styles/showcase-hub.css?url";
@@ -325,8 +326,7 @@ function HubCard({ owner, medianMs }: Readonly<{ owner: HubOwner; medianMs?: num
       <Link
         className={`sw-hub-launch${isFramework ? " sw-hub-launch--framework" : ""}`}
         data-owner={owner.id}
-        // The formula page selects the full engine, so it opens as a fresh page.
-        reloadDocument={owner.id === "formulas"}
+        reloadDocument={opensFreshDocument(owner.href)}
         to={owner.href}
       >
         {isFramework ? (

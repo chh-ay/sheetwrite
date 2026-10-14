@@ -57,6 +57,38 @@ export class GeometryLayoutController {
   private rowTopsView = this.rowTopsScratch;
   private rowHeightsView = this.rowHeightsScratch;
   private rowGeometryLength = 0;
+  private previewColumn = -1;
+  private previewWidth = 0;
+  private hasRowPreview = false;
+
+  previewColumnWidth(column: number, width: number): void {
+    this.previewColumn = column;
+    this.previewWidth = width;
+    this.columnIndex.setWidth(column, width * this.options.zoom());
+  }
+
+  columnWidth(column: number): number {
+    return this.previewColumn === column
+      ? this.previewWidth
+      : (this.options.sheet().columns[column]?.width ?? 0);
+  }
+
+  previewRowHeight(row: number, height: number): void {
+    this.hasRowPreview = true;
+    this.rowIndex.setHeight(row, height * this.options.zoom());
+  }
+
+  clearResizePreview(): void {
+    if (this.previewColumn !== -1) {
+      const column = this.previewColumn;
+      this.previewColumn = -1;
+      this.columnIndex.setWidth(column, this.columnWidth(column) * this.options.zoom());
+    }
+    if (this.hasRowPreview) {
+      this.hasRowPreview = false;
+      this.rebuildRows(this.rowIndex.count);
+    }
+  }
 
   constructor(
     private readonly options: GeometryLayoutOptions,
@@ -288,7 +320,7 @@ export class GeometryLayoutController {
     rowHeights: Float64Array;
   } | null {
     const sheet = this.options.sheet();
-    if (!sheet.rowHeights || sheet.rowHeights.size === 0) return null;
+    if (!this.hasRowPreview && (!sheet.rowHeights || sheet.rowHeights.size === 0)) return null;
 
     const count = Math.max(0, window.end - window.start);
     if (this.rowTopsScratch.length < count) {
@@ -315,7 +347,7 @@ export class GeometryLayoutController {
     rowTops: Float64Array;
     rowHeights: Float64Array;
   } | null {
-    if (count <= 0 || !this.options.sheet().rowHeights?.size) return null;
+    if (count <= 0 || (!this.hasRowPreview && !this.options.sheet().rowHeights?.size)) return null;
     assertGeometryDimensions(count, 0);
     let rowTops: Float64Array;
     let rowHeights: Float64Array;
@@ -351,7 +383,12 @@ export class GeometryLayoutController {
     const sheet = this.options.sheet();
     assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
     this.visibleColumnIndices = visibleColumns(sheet);
-    this.columnIndex = buildColumnIndex(sheet, this.visibleColumnIndices, this.options.zoom());
+    const widths = new Float64Array(this.visibleColumnIndices.length);
+    for (let i = 0; i < this.visibleColumnIndices.length; i++) {
+      const column = this.visibleColumnIndices[i];
+      if (column !== undefined) widths[i] = this.columnWidth(column) * this.options.zoom();
+    }
+    this.columnIndex = new ColumnIndex(this.visibleColumnIndices, widths);
   }
 
   layoutSize(viewportHeight: number): { width: number; height: number } {

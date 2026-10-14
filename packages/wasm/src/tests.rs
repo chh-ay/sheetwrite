@@ -1370,6 +1370,8 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     assert!(store.clear_range(sheet, 0, 0, 2, 1, true, true));
     assert!(store.formula_source(sheet, 1, 0).is_none());
     assert!(string(&store, sheet, 2, 1).is_none());
+    store.compact_string_storage();
+    assert_eq!(store.snapshot_texts(&snapshot)[5], "tail");
     assert!(store.restore_range(sheet, 0, 0, &snapshot));
     store.recompute(sheet);
 
@@ -1393,6 +1395,126 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
     assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+}
+
+#[test]
+fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, 3);
+    store.set_string(sheet, 0, 0, "literal survivor", 0);
+    store.set_formula(sheet, 0, 1, "=\"formula survivor\"", 0);
+    store.set_formula(sheet, 1, 1, "={\"spill anchor\";\"spill child\"}", 0);
+    store.recompute(sheet);
+    let snapshot = store.capture_range(sheet, 0, 0, 3, 3).unwrap();
+    store.begin_mutation();
+    for edit in 0..4_000 {
+        store.set_string(
+            sheet,
+            2,
+            0,
+            &format!("uncommitted-{edit}-{}", "x".repeat(128)),
+            0,
+        );
+    }
+    store.compact_string_storage();
+    assert_eq!(store.string_pool_epoch(), 0);
+    store.end_mutation();
+    assert!(store.string_pool_epoch() > 0);
+    for cycle in 0..4 {
+        for edit in 0..4_000 {
+            store.begin_mutation();
+            store.set_string(
+                sheet,
+                2,
+                0,
+                &format!("{cycle}-{edit}-{}", "x".repeat(128)),
+                0,
+            );
+            store.end_mutation();
+        }
+        let memory = store.memory_stats();
+        let utf8_bytes = memory[3 + crate::memory::STRING_POOL_UTF8 * 3];
+        let span_bytes = memory[3 + crate::memory::STRING_POOL_SPANS * 3];
+        assert!(utf8_bytes + span_bytes < 600_000.0);
+        store.begin_mutation();
+        store.clear_cell(sheet, 2, 0, 0);
+        store.end_mutation();
+    }
+    assert!(store.string_pool_epoch() > 0);
+    store.compact_string_storage();
+    assert_eq!(
+        string(&store, sheet, 0, 0).as_deref(),
+        Some("literal survivor")
+    );
+    assert_eq!(
+        string(&store, sheet, 0, 1).as_deref(),
+        Some("formula survivor")
+    );
+    assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("spill anchor"));
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("spill child"));
+    let redo = store.capture_range(sheet, 0, 0, 3, 3).unwrap();
+    store.clear_range(sheet, 0, 0, 2, 2, true, true);
+    store.compact_string_storage();
+    assert!(store.restore_range(sheet, 0, 0, &snapshot));
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 2, 1).as_deref(), Some("spill child"));
+    store.compact_string_storage();
+    assert!(store.restore_range(sheet, 0, 0, &redo));
+    store.recompute(sheet);
+    assert_eq!(
+        string(&store, sheet, 0, 1).as_deref(),
+        Some("formula survivor")
+    );
+}
+
+#[test]
+fn paged_text_collection_preserves_dirty_overlays_after_clean_eviction() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.begin_page_load();
+    store.set_column_strings(sheet, 0, 0, vec!["clean old".into()], 0);
+    store.set_column_strings(sheet, 0, 4096, vec!["evicted".into()], 0);
+    store.end_page_load();
+    store.set_string(sheet, 0, 0, "dirty survivor", 0);
+    store.begin_page_load();
+    store.set_column_strings(sheet, 0, 8192, vec!["clean survivor".into()], 0);
+    store.set_column_strings(sheet, 0, 12288, vec!["last survivor".into()], 0);
+    for edit in 0..4_000 {
+        store.set_string(
+            sheet,
+            12288,
+            0,
+            &format!("hydration-{edit}-{}", "x".repeat(128)),
+            0,
+        );
+    }
+    store.set_string(sheet, 12288, 0, "last survivor", 0);
+    store.end_page_load();
+    assert_eq!(
+        store.string_pool_epoch(),
+        0,
+        "page hydration must not collect"
+    );
+    store.compact_string_storage();
+    assert_eq!(
+        string(&store, sheet, 0, 0).as_deref(),
+        Some("dirty survivor")
+    );
+    assert_eq!(
+        string(&store, sheet, 8192, 0).as_deref(),
+        Some("clean survivor")
+    );
+    assert_eq!(
+        string(&store, sheet, 12288, 0).as_deref(),
+        Some("last survivor")
+    );
+    assert_eq!(store.cell_state(sheet, 4096, 0), 0);
+    store.mark_range_clean(sheet, 0, 1, 0, 1);
+    store.compact_string_storage();
+    assert_eq!(
+        string(&store, sheet, 0, 0).as_deref(),
+        Some("dirty survivor")
+    );
 }
 
 #[test]
@@ -1427,6 +1549,42 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 
     store.mark_range_clean(sheet, 0, 1, 0, 1);
     assert_eq!(store.paged_stats(sheet)[2], 0.0);
+}
+
+#[test]
+fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 32, 4, 64, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.pin_range(sheet, 0, 1, &[0]);
+    store.pin_viewport_bands(sheet, &[4, 5, 0, 1]);
+    store.pin_read_window(sheet, 0, 1, &[8], &[0]);
+    store.begin_page_load();
+    for row in [0, 4, 8] {
+        store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
+    }
+    store.end_page_load();
+
+    store.pin_read_window(sheet, 0, 0, &[], &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
+    store.end_page_load();
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_close(number(&store, sheet, 4, 0), 5.0);
+    assert_eq!(store.cell_state(sheet, 8, 0), 0);
+
+    store.pin_viewport_bands(sheet, &[]);
+    store.pin_range(sheet, 0, 0, &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
+    store.end_page_load();
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_eq!(store.cell_state(sheet, 4, 0), 0);
+
+    store.pin_range(sheet, 0, 1, &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
+    store.end_page_load();
+    assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 
 #[test]
@@ -1628,6 +1786,7 @@ fn distinct_values_keep_first_seen_order_across_mixed_kinds() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(1, 16);
     fill_mixed_distinct_column(&mut store, sheet);
+    store.compact_string_storage();
 
     let mut column = store.distinct_values(sheet, 0, 0);
     // Text, number, error text, boolean, `-0.0`, `0.0`, NaN, blank, the pooled

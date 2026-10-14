@@ -6,7 +6,7 @@ import type { DomMergeAnchorRequest, DomOverlay } from "../src/dom-overlay.js";
 import { GeometryLayoutController } from "../src/geometry-layout-controller.js";
 import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
-import { RenderCoordinator } from "../src/render-coordinator.js";
+import { ReadWindowController } from "../src/read-window-controller.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Renderer, Store, Viewport, VisibleWindowView } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
@@ -191,7 +191,7 @@ describe("GeometryLayoutController", () => {
   });
 });
 
-describe("RenderCoordinator", () => {
+describe("ReadWindowController", () => {
   it("separates pixel repaints from logical data-window invalidation", () => {
     const store = new SheetwriteStore(makeWorkbook(8));
     let windowReads = 0;
@@ -201,6 +201,7 @@ describe("RenderCoordinator", () => {
     let zoom = 1;
     let anchorRequests: readonly DomMergeAnchorRequest[] = [];
     const countedStore = {
+      getWorkbook: () => store.getWorkbook(),
       getVisibleWindow: (...args: Parameters<Store["getVisibleWindow"]>) => {
         windowReads += 1;
         return store.getVisibleWindow(...args);
@@ -277,7 +278,7 @@ describe("RenderCoordinator", () => {
     }) as typeof requestAnimationFrame;
     globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
 
-    const coordinator = new RenderCoordinator({
+    const coordinator = new ReadWindowController({
       renderer: () => renderer,
       domOverlay,
       overlayPainter: overlay,

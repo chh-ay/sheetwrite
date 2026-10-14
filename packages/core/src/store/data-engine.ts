@@ -27,7 +27,7 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
-import { decodeRestoreBlock } from "../restore-block.js";
+import { restoreBlockFacts } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -846,6 +846,13 @@ export class StoreDataEngine {
     );
   }
 
+  /** Empty protection releases remain valid after their sheet has been removed. */
+  pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
+    const handle = this.handles.get(sheet);
+    if (handle === undefined && bands.length === 0) return;
+    this.wasm.pinViewportBands(handle ?? this.handleOf(sheet), bands);
+  }
+
   canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -1447,7 +1454,8 @@ export class StoreDataEngine {
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
     const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
-    const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
+    const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
+    const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
@@ -1486,22 +1494,21 @@ export class StoreDataEngine {
           hasStructuralPatch = true;
         }
       }
+      if (hasStructuralPatch) {
+        for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
+      }
+      this.flushSpillBlockers();
+      if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
+      this.rangeMutationStats.documentOperations += appliedPatches.length;
+      this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
+
+      this.noteRangeMutationFfi();
+      this.wasm.recomputeChanged();
+      return { appliedPatches, changes, storageRevision };
     } finally {
       if (remoteLoad) this.wasm.endPageLoad();
-      else if (tracksPagedRevision) this.wasm.endMutation();
+      else this.wasm.endMutation();
     }
-
-    if (hasStructuralPatch) {
-      for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
-    }
-    this.flushSpillBlockers();
-    if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
-    this.rangeMutationStats.documentOperations += appliedPatches.length;
-    this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
-
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
-    return { appliedPatches, changes, storageRevision };
   }
 
   private applyPatch(
@@ -1602,12 +1609,13 @@ export class StoreDataEngine {
       }
       case "setBlock":
       case "restoreBlock": {
-        const bounds = normalizedRange(patch.range);
+        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+        const bounds = prepared?.range ?? normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
         const cellCount = rows * cols;
-        const block = patch.op === "restoreBlock" ? decodeRestoreBlock(patch) : patch.block;
+        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
         const styleTable = block.styleTable ?? [];
         const styleIds = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];

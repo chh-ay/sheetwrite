@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { type ReactNode, useEffect } from "react";
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
+import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 import showcaseStylesheet from "../styles/showcase.css?url";
@@ -99,7 +100,10 @@ export const Route = createRootRoute({
       scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
     };
   },
+  shellComponent: RootDocument,
   component: RootComponent,
+  errorComponent: SiteError,
+  notFoundComponent: SiteNotFound,
 });
 
 function RootComponent() {
@@ -114,13 +118,10 @@ function RootComponent() {
     };
   }, []);
 
-  return (
-    <RootDocument>
-      <Outlet />
-    </RootDocument>
-  );
+  return <Outlet />;
 }
 
+/** The `<html>` document: always rendered on the server, around every page, error, and 404. */
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
