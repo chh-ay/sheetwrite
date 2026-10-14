@@ -24,6 +24,7 @@ use crate::types::{
 };
 
 mod transfer;
+mod range_transfer;
 
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);

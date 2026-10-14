@@ -347,6 +347,10 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+  private readonly rangeHistory = new Map<
+    CompactRangeHistory,
+    { sheetHandle: number; replace(resource: RangeSnapshot): void }
+  >();
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
@@ -928,14 +932,15 @@ export class StoreDataEngine {
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
     this.noteRangeMutationFfi();
-    const resource = this.wasm.captureRange(
+    const capturedResource = this.wasm.captureRange(
       this.handleOf(range.sheet),
       range.start.row,
       range.start.col,
       rows,
       cols,
     );
-    if (!resource) return null;
+    if (!capturedResource) return null;
+    let resource: RangeSnapshot = capturedResource;
     this.rangeMutationStats.historySnapshots += 1;
     this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
 
@@ -968,10 +973,12 @@ export class StoreDataEngine {
     }
 
     let disposed = false;
-    return {
+    const history: CompactRangeHistory = {
       range,
       byteLength: resource.byteLength(),
-      resource,
+      get resource() {
+        return resource;
+      },
       refs,
       toDocumentOp: (target) => {
         if (disposed) throw new Error("history range snapshot already disposed");
@@ -1024,9 +1031,19 @@ export class StoreDataEngine {
         if (disposed) return;
         disposed = true;
         resource.free();
+        this.rangeHistory.delete(history);
         this.rangeMutationStats.historyDisposals += 1;
       },
     };
+    this.rangeHistory.set(history, {
+      sheetHandle: this.handleOf(range.sheet),
+      replace: (replacement) => {
+        const previous = resource;
+        resource = replacement;
+        previous.free();
+      },
+    });
+    return history;
   }
 
   getWorkbook(): Workbook {
@@ -3134,14 +3151,39 @@ export class StoreDataEngine {
     const replacement = instance.CellStore.importMemoryState(
       this.wasm.exportMemoryState(),
     ) as RecomputingCellStore;
+    const history: Array<{
+      replacement: RangeSnapshot;
+      replace(resource: RangeSnapshot): void;
+    }> = [];
+    try {
+      for (const [snapshot, owner] of this.rangeHistory) {
+        history.push({
+          replacement: replacement.importRangeMemoryState(
+            snapshot.resource.exportMemoryState(owner.sheetHandle),
+            owner.sheetHandle,
+            snapshot.range.start.row,
+            snapshot.range.start.col,
+          ),
+          replace: owner.replace,
+        });
+      }
+    } catch (cause) {
+      for (const snapshot of history) snapshot.replacement.free();
+      replacement.free();
+      throw new Error("Sheetwrite: compact history migration failed", { cause });
+    }
     return {
-      abort: () => replacement.free(),
+      abort: () => {
+        for (const snapshot of history) snapshot.replacement.free();
+        replacement.free();
+      },
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
         this.pagedDirtyPreflight?.replaceEngine(replacement);
+        for (const snapshot of history) snapshot.replace(snapshot.replacement);
         previous.free();
       },
     };
@@ -3153,6 +3195,7 @@ export class StoreDataEngine {
     const committed = this.wasm.wasmCommittedBytes();
     this.committedBytesAfterDispose = committed > 0 ? committed : null;
     this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
+    for (const history of this.rangeHistory.keys()) history.dispose();
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();

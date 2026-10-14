@@ -17,11 +17,17 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
   }
   const implementation = source
     .replace(/^export (class|function|const|let) /gm, "$1 ")
-    .replace(/^export \{[^}]*\};?\s*$/gm, "");
+    .replace(/^export \{[^}]*\};?\s*$/gm, "")
+    .replace(/ptr => wasm\./g, "ptr => wasm?.");
   const exports = [...new Set([...declarations, "initSync"])];
+  const memoryCaches = [...source.matchAll(/^let (cached\w+Memory\d+) = null;/gm)].map(
+    (match) => `${match[1]} = null;`,
+  );
+  if (memoryCaches.length === 0) throw new Error(`Unrecognized memory caches in ${gluePath}`);
+  const retire = `wasm = undefined; wasmInstance = undefined; wasmModule = undefined; ${memoryCaches.join(" ")}`;
   await writeFile(
     resolve(packageDirectory, "pkg/sheetwrite_wasm_factory.js"),
-    `// Generated from wasm-bindgen glue; do not edit.\nexport function createInstance() {\n${implementation}\nreturn { ${exports.join(", ")}, init: __wbg_init, getModule: () => wasmModule, getMemory: () => wasm.memory };\n}\n`,
+    `// Generated from wasm-bindgen glue; do not edit.\nexport function createInstance() {\n${implementation}\nreturn { ${exports.join(", ")}, init: __wbg_init, getModule: () => { if (!wasmModule) throw new Error("Engine is not initialized or has been retired"); return wasmModule; }, getMemory: () => { if (!wasm) throw new Error("Engine is not initialized or has been retired"); return wasm.memory; }, retire: () => { ${retire} } };\n}\n`,
   );
 }
 

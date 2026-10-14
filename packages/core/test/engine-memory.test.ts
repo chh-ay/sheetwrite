@@ -73,6 +73,11 @@ describe("explicit engine memory release", () => {
 
   it("drops the retired linear memory and shares concurrent release calls", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
+    const disposed = new SheetwriteStore(makeWorkbook(2));
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+    const snapshot = disposed.captureRangeHistory(range);
+    if (!snapshot) throw new Error("Expected a compact history resource");
+    disposed.dispose();
     try {
       const retired = new WeakRef(getEngine().getMemory());
       const first = releaseEngineMemory();
@@ -84,6 +89,11 @@ describe("explicit engine memory release", () => {
         Bun.gc(true);
       }
       expect(retired.deref()).toBeUndefined();
+      // Retained disposed facades/resources must not retain an old glue memory cache.
+      expect(disposed.getWorkbook().sheets).toHaveLength(1);
+      expect(() => snapshot.toDocumentOp(range)).toThrow("already disposed");
+      snapshot.dispose();
+      disposed.dispose();
       store.applyTransaction({
         patches: [{ op: "set", addr: address(0, 1), value: { kind: "literal", value: 7 } }],
       });

@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { validateTransactionResources } from "../src/document-protocol.js";
+import { releaseEngineMemory } from "../src/engine-memory.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -644,7 +645,7 @@ describe("Grid transaction resource ingress", () => {
     grid.destroy();
   });
 
-  it("undo restores every cell of a text clear above the default wire limit", () => {
+  it("undo restores every cell of a text clear across engine releases on both history stacks", async () => {
     const rows = 1_000;
     const cols = 300;
     const columns = Array.from({ length: cols }, (_, col) => ({
@@ -656,7 +657,7 @@ describe("Grid transaction resource ingress", () => {
     const grid = new GridImpl(mountHost(), {
       workbook: {
         activeSheet: "s1",
-        sheets: [{ id: "s1", name: "Text", rowCount: rows, columns }],
+        sheets: [{ id: "s1", name: "Text", rowCount: rows + 1, columns }],
       },
       data: {
         rowCount: rows,
@@ -679,6 +680,13 @@ describe("Grid transaction resource ingress", () => {
       rejections += 1;
     });
     try {
+      const older = { sheet: "s1", row: rows, col: 0 };
+      const newer = { sheet: "s1", row: rows, col: 1 };
+      expect(
+        grid.applyTransaction({
+          patches: [{ op: "set", addr: older, value: { kind: "literal", value: "older edit" } }],
+        }).status,
+      ).toBe("applied");
       expect(
         grid.applyTransaction({
           patches: [
@@ -696,6 +704,20 @@ describe("Grid transaction resource ingress", () => {
         }).status,
       ).toBe("applied");
       expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+      expect(
+        grid.applyTransaction({
+          patches: [{ op: "set", addr: newer, value: { kind: "literal", value: "newer edit" } }],
+        }).status,
+      ).toBe("applied");
+      grid.undo();
+      expect(grid.store.getCell(newer).resolved).toBeNull();
+      if (!(grid.store instanceof SheetwriteStore))
+        throw new Error("Expected an engine-owned store");
+      const materializations = grid.store.getRangeMutationAllocationStats().historyMaterializations;
+      await releaseEngineMemory();
+      expect(grid.store.getRangeMutationAllocationStats().historyMaterializations).toBe(
+        materializations,
+      );
       grid.undo();
       const restored = grid.store.getVisibleWindow(
         "s1",
@@ -711,10 +733,24 @@ describe("Grid transaction resource ingress", () => {
         }
       }
       expect(mismatches).toBe(0);
-      expect(changes.map((event) => event.commitReason)).toEqual(["api", "undo"]);
+      expect(changes.map((event) => event.commitReason)).toEqual([
+        "api",
+        "api",
+        "api",
+        "undo",
+        "undo",
+      ]);
       expect(rejections).toBe(0);
+      await releaseEngineMemory();
+      grid.undo();
+      expect(grid.store.getCell(older).resolved).toBeNull();
+      grid.redo();
+      expect(grid.store.getCell(older).resolved).toBe("older edit");
       grid.redo();
       expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+      await releaseEngineMemory();
+      grid.redo();
+      expect(grid.store.getCell(newer).resolved).toBe("newer edit");
     } finally {
       grid.destroy();
     }

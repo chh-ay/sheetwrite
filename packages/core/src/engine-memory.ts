@@ -34,7 +34,8 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   // the engine over before that transaction and its listeners have returned.
   const replacement = await prepareEngineInstance();
   const started = performance.now();
-  const before = getEngine().getMemory().buffer.byteLength;
+  const previous = getEngine();
+  const before = previous.getMemory().buffer.byteLength;
   const prepared: PreparedEngineMemoryRelease[] = [];
   try {
     for (const engine of liveStoreEngines()) {
@@ -43,6 +44,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
     }
   } catch (cause) {
     for (const migration of prepared) migration.abort();
+    replacement.retire();
     throw new Error(
       "Sheetwrite: engine memory release preparation failed; live stores are unchanged",
       { cause },
@@ -51,6 +53,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   // No await, callbacks, or fallible reconstruction beyond this point.
   for (const migration of prepared) migration.commit();
   replaceEngineInstance(replacement);
+  previous.retire();
   return {
     stores: prepared.length,
     wasmBytesBefore: before,

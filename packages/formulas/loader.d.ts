@@ -29,6 +29,8 @@ export declare function isLoaded(): boolean;
 export type EngineInstance = Omit<typeof WasmExports, "default"> & {
   getModule(): WebAssembly.Module;
   getMemory(): WebAssembly.Memory;
+  /** Drop all glue roots after releasing owned resources. This instance is then unusable. */
+  retire(): void;
   functionNames?: () => string[];
 };
 
