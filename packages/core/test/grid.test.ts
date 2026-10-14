@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { validateTransactionResources } from "../src/document-protocol.js";
-import { releaseEngineMemory } from "../src/engine-memory.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
@@ -11,6 +10,7 @@ import {
   initSheetwrite,
   measureMaxElementHeight,
 } from "../src/grid.js";
+import { releaseEngineMemory } from "../src/index.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import { registerGridTransactionAdmission } from "../src/transaction-admission.js";

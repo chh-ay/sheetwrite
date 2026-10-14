@@ -1,8 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { releaseEngineMemory } from "../src/engine-memory.js";
 import { getEngine } from "../src/engine.js";
-import { initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
+import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {

@@ -29,6 +29,12 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
     resolve(packageDirectory, "pkg/sheetwrite_wasm_factory.js"),
     `// Generated from wasm-bindgen glue; do not edit.\nexport function createInstance() {\n${implementation}\nreturn { ${exports.join(", ")}, init: __wbg_init, getModule: () => { if (!wasmModule) throw new Error("Engine is not initialized or has been retired"); return wasmModule; }, getMemory: () => { if (!wasm) throw new Error("Engine is not initialized or has been retired"); return wasm.memory; }, retire: () => { ${retire} } };\n}\n`,
   );
+  // Preserve the published singleton exports without shipping a second copy of
+  // the glue implementation. Core uses independent instances from the same factory.
+  await writeFile(
+    gluePath,
+    `// Generated singleton loader; do not edit.\nimport { createInstance } from "./sheetwrite_wasm_factory.js";\nconst singleton = createInstance();\nexport const { ${exports.join(", ")} } = singleton;\nexport default singleton.init;\n`,
+  );
 }
 
 if (import.meta.main) {

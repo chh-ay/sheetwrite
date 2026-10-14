@@ -66,6 +66,7 @@ export {
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
 export type { SheetwriteEngine } from "./engine.js";
+export { type EngineMemoryReleaseReport, releaseEngineMemory } from "./engine-memory.js";
 export {
   isSheetwriteError,
   SHEETWRITE_ERROR_CODES,

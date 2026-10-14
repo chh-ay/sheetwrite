@@ -11,7 +11,7 @@ A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/engine.ts#L4"><code>packages/core/src/engine.ts#L4</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -42,6 +42,15 @@ isLoaded: typeof defaultEngine.isLoaded;
 
 </details>
 
+<details class="api-member" id="sheetwrite-engine-create-engine" data-pagefind-weight="1">
+<summary><code>createEngine</code></summary>
+
+```ts generated
+createEngine: typeof defaultEngine.createEngine;
+```
+
+</details>
+
 <details class="api-member" id="sheetwrite-engine-function-names" data-pagefind-weight="1">
 <summary><code>functionNames</code> <span class="api-member-summary">The optional full engine reports its accepted function names.</span></summary>
 
@@ -62,6 +71,7 @@ export interface SheetwriteEngine {
   CellStore: typeof defaultEngine.CellStore;
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
+  createEngine: typeof defaultEngine.createEngine;
   functionNames?: () => string[];
 }
 ```

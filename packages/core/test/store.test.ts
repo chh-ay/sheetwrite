@@ -5,8 +5,8 @@ import {
   validateTransactionResources,
   validateWorkbookSnapshot,
 } from "../src/document-protocol.js";
-import { releaseEngineMemory } from "../src/engine-memory.js";
 import { initSheetwrite } from "../src/grid.js";
+import { releaseEngineMemory } from "../src/index.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type {

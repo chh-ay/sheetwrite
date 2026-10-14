@@ -37,6 +37,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-distinct-values"><code>distinctValues</code></a>
 <a href="#cell-store-end-mutation"><code>endMutation</code></a>
 <a href="#cell-store-end-page-load"><code>endPageLoad</code></a>
+<a href="#cell-store-export-memory-state"><code>exportMemoryState</code></a>
 <a href="#cell-store-filter-rows"><code>filterRows</code></a>
 <a href="#cell-store-filter-rows-multi"><code>filterRowsMulti</code></a>
 <a href="#cell-store-formula-matrix-resource-stats"><code>formulaMatrixResourceStats</code></a>
@@ -48,6 +49,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-get-window-rows"><code>getWindowRows</code></a>
 <a href="#cell-store-hydrate-page-numbers"><code>hydratePageNumbers</code></a>
 <a href="#cell-store-hydrate-page-strings-packed"><code>hydratePageStringsPacked</code></a>
+<a href="#cell-store-import-range-memory-state"><code>importRangeMemoryState</code></a>
 <a href="#cell-store-insert-cols"><code>insertCols</code></a>
 <a href="#cell-store-is-fully-loaded"><code>isFullyLoaded</code></a>
 <a href="#cell-store-is-paged"><code>isPaged</code></a>
@@ -60,6 +62,8 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
+<a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
@@ -107,9 +111,10 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
 <a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
+<a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>95</span>
+## Members <span class="api-count" data-pagefind-ignore>100</span>
 
 <div class="api-member-list">
 
@@ -362,6 +367,15 @@ endPageLoad: () => void;
 
 </details>
 
+<details class="api-member" id="cell-store-export-memory-state" data-pagefind-weight="1">
+<summary><code>exportMemoryState</code> <span class="api-member-summary">Export only live state, not allocator slack or a dependency-index cache.</span></summary>
+
+```ts generated
+exportMemoryState: () => Uint8Array;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-filter-rows" data-pagefind-weight="1">
 <summary><code>filterRows</code> <span class="api-member-summary">Data-row indices whose column text contains needle (case-insensitive).</span></summary>
 
@@ -480,6 +494,15 @@ hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: s
 <p class="api-member-doc">Packed-string counterpart to [`CellStore::hydrate_page_numbers`].</p>
 </details>
 
+<details class="api-member" id="cell-store-import-range-memory-state" data-pagefind-weight="1">
+<summary><code>importRangeMemoryState</code></summary>
+
+```ts generated
+importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-insert-cols" data-pagefind-weight="1">
 <summary><code>insertCols</code></summary>
 
@@ -592,10 +615,30 @@ cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
-<summary><code>pinRange</code></summary>
+<summary><code>pinRange</code> <span class="api-member-summary">Replaces caller-owned persistent pins; empty row ranges leave them unchanged.</span></summary>
 
 ```ts generated
 pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-pin-read-window" data-pagefind-weight="1">
+<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing explicit or viewport pins.</span></summary>
+
+```ts generated
+pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Replaces transient read protection without changing explicit or viewport pins.
+Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.</p>
+</details>
+
+<details class="api-member" id="cell-store-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>pinViewportBands</code> <span class="api-member-summary">Replaces viewport-owned protection independently of transient read pins.</span></summary>
+
+```ts generated
+pinViewportBands: (sheet: number, bands: Uint32Array) => void;
 ```
 
 </details>
@@ -1085,7 +1128,16 @@ the cell's style.</p>
 <summary><code>wasmCommittedBytes</code></summary>
 
 ```ts generated
-wasmCommittedBytes: () => number
+wasmCommittedBytes: () => number;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-import-memory-state" data-pagefind-weight="1">
+<summary><code>importMemoryState</code> <span class="api-member-summary">Import into a fresh instance; failure never mutates the source store.</span></summary>
+
+```ts generated
+static importMemoryState: (bytes: Uint8Array) => CellStore
 ```
 
 </details>
@@ -1182,6 +1234,7 @@ class CellStore {
   ) => DistinctColumn;
   endMutation: () => void;
   endPageLoad: () => void;
+  exportMemoryState: () => Uint8Array;
   filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
   filterRowsMulti: (
     sheet: number,
@@ -1237,6 +1290,12 @@ class CellStore {
     style: number,
     protected_offsets: Uint32Array,
   ) => void;
+  importRangeMemoryState: (
+    bytes: Uint8Array,
+    sheet: number,
+    row_start: number,
+    col_start: number,
+  ) => RangeSnapshot;
   insertCols: (sheet: number, at: number, count: number) => void;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
@@ -1270,6 +1329,14 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => void;
+  pinReadWindow: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => void;
+  pinViewportBands: (sheet: number, bands: Uint32Array) => void;
   poolStrings: (ids: Uint32Array) => string[];
   queryResourceStats: () => Float64Array;
   rangeFullyLoaded: (
@@ -1485,6 +1552,7 @@ class CellStore {
   stringPoolEpoch: () => number;
   styleIdAt: (sheet: number, row: number, col: number) => number;
   wasmCommittedBytes: () => number;
+  static importMemoryState: (bytes: Uint8Array) => CellStore;
 }
 ```
 

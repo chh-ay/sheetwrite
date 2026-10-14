@@ -3164,7 +3164,8 @@ export class StoreDataEngine {
   waitForPageLoads(): Promise<void> | undefined {
     if (this.disposed || this.pendingPageRequests === 0) return undefined;
     const { promise, resolve } = Promise.withResolvers<void>();
-    (this.pageIdleWaiters ??= []).push(resolve);
+    this.pageIdleWaiters ??= [];
+    this.pageIdleWaiters.push(resolve);
     return promise;
   }
 

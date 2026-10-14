@@ -8,7 +8,7 @@ description: "Names accepted by the full engine, including aliases."
 Names accepted by the full engine, including aliases.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L467"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L467</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L492"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L492</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -35,6 +35,8 @@ function functionNames(): string[]
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/formulas/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/formulas/init-output/"><code>InitOutput</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

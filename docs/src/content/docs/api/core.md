@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>317</dd></div>
+<div><dt>Exports</dt><dd>319</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -37,7 +37,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>58</span>
+### Functions <span class="api-count" data-pagefind-ignore>59</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
@@ -76,6 +76,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/parse-date-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>parseDateInput</code></span><span class="api-symbol-card__desc">Parse a user-typed date string into a serial, or null when it is not a date.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/range-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>rangeA1</code></span><span class="api-symbol-card__desc">Two cell corners → A1 range (&quot;A1:B3&quot;), collapsing to a single ref when equal.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/rebase-document-operations/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>rebaseDocumentOperations</code></span><span class="api-symbol-card__desc">Conservative server-ordered rebase for pending offline work.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/release-engine-memory/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>releaseEngineMemory</code></span><span class="api-symbol-card__desc">Move all live stores into a fresh WASM instance.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolve-hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>resolveHyperlinkTarget</code></span><span class="api-symbol-card__desc">Revalidate at the final activation boundary; hosts never receive an unsafe URL.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolve-theme-from-css/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>resolveThemeFromCss</code></span><span class="api-symbol-card__desc">Read --sheetwrite- CSS custom properties into a partial theme.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/resolve-transaction-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>resolveTransactionResourceLimits</code></span><span class="api-symbol-card__desc">Validate and merge transaction ceiling overrides without retaining the caller-owned object.</span></a>
@@ -100,7 +101,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>141</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>142</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -142,6 +143,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/delimited-text-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DelimitedTextOptions</code></span><span class="api-symbol-card__desc">Optional resource ceilings for an in-memory delimited-text operation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/delimited-text-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DelimitedTextResourceLimits</code></span><span class="api-symbol-card__desc">Resource ceilings shared by synchronous CSV and TSV parsing and encoding.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/document-validation-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>DocumentValidationError</code></span><span class="api-symbol-card__desc">Path-qualified validation failure for a document operation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/engine-memory-release-report/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>EngineMemoryReleaseReport</code></span><span class="api-symbol-card__desc">Result of an explicit, all-store engine memory release.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>Grid</code></span><span class="api-symbol-card__desc">Imperative grid handle for document commands, events, rendering, and teardown.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-actions/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridActions</code></span><span class="api-symbol-card__desc">Imperative operations the toolbar and context menu bind to; also exposed as Grid.actions.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-command-state/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridCommandState</code></span><span class="api-symbol-card__desc">Observable availability and selection-derived activity for one command.</span></a>
