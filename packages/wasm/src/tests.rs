@@ -1594,12 +1594,12 @@ fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
     for row in [0, 4, 8] {
         store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
     }
-    store.end_page_load();
+    store.commit_sources();
 
     store.pin_read_window(sheet, 0, 0, &[], &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_close(number(&store, sheet, 4, 0), 5.0);
     assert_eq!(store.cell_state(sheet, 8, 0), 0);
@@ -1608,14 +1608,14 @@ fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
     store.pin_range(sheet, 0, 0, &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_eq!(store.cell_state(sheet, 4, 0), 0);
 
     store.pin_range(sheet, 0, 1, &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 

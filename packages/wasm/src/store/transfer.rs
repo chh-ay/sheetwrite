@@ -32,12 +32,6 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
 
     out.bool(entry.ast.is_some());
     out.error(entry.error);
-    out.u32(match entry.value_kind {
-        FormulaValueKind::Number => 0,
-        FormulaValueKind::Text => 1,
-        FormulaValueKind::Bool => 2,
-        FormulaValueKind::Blank => 3,
-    });
     out.bool(entry.volatile);
     out.bool(entry.has_spill_refs);
     out.bool(entry.produces_array);
@@ -93,13 +87,6 @@ impl CellStore {
         }
 
         entry.error = input.error()?;
-        entry.value_kind = match input.u32()? {
-            0 => FormulaValueKind::Number,
-            1 => FormulaValueKind::Text,
-            2 => FormulaValueKind::Bool,
-            3 => FormulaValueKind::Blank,
-            _ => return Err("invalid transferred value kind".into()),
-        };
         entry.volatile = input.bool()?;
         entry.has_spill_refs = input.bool()?;
         entry.produces_array = input.bool()?;

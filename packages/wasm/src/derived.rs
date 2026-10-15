@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::{encode_num, payload_num, STR_TAG_HI};
+use crate::transfer::{Reader, TransferResult, Writer};
 use crate::types::{FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING};
 
 const ERROR_TAG_PREFIX: u64 = 0xFFFB;
@@ -178,6 +179,51 @@ impl DerivedOverlay {
                     remap(value);
                 }
             }
+        }
+    }
+
+    pub(crate) fn write_transfer(&self, out: &mut Writer) {
+        match self {
+            Self::Dense(values) => {
+                out.bool(false);
+                out.word_runs(values, ABSENT_TAG);
+            }
+            Self::Paged(cells) => {
+                out.bool(true);
+                out.usize(cells.len());
+                for (&index, &value) in cells {
+                    out.usize(index);
+                    out.u64(value);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn read_transfer(
+        input: &mut Reader<'_>,
+        maximum: usize,
+        is_paged: bool,
+    ) -> TransferResult<Self> {
+        if input.bool()? != is_paged {
+            return Err("transferred overlay storage mismatch".into());
+        }
+        if is_paged {
+            let count = input.count()?;
+            let mut cells = HashMap::with_capacity(count);
+            for _ in 0..count {
+                let index = input.usize()?;
+                let value = input.u64()?;
+                if index >= maximum || value == ABSENT_TAG || cells.insert(index, value).is_some() {
+                    return Err("invalid transferred calculated cell".into());
+                }
+            }
+            Ok(Self::Paged(cells))
+        } else {
+            let values = input.word_runs(ABSENT_TAG, maximum)?;
+            if !values.is_empty() && values.len() != maximum {
+                return Err("invalid transferred calculated dimensions".into());
+            }
+            Ok(Self::Dense(values))
         }
     }
 

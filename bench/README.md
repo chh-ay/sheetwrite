@@ -36,29 +36,29 @@ The harness discards forty warmups and records twenty-one samples for edit, read
 
 Use `--mode memory --engine wasm --output <artifact.json>` (and `formulas`) for million-row dense-clear, paged dirty-edit, and large-clear history scenarios. It checks preserved values, undo/redo, no history materialization during migration, a cleared WeakRef to the retired memory, and lower committed WASM/process memory. JavaScript heap is JSC's non-external heap (`heapSize - extraMemorySize`); external accounting is retained separately because JSC counts WASM/ArrayBuffer backing allocations there. Process memory is RSS after five full-GC/event-loop turns, not an estimate from that external counter.
 
-The memory-release captures compare `5a16a55` with this branch on Bun 1.4.3, using runner slot 4. `results/engine-memory-release-read-profiles.json` records isolated A/B read profiles of the implementation at `9915236`, before the lazy-singleton compatibility repair. Both profiles spend their read samples in the same WASM/window-copy paths; neither samples an engine lookup. The reader already keeps a direct store reference, rebound only during migration. The short original read batches mixed JSC tier-up and allocation bursts; the retained protocol uses longer warmed batches rather than adding a lookup cache or changing Rust. The final unprofiled comparison includes the lazy-singleton repair.
+The ordinary-path captures below compare `5a16a55` with the memory-release stack on Bun 1.4.3, using runner slot 4. The read profiles and longer warmed batches are retained in `results/engine-memory-release-{read-profiles,paths-wasm,paths-formulas}.json`. The memory observations below use the formula/spill overlay transfer on Bun 1.4.3 and runner slot 8.
 
 Memory observations below are MiB before → after, after five GC/event-loop turns. Empty-dense is a new million-row, three-column dense store with no data. Dense-clear keeps ten populated rows of the same store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history keeps the compact inverse of a three-column million-row clear. The fresh floor is the WASM memory of a store newly built with the same surviving content and row count, plus the compact history bytes. The scenarios run in sequence in one engine.
 
 | Engine | Scenario | WASM MiB | Fresh floor MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
 | --- | --- | --- | --- | --- | --- | --- |
-| wasm | empty-dense | 38.44 → 38.44 | 38.44 | 5.61 → 5.62 | 110.26 → 110.55 | 52.83 |
-| wasm | dense-clear | 173.25 → 38.44 | 38.44 | 5.63 → 5.64 | 250.66 → 111.88 | 50.29 |
-| wasm | paged-dirty | 38.44 → 1.19 | 1.19 | 5.65 → 5.66 | 132.97 → 80.63 | 5.47 |
-| wasm | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.82 → 7.83 | 270.43 → 159.74 | 274.26 |
-| formulas | empty-dense | 38.44 → 38.44 | 38.44 | 5.69 → 5.70 | 110.86 → 109.86 | 51.98 |
-| formulas | dense-clear | 173.25 → 38.44 | 38.44 | 5.71 → 5.72 | 251.73 → 111.54 | 55.26 |
-| formulas | paged-dirty | 38.44 → 1.19 | 1.19 | 5.73 → 5.74 | 134.39 → 82.24 | 4.07 |
-| formulas | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.89 → 7.90 | 265.95 → 161.40 | 224.24 |
+| wasm | empty-dense | 38.44 → 38.44 | 38.44 | 5.61 → 5.62 | 111.01 → 109.31 | 47.39 |
+| wasm | dense-clear | 101.06 → 38.44 | 38.44 | 5.63 → 5.64 | 180.89 → 118.54 | 43.34 |
+| wasm | paged-dirty | 38.44 → 1.19 | 1.19 | 5.65 → 5.66 | 136.68 → 82.93 | 3.73 |
+| wasm | large-clear-history | 101.12 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.81 → 7.83 | 197.33 → 160.97 | 223.57 |
+| formulas | empty-dense | 38.44 → 38.44 | 38.44 | 5.68 → 5.69 | 109.84 → 109.77 | 45.38 |
+| formulas | dense-clear | 101.06 → 38.44 | 38.44 | 5.71 → 5.72 | 178.77 → 116.39 | 42.98 |
+| formulas | paged-dirty | 38.44 → 1.19 | 1.19 | 5.72 → 5.73 | 134.92 → 81.89 | 3.22 |
+| formulas | large-clear-history | 101.12 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.89 → 7.90 | 197.34 → 162.70 | 251.62 |
 
 Release never grows the WASM memory, and every scenario lands on its fresh floor. The transfer is sized by content, not row count: runs of empty or default values are encoded as runs, and the new instance decodes from a JavaScript buffer through a bounded 64 KiB reader straight into its final vectors, so no full transfer image stays in its heap. All eight retired-memory WeakRefs cleared. Raw bytes and pause measurements are in `results/engine-memory-release-memory-{wasm,formulas}.json`. These local captures are not portable memory ceilings.
 
 | Engine | Baseline raw B | Changed raw B | Baseline Brotli B | Changed Brotli B | Brotli increase B |
 | --- | --- | --- | --- | --- | --- |
-| wasm | 804818 | 848920 | 241093 | 250209 | 9116 |
-| formulas | 1087813 | 1131855 | 329268 | 338637 | 9369 |
+| wasm | 848920 | 868980 | 250156 | 253254 | 3098 |
+| formulas | 1131855 | 1152337 | 338151 | 341843 | 3692 |
 
-Brotli uses quality 11. The default engine grows by 9,116 B, which the maintainer accepted for memory release. Core boot creates only its collectible instance. The published synchronous exports initialize once, on first use, from the module that instance compiled, and the first instance marks the published loader ready. A fresh-process regression counts real instances to guard against a second eager boot instance.
+Brotli uses quality 11; the size baseline is stack top `89222d66` (#102), rebuilt with the same toolchain. Exact byte counts are retained in `results/formula-spill-transfer-sizes.json`. Dense calculated overlays encode absent slots as runs; paged overlays transfer only occupied slots, including their compact error codes. Core boot creates only its collectible instance. The published synchronous exports initialize once, on first use, from the module that instance compiled, and the first instance marks the published loader ready. A fresh-process regression counts real instances to guard against a second eager boot instance.
 
 Ordinary-path verdicts (milliseconds per operation; 3 A/A controls, then 5 ABBA rounds on slot 4; the A/A spread is the maximum absolute paired-control delta):
 

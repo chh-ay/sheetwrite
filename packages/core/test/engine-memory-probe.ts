@@ -193,6 +193,130 @@ try {
 
 await releaseEngineMemory();
 
+for (const storage of ["dense", "paged"] as const) {
+  const calculated = new SheetwriteStore(makeWorkbook(8), undefined, {
+    storage,
+    chunkRows: 4,
+  });
+  const calculatedRange = {
+    sheet: "s1",
+    start: { row: 0, col: 0 },
+    end: { row: 7, col: 2 },
+  };
+  const patches: DocumentOp[] = [
+    {
+      op: "set",
+      addr: { sheet: "s1", row: 0, col: 0 },
+      value: { kind: "formula", src: "=SEQUENCE(3)" },
+    },
+    {
+      op: "set",
+      addr: { sheet: "s1", row: 0, col: 1 },
+      value: { kind: "formula", src: "=FILTER(A1:A3,A1:A3>1)" },
+    },
+    {
+      op: "set",
+      addr: { sheet: "s1", row: 0, col: 2 },
+      value: { kind: "formula", src: "=NOW()" },
+    },
+    { op: "set", addr: { sheet: "s1", row: 4, col: 0 }, value: { kind: "literal", value: 99 } },
+    {
+      op: "set",
+      addr: { sheet: "s1", row: 3, col: 0 },
+      value: { kind: "formula", src: "=SEQUENCE(3)" },
+    },
+    { op: "set", addr: { sheet: "s1", row: 4, col: 1 }, value: { kind: "formula", src: "=1/0" } },
+  ];
+  if (storage === "paged") {
+    calculated.loadPage(
+      "s1",
+      0,
+      [{ start: 0, end: 3, keys: ["name", "amount", "city"] }],
+      Array.from({ length: 8 }, (_, row) => ({
+        name:
+          row === 0 ? { kind: "formula", src: "=SEQUENCE(3)" } : { kind: "literal", value: null },
+        amount: { kind: "literal", value: null },
+        city: { kind: "literal", value: null },
+      })),
+    );
+  }
+  calculated.applyTransaction({ patches });
+  const inverse = calculated.captureRangeHistory(calculatedRange);
+  if (!inverse) throw new Error("Expected calculated-source history");
+  const volatileAddress = { sheet: "s1", row: 0, col: 2 };
+  const volatileBefore = calculated.getCell(volatileAddress).resolved;
+  assert.equal(typeof volatileBefore, "number");
+  calculated.applyTransaction({
+    patches: [
+      {
+        op: "set",
+        addr: { sheet: "s1", row: 7, col: 2 },
+        value: { kind: "literal", value: "undo me" },
+      },
+    ],
+  });
+  const volatileAtRelease = calculated.getCell(volatileAddress).resolved;
+  const expectedCells = [
+    [2, 0, 3],
+    [1, 1, 3],
+    [3, 0, "#SPILL!"],
+    [4, 0, 99],
+    [4, 1, "#DIV/0!"],
+  ] as const;
+  const assertCalculated = (phase: string) => {
+    for (const [row, col, expected] of expectedCells) {
+      assert.equal(
+        calculated.getCell({ sheet: "s1", row, col }).resolved,
+        expected,
+        `${storage} ${phase} ${row}:${col}`,
+      );
+    }
+    assert.deepEqual(calculated.getSpillAnchor({ sheet: "s1", row: 2, col: 0 }), {
+      sheet: "s1",
+      row: 0,
+      col: 0,
+    });
+    assert.deepEqual(calculated.getSpillAnchor({ sheet: "s1", row: 1, col: 1 }), {
+      sheet: "s1",
+      row: 0,
+      col: 1,
+    });
+  };
+  try {
+    assertCalculated("before release");
+    const migrated = await releaseEngineMemory();
+    assert.ok(migrated.stores > 0, "Calculated stores must migrate");
+    assert.ok(migrated.wasmBytesAfter <= migrated.wasmBytesBefore);
+    assertCalculated("after release");
+    assert.equal(
+      calculated.getCell(volatileAddress).resolved,
+      volatileAtRelease,
+      "Release must preserve the exact cached volatile value",
+    );
+    calculated.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 4, col: 0 },
+          value: { kind: "literal", value: null },
+        },
+      ],
+    });
+    assert.equal(calculated.getCell({ sheet: "s1", row: 5, col: 0 }).resolved, 3);
+    assert.deepEqual(calculated.getSpillAnchor({ sheet: "s1", row: 5, col: 0 }), {
+      sheet: "s1",
+      row: 3,
+      col: 0,
+    });
+    calculated.applyTransaction({ patches: [inverse.toDocumentOp(calculatedRange)] });
+    assertCalculated("after undo");
+    assert.equal(calculated.getCell({ sheet: "s1", row: 7, col: 2 }).resolved, null);
+  } finally {
+    inverse.dispose();
+    calculated.dispose();
+  }
+}
+
 const millionRows = 1_000_000;
 const empty = new SheetwriteStore(makeWorkbook(millionRows));
 let freshStoreBytes: number;

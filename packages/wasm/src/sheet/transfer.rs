@@ -89,6 +89,8 @@ impl SheetData {
             out.u64(paged.evictions);
         }
 
+        self.derived.write_transfer(out);
+
         out.usize(self.spill_ranges.len());
 
         for (&(row, col), range) in &self.spill_ranges {
@@ -107,14 +109,6 @@ impl SheetData {
             out.u32(col);
             out.u32(anchor_row);
             out.u32(anchor_col);
-        }
-
-        out.usize(self.spill_errors.len());
-
-        for (&(row, col), &error) in &self.spill_errors {
-            out.u32(row);
-            out.u32(col);
-            out.error(Some(error));
         }
 
         out.usize(self.spill_blockers.len());
@@ -217,6 +211,11 @@ impl SheetData {
             None
         };
 
+        let cells = n_cols
+            .checked_mul(row_count)
+            .ok_or("transferred dimensions overflow")?;
+        let derived = DerivedOverlay::read_transfer(input, cells, paged.is_some())?;
+
         let mut sheet = Self {
             n_cols,
             row_count,
@@ -224,10 +223,10 @@ impl SheetData {
             payload,
             style,
             paged,
+            derived,
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            spill_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -248,14 +247,6 @@ impl SheetData {
             sheet
                 .spill_owners
                 .insert((input.u32()?, input.u32()?), (input.u32()?, input.u32()?));
-        }
-
-        for _ in 0..input.count()? {
-            let key = (input.u32()?, input.u32()?);
-            sheet.spill_errors.insert(
-                key,
-                input.error()?.ok_or("missing transferred spill error")?,
-            );
         }
 
         for _ in 0..input.count()? {
