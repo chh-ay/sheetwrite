@@ -466,7 +466,6 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const props: AdapterConformanceProps = { ...base, workbook, ...handlersFor(first) };
       const mounted = await mount(props);
       const grid = mounted.getPublishedGrid()!;
-      // Select on the active sheet, then switch to `next`.
       const exercise = (value: string, row: number, active: string, next: string) => {
         grid.store.applyTransaction({
           patches: [

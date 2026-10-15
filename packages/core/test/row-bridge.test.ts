@@ -241,7 +241,6 @@ describe("RowBridge", () => {
     expect(
       bridge.project(event([{ op: "set", addr, value: literal(0) }], [], "remote")).status,
     ).toBe("duplicate");
-    // Consume the newest entry and then add two new identities.
     expect(
       bridge.project(event([{ op: "set", addr, value: literal(4) }], [], "remote")).status,
     ).toBe("duplicate");

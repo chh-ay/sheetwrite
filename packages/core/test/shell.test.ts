@@ -53,8 +53,6 @@ function multiSheetWorkbook(): Workbook {
   return base;
 }
 
-// ── Grid API additions the shell depends on ──────────────────────────────────
-
 describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
   it("translates view rows to data addresses under an active sort", () => {
     const { grid, store } = makeGrid();
@@ -110,8 +108,6 @@ describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
     store.dispose();
   });
 });
-
-// ── Leaf pieces ───────────────────────────────────────────────────────────────
 
 describe("createToolbar", () => {
   it("dispatches built-in actions and hands custom items the grid", () => {
@@ -373,8 +369,6 @@ describe("createSelectionStatus", () => {
     store.dispose();
   });
 });
-
-// ── Full shell ────────────────────────────────────────────────────────────────
 
 describe("createSpreadsheetShell", () => {
   it("composes one grid with shell chrome and no duplicate built-ins", () => {

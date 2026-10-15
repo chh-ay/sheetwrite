@@ -62,8 +62,6 @@ afterEach(() => {
 
 // The parser and assist name lists are kept in step by scripts/formula-contract.test.ts.
 
-// ── autocomplete popup ───────────────────────────────────────────────────────
-
 describe("FormulaAssist autocomplete", () => {
   it("filters the popup by the caret token", () => {
     const { host, ta } = mountTextarea();
@@ -155,8 +153,6 @@ describe("FormulaAssist autocomplete", () => {
   });
 });
 
-// ── reference highlighting ───────────────────────────────────────────────────
-
 describe("FormulaAssist ref highlighting", () => {
   it("calls the highlight dep with parsed, colored ranges and clears on detach", () => {
     const calls: (HighlightRange[] | null)[] = [];
@@ -182,8 +178,6 @@ describe("FormulaAssist ref highlighting", () => {
     expect(calls.at(-1)).toBeNull();
   });
 });
-
-// ── EditController integration ───────────────────────────────────────────────
 
 describe("EditController with assist deps", () => {
   function begin(): {

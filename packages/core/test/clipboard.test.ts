@@ -42,8 +42,6 @@ describe("clipboard TSV", () => {
   });
 });
 
-// ── Rich clipboard (copy/cut/paste/pasteValues) ──────────────────────────────
-
 /**
  * In-memory {@link Store} stand-in exercising exactly the reads the controller
  * makes (`getCell`, `getFormula`, `viewRowCount`) plus a patch sink standing in
