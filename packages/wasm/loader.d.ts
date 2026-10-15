@@ -36,3 +36,6 @@ export type EngineInstance = Omit<typeof WasmExports, "default"> & {
 
 /** Initialize a fresh engine; a compiled module can be reused without retaining its memory. */
 export declare function createEngine(source?: Parameters<typeof load>[0]): Promise<EngineInstance>;
+
+/** Create a fresh engine synchronously from the module that `load()` or `createEngine()` already compiled. */
+export declare function createLoadedEngine(): EngineInstance;

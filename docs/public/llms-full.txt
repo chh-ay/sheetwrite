@@ -6942,7 +6942,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteEngine` — interface
 
 ```ts
-export interface SheetwriteEngine { CellStore: typeof defaultEngine.CellStore; load: typeof defaultEngine.load; isLoaded: typeof defaultEngine.isLoaded; createEngine: typeof defaultEngine.createEngine; functionNames?: () => string[]; }
+export interface SheetwriteEngine { CellStore: typeof defaultEngine.CellStore; load: typeof defaultEngine.load; isLoaded: typeof defaultEngine.isLoaded; createEngine: typeof defaultEngine.createEngine; createLoadedEngine: typeof defaultEngine.createLoadedEngine; functionNames?: () => string[]; }
 ```
 
 A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.
@@ -8944,6 +8944,14 @@ the cell's style.
 
 Initialize a fresh engine; a compiled module can be reused without retaining its memory.
 
+##### `createLoadedEngine` — function
+
+```ts
+(): EngineInstance
+```
+
+Create a fresh engine synchronously from the module that `load()` or `createEngine()` already compiled.
+
 ##### `DistinctColumn` — class
 
 ```ts
@@ -10442,6 +10450,14 @@ the cell's style.
 ```
 
 Initialize a fresh engine; a compiled module can be reused without retaining its memory.
+
+##### `createLoadedEngine` — function
+
+```ts
+(): EngineInstance
+```
+
+Create a fresh engine synchronously from the module that `load()` or `createEngine()` already compiled.
 
 ##### `DistinctColumn` — class
 
