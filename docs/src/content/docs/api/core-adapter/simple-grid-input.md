@@ -8,7 +8,7 @@ description: "Normalized workbook and columnar data produced from simple adapter
 Normalized workbook and columnar data produced from simple adapter props.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L452"><code>packages/core/src/adapter.ts#L452</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L451"><code>packages/core/src/adapter.ts#L451</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

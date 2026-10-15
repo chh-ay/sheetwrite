@@ -44,7 +44,6 @@ import {
   type RowBridge as RowBridgeInstance,
   type RowBridgeOptions,
 } from "./row-bridge.js";
-
 import type {
   CellFormat,
   CellScalar,

@@ -1,6 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
 /**

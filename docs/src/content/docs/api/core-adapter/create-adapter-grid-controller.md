@@ -8,7 +8,7 @@ description: "Owns initialization, replacement, publication, and retirement for 
 Owns initialization, replacement, publication, and retirement for framework adapters.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L248"><code>packages/core/src/adapter.ts#L248</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L247"><code>packages/core/src/adapter.ts#L247</code></a></dd></div>
 </dl>
 
 ## Declaration

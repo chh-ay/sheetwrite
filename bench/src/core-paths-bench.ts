@@ -18,11 +18,9 @@
  * `--output`; nothing is written to `bench/results`.
  */
 import "./dom-setup.js";
-
 import { readFileSync } from "node:fs";
 import { cpus } from "node:os";
 import { fileURLToPath } from "node:url";
-
 import {
   type CellAddress,
   type CellLoadState,
@@ -61,7 +59,6 @@ import { createGridController, type GridControllerHandlers } from "@sheetwrite/c
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { initSync } from "@sheetwrite/wasm";
 import { encodeRestoreBlock } from "../../packages/core/src/restore-block.js";
-
 import { assertFiniteNonNegative, type BenchmarkMode, validateRawStat } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, now, type Stat, summarize } from "./stats.js";

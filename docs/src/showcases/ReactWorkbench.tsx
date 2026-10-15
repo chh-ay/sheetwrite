@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 /**
  * React controlled-analytics workbench. Consumes the shared analytics scenario
  * through `useAnalyticsWorkbench`: query/filter controls, formula entry with
@@ -6,9 +5,9 @@ import { Link } from "@tanstack/react-router";
  * search/replace, undo/redo, CSV/XLSX workflow entry points, renderer state,
  * and the adapter's reset/reconciliation lifecycle — all as React state.
  */
-
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 import { SheetwriteGrid } from "@sheetwrite/react";
+import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, Monitor } from "lucide-react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";

@@ -8,7 +8,7 @@ description: "Extracts advanced GridOptions from framework adapter props."
 Extracts advanced GridOptions from framework adapter props.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L184"><code>packages/core/src/adapter.ts#L184</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L183"><code>packages/core/src/adapter.ts#L183</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -5480,7 +5480,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L240",
+              "source": "src/adapter.ts#L239",
               "jsDocTags": [],
               "documentation": "Owns adapter attachment and monotonically numbered Grid generations.",
               "memberDocs": [
@@ -5497,7 +5497,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L220",
+              "source": "src/adapter.ts#L219",
               "jsDocTags": [],
               "documentation": "Committed inputs to a framework adapter lifetime.",
               "memberDocs": []
@@ -5509,7 +5509,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L207",
+              "source": "src/adapter.ts#L206",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
               "memberDocs": []
@@ -5521,7 +5521,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L248",
+              "source": "src/adapter.ts#L247",
               "jsDocTags": [],
               "documentation": "Owns initialization, replacement, publication, and retirement for framework adapters.",
               "memberDocs": []
@@ -5559,7 +5559,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L460",
+              "source": "src/adapter.ts#L459",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -5571,7 +5571,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L437",
+              "source": "src/adapter.ts#L436",
               "jsDocTags": [],
               "documentation": "Creates the optional row bridge for a simple data-first input.",
               "memberDocs": []
@@ -5583,7 +5583,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L398",
+              "source": "src/adapter.ts#L397",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -5595,7 +5595,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L184",
+              "source": "src/adapter.ts#L183",
               "jsDocTags": [],
               "documentation": "Extracts advanced GridOptions from framework adapter props.",
               "memberDocs": []
@@ -5607,7 +5607,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L193",
+              "source": "src/adapter.ts#L192",
               "jsDocTags": [],
               "documentation": "Returns the first reset-sensitive adapter input that changed, if any.",
               "memberDocs": []
@@ -5619,7 +5619,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L70",
+              "source": "src/adapter.ts#L69",
               "jsDocTags": [],
               "documentation": "Classification of adapter options as live-updatable or reset-sensitive.",
               "memberDocs": []
@@ -5631,7 +5631,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L107",
+              "source": "src/adapter.ts#L106",
               "jsDocTags": [],
               "documentation": "Framework-neutral readiness, change, and error callbacks shared by adapters.",
               "memberDocs": [
@@ -5810,7 +5810,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L227",
+              "source": "src/adapter.ts#L226",
               "jsDocTags": [],
               "documentation": "Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication.",
               "memberDocs": [
@@ -5831,7 +5831,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L97",
+              "source": "src/adapter.ts#L96",
               "jsDocTags": [],
               "documentation": "Grid handle, generation, and reason published after adapter initialization.",
               "memberDocs": [
@@ -5856,7 +5856,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L94",
+              "source": "src/adapter.ts#L93",
               "jsDocTags": [],
               "documentation": "Reason an adapter published a ready Grid generation.",
               "memberDocs": []
@@ -5868,7 +5868,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L92",
+              "source": "src/adapter.ts#L91",
               "jsDocTags": [],
               "documentation": "Reset-sensitive input change that requires an adapter to replace its Grid.",
               "memberDocs": []
@@ -5880,7 +5880,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L149",
+              "source": "src/adapter.ts#L148",
               "jsDocTags": [],
               "documentation": "Explicit width and height accepted by framework adapters.",
               "memberDocs": []
@@ -5892,7 +5892,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L170",
+              "source": "src/adapter.ts#L169",
               "jsDocTags": [],
               "documentation": "Converts adapter size props into a host element style object.",
               "memberDocs": []
@@ -5916,7 +5916,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L164",
+              "source": "src/adapter.ts#L163",
               "jsDocTags": [],
               "documentation": "Optional width and height accepted by advanced framework adapters.",
               "memberDocs": []
@@ -6303,7 +6303,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L141",
+              "source": "src/adapter.ts#L140",
               "jsDocTags": [],
               "documentation": "Optional explicit WASM source and initialization error callback for adapters.",
               "memberDocs": [
@@ -6324,7 +6324,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L401",
+              "source": "src/adapter.ts#L400",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -6373,7 +6373,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L452",
+              "source": "src/adapter.ts#L451",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [
@@ -6390,7 +6390,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L423",
+              "source": "src/adapter.ts#L422",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": [

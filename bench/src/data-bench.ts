@@ -33,7 +33,6 @@
 
 // Side-effecting DOM bootstrap MUST be first so Handsontable boots headlessly.
 import "./dom-setup.js";
-
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";

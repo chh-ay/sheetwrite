@@ -31,8 +31,7 @@
     "test/conformance/corpus.json"
   ],
   "sortImports": {
-    "newlinesBetween": false,
-    "partitionByNewline": true
+    "newlinesBetween": false
   },
   "sortPackageJson": false,
   "overrides": [

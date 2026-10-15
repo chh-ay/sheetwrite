@@ -8,7 +8,7 @@ description: "Applies live-updatable adapter option changes to an existing Grid.
 Applies live-updatable adapter option changes to an existing Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L207"><code>packages/core/src/adapter.ts#L207</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L206"><code>packages/core/src/adapter.ts#L206</code></a></dd></div>
 </dl>
 
 ## Declaration
