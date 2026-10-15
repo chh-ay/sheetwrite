@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "460e40da3f69d5967fc0252b6c5464bc711d54e85a82c2be6cefa8b47bd6d7e8",
+  "sha256": "e6893d468d7991b6cebe1c9564e9bfdd560f35d1054d0a6f761b5959f3fd8eca",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -445,7 +445,6 @@
         "SyncInitInput",
         "WindowView",
         "createEngine",
-        "createLoadedEngine",
         "initSync",
         "isLoaded",
         "load"
@@ -544,7 +543,6 @@
         "SyncInitInput",
         "WindowView",
         "createEngine",
-        "createLoadedEngine",
         "initSync",
         "isLoaded",
         "load"

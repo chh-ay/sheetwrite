@@ -6,7 +6,6 @@ export interface SheetwriteEngine {
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;
-  createLoadedEngine: typeof defaultEngine.createLoadedEngine;
   /** The optional full engine reports its accepted function names. */
   functionNames?: () => string[];
 }
@@ -19,22 +18,20 @@ let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
 
 export let engineFunctionNames: readonly string[] | undefined;
 
+/** Appended to every "not initialized" error: the engine package's own load() is not enough. */
+export const ENGINE_LOAD_HINT =
+  "Calling load() from @sheetwrite/wasm or @sheetwrite/formulas does not initialize core.";
+
 export function getEngine(): defaultEngine.EngineInstance {
-  if (!engineInstance) adoptLoadedEngine();
-  if (!engineInstance) throw new Error("Sheetwrite: await initSheetwrite() first");
+  if (!engineInstance) {
+    throw new Error(`Sheetwrite: await initSheetwrite() first. ${ENGINE_LOAD_HINT}`);
+  }
+
   return engineInstance;
 }
 
 export function isEngineLoaded(): boolean {
-  return engineInstance !== undefined || (!initialization && selectedEngine.isLoaded());
-}
-
-// An app that awaited the engine package's own load() gets a core instance from that module.
-function adoptLoadedEngine(): void {
-  if (initialization || !selectedEngine.isLoaded()) return;
-
-  engineInstance = selectedEngine.createLoadedEngine();
-  engineFunctionNames = engineInstance.functionNames?.();
+  return engineInstance !== undefined;
 }
 
 export async function loadEngine(

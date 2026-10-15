@@ -54,6 +54,22 @@ for (const name of [
 
 await load();
 
+// Since 0.5.0 core owns its own engine instance: the engine package's load() alone is not enough.
+let uninitializedError;
+try {
+  new Core.SheetwriteStore({
+    activeSheet: "s",
+    sheets: [{ id: "s", name: "S", rowCount: 1, columns: [] }],
+  });
+} catch (error) {
+  uninitializedError = error;
+}
+if (!String(uninitializedError?.message).includes("does not initialize core")) {
+  throw new Error("SheetwriteStore must require initSheetwrite() even after the engine's load()");
+}
+
+await Core.initSheetwrite();
+
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");
 const css = await readFile(fileURLToPath(cssUrl), "utf8");
 if (!css.includes(".sheetwrite")) {

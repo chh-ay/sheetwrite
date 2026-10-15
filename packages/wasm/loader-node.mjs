@@ -2,11 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { createLoader } from "./loader-state.mjs";
 import init, { initSync } from "./pkg/sheetwrite_wasm.js";
-import {
-  adoptPublishedModule,
-  createInstance,
-  createPublishedInstance,
-} from "./pkg/sheetwrite_wasm_factory.js";
+import { adoptPublishedModule, createInstance } from "./pkg/sheetwrite_wasm_factory.js";
 
 export * from "./pkg/sheetwrite_wasm.js";
 
@@ -35,11 +31,4 @@ export async function createEngine(source) {
 
   await loader.adopt(source, () => adoptPublishedModule(engine.getModule()));
   return engine;
-}
-
-/** Create a fresh engine synchronously from the module the loader already compiled. */
-export function createLoadedEngine() {
-  if (!loader.isLoaded()) throw new Error("Sheetwrite: await load() first");
-
-  return createPublishedInstance();
 }

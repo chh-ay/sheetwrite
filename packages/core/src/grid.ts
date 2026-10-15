@@ -19,7 +19,12 @@ import {
   validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
-import { isEngineLoaded as isLoaded, loadEngine, type SheetwriteEngine } from "./engine.js";
+import {
+  ENGINE_LOAD_HINT,
+  isEngineLoaded as isLoaded,
+  loadEngine,
+  type SheetwriteEngine,
+} from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
@@ -343,7 +348,7 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
     throw new SheetwriteError(
       "initialization-required",
       "create-grid",
-      "Sheetwrite: await initSheetwrite() before createGrid()",
+      `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
   return new GridImpl(host, opts);
