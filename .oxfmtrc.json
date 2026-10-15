@@ -28,7 +28,8 @@
     "**/*.toml",
     "**/*.vue",
     "bun.lock",
-    "test/conformance/corpus.json"
+    "test/conformance/corpus.json",
+    "bench/src/matched-formula-harness.ts"
   ],
   "sortImports": {
     "newlinesBetween": true

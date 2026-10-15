@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-
 import type * as WasmModule from "../../packages/wasm/pkg/sheetwrite_wasm.js";
 
 const root = new URL("../../", import.meta.url).pathname;
