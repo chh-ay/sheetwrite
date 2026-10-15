@@ -92,18 +92,8 @@ impl DepIndex {
         (nodes, edges)
     }
 
-    /// Whether rewriting one formula entry leaves every field
-    /// [`build_dep_index`] reads unchanged.
-    ///
-    /// When this holds, the cached index still describes the rewritten
-    /// formula, so source replacement keeps the current formula epoch and the next
-    /// recompute skips the whole-workbook rebuild. The formula cell itself is
-    /// still marked dirty, so it is always re-evaluated.
-    ///
-    /// An entry with a parse or resolution error carries no reads and no AST,
-    /// so both sides must be error-free for the comparison to be meaningful; a
-    /// cell that gains its first formula changes the formula-cell set, so the
-    /// caller only compares entries when one already existed.
+    /// Unchanged reads and array shape let a rewrite retain the cached dependency index.
+    /// Errors have no reads or AST, so both entries must be valid and already exist.
     pub(crate) fn dependency_graph_unchanged(previous: &FormulaEntry, next: &FormulaEntry) -> bool {
         previous.error.is_none()
             && next.error.is_none()
@@ -150,14 +140,8 @@ impl RangeInterval {
     }
 }
 
-/// Build the whole-workbook dependency index for `epoch`.
-///
-/// The fields this function reads from each formula entry -- the read cells,
-/// the read ranges and whether the AST produces an array -- are also compared
-/// by [`DepIndex::dependency_graph_unchanged`], which lets a formula rewrite
-/// keep the cached index when none of them changed. A new dependency-relevant
-/// field must be added to that comparison too, or the epoch will not advance
-/// when it changes.
+/// New dependency-relevant fields must also be compared by
+/// [`DepIndex::dependency_graph_unchanged`] so changes advance the epoch.
 pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
     let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
