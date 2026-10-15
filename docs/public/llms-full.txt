@@ -4253,6 +4253,10 @@ unchanged.
 
 ### Editing and display
 
+- In the Svelte adapter, a live option such as `readOnly` changed while the
+Grid starts is applied before `ready` fires. In every adapter, a ref or
+`onReady` callback that throws now retires the new Grid, as React already did.
+
 - Every editor commits to the cell it opened on, through sorting and filtering.
 - A rejected fill leaves the selection unchanged.
 - Paste across hidden columns writes only the visible columns, and one undo
@@ -4290,6 +4294,7 @@ measurements and the package sizes of both engines.
 | Restore 4,000,000 cells | 2,213 ms → 1,346 ms (39% faster) |
 | Undo a 1,000,000-cell clear | 2,536 ms → 1,833 ms (28% faster) |
 | Row resize | 0.218 ms → 0.144 ms (34% faster) |
+| Framework adapter mount (React, Vue, Svelte) | 16–38% faster mount and reset |
 | One-cell commit to a 110,000-cell `MemoryPersistenceAdapter` document | ~450 ms → no full rebuild |
 | String-pool storage after 100,000 unique overwrites (not WebAssembly heap size) | 84.3 MB → 0.35 MB (99.6% lower) |
 
@@ -9301,7 +9306,9 @@ emits a safe resolved target; `internal-navigation` additionally moves to
 stable internal destinations; `disabled` rejects every activation request.
 - `inputMode` — Hints at the type of data that might be entered by the user while editing the element or its contents
 - `is` — Specify that a standard HTML element should behave like a defined custom built-in element
-- `minColumns` — Render at least this many columns (empty padding columns past the data, like a spreadsheet).
+- `minColumns` — Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.
 - `mutationPolicy` — Atomic rejects the transaction; partial skips denied operation objects.
 - `onActiveSheetChange` — Fires after the visible sheet changes.
 - `onCommandStateChange` — Receives observable undo/redo and formatting command state.
