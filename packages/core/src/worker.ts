@@ -1,4 +1,4 @@
-// OffscreenCanvas paint worker (M5). Receives the transferred canvas + frames
+// Receives the transferred canvas and frames
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.

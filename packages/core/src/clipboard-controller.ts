@@ -533,8 +533,6 @@ export class ClipboardController {
     }
   }
 
-  // ── Rich paste ─────────────────────────────────────────────────────────────
-
   private pasteInternal(snapshot: ClipboardSnapshot, focus: CellRef, valuesOnly: boolean): void {
     // Copy shifts every relative formula ref by the block's rigid displacement;
     // cut keeps formula source verbatim. Hyperlink source ranges always move to
@@ -643,8 +641,6 @@ export class ClipboardController {
     );
   }
 
-  // ── External TSV paste ───────────────────────────────────────────────────────
-
   private pasteExternal(text: string, focus: CellRef): void {
     const grid = parseTsv(text);
     if (grid.length === 0) return;
@@ -662,8 +658,6 @@ export class ClipboardController {
       }),
     );
   }
-
-  // ── Shared plumbing ──────────────────────────────────────────────────────────
 
   /**
    * Walk a `height`×`widthAt(r)` block anchored at `focus`, resolving each cell to

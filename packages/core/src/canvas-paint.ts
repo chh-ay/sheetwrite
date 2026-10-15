@@ -5,7 +5,6 @@ import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
 
-/** Pull the pixel size out of a CSS font shorthand ("12px sans-serif"). */
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
 const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
@@ -100,7 +99,7 @@ function columnEdges(layout: RenderLayout): number[] {
   return colX;
 }
 
-/** Build the effective canvas font, preserving the default hot path unchanged. */
+/** Resolve the canvas font from the theme and cell style. */
 export function fontFor(
   theme: Theme,
   style: Pick<CellStyle, "bold" | "italic" | "fontSize">,
@@ -244,6 +243,7 @@ function paintTextDecoration(
     // Just under the baseline, which sits ~0.4em below the "middle" text origin.
     ctx.fillRect(left, Math.round(cy + effectiveFontPx * 0.4), runWidth, 1);
   }
+
   if (style.strikethrough) {
     // Through the run's visual middle (≈ the "middle" baseline origin at `cy`).
     ctx.fillRect(left, Math.round(cy), runWidth, 1);
@@ -306,10 +306,7 @@ export function blitVerticalScroll(
   const bodyH = viewport.height - bodyTop;
   if (bodyH <= 0) return undefined;
 
-  // Blit only exact device-pixel shifts. A fractional shift would copy pixels
-  // rounded to the nearest device pixel while the exposed strip repaints at
-  // the true offset - each touchpad scroll then strands sub-pixel-shifted
-  // stale glyph slices that accumulate into visible ghosting.
+  // Fractional device-pixel shifts leave stale glyph slices when the exposed strip repaints.
   const deltaDevice = (viewport.scrollTop - prev.scrollTop) * dpr;
   const deltaPx = Math.round(deltaDevice);
   if (Math.abs(deltaDevice - deltaPx) > 0.001) return undefined;
@@ -445,7 +442,6 @@ export function paintFrame(
   const paintTop = Math.max(headerHeight, clipTop);
   const paintBottom = Math.min(height, clipBottom);
 
-  // Cell body, clipped below the sticky header.
   ctx.save();
   ctx.beginPath();
   ctx.rect(g, headerHeight, Math.max(0, width - g), Math.max(0, height - headerHeight));
@@ -473,10 +469,7 @@ export function paintFrame(
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
 
-      // Sheets lets text spill through adjacent empty cells, but never through
-      // occupied cells. Compute the contiguous empty run around this cell; the
-      // painter chooses the relevant side after resolving alignment. Numbers
-      // and custom renderers deliberately keep their own cell bounds.
+      // Text may spill through empty cells, but numbers and custom renderers keep cell bounds.
       let spillX = x;
       let spillRight = x + cw;
       if (!merge && typeof value === "string" && value !== "") {
@@ -555,7 +548,6 @@ export function paintFrame(
   state.lastFont = theme.font;
   state.lastFill = theme.bg;
 
-  // Vertical gridlines through header + body.
   ctx.strokeStyle = theme.gridLine;
   ctx.beginPath();
   const appendVerticalGridline = (c: number, lineX: number): void => {

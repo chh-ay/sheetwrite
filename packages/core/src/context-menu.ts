@@ -59,7 +59,6 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   exportXlsx: "Export XLSX",
 };
 
-/** Map a built-in action to the matching `GridActions` call; unknown/separator → no-op. */
 function actionHandler(
   action: ContextMenuActionName | undefined,
   actions: GridActions,
@@ -138,7 +137,6 @@ export class ContextMenu {
     const menu = document.createElement("div");
     menu.className = "sheetwrite-context-menu";
     menu.setAttribute("role", "menu");
-    // Fixed positioning + visibility toggle are behavior; cosmetics live in styles.css.
     menu.style.position = "fixed";
     menu.style.display = "none";
 

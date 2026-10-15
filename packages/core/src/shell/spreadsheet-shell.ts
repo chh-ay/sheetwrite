@@ -1,10 +1,4 @@
-// ── Full spreadsheet shell ───────────────────────────────────────────────────
-//
-// Composes the leaf pieces (toolbar, name box, formula bar, tabs, status)
-// around exactly one grid, Google-Sheets style. The shell suppresses only the
-// grid's duplicate built-in toolbar/tabs; find, context menu, and keyboard
-// policy stay under the caller's `GridConfig` control, and the grid host
-// remains the single spreadsheet keyboard/focus authority.
+// The grid host remains the sole keyboard/focus authority; caller config still controls find and menus.
 
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";

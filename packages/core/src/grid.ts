@@ -1013,8 +1013,6 @@ export class GridImpl implements Grid {
     return this.activeRendererKind;
   }
 
-  // ── sheet / layout geometry ────────────────────────────────────────────────
-
   private sheet(id: SheetId = this.activeSheet): Sheet {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
 
@@ -1775,8 +1773,6 @@ export class GridImpl implements Grid {
     this.scheduleRender();
   }
 
-  // ── public API ─────────────────────────────────────────────────────────────
-
   /** Internal structural counters used by allocation regression tests and range benchmarks. */
   getMutationRevisionStats(): MutationRevisionStats {
     return this.mutationRevisions.stats();
@@ -2421,8 +2417,6 @@ export class GridImpl implements Grid {
     }
     return additions.length > 0 ? [...additions, ...patches] : patches;
   }
-
-  // ── toolbar actions (operate on the current selection) ──────────────────────
 
   private buildActions(): GridActions {
     return {

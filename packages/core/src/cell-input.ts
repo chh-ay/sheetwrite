@@ -66,7 +66,6 @@ export function parseCellInput(raw: string, type: CellFormat): CellValue {
 
 /** Spreadsheet booleans; ASCII-only, matching the interactive input rule. */
 const BOOLEAN_TEXT = /^(TRUE|FALSE)$/i;
-/** UTF-16 code unit of `=`, which starts a formula in interactive entry. */
 const EQUALS_CODE_UNIT = 0x3d;
 
 /**
@@ -79,9 +78,10 @@ export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar
   // Imports call this once per field, so the rules are applied directly here
   // instead of building a `CellValue` through `parseCellInput` and trimming twice.
   const trimmed = raw.trim();
+
   if (trimmed === "") return null;
-  // Interactive entry turns this into a formula; imports keep the raw text.
   if (trimmed.length > 1 && trimmed.charCodeAt(0) === EQUALS_CODE_UNIT) return raw;
+
   if ((trimmed.length === 4 || trimmed.length === 5) && BOOLEAN_TEXT.test(trimmed)) {
     return trimmed.toUpperCase() === "TRUE";
   }

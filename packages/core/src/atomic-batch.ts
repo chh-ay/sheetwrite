@@ -13,7 +13,6 @@ import type { TransactionResourceLimits } from "./types/transaction.js";
 export const MAX_ATOMIC_BATCH_VERSIONS = 16;
 export const MAX_ATOMIC_BATCH_ENCODED_BYTES = 64 * 1024 * 1024;
 
-/** Bytes of the `[` and `]` that enclose the operation array of one version. */
 const ARRAY_ENVELOPE_BYTES = 2;
 /**
  * A split block piece targets this fraction of the version limit, so packing
@@ -125,18 +124,22 @@ export function partitionVersionOperations(
   const counts: number[] = [];
   let count = 0;
   let bytes = ARRAY_ENVELOPE_BYTES;
+
   for (const operationBytes of sizes) {
     if (ARRAY_ENVELOPE_BYTES + operationBytes > maxEncodedBytes) return null;
+
     if (count > 0 && (count === maxOperations || bytes + 1 + operationBytes > maxEncodedBytes)) {
       counts.push(count);
       count = 0;
       bytes = ARRAY_ENVELOPE_BYTES;
     }
-    // A comma separates every operation after the first.
+
     bytes += (count > 0 ? 1 : 0) + operationBytes;
     count += 1;
   }
+
   if (count > 0) counts.push(count);
+
   return counts;
 }
 
@@ -198,27 +201,30 @@ function splitBlock(
   const length = alongRows ? block.rowCount : block.colCount;
   const lineCells = alongRows ? block.colCount : 1;
   let bandLength = Math.max(1, Math.floor(limits.pieceBytes / (FIRST_BAND_CELL_BYTES * lineCells)));
-  for (let start = 0; start < length;) {
+
+  for (let start = 0; start < length; ) {
     const lines = Math.min(bandLength, length - start);
     const band = alongRows
       ? sliceBlock(operation, start, lines, 0, block.colCount)
       : sliceBlock(operation, 0, 1, start, lines);
     const bytes = measureOperation(band, limits.pieceBytes);
+
     if (bytes !== null) {
       pieces.push(band);
       sizes.push(bytes);
       start += lines;
-      // Size the next band from the measured bytes per line of this one.
       bandLength = Math.max(
         1,
         Math.floor((lines * limits.pieceBytes * BAND_FILL_RATIO) / Math.max(1, bytes)),
       );
       continue;
     }
+
     if (lines > 1) {
       bandLength = Math.max(1, lines >> 1);
       continue;
     }
+
     if (alongRows && block.colCount > 1) {
       if (!splitBlock(band, limits, pieces, sizes)) return false;
     } else {
@@ -227,8 +233,10 @@ function splitBlock(
       pieces.push(band);
       sizes.push(cellBytes);
     }
+
     start += 1;
   }
+
   return true;
 }
 

@@ -29,6 +29,22 @@ After the initial 0.1.0 release, user-visible package changes require a Changese
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
+## Code style
+
+Biome and rustfmt own formatting. Two rules they cannot check:
+
+- **Comments say why, not what.** Write a comment only for a reason the code
+  cannot show: a constraint, an invariant, a non-obvious trade-off, or a link to
+  an external rule. Do not restate the next line, narrate the steps of a
+  function, or describe history ("before, this…", "now we…"); that belongs in
+  the commit message. Doc comments on exported symbols are the API reference:
+  keep them to what a caller needs, one or two sentences where possible.
+- **Separate the steps.** Put one blank line between the logical steps of a
+  function (setup, the main work, the result), after a block that closes in the
+  middle of a function, and between declarations and members. A function body
+  that needs no blank line is usually short enough to read at a glance; one
+  that needs many is usually several functions.
+
 ## Documentation deployment
 
 CI builds the docs with the package outputs from the same run. It packages
