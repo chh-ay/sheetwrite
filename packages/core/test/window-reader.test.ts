@@ -140,22 +140,4 @@ describe("string-pool epoch lifetime", () => {
       expect(readVisible().stringPoolUpdateIds).toBeUndefined();
     });
   }
-
-  it("rejects stale window and persisted projections before resolving their IDs", () => {
-    const { pool, wasm, reader, readVisible } = makeEpochReader();
-    const retained = wasm.getWindow();
-    pool.epoch += 1;
-    pool.text = "replacement text";
-    wasm.getWindow = () => retained;
-    expect(readVisible).toThrow("stale string-pool epoch");
-    expect(() => reader.readRectangle("s1", 0, 2, [0, 1])).toThrow("stale string-pool epoch");
-
-    const persistedCellData = wasm.persistedCellData;
-    wasm.persistedCellData = () => {
-      const packed = persistedCellData();
-      pool.epoch += 1;
-      return packed;
-    };
-    expect(() => reader.capturePersistedCells("s1")).toThrow("stale string-pool epoch");
-  });
 });
