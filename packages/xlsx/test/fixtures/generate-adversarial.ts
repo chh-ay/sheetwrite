@@ -67,7 +67,7 @@ await Bun.write(
   }),
 );
 const corrupt = packageBytes(ordinarySheet).slice();
-for (let offset = 0; offset + 30 < corrupt.length; ) {
+for (let offset = 0; offset + 30 < corrupt.length;) {
   const view = new DataView(corrupt.buffer, corrupt.byteOffset, corrupt.byteLength);
   if (view.getUint32(offset, true) !== 0x04034b50) break;
   const compressedSize = view.getUint32(offset + 18, true);

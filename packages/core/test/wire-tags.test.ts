@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import {
   KIND_BOOL,
   KIND_EMPTY,
@@ -7,7 +8,6 @@ import {
   KIND_STRING,
   NO_STRING,
 } from "../src/store/wire-tags.js";
-import { SheetwriteStore } from "../src/store.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {

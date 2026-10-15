@@ -66,7 +66,8 @@ type SheetwriteGridHostAttributes = Omit<
 
 /** Advanced framework adapter props for workbook data or datasource ownership. */
 export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
-  extends GridOptions,
+  extends
+    GridOptions,
     GridAdapterEventHandlers<Id>,
     SheetwriteInitializationProps,
     SheetwriteGridHostAttributes {

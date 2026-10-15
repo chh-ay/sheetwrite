@@ -351,7 +351,7 @@ export default function FormulasShowcase() {
             </ol>
           </nav>
 
-          {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this host into an ARIA grid. */}
+          {/* Sheetwrite upgrades this host into an ARIA grid. */}
           <div
             aria-label="Sales analysis workbook"
             className="sw-fx-grid"

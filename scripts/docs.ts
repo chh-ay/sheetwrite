@@ -30,12 +30,6 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
-  COMPATIBILITY_FIXTURES,
-  COMPATIBILITY_INVENTORY,
-  type CompatibilityFixture,
-  type CompatibilityRecord,
-} from "../docs/src/showcases/compatibility.js";
-import {
   buildCompatibilityResults,
   type CompatibilityResults,
 } from "../docs/src/showcases/compatibility-results.js";
@@ -43,6 +37,12 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";

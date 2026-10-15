@@ -134,6 +134,7 @@ export function DocsSearch() {
         <span>Search docs</span>
         <kbd>Ctrl K</kbd>
       </button>
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- only a backdrop click closes the dialog; Escape is the keyboard path. */}
       <dialog
         aria-label="Search documentation"
         className="sw-search-dialog"
@@ -176,7 +177,6 @@ export function DocsSearch() {
                 {result.package ? <code>{result.package}</code> : null}
               </strong>
               {/* Pagefind excerpts are our own indexed text with <mark> highlights. */}
-              {/* biome-ignore lint/security/noDangerouslySetInnerHtml: self-generated index content */}
               <span dangerouslySetInnerHTML={{ __html: result.excerpt }} />
             </a>
           ))}

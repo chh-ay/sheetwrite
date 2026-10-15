@@ -77,12 +77,11 @@
     "test:coverage:ts": "bun scripts/coverage.ts ts",
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",
-    "lint": "biome check .",
-    "format": "biome format --write .",
+    "lint": "oxlint && oxfmt --check",
+    "format": "oxfmt",
     "test": "bun test"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
     "@changesets/cli": "3.0.3",
     "@happy-dom/global-registrator": "^20.14.5",
     "@playwright/test": "^1.63.0",
@@ -94,15 +93,14 @@
     "@types/react-dom": "^19.3.0",
     "fake-indexeddb": "6.2.5",
     "knip": "6.37.0",
+    "oxfmt": "0.73.0",
+    "oxlint": "1.88.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "svelte": "5.57.1",
     "typescript": "^7.0.2",
     "vue": "^3.5.43"
   },
-  "trustedDependencies": [
-    "@biomejs/biome"
-  ],
   "overrides": {
     "nanoid": "3.3.18",
     "postcss": "^8.5.18",

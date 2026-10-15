@@ -329,7 +329,7 @@ function getCurrencySymbol(): string {
 
 function tokenizeDate(section: string): DateToken[] {
   const tokens: DateToken[] = [];
-  for (let index = 0; index < section.length; ) {
+  for (let index = 0; index < section.length;) {
     if (section[index] === '"') {
       const close = section.indexOf('"', index + 1);
       const end = close < 0 ? section.length : close;
@@ -429,14 +429,12 @@ function resolveMonthMinute(tokens: DateToken[]): void {
 function compileFormat(code: string): CompiledFormat {
   const cached = formatCache.get(code);
   if (cached) return cached;
-  const sections = splitRawSections(code).map(
-    (source): CompiledSection => ({
-      source,
-      dateTokens: compileDateFormat(source),
-      numeric: parseNumericFormat(source),
-      literal: decodeLiteral(source),
-    }),
-  );
+  const sections = splitRawSections(code).map((source): CompiledSection => ({
+    source,
+    dateTokens: compileDateFormat(source),
+    numeric: parseNumericFormat(source),
+    literal: decodeLiteral(source),
+  }));
   const compiled = { sections };
   compiledFormats += 1;
   return cacheValue(formatCache, code, compiled, FORMAT_CACHE_LIMIT);

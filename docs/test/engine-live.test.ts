@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import type { ChangeEvent, Grid } from "@sheetwrite/core";
+import { ENGINE_LIVE_SHEET } from "../src/showcases/scenarios/engine-live-data.js";
 import {
   bindEngineEvents,
   createEngineLiveDataSource,
   createEngineTrace,
   type EngineEventInput,
 } from "../src/showcases/scenarios/engine-live.js";
-import { ENGINE_LIVE_SHEET } from "../src/showcases/scenarios/engine-live-data.js";
 
 function fakeGrid(onListener: (event: string, listener: (payload: never) => void) => void): Grid {
   const store = {

@@ -402,7 +402,6 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
   }
 
   // `tiles` is read through `seenRef`, which this render filled from it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: redraw when new tiles arrive.
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");

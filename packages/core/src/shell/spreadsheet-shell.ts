@@ -6,8 +6,8 @@
 // policy stay under the caller's `GridConfig` control, and the grid host
 // remains the single spreadsheet keyboard/focus authority.
 
-import { DEFAULT_THEME } from "../grid.js";
 import { createGridController, type GridController } from "../grid-controller.js";
+import { DEFAULT_THEME } from "../grid.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";

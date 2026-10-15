@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "useTabs": false,
+  "tabWidth": 2,
+  "printWidth": 100,
+  "singleQuote": false,
+  "jsxSingleQuote": false,
+  "quoteProps": "as-needed",
+  "trailingComma": "all",
+  "semi": true,
+  "arrowParens": "always",
+  "bracketSameLine": false,
+  "bracketSpacing": true,
+  "ignorePatterns": [
+    "**/dist",
+    "**/pkg",
+    "**/node_modules",
+    "**/*.d.ts",
+    "**/*.svelte",
+    "bench/results",
+    "docs/src/generated",
+    "docs/src/routeTree.gen.ts",
+    "**/*.md",
+    "**/*.mdx",
+    "**/*.html",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.toml",
+    "**/*.vue",
+    "bun.lock",
+    "test/conformance/corpus.json"
+  ],
+  "sortImports": {
+    "newlinesBetween": false,
+    "partitionByNewline": true
+  },
+  "sortPackageJson": false,
+  "overrides": [
+    {
+      "files": ["test/consumer/**", "test/consumer-nodenext/**"],
+      "options": {
+        "sortImports": false
+      }
+    }
+  ]
+}

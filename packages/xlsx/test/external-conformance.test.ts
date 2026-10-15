@@ -419,8 +419,9 @@ describe("local deterministic and adversarial XLSX gates", () => {
     const second = structuredClone(first);
     second.sheets[0]!.cells.reverse();
     second.sheets[0]!.columns[1]!.cellStyle = { color: "#112233", bold: true };
-    second.sheets[0]!.cells.find((block) => block.startRow === 1 && block.startCol === 1)!
-      .cells[0]!.style = {
+    second.sheets[0]!.cells.find(
+      (block) => block.startRow === 1 && block.startCol === 1,
+    )!.cells[0]!.style = {
       backgroundColor: "#AABBCC",
       italic: true,
     };

@@ -1,4 +1,4 @@
-// biome-ignore-all assist/source/organizeImports: Negative imports intentionally bind one error directive each.
+// Import order matters: each negative import binds the error directive above it.
 import * as Core from "@sheetwrite/core";
 import * as Adapter from "@sheetwrite/core/adapter";
 import * as Shell from "@sheetwrite/core/shell";

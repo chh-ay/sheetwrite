@@ -53,6 +53,7 @@ export function CodeTabs() {
   const current = FRAMEWORKS.find((framework) => framework.id === active) ?? FRAMEWORKS[0];
   return (
     <div className="sw-code-tabs">
+      {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Framework"
         className="sw-code-tabs__list"

@@ -579,9 +579,9 @@ async function classSignature(symbol: ApiSymbol, project: Project): Promise<stri
     .join(" ");
   const constructors = (
     await Promise.all(
-      (
-        await checker.getSignaturesOfType(valueType, SignatureKind.Construct)
-      ).map((signature) => signatureText(signature, declaration, project)),
+      (await checker.getSignaturesOfType(valueType, SignatureKind.Construct)).map((signature) =>
+        signatureText(signature, declaration, project),
+      ),
     )
   )
     // `(args): Instance` is a call signature — invalid inside a class body.
@@ -609,16 +609,16 @@ async function classSignature(symbol: ApiSymbol, project: Project): Promise<stri
     );
   const members = (
     await Promise.all(
-      (
-        await declaredMembers(instanceType)
-      ).map((property) => publicPropertySignature(property, project)),
+      (await declaredMembers(instanceType)).map((property) =>
+        publicPropertySignature(property, project),
+      ),
     )
   ).filter((signature): signature is string => signature !== undefined);
   const staticMembers = (
     await Promise.all(
-      (
-        await declaredMembers(valueType)
-      ).map((property) => publicPropertySignature(property, project, "static ")),
+      (await declaredMembers(valueType)).map((property) =>
+        publicPropertySignature(property, project, "static "),
+      ),
     )
   ).filter((signature): signature is string => signature !== undefined);
   const body = [...constructors, ...members.sort(), ...staticMembers.sort()].join("; ");

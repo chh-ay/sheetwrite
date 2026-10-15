@@ -675,7 +675,7 @@ function PerformanceRoute() {
                 <strong data-testid="scale-readable-rows">
                   Rows {(firstRow + 1).toLocaleString()}–{(lastRow + 1).toLocaleString()}
                 </strong>
-                {/* biome-ignore lint/a11y/useSemanticElements: An ARIA meter keeps consistent track geometry across browsers. */}
+                {/* An ARIA meter keeps the same track geometry in every browser. */}
                 <div
                   aria-label="Position in the million-row sheet"
                   aria-valuemin={0}
@@ -781,7 +781,7 @@ function PerformanceRoute() {
                     </button>
                   </fieldset>
                 </div>
-                {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this canvas host into a virtualized ARIA grid. */}
+                {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
                 <div
                   aria-label="Million-row financial operations grid — one-billion-address Sheetwrite Grid"
                   className="sw-sp-grid"
@@ -1132,7 +1132,7 @@ function PerformanceRoute() {
 
             <div className="sw-sp-cache-meter">
               <span>Cache use</span>
-              {/* biome-ignore lint/a11y/useSemanticElements: An ARIA meter keeps consistent track geometry across browsers. */}
+              {/* An ARIA meter keeps the same track geometry in every browser. */}
               <div
                 aria-label="Resident tile cache use"
                 aria-valuemax={100}

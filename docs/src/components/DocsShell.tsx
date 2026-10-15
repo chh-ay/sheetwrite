@@ -182,7 +182,7 @@ function NavigationDrawer({
   onClosed,
 }: Readonly<NavigationDrawerProps>) {
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
     <dialog
       aria-label="Documentation"
       className="sw-nav-dialog"

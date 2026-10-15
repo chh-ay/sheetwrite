@@ -1,7 +1,7 @@
 // Declaration-resolution guard: a strict `moduleResolution: nodenext` consumer
 // must be able to follow @sheetwrite/core's d.ts graph (every relative
 // specifier inside dist/*.d.ts needs an explicit .js extension).
-// biome-ignore-all assist/source/organizeImports: Negative imports intentionally bind one error directive each.
+// Import order matters: each negative import binds the error directive above it.
 import type {
   ChangeEvent,
   DataSource,

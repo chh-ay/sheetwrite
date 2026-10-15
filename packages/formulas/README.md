@@ -174,7 +174,7 @@ A family is one Rust file that owns a group of functions. Only the full engine c
 5. Add each function to `test/conformance/formula-contract.inventory.json` with `"builds": ["@sheetwrite/formulas"]` and its signature, semantics, dialect, and implementation profiles. Update the function counts in `scripts/formula-contract.test.ts`, then run:
 
    ```sh
-   bun scripts/conformance.ts generate && bunx biome format --write test/conformance/corpus.manifest.json
+   bun scripts/conformance.ts generate && bunx oxfmt test/conformance/corpus.manifest.json
    bun run docs:generate
    bun test scripts/formula-contract.test.ts
    ```

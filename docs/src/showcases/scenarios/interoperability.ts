@@ -85,15 +85,13 @@ export function createBulkSalesCsv(): { text: string; columns: Column[] } {
     { key: "region", header: "Region", width: 110, type: "text" },
     { key: "channel", header: "Channel", width: 115, type: "text" },
     { key: "units", header: "Units", width: 90, type: "number" },
-    ...["Unit price", "Revenue", "Discount", "Net revenue"].map(
-      (header, index): Column => ({
-        key: `amount${index}`,
-        header,
-        width: 140,
-        type: "currency",
-        numberFormat: "$#,##0.00",
-      }),
-    ),
+    ...["Unit price", "Revenue", "Discount", "Net revenue"].map((header, index): Column => ({
+      key: `amount${index}`,
+      header,
+      width: 140,
+      type: "currency",
+      numberFormat: "$#,##0.00",
+    })),
   ];
   const records = [columns.map((column) => column.header).join(",")];
   for (let row = 0; row < BULK_SALES_ROWS; row++) {

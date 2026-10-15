@@ -13,7 +13,8 @@ import type { HTMLAttributes } from "svelte/elements";
 
 /** Advanced Svelte adapter props with inferred host row identity. */
 export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
-  extends Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers<Id> | "children">,
+  extends
+    Omit<HTMLAttributes<HTMLDivElement>, keyof GridAdapterEventHandlers<Id> | "children">,
     GridAdapterEventHandlers<Id>,
     SheetwriteInitializationProps {
   /** Live workbook schema adopted by the Grid. */

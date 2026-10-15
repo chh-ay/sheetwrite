@@ -23,9 +23,9 @@ import {
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import compatibilityData from "../generated/compatibility.json";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
+import compatibilityData from "../generated/compatibility.json";
 import { pageMeta } from "../lib/seo.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
@@ -953,6 +953,7 @@ function InteroperabilityRoute() {
         </nav>
 
         <section aria-label="Workbook exchange workbench" className="sw-si-section" id="xlsx">
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path. */}
           <section
             className="sw-si-workbench"
             aria-label="Live workbook and spreadsheet drop target"
@@ -1200,7 +1201,7 @@ function InteroperabilityRoute() {
                   className="sheetwrite-shell-row sheetwrite-shell-formula-row"
                   ref={formulaRowRef}
                 />
-                {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this canvas host into a virtualized ARIA grid; a table cannot host the runtime. */}
+                {/* Sheetwrite upgrades this host into a virtualized ARIA grid; a table cannot host the runtime. */}
                 <div
                   aria-label="Interoperability workbench grid"
                   role="grid"

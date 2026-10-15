@@ -120,7 +120,6 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     setActivity(message);
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resetCount is an explicit remount token whose value is intentionally opaque.
   useEffect(() => {
     if (!alive || !hydrated) return;
     const host = hostRef.current;

@@ -261,7 +261,7 @@ function translateFormula(
     );
   let output = "";
   let segmentStart = 0;
-  for (let cursor = 0; cursor < formula.length; ) {
+  for (let cursor = 0; cursor < formula.length;) {
     const quote = formula[cursor];
     const closing = quote === '"' ? '"' : quote === "'" ? "'" : quote === "[" ? "]" : "";
     if (!closing) {
