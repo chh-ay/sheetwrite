@@ -9,7 +9,7 @@ description: "<output role=\"status\"> that follows the grid's selection."
 polite live region so screen readers announce changes without interrupting.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/selection-status.ts#L31"><code>packages/core/src/shell/selection-status.ts#L31</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/selection-status.ts#L27"><code>packages/core/src/shell/selection-status.ts#L27</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "Exhaustive serializable operation union for workbook mutations."
 Exhaustive serializable operation union for workbook mutations.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L378"><code>packages/core/src/types/document.ts#L378</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L376"><code>packages/core/src/types/document.ts#L376</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>34</span>

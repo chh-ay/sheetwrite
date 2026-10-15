@@ -16,7 +16,7 @@ paint activity. Nothing is painted — assert grid STATE, not pixels.
 Test-only: never import from production code.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/testing.ts#L74"><code>packages/core/src/testing.ts#L74</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/testing.ts#L72"><code>packages/core/src/testing.ts#L72</code></a></dd></div>
 </dl>
 
 ## Declaration
