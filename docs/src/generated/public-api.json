@@ -7253,7 +7253,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L383",
+              "source": "../core/dist/types/grid.d.ts#L379",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -7918,7 +7918,7 @@
                 },
                 {
                   "name": "minColumns",
-                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
+                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
                 },
                 {
                   "name": "mutationPolicy",
@@ -8187,7 +8187,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L383",
+              "source": "../core/dist/types/grid.d.ts#L379",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -9113,7 +9113,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L383",
+              "source": "../core/dist/types/grid.d.ts#L379",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
