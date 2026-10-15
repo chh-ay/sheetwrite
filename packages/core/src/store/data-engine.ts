@@ -4,7 +4,7 @@ import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
-import { getEngine, isEngineLoaded as isLoaded } from "../engine.js";
+import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
   cloneCellHyperlink,
@@ -379,7 +379,9 @@ export class StoreDataEngine {
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
     if (!isLoaded()) {
-      throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
+      throw new Error(
+        `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
+      );
     }
     if (
       options.referenceSimulationLimit !== undefined &&

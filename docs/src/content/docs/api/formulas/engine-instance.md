@@ -40,8 +40,6 @@ export type EngineInstance = Omit<typeof WasmExports, "default"> & {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/formulas/create-engine/"><code>createEngine</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
-<li><a href="/docs/api/formulas/create-loaded-engine/"><code>createLoadedEngine</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/create-engine/"><code>createEngine</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
-<li><a href="/docs/api/wasm/create-loaded-engine/"><code>createLoadedEngine</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>
