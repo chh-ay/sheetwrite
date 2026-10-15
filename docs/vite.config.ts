@@ -17,6 +17,7 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
+
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 

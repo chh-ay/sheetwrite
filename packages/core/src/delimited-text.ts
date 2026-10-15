@@ -142,7 +142,7 @@ function utf8WidthAt(text: string, index: number): { bytes: number; advance: num
 
 function boundedUtf8InputBytes(text: string, limit: number): number {
   let bytes = 0;
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < text.length;) {
     const code = text.charCodeAt(index);
     if (code <= ASCII_MAX_CODE_UNIT) {
       // A run of ASCII code units is one byte each, so it can cross the ceiling
@@ -421,7 +421,7 @@ function planEncodedField(
   let bytes = 0;
   let quoteCount = 0;
   let quote = forceQuote;
-  for (let index = 0; index < text.length; ) {
+  for (let index = 0; index < text.length;) {
     const ch = text[index]!;
     const width = utf8WidthAt(text, index);
     bytes += width.bytes;

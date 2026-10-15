@@ -3,8 +3,24 @@ import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
+import {
+  createEngineLiveWorkbook,
+  ENGINE_ACCOUNT_ROWS,
+  ENGINE_ACTUAL_ADJUSTMENT,
+  ENGINE_COLUMN_INDEX,
+  ENGINE_COLUMN_LETTER,
+  ENGINE_FORECAST_UPSIDE,
+  ENGINE_LIVE_ROWS,
+  ENGINE_LIVE_SHEET,
+  ENGINE_LIVE_STORAGE,
+  ENGINE_PLAN_COLUMN,
+  ENGINE_PLAN_KEY,
+  type EngineColumnBand,
+  engineAccountTotalRow,
+} from "./scenarios/engine-live-data.js";
 import {
   bindEngineEvents,
   createEngineHostSaver,
@@ -23,21 +39,7 @@ import {
   formatEngineEvent,
   formatEngineValue,
 } from "./scenarios/engine-live.js";
-import {
-  createEngineLiveWorkbook,
-  ENGINE_ACCOUNT_ROWS,
-  ENGINE_ACTUAL_ADJUSTMENT,
-  ENGINE_COLUMN_INDEX,
-  ENGINE_COLUMN_LETTER,
-  ENGINE_FORECAST_UPSIDE,
-  ENGINE_LIVE_ROWS,
-  ENGINE_LIVE_SHEET,
-  ENGINE_LIVE_STORAGE,
-  ENGINE_PLAN_COLUMN,
-  ENGINE_PLAN_KEY,
-  type EngineColumnBand,
-  engineAccountTotalRow,
-} from "./scenarios/engine-live-data.js";
+
 import "@sheetwrite/core/styles.css";
 
 interface EngineShowcaseHandle {

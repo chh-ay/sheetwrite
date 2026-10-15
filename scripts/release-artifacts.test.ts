@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   assertOutputDirectoryEmpty,

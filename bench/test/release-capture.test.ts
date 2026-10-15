@@ -1,5 +1,6 @@
 import { expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
+
 import { RELEASE_ARTIFACTS, RELEASE_SMOKE_COMMANDS } from "../src/release-capture.js";
 
 function evidencePage(): string {

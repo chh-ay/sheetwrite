@@ -426,15 +426,15 @@
    same variables on the widgets themselves wins (a declaration beats the
    inherited value — the mechanism core's styles.css documents). */
 .sw-fx-grid
-:is(
-  .sheetwrite-find,
-  .sheetwrite-context-menu,
-  .sheetwrite-tab-menu,
-  .sheetwrite-tab-unhide-menu,
-  .sheetwrite-assist,
-  .sheetwrite-validation-list,
-  .sheetwrite-validation-checkbox
-) {
+  :is(
+    .sheetwrite-find,
+    .sheetwrite-context-menu,
+    .sheetwrite-tab-menu,
+    .sheetwrite-tab-unhide-menu,
+    .sheetwrite-assist,
+    .sheetwrite-validation-list,
+    .sheetwrite-validation-checkbox
+  ) {
   --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
   --sheetwrite-widget-bg: var(--sw-surface-2);
   --sheetwrite-widget-fg: var(--sw-fg);

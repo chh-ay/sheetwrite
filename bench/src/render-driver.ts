@@ -1,7 +1,9 @@
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { type Browser, chromium, type Page } from "@playwright/test";
+
 import { DEFAULT_SEED, datasetChecksum, makeColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
 import { sourceTreeDirty } from "./protocol-meta.js";

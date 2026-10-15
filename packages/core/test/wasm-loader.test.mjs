@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
+
 import { createLoader } from "../../wasm/loader-state.mjs";
 
 describe("WASM loader lifecycle", () => {

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+
 import { persistCapture, readBoundedResponse } from "../capture.js";
 import { canonicalJson, isNonemptyString, isObject, sha256 } from "../normalize.js";
 import { rejectUnknownKeys, scanSecrets, validateResult } from "../schema.js";

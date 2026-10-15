@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import type { Grid } from "../../packages/core/src/types.js";
 
 declare global {
@@ -30,77 +31,88 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-test("workbook XLSX backend preserves formulas in a browser build", {
-  tag: "@portability",
-}, async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto(siteUrl("/test/xlsx/"));
-  const result = page.locator("#result");
-  await expect
-    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
-    .not.toBe("running");
+test(
+  "workbook XLSX backend preserves formulas in a browser build",
+  {
+    tag: "@portability",
+  },
+  async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto(siteUrl("/test/xlsx/"));
+    const result = page.locator("#result");
+    await expect
+      .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+      .not.toBe("running");
 
-  expect(
-    await result.getAttribute("data-status"),
-    (await result.textContent()) ?? "XLSX smoke returned no result text",
-  ).toBe("ready");
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
+    expect(
+      await result.getAttribute("data-status"),
+      (await result.textContent()) ?? "XLSX smoke returned no result text",
+    ).toBe("ready");
+    expect(errors.page).toEqual([]);
+    expect(errors.console).toEqual([]);
+  },
+);
 
-test("offline queue, two-grid sync, and presence converge in a browser", {
-  tag: "@portability",
-}, async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto(siteUrl("/test/collaboration/"));
-  const result = page.locator("#result");
-  await expect
-    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
-    .not.toBe("running");
+test(
+  "offline queue, two-grid sync, and presence converge in a browser",
+  {
+    tag: "@portability",
+  },
+  async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto(siteUrl("/test/collaboration/"));
+    const result = page.locator("#result");
+    await expect
+      .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+      .not.toBe("running");
 
-  expect(
-    await result.getAttribute("data-status"),
-    (await result.textContent()) ?? "Collaboration smoke returned no result text",
-  ).toBe("ready");
-  const payload = JSON.parse((await result.textContent()) ?? "{}") as Record<string, unknown>;
-  // The harness self-checks before reporting ready; assert the durable
-  // outcomes without pinning incidental counters like presence node counts.
-  expect(payload).toMatchObject({
-    literal: 21,
-    formula: 42,
-    sheetName: "Shared",
-    restoredMutation: "durable-browser-m1",
-  });
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
+    expect(
+      await result.getAttribute("data-status"),
+      (await result.textContent()) ?? "Collaboration smoke returned no result text",
+    ).toBe("ready");
+    const payload = JSON.parse((await result.textContent()) ?? "{}") as Record<string, unknown>;
+    // The harness self-checks before reporting ready; assert the durable
+    // outcomes without pinning incidental counters like presence node counts.
+    expect(payload).toMatchObject({
+      literal: 21,
+      formula: 42,
+      sheetName: "Shared",
+      restoredMutation: "durable-browser-m1",
+    });
+    expect(errors.page).toEqual([]);
+    expect(errors.console).toEqual([]);
+  },
+);
 
-test("vanilla example commits an edit through the formula bar and undoes it", {
-  tag: "@portability",
-}, async ({ page }) => {
-  await page.goto(urlOf("vanilla"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
+test(
+  "vanilla example commits an edit through the formula bar and undoes it",
+  {
+    tag: "@portability",
+  },
+  async ({ page }) => {
+    await page.goto(urlOf("vanilla"));
+    await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
 
-  // Select B2 via the name box, then commit a literal through the formula bar.
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  const original = await page.locator("#formula").inputValue();
-  expect(original).not.toBe("browser-smoke");
-  await page.fill("#formula", "browser-smoke");
-  await page.press("#formula", "Enter");
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    const original = await page.locator("#formula").inputValue();
+    expect(original).not.toBe("browser-smoke");
+    await page.fill("#formula", "browser-smoke");
+    await page.press("#formula", "Enter");
 
-  // Re-selecting the same cell echoes the committed value back into the bar.
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  await expect(page.locator("#formula")).toHaveValue("browser-smoke");
+    // Re-selecting the same cell echoes the committed value back into the bar.
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    await expect(page.locator("#formula")).toHaveValue("browser-smoke");
 
-  // Ctrl+Z on the grid undoes the commit and restores the original value.
-  await page.locator(".sheetwrite").first().click();
-  await page.keyboard.press("Control+z");
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  await expect(page.locator("#formula")).toHaveValue(original);
-});
+    // Ctrl+Z on the grid undoes the commit and restores the original value.
+    await page.locator(".sheetwrite").first().click();
+    await page.keyboard.press("Control+z");
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    await expect(page.locator("#formula")).toHaveValue(original);
+  },
+);
 
 test("dynamic spill entry, obstruction, resize, ownership, and undo are visible", async ({
   page,

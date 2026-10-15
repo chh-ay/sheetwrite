@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { CONTROLLED_BASELINE_MINIMUM_ROUNDS } from "./controlled-baseline.js";
 
 const BENCH_ROOT = new URL("..", import.meta.url).pathname;

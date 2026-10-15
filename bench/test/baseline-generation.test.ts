@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { generateBaseline } from "../src/generate-baseline.js";
 import { makeRenderArtifact, TEST_RUNNER } from "./gate-fixtures.js";
 

@@ -1,7 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
-import compatibilityResults from "../../docs/src/generated/compatibility-results.json" with {
-  type: "json",
-};
+
+import compatibilityResults from "../../docs/src/generated/compatibility-results.json" with { type: "json" };
 import type { Grid } from "../../packages/core/src/types.js";
 import fixtureManifest from "../../packages/xlsx/test/fixtures/manifest.json" with { type: "json" };
 import { siteUrl } from "./playwright.config.js";

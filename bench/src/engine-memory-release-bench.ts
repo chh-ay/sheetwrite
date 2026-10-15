@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+
 import type * as Wasm from "@sheetwrite/wasm";
+
 import type * as Core from "../../packages/core/src/index.js";
 import type { CompactRangeHistory } from "../../packages/core/src/store/data-engine.js";
 

@@ -1,5 +1,5 @@
-import { storeEngine } from "./store/engine-registry.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type {
   DataSource,

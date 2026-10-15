@@ -1,6 +1,8 @@
 import { cpus } from "node:os";
 import { resolve } from "node:path";
+
 import { type Browser, chromium, type Page } from "@playwright/test";
+
 import {
   INTERACTION_CEILING_KEYS,
   INTERACTION_CEILINGS,

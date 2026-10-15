@@ -8,8 +8,10 @@ import {
   parseDateInput,
   type Workbook,
 } from "@sheetwrite/core";
+
 import "@sheetwrite/core/styles.css";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
+
 import {
   getMergeIndexResourceStatsForTest,
   intersectingMerges,
@@ -23,6 +25,7 @@ import {
 } from "../../packages/core/src/number-format.js";
 import type { InstrumentedVisibleWindowView } from "../../packages/core/src/store/window-reader.js";
 import type { PanePaint } from "../../packages/core/src/types/render.js";
+
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import {
@@ -1109,28 +1112,26 @@ function renderResults(result: BrowserCombinationResult): void {
 
 function teardownFailures(results: readonly ScenarioResult[], error: unknown): ScenarioResult[] {
   const normalized = error instanceof Error ? error : new Error(String(error));
-  return results.map(
-    (result): FailedScenario => ({
-      runId: result.runId,
-      round: result.round,
-      engine: result.engine,
-      rows: result.rows,
-      scenarioId: result.scenarioId,
-      group: result.group,
-      ...(result.dataValidity === undefined ? {} : { dataValidity: result.dataValidity }),
-      status: "failed",
-      stage: "teardown",
-      errorClass: normalized.name || "Error",
-      message: normalized.message,
-      timeout: false,
-      crash: false,
-      consoleErrors: result.status === "failed" ? result.consoleErrors : [],
-      pageErrors: result.status === "failed" ? result.pageErrors : [],
-      partialSamples: result.status === "success" ? result.rawSamples : result.partialSamples,
-      validation: result.validation,
-      memory: result.memory,
-    }),
-  );
+  return results.map((result): FailedScenario => ({
+    runId: result.runId,
+    round: result.round,
+    engine: result.engine,
+    rows: result.rows,
+    scenarioId: result.scenarioId,
+    group: result.group,
+    ...(result.dataValidity === undefined ? {} : { dataValidity: result.dataValidity }),
+    status: "failed",
+    stage: "teardown",
+    errorClass: normalized.name || "Error",
+    message: normalized.message,
+    timeout: false,
+    crash: false,
+    consoleErrors: result.status === "failed" ? result.consoleErrors : [],
+    pageErrors: result.status === "failed" ? result.pageErrors : [],
+    partialSamples: result.status === "success" ? result.rawSamples : result.partialSamples,
+    validation: result.validation,
+    memory: result.memory,
+  }));
 }
 
 async function run(configuration: PageConfiguration): Promise<void> {

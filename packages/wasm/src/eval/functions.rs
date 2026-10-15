@@ -362,7 +362,6 @@ fn aggregate_numbers(values: &FuncAccumulator) -> Result<NumericAggregate, Formu
     }
 }
 
-/// The reductions whose result is one running fold over their values.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ReductionKind {
     Sum,
@@ -373,9 +372,7 @@ enum ReductionKind {
     CountA,
 }
 
-/// A running fold for [`ReductionKind`], fed one value at a time. It mirrors
-/// the accumulator path, including its cell limit, error order and empty-input
-/// results, so a streamed range and a materialized one answer the same.
+/// Match materialized accumulation limits, error order, and empty-input results.
 pub(super) struct ReductionFold {
     kind: ReductionKind,
     cells: u64,
@@ -407,7 +404,6 @@ impl ReductionFold {
         })
     }
 
-    /// Folds one value pulled from a range or a scalar argument.
     pub(super) fn push(&mut self, value: &Value) -> Result<(), FormulaError> {
         if self.cells >= RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);

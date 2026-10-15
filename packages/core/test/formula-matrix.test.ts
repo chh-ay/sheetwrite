@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { initSheetwrite, SheetwriteStore } from "../src/index.js";
 import { makeWorkbook } from "./fixtures.js";
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
 
-// biome-ignore lint/suspicious/noApproximativeNumericConstant: exact three-decimal result of ROUND(PI(), 3).
 const ROUNDED_PI = 3.142;
 
 beforeAll(async () => {

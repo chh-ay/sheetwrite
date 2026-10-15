@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+
 import {
   createGridFromSnapshot,
   type Grid,
@@ -10,6 +11,7 @@ import {
   type VersionedOperation,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+
 import {
   COLLABORATION_ACTORS,
   ShowcaseCollaborationServer,

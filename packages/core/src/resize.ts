@@ -2,8 +2,6 @@
 // grid feeds content-space coordinates and band spans, and text measurement is
 // injected, so this stays unit-testable without a canvas.
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 /** Pointer proximity (px) to a boundary that counts as grabbing it. */
 const RESIZE_THRESHOLD = 4;
 /** Floors so a resized column / row never collapses away. */
@@ -11,8 +9,6 @@ export const MIN_COLUMN_WIDTH = 24;
 export const MIN_ROW_HEIGHT = 12;
 /** Left+right text padding baked into an autofit width (matches the paint CELL_PAD * 2). */
 const AUTOFIT_PADDING = 12;
-
-// ── Boundary hit-testing ─────────────────────────────────────────────────────
 
 /**
  * Which band's trailing edge the pointer grabs at content-space `pos`, or null
@@ -37,8 +33,6 @@ export function resizeTargetAt(
   if (distStart <= threshold && prev >= 0) return prev;
   return null;
 }
-
-// ── Autofit ──────────────────────────────────────────────────────────────────
 
 /**
  * Autofit width for a column: the widest of the header label and every supplied

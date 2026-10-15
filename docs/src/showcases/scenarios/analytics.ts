@@ -8,6 +8,7 @@
  */
 
 import type { ColumnarData, DocumentOp, Theme, Workbook } from "@sheetwrite/core";
+
 import { REACT_SHOWCASE_THEME, revenueAccountName } from "../revenue.js";
 
 export const ANALYTICS_ROWS = 100_000;

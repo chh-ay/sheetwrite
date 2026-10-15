@@ -65,6 +65,7 @@ export interface SheetwriteInitializationProps {
 <p class="api-consumers-label">Public exports naming <code>SheetwriteInitializationProps</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-adapter/adapter-grid-input/"><code>AdapterGridInput</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/vue/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/vue</span></li>
 </ul>
 </div>

@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
+
 import {
   isCallSignatureDeclaration,
   isClassDeclaration,
@@ -17,6 +18,7 @@ import {
   type SourceFile,
 } from "typescript/unstable/ast";
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
+
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -30,12 +32,6 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
-  COMPATIBILITY_FIXTURES,
-  COMPATIBILITY_INVENTORY,
-  type CompatibilityFixture,
-  type CompatibilityRecord,
-} from "../docs/src/showcases/compatibility.js";
-import {
   buildCompatibilityResults,
   type CompatibilityResults,
 } from "../docs/src/showcases/compatibility-results.js";
@@ -43,6 +39,12 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";

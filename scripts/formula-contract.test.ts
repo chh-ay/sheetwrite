@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { extractAssistSpellings, validateFormulaContractRepository } from "./formula-contract.js";
 import { renderFormulaFunctionContract } from "./formula-docs.js";
 

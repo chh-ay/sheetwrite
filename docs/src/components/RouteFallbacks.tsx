@@ -1,5 +1,6 @@
 import { type ErrorComponentProps, Link, useLocation, useRouter } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { DocsShell } from "./DocsShell.js";
 import { SiteTopbar } from "./SiteTopbar.js";
 

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAbsolute, normalize, resolve } from "node:path";
+
 import type { ControlledRunnerFingerprint, HarnessFingerprint } from "./gate-protocol.js";
 import { fingerprintMismatches, MATRIX_IDS, validateExactMatrix } from "./gate-protocol.js";
 import { validateRenderGateArtifact } from "./render-gate.js";

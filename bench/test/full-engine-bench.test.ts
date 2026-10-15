@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
+
 import { type FullEngineResult, validateFullEngineResult } from "../src/full-engine-bench.js";
 
 function recordedCapture(): FullEngineResult {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { coldTaskDurations, type TraceEvent } from "../src/interaction-bench.js";
 import {
   INTERACTION_CEILING_KEYS,

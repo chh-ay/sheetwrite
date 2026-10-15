@@ -4,7 +4,9 @@ import { cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
+
 import { chromium } from "@playwright/test";
+
 import { deferredModule, installFixtureOnlyCandidate } from "./candidate-package.mjs";
 
 const fixtureRoot = resolve(import.meta.dirname, "..");

@@ -61,6 +61,12 @@ replace the grid. Live inputs are `theme`, `readOnly`, `config`, `overscan`, and
 
 `ref` receives the current `Grid` before `onReady({ grid, generation, reason })` runs and clears on replacement or unmount. Reasons are `initial`, `input-reset`, and `renderer-reset`.
 
+Readiness observes the latest committed live options. A throwing ref or ready
+callback retires the new Grid; consumer errors are not initialization failures.
+Omitted `renderer` and `"canvas"` are equivalent. Changing an explicit
+`wasmSource` after readiness preserves the Grid and retains the loader's
+first-source warning.
+
 Grid events use collision-free names: `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onCommandStateChange`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`. Native host `onChange` and `onScroll` remain ordinary DOM handlers.
 
 For vanilla/preload control, import `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [React integration](https://sheetwrite.vercel.app/docs/frameworks/react/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).

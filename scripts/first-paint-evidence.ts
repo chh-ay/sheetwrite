@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+
 import { type BundlerProvenance, SIZE_PROTOCOL_VERSION } from "./size-report.js";
 
 export const FIRST_PAINT_BROTLI_GATE_BYTES = 7_680;

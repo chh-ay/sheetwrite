@@ -346,24 +346,20 @@ const LEFT_ALIGNED_TEXT: ReadonlyArray<{
 
 /** Panel titles and formulas, written in one transaction after the ledger loads. */
 export function formulaDashboardOps(): DocumentOp[] {
-  const titles = [...FORMULA_PANELS, PLAYGROUND].map(
-    (panel): DocumentOp => ({
-      op: "set",
-      addr: { sheet: ANALYSIS_SHEET_ID, row: panel.row - 1, col: panel.col },
-      value: { kind: "literal", value: panel.title },
-    }),
-  );
-  const styles = [...FORMULA_PANELS, PLAYGROUND].map(
-    (panel): DocumentOp => ({
-      op: "setRangeStyle",
-      range: {
-        sheet: ANALYSIS_SHEET_ID,
-        start: { row: panel.row - 1, col: panel.col },
-        end: { row: panel.row - 1, col: panel.col },
-      },
-      style: { bold: true, align: "left" },
-    }),
-  );
+  const titles = [...FORMULA_PANELS, PLAYGROUND].map((panel): DocumentOp => ({
+    op: "set",
+    addr: { sheet: ANALYSIS_SHEET_ID, row: panel.row - 1, col: panel.col },
+    value: { kind: "literal", value: panel.title },
+  }));
+  const styles = [...FORMULA_PANELS, PLAYGROUND].map((panel): DocumentOp => ({
+    op: "setRangeStyle",
+    range: {
+      sheet: ANALYSIS_SHEET_ID,
+      start: { row: panel.row - 1, col: panel.col },
+      end: { row: panel.row - 1, col: panel.col },
+    },
+    style: { bold: true, align: "left" },
+  }));
   // A spill can put text in a numeric column; keep those cells left-aligned.
   const textStyles = LEFT_ALIGNED_TEXT.flatMap((entry): DocumentOp[] => {
     const panel = FORMULA_PANELS.find((candidate) => candidate.id === entry.panel);
@@ -381,13 +377,11 @@ export function formulaDashboardOps(): DocumentOp[] {
       },
     ];
   });
-  const formulas = FORMULA_PANELS.map(
-    (panel): DocumentOp => ({
-      op: "set",
-      addr: { sheet: ANALYSIS_SHEET_ID, row: panel.row, col: panel.col },
-      value: { kind: "formula", src: panel.formula },
-    }),
-  );
+  const formulas = FORMULA_PANELS.map((panel): DocumentOp => ({
+    op: "set",
+    addr: { sheet: ANALYSIS_SHEET_ID, row: panel.row, col: panel.col },
+    value: { kind: "formula", src: panel.formula },
+  }));
   return [...titles, ...styles, ...textStyles, ...formulas];
 }
 

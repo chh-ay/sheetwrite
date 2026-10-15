@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import {
   ANALYTICS_EXPECTED,
   ANALYTICS_ROWS,
@@ -76,7 +77,6 @@ test.describe("react workbench — controlled analytics", () => {
     const errors = collectErrors(page);
     await openWorkbench(page);
 
-    // The editable Grid is on the first screen.
     await expect(page.locator(GRID)).toBeInViewport();
     await expect(
       page.getByRole("complementary", { name: "Controlled analytics state" }),
@@ -162,7 +162,6 @@ test.describe("react workbench — controlled analytics", () => {
     const errors = collectErrors(page);
     await openWorkbench(page);
 
-    // Copy the first account (column B) over the second with the keyboard.
     await page.locator(GRID).focus();
     await page.keyboard.press("ControlOrMeta+Home");
     await page.keyboard.press("ArrowRight");

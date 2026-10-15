@@ -1,8 +1,4 @@
-// ── Selection status readout ─────────────────────────────────────────────────
-//
-// Geometry-only, allocation-free status line. It never enumerates selected
-// cells, never reads the store, and runs constant-time work per selection
-// event — safe next to any selection size.
+// Geometry-only work keeps status updates constant-time for any selection size.
 
 import type { Selection } from "../types/coordinates.js";
 import type { Grid } from "../types/grid.js";

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Use Bun 1.4.2, Rust 1.99.0 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
+Use Bun 1.4.3, Rust 1.99.0 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
 
 ```sh
 rustup toolchain install
@@ -28,6 +28,22 @@ Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are own
 After the initial 0.1.0 release, user-visible package changes require a Changeset created with `bunx changeset`. Private workspaces are excluded.
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
+
+## Code style
+
+oxfmt and rustfmt own formatting. Two rules they cannot check:
+
+- **Comments say why, not what.** Write a comment only for a reason the code
+  cannot show: a constraint, an invariant, a non-obvious trade-off, or a link to
+  an external rule. Do not restate the next line, narrate the steps of a
+  function, or describe history ("before, this…", "now we…"); that belongs in
+  the commit message. Doc comments on exported symbols are the API reference:
+  keep them to what a caller needs, one or two sentences where possible.
+- **Separate the steps.** Put one blank line between the logical steps of a
+  function (setup, the main work, the result), after a block that closes in the
+  middle of a function, and between declarations and members. A function body
+  that needs no blank line is usually short enough to read at a glance; one
+  that needs many is usually several functions.
 
 ## Documentation deployment
 

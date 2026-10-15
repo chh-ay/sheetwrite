@@ -1,5 +1,6 @@
 import { fullGC, heapStats } from "bun:jsc";
 import { fileURLToPath } from "node:url";
+
 import { StoreViewState } from "../../packages/core/src/store/view-state.js";
 import type { RecomputingCellStore } from "../../packages/core/src/store/wasm-contract.js";
 import type { Workbook } from "../../packages/core/src/types.js";

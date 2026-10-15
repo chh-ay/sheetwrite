@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { requiresDocumentationBuild } from "./ci-paths.js";
 
 describe("documentation CI path classification", () => {

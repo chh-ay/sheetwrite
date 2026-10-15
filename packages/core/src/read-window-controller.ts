@@ -572,7 +572,7 @@ export class ReadWindowController {
       for (const root of roots) {
         if (root.sheet !== sheet) continue;
         // Formula discovery and engine pins use backing rows, never display rows.
-        for (let row = root.row; row < root.end; ) {
+        for (let row = root.row; row < root.end;) {
           const start = engine.dataRowAt(sheet, row);
           let end = start + 1;
           row += 1;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { detectFillSeries, type FillSourceCell } from "../src/fill-series.js";
 
 function cells(values: readonly number[]): FillSourceCell[] {

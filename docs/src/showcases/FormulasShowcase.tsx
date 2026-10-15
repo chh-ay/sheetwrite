@@ -1,6 +1,7 @@
 import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -18,6 +19,7 @@ import {
   PLAYGROUND_EXAMPLE,
 } from "./scenarios/formulas.js";
 import FormulasSetupSnippet from "./snippets/formulas-setup.mdx";
+
 import "@sheetwrite/core/styles.css";
 
 declare global {
@@ -351,7 +353,7 @@ export default function FormulasShowcase() {
             </ol>
           </nav>
 
-          {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this host into an ARIA grid. */}
+          {/* Sheetwrite upgrades this host into an ARIA grid. */}
           <div
             aria-label="Sales analysis workbook"
             className="sw-fx-grid"

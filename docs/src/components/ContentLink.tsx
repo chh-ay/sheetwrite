@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { AnchorHTMLAttributes } from "react";
+
 import { opensFreshDocument } from "../lib/navigation.js";
 
 /** Files served as-is: the router has no page for them. */

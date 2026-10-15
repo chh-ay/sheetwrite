@@ -26,6 +26,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
 import { ShowcaseCollaborationServer, ShowcasePresenceBus } from "./collaboration-protocol.js";
 import {
   createOfflineData,
@@ -637,7 +638,7 @@ export class SvelteWorkbenchSession {
         this.feed("err", describeError(event.error));
       }
     });
-    // Bring the colleague back into view immediately after (re)connecting.
+
     if (this.lastColleaguePresence) {
       void this.colleagueTransport.publish({ ...this.lastColleaguePresence, sentAt: Date.now() });
     } else {

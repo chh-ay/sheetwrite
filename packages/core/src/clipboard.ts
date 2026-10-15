@@ -44,8 +44,6 @@ export function parseTsv(text: string, options: DelimitedTextOptions = {}): stri
   return parseDelimitedText(text, "\t", options);
 }
 
-// ── Internal snapshot ────────────────────────────────────────────────────────
-
 /**
  * One copied cell in an internal clipboard snapshot: its source value (a formula
  * whose src is preserved, or a literal), the scalar it resolved to at copy time

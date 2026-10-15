@@ -50,6 +50,6 @@ export type RowBridgeId = string | number;
 <li><a href="/docs/api/core/row-bridge-options/"><code>RowBridgeOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-paste-delta/"><code>RowBridgePasteDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-projection/"><code>RowBridgeProjection</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 49 more</li>
+<li class="api-consumer-more">and 52 more</li>
 </ul>
 </div>

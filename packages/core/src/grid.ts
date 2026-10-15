@@ -40,8 +40,8 @@ import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
-import { visibleSheetNeighbor } from "./store/ranges.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { visibleSheetNeighbor } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
@@ -490,7 +490,7 @@ export class GridImpl implements Grid {
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
-    const virtualTarget = padTarget(host, opts.minColumns);
+    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
@@ -1012,8 +1012,6 @@ export class GridImpl implements Grid {
   rendererKind(): "canvas" | "worker" {
     return this.activeRendererKind;
   }
-
-  // ── sheet / layout geometry ────────────────────────────────────────────────
 
   private sheet(id: SheetId = this.activeSheet): Sheet {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
@@ -1755,7 +1753,10 @@ export class GridImpl implements Grid {
   setMinColumns(minColumns?: number): void {
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
     if (!stored) return;
-    const target = Math.max(stored.columns.length, padTarget(this.host, minColumns));
+    const target = Math.max(
+      stored.columns.length,
+      padTarget(this.host, minColumns, this.presentation),
+    );
     if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
     this.virtualColumnTargets.set(this.activeSheet, target);
     this.activeSheetCache = null;
@@ -1771,8 +1772,6 @@ export class GridImpl implements Grid {
     this.readWindows.invalidate();
     this.scheduleRender();
   }
-
-  // ── public API ─────────────────────────────────────────────────────────────
 
   /** Internal structural counters used by allocation regression tests and range benchmarks. */
   getMutationRevisionStats(): MutationRevisionStats {
@@ -2419,8 +2418,6 @@ export class GridImpl implements Grid {
     return additions.length > 0 ? [...additions, ...patches] : patches;
   }
 
-  // ── toolbar actions (operate on the current selection) ──────────────────────
-
   private buildActions(): GridActions {
     return {
       toggleBold: () => this.styleActions.toggleStyle("bold"),
@@ -2939,8 +2936,17 @@ function appendPadColumns(columns: Column[], target: number): void {
   }
 }
 
-/** Columns needed to satisfy `minColumns` and fill the host width. */
-function padTarget(host: HTMLElement, minColumns: number | undefined): number {
+/**
+ * Columns needed to satisfy `minColumns` and, for a spreadsheet, to fill the
+ * host width. A data grid's columns come from the data, so it adds empty
+ * columns only when the host asks for them with `minColumns`.
+ */
+function padTarget(
+  host: HTMLElement,
+  minColumns: number | undefined,
+  presentation: GridPresentation,
+): number {
+  if (presentation === "data-grid") return minColumns ?? 0;
   const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
   const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
   return Math.max(minColumns ?? 0, fillCols);

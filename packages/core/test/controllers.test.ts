@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { AriaMirror } from "../src/aria-mirror.js";
 import { DatasourceController } from "../src/datasource-controller.js";
 import { DocumentController } from "../src/document-controller.js";

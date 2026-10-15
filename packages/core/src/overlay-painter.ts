@@ -262,11 +262,7 @@ export class OverlayPainter {
   private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
   private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
 
-  // ── Rect pool ──────────────────────────────────────────────────────────
-  // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
-  // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
-  // div only when the pool runs short. Surplus divs are hidden with
-  // `display:none`, never removed, so subsequent passes can reclaim them.
+  // Retain surplus nodes so later paint passes can reuse them without allocation.
   private readonly pool: HTMLDivElement[] = [];
   private cursor = 0;
   private readonly presenceLabelPool: HTMLDivElement[] = [];
@@ -275,7 +271,6 @@ export class OverlayPainter {
   private presenceLabelBoundsCount = 0;
   private presenceColorContext: CanvasRenderingContext2D | null | undefined;
 
-  // ── Per-pass context ───────────────────────────────────────────────────
   // Threaded into the `forEachRect` selection callback, which cannot take args.
   private paintContentTop = 0;
   private paintScrollLeft = 0;
@@ -287,7 +282,6 @@ export class OverlayPainter {
   private highlightVersion = 0;
   private presenceVersion = 0;
 
-  // ── Match and note row indexes ─────────────────────────────────────────
   // Repaints look up only the rows in the painted band. Each index rebuilds
   // when its items or the view order change, never on scroll.
   private readonly matchIndex = new ViewRowIndex();
@@ -303,9 +297,6 @@ export class OverlayPainter {
   /** Note indices of the painted band, kept in note order. */
   private readonly notePaintOrder: number[] = [];
 
-  // ── Cached paint signature ─────────────────────────────────────────────
-  // `paint` skips when every field below is unchanged and the theme identity
-  // still matches — the same skip semantics as the old join('|') signature.
   private lastPaintTheme: Theme | null = null;
   private lastContentTop = 0;
   private lastScrollLeft = 0;

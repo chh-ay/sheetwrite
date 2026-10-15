@@ -3,6 +3,7 @@ import { initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { ENGINE_THEME } from "./scenarios/engine.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRadioGroup, DemoRadioItem } from "./ui/DemoRadioGroup.js";
@@ -19,6 +20,7 @@ import {
   type WorkbenchDataMode,
   type WorkbenchRendererState,
 } from "./vanilla-workbench.js";
+
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
 
@@ -120,7 +122,6 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     setActivity(message);
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resetCount is an explicit remount token whose value is intentionally opaque.
   useEffect(() => {
     if (!alive || !hydrated) return;
     const host = hostRef.current;

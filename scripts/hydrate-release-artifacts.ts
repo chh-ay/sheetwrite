@@ -1,5 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
 const artifactRoot = resolve(process.argv[2] ?? "test-results/release-artifacts");

@@ -387,7 +387,7 @@ export function xmlBoolean(value: string | undefined): boolean {
 export function decodeXstring(value: string): string {
   if (!/_x[\da-f]{4}_/i.test(value)) return value;
   let output = "";
-  for (let index = 0; index < value.length; ) {
+  for (let index = 0; index < value.length;) {
     const literalEscape = /^_x005F_(x[\da-f]{4}_)/i.exec(value.slice(index));
     if (literalEscape) {
       output += `_${literalEscape[1]}`;

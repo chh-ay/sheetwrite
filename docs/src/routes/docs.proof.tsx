@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import Proof from "../content/proof.mdx";
 
 export const Route = createFileRoute("/docs/proof")({

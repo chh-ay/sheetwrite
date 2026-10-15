@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
 import { verifyReleaseArtifacts } from "./release-artifacts.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");

@@ -204,7 +204,6 @@ const HOST_PERSISTENCE_BOUNDARY =
   "Authentication, authorization, transport, server database transactions, and deployment are host-owned.";
 
 export const CAPABILITY_INVENTORY: readonly Capability[] = [
-  // ── Editing & interaction ────────────────────────────────────────────────
   {
     id: "editing.cell-edit",
     title: "Cell editing",
@@ -311,7 +310,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "The host owns when and why operations fire; the engine owns applying them.",
   },
 
-  // ── Formulas, aggregation & query ────────────────────────────────────────
   {
     id: "formulas.entry-recalc",
     title: "Formula entry & recalculation",
@@ -431,7 +429,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "Datasource backends (databases, APIs) are host-owned; paging contracts are engine-owned.",
   },
 
-  // ── Governance & annotation workflow ─────────────────────────────────────
   {
     id: "data.validation-rules",
     title: "Data validation",
@@ -519,7 +516,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "Only leading rows/columns freeze; arbitrary interior panes are unsupported.",
   },
 
-  // ── Scale & rendering ────────────────────────────────────────────────────
   {
     id: "scale.dense-datasource",
     title: "Dense in-memory datasource",
@@ -639,7 +635,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "Numbers come from the checked-in benchmark protocol only — measured, never promised.",
   },
 
-  // ── Spreadsheet interoperability ─────────────────────────────────────────
   {
     id: "io.xlsx-import",
     title: "XLSX import",
@@ -717,7 +712,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "Core never bundles the codec; hosts opt in per entry point.",
   },
 
-  // ── Persistence & document lifecycle ─────────────────────────────────────
   {
     id: "persistence.snapshot-load",
     title: "Snapshot load",
@@ -819,7 +813,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "The durable browser-database proof lives on /showcases/database/; production storage is host-owned.",
   },
 
-  // ── Offline, sync & collaboration ────────────────────────────────────────
   {
     id: "offline.durable-pending",
     title: "Durable pending work",
@@ -985,7 +978,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "The entity store, its persistence, and the write policy are host-owned; Sheetwrite keeps row identity and reports deltas.",
   },
 
-  // ── Framework lifecycle ──────────────────────────────────────────────────
   {
     id: "lifecycle.vanilla",
     title: "Vanilla lifecycle",

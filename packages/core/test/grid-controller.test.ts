@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { initSheetwrite } from "../src/grid.js";
+
 import { createGridController, type GridControllerHandlers } from "../src/grid-controller.js";
+import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, GridEvents, Selection, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
@@ -104,15 +105,12 @@ function wideWorkbook(rowCount: number, columnCount: number): Workbook {
         id: "s1",
         name: "Sheet 1",
         rowCount,
-        columns: Array.from(
-          { length: columnCount },
-          (_, index): Column => ({
-            key: `c${index}`,
-            header: `Column ${index + 1}`,
-            width: 120,
-            type: "number",
-          }),
-        ),
+        columns: Array.from({ length: columnCount }, (_, index): Column => ({
+          key: `c${index}`,
+          header: `Column ${index + 1}`,
+          width: 120,
+          type: "number",
+        })),
       },
     ],
   };

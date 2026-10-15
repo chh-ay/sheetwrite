@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
+
 import { CONTROLLED_SAMPLING_FINGERPRINT, compareControlledRender } from "../src/check.js";
 import {
   buildControlledBaseline,

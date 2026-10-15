@@ -138,7 +138,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L331",
+              "source": "src/types/document.ts#L329",
               "jsDocTags": [],
               "documentation": "Sparse row-major cells bounded by one rectangular block.",
               "memberDocs": []
@@ -288,7 +288,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L424",
+              "source": "src/types/grid.ts#L428",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -325,7 +325,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L194",
+              "source": "src/types/document.ts#L192",
               "jsDocTags": [],
               "documentation": "Serializable plain-text note anchored to a cell.",
               "memberDocs": []
@@ -577,7 +577,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L94",
+              "source": "src/types/document.ts#L92",
               "jsDocTags": [],
               "documentation": "One column's filter predicate. All active column filters AND together;\nmatching is against the cell's resolved value (text or number).",
               "memberDocs": []
@@ -733,7 +733,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L207",
+              "source": "src/types/document.ts#L205",
               "jsDocTags": [],
               "documentation": "The gesture/operation that produced a committed transaction. Consumers\nswitching on reasons MUST keep a default branch — the union grows with new\nmutation features.",
               "memberDocs": []
@@ -888,7 +888,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L953",
+              "source": "src/row-bridge.ts#L961",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -1061,7 +1061,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L139",
+              "source": "src/types/document.ts#L137",
               "jsDocTags": [],
               "documentation": "Native comparison semantics for numeric, date-serial, and text-length validation.\nInterval operands are inclusive; `notBetween` accepts values outside that interval.",
               "memberDocs": []
@@ -1073,7 +1073,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L158",
+              "source": "src/types/document.ts#L156",
               "jsDocTags": [],
               "documentation": "Serializable condition enforced by a data-validation rule.\n\n`min` and `max` remain inclusive legacy bounds. Use `comparison` when the\noperator itself is significant; comparison and legacy bounds are mutually exclusive.",
               "memberDocs": []
@@ -1085,7 +1085,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L176",
+              "source": "src/types/document.ts#L174",
               "jsDocTags": [],
               "documentation": "One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled.",
               "memberDocs": []
@@ -1097,7 +1097,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L29",
+              "source": "src/date-serial.ts#L15",
               "jsDocTags": [],
               "documentation": "Convert a real UTC `Date` to the Excel 1900-system serial. It is the inverse\nof {@link serialToDate} except for synthetic serial 60, which JavaScript\ncannot represent as a Date. Construct calendar dates with `Date.UTC(...)`\n(or via {@link parseDateInput}) to avoid host-timezone shifts.",
               "memberDocs": []
@@ -1133,7 +1133,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L295",
+              "source": "src/document-protocol.ts#L294",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1311,7 +1311,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L378",
+              "source": "src/types/document.ts#L376",
               "jsDocTags": [],
               "documentation": "Exhaustive serializable operation union for workbook mutations.",
               "memberDocs": []
@@ -1323,7 +1323,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2966",
+              "source": "src/document-protocol.ts#L2965",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1347,7 +1347,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L342",
+              "source": "src/document-protocol.ts#L341",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1359,7 +1359,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L357",
+              "source": "src/document-protocol.ts#L356",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -1424,7 +1424,7 @@
               "owners": [
                 "src/number-format.ts"
               ],
-              "source": "src/number-format.ts#L537",
+              "source": "src/number-format.ts#L535",
               "jsDocTags": [],
               "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes.",
               "memberDocs": []
@@ -1448,7 +1448,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L393",
+              "source": "src/export.ts#L391",
               "jsDocTags": [],
               "documentation": "Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed\nrow is treated as the header and its cell text becomes each column's key.\nNumbers stay numbers, date cells use the date-serial convention, strings are\nverbatim, and empty cells become `null`.",
               "memberDocs": []
@@ -1460,7 +1460,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L482",
+              "source": "src/export.ts#L478",
               "jsDocTags": [],
               "documentation": "Formula-preserving, multi-sheet workbook import through the optional XLSX backend.",
               "memberDocs": []
@@ -1472,7 +1472,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L480",
+              "source": "src/types/grid.ts#L484",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -1871,7 +1871,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L444",
+              "source": "src/types/grid.ts#L448",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -1934,7 +1934,7 @@
                 },
                 {
                   "name": "minColumns",
-                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
+                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
                 },
                 {
                   "name": "mutationPolicy",
@@ -2054,7 +2054,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L249",
+              "source": "src/store/data-engine.ts#L250",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -2287,7 +2287,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L247",
+              "source": "src/types/document.ts#L245",
               "jsDocTags": [],
               "documentation": "Structured warning or rejection produced while applying an operation.",
               "memberDocs": []
@@ -2299,7 +2299,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L200",
+              "source": "src/types/document.ts#L198",
               "jsDocTags": [],
               "documentation": "Atomic or partial handling for locally denied operations.",
               "memberDocs": []
@@ -2311,7 +2311,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L126",
+              "source": "src/types/document.ts#L124",
               "jsDocTags": [],
               "documentation": "Workbook-global or sheet-scoped named range used by formulas and persistence.",
               "memberDocs": [
@@ -2352,7 +2352,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L320",
+              "source": "src/types/document.ts#L318",
               "jsDocTags": [],
               "documentation": "Dense row-major mutation payload. Primitive arrays keep large paste/fill\noperations JSON-safe without allocating one operation object per cell.\nFormula/reference tuples are sparse exceptions keyed by row-major offset.",
               "memberDocs": []
@@ -2393,7 +2393,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L78",
+              "source": "src/cell-input.ts#L77",
               "jsDocTags": [],
               "documentation": "Parse imported text as a literal using the same boolean, number, date, and\ncurrency rules as {@link parseCellInput}. Unlike interactive entry, a leading\n`=` remains inert text. Declared date columns also accept an existing finite\ndate serial so delimited export/import preserves numeric dates.",
               "memberDocs": []
@@ -2429,7 +2429,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L95",
+              "source": "src/date-serial.ts#L81",
               "jsDocTags": [],
               "documentation": "Parse a user-typed date string into a serial, or `null` when it is not a date.\nAccepted forms:\n\n- ISO `yyyy-mm-dd` (e.g. `2026-07-06`);\n- ISO date-time `yyyy-mm-dd hh:mm` or `yyyy-mm-dd hh:mm:ss` (a `T` separator is\n  also accepted); the fractional serial carries the time;\n- slash `dd/mm/yyyy` and `mm/dd/yyyy`, disambiguated **conservatively**: if one\n  component exceeds 12 it must be the day and the layout is unambiguous; when\n  both are ≤ 12 the value is ambiguous (e.g. `04/05/2026`) and is read as\n  **mm/dd** — Google Sheets' default (US) locale. Both > 12 is rejected.\n\nAnything else (bare numbers, free text) returns `null` so callers can fall back\nto a text literal.",
               "memberDocs": []
@@ -2700,7 +2700,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L186",
+              "source": "src/types/document.ts#L184",
               "jsDocTags": [],
               "documentation": "Serializable client UX policy. A host resolver decides whether a local mutation may proceed.",
               "memberDocs": []
@@ -2712,7 +2712,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L228",
+              "source": "src/types/document.ts#L226",
               "jsDocTags": [],
               "documentation": "Local operation and protected-range context supplied to the host policy.",
               "memberDocs": []
@@ -2724,7 +2724,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L235",
+              "source": "src/types/document.ts#L233",
               "jsDocTags": [],
               "documentation": "Host-owned client UX permission callback for protected mutations.",
               "memberDocs": []
@@ -2808,7 +2808,7 @@
               "owners": [
                 "src/reference.ts"
               ],
-              "source": "src/reference.ts#L5",
+              "source": "src/reference.ts#L6",
               "jsDocTags": [],
               "documentation": "Sentinel shown for a reference that participates in a cycle.",
               "memberDocs": []
@@ -2861,7 +2861,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L410",
+              "source": "src/types/grid.ts#L414",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -3052,7 +3052,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L387",
+              "source": "src/row-bridge.ts#L395",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -3093,7 +3093,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L84",
+              "source": "src/row-bridge.ts#L85",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -3117,7 +3117,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L158",
+              "source": "src/row-bridge.ts#L166",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -3129,7 +3129,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L100",
+              "source": "src/row-bridge.ts#L103",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -3141,7 +3141,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L201",
+              "source": "src/row-bridge.ts#L209",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -3153,7 +3153,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L139",
+              "source": "src/row-bridge.ts#L145",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -3189,7 +3189,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L122",
+              "source": "src/row-bridge.ts#L127",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -3226,7 +3226,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L92",
+              "source": "src/row-bridge.ts#L94",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -3238,7 +3238,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L194",
+              "source": "src/row-bridge.ts#L202",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -3262,7 +3262,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L179",
+              "source": "src/row-bridge.ts#L187",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -3283,7 +3283,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L170",
+              "source": "src/row-bridge.ts#L178",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -3295,7 +3295,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L108",
+              "source": "src/row-bridge.ts#L112",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -3319,7 +3319,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L961",
+              "source": "src/row-bridge.ts#L969",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -3331,7 +3331,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L151",
+              "source": "src/row-bridge.ts#L158",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -3355,7 +3355,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L102",
+              "source": "src/types/document.ts#L100",
               "jsDocTags": [],
               "documentation": "A collapsible row group (data-row range, end-inclusive), Sheets-style.",
               "memberDocs": []
@@ -3367,7 +3367,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L303",
+              "source": "src/types/document.ts#L301",
               "jsDocTags": [],
               "documentation": "Persistent display and grouping metadata for one document row.",
               "memberDocs": []
@@ -3475,7 +3475,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L388",
+              "source": "src/types/grid.ts#L392",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3504,7 +3504,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L400",
+              "source": "src/types/grid.ts#L404",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -3541,7 +3541,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L40",
+              "source": "src/date-serial.ts#L26",
               "jsDocTags": [],
               "documentation": "Convert a date serial back to a `Date`. Read the result with the UTC accessors\n(`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the\ncalendar fields are stable regardless of the host time zone.",
               "memberDocs": []
@@ -3565,7 +3565,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L383",
+              "source": "src/export.ts#L381",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -3577,7 +3577,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L454",
+              "source": "src/export.ts#L450",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -3690,7 +3690,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L238",
+              "source": "src/types/document.ts#L236",
               "jsDocTags": [],
               "documentation": "Stable lifecycle rejection codes suitable for inline sheet-management UI.",
               "memberDocs": []
@@ -3702,7 +3702,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L434",
+              "source": "src/types/grid.ts#L438",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -3750,7 +3750,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L340",
+              "source": "src/types/document.ts#L338",
               "jsDocTags": [],
               "documentation": "Serializable complete state for one workbook sheet.",
               "memberDocs": [
@@ -4059,7 +4059,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L309",
+              "source": "src/types/document.ts#L307",
               "jsDocTags": [],
               "documentation": "Serializable cell value and optional style inside a snapshot block.",
               "memberDocs": []
@@ -4083,7 +4083,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L321",
+              "source": "src/document-protocol.ts#L320",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -4095,7 +4095,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L277",
+              "source": "src/document-protocol.ts#L276",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -4136,7 +4136,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L274",
+              "source": "src/document-protocol.ts#L273",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -4148,7 +4148,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L362",
+              "source": "src/document-protocol.ts#L361",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -4160,7 +4160,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L313",
+              "source": "src/document-protocol.ts#L312",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -4181,7 +4181,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L85",
+              "source": "src/types/document.ts#L83",
               "jsDocTags": [],
               "documentation": "One key of a multi-column sort, applied in array order (first = primary).",
               "memberDocs": []
@@ -4813,7 +4813,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L465",
+              "source": "src/export.ts#L461",
               "jsDocTags": [],
               "documentation": "Formula-preserving, multi-sheet workbook export through the optional XLSX backend.",
               "memberDocs": []
@@ -4940,7 +4940,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2928",
+              "source": "src/document-protocol.ts#L2927",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -4964,7 +4964,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L133",
+              "source": "src/types/document.ts#L131",
               "jsDocTags": [],
               "documentation": "Reject-or-warn policy attached to a data-validation rule.",
               "memberDocs": []
@@ -5147,7 +5147,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L109",
+              "source": "src/types/document.ts#L107",
               "jsDocTags": [],
               "documentation": "Live workbook schema containing ordered sheets and the active sheet ID.",
               "memberDocs": [
@@ -5184,7 +5184,7 @@
               "owners": [
                 "src/types/document.ts"
               ],
-              "source": "src/types/document.ts#L366",
+              "source": "src/types/document.ts#L364",
               "jsDocTags": [],
               "documentation": "Schema-versioned serializable workbook document.",
               "memberDocs": []
@@ -5451,7 +5451,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L372",
+              "source": "src/export.ts#L370",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -5463,7 +5463,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L442",
+              "source": "src/export.ts#L438",
               "jsDocTags": [],
               "documentation": "Optional backend contract for complete workbook XLSX interchange.",
               "memberDocs": []
@@ -5475,7 +5475,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L431",
+              "source": "src/export.ts#L427",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -5500,7 +5500,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L412",
+              "source": "src/export.ts#L408",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -5515,6 +5515,35 @@
           "classification": "supported",
           "exports": [
             {
+              "name": "AdapterGridController",
+              "kind": "interface",
+              "signature": "export interface AdapterGridController<Id extends RowBridgeId = RowBridgeId> { mount(host: HTMLElement, input: AdapterGridInput<Id>): void; update(input: AdapterGridInput<Id>): void; unmount(): void; }",
+              "owners": [
+                "src/adapter.ts"
+              ],
+              "source": "src/adapter.ts#L239",
+              "jsDocTags": [],
+              "documentation": "Owns adapter attachment and monotonically numbered Grid generations.",
+              "memberDocs": [
+                {
+                  "name": "unmount",
+                  "documentation": "Idempotent; a later mount preserves generation numbering."
+                }
+              ]
+            },
+            {
+              "name": "AdapterGridInput",
+              "kind": "interface",
+              "signature": "export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> { options: GridOptions; rowBridge?: RowBridgeInstance<Id>; wasmSource?: SheetwriteInitializationProps[\"wasmSource\"]; }",
+              "owners": [
+                "src/adapter.ts"
+              ],
+              "source": "src/adapter.ts#L219",
+              "jsDocTags": [],
+              "documentation": "Committed inputs to a framework adapter lifetime.",
+              "memberDocs": []
+            },
+            {
               "name": "applyChangedLiveGridOptions",
               "kind": "function",
               "signature": "(controller: GridController, previous: GridOptions, next: GridOptions): void",
@@ -5524,6 +5553,18 @@
               "source": "src/adapter.ts#L206",
               "jsDocTags": [],
               "documentation": "Applies live-updatable adapter option changes to an existing Grid.",
+              "memberDocs": []
+            },
+            {
+              "name": "createAdapterGridController",
+              "kind": "function",
+              "signature": "<Id extends RowBridgeId = RowBridgeId>(handlers: GridAdapterEventHandlers<Id>, publication: GridPublicationAdapter): AdapterGridController<Id>",
+              "owners": [
+                "src/adapter.ts"
+              ],
+              "source": "src/adapter.ts#L247",
+              "jsDocTags": [],
+              "documentation": "Owns initialization, replacement, publication, and retirement for framework adapters.",
               "memberDocs": []
             },
             {
@@ -5547,7 +5588,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L953",
+              "source": "src/row-bridge.ts#L961",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -5559,7 +5600,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L281",
+              "source": "src/adapter.ts#L459",
               "jsDocTags": [],
               "documentation": "Converts simple columns and row objects into canonical workbook and columnar input.",
               "memberDocs": []
@@ -5571,7 +5612,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L258",
+              "source": "src/adapter.ts#L436",
               "jsDocTags": [],
               "documentation": "Creates the optional row bridge for a simple data-first input.",
               "memberDocs": []
@@ -5583,7 +5624,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L219",
+              "source": "src/adapter.ts#L397",
               "jsDocTags": [],
               "documentation": "Default pixel width assigned to simple adapter columns.",
               "memberDocs": []
@@ -5804,6 +5845,27 @@
               ]
             },
             {
+              "name": "GridPublicationAdapter",
+              "kind": "interface",
+              "signature": "export interface GridPublicationAdapter { publish(grid: Grid | null): void | Promise<void>; setInitializationState(state: \"loading\" | \"ready\" | \"error\"): void; reportConsumerFailure(thrown: unknown): void; }",
+              "owners": [
+                "src/adapter.ts"
+              ],
+              "source": "src/adapter.ts#L226",
+              "jsDocTags": [],
+              "documentation": "Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication.",
+              "memberDocs": [
+                {
+                  "name": "publish",
+                  "documentation": "Resolves only after the imperative handle is visible to consumers."
+                },
+                {
+                  "name": "reportConsumerFailure",
+                  "documentation": "Receives asynchronous construction or consumer failures unchanged.\nThe value may be any thrown value, including a SheetwriteError from construction;\nit is never reclassified as an initialization error."
+                }
+              ]
+            },
+            {
               "name": "GridReadyEvent",
               "kind": "interface",
               "signature": "export interface GridReadyEvent { grid: Grid; generation: number; reason: GridReadyReason; }",
@@ -5907,7 +5969,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L387",
+              "source": "src/row-bridge.ts#L395",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -5948,7 +6010,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L84",
+              "source": "src/row-bridge.ts#L85",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -5972,7 +6034,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L158",
+              "source": "src/row-bridge.ts#L166",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -5984,7 +6046,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L100",
+              "source": "src/row-bridge.ts#L103",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -5996,7 +6058,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L201",
+              "source": "src/row-bridge.ts#L209",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -6008,7 +6070,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L139",
+              "source": "src/row-bridge.ts#L145",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -6044,7 +6106,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L122",
+              "source": "src/row-bridge.ts#L127",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -6081,7 +6143,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L92",
+              "source": "src/row-bridge.ts#L94",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -6093,7 +6155,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L194",
+              "source": "src/row-bridge.ts#L202",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -6117,7 +6179,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L179",
+              "source": "src/row-bridge.ts#L187",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -6138,7 +6200,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L170",
+              "source": "src/row-bridge.ts#L178",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -6150,7 +6212,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L108",
+              "source": "src/row-bridge.ts#L112",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -6174,7 +6236,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L961",
+              "source": "src/row-bridge.ts#L969",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -6186,7 +6248,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L151",
+              "source": "src/row-bridge.ts#L158",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -6303,7 +6365,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L222",
+              "source": "src/adapter.ts#L400",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -6352,7 +6414,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L273",
+              "source": "src/adapter.ts#L451",
               "jsDocTags": [],
               "documentation": "Normalized workbook and columnar data produced from simple adapter props.",
               "memberDocs": [
@@ -6369,7 +6431,7 @@
               "owners": [
                 "src/adapter.ts"
               ],
-              "source": "src/adapter.ts#L244",
+              "source": "src/adapter.ts#L422",
               "jsDocTags": [],
               "documentation": "Framework-neutral simple columns, rows, sizing, and grid options.",
               "memberDocs": [
@@ -6461,7 +6523,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L136",
+              "source": "src/shell/formula-controls.ts#L131",
               "jsDocTags": [],
               "documentation": "Detached formula bar: mirrors the focused cell's editable text (exact\nformula source, else literal text) and commits on Enter through the grid's\nundoable transaction path, targeting the data address captured with the\ndraft — correct even under an active sort/filter view. A focused, dirty\ndraft is never overwritten by selection/change events; Escape restores the\nlast stable text.",
               "memberDocs": []
@@ -6473,7 +6535,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L31",
+              "source": "src/shell/formula-controls.ts#L26",
               "jsDocTags": [],
               "documentation": "A1 jump box: shows the focused cell's reference and navigates on Enter.\nInvalid or out-of-bounds references set `aria-invalid` and make no grid\ncalls; Escape restores the displayed reference.",
               "memberDocs": []
@@ -6485,7 +6547,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L31",
+              "source": "src/shell/selection-status.ts#L27",
               "jsDocTags": [],
               "documentation": "`<output role=\"status\">` that follows the grid's selection. Text nodes only;\npolite live region so screen readers announce changes without interrupting.",
               "memberDocs": []
@@ -6497,7 +6559,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L60",
+              "source": "src/shell/spreadsheet-shell.ts#L54",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -6509,7 +6571,7 @@
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L27",
+              "source": "src/shell/toolbar-factory.ts#L23",
               "jsDocTags": [],
               "documentation": "Mount a toolbar bound to `grid.actions` (custom items receive the grid).\nMouse clicks never steal grid focus; keyboard users get local\nLeft/Right/Home/End movement across the controls while the toolbar has\nfocus. Returns the mounted piece with an idempotent `destroy`.",
               "memberDocs": []
@@ -6521,7 +6583,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L12",
+              "source": "src/shell/selection-status.ts#L8",
               "jsDocTags": [],
               "documentation": "Human phrase for a selection's geometry; blank for null/single-cell.",
               "memberDocs": []
@@ -6533,7 +6595,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L116",
+              "source": "src/shell/formula-controls.ts#L111",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a formula bar to a Grid.",
               "memberDocs": [
@@ -6554,7 +6616,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L124",
+              "source": "src/shell/formula-controls.ts#L119",
               "jsDocTags": [],
               "documentation": "A formula bar piece; `setReadOnly` blocks commits without unmounting.",
               "memberDocs": []
@@ -6566,7 +6628,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L19",
+              "source": "src/shell/formula-controls.ts#L14",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a name box to a Grid.",
               "memberDocs": [
@@ -6587,7 +6649,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L13",
+              "source": "src/shell/formula-controls.ts#L8",
               "jsDocTags": [],
               "documentation": "A mounted shell piece: its root element plus an idempotent teardown.",
               "memberDocs": []
@@ -6599,7 +6661,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L35",
+              "source": "src/shell/spreadsheet-shell.ts#L29",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -6624,7 +6686,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L23",
+              "source": "src/shell/spreadsheet-shell.ts#L17",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [
@@ -6649,7 +6711,7 @@
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L12",
+              "source": "src/shell/toolbar-factory.ts#L8",
               "jsDocTags": [],
               "documentation": "Host element and configuration used to create the built-in toolbar.",
               "memberDocs": [
@@ -6697,7 +6759,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L23",
+              "source": "src/testing.ts#L21",
               "jsDocTags": [],
               "documentation": "Layout dimensions installed by {@link installCanvasTestStubs} in DOM test environments.",
               "memberDocs": [
@@ -6718,7 +6780,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L74",
+              "source": "src/testing.ts#L72",
               "jsDocTags": [],
               "documentation": "Install the canvas + layout stubs a DOM test environment (jsdom/happy-dom)\nneeds before `createGrid` can mount — without them the renderer throws\n`\"Sheetwrite: 2D canvas context is unavailable\"`. Returns a restore\nfunction that undoes every patch.\n\nThe installed `getContext(\"2d\")` returns a per-canvas\n{@link RecordingContext2D}; re-request it from a mounted canvas to assert\npaint activity. Nothing is painted — assert grid STATE, not pixels.\nTest-only: never import from production code.",
               "memberDocs": []
@@ -6742,7 +6804,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L10",
+              "source": "src/testing.ts#L8",
               "jsDocTags": [],
               "documentation": "The stub 2D context the canvas test stubs install: every method is a no-op\nthat counts its invocations in `calls`, so tests can assert paint activity\n(e.g. `ctx.calls.fillText > 0`) without a real canvas.",
               "memberDocs": [
@@ -7331,7 +7393,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -7710,7 +7772,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L458",
+              "source": "src/index.tsx#L330",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource.",
               "memberDocs": []
@@ -7722,7 +7784,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L403",
+              "source": "src/index.tsx#L275",
               "jsDocTags": [],
               "documentation": "Advanced framework component with inferred row-bridge identity.",
               "memberDocs": []
@@ -7734,7 +7796,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L74",
+              "source": "src/index.tsx#L68",
               "jsDocTags": [],
               "documentation": "Advanced framework adapter props for workbook data or datasource ownership.",
               "memberDocs": [
@@ -7996,7 +8058,7 @@
                 },
                 {
                   "name": "minColumns",
-                  "documentation": "Render at least this many columns (empty padding columns past the data, like a spreadsheet)."
+                  "documentation": "Render at least this many columns, adding empty columns past the data. A\nspreadsheet also adds empty columns to fill the host width; a data grid\nadds them only through this option."
                 },
                 {
                   "name": "mutationPolicy",
@@ -8123,7 +8185,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L408",
+              "source": "src/index.tsx#L280",
               "jsDocTags": [],
               "documentation": "Simple framework adapter props for columns and default row objects.",
               "memberDocs": []
@@ -8135,7 +8197,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L110",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -8265,7 +8327,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -9049,7 +9111,7 @@
               "owners": [
                 "src/props.ts"
               ],
-              "source": "src/props.ts#L68",
+              "source": "src/props.ts#L69",
               "jsDocTags": [],
               "documentation": "Simple framework adapter props for columns and default row objects.",
               "memberDocs": []
@@ -9061,7 +9123,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L110",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -9191,7 +9253,7 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L379",
+              "source": "../core/dist/types/grid.d.ts#L383",
               "jsDocTags": [],
               "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
               "memberDocs": [
@@ -9570,7 +9632,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L532",
+              "source": "src/index.ts#L453",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows with live option updates.",
               "memberDocs": []
@@ -9582,7 +9644,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L160",
+              "source": "src/index.ts#L159",
               "jsDocTags": [],
               "documentation": "Vue constructor type for Sheetwrite components: Sheetwrite-owned props,\nemitted events exposed as `on*` listener props, and the exposed instance\nsurface reachable through a template ref.",
               "memberDocs": []
@@ -9594,7 +9656,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L444",
+              "source": "src/index.ts#L365",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []
@@ -9606,7 +9668,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L122",
+              "source": "src/index.ts#L121",
               "jsDocTags": [],
               "documentation": "Event payloads emitted by the Vue components, keyed by template event name.",
               "memberDocs": [
@@ -9679,7 +9741,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L52",
+              "source": "src/index.ts#L51",
               "jsDocTags": [],
               "documentation": "Imperative Grid handle exposed by the Vue advanced component.",
               "memberDocs": [
@@ -9696,7 +9758,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L57",
+              "source": "src/index.ts#L56",
               "jsDocTags": [],
               "documentation": "Advanced Vue adapter props for workbook data or datasource ownership.",
               "memberDocs": [
@@ -9797,7 +9859,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L105",
+              "source": "src/index.ts#L104",
               "jsDocTags": [],
               "documentation": "Simple Vue adapter props for columns and default row objects.",
               "memberDocs": [
@@ -9902,7 +9964,7 @@
               "owners": [
                 "../core/dist/adapter.d.ts"
               ],
-              "source": "../core/dist/adapter.d.ts#L110",
+              "source": "../core/dist/adapter.d.ts#L137",
               "jsDocTags": [],
               "documentation": "Column definition accepted by the adapters’ simple row-object API.",
               "memberDocs": [
@@ -10425,7 +10487,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L31",
+              "source": "src/table-export.ts#L32",
               "jsDocTags": [],
               "documentation": "Build the active-sheet table model used by the bounded OOXML writer.",
               "memberDocs": []
@@ -10437,7 +10499,7 @@
               "owners": [
                 "src/registration.ts"
               ],
-              "source": "src/registration.ts#L11",
+              "source": "src/registration.ts#L12",
               "jsDocTags": [],
               "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.",
               "memberDocs": []
@@ -10449,7 +10511,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L187",
+              "source": "src/table-export.ts#L188",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table export backend.",
               "memberDocs": []
@@ -10461,7 +10523,7 @@
               "owners": [
                 "src/table-import.ts"
               ],
-              "source": "src/table-import.ts#L20",
+              "source": "src/table-import.ts#L21",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table import backend.",
               "memberDocs": []
@@ -10473,7 +10535,7 @@
               "owners": [
                 "src/workbook.ts"
               ],
-              "source": "src/workbook.ts#L7",
+              "source": "src/workbook.ts#L8",
               "jsDocTags": [],
               "documentation": "Deterministic optional OOXML workbook backend implemented by Sheetwrite.",
               "memberDocs": []
@@ -10485,7 +10547,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L23",
+              "source": "src/table-export.ts#L24",
               "jsDocTags": [],
               "documentation": "Implementation-neutral first-sheet table export model.",
               "memberDocs": []
@@ -10497,7 +10559,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L14",
+              "source": "src/table-export.ts#L15",
               "jsDocTags": [],
               "documentation": "Implementation-neutral cell in the first-sheet table export model.",
               "memberDocs": []
@@ -10518,7 +10580,7 @@
               "owners": [
                 "src/registration.ts"
               ],
-              "source": "src/registration.ts#L11",
+              "source": "src/registration.ts#L12",
               "jsDocTags": [],
               "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.",
               "memberDocs": []

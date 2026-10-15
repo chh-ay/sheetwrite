@@ -313,14 +313,14 @@ export class PagedDirtyPreflight {
       const state = stateFor(sheet);
       return Boolean(
         state &&
-          startRow >= 0 &&
-          startCol >= 0 &&
-          Number.isSafeInteger(rows) &&
-          Number.isSafeInteger(cols) &&
-          rows > 0 &&
-          cols > 0 &&
-          rows <= state.rows - startRow &&
-          cols <= state.cols - startCol,
+        startRow >= 0 &&
+        startCol >= 0 &&
+        Number.isSafeInteger(rows) &&
+        Number.isSafeInteger(cols) &&
+        rows > 0 &&
+        cols > 0 &&
+        rows <= state.rows - startRow &&
+        cols <= state.cols - startCol,
       );
     };
     const addRectangle = (

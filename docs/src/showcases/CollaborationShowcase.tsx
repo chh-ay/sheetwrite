@@ -13,8 +13,10 @@ import {
   type SyncStateSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
 import "@sheetwrite/core/styles.css";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import {
   COLLABORATION_ACTORS,
   type ShowcaseActor,
@@ -646,7 +648,6 @@ export default function CollaborationShowcase() {
     }
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the public page owns one mount/unmount session; reset invokes the current callbacks explicitly.
   useEffect(() => {
     const generation = bootGenerationRef.current + 1;
     bootGenerationRef.current = generation;
@@ -657,6 +658,8 @@ export default function CollaborationShowcase() {
       stopServers();
       busRef.current = null;
     };
+    // The page owns one mount/unmount session; reset calls the current callbacks directly.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

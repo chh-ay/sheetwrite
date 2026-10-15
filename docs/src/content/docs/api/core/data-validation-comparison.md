@@ -9,7 +9,7 @@ Native comparison semantics for numeric, date-serial, and text-length validation
 Interval operands are inclusive; `notBetween` accepts values outside that interval.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L139"><code>packages/core/src/types/document.ts#L139</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L137"><code>packages/core/src/types/document.ts#L137</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

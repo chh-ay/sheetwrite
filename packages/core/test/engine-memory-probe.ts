@@ -1,8 +1,10 @@
 // Each engine is selected once in a fresh process, as in an application.
 import assert from "node:assert/strict";
+
 import * as formulas from "@sheetwrite/formulas";
 import type { EngineInstance } from "@sheetwrite/wasm";
 import * as wasm from "@sheetwrite/wasm";
+
 import { DatasourceController } from "../src/datasource-controller.js";
 import { getEngine } from "../src/engine.js";
 import { initSheetwrite } from "../src/grid.js";

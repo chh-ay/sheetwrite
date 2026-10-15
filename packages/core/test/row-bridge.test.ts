@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";
@@ -241,7 +242,6 @@ describe("RowBridge", () => {
     expect(
       bridge.project(event([{ op: "set", addr, value: literal(0) }], [], "remote")).status,
     ).toBe("duplicate");
-    // Consume the newest entry and then add two new identities.
     expect(
       bridge.project(event([{ op: "set", addr, value: literal(4) }], [], "remote")).status,
     ).toBe("duplicate");

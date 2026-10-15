@@ -177,21 +177,19 @@ export function buildCompatibilityResults({
   const unsupportedIds = new Set(offline.unsupported);
   const allCases = corpus.cases.map((entry, index): CompatibilityResultCase => {
     const entryFeature = feature(entry);
-    const observations = entry.observations.map(
-      (observation): CompatibilityResultObservation => ({
-        testedApp: observation.producer,
-        version: observation.producerVersion,
-        capturedAt: observation.capturedAt,
-        reviewStatus: observation.status,
-        ...(observation.result ? { result: observation.result } : {}),
-        ...(observation.artifactSha256 ? { evidenceFileChecksum: observation.artifactSha256 } : {}),
-        ...(observation.notes ? { notes: observation.notes } : {}),
-        differences:
-          observation.status === "reviewed"
-            ? [...compareObservation(entry.expected, observation, entry.knownDivergence)]
-            : [],
-      }),
-    );
+    const observations = entry.observations.map((observation): CompatibilityResultObservation => ({
+      testedApp: observation.producer,
+      version: observation.producerVersion,
+      capturedAt: observation.capturedAt,
+      reviewStatus: observation.status,
+      ...(observation.result ? { result: observation.result } : {}),
+      ...(observation.artifactSha256 ? { evidenceFileChecksum: observation.artifactSha256 } : {}),
+      ...(observation.notes ? { notes: observation.notes } : {}),
+      differences:
+        observation.status === "reviewed"
+          ? [...compareObservation(entry.expected, observation, entry.knownDivergence)]
+          : [],
+    }));
     const reviewed = observations.filter((observation) => observation.reviewStatus === "reviewed");
     const statuses: CompatibilityResultStatus[] = [];
     const unsupported = entry.unsupported === true;

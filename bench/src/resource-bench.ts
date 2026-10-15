@@ -1,5 +1,6 @@
 import "./dom-setup.js";
 import { readFileSync } from "node:fs";
+
 import {
   createGrid,
   createRuntimeResourceSnapshot,
@@ -22,6 +23,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+
 import { COLUMNS, type ColumnarDataset, makeColumnar, toSheetwriteColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
 import {

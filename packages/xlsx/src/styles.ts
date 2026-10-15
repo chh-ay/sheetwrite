@@ -1,4 +1,5 @@
 import type { CellBorder, CellStyle } from "@sheetwrite/core";
+
 import { assertResource, emitWarning, type XlsxCodecContext } from "./resources.js";
 import {
   assertXmlRoot,

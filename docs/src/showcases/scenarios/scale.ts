@@ -20,6 +20,7 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import { IncompleteDataError, SheetwriteStore, toCsv } from "@sheetwrite/core";
+
 import interactionResults from "../../../../bench/results/interaction-results.json";
 import pagedResults from "../../../../bench/results/paged-results.json";
 import landingBench from "../../generated/landing-bench.json";
@@ -364,8 +365,6 @@ export function createScaleDataSource(
   };
 }
 
-// ── Paged-store observation protocol ─────────────────────────────────────────
-
 function loadableStoreOf(grid: Grid): SheetwriteStore | null {
   return grid.store instanceof SheetwriteStore ? grid.store : null;
 }
@@ -454,8 +453,6 @@ export function attemptColumnScan(grid: Grid, col: number, op: AggregateOp): Sca
   }
 }
 
-// ── WASM crossing measurement ────────────────────────────────────────────────
-
 export interface CrossingReport {
   cells: number;
   durationMs: number;
@@ -516,8 +513,6 @@ export function measureBulkMutation(
   };
 }
 
-// ── Cache churn protocol ─────────────────────────────────────────────────────
-
 export interface ChurnReport {
   jumps: number;
   rowsVisited: readonly number[];
@@ -563,8 +558,6 @@ export async function sweepCacheChurn(
     withinBudget: (stats?.allocatedBytes ?? 0) <= SCALE_STORAGE.cacheBytes,
   };
 }
-
-// ── Committed benchmark evidence (never invented, always attributed) ─────────
 
 export interface EvidenceStat {
   medianMs: number;

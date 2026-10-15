@@ -215,6 +215,7 @@ export interface GridAdapterEventHandlers<
 <p class="api-consumers-label">Public exports naming <code>GridAdapterEventHandlers</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core-adapter/create-adapter-grid-controller/"><code>createAdapterGridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>
 <li><a href="/docs/api/svelte/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/svelte</span></li>
 </ul>

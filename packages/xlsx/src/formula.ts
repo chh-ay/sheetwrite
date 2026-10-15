@@ -5,7 +5,7 @@ const EXTERNAL_BOOK_TOKEN = /\[(?:\d+|[^\]]+\.(?:xlsx?|xlsm|xlsb|xlam|ods|csv))\
 /** Detect formula constructs that would keep an external workbook/data source live. */
 export function formulaContainsExternalReference(formula: string): boolean {
   let executable = "";
-  for (let index = 0; index < formula.length; ) {
+  for (let index = 0; index < formula.length;) {
     if (formula[index] !== '"') {
       executable += formula[index]!;
       index += 1;

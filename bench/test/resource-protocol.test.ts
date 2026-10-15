@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   createRuntimeResourceSnapshot,
   decodeStoreMemoryStats,
@@ -9,6 +10,7 @@ import {
   STORE_MEMORY_PROTOCOL_VERSION,
   WASM_MEMORY_OWNERS,
 } from "@sheetwrite/core";
+
 import {
   RESOURCE_BENCHMARK_SCHEMA_VERSION,
   RESOURCE_FULL_SCENARIOS,

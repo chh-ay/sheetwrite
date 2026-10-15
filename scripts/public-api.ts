@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
+
 import {
   type Expression,
   type ExpressionWithTypeArguments,
@@ -50,6 +51,7 @@ import {
   SymbolFlags,
   type Type,
 } from "typescript/unstable/async";
+
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
@@ -579,13 +581,12 @@ async function classSignature(symbol: ApiSymbol, project: Project): Promise<stri
     .join(" ");
   const constructors = (
     await Promise.all(
-      (
-        await checker.getSignaturesOfType(valueType, SignatureKind.Construct)
-      ).map((signature) => signatureText(signature, declaration, project)),
+      (await checker.getSignaturesOfType(valueType, SignatureKind.Construct)).map((signature) =>
+        signatureText(signature, declaration, project),
+      ),
     )
   )
     // `(args): Instance` is a call signature — invalid inside a class body.
-    // Emit the real `constructor(args)` member (drop the return type).
     .map((signature) => `constructor${signature.replace(/\)\s*:\s*[^:]*$/, ")")}`)
     // A default constructor adds nothing the class name doesn't already say.
     .filter((signature) => signature !== "constructor()");
@@ -609,16 +610,16 @@ async function classSignature(symbol: ApiSymbol, project: Project): Promise<stri
     );
   const members = (
     await Promise.all(
-      (
-        await declaredMembers(instanceType)
-      ).map((property) => publicPropertySignature(property, project)),
+      (await declaredMembers(instanceType)).map((property) =>
+        publicPropertySignature(property, project),
+      ),
     )
   ).filter((signature): signature is string => signature !== undefined);
   const staticMembers = (
     await Promise.all(
-      (
-        await declaredMembers(valueType)
-      ).map((property) => publicPropertySignature(property, project, "static ")),
+      (await declaredMembers(valueType)).map((property) =>
+        publicPropertySignature(property, project, "static "),
+      ),
     )
   ).filter((signature): signature is string => signature !== undefined);
   const body = [...constructors, ...members.sort(), ...staticMembers.sort()].join("; ");
