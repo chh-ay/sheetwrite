@@ -637,7 +637,7 @@ export class SvelteWorkbenchSession {
         this.feed("err", describeError(event.error));
       }
     });
-    // Bring the colleague back into view immediately after (re)connecting.
+
     if (this.lastColleaguePresence) {
       void this.colleagueTransport.publish({ ...this.lastColleaguePresence, sentAt: Date.now() });
     } else {

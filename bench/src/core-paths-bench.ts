@@ -420,8 +420,6 @@ function variant(id: string, samplesMs: readonly number[]): CorePathVariantResul
   return { id, samplesMs, timing };
 }
 
-// ── row-bridge-insert ───────────────────────────────────────────────────────
-
 function projectRowsIntoBridge(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const defaultRows = new Array<Record<string, CellScalar>>(scale.bridgeRows).fill(EMPTY_ROW);
   let nextRowId = scale.bridgeRows;
@@ -489,8 +487,6 @@ function projectRowsIntoBridge(scale: CorePathScale, plan: SamplePlan): CorePath
     "projected delta is one row-structure insert with every created identity present in the bridge in order",
   );
 }
-
-// ── command-state-select ────────────────────────────────────────────────────
 
 function selectWithCommandState(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const handlers: GridControllerHandlers = {};
@@ -571,8 +567,6 @@ function selectWithCommandState(scale: CorePathScale, plan: SamplePlan): CorePat
     },
   );
 }
-
-// ── setblock-admission / setblock-detailed-capture ───────────────────────────
 
 function applyOneBlock(
   scale: CorePathScale,
@@ -714,8 +708,6 @@ function applyOneBlock(
   );
 }
 
-// ── sync-offline-queue ──────────────────────────────────────────────────────
-
 function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const rows = Math.min(scale.offlineCommits, COMMIT_ROW_COUNT);
   const mounted = mountGrid({ workbook: workbook(rows, numberColumns(4)) });
@@ -802,8 +794,6 @@ function queueOfflineCommits(scale: CorePathScale, plan: SamplePlan): CorePathSc
     "every commit is applied, the queue holds every commit at server version 0, and capacity stays available",
   );
 }
-
-// ── rebase-large ────────────────────────────────────────────────────────────
 
 function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const blockStartRow = 5_000;
@@ -894,8 +884,6 @@ function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CoreP
   );
 }
 
-// ── validation-sparse ───────────────────────────────────────────────────────
-
 function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const filledRows = scale.sparseCells / SPARSE_COLUMNS;
   const rangeRows = filledRows * SPARSE_ROW_STRIDE;
@@ -979,8 +967,6 @@ function writeSparseRangeWithRules(scale: CorePathScale, plan: SamplePlan): Core
     "every write is applied, probe cells hold the last written values, every rule is retained, and a rule violation is still rejected",
   );
 }
-
-// ── csv-import ──────────────────────────────────────────────────────────────
 
 function buildCsvText(rows: number, columns: number): string {
   const lines = new Array<string>(rows + 1);
@@ -1079,8 +1065,6 @@ function restoreNearCeiling(scale: CorePathScale, plan: SamplePlan): CorePathSce
   );
 }
 
-// ── undo-large-clear ────────────────────────────────────────────────────────
-
 function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenarioResult {
   const cellCount = scale.clearRows * scale.clearColumns;
   const data: ColumnarData = {
@@ -1160,8 +1144,6 @@ function undoLargeClear(scale: CorePathScale, plan: SamplePlan): CorePathScenari
     "the clear empties the block and the undos restore every original cell value",
   );
 }
-
-// ── paged-evicted-revisit ───────────────────────────────────────────────────
 
 interface ColumnLoadProbe {
   areColumnsFullyLoaded(
@@ -1283,8 +1265,6 @@ async function revisitEvictedBand(
 }
 
 const FAILED_EVICTION = -1;
-
-// ── node-cold-init ──────────────────────────────────────────────────────────
 
 /**
  * Runs in a fresh Node process. The child loads `@sheetwrite/wasm` through a
@@ -1422,8 +1402,6 @@ async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioRe
     { observations: { nodeVersion } },
   );
 }
-
-// ── artifact ────────────────────────────────────────────────────────────────
 
 export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   Record<

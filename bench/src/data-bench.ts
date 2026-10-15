@@ -66,8 +66,6 @@ import { createHandsontable } from "./handsontable-runtime.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, type MeasureOptions, mib, ms, type Stat, summarize } from "./stats.js";
 
-// ── Configuration ────────────────────────────────────────────────────────────
-
 /** Sheetwrite is measured across the full range; its store scales to 1M. */
 export const SHEETWRITE_ROWS = [1_000, 10_000, 100_000, 500_000, 1_000_000] as const;
 /** Handsontable headless ceiling — larger sizes render every row (infeasible). */
@@ -293,8 +291,6 @@ function measureBatched(fn: () => void, opts: MeasureOptions, batch: number): Da
   );
 }
 
-// ── Result types ─────────────────────────────────────────────────────────────
-
 /** Memory attributable to holding N rows in one engine, sampled in isolation. */
 export interface MemoryProfile {
   /** process.memoryUsage().heapUsed delta around a single ingest (bytes). */
@@ -514,8 +510,6 @@ export function validateDataBenchmark(
   }
 }
 
-// ── Sheetwrite harness ───────────────────────────────────────────────────────
-
 function makeWorkbook(rowCount: number): Workbook {
   const columns: Column[] = COLUMNS.map((c) => ({
     key: c.key,
@@ -687,8 +681,7 @@ function benchSheetwrite(
     {
       ...plan("ingest", rows),
       before: () => {
-        // Free the previous iteration's store: WASM linear memory is released
-        // deterministically instead of accumulating across iterations/rounds.
+        // Dispose deterministically so WASM memory does not accumulate across rounds.
         storeSink?.dispose();
         storeSink = undefined;
       },
@@ -1085,8 +1078,6 @@ function warmSheetwriteDataPath(): void {
   store.dispose();
 }
 
-// ── Handsontable harness ─────────────────────────────────────────────────────
-
 /** Equivalent Handsontable config: same columns, virtualization on, plugins enabled. */
 function hotOptions(data: CellValue[][]): GridSettings {
   return {
@@ -1271,8 +1262,6 @@ function benchHandsontable(ds: ColumnarDataset): Omit<EngineResult, "memory"> {
   return { rows, stats, notes, queryResources: null, queries: {} };
 }
 
-// ── Memory probes (isolated subprocess) ──────────────────────────────────────
-
 const retain: unknown[] = [];
 
 /**
@@ -1360,8 +1349,6 @@ async function runMemMode(): Promise<void> {
     console.log(JSON.stringify(probeHandsontableMemory(rows)));
   }
 }
-
-// ── Reporting ────────────────────────────────────────────────────────────────
 
 const N = (n: number): string => n.toLocaleString("en-US");
 
@@ -1621,8 +1608,6 @@ async function runFullBench(outputPath: string | undefined): Promise<void> {
   console.log(report.trimEnd());
   await writeDataArtifact(result, report, outputPath);
 }
-
-// ── Entry ────────────────────────────────────────────────────────────────────
 
 function argumentValue(args: readonly string[], name: string): string | undefined {
   const index = args.indexOf(name);

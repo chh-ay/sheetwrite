@@ -395,7 +395,7 @@ function ScaleMinimap({ tiles, window: view, onJump }: Readonly<ScaleMinimapProp
   const seenRef = useRef(new Map<number, DatasourceTile & { residence: string }>());
 
   for (const tile of tiles) seenRef.current.set(tile.id, tile);
-  // Keep the newest few thousand tiles; older ones fade from the map.
+
   if (seenRef.current.size > 4096) {
     const keep = [...seenRef.current.entries()].slice(-4096);
     seenRef.current = new Map(keep);

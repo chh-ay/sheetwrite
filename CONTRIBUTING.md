@@ -31,7 +31,7 @@ Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs f
 
 ## Code style
 
-Biome and rustfmt own formatting. Two rules they cannot check:
+oxfmt and rustfmt own formatting. Two rules they cannot check:
 
 - **Comments say why, not what.** Write a comment only for a reason the code
   cannot show: a constraint, an invariant, a non-obvious trade-off, or a link to

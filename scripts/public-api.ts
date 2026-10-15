@@ -585,7 +585,6 @@ async function classSignature(symbol: ApiSymbol, project: Project): Promise<stri
     )
   )
     // `(args): Instance` is a call signature — invalid inside a class body.
-    // Emit the real `constructor(args)` member (drop the return type).
     .map((signature) => `constructor${signature.replace(/\)\s*:\s*[^:]*$/, ")")}`)
     // A default constructor adds nothing the class name doesn't already say.
     .filter((signature) => signature !== "constructor()");
