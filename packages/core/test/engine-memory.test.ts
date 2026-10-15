@@ -13,6 +13,7 @@ describe("explicit engine memory release", () => {
   it("moves every live dense store without changing source, style, cached results, or events", async () => {
     const first = new SheetwriteStore(makeWorkbook(10));
     const second = new SheetwriteStore(makeWorkbook(4));
+
     try {
       first.applyTransaction({
         patches: [
@@ -41,6 +42,7 @@ describe("explicit engine memory release", () => {
           { op: "set", addr: address(0, 0), value: { kind: "literal", value: "other workbook" } },
         ],
       });
+
       const snapshot = first.exportSnapshot();
       const window = first.getVisibleWindow("s1", { start: 0, end: 8 }, [0, 1, 2]);
       const values = Array.from(window.values);
@@ -48,6 +50,7 @@ describe("explicit engine memory release", () => {
       const unsubscribe = first.on("change", () => {
         changes += 1;
       });
+
       const report = await releaseEngineMemory();
       expect(report.stores).toBeGreaterThanOrEqual(2);
       expect(report.wasmBytesAfter).toBeGreaterThan(0);
@@ -58,6 +61,7 @@ describe("explicit engine memory release", () => {
       expect(refreshed.stringPoolEpoch).not.toBe(window.stringPoolEpoch);
       expect(changes).toBe(0);
       expect(second.getCell(address(0, 0)).resolved).toBe("other workbook");
+
       first.applyTransaction({
         patches: [{ op: "set", addr: address(0, 1), value: { kind: "literal", value: 100 } }],
       });
@@ -77,7 +81,9 @@ describe("explicit engine memory release", () => {
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
     const snapshot = disposed.captureRangeHistory(range);
     if (!snapshot) throw new Error("Expected a compact history resource");
+
     disposed.dispose();
+
     try {
       const retired = new WeakRef(getEngine().getMemory());
       const first = releaseEngineMemory();
@@ -85,15 +91,19 @@ describe("explicit engine memory release", () => {
       await first;
       for (let cycle = 0; cycle < 5; cycle++) {
         // A real task boundary ends WeakRef's keep-alive job; fake time cannot force GC.
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        const next = Promise.withResolvers<void>();
+        setImmediate(next.resolve);
+        await next.promise;
         Bun.gc(true);
       }
+
       expect(retired.deref()).toBeUndefined();
       // Retained disposed facades/resources must not retain an old glue memory cache.
       expect(disposed.getWorkbook().sheets).toHaveLength(1);
       expect(() => snapshot.toDocumentOp(range)).toThrow("already disposed");
       snapshot.dispose();
       disposed.dispose();
+
       store.applyTransaction({
         patches: [{ op: "set", addr: address(0, 1), value: { kind: "literal", value: 7 } }],
       });

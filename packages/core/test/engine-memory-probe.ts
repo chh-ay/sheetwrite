@@ -13,9 +13,20 @@ import { makeWorkbook } from "./fixtures.js";
 
 const engineName = process.argv[2];
 if (engineName !== "wasm" && engineName !== "formulas") throw new Error("Expected an engine name");
+
 const provider = engineName === "formulas" ? formulas : wasm;
 let failImportAt: number | undefined;
 let candidateCreated: PromiseWithResolvers<void> | undefined;
+const NativeInstance = WebAssembly.Instance;
+let instancesCreated = 0;
+
+WebAssembly.Instance = class extends NativeInstance {
+  constructor(module: WebAssembly.Module, imports?: WebAssembly.Imports) {
+    super(module, imports);
+    instancesCreated += 1;
+  }
+};
+
 await initSheetwrite(undefined, {
   ...provider,
   async createEngine(source): Promise<EngineInstance> {
@@ -28,10 +39,20 @@ await initSheetwrite(undefined, {
         return importStore(bytes.subarray(0, bytes.byteLength - 1));
       return importStore(bytes);
     };
+
     candidateCreated?.resolve();
     return instance;
   },
 });
+
+assert.equal(instancesCreated, 1, "Core boot must not eagerly instantiate the public singleton");
+
+if (engineName === "formulas") assert.ok(formulas.functionNames().includes("GROUPBY"));
+
+const publicStore = new provider.CellStore();
+publicStore.free();
+assert.equal(instancesCreated, 2, "Published exports must share one lazily initialized instance");
+WebAssembly.Instance = NativeInstance;
 
 const dense = new SheetwriteStore(makeWorkbook(8));
 const pagedWorkbook = makeWorkbook(1_000_000);
@@ -73,10 +94,12 @@ try {
   assert.equal(paged.getCell(address).resolved, "unsaved");
   assert.equal(paged.getCellLoadState(address), "local-edit");
   assert.equal(changes, 0);
+
   failImportAt = undefined;
   await releaseEngineMemory();
   assert.deepEqual(dense.exportSnapshot(), denseBefore);
   assert.equal(paged.getCell(address).resolved, "unsaved");
+
   dense.applyTransaction({ patches: [{ op: "clearRange", range, contents: true, style: true }] });
   dense.applyTransaction({ patches: [history.toDocumentOp(range)] });
   assert.equal(dense.getCell(address).resolved, "survives");
@@ -93,6 +116,7 @@ try {
       columns: () => {
         const sheet = pagedWorkbook.sheets[0];
         if (!sheet) throw new Error("Expected paged metadata");
+
         return sheet.columns;
       },
       revision: () => 0,
@@ -120,10 +144,12 @@ try {
       return report;
     });
     await candidateCreated.promise;
+
     // Instantiation has completed; only the active datasource request can block cutover.
     for (let turn = 0; turn < 8; turn++) await Promise.resolve();
     assert.equal(settled, false);
     assert.equal(getEngine().getMemory(), memoryBeforeLoad);
+
     page.resolve({
       protocol: 2,
       start: 4,
@@ -137,6 +163,7 @@ try {
   } finally {
     controller.destroy();
   }
+
   process.stdout.write(
     `${JSON.stringify({ engine: engineName, atomic: true, waitedForPage: true })}\n`,
   );

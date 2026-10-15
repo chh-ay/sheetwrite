@@ -21,6 +21,7 @@ impl RangeSnapshot {
             out.u32(*col);
             super::transfer::write_formula(&mut out, entry, sheet);
         }
+
         out.0
     }
 }
@@ -45,6 +46,7 @@ impl CellStore {
         {
             return Err("invalid transferred history dimensions".into());
         }
+
         let strings = input.strings()?;
         let mut formulas = Vec::new();
         for _ in 0..input.count()? {
@@ -60,6 +62,7 @@ impl CellStore {
             )?;
             formulas.push((row, col, entry));
         }
+
         input.finish()?;
         Ok(RangeSnapshot {
             rows,

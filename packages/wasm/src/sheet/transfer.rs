@@ -9,6 +9,7 @@ fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
         out.usize(b);
     }
 }
+
 fn read_keys(input: &mut Reader<'_>) -> TransferResult<HashSet<(usize, usize)>> {
     (0..input.count()?)
         .map(|_| Ok((input.usize()?, input.usize()?)))
@@ -37,6 +38,7 @@ impl SheetData {
                 out.words(&value.loaded);
                 out.u64(value.last_access.get());
             }
+
             out.usize(paged.dirty.len());
             for (&(row, col), value) in &paged.dirty {
                 out.usize(row);
@@ -47,6 +49,7 @@ impl SheetData {
                 out.usize(value.revision_index);
                 out.u32(value.kind as u32);
             }
+
             out.usize(paged.dirty_by_revision.len());
             for (&revision, keys) in &paged.dirty_by_revision {
                 out.u64(revision);
@@ -56,6 +59,7 @@ impl SheetData {
                     out.usize(col);
                 }
             }
+
             for keys in [
                 &paged.pinned,
                 &paged.read_pinned,
@@ -65,6 +69,7 @@ impl SheetData {
             ] {
                 write_keys(out, keys);
             }
+
             let evictable = paged.evictable.borrow();
             out.usize(evictable.len());
             for &(access, col, chunk) in evictable.iter() {
@@ -72,10 +77,12 @@ impl SheetData {
                 out.usize(col);
                 out.usize(chunk);
             }
+
             out.u64(paged.clock.get());
             out.u64(paged.eviction_candidate_checks);
             out.u64(paged.evictions);
         }
+
         out.usize(self.spill_ranges.len());
         for (&(row, col), range) in &self.spill_ranges {
             out.u32(row);
@@ -85,6 +92,7 @@ impl SheetData {
             out.u32(range.row_end);
             out.u32(range.col_end);
         }
+
         out.usize(self.spill_owners.len());
         for (&(row, col), &(anchor_row, anchor_col)) in &self.spill_owners {
             out.u32(row);
@@ -92,12 +100,14 @@ impl SheetData {
             out.u32(anchor_row);
             out.u32(anchor_col);
         }
+
         out.usize(self.spill_errors.len());
         for (&(row, col), &error) in &self.spill_errors {
             out.u32(row);
             out.u32(col);
             out.error(Some(error));
         }
+
         out.usize(self.spill_blockers.len());
         for blocker in &self.spill_blockers {
             out.u32(blocker.row_start);
@@ -105,11 +115,13 @@ impl SheetData {
             out.u32(blocker.row_end);
             out.u32(blocker.col_end);
         }
+
         out.usize(self.dirty_cells.len());
         for &(row, col) in &self.dirty_cells {
             out.u32(row);
             out.u32(col);
         }
+
         out.bool(self.all_dirty);
         // Conditional rules contain parsed ASTs and are lazily rebuilt by the host.
     }
@@ -123,6 +135,7 @@ impl SheetData {
         if kind.len() != payload.len() || kind.len() != style.len() {
             return Err("invalid transferred cell arrays".into());
         }
+
         let paged = if input.bool()? {
             let mut paged = PagedStorage::new(input.usize()?, input.usize()?, input.usize()?);
             for _ in 0..input.count()? {
@@ -141,8 +154,10 @@ impl SheetData {
                 {
                     return Err("invalid transferred page chunk".into());
                 }
+
                 paged.chunks.insert(key, chunk);
             }
+
             for _ in 0..input.count()? {
                 let key = (input.usize()?, input.usize()?);
                 let value = DirtyCell {
@@ -154,6 +169,7 @@ impl SheetData {
                 };
                 paged.dirty.insert(key, value);
             }
+
             for _ in 0..input.count()? {
                 let revision = input.u64()?;
                 let keys = (0..input.count()?)
@@ -161,6 +177,7 @@ impl SheetData {
                     .collect::<TransferResult<Vec<_>>>()?;
                 paged.dirty_by_revision.insert(revision, keys);
             }
+
             paged.pinned = read_keys(input)?;
             paged.read_pinned = read_keys(input)?;
             paged.pin_scratch = read_keys(input)?;
@@ -172,6 +189,7 @@ impl SheetData {
                     .get_mut()
                     .insert((input.u64()?, input.usize()?, input.usize()?));
             }
+
             paged.clock.set(input.u64()?);
             paged.eviction_candidate_checks = input.u64()?;
             paged.evictions = input.u64()?;
@@ -180,8 +198,10 @@ impl SheetData {
             if n_cols.checked_mul(row_count) != Some(kind.len()) {
                 return Err("invalid transferred dense dimensions".into());
             }
+
             None
         };
+
         let mut sheet = Self {
             n_cols,
             row_count,
@@ -198,6 +218,7 @@ impl SheetData {
             all_dirty: false,
             cond_rules: Vec::new(),
         };
+
         for _ in 0..input.count()? {
             let key = (input.u32()?, input.u32()?);
             let range = SpillRange {
@@ -207,11 +228,13 @@ impl SheetData {
             };
             sheet.spill_ranges.insert(key, range);
         }
+
         for _ in 0..input.count()? {
             sheet
                 .spill_owners
                 .insert((input.u32()?, input.u32()?), (input.u32()?, input.u32()?));
         }
+
         for _ in 0..input.count()? {
             let key = (input.u32()?, input.u32()?);
             sheet.spill_errors.insert(
@@ -219,6 +242,7 @@ impl SheetData {
                 input.error()?.ok_or("missing transferred spill error")?,
             );
         }
+
         for _ in 0..input.count()? {
             sheet.spill_blockers.push(SpillBlocker {
                 row_start: input.u32()?,
@@ -227,9 +251,11 @@ impl SheetData {
                 col_end: input.u32()?,
             });
         }
+
         for _ in 0..input.count()? {
             sheet.dirty_cells.insert((input.u32()?, input.u32()?));
         }
+
         sheet.all_dirty = input.bool()?;
         Ok(sheet)
     }

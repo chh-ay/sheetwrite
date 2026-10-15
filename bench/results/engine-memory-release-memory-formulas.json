@@ -1,0 +1,76 @@
+{
+  "engine": "formulas",
+  "root": "/home/vvin/learn/sheetwrite-wt/memory-release",
+  "jsHeapMeasurement": "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
+  "observations": [
+    {
+      "scenario": "dense-clear",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 181665792,
+        "jsHeapBytes": 5896592,
+        "jscExternalBytes": 366955645,
+        "rssBytes": 267841536
+      },
+      "after": {
+        "wasmBytes": 79298560,
+        "jsHeapBytes": 5917776,
+        "jscExternalBytes": 161136092,
+        "rssBytes": 162996224
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 181665792,
+        "wasmBytesAfter": 79298560,
+        "pauseMs": 81.49682300000018
+      },
+      "oldMemoryCollected": true
+    },
+    {
+      "scenario": "paged-dirty",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 79298560,
+        "jsHeapBytes": 5969792,
+        "jscExternalBytes": 161429734,
+        "rssBytes": 181243904
+      },
+      "after": {
+        "wasmBytes": 1310720,
+        "jsHeapBytes": 5980032,
+        "jscExternalBytes": 5465045,
+        "rssBytes": 86614016
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 79298560,
+        "wasmBytesAfter": 1310720,
+        "pauseMs": 0.5627680000000055
+      },
+      "oldMemoryCollected": true
+    },
+    {
+      "scenario": "large-clear-history",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 181469184,
+        "jsHeapBytes": 8246144,
+        "jscExternalBytes": 367664627,
+        "rssBytes": 283467776
+      },
+      "after": {
+        "wasmBytes": 130416640,
+        "jsHeapBytes": 8259808,
+        "jscExternalBytes": 265701806,
+        "rssBytes": 222224384
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 181469184,
+        "wasmBytesAfter": 130416640,
+        "pauseMs": 109.43482300000005
+      },
+      "oldMemoryCollected": true
+    }
+  ]
+}

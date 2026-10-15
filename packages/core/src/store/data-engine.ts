@@ -347,13 +347,18 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
     { sheetHandle: number; replace(resource: RangeSnapshot): void }
   >();
+
   private pendingPageRequests = 0;
+
   private pageIdleWaiters: Array<() => void> | undefined;
+
   private readonly memoryReleaseListeners = new Set<() => void>();
+
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
@@ -943,6 +948,7 @@ export class StoreDataEngine {
       cols,
     );
     if (!capturedResource) return null;
+
     let resource: RangeSnapshot = capturedResource;
     this.rangeMutationStats.historySnapshots += 1;
     this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
@@ -979,9 +985,11 @@ export class StoreDataEngine {
     const history: CompactRangeHistory = {
       range,
       byteLength: resource.byteLength(),
+
       get resource() {
         return resource;
       },
+
       refs,
       toDocumentOp: (target) => {
         if (disposed) throw new Error("history range snapshot already disposed");
@@ -1038,6 +1046,7 @@ export class StoreDataEngine {
         this.rangeMutationStats.historyDisposals += 1;
       },
     };
+
     this.rangeHistory.set(history, {
       sheetHandle: this.handleOf(range.sheet),
       replace: (replacement) => {
@@ -1046,6 +1055,7 @@ export class StoreDataEngine {
         previous.free();
       },
     });
+
     return history;
   }
 
@@ -3154,6 +3164,7 @@ export class StoreDataEngine {
 
   endPageRequest(): void {
     this.pendingPageRequests -= 1;
+
     if (this.pendingPageRequests === 0) {
       const waiters = this.pageIdleWaiters;
       this.pageIdleWaiters = undefined;
@@ -3163,9 +3174,11 @@ export class StoreDataEngine {
 
   waitForPageLoads(): Promise<void> | undefined {
     if (this.disposed || this.pendingPageRequests === 0) return undefined;
+
     const { promise, resolve } = Promise.withResolvers<void>();
     this.pageIdleWaiters ??= [];
     this.pageIdleWaiters.push(resolve);
+
     return promise;
   }
 
@@ -3181,6 +3194,7 @@ export class StoreDataEngine {
   /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
   prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
     if (this.disposed) return null;
+
     const replacement = instance.CellStore.importMemoryState(
       this.wasm.exportMemoryState(),
     ) as RecomputingCellStore;
@@ -3188,6 +3202,7 @@ export class StoreDataEngine {
       replacement: RangeSnapshot;
       replace(resource: RangeSnapshot): void;
     }> = [];
+
     try {
       for (const [snapshot, owner] of this.rangeHistory) {
         history.push({
@@ -3205,6 +3220,7 @@ export class StoreDataEngine {
       replacement.free();
       throw new Error("Sheetwrite: compact history migration failed", { cause });
     }
+
     return {
       abort: () => {
         for (const snapshot of history) snapshot.replacement.free();
@@ -3216,7 +3232,9 @@ export class StoreDataEngine {
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
         this.pagedDirtyPreflight?.replaceEngine(replacement);
+
         for (const snapshot of history) snapshot.replace(snapshot.replacement);
+
         previous.free();
       },
     };

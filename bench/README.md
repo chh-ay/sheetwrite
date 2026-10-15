@@ -28,6 +28,51 @@ constants, checks the computed value after each edit, and reports ten samples
 after two warmups. The scalar `formula-constant-edit` workload remains available
 through `--sample formula-constant-edit 100000` for comparison.
 
+### Engine memory-release gate
+
+From the repository root, run `bun bench/src/engine-memory-release-bench.ts --compare <detached-base-worktree> --engine wasm --output <artifact.json>` under the machine's benchmark runner. Repeat with `--engine formulas`, keeping one CPU slot for all rounds. Both worktrees need release-built engines.
+
+The harness discards forty warmups and records twenty-one samples for edit, read, ingest, and recalculation. Each sample covers 1,024 edits, 2,048 scrolling windows, one 100,000-row ingest, or 32 recalculations, respectively, so JSC tier-up and finalizer scheduling do not dominate a short batch. It runs three A/A controls, then five alternating ABBA/BAAB rounds; the artifact retains every sample, per-round medians, the A/A noise band, and the median-of-round-medians verdict. Ordinary paths may not exceed a 3% slowdown beyond the measured A/A spread. Use `--metric read` with Bun's `--cpu-prof` to isolate read-loop profiles on either worktree.
+
+Use `--mode memory --engine wasm --output <artifact.json>` (and `formulas`) for million-row dense-clear, paged dirty-edit, and large-clear history scenarios. It checks preserved values, undo/redo, no history materialization during migration, a cleared WeakRef to the retired memory, and lower committed WASM/process memory. JavaScript heap is JSC's non-external heap (`heapSize - extraMemorySize`); external accounting is retained separately because JSC counts WASM/ArrayBuffer backing allocations there. Process memory is RSS after five full-GC/event-loop turns, not an estimate from that external counter.
+
+The memory-release captures compare `5a16a55` with this branch on Bun 1.4.3, using runner slot 4. `results/engine-memory-release-read-profiles.json` records isolated A/B read profiles of the implementation at `9915236`, before the lazy-singleton compatibility repair. Both profiles spend their read samples in the same WASM/window-copy paths; neither samples an engine lookup. The reader already keeps a direct store reference, rebound only during migration. The short original read batches mixed JSC tier-up and allocation bursts; the retained protocol uses longer warmed batches rather than adding a lookup cache or changing Rust. The final unprofiled comparison includes the lazy-singleton repair.
+
+Memory observations below are MiB before → after, after five GC/event-loop turns. Dense-clear retains ten populated rows of a million-row, three-column dense store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history retains the compact inverse of a three-column million-row clear. The scenarios run sequentially in one engine, so the paged case also starts with the preceding dense case's committed high-water mark.
+
+| Engine | Scenario | WASM MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
+| --- | --- | --- | --- | --- | --- |
+| wasm | dense-clear | 173.25 → 75.63 | 5.56 → 5.58 | 248.83 → 153.32 | 95.01 |
+| wasm | paged-dirty | 75.63 → 1.25 | 5.63 → 5.64 | 171.43 → 81.48 | 0.69 |
+| wasm | large-clear-history | 173.06 → 124.38 | 7.80 → 7.81 | 268.63 → 209.41 | 137.68 |
+| formulas | dense-clear | 173.25 → 75.63 | 5.62 → 5.64 | 255.43 → 155.45 | 81.50 |
+| formulas | paged-dirty | 75.63 → 1.25 | 5.69 → 5.70 | 172.85 → 82.60 | 0.56 |
+| formulas | large-clear-history | 173.06 → 124.38 | 7.86 → 7.88 | 270.34 → 211.93 | 109.43 |
+
+All six retired-memory WeakRefs cleared; WASM and process memory fell without materializing compact history into JS cells. Raw bytes and pause measurements are retained in `results/engine-memory-release-memory-{wasm,formulas}.json`. The small non-external heap increases are tens of KiB, not millions of JS cells. These local captures are not portable memory ceilings or clean-tree published-site evidence.
+
+| Engine | Baseline raw B | Changed raw B | Baseline Brotli B | Changed Brotli B | Brotli increase B |
+| --- | --- | --- | --- | --- | --- |
+| wasm | 804818 | 846757 | 241093 | 249171 | 8078 |
+| formulas | 1087813 | 1129666 | 329268 | 337729 | 8461 |
+
+The default engine remains 114 B below its 8192 B Brotli feature budget after the final rebuild. No additional Rust implementation is included in the profiling/sampling correction. Core boot creates only its collectible instance; the published synchronous singleton exports initialize once, on first use, from the already-compiled module. A fresh-process regression counts real instances to guard against a second eager boot instance.
+
+Final ordinary-path verdicts (milliseconds per operation; A/A spread is the maximum absolute paired-control delta):
+
+| Engine | Path | A median ms | B median ms | Delta | A/A spread | Limit | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| wasm | edit | 0.004656015 | 0.004941355 | +6.13% | 15.10% | +18.10% | pass |
+| wasm | scroll/read | 0.009864620 | 0.009801872 | −0.64% | 5.07% | +8.07% | pass |
+| wasm | ingest | 48.9134055 | 49.8515170 | +1.92% | 6.48% | +9.48% | pass |
+| wasm | recalculation | 1.001599781 | 1.058138516 | +5.64% | 5.03% | +8.03% | pass |
+| formulas | edit | 0.004667926 | 0.004809408 | +3.03% | 13.37% | +16.37% | pass |
+| formulas | scroll/read | 0.008333863 | 0.008006740 | −3.93% | 19.55% | +22.55% | pass |
+| formulas | ingest | 46.3539635 | 45.6183620 | −1.59% | 12.84% | +15.84% | pass |
+| formulas | recalculation | 0.908358219 | 0.957571906 | +5.42% | 22.31% | +25.31% | pass |
+
+All paths pass the predefined noise-adjusted gate; these measurements do not establish a speedup. Every unrounded per-round median, raw sample, and A/A control is retained in `results/engine-memory-release-paths-{wasm,formulas}.json`.
+
 ─────────────────────────────────────────────────────────────────────────────
 
 ## Methodology

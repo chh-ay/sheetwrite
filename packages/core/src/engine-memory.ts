@@ -6,10 +6,13 @@ import { liveStoreEngines } from "./store/engine-registry.js";
 export interface EngineMemoryReleaseReport {
   /** Stores migrated together; disposed stores are excluded. */
   readonly stores: number;
+
   /** Committed linear memory of the retired engine. */
   readonly wasmBytesBefore: number;
+
   /** Committed linear memory of its replacement, including migration scratch. */
   readonly wasmBytesAfter: number;
+
   /** Main-thread migration pause, excluding the wait for active work. */
   readonly pauseMs: number;
 }
@@ -23,9 +26,11 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
  */
 export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
   if (pendingRelease) return pendingRelease;
+
   pendingRelease = release().finally(() => {
     pendingRelease = undefined;
   });
+
   return pendingRelease;
 }
 
@@ -33,15 +38,19 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   // Instantiation yields: a caller inside a synchronous transaction cannot cut
   // the engine over before that transaction and its listeners have returned.
   const replacement = await prepareEngineInstance();
+
   for (;;) {
     const waits: Promise<void>[] = [];
     for (const engine of liveStoreEngines()) {
       const wait = engine.waitForPageLoads();
       if (wait) waits.push(wait);
     }
+
     if (waits.length === 0) break;
+
     await Promise.all(waits);
   }
+
   const started = performance.now();
   const previous = getEngine();
   const before = previous.getMemory().buffer.byteLength;
@@ -60,14 +69,17 @@ async function release(): Promise<EngineMemoryReleaseReport> {
       { cause },
     );
   }
+
   // No await, callbacks, or fallible reconstruction inside the cutover.
   for (const migration of prepared) migration.commit();
   replaceEngineInstance(replacement);
   previous.retire();
+
   // Renderers rebuild frames after the whole cutover, without document events.
   queueMicrotask(() => {
     for (const engine of engines) engine.notifyMemoryRelease();
   });
+
   return {
     stores: prepared.length,
     wasmBytesBefore: before,

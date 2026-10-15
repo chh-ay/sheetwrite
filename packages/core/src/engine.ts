@@ -15,6 +15,7 @@ let pendingEngine: SheetwriteEngine | undefined;
 let engineInstance: defaultEngine.EngineInstance | undefined;
 let initialization: Promise<void> | undefined;
 let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
+
 export let engineFunctionNames: readonly string[] | undefined;
 
 export function getEngine(): defaultEngine.EngineInstance {
@@ -39,22 +40,27 @@ export async function loadEngine(
       "Sheetwrite: select one engine before initialization; the engine cannot change.",
     );
   }
+
   if (initialization) {
     if (source !== undefined && source !== selectedSource) {
       throw new Error(
         "Sheetwrite: concurrent load() with a different source while initialization is in flight",
       );
     }
+
     return initialization;
   }
+
   if (engineInstance) {
     if (source !== undefined && source !== selectedSource) {
       console.warn(
         "Sheetwrite: load() called with a different source after initialization; keeping the first module.",
       );
     }
+
     return;
   }
+
   pendingEngine = requested;
   selectedSource = source;
   initialization = (async () => {
@@ -68,6 +74,7 @@ export async function loadEngine(
       initialization = undefined;
     }
   })();
+
   return initialization;
 }
 

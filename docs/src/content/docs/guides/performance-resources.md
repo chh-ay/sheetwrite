@@ -4,6 +4,22 @@ description: "Freshness-gated benchmark and package-size evidence for Sheetwrite
 ---
 Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.
 
+## Release retained engine memory
+
+WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.
+
+```ts prelude="core" partial="requires an initialized application at an idle point" title="Explicit idle memory release"
+import { releaseEngineMemory } from "@sheetwrite/core";
+
+const report = await releaseEngineMemory();
+```
+
+The call waits for synchronous transactions and active datasource page loads, then moves all live stores together into a fresh instance of the selected engine. Cell sources, styles, cached formula results (including volatile results), resident datasource pages, unsaved dirty edits, and compact undo/redo history survive. Unloaded clean pages remain unloaded and can be fetched again from the datasource. Worker renderers rebuild their frames without document-change events.
+
+The main-thread pause scales with resident cells and compact history, so do not invoke it on an interaction-critical path. Migration temporarily needs both instances and packed transfer buffers; it can increase peak memory before garbage collection reclaims the retired instance. If preparation fails, every live store stays on the original instance. Concurrent calls share the same release.
+
+`report.wasmBytesBefore` and `report.wasmBytesAfter` are committed linear-memory bytes, not live-cell bytes or process memory. `report.pauseMs` measures migration, excluding the idle wait. A release is not guaranteed to reduce committed bytes: surviving data, compact history, and migration scratch can still require substantial memory. Actual process-memory reclamation depends on garbage collection.
+
 ## Capture
 
 <div class="evidence-mixed" data-pagefind-ignore><strong>Mixed capture vintages.</strong> The sections below were captured at different commits. Each section is internally consistent and each one names its own commit; the page as a whole is not a single point-in-time measurement.</div>

@@ -181,6 +181,7 @@ export class StoreWindowReader {
     this.clear();
     this.wasm = wasm;
   }
+
   spillDerivedMask(
     sheet: SheetId,
     rows: { start: number; end: number },

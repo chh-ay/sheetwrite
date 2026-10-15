@@ -10,7 +10,7 @@ the main-thread pause scales with resident data and compact undo history.
 Preparation failures leave every live store and the selected instance unchanged.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/engine-memory.ts#L24"><code>packages/core/src/engine-memory.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/engine-memory.ts#L27"><code>packages/core/src/engine-memory.ts#L27</code></a></dd></div>
 </dl>
 
 ## Declaration

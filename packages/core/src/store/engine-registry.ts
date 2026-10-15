@@ -9,7 +9,9 @@ import type { StoreDataEngine } from "./data-engine.js";
  * store. The map holds no strong references, so a store stays collectable.
  */
 const ENGINES = new WeakMap<object, StoreDataEngine>();
+
 const LIVE_ENGINES = new Set<WeakRef<StoreDataEngine>>();
+
 const finalized = new FinalizationRegistry<WeakRef<StoreDataEngine>>((ref) => {
   LIVE_ENGINES.delete(ref);
 });
@@ -17,6 +19,7 @@ const finalized = new FinalizationRegistry<WeakRef<StoreDataEngine>>((ref) => {
 /** Record the engine behind a store facade. Called once per constructed store. */
 export function registerStoreEngine(store: object, engine: StoreDataEngine): void {
   ENGINES.set(store, engine);
+
   const ref = new WeakRef(engine);
   LIVE_ENGINES.add(ref);
   finalized.register(engine, ref);
@@ -39,5 +42,6 @@ export function liveStoreEngines(): StoreDataEngine[] {
     if (engine) engines.push(engine);
     else LIVE_ENGINES.delete(ref);
   }
+
   return engines;
 }

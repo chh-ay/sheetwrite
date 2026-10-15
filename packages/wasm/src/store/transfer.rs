@@ -12,6 +12,7 @@ fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
         out.usize(handle);
     }
 }
+
 fn read_names(input: &mut Reader<'_>) -> TransferResult<HashMap<String, usize>> {
     (0..input.count()?)
         .map(|_| Ok((input.text()?, input.usize()?)))
@@ -27,6 +28,7 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
         out.u32(target.row);
         out.u32(target.col);
     }
+
     out.bool(entry.ast.is_some());
     out.error(entry.error);
     out.u32(match entry.value_kind {
@@ -44,6 +46,7 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
         out.u32(key.row);
         out.u32(key.col);
     }
+
     out.usize(entry.reads.ranges.len());
     for range in &entry.reads.ranges {
         out.u32(range.sheet);
@@ -79,10 +82,12 @@ impl CellStore {
         } else {
             self.parse_formula_entry(&source, sheet, row, col)
         };
+
         entry.source = source;
         if !input.bool()? {
             entry.ast = None;
         }
+
         entry.error = input.error()?;
         entry.value_kind = match input.u32()? {
             0 => FormulaValueKind::Number,
@@ -114,6 +119,7 @@ impl CellStore {
                 })
             })
             .collect::<TransferResult<Vec<_>>>()?;
+
         entry.reads = ReadSet { cells, ranges };
         Ok(entry)
     }
@@ -127,8 +133,10 @@ impl CellStore {
             store.sheet_names.push(input.text()?);
             store.sheet_alive.push(input.bool()?);
         }
+
         store.sheet_lookup = read_names(&mut input)?;
         store.sheet_ids = read_names(&mut input)?;
+
         for _ in 0..input.count()? {
             let scope = if input.bool()? {
                 Some(input.u32()?)
@@ -147,6 +155,7 @@ impl CellStore {
             };
             store.named_ranges.insert((scope, key), range);
         }
+
         for _ in 0..input.count()? {
             let key = input.text()?;
             let mut table = TableDefinition {
@@ -170,6 +179,7 @@ impl CellStore {
             }
             store.tables.insert(key, table);
         }
+
         store.formula_epoch = input.u64()?;
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
@@ -178,6 +188,7 @@ impl CellStore {
         if sheets != store.sheet_names.len() {
             return Err("invalid transferred sheet handles".into());
         }
+
         for sheet in 0..sheets {
             let mut data = SheetData::read_transfer(&mut input)?;
             for _ in 0..input.count()? {
@@ -188,6 +199,7 @@ impl CellStore {
             }
             store.sheets.push(data);
         }
+
         input.finish()?;
         Ok(store)
     }
@@ -201,6 +213,7 @@ impl CellStore {
         if self.loading_page != 0 || self.active_mutation_revision.is_some() {
             wasm_bindgen::throw_str("engine memory release requires an idle store");
         }
+
         let mut out = Writer::new(STORE_TAG);
         out.strings(&self.strings);
         out.usize(self.sheet_names.len());
@@ -208,6 +221,7 @@ impl CellStore {
             out.text(name);
             out.bool(alive);
         }
+
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
         out.usize(self.named_ranges.len());
@@ -224,6 +238,7 @@ impl CellStore {
             out.u32(range.row_end);
             out.u32(range.col_end);
         }
+
         out.usize(self.tables.len());
         for (key, table) in &self.tables {
             out.text(key);
