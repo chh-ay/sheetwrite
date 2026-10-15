@@ -1992,7 +1992,6 @@ export function readWorkbook(
       rowOffset: cell.row,
       colOffset: cell.col,
       value: cell.value ?? { kind: "literal", value: null },
-      // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
       ...(cell.style ? { style: copyStyleData(cell.style) as CellStyle } : {}),
     }));
     const nativeValidations = source.validations.map((validation, index) => {
