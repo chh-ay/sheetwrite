@@ -18,7 +18,6 @@ let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
 
 export let engineFunctionNames: readonly string[] | undefined;
 
-/** Appended to every "not initialized" error: the engine package's own load() is not enough. */
 export const ENGINE_LOAD_HINT =
   "Calling load() from @sheetwrite/wasm or @sheetwrite/formulas does not initialize core.";
 

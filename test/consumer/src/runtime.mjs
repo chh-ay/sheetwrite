@@ -54,7 +54,6 @@ for (const name of [
 
 await load();
 
-// Since 0.5.0 core owns its own engine instance: the engine package's load() alone is not enough.
 let uninitializedError;
 try {
   new Core.SheetwriteStore({
