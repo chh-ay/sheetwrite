@@ -3815,7 +3815,7 @@
             {
               "name": "SheetwriteEngine",
               "kind": "interface",
-              "signature": "export interface SheetwriteEngine { CellStore: typeof defaultEngine.CellStore; load: typeof defaultEngine.load; isLoaded: typeof defaultEngine.isLoaded; createEngine: typeof defaultEngine.createEngine; functionNames?: () => string[]; }",
+              "signature": "export interface SheetwriteEngine { CellStore: typeof defaultEngine.CellStore; load: typeof defaultEngine.load; isLoaded: typeof defaultEngine.isLoaded; createEngine: typeof defaultEngine.createEngine; createLoadedEngine: typeof defaultEngine.createLoadedEngine; functionNames?: () => string[]; }",
               "owners": [
                 "src/engine.ts"
               ],
@@ -7132,6 +7132,18 @@
               "memberDocs": []
             },
             {
+              "name": "createLoadedEngine",
+              "kind": "function",
+              "signature": "(): EngineInstance",
+              "owners": [
+                "loader.d.ts"
+              ],
+              "source": "loader.d.ts#L44",
+              "jsDocTags": [],
+              "documentation": "Create a fresh engine synchronously from the module that `load()` or `createEngine()` already compiled.",
+              "memberDocs": []
+            },
+            {
               "name": "DistinctColumn",
               "kind": "class",
               "signature": "class DistinctColumn { free: () => void; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeTexts: () => string[] }",
@@ -10295,6 +10307,18 @@
               "source": "loader.d.ts#L41",
               "jsDocTags": [],
               "documentation": "Initialize a fresh engine; a compiled module can be reused without retaining its memory.",
+              "memberDocs": []
+            },
+            {
+              "name": "createLoadedEngine",
+              "kind": "function",
+              "signature": "(): EngineInstance",
+              "owners": [
+                "loader.d.ts"
+              ],
+              "source": "loader.d.ts#L44",
+              "jsDocTags": [],
+              "documentation": "Create a fresh engine synchronously from the module that `load()` or `createEngine()` already compiled.",
               "memberDocs": []
             },
             {

@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/wasm."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>15</dd></div>
+<div><dt>Exports</dt><dd>16</dd></div>
 </dl>
 
 Source entry: `packages/wasm/loader.d.ts`
@@ -27,10 +27,11 @@ Source entry: `packages/wasm/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/wasm/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>4</span>
+### Functions <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/wasm/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
+<a class="api-symbol-card" href="/docs/api/wasm/create-loaded-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createLoadedEngine</code></span><span class="api-symbol-card__desc">Create a fresh engine synchronously from the module that load() or createEngine() already compiled.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>
 <a class="api-symbol-card" href="/docs/api/wasm/load/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>load</code></span><span class="api-symbol-card__desc">Initialize the WASM module.</span></a>

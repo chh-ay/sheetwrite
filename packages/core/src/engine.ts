@@ -6,7 +6,7 @@ export interface SheetwriteEngine {
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;
-
+  createLoadedEngine: typeof defaultEngine.createLoadedEngine;
   /** The optional full engine reports its accepted function names. */
   functionNames?: () => string[];
 }
@@ -20,12 +20,21 @@ let selectedSource: Parameters<SheetwriteEngine["load"]>[0];
 export let engineFunctionNames: readonly string[] | undefined;
 
 export function getEngine(): defaultEngine.EngineInstance {
+  if (!engineInstance) adoptLoadedEngine();
   if (!engineInstance) throw new Error("Sheetwrite: await initSheetwrite() first");
   return engineInstance;
 }
 
 export function isEngineLoaded(): boolean {
-  return engineInstance !== undefined;
+  return engineInstance !== undefined || (!initialization && selectedEngine.isLoaded());
+}
+
+// An app that awaited the engine package's own load() gets a core instance from that module.
+function adoptLoadedEngine(): void {
+  if (initialization || !selectedEngine.isLoaded()) return;
+
+  engineInstance = selectedEngine.createLoadedEngine();
+  engineFunctionNames = engineInstance.functionNames?.();
 }
 
 export async function loadEngine(
@@ -33,7 +42,6 @@ export async function loadEngine(
   engine?: SheetwriteEngine,
 ): Promise<void> {
   const requested = engine ?? pendingEngine ?? selectedEngine;
-
   if (
     (pendingEngine && pendingEngine !== requested) ||
     (engineInstance && selectedEngine !== requested)
@@ -68,7 +76,6 @@ export async function loadEngine(
   initialization = (async () => {
     try {
       const instance = await requested.createEngine(source);
-
       selectedEngine = requested;
       engineInstance = instance;
       engineFunctionNames = instance.functionNames?.();
