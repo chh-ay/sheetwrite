@@ -756,24 +756,13 @@ impl CellStore {
             return Vec::new();
         }
 
-        let additional_errors = matrix
-            .values
-            .iter()
-            .skip(1)
-            .filter(|value| matches!(value, Value::Error(_)))
-            .count();
         let current_owner_cells = self.sheets.iter().try_fold(0usize, |total, data| {
             total.checked_add(data.spill_owners.len())
         });
-        let current_error_cells = self.sheets.iter().try_fold(0usize, |total, data| {
-            total.checked_add(data.derived_errors.len())
-        });
         let within_budget = current_owner_cells
             .and_then(|total| total.checked_add(matrix.values.len()))
-            .zip(current_error_cells.and_then(|total| total.checked_add(additional_errors)))
-            .is_some_and(|(owners, errors)| {
-                owners <= self.spill_owner_cell_limit
-                    && spill_ownership_within_budget(owners, errors)
+            .is_some_and(|owners| {
+                owners <= self.spill_owner_cell_limit && spill_ownership_within_budget(owners)
             });
         if !within_budget {
             self.sheets[sheet].compact_spill_metadata();
@@ -782,7 +771,6 @@ impl CellStore {
         }
         let data = &mut self.sheets[sheet];
         if data.spill_owners.try_reserve(matrix.values.len()).is_err()
-            || data.derived_errors.try_reserve(additional_errors).is_err()
             || !data.reserve_derived(matrix.values.len())
         {
             data.compact_spill_metadata();
@@ -815,10 +803,7 @@ impl CellStore {
                     ),
                     Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
                     Value::Blank => (KIND_EMPTY, 0),
-                    Value::Error(error) => {
-                        data.derived_errors.insert(cell, *error);
-                        (KIND_FORMULA, 0)
-                    }
+                    Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
                 };
                 data.set_derived(index, kind, payload);
                 changed.push(cell);
@@ -848,21 +833,18 @@ impl CellStore {
             return;
         }
 
-        data.derived_errors.remove(&key.local());
         let (kind, payload) = match result {
             Value::Number(value) => (KIND_NUMBER, encode_num(value)),
             Value::Text(_) => (KIND_STRING, interned.map_or(0, encode_str_id)),
             Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(value))),
             Value::Blank => (KIND_EMPTY, 0),
-            Value::Error(error) => {
-                data.derived_errors.insert(key.local(), error);
-                (KIND_FORMULA, 0)
-            }
+            Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
         };
 
-        if !data.set_derived(index, kind, payload) {
-            data.derived_errors.insert(key.local(), FormulaError::Num);
-        }
+        assert!(
+            data.set_derived(index, kind, payload),
+            "calculated overlay allocation failed"
+        );
     }
 
     pub(crate) fn eval_at(
@@ -902,9 +884,7 @@ impl CellStore {
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
         if kind != KIND_FORMULA {
-            debug_assert!(cell_key(row, col).is_none_or(|key| {
-                !s.formulas.contains_key(&key) && !s.derived_errors.contains_key(&key)
-            }));
+            debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains_key(&key) }));
             return literal_cell_value(&self.strings, kind, payload);
         }
 
@@ -922,8 +902,8 @@ impl CellStore {
                     formula_error_with_entry(s, key, Some(entry)),
                 );
             }
-            if let Some(error) = s.derived_errors.get(&key) {
-                return Value::Error(*error);
+            if let Some(error) = s.calculated_error_at(i) {
+                return Value::Error(error);
             }
         }
 

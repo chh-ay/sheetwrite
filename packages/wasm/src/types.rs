@@ -100,6 +100,23 @@ impl FormulaError {
             FormulaError::Null => 10,
         }
     }
+
+    pub(crate) fn from_slot(slot: u64) -> Option<Self> {
+        match slot {
+            0 => Some(Self::Cycle),
+            1 => Some(Self::DivZero),
+            2 => Some(Self::Ref),
+            3 => Some(Self::Num),
+            4 => Some(Self::Value),
+            5 => Some(Self::Name),
+            6 => Some(Self::Na),
+            7 => Some(Self::Spill),
+            8 => Some(Self::Calc),
+            9 => Some(Self::Loading),
+            10 => Some(Self::Null),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

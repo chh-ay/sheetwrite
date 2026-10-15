@@ -724,17 +724,11 @@ pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
 pub(crate) const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
 // Includes installed-owner metadata and its source-independent scalar overlay.
 const SPILL_OWNER_ENTRY_BYTES: usize = 64;
-const SPILL_ERROR_ENTRY_BYTES: usize = 16;
 
-pub(crate) fn spill_ownership_within_budget(owner_cells: usize, error_cells: usize) -> bool {
+pub(crate) fn spill_ownership_within_budget(owner_cells: usize) -> bool {
     owner_cells <= MAX_SPILL_OWNER_CELLS
         && owner_cells
             .checked_mul(SPILL_OWNER_ENTRY_BYTES)
-            .and_then(|bytes| {
-                error_cells
-                    .checked_mul(SPILL_ERROR_ENTRY_BYTES)
-                    .and_then(|errors| bytes.checked_add(errors))
-            })
             .is_some_and(|bytes| bytes <= MAX_SPILL_OWNER_BYTES)
 }
 
@@ -807,8 +801,6 @@ pub(crate) struct SheetData {
     pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
     /// Every currently materialized spill cell (including its anchor) to its owner.
     pub(crate) spill_owners: HashMap<CellKey, CellKey>,
-    /// Calculated errors for formula anchors and spill output, never source metadata.
-    pub(crate) derived_errors: HashMap<CellKey, FormulaError>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
@@ -905,7 +897,6 @@ impl SheetData {
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            derived_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -931,7 +922,6 @@ impl SheetData {
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            derived_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -1058,6 +1048,11 @@ impl SheetData {
         self.derived.get(index)
     }
 
+    #[inline]
+    pub(crate) fn calculated_error_at(&self, index: usize) -> Option<FormulaError> {
+        self.derived.error_at(index)
+    }
+
     pub(crate) fn set_derived(&mut self, index: usize, kind: u8, payload: u64) -> bool {
         if self.derived.is_empty() && !self.reserve_derived(1) {
             return false;
@@ -1084,7 +1079,6 @@ impl SheetData {
 
     pub(crate) fn invalidate_derived(&mut self) {
         self.derived.clear();
-        self.derived_errors.clear();
     }
 
     pub(crate) fn invalidate_calculations(&mut self) {
@@ -1357,17 +1351,6 @@ impl SheetData {
         {
             self.spill_owners.shrink_to_fit();
         }
-        if self.derived_errors.is_empty() {
-            self.derived_errors = HashMap::new();
-        } else if self.derived_errors.capacity() > self.derived_errors.len().saturating_mul(2)
-            && self
-                .derived_errors
-                .capacity()
-                .saturating_sub(self.derived_errors.len())
-                > 4096
-        {
-            self.derived_errors.shrink_to_fit();
-        }
         self.derived.compact();
     }
 
@@ -1391,7 +1374,6 @@ impl SheetData {
                 if cell == anchor || !self.contains_cell(row as usize, col as usize) {
                     continue;
                 }
-                self.derived_errors.remove(&cell);
                 let index = self.idx(row as usize, col as usize);
                 self.derived.remove(index);
                 changed.push(cell);
@@ -1424,10 +1406,6 @@ impl SheetData {
         if !self.derived.is_empty() && self.contains_cell(cell.0 as usize, cell.1 as usize) {
             self.derived
                 .remove(self.idx(cell.0 as usize, cell.1 as usize));
-        }
-
-        if !self.derived_errors.is_empty() {
-            self.derived_errors.remove(&cell);
         }
 
         // No spill metadata means nothing to detach, invalidate or enqueue; the
@@ -1905,10 +1883,6 @@ impl SheetData {
             entry.heap_memory_stats(formulas);
         }
         self.derived.add_memory_stats(formulas);
-        formulas.add_hash_table::<CellKey, FormulaError>(
-            self.derived_errors.len(),
-            self.derived_errors.capacity(),
-        );
 
         stats
             .owner_mut(SPILL_RANGES)
@@ -1947,10 +1921,11 @@ pub(crate) fn formula_error_with_entry(
     key: CellKey,
     entry: Option<&FormulaEntry>,
 ) -> Option<FormulaError> {
+    let (row, col) = (key.0 as usize, key.1 as usize);
     sheet
-        .derived_errors
-        .get(&key)
-        .copied()
+        .contains_cell(row, col)
+        .then(|| sheet.calculated_error_at(sheet.idx(row, col)))
+        .flatten()
         .or_else(|| entry.and_then(|entry| entry.error))
 }
 

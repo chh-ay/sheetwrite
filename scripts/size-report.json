@@ -6,9 +6,9 @@
     "version": "2.0.0"
   },
   "meta": {
-    "commit": "85584e9f3e55005f10ab6eda671ba38dfb2c33d5",
+    "commit": "11e933655403cc868757c4bcade327730452753d",
     "dirty": true,
-    "timestamp": "2026-10-15T09:02:57.705Z"
+    "timestamp": "2026-10-15T10:10:17.589Z"
   },
   "toolchain": {
     "bun": "1.4.3",
@@ -590,7 +590,7 @@
       "owner": "webpack:worker-async"
     },
     "closure.core-xlsx.logicalBytes": {
-      "actual": 3606863,
+      "actual": 3604940,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-xlsx"
@@ -602,7 +602,7 @@
       "owner": "core-xlsx"
     },
     "closure.core.logicalBytes": {
-      "actual": 3373139,
+      "actual": 3371216,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core"
@@ -620,7 +620,7 @@
       "owner": "core"
     },
     "closure.react.logicalBytes": {
-      "actual": 3566057,
+      "actual": 3564134,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "react"
@@ -638,7 +638,7 @@
       "owner": "react"
     },
     "closure.svelte.logicalBytes": {
-      "actual": 8427319,
+      "actual": 8425396,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "svelte"
@@ -656,7 +656,7 @@
       "owner": "svelte"
     },
     "closure.vue.logicalBytes": {
-      "actual": 20254814,
+      "actual": 20252891,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "vue"
@@ -812,19 +812,19 @@
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.tarballBytes": {
-      "actual": 459736,
+      "actual": 459552,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.unpackedBytes": {
-      "actual": 1246625,
+      "actual": 1244681,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/formulas"
     },
     "package.@sheetwrite/formulas.wasmBytes": {
-      "actual": 1100386,
+      "actual": 1098442,
       "unit": "bytes",
       "category": "package-unpacked-wasm",
       "owner": "@sheetwrite/formulas"
@@ -1052,19 +1052,19 @@
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.tarballBytes": {
-      "actual": 338545,
+      "actual": 338277,
       "unit": "bytes",
       "category": "package-tarball",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.unpackedBytes": {
-      "actual": 951737,
+      "actual": 949814,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/wasm"
     },
     "package.@sheetwrite/wasm.wasmBytes": {
-      "actual": 817005,
+      "actual": 815082,
       "unit": "bytes",
       "category": "package-unpacked-wasm",
       "owner": "@sheetwrite/wasm"
@@ -1148,8 +1148,8 @@
     },
     {
       "name": "@sheetwrite/formulas",
-      "tarballBytes": 459736,
-      "unpackedBytes": 1246625,
+      "tarballBytes": 459552,
+      "unpackedBytes": 1244681,
       "fileCount": 12,
       "categories": {
         "css": 0,
@@ -1158,7 +1158,7 @@
         "metadata": 14317,
         "runtime-js": 79759,
         "runtime-source": 0,
-        "wasm": 1100386
+        "wasm": 1098442
       }
     },
     {
@@ -1208,8 +1208,8 @@
     },
     {
       "name": "@sheetwrite/wasm",
-      "tarballBytes": 338545,
-      "unpackedBytes": 951737,
+      "tarballBytes": 338277,
+      "unpackedBytes": 949814,
       "fileCount": 12,
       "categories": {
         "css": 0,
@@ -1218,7 +1218,7 @@
         "metadata": 3313,
         "runtime-js": 79469,
         "runtime-source": 0,
-        "wasm": 817005
+        "wasm": 815082
       }
     },
     {
@@ -1241,13 +1241,13 @@
     {
       "name": "core",
       "packageCount": 3,
-      "logicalBytes": 3373139,
+      "logicalBytes": 3371216,
       "packages": ["@sheetwrite/core@0.4.0", "@sheetwrite/wasm@0.4.0", "fflate@0.8.3"]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
-      "logicalBytes": 3606863,
+      "logicalBytes": 3604940,
       "packages": [
         "@sheetwrite/core@0.4.0",
         "@sheetwrite/wasm@0.4.0",
@@ -1258,7 +1258,7 @@
     {
       "name": "react",
       "packageCount": 5,
-      "logicalBytes": 3566057,
+      "logicalBytes": 3564134,
       "packages": [
         "@sheetwrite/core@0.4.0",
         "@sheetwrite/react@0.4.0",
@@ -1270,7 +1270,7 @@
     {
       "name": "svelte",
       "packageCount": 24,
-      "logicalBytes": 8427319,
+      "logicalBytes": 8425396,
       "packages": [
         "@jridgewell/gen-mapping@0.3.13",
         "@jridgewell/remapping@2.3.5",
@@ -1301,7 +1301,7 @@
     {
       "name": "vue",
       "packageCount": 27,
-      "logicalBytes": 20254814,
+      "logicalBytes": 20252891,
       "packages": [
         "@babel/helper-string-parser@7.29.7",
         "@babel/helper-validator-identifier@7.29.7",

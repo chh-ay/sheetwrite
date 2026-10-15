@@ -186,6 +186,7 @@ impl CellStore {
     }
 }
 
+#[inline(always)]
 pub(crate) fn fill_window_cell(
     sheet: &SheetData,
     row: usize,
