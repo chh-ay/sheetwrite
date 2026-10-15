@@ -645,7 +645,7 @@ readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d
 <summary><code>cellstore_importMemoryState</code></summary>
 
 ```ts generated
-readonly cellstore_importMemoryState: (a: number, b: number) => number;
+readonly cellstore_importMemoryState: (a: any) => number;
 ```
 
 </details>
@@ -654,7 +654,7 @@ readonly cellstore_importMemoryState: (a: number, b: number) => number;
 <summary><code>cellstore_importRangeMemoryState</code></summary>
 
 ```ts generated
-readonly cellstore_importRangeMemoryState: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number;
 ```
 
 </details>
@@ -1727,14 +1727,13 @@ export interface InitOutput {
     j: number,
     k: number,
   ) => void;
-  readonly cellstore_importMemoryState: (a: number, b: number) => number;
+  readonly cellstore_importMemoryState: (a: any) => number;
   readonly cellstore_importRangeMemoryState: (
     a: number,
-    b: number,
+    b: any,
     c: number,
     d: number,
     e: number,
-    f: number,
   ) => number;
   readonly cellstore_insertCols: (
     a: number,

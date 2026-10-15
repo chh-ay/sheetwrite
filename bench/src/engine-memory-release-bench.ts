@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import type * as Wasm from "@sheetwrite/wasm";
 import type * as Core from "../../packages/core/src/index.js";
+import type { CompactRangeHistory } from "../../packages/core/src/store/data-engine.js";
 
 // Run the entire comparison under one bench-run slot. Children inherit that
 // affinity; no nested wrappers or concurrent samples are used.
@@ -292,6 +293,9 @@ async function memory() {
     after: MemoryObservation;
     report: Core.EngineMemoryReleaseReport;
     oldMemoryCollected: boolean;
+    freshWasmBytesFloor: number;
+    compactHistoryBytes: number;
+    bytesAboveFreshFloor: number;
   }> = [];
   function observe(): MemoryObservation {
     const heap = heapStats();
@@ -304,7 +308,62 @@ async function memory() {
       rssBytes: process.memoryUsage().rss,
     };
   }
-  async function capture(scenario: string, verify: () => void) {
+
+  const freshFloors = new Map<string, number>();
+
+  for (const scenario of ["empty-dense", "dense-clear", "paged-dirty", "large-clear-history"]) {
+    await core.releaseEngineMemory();
+    const fresh = new core.SheetwriteStore(
+      workbook(MEMORY_ROWS),
+      undefined,
+      scenario === "paged-dirty"
+        ? { storage: "paged", chunkRows: 256, cacheBytes: 64 * 1024 }
+        : undefined,
+    );
+    let history: CompactRangeHistory | null = null;
+
+    try {
+      if (scenario === "dense-clear") {
+        fresh.applyTransaction({
+          patches: Array.from({ length: 10 }, (_, row) => ({
+            op: "setBlock" as const,
+            range: { sheet: "s1", start: { row, col: 0 }, end: { row, col: 2 } },
+            block: { rowCount: 1, colCount: 3, values: [`value-${row}`, 17, 5] },
+          })),
+        });
+      } else if (scenario === "paged-dirty") {
+        fresh.loadPage(
+          "s1",
+          199_744,
+          [{ start: 0, end: 3, keys: ["name", "amount", "other"] }],
+          Array.from({ length: 256 }, () => ({ name: "resident page", amount: 17, other: 5 })),
+        );
+        fresh.applyTransaction({
+          patches: [
+            { op: "set", addr: address(0, 1), value: { kind: "literal", value: 99 } },
+            { op: "set", addr: address(0, 2), value: { kind: "formula", src: "=B1*2" } },
+          ],
+        });
+      } else if (scenario === "large-clear-history") {
+        history = fresh.captureRangeHistory({
+          sheet: "s1",
+          start: { row: 0, col: 0 },
+          end: { row: MEMORY_ROWS - 1, col: 2 },
+        });
+      }
+
+      freshFloors.set(scenario, engine.getEngine().getMemory().buffer.byteLength);
+    } finally {
+      history?.dispose();
+      fresh.dispose();
+    }
+  }
+
+  await core.releaseEngineMemory();
+  async function capture(scenario: string, verify: () => void, compactHistoryBytes = 0) {
+    const freshWasmBytesFloor = freshFloors.get(scenario);
+    if (freshWasmBytesFloor === undefined) throw new Error(`Missing fresh floor for ${scenario}`);
+
     await collectGarbage();
     const before = observe();
     const retired = new WeakRef(engine.getEngine().getMemory());
@@ -313,8 +372,19 @@ async function memory() {
     const after = observe();
     verify();
     assert.equal(retired.deref(), undefined, "Retired WebAssembly.Memory must be collectible");
-    assert.ok(after.wasmBytes < before.wasmBytes, `${scenario}: committed memory did not fall`);
-    assert.ok(after.rssBytes < before.rssBytes, `${scenario}: process memory did not fall`);
+    assert.ok(after.wasmBytes <= before.wasmBytes, `${scenario}: committed memory grew`);
+    if (scenario !== "empty-dense") {
+      assert.ok(after.wasmBytes < before.wasmBytes, `${scenario}: committed memory did not fall`);
+      assert.ok(after.rssBytes < before.rssBytes, `${scenario}: process memory did not fall`);
+    }
+
+    if (scenario !== "paged-dirty") {
+      assert.ok(
+        after.wasmBytes <= freshWasmBytesFloor * 1.1,
+        `${scenario}: import exceeded the fresh floor by over 10%`,
+      );
+    }
+
     observations.push({
       scenario,
       rows: MEMORY_ROWS,
@@ -322,9 +392,22 @@ async function memory() {
       after,
       report,
       oldMemoryCollected: true,
+      freshWasmBytesFloor,
+      compactHistoryBytes,
+      bytesAboveFreshFloor: Math.max(0, after.wasmBytes - freshWasmBytesFloor),
     });
   }
   try {
+    const empty = new core.SheetwriteStore(workbook(MEMORY_ROWS));
+
+    try {
+      await capture("empty-dense", () => {
+        assert.equal(empty.getCell(address(MEMORY_ROWS - 1, 1)).resolved, null);
+      });
+    } finally {
+      empty.dispose();
+    }
+
     const dense = new core.SheetwriteStore(workbook(MEMORY_ROWS), columnar(MEMORY_ROWS));
     try {
       assert.equal(
@@ -413,14 +496,18 @@ async function memory() {
       );
       assert.ok(grid.store instanceof core.SheetwriteStore);
       const materializations = grid.store.getRangeMutationAllocationStats().historyMaterializations;
-      await capture("large-clear-history", () => {
-        assert.equal(grid.store.getCell(address(MEMORY_ROWS - 1, 1)).resolved, null);
-        assert.ok(grid.store instanceof core.SheetwriteStore);
-        assert.equal(
-          grid.store.getRangeMutationAllocationStats().historyMaterializations,
-          materializations,
-        );
-      });
+      await capture(
+        "large-clear-history",
+        () => {
+          assert.equal(grid.store.getCell(address(MEMORY_ROWS - 1, 1)).resolved, null);
+          assert.ok(grid.store instanceof core.SheetwriteStore);
+          assert.equal(
+            grid.store.getRangeMutationAllocationStats().historyMaterializations,
+            materializations,
+          );
+        },
+        grid.store.getRangeMutationAllocationStats().historySnapshotBytes,
+      );
       grid.undo();
       assert.equal(grid.store.getCell(address(MEMORY_ROWS - 1, 1)).resolved, 17);
       grid.redo();

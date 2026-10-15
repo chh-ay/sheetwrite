@@ -5,6 +5,12 @@ use crate::types::{FormulaError, StringStorage};
 
 pub(crate) type TransferResult<T> = Result<T, String>;
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) type TransferInput<'a> = js_sys::Uint8Array;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) type TransferInput<'a> = &'a [u8];
+
 pub(crate) struct Writer(pub(crate) Vec<u8>);
 
 impl Writer {
@@ -32,7 +38,25 @@ impl Writer {
 
     pub(crate) fn bytes(&mut self, value: &[u8]) {
         self.usize(value.len());
-        self.0.extend_from_slice(value);
+        let mut start = 0;
+
+        while start < value.len() {
+            let is_zero = value[start] == 0;
+            let mut end = start + 1;
+            while end < value.len()
+                && end - start < (u32::MAX >> 1) as usize
+                && (value[end] == 0) == is_zero
+            {
+                end += 1;
+            }
+
+            self.u32(((end - start) as u32) << 1 | u32::from(!is_zero));
+            if !is_zero {
+                self.0.extend_from_slice(&value[start..end]);
+            }
+
+            start = end;
+        }
     }
 
     pub(crate) fn text(&mut self, value: &str) {
@@ -40,17 +64,16 @@ impl Writer {
     }
 
     pub(crate) fn words(&mut self, value: &[u64]) {
-        self.usize(value.len());
-        for &item in value {
-            self.u64(item);
-        }
+        // WASM is little-endian; borrow the backing bytes instead of packing a second vector.
+        self.bytes(unsafe {
+            std::slice::from_raw_parts(value.as_ptr().cast(), std::mem::size_of_val(value))
+        });
     }
 
     pub(crate) fn ints(&mut self, value: &[u32]) {
-        self.usize(value.len());
-        for &item in value {
-            self.u32(item);
-        }
+        self.bytes(unsafe {
+            std::slice::from_raw_parts(value.as_ptr().cast(), std::mem::size_of_val(value))
+        });
     }
 
     pub(crate) fn strings(&mut self, strings: &StringStorage) {
@@ -66,11 +89,23 @@ impl Writer {
     }
 }
 
-pub(crate) struct Reader<'a>(&'a [u8]);
+pub(crate) struct Reader<'a> {
+    #[cfg(not(target_arch = "wasm32"))]
+    bytes: &'a [u8],
+    #[cfg(target_arch = "wasm32")]
+    _native_borrow: std::marker::PhantomData<&'a [u8]>,
+    #[cfg(target_arch = "wasm32")]
+    source: js_sys::Uint8Array,
+    #[cfg(target_arch = "wasm32")]
+    buffer: Vec<u8>,
+    #[cfg(target_arch = "wasm32")]
+    offset: usize,
+}
 
 impl<'a> Reader<'a> {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn new(bytes: &'a [u8], tag: u32) -> TransferResult<Self> {
-        let mut input = Self(bytes);
+        let mut input = Self { bytes };
         if input.u32()? != tag {
             return Err("invalid engine memory transfer".into());
         }
@@ -78,18 +113,77 @@ impl<'a> Reader<'a> {
         Ok(input)
     }
 
-    fn take(&mut self, count: usize) -> TransferResult<&'a [u8]> {
-        if count > self.0.len() {
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn new(source: js_sys::Uint8Array, tag: u32) -> TransferResult<Self> {
+        let mut input = Self {
+            _native_borrow: std::marker::PhantomData,
+            source,
+            buffer: Vec::new(),
+            offset: 0,
+        };
+        if input.u32()? != tag {
+            return Err("invalid engine memory transfer".into());
+        }
+
+        Ok(input)
+    }
+
+    fn remaining(&self) -> usize {
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.source.length() as usize - self.offset
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.bytes.len()
+        }
+    }
+
+    fn read_exact(&mut self, output: &mut [u8]) -> TransferResult<()> {
+        if output.len() > self.remaining() {
             return Err("truncated engine memory transfer".into());
         }
 
-        let (value, rest) = self.0.split_at(count);
-        self.0 = rest;
+        #[cfg(target_arch = "wasm32")]
+        {
+            const CHUNK_BYTES: usize = 64 * 1024;
+            let mut written = 0;
+
+            while written < output.len() {
+                let cursor = self.offset % CHUNK_BYTES;
+                if cursor == 0 {
+                    let length = CHUNK_BYTES.min(self.remaining());
+                    self.buffer.resize(length, 0);
+                    self.source
+                        .subarray(self.offset as u32, (self.offset + length) as u32)
+                        .copy_to(&mut self.buffer);
+                }
+
+                let length = (self.buffer.len() - cursor).min(output.len() - written);
+                output[written..written + length]
+                    .copy_from_slice(&self.buffer[cursor..cursor + length]);
+                self.offset += length;
+                written += length;
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (value, rest) = self.bytes.split_at(output.len());
+            output.copy_from_slice(value);
+            self.bytes = rest;
+        }
+
+        Ok(())
+    }
+
+    fn fixed<const N: usize>(&mut self) -> TransferResult<[u8; N]> {
+        let mut value = [0; N];
+        self.read_exact(&mut value)?;
         Ok(value)
     }
 
     pub(crate) fn u32(&mut self) -> TransferResult<u32> {
-        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+        Ok(u32::from_le_bytes(self.fixed()?))
     }
 
     pub(crate) fn usize(&mut self) -> TransferResult<usize> {
@@ -97,11 +191,11 @@ impl<'a> Reader<'a> {
     }
 
     pub(crate) fn u64(&mut self) -> TransferResult<u64> {
-        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+        Ok(u64::from_le_bytes(self.fixed()?))
     }
 
     pub(crate) fn bool(&mut self) -> TransferResult<bool> {
-        match self.take(1)?[0] {
+        match self.fixed::<1>()?[0] {
             0 => Ok(false),
             1 => Ok(true),
             _ => Err("invalid transfer flag".into()),
@@ -110,16 +204,52 @@ impl<'a> Reader<'a> {
 
     pub(crate) fn count(&mut self) -> TransferResult<usize> {
         let count = self.usize()?;
-        if count > self.0.len() {
+        if count > self.remaining() {
             return Err("invalid transfer count".into());
         }
 
         Ok(count)
     }
 
+    fn array<T: Copy + Default>(&mut self) -> TransferResult<Vec<T>> {
+        let length = self.usize()?;
+        let width = std::mem::size_of::<T>();
+        if length % width != 0 {
+            return Err("invalid transfer length".into());
+        }
+
+        let mut values = vec![T::default(); length / width];
+        // Only u8/u32/u64 call this method, and every bit pattern is valid for them.
+        let bytes =
+            unsafe { std::slice::from_raw_parts_mut(values.as_mut_ptr().cast::<u8>(), length) };
+        self.fill_array(bytes)?;
+        Ok(values)
+    }
+
+    // Share the run decoder across element widths instead of duplicating it in WASM.
+    #[inline(never)]
+    fn fill_array(&mut self, bytes: &mut [u8]) -> TransferResult<()> {
+        let mut offset = 0;
+
+        while offset < bytes.len() {
+            let run = self.u32()?;
+            let count = (run >> 1) as usize;
+            if count == 0 || count > bytes.len() - offset {
+                return Err("invalid transfer run".into());
+            }
+
+            if run & 1 != 0 {
+                self.read_exact(&mut bytes[offset..offset + count])?;
+            }
+
+            offset += count;
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn bytes(&mut self) -> TransferResult<Vec<u8>> {
-        let count = self.usize()?;
-        Ok(self.take(count)?.to_vec())
+        self.array()
     }
 
     pub(crate) fn text(&mut self) -> TransferResult<String> {
@@ -127,21 +257,11 @@ impl<'a> Reader<'a> {
     }
 
     pub(crate) fn words(&mut self) -> TransferResult<Vec<u64>> {
-        let count = self.usize()?;
-        let bytes = self.take(count.checked_mul(8).ok_or("invalid transfer length")?)?;
-        Ok(bytes
-            .chunks_exact(8)
-            .map(|item| u64::from_le_bytes(item.try_into().unwrap()))
-            .collect())
+        self.array()
     }
 
     pub(crate) fn ints(&mut self) -> TransferResult<Vec<u32>> {
-        let count = self.usize()?;
-        let bytes = self.take(count.checked_mul(4).ok_or("invalid transfer length")?)?;
-        Ok(bytes
-            .chunks_exact(4)
-            .map(|item| u32::from_le_bytes(item.try_into().unwrap()))
-            .collect())
+        self.array()
     }
 
     pub(crate) fn strings(&mut self) -> TransferResult<StringStorage> {
@@ -170,7 +290,7 @@ impl<'a> Reader<'a> {
     }
 
     pub(crate) fn finish(self) -> TransferResult<()> {
-        if self.0.is_empty() {
+        if self.remaining() == 0 {
             Ok(())
         } else {
             Err("trailing engine memory transfer".into())

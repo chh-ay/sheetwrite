@@ -23,6 +23,7 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
  * Move all live stores into a fresh WASM instance. Call explicitly while idle;
  * the main-thread pause scales with resident data and compact undo history.
  * Preparation failures leave every live store and the selected instance unchanged.
+ * A larger replacement is discarded; the report then has zero migrated stores.
  */
 export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
   if (pendingRelease) return pendingRelease;
@@ -70,6 +71,19 @@ async function release(): Promise<EngineMemoryReleaseReport> {
     );
   }
 
+  const after = replacement.getMemory().buffer.byteLength;
+  if (after > before) {
+    for (const migration of prepared) migration.abort();
+    replacement.retire();
+
+    return {
+      stores: 0,
+      wasmBytesBefore: before,
+      wasmBytesAfter: before,
+      pauseMs: performance.now() - started,
+    };
+  }
+
   // No await, callbacks, or fallible reconstruction inside the cutover.
   for (const migration of prepared) migration.commit();
   replaceEngineInstance(replacement);
@@ -83,7 +97,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   return {
     stores: prepared.length,
     wasmBytesBefore: before,
-    wasmBytesAfter: replacement.getMemory().buffer.byteLength,
+    wasmBytesAfter: after,
     pauseMs: performance.now() - started,
   };
 }

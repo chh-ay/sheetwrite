@@ -18,5 +18,6 @@ export const { load, isLoaded } = loader;
 export async function createEngine(source) {
   const engine = createInstance();
   await engine.init(source === undefined ? undefined : { module_or_path: source });
+  loader.adopt(source);
   return engine;
 }

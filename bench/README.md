@@ -38,40 +38,42 @@ Use `--mode memory --engine wasm --output <artifact.json>` (and `formulas`) for 
 
 The memory-release captures compare `5a16a55` with this branch on Bun 1.4.3, using runner slot 4. `results/engine-memory-release-read-profiles.json` records isolated A/B read profiles of the implementation at `9915236`, before the lazy-singleton compatibility repair. Both profiles spend their read samples in the same WASM/window-copy paths; neither samples an engine lookup. The reader already keeps a direct store reference, rebound only during migration. The short original read batches mixed JSC tier-up and allocation bursts; the retained protocol uses longer warmed batches rather than adding a lookup cache or changing Rust. The final unprofiled comparison includes the lazy-singleton repair.
 
-Memory observations below are MiB before → after, after five GC/event-loop turns. Dense-clear retains ten populated rows of a million-row, three-column dense store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history retains the compact inverse of a three-column million-row clear. The scenarios run sequentially in one engine, so the paged case also starts with the preceding dense case's committed high-water mark.
+Memory observations below are MiB before → after, after five GC/event-loop turns. Empty-dense is a new million-row, three-column dense store with no data. Dense-clear keeps ten populated rows of the same store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history keeps the compact inverse of a three-column million-row clear. The fresh floor is the WASM memory of a store newly built with the same surviving content and row count, plus the compact history bytes. The scenarios run in sequence in one engine.
 
-| Engine | Scenario | WASM MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
-| --- | --- | --- | --- | --- | --- |
-| wasm | dense-clear | 173.25 → 75.63 | 5.56 → 5.58 | 248.83 → 153.32 | 95.01 |
-| wasm | paged-dirty | 75.63 → 1.25 | 5.63 → 5.64 | 171.43 → 81.48 | 0.69 |
-| wasm | large-clear-history | 173.06 → 124.38 | 7.80 → 7.81 | 268.63 → 209.41 | 137.68 |
-| formulas | dense-clear | 173.25 → 75.63 | 5.62 → 5.64 | 255.43 → 155.45 | 81.50 |
-| formulas | paged-dirty | 75.63 → 1.25 | 5.69 → 5.70 | 172.85 → 82.60 | 0.56 |
-| formulas | large-clear-history | 173.06 → 124.38 | 7.86 → 7.88 | 270.34 → 211.93 | 109.43 |
+| Engine | Scenario | WASM MiB | Fresh floor MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | empty-dense | 38.44 → 38.44 | 38.44 | 5.61 → 5.62 | 110.26 → 110.55 | 52.83 |
+| wasm | dense-clear | 173.25 → 38.44 | 38.44 | 5.63 → 5.64 | 250.66 → 111.88 | 50.29 |
+| wasm | paged-dirty | 38.44 → 1.19 | 1.19 | 5.65 → 5.66 | 132.97 → 80.63 | 5.47 |
+| wasm | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.82 → 7.83 | 270.43 → 159.74 | 274.26 |
+| formulas | empty-dense | 38.44 → 38.44 | 38.44 | 5.69 → 5.70 | 110.86 → 109.86 | 51.98 |
+| formulas | dense-clear | 173.25 → 38.44 | 38.44 | 5.71 → 5.72 | 251.73 → 111.54 | 55.26 |
+| formulas | paged-dirty | 38.44 → 1.19 | 1.19 | 5.73 → 5.74 | 134.39 → 82.24 | 4.07 |
+| formulas | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.89 → 7.90 | 265.95 → 161.40 | 224.24 |
 
-All six retired-memory WeakRefs cleared; WASM and process memory fell without materializing compact history into JS cells. Raw bytes and pause measurements are retained in `results/engine-memory-release-memory-{wasm,formulas}.json`. The small non-external heap increases are tens of KiB, not millions of JS cells. These local captures are not portable memory ceilings or clean-tree published-site evidence.
+Release never grows the WASM memory, and every scenario lands on its fresh floor. The transfer is sized by content, not row count: runs of empty or default values are encoded as runs, and the new instance decodes from a JavaScript buffer through a bounded 64 KiB reader straight into its final vectors, so no full transfer image stays in its heap. All eight retired-memory WeakRefs cleared. Raw bytes and pause measurements are in `results/engine-memory-release-memory-{wasm,formulas}.json`. These local captures are not portable memory ceilings.
 
 | Engine | Baseline raw B | Changed raw B | Baseline Brotli B | Changed Brotli B | Brotli increase B |
 | --- | --- | --- | --- | --- | --- |
-| wasm | 804818 | 846757 | 241093 | 249171 | 8078 |
-| formulas | 1087813 | 1129666 | 329268 | 337729 | 8461 |
+| wasm | 804818 | 848920 | 241093 | 250209 | 9116 |
+| formulas | 1087813 | 1131855 | 329268 | 338637 | 9369 |
 
-The default engine remains 114 B below its 8192 B Brotli feature budget after the final rebuild. No additional Rust implementation is included in the profiling/sampling correction. Core boot creates only its collectible instance; the published synchronous singleton exports initialize once, on first use, from the already-compiled module. A fresh-process regression counts real instances to guard against a second eager boot instance.
+Brotli uses quality 11. The default engine grows by 9,116 B, which the maintainer accepted for memory release. Core boot creates only its collectible instance. The published synchronous exports initialize once, on first use, from the module that instance compiled, and the first instance marks the published loader ready. A fresh-process regression counts real instances to guard against a second eager boot instance.
 
-Final ordinary-path verdicts (milliseconds per operation; A/A spread is the maximum absolute paired-control delta):
+Ordinary-path verdicts (milliseconds per operation; 3 A/A controls, then 5 ABBA rounds on slot 4; the A/A spread is the maximum absolute paired-control delta):
 
-| Engine | Path | A median ms | B median ms | Delta | A/A spread | Limit | Verdict |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| wasm | edit | 0.004656015 | 0.004941355 | +6.13% | 15.10% | +18.10% | pass |
-| wasm | scroll/read | 0.009864620 | 0.009801872 | −0.64% | 5.07% | +8.07% | pass |
-| wasm | ingest | 48.9134055 | 49.8515170 | +1.92% | 6.48% | +9.48% | pass |
-| wasm | recalculation | 1.001599781 | 1.058138516 | +5.64% | 5.03% | +8.03% | pass |
-| formulas | edit | 0.004667926 | 0.004809408 | +3.03% | 13.37% | +16.37% | pass |
-| formulas | scroll/read | 0.008333863 | 0.008006740 | −3.93% | 19.55% | +22.55% | pass |
-| formulas | ingest | 46.3539635 | 45.6183620 | −1.59% | 12.84% | +15.84% | pass |
-| formulas | recalculation | 0.908358219 | 0.957571906 | +5.42% | 22.31% | +25.31% | pass |
+| Engine | Path | A median ms | B median ms | Delta | A/A spread | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | edit | 0.0031 | 0.0032 | +3.05% | 12.11% | pass |
+| wasm | scroll/read | 0.0059 | 0.0059 | +0.64% | 1.19% | pass |
+| wasm | ingest | 33.108 | 33.337 | +0.69% | 1.39% | pass |
+| wasm | recalculation | 0.6959 | 0.6996 | +0.53% | 2.13% | pass |
+| formulas | edit | 0.0031 | 0.0030 | −1.59% | 5.77% | pass |
+| formulas | scroll/read | 0.0058 | 0.0059 | +1.91% | 5.39% | pass |
+| formulas | ingest | 33.463 | 33.313 | −0.45% | 0.53% | pass |
+| formulas | recalculation | 0.6956 | 0.6941 | −0.22% | 1.25% | pass |
 
-All paths pass the predefined noise-adjusted gate; these measurements do not establish a speedup. Every unrounded per-round median, raw sample, and A/A control is retained in `results/engine-memory-release-paths-{wasm,formulas}.json`.
+Every path is within the A/A noise plus 3 points; these measurements do not show a speedup. Every unrounded per-round median, raw sample and A/A control is in `results/engine-memory-release-paths-{wasm,formulas}.json`.
 
 ─────────────────────────────────────────────────────────────────────────────
 

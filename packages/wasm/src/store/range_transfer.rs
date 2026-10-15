@@ -1,7 +1,7 @@
 use super::*;
-use crate::transfer::{Reader, TransferResult, Writer};
+use crate::transfer::{Reader, TransferInput, TransferResult, Writer};
 
-const RANGE_TAG: u32 = 0x31484d53;
+const RANGE_TAG: u32 = 0x32484d53;
 
 #[wasm_bindgen]
 impl RangeSnapshot {
@@ -29,7 +29,7 @@ impl RangeSnapshot {
 impl CellStore {
     fn read_range_memory(
         &self,
-        bytes: &[u8],
+        bytes: TransferInput<'_>,
         sheet: u32,
         row_start: u32,
         col_start: u32,
@@ -78,10 +78,11 @@ impl CellStore {
 
 #[wasm_bindgen]
 impl CellStore {
+    #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importRangeMemoryState)]
     pub fn import_range_memory_state(
         &self,
-        bytes: &[u8],
+        bytes: js_sys::Uint8Array,
         sheet: u32,
         row_start: u32,
         col_start: u32,

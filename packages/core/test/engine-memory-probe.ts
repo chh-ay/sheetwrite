@@ -16,6 +16,7 @@ if (engineName !== "wasm" && engineName !== "formulas") throw new Error("Expecte
 
 const provider = engineName === "formulas" ? formulas : wasm;
 let failImportAt: number | undefined;
+let growCandidate = false;
 let candidateCreated: PromiseWithResolvers<void> | undefined;
 const NativeInstance = WebAssembly.Instance;
 let instancesCreated = 0;
@@ -31,6 +32,8 @@ await initSheetwrite(undefined, {
   ...provider,
   async createEngine(source): Promise<EngineInstance> {
     const instance = await provider.createEngine(source);
+    if (growCandidate) instance.getMemory().grow(128);
+
     const importStore = instance.CellStore.importMemoryState;
     let importedStores = 0;
     instance.CellStore.importMemoryState = (bytes: Uint8Array) => {
@@ -86,6 +89,16 @@ const stopPaged = paged.on("change", () => {
 });
 
 try {
+  growCandidate = true;
+  const skipped = await releaseEngineMemory();
+  assert.equal(skipped.stores, 0, "A larger replacement must be discarded atomically");
+  assert.equal(skipped.wasmBytesAfter, skipped.wasmBytesBefore);
+  assert.equal(getEngine().getMemory(), previousMemory);
+  assert.deepEqual(dense.exportSnapshot(), denseBefore);
+  assert.equal(paged.getCell(address).resolved, "unsaved");
+  assert.equal(changes, 0);
+  growCandidate = false;
+
   failImportAt = 2;
   await assert.rejects(releaseEngineMemory(), /live stores are unchanged/);
   assert.equal(getEngine().getMemory(), previousMemory);
@@ -163,10 +176,6 @@ try {
   } finally {
     controller.destroy();
   }
-
-  process.stdout.write(
-    `${JSON.stringify({ engine: engineName, atomic: true, waitedForPage: true })}\n`,
-  );
 } finally {
   stopDense();
   stopPaged();
@@ -174,3 +183,81 @@ try {
   dense.dispose();
   paged.dispose();
 }
+
+await releaseEngineMemory();
+
+const millionRows = 1_000_000;
+const empty = new SheetwriteStore(makeWorkbook(millionRows));
+let freshStoreBytes: number;
+
+try {
+  const report = await releaseEngineMemory();
+  assert.ok(
+    report.wasmBytesAfter <= report.wasmBytesBefore,
+    "Empty dense release must not grow memory",
+  );
+  freshStoreBytes = report.wasmBytesBefore;
+
+  empty.applyTransaction({
+    patches: Array.from({ length: 10 }, (_, row) => ({
+      op: "set" as const,
+      addr: { sheet: "s1", row, col: 1 },
+      value: { kind: "literal" as const, value: 17 },
+    })),
+  });
+  const populated = await releaseEngineMemory();
+  assert.ok(populated.wasmBytesAfter <= populated.wasmBytesBefore);
+} finally {
+  empty.dispose();
+}
+
+const source = {
+  rowCount: millionRows,
+  columns: { amount: new Float64Array(millionRows).fill(17) },
+};
+const entireSheet = {
+  sheet: "s1",
+  start: { row: 0, col: 0 },
+  end: { row: millionRows - 1, col: 2 },
+};
+
+for (const keepHistory of [false, true]) {
+  await releaseEngineMemory();
+  const store = new SheetwriteStore(makeWorkbook(millionRows), source);
+  const retained = keepHistory ? store.captureRangeHistory(entireSheet) : null;
+
+  try {
+    store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { ...entireSheet, start: { row: keepHistory ? 0 : 10, col: 0 } },
+          contents: true,
+          style: true,
+        },
+      ],
+    });
+    const report = await releaseEngineMemory();
+    const freshFloor = freshStoreBytes + (retained?.byteLength ?? 0);
+    assert.ok(report.wasmBytesAfter <= report.wasmBytesBefore, "Release must not grow memory");
+    assert.ok(
+      report.wasmBytesAfter <= freshFloor * 1.1,
+      "Import must stay near the fresh allocation floor",
+    );
+
+    if (retained) {
+      assert.equal(store.getCell({ sheet: "s1", row: millionRows - 1, col: 1 }).resolved, null);
+      assert.equal(store.getRangeMutationAllocationStats().historyMaterializations, 0);
+    } else {
+      assert.equal(store.getCell({ sheet: "s1", row: 9, col: 1 }).resolved, 17);
+      assert.equal(store.getCell({ sheet: "s1", row: 10, col: 1 }).resolved, null);
+    }
+  } finally {
+    retained?.dispose();
+    store.dispose();
+  }
+}
+
+process.stdout.write(
+  `${JSON.stringify({ engine: engineName, atomic: true, waitedForPage: true })}\n`,
+);

@@ -4,73 +4,108 @@
   "jsHeapMeasurement": "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
   "observations": [
     {
+      "scenario": "empty-dense",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5880880,
+        "jscExternalBytes": 83368105,
+        "rssBytes": 115613696
+      },
+      "after": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5888032,
+        "jscExternalBytes": 83383110,
+        "rssBytes": 115916800
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 40304640,
+        "wasmBytesAfter": 40304640,
+        "pauseMs": 52.83225600000003
+      },
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 40304640,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
+    },
+    {
       "scenario": "dense-clear",
       "rows": 1000000,
       "before": {
         "wasmBytes": 181665792,
-        "jsHeapBytes": 5827600,
-        "jscExternalBytes": 365790700,
-        "rssBytes": 260919296
+        "jsHeapBytes": 5905328,
+        "jscExternalBytes": 366210963,
+        "rssBytes": 262840320
       },
       "after": {
-        "wasmBytes": 79298560,
-        "jsHeapBytes": 5847904,
-        "jscExternalBytes": 161096300,
-        "rssBytes": 160768000
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5915808,
+        "jscExternalBytes": 83496911,
+        "rssBytes": 117313536
       },
       "report": {
         "stores": 1,
         "wasmBytesBefore": 181665792,
-        "wasmBytesAfter": 79298560,
-        "pauseMs": 95.00944400000003
+        "wasmBytesAfter": 40304640,
+        "pauseMs": 50.285131999999976
       },
-      "oldMemoryCollected": true
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 40304640,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
     },
     {
       "scenario": "paged-dirty",
       "rows": 1000000,
       "before": {
-        "wasmBytes": 79298560,
-        "jsHeapBytes": 5900240,
-        "jscExternalBytes": 161392140,
-        "rssBytes": 179752960
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5922784,
+        "jscExternalBytes": 83563665,
+        "rssBytes": 139427840
       },
       "after": {
-        "wasmBytes": 1310720,
-        "jsHeapBytes": 5910384,
-        "jscExternalBytes": 5427451,
-        "rssBytes": 85438464
+        "wasmBytes": 1245184,
+        "jsHeapBytes": 5933984,
+        "jscExternalBytes": 5455792,
+        "rssBytes": 84545536
       },
       "report": {
         "stores": 1,
-        "wasmBytesBefore": 79298560,
-        "wasmBytesAfter": 1310720,
-        "pauseMs": 0.6864439999999377
+        "wasmBytesBefore": 40304640,
+        "wasmBytesAfter": 1245184,
+        "pauseMs": 5.468508999999813
       },
-      "oldMemoryCollected": true
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 1245184,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
     },
     {
       "scenario": "large-clear-history",
       "rows": 1000000,
       "before": {
-        "wasmBytes": 181469184,
-        "jsHeapBytes": 8177904,
-        "jscExternalBytes": 367636003,
-        "rssBytes": 281681920
+        "wasmBytes": 181731328,
+        "jsHeapBytes": 8195024,
+        "jscExternalBytes": 368258867,
+        "rssBytes": 283561984
       },
       "after": {
-        "wasmBytes": 130416640,
-        "jsHeapBytes": 8191376,
-        "jscExternalBytes": 265673183,
-        "rssBytes": 219586560
+        "wasmBytes": 79429632,
+        "jsHeapBytes": 8209312,
+        "jscExternalBytes": 163796565,
+        "rssBytes": 167497728
       },
       "report": {
         "stores": 1,
-        "wasmBytesBefore": 181469184,
-        "wasmBytesAfter": 130416640,
-        "pauseMs": 137.6824489999999
+        "wasmBytesBefore": 181731328,
+        "wasmBytesAfter": 79429632,
+        "pauseMs": 274.260683
       },
-      "oldMemoryCollected": true
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 79429632,
+      "compactHistoryBytes": 39000582,
+      "bytesAboveFreshFloor": 0
     }
   ]
 }

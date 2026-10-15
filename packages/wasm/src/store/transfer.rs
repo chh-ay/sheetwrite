@@ -1,9 +1,9 @@
 //! Same-build instance migration; never exposed as the document persistence format.
 use super::*;
-use crate::transfer::{Reader, TransferResult, Writer};
+use crate::transfer::{Reader, TransferInput, TransferResult, Writer};
 use crate::types::{CellRange, ReadSet};
 
-const STORE_TAG: u32 = 0x31524d53;
+const STORE_TAG: u32 = 0x32524d53;
 
 fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
     out.usize(names.len());
@@ -124,7 +124,7 @@ impl CellStore {
         Ok(entry)
     }
 
-    fn read_memory_state(bytes: &[u8]) -> TransferResult<Self> {
+    fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
         let mut input = Reader::new(bytes, STORE_TAG)?;
         let mut store = Self::new();
         store.strings = input.strings()?;
@@ -276,8 +276,9 @@ impl CellStore {
     }
 
     /// Import into a fresh instance; failure never mutates the source store.
+    #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importMemoryState)]
-    pub fn import_memory_state(bytes: &[u8]) -> CellStore {
+    pub fn import_memory_state(bytes: js_sys::Uint8Array) -> CellStore {
         Self::read_memory_state(bytes).unwrap_or_else(|error| wasm_bindgen::throw_str(&error))
     }
 }
@@ -296,7 +297,7 @@ mod tests {
         original.recompute_changed();
         let cached_time = original.get_cell(0, 1, 1).num();
         let bytes = original.export_memory_state();
-        let mut replacement = CellStore::import_memory_state(&bytes);
+        let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
         assert_eq!(replacement.get_cell(0, 0, 0).style(), 7);
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 42.0);
         assert_eq!(

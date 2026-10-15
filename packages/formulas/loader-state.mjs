@@ -50,5 +50,17 @@ export function createLoader(initialize) {
     return ready;
   }
 
-  return { load, isLoaded };
+  /**
+   * Mark the published exports ready once an engine instance has compiled the module;
+   * they initialize from that compiled module on first use.
+   *
+   * @param {BufferSource | URL | string | Request | WebAssembly.Module} [source]
+   */
+  function adopt(source) {
+    if (ready || inFlight) return;
+    selectedSource = source;
+    ready = true;
+  }
+
+  return { load, isLoaded, adopt };
 }

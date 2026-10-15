@@ -27,5 +27,7 @@ export async function createEngine(source) {
   } else {
     await engine.init({ module_or_path: source });
   }
+
+  loader.adopt(source);
   return engine;
 }
