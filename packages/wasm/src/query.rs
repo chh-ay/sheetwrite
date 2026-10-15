@@ -299,7 +299,7 @@ impl CellStore {
             for (row, (&kind, &bits)) in kinds.iter().zip(payloads.iter()).enumerate() {
                 let matched = if kind == KIND_STRING {
                     cache.matches(&self.strings, payload_str_id(bits), &needle, true, false)
-                } else if kind == KIND_EMPTY {
+                } else if kind == KIND_EMPTY && s.kind_at(base + row) == KIND_EMPTY {
                     false
                 } else {
                     cell_matches_text(
@@ -819,18 +819,11 @@ fn resolved_kind(sheet: &SheetData, index: usize) -> u8 {
             if formula_error_at(sheet, key).is_some() {
                 return 2;
             }
-            let Some(entry) = sheet.formulas.get(&key) else {
-                return 0;
-            };
-            if formula_error_at(sheet, key).is_some() {
-                2
-            } else {
-                match entry.value_kind {
-                    FormulaValueKind::Number => 1,
-                    FormulaValueKind::Text => 2,
-                    FormulaValueKind::Bool => 3,
-                    FormulaValueKind::Blank => 0,
-                }
+            match sheet.formula_value_kind(index) {
+                FormulaValueKind::Number => 1,
+                FormulaValueKind::Text => 2,
+                FormulaValueKind::Bool => 3,
+                FormulaValueKind::Blank => 0,
             }
         }
         _ => 0,
@@ -850,8 +843,8 @@ fn boolean_cell_value(sheet: &SheetData, index: usize) -> Option<bool> {
         KIND_BOOL => Some(sheet.num_at(index) != 0.0),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            let entry = sheet.formulas.get(&key)?;
-            (formula_error_at(sheet, key).is_none() && entry.value_kind == FormulaValueKind::Bool)
+            (formula_error_at(sheet, key).is_none()
+                && sheet.formula_value_kind(index) == FormulaValueKind::Bool)
                 .then(|| sheet.num_at(index) != 0.0)
         }
         _ => None,
@@ -914,9 +907,8 @@ pub(crate) fn numeric_cell_value(sheet: &SheetData, index: usize) -> Option<f64>
         KIND_NUMBER => Some(sheet.num_at(index)),
         KIND_FORMULA => {
             let key = key_for_index(sheet, index)?;
-            let entry = sheet.formulas.get(&key)?;
             if formula_error_at(sheet, key).is_none()
-                && entry.value_kind == FormulaValueKind::Number
+                && sheet.formula_value_kind(index) == FormulaValueKind::Number
             {
                 Some(sheet.num_at(index))
             } else {
@@ -1341,17 +1333,9 @@ impl<'a> ComparableCell<'a> {
                 };
                 if let Some(error) = formula_error_at(sheet, key) {
                     ComparableCell::Text(error.sentinel())
-                } else if sheet
-                    .formulas
-                    .get(&key)
-                    .is_some_and(|entry| entry.value_kind == FormulaValueKind::Blank)
-                {
+                } else if sheet.formula_value_kind(index) == FormulaValueKind::Blank {
                     ComparableCell::Empty
-                } else if sheet
-                    .formulas
-                    .get(&key)
-                    .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
-                {
+                } else if sheet.formula_value_kind(index) == FormulaValueKind::Bool {
                     ComparableCell::Bool(sheet.num_at(index) != 0.0)
                 } else if let Some(text) = string_from_pool_ref(strings, sheet.str_id_at(index)) {
                     ComparableCell::Text(text)
@@ -1390,18 +1374,10 @@ impl<'a> ComparableCell<'a> {
                 } else {
                     // SAFETY: caller guarantees `index` is valid for all cell vectors.
                     let bits = unsafe { sheet.payload_unchecked(index) };
-                    if sheet
-                        .formulas
-                        .get(&key)
-                        .is_some_and(|entry| entry.value_kind == FormulaValueKind::Blank)
-                    {
+                    if sheet.formula_value_kind(index) == FormulaValueKind::Blank {
                         return ComparableCell::Empty;
                     }
-                    if sheet
-                        .formulas
-                        .get(&key)
-                        .is_some_and(|entry| entry.value_kind == FormulaValueKind::Bool)
-                    {
+                    if sheet.formula_value_kind(index) == FormulaValueKind::Bool {
                         ComparableCell::Bool(payload_num(bits) != 0.0)
                     } else if let Some(text) = string_from_pool_ref(strings, payload_str_id(bits)) {
                         ComparableCell::Text(text)

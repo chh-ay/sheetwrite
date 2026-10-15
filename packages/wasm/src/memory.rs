@@ -213,7 +213,7 @@ mod tests {
         let sheet = paged.add_paged_sheet(1, 100, 4, 4096, 1_000_000);
         paged.begin_page_load();
         paged.set_number(sheet, 0, 0, 2.0, 0);
-        paged.end_page_load();
+        paged.commit_sources();
         let paged_stats = paged.memory_stats();
         assert_eq!(owner(&paged_stats, PAGED_KINDS).2, 4);
         assert_eq!(owner(&paged_stats, PAGED_PAYLOADS).2, 4);

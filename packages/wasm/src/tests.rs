@@ -16,9 +16,7 @@ fn string(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<Str
 }
 
 fn put_number(sheet: &mut SheetData, row: usize, col: usize, value: f64) {
-    let i = sheet.idx(row, col);
-    sheet.kind[i] = KIND_NUMBER;
-    sheet.set_num(i, value);
+    assert!(sheet.write_cell(row, col, KIND_NUMBER, encode_num(value), 0, None));
 }
 
 struct DecodedWindow {
@@ -136,7 +134,7 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(!paged.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
         for row in 0..2 {
-            paged.mark_cell_loaded(row, col, true);
+            assert!(paged.write_cell(row, col, KIND_EMPTY, 0, 0, Some(1)));
         }
     }
     assert!(paged.is_fully_loaded());
@@ -887,7 +885,7 @@ fn public_api_bounds_checks_do_not_panic() {
         store.pin_range(99, 0, 1, &[0]);
         store.set_bool(99, 0, 0, true, 0);
         store.set_conditional_rules(99, &[], &[], &[], Vec::new(), &[]);
-        store.end_page_load();
+        store.commit_sources();
 
         assert!(!store.is_paged(99));
         assert_eq!(store.paged_stats(99), vec![0.0; 6]);
@@ -953,7 +951,7 @@ fn public_api_bounds_checks_do_not_panic() {
 #[test]
 fn window_view_uses_error_strings_and_consuming_reads() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(2, 1);
+    let sheet = store.add_sheet(2, 2);
     store.set_string(sheet, 0, 0, "hello", 7);
     store.set_formula(sheet, 0, 1, "=1/0", 9);
     store.recompute(sheet);
@@ -976,13 +974,12 @@ fn window_view_uses_error_strings_and_consuming_reads() {
     assert!(!consumed.take_packed().is_empty());
     assert!(consumed.take_packed().is_empty());
 
-    store.sheets[sheet]
-        .spill_errors
-        .insert((0, 1), FormulaError::Spill);
-    let spill_view = decode_window(store.get_window(sheet, 0, 1, &[1]));
+    store.set_formula(sheet, 1, 0, "=A1:B1", 0);
+    store.recompute(sheet);
+    let spill_view = decode_window(store.get_window(sheet, 1, 2, &[1]));
     assert_eq!(spill_view.kinds, vec![KIND_STRING]);
     let spill_index = spill_view.string_index[0];
-    assert_eq!(spill_view.strings[spill_index as usize], "#SPILL!");
+    assert_eq!(spill_view.strings[spill_index as usize], "#DIV/0!");
 }
 
 #[test]
@@ -1352,7 +1349,8 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
     let snapshot_numbers = store.snapshot_numbers(&snapshot);
     assert_close(snapshot_numbers[0], 5.0);
-    assert_close(snapshot_numbers[1], 6.0);
+    // History captures the written source, never the calculated scalar.
+    assert_close(snapshot_numbers[1], 0.0);
     assert_eq!(
         store.snapshot_texts(&snapshot),
         vec!["", "", "", "", "", "tail"]
@@ -1418,7 +1416,7 @@ fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
     }
     store.compact_string_storage();
     assert_eq!(store.string_pool_epoch(), 0);
-    store.end_mutation();
+    store.commit_sources();
     assert!(store.string_pool_epoch() > 0);
     for cycle in 0..4 {
         for edit in 0..4_000 {
@@ -1430,7 +1428,7 @@ fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
                 &format!("{cycle}-{edit}-{}", "x".repeat(128)),
                 0,
             );
-            store.end_mutation();
+            store.commit_sources();
         }
         let memory = store.memory_stats();
         let utf8_bytes = memory[3 + crate::memory::STRING_POOL_UTF8 * 3];
@@ -1438,7 +1436,7 @@ fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
         assert!(utf8_bytes + span_bytes < 600_000.0);
         store.begin_mutation();
         store.clear_cell(sheet, 2, 0, 0);
-        store.end_mutation();
+        store.commit_sources();
     }
     assert!(store.string_pool_epoch() > 0);
     store.compact_string_storage();
@@ -1468,13 +1466,47 @@ fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
 }
 
 #[test]
+fn paged_derived_text_is_remapped_by_collection_but_not_captured_as_source() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 3, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    for row in 0..3 {
+        store.clear_cell(sheet, row, 0, 0);
+    }
+    for edit in 0..100 {
+        store.set_string(sheet, 0, 1, &format!("obsolete-{edit}"), 0);
+    }
+    store.set_formula(
+        sheet,
+        0,
+        0,
+        "={\"anchor\";\"first child\";\"second child\"}",
+        0,
+    );
+    store.commit_sources();
+    store.clear_cell(sheet, 0, 1, 0);
+    store.compact_string_storage();
+    assert!(store.string_pool_epoch() > 0);
+    assert_eq!(
+        [0, 1, 2].map(|row| string(&store, sheet, row, 0)),
+        [
+            Some("anchor".into()),
+            Some("first child".into()),
+            Some("second child".into())
+        ],
+    );
+    let snapshot = store.capture_range(sheet, 0, 0, 3, 1).unwrap();
+    assert_eq!(store.snapshot_texts(&snapshot), vec!["", "", ""]);
+    assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_EMPTY, KIND_EMPTY]);
+}
+
+#[test]
 fn paged_text_collection_preserves_dirty_overlays_after_clean_eviction() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
     store.set_column_strings(sheet, 0, 0, vec!["clean old".into()], 0);
     store.set_column_strings(sheet, 0, 4096, vec!["evicted".into()], 0);
-    store.end_page_load();
+    store.commit_sources();
     store.set_string(sheet, 0, 0, "dirty survivor", 0);
     store.begin_page_load();
     store.set_column_strings(sheet, 0, 8192, vec!["clean survivor".into()], 0);
@@ -1489,7 +1521,7 @@ fn paged_text_collection_preserves_dirty_overlays_after_clean_eviction() {
         );
     }
     store.set_string(sheet, 12288, 0, "last survivor", 0);
-    store.end_page_load();
+    store.commit_sources();
     assert_eq!(
         store.string_pool_epoch(),
         0,
@@ -1528,7 +1560,7 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[1.0], 0);
     store.set_column_numbers(sheet, 0, 4096, &[2.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     let loaded = store.paged_stats(sheet);
     assert_eq!(loaded[0], 2.0);
     assert_eq!(loaded[1], 2.0);
@@ -1540,7 +1572,7 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 8192, &[3.0], 0);
     store.set_column_numbers(sheet, 0, 12288, &[4.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     let evicted = store.paged_stats(sheet);
     assert_eq!(evicted[0], 2.0);
     assert_eq!(evicted[2], 1.0);
@@ -1559,7 +1591,7 @@ fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounti
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
     store.set_column_numbers(sheet, 2, 0, &[5.0, 6.0, 7.0, 8.0], 0);
-    store.end_page_load();
+    store.commit_sources();
 
     assert!(store.columns_fully_loaded(sheet, 0, 4, &[0]));
     assert!(store.columns_fully_loaded(sheet, 0, 4, &[2]));
@@ -1594,7 +1626,7 @@ fn paged_formulas_propagate_loading_until_dependencies_arrive() {
 
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 42.0);
 }
@@ -1628,6 +1660,77 @@ fn formula_read_bands_follow_same_sheet_formula_chains_within_the_budget() {
     assert!(store
         .formula_read_bands(usize::MAX, 40, 42, &[7], 1_000)
         .is_empty());
+}
+
+#[test]
+fn host_source_hydration_obstructs_spills_without_erasing_the_source() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 4, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.begin_page_load();
+    for row in 0..4 {
+        store.clear_cell(sheet, row, 0, 0);
+    }
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(3)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 2.0);
+
+    assert_eq!(
+        store.set_sparse_block(
+            sheet,
+            1,
+            0,
+            1,
+            1,
+            &[0],
+            &[KIND_NUMBER],
+            &[99.0],
+            vec![String::new()],
+            &[0],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        0
+    );
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#SPILL!"));
+    assert_close(number(&store, sheet, 1, 0), 99.0);
+    assert_eq!(store.spill_anchor_row(sheet, 1, 0), u32::MAX);
+    let sources = store.capture_range(sheet, 0, 0, 3, 1).unwrap();
+    assert_eq!(sources.kinds(), vec![KIND_FORMULA, KIND_NUMBER, KIND_EMPTY]);
+
+    store.set_number(sheet, 0, 0, 17.0, 0);
+    store.set_formula(sheet, 0, 1, "=A1", 0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 0, 1), 17.0);
+    assert_close(number(&store, sheet, 1, 0), 99.0);
+}
+
+#[test]
+fn paged_spills_demand_unknown_output_destinations_and_child_anchor_inputs() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(4)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#LOADING!"));
+    assert_eq!(
+        store.formula_read_bands(sheet, 0, 1, &[0], 8),
+        vec![0, 4, 0, 1]
+    );
+    assert!(store.formula_read_bands(sheet, 0, 1, &[0], 3).is_empty());
+
+    for row in 1..4 {
+        store.clear_cell(sheet, row, 0, 0);
+    }
+    store.set_number(sheet, 7, 1, 4.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(B8)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 3, 0), 4.0);
+    assert_eq!(
+        store.formula_read_bands(sheet, 3, 4, &[0], 8),
+        vec![0, 4, 0, 1, 7, 8, 1, 2],
+    );
 }
 
 #[test]
@@ -1830,7 +1933,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
         ),
         0
     );
-    store.recompute_changed_sources();
+    store.commit_sources();
 
     assert_close(number(&store, sheet, 0, 1), 6.0);
     assert_close(number(&store, sheet, 1, 0), 6.0);
@@ -1875,7 +1978,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
         ),
         0
     );
-    store.recompute_changed_sources();
+    store.commit_sources();
     assert_close(number(&store, sheet, 0, 1), 12.0);
     assert_close(number(&store, sheet, 1, 0), 12.0);
 }
@@ -1934,11 +2037,11 @@ fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
         ),
         0
     );
-    store.recompute_changed_sources();
+    store.commit_sources();
     assert_close(number(&store, sheet, 2, 1), 9.0);
 
     store.add_rows(sheet, 0, 1);
-    store.recompute_changed_sources();
+    store.commit_sources();
     assert_eq!(
         store.reference_target(sheet, 3, 1),
         Some(vec![sheet as u32, 1, 0])
@@ -1946,7 +2049,7 @@ fn plain_reference_targets_follow_structural_edits_and_drop_on_target_delete() {
     assert_close(number(&store, sheet, 3, 1), 9.0);
 
     store.remove_rows(sheet, 1, 1);
-    store.recompute_changed_sources();
+    store.commit_sources();
     assert!(store.reference_target(sheet, 2, 1).is_none());
     assert_eq!(store.get_cell(sheet, 2, 1).kind(), KIND_EMPTY);
 }
@@ -2785,8 +2888,8 @@ fn column_major_block_input_matches_row_major_for_mixed_cells() {
         0
     );
 
-    row_major.recompute_changed_sources();
-    column_major.recompute_changed_sources();
+    row_major.commit_sources();
+    column_major.commit_sources();
     for row in 0..ROWS {
         for col in 0..COLS {
             let expected = row_major.get_cell(row_sheet, row, col);
@@ -2898,7 +3001,7 @@ fn loaded_spans_match_per_row_loaded_probes() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
     store.set_column_numbers(sheet, 1, 2, &[1.0, 2.0, 3.0, 4.0], 0);
-    store.end_page_load();
+    store.commit_sources();
     // A local edit is loaded but dirty; both states belong in a run.
     store.set_number(sheet, 7, 0, 9.0, 0);
 

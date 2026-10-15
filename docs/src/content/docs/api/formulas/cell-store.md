@@ -16,6 +16,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-add-paged-sheet"><code>addPagedSheet</code></a>
 <a href="#cell-store-add-rows"><code>addRows</code></a>
 <a href="#cell-store-add-sheet"><code>addSheet</code></a>
+<a href="#cell-store-admit-source-range"><code>admitSourceRange</code></a>
 <a href="#cell-store-aggregate"><code>aggregate</code></a>
 <a href="#cell-store-begin-mutation"><code>beginMutation</code></a>
 <a href="#cell-store-begin-page-load"><code>beginPageLoad</code></a>
@@ -30,13 +31,12 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-clear-range"><code>clearRange</code></a>
 <a href="#cell-store-col-count"><code>colCount</code></a>
 <a href="#cell-store-columns-fully-loaded"><code>columnsFullyLoaded</code></a>
+<a href="#cell-store-commit-sources"><code>commitSources</code></a>
 <a href="#cell-store-compact-string-storage"><code>compactStringStorage</code></a>
 <a href="#cell-store-data-edge"><code>dataEdge</code></a>
 <a href="#cell-store-data-edge-ordered"><code>dataEdgeOrdered</code></a>
 <a href="#cell-store-dirty-revision"><code>dirtyRevision</code></a>
 <a href="#cell-store-distinct-values"><code>distinctValues</code></a>
-<a href="#cell-store-end-mutation"><code>endMutation</code></a>
-<a href="#cell-store-end-page-load"><code>endPageLoad</code></a>
 <a href="#cell-store-filter-rows"><code>filterRows</code></a>
 <a href="#cell-store-filter-rows-multi"><code>filterRowsMulti</code></a>
 <a href="#cell-store-formula-matrix-resource-stats"><code>formulaMatrixResourceStats</code></a>
@@ -65,7 +65,6 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
 <a href="#cell-store-range-style-ids"><code>rangeStyleIds</code></a>
 <a href="#cell-store-recompute"><code>recompute</code></a>
-<a href="#cell-store-recompute-changed"><code>recomputeChanged</code></a>
 <a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
 <a href="#cell-store-reference-target"><code>referenceTarget</code></a>
 <a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
@@ -109,7 +108,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>95</span>
+## Members <span class="api-count" data-pagefind-ignore>94</span>
 
 <div class="api-member-list">
 
@@ -147,6 +146,17 @@ addRows: (sheet: number, at: number, count: number) => void;
 addSheet: (n_cols: number, row_count: number) => number;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-admit-source-range" data-pagefind-weight="1">
+<summary><code>admitSourceRange</code> <span class="api-member-summary">Whether a source rectangle can replace its spill cells without cutting an installed spill away from its anchor.</span></summary>
+
+```ts generated
+admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean;
+```
+
+<p class="api-member-doc">Whether a source rectangle can replace its spill cells without cutting
+an installed spill away from its anchor. No owner window crosses WASM.</p>
 </details>
 
 <details class="api-member" id="cell-store-aggregate" data-pagefind-weight="1">
@@ -289,6 +299,18 @@ columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Ui
 
 </details>
 
+<details class="api-member" id="cell-store-commit-sources" data-pagefind-weight="1">
+<summary><code>commitSources</code> <span class="api-member-summary">Commit staged user or host sources.</span></summary>
+
+```ts generated
+commitSources: () => void;
+```
+
+<p class="api-member-doc">Commit staged user or host sources. Admission metadata must be staged
+before this barrier; derived values and string roots are complete on return.
+Beginning a page load suppresses local dirty tracking until this commit.</p>
+</details>
+
 <details class="api-member" id="cell-store-compact-string-storage" data-pagefind-weight="1">
 <summary><code>compactStringStorage</code> <span class="api-member-summary">Reclaim unreachable text and release growth slack at a transaction barrier.</span></summary>
 
@@ -344,24 +366,6 @@ distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn;
 
 </details>
 
-<details class="api-member" id="cell-store-end-mutation" data-pagefind-weight="1">
-<summary><code>endMutation</code></summary>
-
-```ts generated
-endMutation: () => void;
-```
-
-</details>
-
-<details class="api-member" id="cell-store-end-page-load" data-pagefind-weight="1">
-<summary><code>endPageLoad</code></summary>
-
-```ts generated
-endPageLoad: () => void;
-```
-
-</details>
-
 <details class="api-member" id="cell-store-filter-rows" data-pagefind-weight="1">
 <summary><code>filterRows</code> <span class="api-member-summary">Data-row indices whose column text contains needle (case-insensitive).</span></summary>
 
@@ -390,18 +394,20 @@ formulaMatrixResourceStats: () => Float64Array;
 </details>
 
 <details class="api-member" id="cell-store-formula-read-bands" data-pagefind-weight="1">
-<summary><code>formulaReadBands</code> <span class="api-member-summary">Same-sheet cells that the formulas in startrow..endrow × cols read, as flat [rowstart, rowend, colstart, colend) rectangles.</span></summary>
+<summary><code>formulaReadBands</code> <span class="api-member-summary">Same-sheet calculation prerequisites for startrow..endrow × cols, as flat [rowstart, rowend, colstart, colend) rectangles.</span></summary>
 
 ```ts generated
 formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array;
 ```
 
-<p class="api-member-doc">Same-sheet cells that the formulas in `start_row..end_row` × `cols`
-read, as flat `[row_start, row_end, col_start, col_end)` rectangles.
+<p class="api-member-doc">Same-sheet calculation prerequisites for `start_row..end_row` × `cols`,
+as flat `[row_start, row_end, col_start, col_end)` rectangles.
 
 The walk follows each read into the formula cells it reaches, so for
-`H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`. It skips
-reads of other sheets. `max_cells` bounds the walk: a read larger than
+`H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`.
+Spill children follow their anchor; attempted spill destinations are also
+prerequisites because admission must establish that source cells are empty.
+Reads of other sheets are skipped. `max_cells` bounds the walk: a read larger than
 the remaining budget is skipped, so one whole-column range cannot make a
 window demand the full column. Rectangles are disjoint and ascend by
 column, then by row.</p>
@@ -649,15 +655,6 @@ The pass first grows the dirty cell set through formula read-sets to find
 all dependent formulas. It then evaluates only those formulas, using a
 per-pass memo table so each formula cell is evaluated at most once even
 when many downstream formulas reference it.</p>
-</details>
-
-<details class="api-member" id="cell-store-recompute-changed" data-pagefind-weight="1">
-<summary><code>recomputeChanged</code> <span class="api-member-summary">Recompute the union of every dirty sheet once at the host transaction barrier, including cross-sheet formula and plain-reference dependents.</span></summary>
-
-```ts generated
-recomputeChanged: () => void;
-```
-
 </details>
 
 <details class="api-member" id="cell-store-recompute-volatile" data-pagefind-weight="1">
@@ -1108,6 +1105,13 @@ class CellStore {
   ) => number;
   addRows: (sheet: number, at: number, count: number) => void;
   addSheet: (n_cols: number, row_count: number) => number;
+  admitSourceRange: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+  ) => boolean;
   aggregate: (sheet: number, col: number, op: number) => number;
   beginMutation: () => bigint;
   beginPageLoad: () => void;
@@ -1158,6 +1162,7 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => boolean;
+  commitSources: () => void;
   compactStringStorage: () => void;
   dataEdge: (
     sheet: number,
@@ -1180,8 +1185,6 @@ class CellStore {
     col: number,
     limit: number,
   ) => DistinctColumn;
-  endMutation: () => void;
-  endPageLoad: () => void;
   filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
   filterRowsMulti: (
     sheet: number,
@@ -1287,7 +1290,6 @@ class CellStore {
     c1: number,
   ) => Uint32Array;
   recompute: (sheet: number) => void;
-  recomputeChanged: () => void;
   recomputeVolatile: (serial: number) => boolean;
   referenceTarget: (
     sheet: number,

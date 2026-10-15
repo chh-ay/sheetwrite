@@ -47,7 +47,7 @@ function controls() {
           for (let edit = 0; edit < EDITS; edit++) {
             store.beginMutation();
             store.setString(sheet, 0, 0, `category-${edit % 100}`, 0);
-            store.endMutation();
+            store.commitSources();
           }
         }),
         read: measure(() => {
@@ -98,7 +98,7 @@ function lifetime() {
     for (let edit = 0; edit < EDITS; edit++) {
       store.beginMutation();
       store.setString(sheet, 0, 0, `unique-edit-${edit}-${"x".repeat(128)}`, 0);
-      store.endMutation();
+      store.commitSources();
     }
     return {
       pauseMs: Math.max(...sweepPausesMs),

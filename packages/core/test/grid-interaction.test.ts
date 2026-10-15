@@ -407,4 +407,53 @@ describe("datasource repaint invalidation", () => {
     }
     grid.destroy();
   });
+
+  it("hydrates off-screen spill destinations before repainting a paged array", async () => {
+    const spillRows = 400;
+    const workbook = makeWorkbook(1_000);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("workbook fixture has no sheet");
+    sheet.columns = [{ key: "spill", header: "Spill", width: 100, type: "number" }];
+    const requests: DataSourceRequest[] = [];
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      datasourceStorage: { mode: "paged" },
+      datasource: {
+        capabilities: WINDOWED_DATASOURCE,
+        getRows: (request) => {
+          requests.push(request);
+          return Promise.resolve(
+            coveredPage(
+              request,
+              Array.from(
+                { length: request.end - request.start },
+                (_, offset): RowData => ({
+                  spill:
+                    request.start + offset === 0
+                      ? { kind: "formula", src: `=SEQUENCE(${spillRows})` }
+                      : { kind: "literal", value: null },
+                }),
+              ),
+            ),
+          );
+        },
+      },
+    });
+    const recorder = makePaintRecorder();
+    Reflect.set(grid, "renderer", recorder);
+    try {
+      for (let turn = 0; turn < 32; turn++) await Promise.resolve();
+      const firstRequest = requests[0];
+      if (!firstRequest) throw new Error("viewport request was not issued");
+      expect(firstRequest.end).toBeLessThan(spillRows);
+      expect(requests.some((request) => request.end >= spillRows)).toBe(true);
+      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(1);
+      expect(grid.store.getCell({ sheet: "s1", row: spillRows - 1, col: 0 }).resolved).toBe(
+        spillRows,
+      );
+      expect(recorder.paints.at(-1)?.values).toContain(1);
+    } finally {
+      grid.destroy();
+    }
+  });
 });

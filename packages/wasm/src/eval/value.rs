@@ -2,9 +2,10 @@
 
 use std::cmp::Ordering;
 
-use crate::sheet::SheetData;
+use crate::sheet::{payload_num, payload_str_id, SheetData};
 use crate::types::{
-    string_from_pool_ref, FormulaEntry, FormulaError, FormulaValueKind, StringStorage, Value,
+    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
+    KIND_NUMBER, KIND_STRING,
 };
 
 use super::date::format_date_serial;
@@ -13,19 +14,24 @@ pub(super) fn cached_formula_value(
     sheet: &SheetData,
     strings: &StringStorage,
     index: usize,
-    entry: &FormulaEntry,
+    error: Option<FormulaError>,
 ) -> Value {
-    if let Some(error) = entry.error {
+    if let Some(error) = error {
         return Value::Error(error);
     }
 
-    match entry.value_kind {
-        FormulaValueKind::Number => Value::number(sheet.num_at(index)),
-        FormulaValueKind::Text => string_from_pool_ref(strings, sheet.str_id_at(index))
+    let Some((kind, payload)) = sheet.calculated_cell_at(index) else {
+        return Value::number(sheet.num_at(index));
+    };
+    match kind {
+        KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
             .map(Value::text)
             .unwrap_or(Value::Error(FormulaError::Ref)),
-        FormulaValueKind::Bool => Value::Bool(sheet.num_at(index) != 0.0),
-        FormulaValueKind::Blank => Value::Blank,
+        KIND_BOOL => Value::Bool(payload_num(payload) != 0.0),
+        KIND_EMPTY => Value::Blank,
+        KIND_NUMBER => Value::number(payload_num(payload)),
+        KIND_FORMULA => unreachable!("calculated error was not accompanied by error metadata"),
+        _ => unreachable!("unsupported calculated scalar kind: {kind}"),
     }
 }
 
@@ -190,46 +196,40 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
 #[cfg(test)]
 mod tests {
     use super::cached_formula_value;
-    use crate::calc::Ast;
-    use crate::sheet::SheetData;
-    use crate::types::{FormulaEntry, FormulaError, FormulaValueKind, StringStorage, Value};
+    use crate::sheet::{encode_num, encode_str_id, SheetData};
+    use crate::types::{FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING};
 
     #[test]
     fn reads_each_cached_formula_value_kind_and_prior_errors() {
         let mut sheet = SheetData::new(1, 1);
         let mut strings = StringStorage::new();
-        let mut entry = FormulaEntry::parsed(Ast::Num(0.0), 0, "=0");
 
-        entry.error = Some(FormulaError::Ref);
         assert_eq!(
-            cached_formula_value(&sheet, &strings, 0, &entry),
+            cached_formula_value(&sheet, &strings, 0, Some(FormulaError::Ref)),
             Value::Error(FormulaError::Ref)
         );
 
-        entry.error = None;
-        sheet.set_num(0, 42.5);
+        sheet.set_derived(0, KIND_NUMBER, encode_num(42.5));
         assert_eq!(
-            cached_formula_value(&sheet, &strings, 0, &entry),
+            cached_formula_value(&sheet, &strings, 0, None),
             Value::Number(42.5)
         );
 
-        entry.value_kind = FormulaValueKind::Text;
         let text_id = strings.intern("cached");
-        sheet.set_str(0, text_id);
+        sheet.set_derived(0, KIND_STRING, encode_str_id(text_id));
         assert_eq!(
-            cached_formula_value(&sheet, &strings, 0, &entry),
+            cached_formula_value(&sheet, &strings, 0, None),
             Value::text("cached")
         );
-        sheet.set_str(0, text_id + 1);
+        sheet.set_derived(0, KIND_STRING, encode_str_id(text_id + 1));
         assert_eq!(
-            cached_formula_value(&sheet, &strings, 0, &entry),
+            cached_formula_value(&sheet, &strings, 0, None),
             Value::Error(FormulaError::Ref)
         );
 
-        entry.value_kind = FormulaValueKind::Bool;
-        sheet.set_num(0, 1.0);
+        sheet.set_derived(0, KIND_BOOL, encode_num(1.0));
         assert_eq!(
-            cached_formula_value(&sheet, &strings, 0, &entry),
+            cached_formula_value(&sheet, &strings, 0, None),
             Value::Bool(true)
         );
     }

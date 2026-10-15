@@ -23,12 +23,15 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::calc::{Ast, Func};
-use crate::sheet::{spill_ownership_within_budget, SheetData, SpillRange};
+use crate::sheet::{
+    encode_num, encode_str_id, formula_error_with_entry, payload_num, payload_str_id,
+    spill_ownership_within_budget, SheetData, SpillRange,
+};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError,
-    FormulaValueKind, StringStorage, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
-    KIND_FORMULA, KIND_NUMBER, KIND_STRING, RANGE_CELL_LIMIT,
+    cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
+    Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
+    RANGE_CELL_LIMIT,
 };
 
 pub(crate) use array::ast_produces_array;
@@ -109,15 +112,40 @@ fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
 }
 
-/// The value of a cell whose stored kind is not `KIND_FORMULA`.
-fn literal_cell_value(data: &SheetData, strings: &StringStorage, index: usize, kind: u8) -> Value {
+fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
     match kind {
-        KIND_NUMBER => Value::number(data.num_at(index)),
-        KIND_STRING => string_from_pool_ref(strings, data.str_id_at(index))
+        KIND_NUMBER => Value::number(payload_num(payload)),
+        KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
             .map(Value::text)
             .unwrap_or(Value::Error(FormulaError::Ref)),
-        KIND_BOOL => Value::Bool(data.num_at(index) != 0.0),
+        KIND_BOOL => Value::Bool(payload_num(payload) != 0.0),
         _ => Value::Blank,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LiteralSources<'a> {
+    kinds: &'a [u8],
+    payloads: &'a [u64],
+}
+
+impl<'a> LiteralSources<'a> {
+    fn new(sheet: &'a SheetData, depth: usize) -> Option<Self> {
+        (!sheet.is_paged() && depth < FORMULA_RECURSION_LIMIT).then_some(Self {
+            kinds: &sheet.kind,
+            payloads: &sheet.payload,
+        })
+    }
+
+    #[inline]
+    fn value_at(self, strings: &StringStorage, index: usize) -> Option<Value> {
+        let kind = self.kinds[index];
+        match kind {
+            KIND_NUMBER | KIND_STRING | KIND_BOOL => {
+                Some(literal_cell_value(strings, kind, self.payloads[index]))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -388,7 +416,7 @@ impl CellStore {
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.clear_dirty();
+                    data.finish_recompute();
                 }
             }
             return;
@@ -445,7 +473,7 @@ impl CellStore {
         if affected.is_empty() {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.clear_dirty();
+                    data.finish_recompute();
                 }
             }
             return;
@@ -471,7 +499,7 @@ impl CellStore {
                 }
             }
             for &sheet in seeds {
-                self.sheets[sheet].clear_dirty();
+                self.sheets[sheet].finish_recompute();
             }
             return;
         }
@@ -652,7 +680,7 @@ impl CellStore {
             }
         }
         for seeded_sheet in seeded_sheets {
-            self.sheets[seeded_sheet].clear_dirty();
+            self.sheets[seeded_sheet].finish_recompute();
         }
     }
 
@@ -689,7 +717,7 @@ impl CellStore {
                 let index = data.idx(row as usize, col as usize);
                 if data.spill_owners.contains_key(&cell)
                     || data.formulas.contains_key(&cell)
-                    || data.kind_at(index) != KIND_EMPTY
+                    || data.source_kind_at(index) != KIND_EMPTY
                 {
                     return Err(FormulaError::Spill);
                 }
@@ -738,7 +766,7 @@ impl CellStore {
             total.checked_add(data.spill_owners.len())
         });
         let current_error_cells = self.sheets.iter().try_fold(0usize, |total, data| {
-            total.checked_add(data.spill_errors.len())
+            total.checked_add(data.derived_errors.len())
         });
         let within_budget = current_owner_cells
             .and_then(|total| total.checked_add(matrix.values.len()))
@@ -754,7 +782,8 @@ impl CellStore {
         }
         let data = &mut self.sheets[sheet];
         if data.spill_owners.try_reserve(matrix.values.len()).is_err()
-            || data.spill_errors.try_reserve(additional_errors).is_err()
+            || data.derived_errors.try_reserve(additional_errors).is_err()
+            || !data.reserve_derived(matrix.values.len())
         {
             data.compact_spill_metadata();
             memo.insert(key, Value::Error(FormulaError::Num));
@@ -778,32 +807,20 @@ impl CellStore {
                 };
                 let data = &mut self.sheets[sheet];
                 let index = data.idx(cell.0 as usize, cell.1 as usize);
-                match value {
-                    Value::Number(number) => {
-                        data.set_kind(index, KIND_NUMBER);
-                        data.set_num(index, *number);
-                    }
-                    Value::Text(_) => {
-                        data.set_kind(index, KIND_STRING);
-                        if let Some(id) = interned {
-                            data.set_str(index, id);
-                        }
-                    }
-                    Value::Bool(value) => {
-                        data.set_kind(index, KIND_BOOL);
-                        data.set_num(index, f64::from(*value));
-                    }
-                    Value::Blank => {
-                        data.set_kind(index, KIND_EMPTY);
-                        data.clear_payload(index);
-                    }
+                let (kind, payload) = match value {
+                    Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
+                    Value::Text(_) => (
+                        KIND_STRING,
+                        encode_str_id(interned.expect("interned spill text")),
+                    ),
+                    Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
+                    Value::Blank => (KIND_EMPTY, 0),
                     Value::Error(error) => {
-                        data.set_kind(index, KIND_FORMULA);
-                        data.clear_payload(index);
-                        data.spill_errors.insert(cell, *error);
+                        data.derived_errors.insert(cell, *error);
+                        (KIND_FORMULA, 0)
                     }
-                }
-                data.mark_cell_loaded(cell.0 as usize, cell.1 as usize, false);
+                };
+                data.set_derived(index, kind, payload);
                 changed.push(cell);
             }
         }
@@ -820,44 +837,31 @@ impl CellStore {
         let Some(data) = self.sheets.get_mut(sheet) else {
             return;
         };
+
         let (row, col) = key.local();
         if !data.contains_cell(row as usize, col as usize) {
             return;
         }
+
         let index = data.idx(row as usize, col as usize);
-        let Some(entry) = data.formulas.get_mut(&key.local()) else {
+        if !data.formulas.contains_key(&key.local()) {
             return;
-        };
-        match &result {
-            Value::Number(_) => {
-                entry.error = None;
-                entry.value_kind = FormulaValueKind::Number;
-            }
-            Value::Text(_) => {
-                entry.error = None;
-                entry.value_kind = FormulaValueKind::Text;
-            }
-            Value::Bool(_) => {
-                entry.error = None;
-                entry.value_kind = FormulaValueKind::Bool;
-            }
-            Value::Blank => {
-                entry.error = None;
-                entry.value_kind = FormulaValueKind::Blank;
-            }
-            Value::Error(error) => {
-                entry.error = Some(*error);
-                entry.value_kind = FormulaValueKind::Number;
-            }
         }
-        match result {
-            Value::Number(value) => data.set_num(index, value),
-            Value::Text(_) => match interned {
-                Some(id) => data.set_str(index, id),
-                None => data.clear_payload(index),
-            },
-            Value::Bool(value) => data.set_num(index, f64::from(value)),
-            Value::Blank | Value::Error(_) => data.clear_payload(index),
+
+        data.derived_errors.remove(&key.local());
+        let (kind, payload) = match result {
+            Value::Number(value) => (KIND_NUMBER, encode_num(value)),
+            Value::Text(_) => (KIND_STRING, interned.map_or(0, encode_str_id)),
+            Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(value))),
+            Value::Blank => (KIND_EMPTY, 0),
+            Value::Error(error) => {
+                data.derived_errors.insert(key.local(), error);
+                (KIND_FORMULA, 0)
+            }
+        };
+
+        if !data.set_derived(index, kind, payload) {
+            data.derived_errors.insert(key.local(), FormulaError::Num);
         }
     }
 
@@ -881,33 +885,44 @@ impl CellStore {
         if !s.contains_cell(row, col) {
             return Value::Error(FormulaError::Ref);
         }
+
         if !s.is_loaded(row, col) {
             return Value::Error(FormulaError::Loading);
         }
 
-        // 2026-06 release harness: unchecked cell access was 1.13x here,
-        // below the 2x threshold; keep the safe indexing.
         let i = s.idx(row, col);
-        let kind = s.kind_at(i);
-        // Formula, reference and spill-error cells are always stored as
-        // `KIND_FORMULA`, so any other kind is a plain value and needs neither
-        // the formula-map nor the spill-error lookup. Range reads hit this for
-        // every literal cell.
+        // Literal sources cannot be shadowed by calculated output. Decode their
+        // payload directly instead of resolving the overlay a second time.
+        let source_kind = s.source_kind_at(i);
+        let (kind, payload) = if source_kind == KIND_EMPTY {
+            s.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
+        } else {
+            (source_kind, s.source_payload_at(i))
+        };
+
+        // Literal range scans avoid per-cell formula and calculated-error lookups.
         if kind != KIND_FORMULA {
             debug_assert!(cell_key(row, col).is_none_or(|key| {
-                !s.formulas.contains_key(&key) && !s.spill_errors.contains_key(&key)
+                !s.formulas.contains_key(&key) && !s.derived_errors.contains_key(&key)
             }));
-            return literal_cell_value(s, &self.strings, i, kind);
+            return literal_cell_value(&self.strings, kind, payload);
         }
+
         if let Some(key) = cell_key(row, col) {
             let abs_key = AbsCellKey::from_local(sheet, key);
             if let Some(entry) = s.formulas.get(&key) {
                 if affected.contains(&abs_key) {
                     return self.eval_formula_cell(abs_key, affected, memo, visiting, depth + 1);
                 }
-                return cached_formula_value(s, &self.strings, i, entry);
+
+                return cached_formula_value(
+                    s,
+                    &self.strings,
+                    i,
+                    formula_error_with_entry(s, key, Some(entry)),
+                );
             }
-            if let Some(error) = s.spill_errors.get(&key) {
+            if let Some(error) = s.derived_errors.get(&key) {
                 return Value::Error(*error);
             }
         }
@@ -1692,12 +1707,19 @@ impl CellStore {
             }
         }
         let mut values = Vec::with_capacity(total);
+        let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
                 if !data.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                values.push(self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1));
+                let index = data.idx(row, col);
+                let value = literals
+                    .and_then(|sources| sources.value_at(&self.strings, index))
+                    .unwrap_or_else(|| {
+                        self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
+                    });
+                values.push(value);
             }
         }
         Ok(EvalMatrix::new(rows, cols, values))
@@ -2684,6 +2706,7 @@ impl CellStore {
         let mut sum: f64 = 0.0;
         let mut cacheable = true;
         let has_spill_cells = !data.spill_owners.is_empty();
+        let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
                 if !data.is_loaded(row, col) {
@@ -2701,7 +2724,11 @@ impl CellStore {
                 {
                     cacheable = false;
                 }
-                let value = if kind == KIND_EMPTY {
+                let value = if let Some(value) =
+                    literals.and_then(|sources| sources.value_at(&self.strings, index))
+                {
+                    value
+                } else if kind == KIND_EMPTY {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
@@ -2764,6 +2791,7 @@ impl CellStore {
         }
 
         values.reserve(total as usize)?;
+        let literals = LiteralSources::new(s, depth);
 
         for row in row_start..=row_end {
             for col in col_start..=col_end {
@@ -2771,7 +2799,11 @@ impl CellStore {
                     return Err(FormulaError::Loading);
                 }
                 let i = s.idx(row, col);
-                let value = if s.kind_at(i) == KIND_EMPTY {
+                let value = if let Some(value) =
+                    literals.and_then(|sources| sources.value_at(&self.strings, i))
+                {
+                    value
+                } else if s.kind_at(i) == KIND_EMPTY {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)

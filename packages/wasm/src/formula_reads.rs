@@ -1,9 +1,5 @@
-//! Same-sheet cells that the formulas of a visible window read.
-//!
-//! A windowed datasource loads only the columns on screen. A formula there can
-//! read a column that is off screen, and it shows `#LOADING!` until that column
-//! loads. The datasource controller asks for these read bands so it can load
-//! them with the window.
+//! Spill admission needs known-empty destinations as well as loaded inputs.
+//! Windowed datasources must request both beyond the visible window.
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -15,12 +11,14 @@ use crate::types::{cell_key, CellKey, CellRange};
 
 #[wasm_bindgen]
 impl CellStore {
-    /// Same-sheet cells that the formulas in `start_row..end_row` × `cols`
-    /// read, as flat `[row_start, row_end, col_start, col_end)` rectangles.
+    /// Same-sheet calculation prerequisites for `start_row..end_row` × `cols`,
+    /// as flat `[row_start, row_end, col_start, col_end)` rectangles.
     ///
     /// The walk follows each read into the formula cells it reaches, so for
-    /// `H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`. It skips
-    /// reads of other sheets. `max_cells` bounds the walk: a read larger than
+    /// `H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`.
+    /// Spill children follow their anchor; attempted spill destinations are also
+    /// prerequisites because admission must establish that source cells are empty.
+    /// Reads of other sheets are skipped. `max_cells` bounds the walk: a read larger than
     /// the remaining budget is skipped, so one whole-column range cannot make a
     /// window demand the full column. Rectangles are disjoint and ascend by
     /// column, then by row.
@@ -75,8 +73,9 @@ impl<'a> ReadWalk<'a> {
         }
     }
 
-    /// Queues a formula cell once; cells without a formula read nothing.
     fn visit(&mut self, key: CellKey) {
+        let key = self.data.spill_owner(key).unwrap_or(key);
+
         if self.data.formulas.contains_key(&key) && self.visited.insert(key) {
             self.pending.push(key);
         }
@@ -87,17 +86,30 @@ impl<'a> ReadWalk<'a> {
             let Some(entry) = self.data.formulas.get(&key) else {
                 continue;
             };
+
             for cell in &entry.reads.cells {
                 if cell.sheet != self.handle {
                     continue;
                 }
+
                 let range = CellRange::new(cell.sheet, cell.row, cell.col, cell.row, cell.col);
                 self.read_range(range);
             }
+
             for &range in &entry.reads.ranges {
                 if range.sheet == self.handle {
                     self.read_range(range);
                 }
+            }
+
+            if let Some(range) = self.data.spill_ranges.get(&key) {
+                self.read_range(CellRange::new(
+                    self.handle,
+                    range.anchor.0,
+                    range.anchor.1,
+                    range.row_end,
+                    range.col_end,
+                ));
             }
         }
     }

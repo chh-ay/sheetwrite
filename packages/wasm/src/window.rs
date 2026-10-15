@@ -6,11 +6,11 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::translate_relative_refs;
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, payload_num, payload_str_id, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringStorage, Value,
-    KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
+    KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
@@ -206,14 +206,14 @@ pub(crate) fn fill_window_cell(
         return;
     }
     let src = sheet.idx(row, col);
-    let stored_kind = sheet.kind_at(src);
+    let (stored_kind, payload) = sheet.resolved_cell_at(src);
     kind[dst] = stored_kind;
     style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 
     match stored_kind {
-        KIND_NUMBER | KIND_BOOL => num[dst] = sheet.num_at(src),
+        KIND_NUMBER | KIND_BOOL => num[dst] = payload_num(payload),
         KIND_STRING => {
-            let pool_id = sheet.str_id_at(src);
+            let pool_id = payload_str_id(payload);
             if pool_id == NO_STRING {
                 kind[dst] = KIND_EMPTY;
             } else {
@@ -228,23 +228,8 @@ pub(crate) fn fill_window_cell(
                 kind[dst] = KIND_STRING;
                 str_local[dst] = local_error_index(error, error_slots, strings);
             } else {
-                match entry.map(|entry| entry.value_kind) {
-                    Some(FormulaValueKind::Bool) => {
-                        kind[dst] = KIND_BOOL;
-                        num[dst] = sheet.num_at(src);
-                    }
-                    Some(FormulaValueKind::Text) => {
-                        kind[dst] = KIND_STRING;
-                        string_ids[dst] = sheet.str_id_at(src);
-                    }
-                    Some(FormulaValueKind::Blank) => {
-                        kind[dst] = KIND_EMPTY;
-                    }
-                    _ => {
-                        kind[dst] = KIND_NUMBER;
-                        num[dst] = sheet.num_at(src);
-                    }
-                }
+                kind[dst] = KIND_NUMBER;
+                num[dst] = payload_num(payload);
             }
         }
         _ => {}

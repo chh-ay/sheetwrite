@@ -324,8 +324,8 @@ pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
     pub(crate) source: String,
     pub(crate) reads: ReadSet,
+    /// Source parse rejection; recalculation never mutates this field.
     pub(crate) error: Option<FormulaError>,
-    pub(crate) value_kind: FormulaValueKind,
     pub(crate) volatile: bool,
     /// The formula contains `A1#`. Each evaluation replaces those with the
     /// current spill ranges; other formulas skip that step.
@@ -335,11 +335,6 @@ pub(crate) struct FormulaEntry {
 }
 
 impl FormulaEntry {
-    #[cfg(test)]
-    pub(crate) fn parsed(ast: Ast, sheet: u32, source: &str) -> Self {
-        Self::parsed_source(ast, sheet, source.to_string())
-    }
-
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
         let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
@@ -349,7 +344,6 @@ impl FormulaEntry {
             source: source.to_string(),
             reads,
             error: None,
-            value_kind: FormulaValueKind::Number,
             volatile,
             source_kind: PersistedSourceKind::Formula,
         }
@@ -371,7 +365,6 @@ impl FormulaEntry {
             ast: Some(ast),
             source: String::new(),
             error: None,
-            value_kind: FormulaValueKind::Blank,
             volatile: false,
             has_spill_refs: false,
             produces_array: false,
@@ -416,7 +409,6 @@ impl FormulaEntry {
             source: source.to_string(),
             reads: ReadSet::default(),
             error: Some(error),
-            value_kind: FormulaValueKind::Number,
             volatile: false,
             has_spill_refs: false,
             produces_array: false,

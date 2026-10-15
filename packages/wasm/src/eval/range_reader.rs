@@ -8,6 +8,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::LiteralSources;
+
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
@@ -18,6 +20,7 @@ use crate::types::{
 pub(crate) struct RangeReader<'a> {
     store: &'a CellStore,
     data: &'a SheetData,
+    literals: Option<LiteralSources<'a>>,
     sheet: usize,
     row: usize,
     col: usize,
@@ -60,6 +63,7 @@ impl<'a> RangeReader<'a> {
         Ok(Self {
             store,
             data,
+            literals: LiteralSources::new(data, depth),
             sheet,
             row: row_start,
             col: col_start,
@@ -113,7 +117,12 @@ impl<'a> RangeReader<'a> {
             return Err(FormulaError::Loading);
         }
         let index = self.data.idx(self.row, self.col);
-        let value = if self.data.kind_at(index) == KIND_EMPTY {
+        let value = if let Some(value) = self
+            .literals
+            .and_then(|sources| sources.value_at(&self.store.strings, index))
+        {
+            value
+        } else if self.data.kind_at(index) == KIND_EMPTY {
             Value::Blank
         } else {
             self.store.eval_at(

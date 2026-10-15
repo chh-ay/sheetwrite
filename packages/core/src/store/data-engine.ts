@@ -598,31 +598,15 @@ export class StoreDataEngine {
     return { sheet: addr.sheet, row, col };
   }
 
-  private rangeCutsSpill(range: Range): boolean {
+  private admitsSourceRange(range: Range): boolean {
     const bounds = normalizedRange(range);
-    const cols = Array.from(
-      { length: bounds.end.col - bounds.start.col + 1 },
-      (_, index) => bounds.start.col + index,
+    return this.wasm.admitSourceRange(
+      this.handleOf(bounds.sheet),
+      bounds.start.row,
+      bounds.start.col,
+      bounds.end.row,
+      bounds.end.col,
     );
-    const owners = this.windowReader.spillOwnerCoordinates(
-      bounds.sheet,
-      { start: bounds.start.row, end: bounds.end.row + 1 },
-      cols,
-    );
-    for (let offset = 0; offset < owners.length; offset += 2) {
-      const row = owners[offset] ?? 0xffffffff;
-      const col = owners[offset + 1] ?? 0xffffffff;
-      if (row === 0xffffffff || col === 0xffffffff) continue;
-      if (
-        row < bounds.start.row ||
-        row > bounds.end.row ||
-        col < bounds.start.col ||
-        col > bounds.end.col
-      ) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private captureSourceProjection(
@@ -1495,12 +1479,9 @@ export class StoreDataEngine {
       this.rangeMutationStats.documentOperations += appliedPatches.length;
       this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
 
-      this.noteRangeMutationFfi();
-      this.wasm.recomputeChanged();
       return { appliedPatches, changes, storageRevision };
     } finally {
-      if (remoteLoad) this.wasm.endPageLoad();
-      else this.wasm.endMutation();
+      this.wasm.commitSources();
     }
   }
 
@@ -1512,8 +1493,14 @@ export class StoreDataEngine {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
-        const owner = this.spillAnchor(patch.addr);
-        if (owner && (owner.row !== patch.addr.row || owner.col !== patch.addr.col)) return false;
+        if (
+          !this.admitsSourceRange({
+            sheet: patch.addr.sheet,
+            start: { row: patch.addr.row, col: patch.addr.col },
+            end: { row: patch.addr.row, col: patch.addr.col },
+          })
+        )
+          return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const bounds: Range = {
           sheet: patch.addr.sheet,
@@ -1560,13 +1547,9 @@ export class StoreDataEngine {
         }
         if (
           patch.cells.some((cell) => {
-            const addr = {
-              sheet: bounds.sheet,
-              row: bounds.start.row + cell.rowOffset,
-              col: bounds.start.col + cell.colOffset,
-            };
-            const owner = this.spillAnchor(addr);
-            return owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
+            const row = bounds.start.row + cell.rowOffset;
+            const col = bounds.start.col + cell.colOffset;
+            return !this.wasm.admitSourceRange(this.handleOf(bounds.sheet), row, col, row, col);
           })
         ) {
           return false;
@@ -1631,7 +1614,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        if (this.rangeCutsSpill(bounds)) return false;
+        if (!this.admitsSourceRange(bounds)) return false;
 
         const beforeCells =
           changes && captureDetailedChanges
@@ -1713,7 +1696,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        if ((patch.contents ?? true) && this.rangeCutsSpill(bounds)) return false;
+        if ((patch.contents ?? true) && !this.admitsSourceRange(bounds)) return false;
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
         const beforeCells =
@@ -3071,12 +3054,10 @@ export class StoreDataEngine {
       accepted = this.writeSparseBlock(bounds, cells);
     } finally {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.endPageLoad();
+      this.wasm.commitSources();
       this.resourceOperation = previousOperation;
     }
     if (!accepted) throw new Error("datasource page contains invalid persisted sources");
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
   }
 
   hydrateSnapshot(snapshot: WorkbookSnapshot): void {
@@ -3107,13 +3088,11 @@ export class StoreDataEngine {
         this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
-      this.wasm.endPageLoad();
+      this.wasm.commitSources();
     }
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
     this.snapshotAuthoritative = true;
     for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
@@ -3207,7 +3186,7 @@ export class StoreDataEngine {
       throw new Error("columnar import contains invalid persisted sources");
     }
     this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
+    this.wasm.commitSources();
     this.noteRangeMutationFfi();
     this.wasm.compactStringStorage();
   }

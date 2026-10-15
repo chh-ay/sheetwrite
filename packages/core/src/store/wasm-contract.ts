@@ -9,7 +9,8 @@ import type {
 /** Internal typed subset added by the generated WASM store at runtime. */
 export type RecomputingCellStore = CellStore & {
   recompute(sheet: number): void;
-  recomputeChanged(): void;
+  commitSources(): void;
+  admitSourceRange(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
   setSheetName(sheet: number, id: string, name: string): void;
   renameSheet(sheet: number, id: string, name: string): boolean;
   removeSheet(sheet: number): boolean;
@@ -184,7 +185,6 @@ export type RecomputingCellStore = CellStore & {
   pagedDirtyCoordinates(sheet: number): Float64Array;
   dirtyRevision(sheet: number, row: number, col: number): bigint;
   beginMutation(): bigint;
-  endMutation(): void;
   acknowledgeRevision(revision: bigint): void;
   isFullyLoaded(sheet: number): boolean;
   rangeFullyLoaded(sheet: number, r0: number, c0: number, r1: number, c1: number): boolean;
@@ -200,7 +200,6 @@ export type RecomputingCellStore = CellStore & {
   cellSnapshots(sheet: number, rows: Uint32Array, cols: Uint32Array): CellSnapshot | undefined;
   pinRange(sheet: number, startRow: number, endRow: number, cols: Uint32Array): void;
   beginPageLoad(): void;
-  endPageLoad(): void;
   hydratePageNumbers(
     sheet: number,
     col: number,

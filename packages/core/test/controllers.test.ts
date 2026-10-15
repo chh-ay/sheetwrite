@@ -141,6 +141,29 @@ describe("DocumentController", () => {
     controller.undo();
     expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
 
+    const spillRange = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } };
+    store.applyTransaction({
+      patches: [
+        { op: "clearRange", range: spillRange },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "formula", src: "=SEQUENCE(3)" },
+        },
+      ],
+    });
+    expect(controller.commit([{ op: "clearRange", range: spillRange }], "api").status).toBe(
+      "applied",
+    );
+    controller.undo();
+    expect(store.getFormula({ sheet: "s1", row: 0, col: 1 })).toBe("=SEQUENCE(3)");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(1);
+    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(3);
+    expect(store.getSpillAnchor({ sheet: "s1", row: 2, col: 1 })).toEqual({
+      sheet: "s1",
+      row: 0,
+      col: 1,
+    });
     controller.destroy();
     store.dispose();
   });

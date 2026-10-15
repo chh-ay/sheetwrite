@@ -285,7 +285,7 @@ export class DocumentController {
   private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
     switch (patch.op) {
       case "set":
-        return [this.inverseSetPatch(patch)];
+        return [this.snapshotCell(patch.addr)];
       case "setRange":
       case "setBlock":
       case "restoreBlock":
@@ -641,25 +641,6 @@ export class DocumentController {
     };
   }
 
-  private inverseSetPatch(patch: Extract<DocumentOp, { op: "set" }>): DocumentOp {
-    const formula =
-      this.options.loadable?.getFormula(patch.addr) ?? this.options.store.getFormula(patch.addr);
-    const refTarget = this.options.store.getRefTarget(patch.addr);
-    const cell = this.options.store.getCell(patch.addr);
-    const value: CellValue = formula
-      ? { kind: "formula", src: formula }
-      : refTarget
-        ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
-
-    return {
-      op: "set",
-      addr: patch.addr,
-      value,
-      style: cell.style,
-    };
-  }
-
   private snapshotRows(sheetId: SheetId, at: number, count: number): DocumentOp[] {
     const sheet = this.sheetById(sheetId);
     if (!sheet) return [];
@@ -695,14 +676,16 @@ export class DocumentController {
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
-    const formula = this.options.store.getFormula(addr);
+    const formula = this.options.loadable?.getFormula(addr) ?? this.options.store.getFormula(addr);
     const refTarget = this.options.store.getRefTarget(addr);
     const cell = this.options.store.getCell(addr);
+    const owner = this.options.store.getSpillAnchor(addr);
+    const isSpillChild = owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
     const value: CellValue = formula
       ? { kind: "formula", src: formula }
       : refTarget
         ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
+        : { kind: "literal", value: isSpillChild ? null : cell.resolved };
     return { op: "set", addr, value, style: cell.style };
   }
 

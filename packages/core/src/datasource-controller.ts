@@ -1081,9 +1081,9 @@ export class DatasourceController {
   }
 
   /**
-   * Off-viewport cells that the formulas of the viewport read. A formula shows
-   * `#LOADING!` until every cell it reads is loaded, and the column window does
-   * not include a column that is off screen.
+   * Off-viewport formula inputs and spill destinations required for calculation.
+   * Spill admission needs known-empty source cells as well as loaded inputs;
+   * neither prerequisite is necessarily covered by the viewport request.
    */
   private formulaReadDemands(
     start: number,

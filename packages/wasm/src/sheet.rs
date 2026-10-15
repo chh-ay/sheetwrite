@@ -4,12 +4,13 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::calc::Ast;
+use crate::derived::DerivedOverlay;
 use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
     SHEET_INDEXES_METADATA, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES,
 };
-use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
+use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, KIND_FORMULA, NO_STRING};
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
 /// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
@@ -53,7 +54,7 @@ pub(crate) struct CondRule {
 // Numeric writes canonicalize NaN, so the tag surface (a negative signaling
 // NaN pattern) can never be produced by a number.
 
-const STR_TAG_HI: u64 = 0xFFFC_0000;
+pub(crate) const STR_TAG_HI: u64 = 0xFFFC_0000;
 const STR_TAG: u64 = STR_TAG_HI << 32;
 const CANON_NAN: u64 = 0x7FF8_0000_0000_0000;
 
@@ -721,7 +722,8 @@ impl PagedStorage {
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
 pub(crate) const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
-const SPILL_OWNER_ENTRY_BYTES: usize = 32;
+// Includes installed-owner metadata and its source-independent scalar overlay.
+const SPILL_OWNER_ENTRY_BYTES: usize = 64;
 const SPILL_ERROR_ENTRY_BYTES: usize = 16;
 
 pub(crate) fn spill_ownership_within_budget(owner_cells: usize, error_cells: usize) -> bool {
@@ -796,15 +798,17 @@ pub(crate) struct SheetData {
     /// Host style-dictionary id; `0` means "no explicit style".
     pub(crate) style: Vec<u32>,
     paged: Option<PagedStorage>,
-    /// Arithmetic formulas keyed by (row, col); successful results cache in the payload.
+    /// Calculated scalars and spill output; never persisted or hydrated.
+    derived: DerivedOverlay,
+    /// Formula source and dependency metadata, independent of calculated payloads.
     pub(crate) formulas: HashMap<CellKey, FormulaEntry>,
     /// Attempted spill bounds remain registered even while obstructed so clearing
     /// a blocker invalidates the owning anchor.
     pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
     /// Every currently materialized spill cell (including its anchor) to its owner.
     pub(crate) spill_owners: HashMap<CellKey, CellKey>,
-    /// Errors projected into derived spill cells; anchors keep errors in FormulaEntry.
-    pub(crate) spill_errors: HashMap<CellKey, FormulaError>,
+    /// Calculated errors for formula anchors and spill output, never source metadata.
+    pub(crate) derived_errors: HashMap<CellKey, FormulaError>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
@@ -829,6 +833,7 @@ impl SheetData {
         for &payload in &self.payload {
             visit_payload(payload);
         }
+        self.derived.visit_payloads(&mut visit_payload);
         if let Some(paged) = &self.paged {
             for chunk in paged.chunks.values() {
                 for &payload in &chunk.payload {
@@ -851,6 +856,7 @@ impl SheetData {
         for payload in &mut self.payload {
             remap_payload(payload);
         }
+        self.derived.remap_payloads(&remap_payload);
         if let Some(paged) = &mut self.paged {
             for chunk in paged.chunks.values_mut() {
                 for payload in &mut chunk.payload {
@@ -895,10 +901,11 @@ impl SheetData {
             payload,
             style,
             paged: None,
+            derived: DerivedOverlay::dense(),
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            spill_errors: HashMap::new(),
+            derived_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -920,10 +927,11 @@ impl SheetData {
             payload: Vec::new(),
             style: Vec::new(),
             paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
+            derived: DerivedOverlay::paged(),
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            spill_errors: HashMap::new(),
+            derived_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -956,16 +964,33 @@ impl SheetData {
         coordinates.extend(self.formulas.keys().copied());
         coordinates.sort_unstable();
         coordinates.dedup();
-        coordinates.retain(|&(row, col)| {
-            self.spill_owner((row, col)).is_none_or(|anchor| {
-                anchor == (row, col) || self.style_at(self.idx(row as usize, col as usize)) != 0
-            })
-        });
+        // Derived output has no source coordinate. Explicit child styles remain.
         coordinates
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn kind_at(&self, index: usize) -> u8 {
+        let source = if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, _, _, loaded, _) = paged.read(row, col);
+            if !loaded {
+                return kind;
+            }
+
+            kind
+        } else {
+            self.kind[index]
+        };
+
+        if source == KIND_EMPTY && !self.derived.is_empty() {
+            self.derived.get(index).map_or(source, |value| value.0)
+        } else {
+            source
+        }
+    }
+
+    #[inline]
+    pub(crate) fn source_kind_at(&self, index: usize) -> u8 {
         if let Some(paged) = &self.paged {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).0
@@ -975,24 +1000,109 @@ impl SheetData {
     }
 
     #[inline]
+    pub(crate) fn source_payload_at(&self, index: usize) -> u64 {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            paged.read(row, col).1
+        } else {
+            self.payload[index]
+        }
+    }
+
+    #[inline]
+    fn resolved_payload_at(&self, index: usize) -> u64 {
+        if self.derived.is_empty() {
+            return self.source_payload_at(index);
+        }
+
+        let (kind, payload) = if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, loaded, _) = paged.read(row, col);
+            if !loaded {
+                return payload;
+            }
+
+            (kind, payload)
+        } else {
+            (self.kind[index], self.payload[index])
+        };
+
+        if kind == KIND_EMPTY || kind == KIND_FORMULA {
+            self.derived.get(index).map_or(payload, |cell| cell.1)
+        } else {
+            payload
+        }
+    }
+
+    /// The source-first projection for a resident cell. Every source replacement
+    /// removes its calculated slot, and admission installs only over empty or
+    /// formula sources. Thus a present slot certifies that no literal source
+    /// wins; bulk reads need not fetch the source discriminator again.
+    #[inline(always)]
+    pub(crate) fn resolved_cell_at(&self, index: usize) -> (u8, u64) {
+        if let Some(cell) = self.derived.get(index) {
+            return cell;
+        }
+
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, _, _) = paged.read(row, col);
+            return (kind, payload);
+        }
+
+        (self.kind[index], self.payload[index])
+    }
+
+    #[inline]
+    pub(crate) fn calculated_cell_at(&self, index: usize) -> Option<(u8, u64)> {
+        self.derived.get(index)
+    }
+
+    pub(crate) fn set_derived(&mut self, index: usize, kind: u8, payload: u64) -> bool {
+        if self.derived.is_empty() && !self.reserve_derived(1) {
+            return false;
+        }
+
+        self.derived.set(index, kind, payload);
+        true
+    }
+
+    pub(crate) fn reserve_derived(&mut self, additional: usize) -> bool {
+        self.derived.reserve(additional, self.kind.len())
+    }
+
+    pub(crate) fn formula_value_kind(&self, index: usize) -> crate::types::FormulaValueKind {
+        use crate::types::{FormulaValueKind, KIND_BOOL, KIND_STRING};
+
+        match self.derived.get(index).map(|cell| cell.0) {
+            Some(KIND_STRING) => FormulaValueKind::Text,
+            Some(KIND_BOOL) => FormulaValueKind::Bool,
+            Some(KIND_EMPTY) => FormulaValueKind::Blank,
+            _ => FormulaValueKind::Number,
+        }
+    }
+
+    pub(crate) fn invalidate_derived(&mut self) {
+        self.derived.clear();
+        self.derived_errors.clear();
+    }
+
+    pub(crate) fn invalidate_calculations(&mut self) {
+        // Whole-sheet recalculation makes per-output teardown unnecessary.
+        self.spill_ranges.clear();
+        self.spill_owners = HashMap::new();
+        self.invalidate_derived();
+        self.clear_dirty();
+        self.all_dirty = true;
+    }
+
+    #[inline]
     pub(crate) fn style_at(&self, index: usize) -> u32 {
         if let Some(paged) = &self.paged {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).2
         } else {
             self.style[index]
-        }
-    }
-
-    pub(crate) fn set_kind(&mut self, index: usize, kind: u8) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(index);
-            let (_, payload, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, payload, style, None);
-            }
-        } else {
-            self.kind[index] = kind;
         }
     }
 
@@ -1027,6 +1137,7 @@ impl SheetData {
             .is_none_or(|paged| paged.prepare_dirty_cells(cells, revision))
     }
 
+    #[inline]
     pub(crate) fn write_cell(
         &mut self,
         row: usize,
@@ -1041,12 +1152,17 @@ impl SheetData {
                 return false;
             }
         }
-        if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
-            self.prepare_cell_write((row, col));
+
+        if !self.derived.is_empty() || !self.spill_ranges.is_empty() {
+            if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
+                self.prepare_cell_write((row, col));
+            }
         }
+
         if let Some(paged) = &mut self.paged {
             return paged.write(row, col, kind, payload, style, dirty_revision);
         }
+
         let index = self.idx(row, col);
         self.kind[index] = kind;
         self.payload[index] = payload;
@@ -1054,17 +1170,24 @@ impl SheetData {
         true
     }
 
-    pub(crate) fn mark_cell_loaded(&mut self, row: usize, col: usize, dirty: bool) {
+    /// A style edit changes source formatting, not calculated cell identity.
+    pub(crate) fn write_style(
+        &mut self,
+        row: usize,
+        col: usize,
+        style: u32,
+        revision: Option<u64>,
+    ) -> bool {
+        let index = self.idx(row, col);
+        let kind = self.source_kind_at(index);
+        let payload = self.source_payload_at(index);
+
         if let Some(paged) = &mut self.paged {
-            let (kind, payload, style, _, was_dirty) = paged.read(row, col);
-            let revision = if dirty {
-                Some(paged.dirty_revision(row, col).unwrap_or(1))
-            } else {
-                None
-            };
-            let _ = paged.write(row, col, kind, payload, style, revision);
-            debug_assert!(!was_dirty || paged.dirty_revision(row, col).is_some());
+            return paged.write(row, col, kind, payload, style, revision);
         }
+
+        self.style[index] = style;
+        true
     }
 
     pub(crate) fn hydrate_cell(
@@ -1076,12 +1199,17 @@ impl SheetData {
         style: u32,
     ) -> bool {
         if let Some(paged) = &mut self.paged {
-            return paged.hydrate(row, col, kind, payload, style);
+            if !paged.hydrate(row, col, kind, payload, style) {
+                return false;
+            }
+        } else {
+            let index = self.idx(row, col);
+            self.kind[index] = kind;
+            self.payload[index] = payload;
+            self.style[index] = style;
         }
-        let index = self.idx(row, col);
-        self.kind[index] = kind;
-        self.payload[index] = payload;
-        self.style[index] = style;
+
+        self.prepare_cell_write((row as u32, col as u32));
         true
     }
 
@@ -1179,68 +1307,19 @@ impl SheetData {
 
     #[inline]
     pub(crate) fn num_at(&self, i: usize) -> f64 {
-        if let Some(paged) = &self.paged {
-            let (row, col) = self.coordinates(i);
-            payload_num(paged.read(row, col).1)
-        } else {
-            payload_num(self.payload[i])
-        }
+        payload_num(self.resolved_payload_at(i))
     }
 
     #[inline]
     pub(crate) fn str_id_at(&self, i: usize) -> u32 {
-        if let Some(paged) = &self.paged {
-            let (row, col) = self.coordinates(i);
-            payload_str_id(paged.read(row, col).1)
-        } else {
-            payload_str_id(self.payload[i])
-        }
+        payload_str_id(self.resolved_payload_at(i))
     }
 
     /// # Safety
     /// `i` must be in-bounds for the cell vectors.
     #[inline]
     pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        unsafe { *self.payload.get_unchecked(i) }
-    }
-
-    #[inline]
-    pub(crate) fn set_num(&mut self, i: usize, value: f64) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, encode_num(value), style, None);
-            }
-        } else {
-            self.payload[i] = encode_num(value);
-        }
-    }
-
-    #[inline]
-    pub(crate) fn set_str(&mut self, i: usize, id: u32) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, encode_str_id(id), style, None);
-            }
-        } else {
-            self.payload[i] = encode_str_id(id);
-        }
-    }
-
-    #[inline]
-    pub(crate) fn clear_payload(&mut self, i: usize) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, 0, style, None);
-            }
-        } else {
-            self.payload[i] = 0;
-        }
+        self.resolved_payload_at(i)
     }
 
     #[inline]
@@ -1266,8 +1345,6 @@ impl SheetData {
         self.spill_ranges.get(&anchor).copied()
     }
 
-    /// Remove only cells still owned by `anchor`; a user-written obstruction that
-    /// detached from the spill remains untouched.
     pub(crate) fn compact_spill_metadata(&mut self) {
         if self.spill_owners.is_empty() {
             self.spill_owners = HashMap::new();
@@ -1280,19 +1357,22 @@ impl SheetData {
         {
             self.spill_owners.shrink_to_fit();
         }
-        if self.spill_errors.is_empty() {
-            self.spill_errors = HashMap::new();
-        } else if self.spill_errors.capacity() > self.spill_errors.len().saturating_mul(2)
+        if self.derived_errors.is_empty() {
+            self.derived_errors = HashMap::new();
+        } else if self.derived_errors.capacity() > self.derived_errors.len().saturating_mul(2)
             && self
-                .spill_errors
+                .derived_errors
                 .capacity()
-                .saturating_sub(self.spill_errors.len())
+                .saturating_sub(self.derived_errors.len())
                 > 4096
         {
-            self.spill_errors.shrink_to_fit();
+            self.derived_errors.shrink_to_fit();
         }
+        self.derived.compact();
     }
 
+    /// Remove only cells still owned by `anchor`; a user-written obstruction that
+    /// detached from the spill remains untouched.
     pub(crate) fn clear_spill(&mut self, anchor: CellKey) -> Vec<CellKey> {
         if self.spill_owner(anchor) != Some(anchor) {
             return Vec::new();
@@ -1308,16 +1388,12 @@ impl SheetData {
                     continue;
                 }
                 self.spill_owners.remove(&cell);
-                self.spill_errors.remove(&cell);
                 if cell == anchor || !self.contains_cell(row as usize, col as usize) {
                     continue;
                 }
-                if !self.is_loaded(row as usize, col as usize) {
-                    continue;
-                }
+                self.derived_errors.remove(&cell);
                 let index = self.idx(row as usize, col as usize);
-                self.set_kind(index, KIND_EMPTY);
-                self.clear_payload(index);
+                self.derived.remove(index);
                 changed.push(cell);
             }
         }
@@ -1343,28 +1419,41 @@ impl SheetData {
 
     /// Detach a direct write from any spill and invalidate every attempted spill
     /// whose destination includes this cell.
+    #[inline]
     pub(crate) fn prepare_cell_write(&mut self, cell: CellKey) {
+        if !self.derived.is_empty() && self.contains_cell(cell.0 as usize, cell.1 as usize) {
+            self.derived
+                .remove(self.idx(cell.0 as usize, cell.1 as usize));
+        }
+
+        if !self.derived_errors.is_empty() {
+            self.derived_errors.remove(&cell);
+        }
+
         // No spill metadata means nothing to detach, invalidate or enqueue; the
         // hash probes below would only pay for empty-map lookups on every write.
-        if self.spill_ranges.is_empty()
-            && self.spill_owners.is_empty()
-            && self.spill_errors.is_empty()
-        {
+        if self.spill_ranges.is_empty() && self.spill_owners.is_empty() {
             return;
         }
+
+        self.detach_spill_source(cell);
+    }
+
+    fn detach_spill_source(&mut self, cell: CellKey) {
         let affected: Vec<CellKey> = self
             .spill_ranges
             .iter()
             .filter_map(|(&anchor, &range)| range.contains(cell).then_some(anchor))
             .collect();
+
         if self.spill_ranges.contains_key(&cell) {
             let changed = self.clear_spill(cell);
             self.dirty_cells.extend(changed);
             self.spill_ranges.remove(&cell);
         } else {
             self.spill_owners.remove(&cell);
-            self.spill_errors.remove(&cell);
         }
+
         self.compact_spill_metadata();
         self.dirty_cells.extend(affected);
     }
@@ -1379,6 +1468,14 @@ impl SheetData {
         } else {
             self.dirty_cells.clear();
         }
+    }
+
+    pub(crate) fn finish_recompute(&mut self) {
+        if self.formulas.is_empty() {
+            self.invalidate_derived();
+        }
+
+        self.clear_dirty();
     }
 
     fn remap_paged<F>(&mut self, new_rows: usize, new_cols: usize, mut remap: F)
@@ -1807,6 +1904,11 @@ impl SheetData {
         for entry in self.formulas.values() {
             entry.heap_memory_stats(formulas);
         }
+        self.derived.add_memory_stats(formulas);
+        formulas.add_hash_table::<CellKey, FormulaError>(
+            self.derived_errors.len(),
+            self.derived_errors.capacity(),
+        );
 
         stats
             .owner_mut(SPILL_RANGES)
@@ -1846,7 +1948,7 @@ pub(crate) fn formula_error_with_entry(
     entry: Option<&FormulaEntry>,
 ) -> Option<FormulaError> {
     sheet
-        .spill_errors
+        .derived_errors
         .get(&key)
         .copied()
         .or_else(|| entry.and_then(|entry| entry.error))

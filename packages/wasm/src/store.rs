@@ -591,20 +591,9 @@ impl CellStore {
         revision
     }
 
-    #[wasm_bindgen(js_name = endMutation)]
-    pub fn end_mutation(&mut self) {
-        self.active_mutation_revision = None;
-        self.maybe_collect_strings();
-    }
-
     #[wasm_bindgen(js_name = beginPageLoad)]
     pub fn begin_page_load(&mut self) {
         self.loading_page = self.loading_page.saturating_add(1);
-    }
-
-    #[wasm_bindgen(js_name = endPageLoad)]
-    pub fn end_page_load(&mut self) {
-        self.loading_page = self.loading_page.saturating_sub(1);
     }
 
     #[wasm_bindgen(js_name = setSheetName)]
@@ -1098,7 +1087,7 @@ impl CellStore {
             return false;
         }
         if contents {
-            s.clear_all_spills();
+            s.invalidate_calculations();
         }
         let mut removed_formula = false;
         for col in c0..=c1 {
@@ -1110,17 +1099,20 @@ impl CellStore {
                 let kind = if contents {
                     KIND_EMPTY
                 } else {
-                    s.kind_at(index)
+                    s.source_kind_at(index)
                 };
                 let payload = if contents {
                     0
-                } else if s.str_id_at(index) != NO_STRING {
-                    encode_str_id(s.str_id_at(index))
                 } else {
-                    encode_num(s.num_at(index))
+                    s.source_payload_at(index)
                 };
                 let next_style = if style { 0 } else { s.style_at(index) };
-                if !s.write_cell(row, col, kind, payload, next_style, dirty_revision) {
+                let written = if contents {
+                    s.write_cell(row, col, kind, payload, next_style, dirty_revision)
+                } else {
+                    s.write_style(row, col, next_style, dirty_revision)
+                };
+                if !written {
                     return false;
                 }
                 if contents {
@@ -1403,13 +1395,7 @@ impl CellStore {
                 let Some(&new_style) = mapping.get(&old_style) else {
                     continue;
                 };
-                let kind = s.kind_at(index);
-                let payload = if s.str_id_at(index) != NO_STRING {
-                    encode_str_id(s.str_id_at(index))
-                } else {
-                    encode_num(s.num_at(index))
-                };
-                if !s.write_cell(row, col, kind, payload, new_style, dirty_revision) {
+                if !s.write_style(row, col, new_style, dirty_revision) {
                     return false;
                 }
             }
@@ -1432,14 +1418,11 @@ impl CellStore {
         for &(row, col) in &persisted {
             let key = (row, col);
             let index = s.idx(row as usize, col as usize);
-            let derived = s.spill_owner(key).is_some_and(|anchor| anchor != key);
-            let kind = if derived {
-                KIND_EMPTY
-            } else {
-                s.kind_at(index)
-            };
-            let string_id = if !derived && s.str_id_at(index) != NO_STRING {
-                f64::from(s.str_id_at(index))
+            let kind = s.source_kind_at(index);
+            let source_payload = s.source_payload_at(index);
+            let source_string = payload_str_id(source_payload);
+            let string_id = if source_string != NO_STRING {
+                f64::from(source_string)
             } else {
                 -1.0
             };
@@ -1465,7 +1448,7 @@ impl CellStore {
                 f64::from(row),
                 f64::from(col),
                 f64::from(kind),
-                if derived { 0.0 } else { s.num_at(index) },
+                crate::sheet::payload_num(source_payload),
                 f64::from(s.style_at(index)),
                 string_id,
                 f64::from(source_kind),
@@ -1520,19 +1503,13 @@ impl CellStore {
             for row_offset in 0..rows {
                 let row = r0 + row_offset;
                 let index = s.idx(row, col);
-                let key = (row as u32, col as u32);
-                let derived = s.spill_owner(key).is_some_and(|anchor| anchor != key);
-                kind.push(if derived {
-                    KIND_EMPTY
+                kind.push(s.source_kind_at(index));
+                let source_payload = s.source_payload_at(index);
+                let source_string = payload_str_id(source_payload);
+                payload.push(if source_string != NO_STRING {
+                    encode_str_id(strings.intern(self.strings.get(source_string)?))
                 } else {
-                    s.kind_at(index)
-                });
-                payload.push(if derived {
-                    0
-                } else if s.str_id_at(index) != NO_STRING {
-                    encode_str_id(strings.intern(self.strings.get(s.str_id_at(index))?))
-                } else {
-                    crate::sheet::encode_num(s.num_at(index))
+                    source_payload
                 });
                 style.push(s.style_at(index));
             }
@@ -1587,7 +1564,7 @@ impl CellStore {
                     .intern(snapshot.strings.get(id as u32).expect("snapshot text ID"))
             })
             .collect();
-        s.clear_all_spills();
+        s.invalidate_calculations();
         s.formulas.retain(|&(row, col), _| {
             let row = row as usize;
             let col = col as usize;
@@ -1759,11 +1736,11 @@ impl CellStore {
                 return;
             }
 
-            s.clear_all_spills();
             let limit = values.len().min(s.row_count - start_row);
             if dirty_revision.is_some() && !s.can_dirty_rect(start_row, col, limit, 1) {
                 return;
             }
+            s.invalidate_calculations();
             let mut removed_formula = false;
             for (offset, &value) in values.iter().take(limit).enumerate() {
                 let row = start_row + offset;
@@ -1814,7 +1791,7 @@ impl CellStore {
         if dirty_revision.is_some() && !existing.can_dirty_rect(start_row, col, limit, 1) {
             return;
         }
-        self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_calculations();
         for (offset, value) in values.into_iter().take(limit).enumerate() {
             let row = start_row + offset;
             if cell_key(row, col).is_none() {
@@ -1873,7 +1850,7 @@ impl CellStore {
         let slices = utf16_slices(&buf, utf16_lens, limit);
 
         let mut removed_formula = false;
-        self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_calculations();
         for (offset, text) in slices.iter().enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1911,6 +1888,7 @@ impl CellStore {
         }
         let at = at.min(row_count);
         self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_derived();
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
         self.bump_formula_epoch();
@@ -1926,6 +1904,7 @@ impl CellStore {
         }
         let count = count.min(row_count - at);
         self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_derived();
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
         self.bump_formula_epoch();
@@ -1941,6 +1920,7 @@ impl CellStore {
         }
         let at = at.min(col_count);
         self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_derived();
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
         self.bump_formula_epoch();
@@ -1956,6 +1936,7 @@ impl CellStore {
         }
         let count = count.min(col_count - at);
         self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_derived();
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
         self.bump_formula_epoch();
@@ -1991,8 +1972,8 @@ impl CellStore {
                     style: s.style_at(i),
                 };
             }
-            if let Some(entry) = key.and_then(|key| s.formulas.get(&key)) {
-                match entry.value_kind {
+            if key.is_some_and(|key| s.formulas.contains_key(&key)) {
+                match s.formula_value_kind(i) {
                     FormulaValueKind::Bool => {
                         return CellOut {
                             kind: KIND_BOOL,
@@ -2296,7 +2277,7 @@ impl CellStore {
             row,
             col,
             kind: KIND_FORMULA,
-            payload: encode_num(carried),
+            payload: 0,
             style,
             source: Some(entry),
             revision: dirty_revision,
@@ -2471,11 +2452,60 @@ impl CellStore {
         self.recompute_sheet(sheet);
     }
 
-    /// Recompute the union of every dirty sheet once at the host transaction
-    /// barrier, including cross-sheet formula and plain-reference dependents.
-    #[wasm_bindgen(js_name = recomputeChanged)]
-    pub fn recompute_changed_sources(&mut self) {
+    /// Commit staged user or host sources. Admission metadata must be staged
+    /// before this barrier; derived values and string roots are complete on return.
+    /// Beginning a page load suppresses local dirty tracking until this commit.
+    #[wasm_bindgen(js_name = commitSources)]
+    pub fn commit_sources(&mut self) {
+        let was_page_load = self.loading_page > 0;
+        self.loading_page = self.loading_page.saturating_sub(1);
+
         self.recompute_changed();
+        self.active_mutation_revision = None;
+
+        if !was_page_load {
+            self.maybe_collect_strings();
+        }
+    }
+
+    /// Whether a source rectangle can replace its spill cells without cutting
+    /// an installed spill away from its anchor. No owner window crosses WASM.
+    #[wasm_bindgen(js_name = admitSourceRange)]
+    pub fn admit_source_range(
+        &self,
+        sheet: usize,
+        r0: usize,
+        c0: usize,
+        r1: usize,
+        c1: usize,
+    ) -> bool {
+        let Some(data) = self.sheets.get(sheet) else {
+            return false;
+        };
+
+        if r0 > r1 || c0 > c1 || !data.contains_cell(r1, c1) {
+            return false;
+        }
+
+        if data.spill_owners.is_empty() {
+            return true;
+        }
+
+        for col in c0..=c1 {
+            for row in r0..=r1 {
+                if let Some((owner_row, owner_col)) = data.spill_owner((row as u32, col as u32)) {
+                    if (owner_row as usize) < r0
+                        || (owner_row as usize) > r1
+                        || (owner_col as usize) < c0
+                        || (owner_col as usize) > c1
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 
     /// Atomically write one row-major mixed literal/formula/reference block
@@ -2731,7 +2761,7 @@ impl CellStore {
             string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
         }
 
-        self.sheets[sheet].clear_all_spills();
+        self.sheets[sheet].invalidate_calculations();
         for col_offset in 0..cols {
             let col = start_col + col_offset;
             for row_offset in 0..rows {
@@ -2957,7 +2987,7 @@ impl CellStore {
         };
         if hydrating {
             sheet_data.all_dirty = true;
-        } else {
+        } else if !sheet_data.all_dirty {
             sheet_data.dirty_cells.insert(key);
         }
         if graph_changed {

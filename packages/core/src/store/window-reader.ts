@@ -309,19 +309,6 @@ export class StoreWindowReader {
     };
   }
 
-  spillOwnerCoordinates(
-    sheet: SheetId,
-    rows: { start: number; end: number },
-    cols: readonly number[],
-  ): Uint32Array {
-    return this.wasm.spillOwnerCoordinates(
-      this.handleOf(sheet),
-      rows.start,
-      rows.end,
-      this.colsU32For(cols),
-    );
-  }
-
   read(
     sheet: SheetId,
     rows: { start: number; end: number },
