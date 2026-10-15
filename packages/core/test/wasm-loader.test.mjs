@@ -34,6 +34,7 @@ describe("WASM loader lifecycle", () => {
     } finally {
       console.warn = originalWarn;
     }
+
     expect(warnings).toEqual([
       "Sheetwrite: load() called with a different source after initialization; keeping the first module.",
     ]);
@@ -45,6 +46,7 @@ describe("WASM loader lifecycle", () => {
         throw new Error("transient compile failure");
       }
     });
+
     fail = true;
     await expect(retrying.load("retry")).rejects.toThrow("transient compile failure");
     expect(retrying.isLoaded()).toBe(false);
@@ -87,6 +89,7 @@ describe("WASM loader lifecycle", () => {
     } finally {
       console.warn = originalWarn;
     }
+
     expect(warnings).toHaveLength(1);
   });
 
@@ -137,6 +140,7 @@ describe("WASM loader lifecycle", () => {
       expect(second.getMemory()).not.toBe(first.getMemory());
       const left = new first.CellStore();
       const right = new second.CellStore();
+
       try {
         left.addSheet(1, 10);
         right.addSheet(1, 10);
@@ -144,6 +148,7 @@ describe("WASM loader lifecycle", () => {
         right.setNumber(0, 0, 0, 7);
         const a = left.getCell(0, 0, 0);
         const b = right.getCell(0, 0, 0);
+
         try {
           expect(a.num).toBe(42);
           expect(b.num).toBe(7);

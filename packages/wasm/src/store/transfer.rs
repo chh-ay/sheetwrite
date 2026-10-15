@@ -22,6 +22,7 @@ fn read_names(input: &mut Reader<'_>) -> TransferResult<HashMap<String, usize>> 
 pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
     out.text(&entry.source);
     out.bool(entry.is_reference());
+
     if entry.is_reference() {
         let target = entry.reference_target(sheet).expect("reference target");
         out.u32(target.sheet);
@@ -41,6 +42,7 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     out.bool(entry.has_spill_refs);
     out.bool(entry.produces_array);
     out.usize(entry.reads.cells.len());
+
     for key in &entry.reads.cells {
         out.u32(key.sheet);
         out.u32(key.row);
@@ -48,6 +50,7 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 
     out.usize(entry.reads.ranges.len());
+
     for range in &entry.reads.ranges {
         out.u32(range.sheet);
         out.u32(range.row_start);
@@ -84,6 +87,7 @@ impl CellStore {
         };
 
         entry.source = source;
+
         if !input.bool()? {
             entry.ast = None;
         }
@@ -129,6 +133,7 @@ impl CellStore {
         let mut store = Self::new();
         store.strings = input.strings()?;
         store.strings.epoch = store.strings.epoch.wrapping_add(1);
+
         for _ in 0..input.count()? {
             store.sheet_names.push(input.text()?);
             store.sheet_alive.push(input.bool()?);
@@ -177,6 +182,7 @@ impl CellStore {
                     col: input.u32()?,
                 });
             }
+
             store.tables.insert(key, table);
         }
 
@@ -184,6 +190,7 @@ impl CellStore {
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
+
         let sheets = input.count()?;
         if sheets != store.sheet_names.len() {
             return Err("invalid transferred sheet handles".into());
@@ -191,12 +198,14 @@ impl CellStore {
 
         for sheet in 0..sheets {
             let mut data = SheetData::read_transfer(&mut input)?;
+
             for _ in 0..input.count()? {
                 let row = input.u32()?;
                 let col = input.u32()?;
                 let entry = store.read_transfer_formula(&mut input, sheet as u32, row, col)?;
                 data.formulas.insert((row, col), entry);
             }
+
             store.sheets.push(data);
         }
 
@@ -217,6 +226,7 @@ impl CellStore {
         let mut out = Writer::new(STORE_TAG);
         out.strings(&self.strings);
         out.usize(self.sheet_names.len());
+
         for (name, &alive) in self.sheet_names.iter().zip(&self.sheet_alive) {
             out.text(name);
             out.bool(alive);
@@ -225,11 +235,13 @@ impl CellStore {
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
         out.usize(self.named_ranges.len());
+
         for ((scope, key), range) in &self.named_ranges {
             out.bool(scope.is_some());
             if let Some(scope) = scope {
                 out.u32(*scope);
             }
+
             out.text(key);
             out.text(&range.name);
             out.u32(range.sheet);
@@ -240,6 +252,7 @@ impl CellStore {
         }
 
         out.usize(self.tables.len());
+
         for (key, table) in &self.tables {
             out.text(key);
             out.text(&table.id);
@@ -258,6 +271,7 @@ impl CellStore {
                 out.u32(column.col);
             }
         }
+
         out.u64(self.formula_epoch);
         out.u64(self.mutation_revision);
         out.u64(self.volatile_serial.to_bits());
@@ -272,6 +286,7 @@ impl CellStore {
                 write_formula(&mut out, entry, sheet as u32);
             }
         }
+
         out.0
     }
 
@@ -295,15 +310,18 @@ mod tests {
         original.set_formula(0, 0, 1, "=A1+1", 3);
         original.set_formula(0, 1, 1, "=NOW()", 0);
         original.recompute_changed();
+
         let cached_time = original.get_cell(0, 1, 1).num();
         let bytes = original.export_memory_state();
         let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
+
         assert_eq!(replacement.get_cell(0, 0, 0).style(), 7);
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 42.0);
         assert_eq!(
             replacement.get_cell(0, 1, 1).num().to_bits(),
             cached_time.to_bits()
         );
+
         replacement.set_number(0, 0, 0, 99.0, 7);
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
@@ -316,6 +334,7 @@ mod tests {
         original.add_sheet(1, 1);
         original.set_number(0, 0, 0, 5.0, 0);
         let bytes = original.export_memory_state();
+
         for length in 0..bytes.len() {
             assert!(CellStore::read_memory_state(&bytes[..length]).is_err());
         }

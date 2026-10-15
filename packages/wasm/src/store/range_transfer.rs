@@ -16,6 +16,7 @@ impl RangeSnapshot {
         out.ints(&self.style);
         out.strings(&self.strings);
         out.usize(self.formulas.len());
+
         for (row, col, entry) in &self.formulas {
             out.u32(*row);
             out.u32(*col);
@@ -49,6 +50,7 @@ impl CellStore {
 
         let strings = input.strings()?;
         let mut formulas = Vec::new();
+
         for _ in 0..input.count()? {
             let row = input.u32()?;
             let col = input.u32()?;

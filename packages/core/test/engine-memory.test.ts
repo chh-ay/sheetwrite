@@ -90,6 +90,7 @@ describe("explicit engine memory release", () => {
       const first = releaseEngineMemory();
       expect(releaseEngineMemory()).toBe(first);
       await first;
+
       for (let cycle = 0; cycle < 5; cycle++) {
         // A real task boundary ends WeakRef's keep-alive job; fake time cannot force GC.
         const next = Promise.withResolvers<void>();
@@ -99,6 +100,7 @@ describe("explicit engine memory release", () => {
       }
 
       expect(retired.deref()).toBeUndefined();
+
       // Retained disposed facades/resources must not retain an old glue memory cache.
       expect(disposed.getWorkbook().sheets).toHaveLength(1);
       expect(() => snapshot.toDocumentOp(range)).toThrow("already disposed");

@@ -36,12 +36,12 @@ export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
 }
 
 async function release(): Promise<EngineMemoryReleaseReport> {
-  // Instantiation yields: a caller inside a synchronous transaction cannot cut
-  // the engine over before that transaction and its listeners have returned.
+  // Yield so synchronous transactions and their listeners finish before cutover.
   const replacement = await prepareEngineInstance();
 
   for (;;) {
     const waits: Promise<void>[] = [];
+
     for (const engine of liveStoreEngines()) {
       const wait = engine.waitForPageLoads();
       if (wait) waits.push(wait);
@@ -57,6 +57,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   const before = previous.getMemory().buffer.byteLength;
   const prepared: PreparedEngineMemoryRelease[] = [];
   const engines = liveStoreEngines();
+
   try {
     for (const engine of engines) {
       const migration = engine.prepareMemoryRelease(replacement);
@@ -64,7 +65,9 @@ async function release(): Promise<EngineMemoryReleaseReport> {
     }
   } catch (cause) {
     for (const migration of prepared) migration.abort();
+
     replacement.retire();
+
     throw new Error(
       "Sheetwrite: engine memory release preparation failed; live stores are unchanged",
       { cause },
@@ -72,6 +75,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   }
 
   const after = replacement.getMemory().buffer.byteLength;
+
   if (after > before) {
     for (const migration of prepared) migration.abort();
     replacement.retire();
@@ -89,7 +93,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   replaceEngineInstance(replacement);
   previous.retire();
 
-  // Renderers rebuild frames after the whole cutover, without document events.
+  // Defer renderer callbacks until every store has committed.
   queueMicrotask(() => {
     for (const engine of engines) engine.notifyMemoryRelease();
   });

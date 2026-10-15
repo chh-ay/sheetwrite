@@ -125,6 +125,7 @@ export class ReadWindowController {
 
   schedule(): void {
     if (this.frame || this.destroyed) return;
+
     const requestFrame =
       globalThis.requestAnimationFrame ??
       ((callback: FrameRequestCallback) => setTimeout(callback, 16));
@@ -151,10 +152,12 @@ export class ReadWindowController {
       storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
       this.pinnedSheet = null;
     }
+
     if (this.frame) {
       (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
       this.frame = 0;
     }
+
     this.lastPaintView = null;
     this.cachedPaneViews = [];
     this.cachedDomMergeAnchorViews = [];
@@ -171,6 +174,7 @@ export class ReadWindowController {
     const contentTop = geometry.toContent(this.options.scrollTop());
     const scrollLeft = this.options.scrollLeft();
     const cellViewportWidth = Math.max(0, clientWidth - theme.rowHeaderWidth);
+
     const paintWindow = geometry.paintWindow(
       contentTop,
       scrollLeft,
@@ -184,6 +188,7 @@ export class ReadWindowController {
     const frozenColumns = paintWindow.frozenColumns;
     const frozenHeight = paintWindow.frozenHeight;
     const frozenWidth = paintWindow.frozenWidth;
+
     const visibleColumns = geometry.columnWindow(scrollLeft, cellViewportWidth, 0);
     const firstBodyVisibleColumn = geometry.columnIndices[visibleColumns.start] ?? null;
     const lastBodyVisibleColumn = geometry.columnIndices[visibleColumns.end - 1] ?? null;
@@ -206,6 +211,7 @@ export class ReadWindowController {
             end: Math.max(rawVisibleRows.end, frozenRows),
           }
         : rawVisibleRows;
+
     const usePanes =
       (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
     const rowGeometry = geometry.rowGeometry(rows);
@@ -219,12 +225,14 @@ export class ReadWindowController {
           contentsChanged = true;
         }
       }
+
       this.columnWindowStart = columns.start;
       this.columnWindowEnd = columns.end;
       this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
       if (contentsChanged) this.columnWindowRevision += 1;
       this.options.ariaMirror.bumpVersion();
     }
+
     if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
       const frozenColumnIndices =
         frozenColumns > 0 ? geometry.columnIndices.slice(0, frozenColumns) : [];
@@ -243,6 +251,7 @@ export class ReadWindowController {
           demanded[write++] = column;
         }
       }
+
       demanded.length = write;
       this.datasourceColumnIndices = demanded;
       this.datasourceFrozenColumns = frozenColumns;
@@ -261,6 +270,7 @@ export class ReadWindowController {
       viewport.rowTops = rowGeometry.rowTops;
       viewport.rowHeights = rowGeometry.rowHeights;
     }
+
     this.options.renderer().setViewport(viewport);
 
     const zoom = this.options.zoom();
@@ -284,6 +294,7 @@ export class ReadWindowController {
       !Object.is(frozenHeight, this.lastPaintFrozenHeight) ||
       !Object.is(frozenWidth, this.lastPaintFrozenWidth) ||
       !Object.is(zoom, this.lastPaintZoom);
+
     this.updateDemand(activeSheet, rows, visibleRows, frozenRows, refreshData);
 
     let view: VisibleWindowView;
@@ -313,6 +324,7 @@ export class ReadWindowController {
           this.windowedColumnIndices,
         );
       }
+
       const cachedView = this.lastPaintView;
       if (!cachedView) throw new Error("Sheetwrite: paint window was not resolved");
       view = cachedView;
@@ -326,11 +338,13 @@ export class ReadWindowController {
           this.lastPaintView = view;
           this.domMergeSourceViews[0] = view;
         }
+
         if (refreshAnchors) this.loadDomMergeAnchorViews(requests);
         this.options.domOverlay.paint(view, viewport, this.cachedDomMergeAnchorViews);
         this.options.renderer().paint(view);
       }
     }
+
     this.lastPaintView = view;
     this.lastDataSheet = activeSheet;
     this.lastDataRowStart = rows.start;
@@ -348,6 +362,7 @@ export class ReadWindowController {
     this.lastPaintFrozenHeight = frozenHeight;
     this.lastPaintFrozenWidth = frozenWidth;
     this.lastPaintZoom = zoom;
+
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);
@@ -388,6 +403,7 @@ export class ReadWindowController {
     const frozenGeometry =
       frozenRows > 0 ? this.options.geometry.frozenRowGeometry(frozenRows) : null;
     const panes: PanePaint[] = [];
+
     const paneView = (
       rows: { start: number; end: number },
       columns: readonly number[],
@@ -401,6 +417,7 @@ export class ReadWindowController {
         );
         this.cachedPaneViews[slot] = view;
       }
+
       return view;
     };
 
@@ -414,6 +431,7 @@ export class ReadWindowController {
         rowHeights: frozenGeometry?.rowHeights,
       });
     }
+
     if (frozenRows > 0) {
       panes.push({
         view: paneView(frozenRowWindow, bodyColumns),
@@ -424,6 +442,7 @@ export class ReadWindowController {
         rowHeights: frozenGeometry?.rowHeights,
       });
     }
+
     if (frozenColumns > 0) {
       panes.push({
         view: paneView(bodyRows, frozenColumnIndices),
@@ -450,6 +469,7 @@ export class ReadWindowController {
       rowHeights: bodyGeometry?.rowHeights,
     });
     this.cachedPaneViews.length = panes.length;
+
     if (repaint) {
       this.domMergeSourceViews.length = panes.length;
       for (let slot = 0; slot < panes.length; slot++) {
@@ -457,16 +477,19 @@ export class ReadWindowController {
         if (!pane) throw new Error("Sheetwrite: missing frozen pane");
         this.domMergeSourceViews[slot] = pane.view;
       }
+
       const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
       if (this.domMergeAnchorsNeedRefresh(requests, refreshData)) {
         this.loadDomMergeAnchorViews(requests);
       }
+
       this.options.domOverlay.paintPanes(panes, this.cachedDomMergeAnchorViews);
       this.options.renderer().paintPanes?.(panes, {
         x: frozenColumns > 0 ? xSplit - 0.5 : null,
         y: frozenRows > 0 ? ySplit - 0.5 : null,
       });
     }
+
     return bodyView;
   }
 
@@ -476,6 +499,7 @@ export class ReadWindowController {
   ): boolean {
     let changed = refreshData;
     let stateIndex = 0;
+
     for (const request of requests) {
       if (this.domMergeAnchorState[stateIndex] !== request.sheet) changed = true;
       this.domMergeAnchorState[stateIndex++] = request.sheet;
@@ -488,6 +512,7 @@ export class ReadWindowController {
         this.domMergeAnchorState[stateIndex++] = col;
       }
     }
+
     if (this.domMergeAnchorState.length !== stateIndex) changed = true;
     this.domMergeAnchorState.length = stateIndex;
     return changed;
@@ -498,6 +523,7 @@ export class ReadWindowController {
     for (let slot = 0; slot < requests.length; slot++) {
       const request = requests[slot];
       if (!request) throw new Error("Sheetwrite: missing merge anchor request");
+
       const view = this.options.store.getVisibleWindow(
         request.sheet,
         { start: request.row, end: request.row + 1 },
@@ -508,6 +534,7 @@ export class ReadWindowController {
         values = new Array<CellScalar>(view.values.length);
         this.domMergeAnchorValuePools[slot] = values;
       }
+
       for (let index = 0; index < values.length; index++)
         values[index] = view.values[index] ?? null;
       this.cachedDomMergeAnchorViews[slot] = { ...view, values };
@@ -526,6 +553,7 @@ export class ReadWindowController {
       refreshData &&
       engine !== null &&
       (this.options.datasourceEnabled === true || engine.isPaged(sheet));
+
     if (refreshData && !refreshClosure) {
       this.formulaBands = EMPTY_BANDS;
       if (engine && this.pinnedSheet !== null) {
@@ -533,6 +561,7 @@ export class ReadWindowController {
         this.pinnedSheet = null;
       }
     }
+
     const anchors: DomMergeAnchorRequest[] = [];
     if (refreshClosure) {
       const merges =
@@ -553,11 +582,13 @@ export class ReadWindowController {
             reached.add(merge);
           }
         }
+
         for (const merge of reached) {
           anchors.push({ sheet, row: merge.r0, cols: [merge.c0] });
         }
       }
     }
+
     if (engine && refreshClosure) {
       const roots = [
         { sheet, row: paintRows.start, end: paintRows.end, cols: this.datasourceColumnIndices },
@@ -569,6 +600,7 @@ export class ReadWindowController {
       const protectedBands: number[] = [];
       const formulaBands: number[] = [];
       let remainingCells = FORMULA_CLOSURE_MAX_CELLS;
+
       for (const root of roots) {
         if (root.sheet !== sheet) continue;
         // Formula discovery and engine pins use backing rows, never display rows.
@@ -580,6 +612,7 @@ export class ReadWindowController {
             end += 1;
             row += 1;
           }
+
           for (const col of root.cols) protectedBands.push(start, end, col, col + 1);
           const bands = engine.formulaReadBands(sheet, start, end, root.cols, remainingCells);
           for (let index = 0; index < bands.length; index += 4) {
@@ -595,25 +628,30 @@ export class ReadWindowController {
             ) {
               throw new Error("Sheetwrite: invalid formula closure band");
             }
+
             formulaBands.push(rowStart, rowEnd, colStart, colEnd);
             protectedBands.push(rowStart, rowEnd, colStart, colEnd);
             remainingCells -= (rowEnd - rowStart) * (colEnd - colStart);
           }
         }
       }
+
       if (this.pinnedSheet !== null && this.pinnedSheet !== sheet) {
         engine.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
       }
+
       this.formulaBands = formulaBands.length === 0 ? EMPTY_BANDS : Uint32Array.from(formulaBands);
       engine.pinViewportBands(sheet, Uint32Array.from(protectedBands));
       this.pinnedSheet = sheet;
     }
+
     // Protection is committed before any page can hydrate or evict a chunk.
     if (frozenRows > 0)
       this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
     for (const anchor of anchors) {
       this.options.datasource.ensureLoaded(anchor.row, anchor.row + 1, anchor.cols);
     }
+
     this.options.datasource.updateViewport(
       visibleRows.start,
       visibleRows.end,
@@ -638,6 +676,7 @@ export class ReadWindowController {
       values = new Array<CellScalar>(view.values.length);
       this.paneValuePools[slot] = values;
     }
+
     for (let index = 0; index < values.length; index++) values[index] = view.values[index] ?? null;
     return { ...view, values };
   }

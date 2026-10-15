@@ -23,6 +23,7 @@ export function createLoader(initialize) {
       if (source !== undefined && source !== selectedSource) {
         console.warn(DIFFERENT_SOURCE_AFTER_INIT);
       }
+
       return;
     }
 
@@ -30,6 +31,7 @@ export function createLoader(initialize) {
       if (source !== undefined && source !== selectedSource) {
         throw new Error(DIFFERENT_SOURCE_IN_FLIGHT);
       }
+
       return inFlight;
     }
 

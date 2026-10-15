@@ -6,6 +6,7 @@ export interface SheetwriteEngine {
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;
+
   /** The optional full engine reports its accepted function names. */
   functionNames?: () => string[];
 }
@@ -32,6 +33,7 @@ export async function loadEngine(
   engine?: SheetwriteEngine,
 ): Promise<void> {
   const requested = engine ?? pendingEngine ?? selectedEngine;
+
   if (
     (pendingEngine && pendingEngine !== requested) ||
     (engineInstance && selectedEngine !== requested)
@@ -66,6 +68,7 @@ export async function loadEngine(
   initialization = (async () => {
     try {
       const instance = await requested.createEngine(source);
+
       selectedEngine = requested;
       engineInstance = instance;
       engineFunctionNames = instance.functionNames?.();

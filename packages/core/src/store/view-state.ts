@@ -27,12 +27,14 @@ function packedIndexShape(logicalRows: number, survivors: number): PackedRowInde
   if (survivors === 0) return { kind: "empty", storageLength: 0 };
 
   const requiredSlots = survivors * 2;
+
   if (requiredSlots < 0x8000_0000) {
     let capacity = 1;
     while (capacity < requiredSlots) capacity *= 2;
     const storageLength = capacity * 2;
     if (storageLength < logicalRows) return { kind: "sparse", storageLength };
   }
+
   return { kind: "dense", storageLength: logicalRows };
 }
 
@@ -96,6 +98,7 @@ export class StoreViewState {
       if (dataRow >= meta.rowCount) return null;
       index = this.rebuildRowIndex(sheet, order, meta.rowCount, index);
     }
+
     if (dataRow >= index.logicalRows || index.kind === "empty") return null;
 
     if (index.kind === "dense") {
@@ -106,6 +109,7 @@ export class StoreViewState {
     const capacity = index.storage.length / 2;
     const mask = capacity - 1;
     let slot = hashDataRow(dataRow) & mask;
+
     for (;;) {
       const at = slot * 2;
       const storedDataRow = index.storage[at]!;
@@ -147,12 +151,14 @@ export class StoreViewState {
   metadataChanged(sheet: SheetId): void {
     const meta = this.sheetMeta(sheet);
     const state = this.ensureState(sheet);
+
     state.sortKeys = meta.sortKeys?.map((key) => ({ ...key })) ?? [];
     state.filters = new Map(
       meta.filters?.map(([col, filter]) => [col, cloneJsonValue(filter)]) ?? [],
     );
     state.hiddenRows = new Set(meta.hiddenRows ?? []);
     state.groups = meta.rowGroups?.map((group) => ({ ...group })) ?? [];
+
     this.recompute(sheet);
   }
 
@@ -168,6 +174,7 @@ export class StoreViewState {
       state.hiddenRows = new Set(meta.hiddenRows ?? []);
       state.groups = meta.rowGroups?.map((group) => ({ ...group })) ?? [];
     }
+
     this.recompute(sheet);
   }
 
@@ -181,6 +188,7 @@ export class StoreViewState {
       state.sortKeys = [];
       state.filters.clear();
     }
+
     this.recompute(sheet);
   }
 
@@ -193,21 +201,27 @@ export class StoreViewState {
   resourceOwners(): ResourceOwnerBytes[] {
     let orderBytes = 0;
     let orderEntries = 0;
+
     for (const order of this.orderBySheet.values()) {
       orderBytes += order.byteLength;
       orderEntries += order.length;
     }
+
     let inverseBytes = 0;
     let inverseEntries = 0;
+
     for (const index of this.rowIndexBySheet.values()) {
       inverseBytes += index.storage.byteLength;
       inverseEntries += index.storage.length;
     }
+
     let configEntries = 0;
+
     for (const state of this.stateBySheet.values()) {
       configEntries +=
         state.sortKeys.length + state.filters.size + state.hiddenRows.size + state.groups.length;
     }
+
     return [
       {
         owner: "js.view.order",
@@ -249,12 +263,14 @@ export class StoreViewState {
     const out: CellScalar[] = new Array(kinds.length);
     let numberAt = 0;
     let textAt = 0;
+
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === 1) out[i] = numbers[numberAt++] ?? null;
       else if (kinds[i] === 2) out[i] = texts[textAt++] ?? null;
       else if (kinds[i] === 3) out[i] = (numbers[numberAt++] ?? 0) !== 0;
       else out[i] = null;
     }
+
     return out;
   }
 
@@ -287,6 +303,7 @@ export class StoreViewState {
       this.setOrder(sheet, EMPTY_U32);
       return;
     }
+
     if (!hasSort) {
       this.setOrder(sheet, survivors ?? EMPTY_U32);
       return;
@@ -294,10 +311,12 @@ export class StoreViewState {
 
     const cols = new Uint32Array(state!.sortKeys.length);
     const ascending = new Uint8Array(state!.sortKeys.length);
+
     for (let i = 0; i < state!.sortKeys.length; i++) {
       cols[i] = state!.sortKeys[i]!.col;
       ascending[i] = state!.sortKeys[i]!.ascending ? 1 : 0;
     }
+
     this.setOrder(sheet, this.wasm.sortRowsMulti(handle, cols, ascending, survivors ?? EMPTY_U32));
   }
 
@@ -342,6 +361,7 @@ export class StoreViewState {
               textCount++;
             }
           }
+
           numCounts[i] = numberCount;
           textCounts[i] = textCount;
           flags[i] = includesNull ? 1 : 0;
@@ -365,6 +385,7 @@ export class StoreViewState {
           kinds[i] = 4;
           break;
       }
+
       i++;
     }
 
@@ -389,6 +410,7 @@ export class StoreViewState {
         break;
       }
     }
+
     if (!hasCollapsed) return state.hiddenRows.size > 0 ? state.hiddenRows : null;
 
     const hidden = new Set<number>(state.hiddenRows);
@@ -396,6 +418,7 @@ export class StoreViewState {
       if (!group.collapsed) continue;
       for (let row = group.start; row <= group.end; row++) hidden.add(row);
     }
+
     return hidden.size > 0 ? hidden : null;
   }
 
@@ -411,6 +434,7 @@ export class StoreViewState {
       };
       this.stateBySheet.set(sheet, state);
     }
+
     return state;
   }
 
@@ -454,11 +478,13 @@ export class StoreViewState {
             `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
           );
         }
+
         if (index.storage[dataRow] !== ABSENT_VIEW_ROW) {
           throw new RangeError(
             `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
           );
         }
+
         index.storage[dataRow] = viewRow;
       }
     } else {
@@ -471,6 +497,7 @@ export class StoreViewState {
             `view order for sheet ${sheet} contains out-of-bounds data row ${dataRow}`,
           );
         }
+
         let slot = hashDataRow(dataRow) & mask;
         for (;;) {
           const at = slot * 2;
@@ -480,15 +507,18 @@ export class StoreViewState {
               `view order for sheet ${sheet} contains duplicate data row ${dataRow}`,
             );
           }
+
           if (storedDataRow === ABSENT_VIEW_ROW) {
             index.storage[at] = dataRow;
             index.storage[at + 1] = viewRow;
             break;
           }
+
           slot = (slot + 1) & mask;
         }
       }
     }
+
     index.valid = true;
     return index;
   }

@@ -8,6 +8,7 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
   const declarations = [...source.matchAll(/^export (?:class|function|const|let) (\w+)/gm)].map(
     (match) => match[1],
   );
+
   if (!declarations.includes("CellStore") || !/\bfunction initSync\b/.test(source)) {
     throw new Error(`Unrecognized wasm-bindgen exports in ${gluePath}`);
   }
@@ -24,9 +25,11 @@ export async function generateWasmFactory(packageDirectory: string): Promise<voi
   const memoryCaches = [...source.matchAll(/^let (cached\w+Memory\d+) = null;/gm)].map(
     (match) => `${match[1]} = null;`,
   );
+
   if (memoryCaches.length === 0) throw new Error(`Unrecognized memory caches in ${gluePath}`);
 
   const retire = `wasm = undefined; wasmInstance = undefined; wasmModule = undefined; ${memoryCaches.join(" ")}`;
+
   await writeFile(
     resolve(packageDirectory, "pkg/sheetwrite_wasm_factory.js"),
     `// Generated from wasm-bindgen glue; do not edit.
@@ -58,8 +61,7 @@ return { ${exports.join(", ")}, init: __wbg_init, getModule: () => { if (!wasmMo
 `,
   );
 
-  // Preserve the published singleton exports without shipping a second copy of
-  // the glue implementation. Core uses independent instances from the same factory.
+  // Share the factory implementation to avoid shipping a second copy of the glue.
   await writeFile(
     gluePath,
     `// Generated singleton loader; do not edit.\nimport { createInstance } from "./sheetwrite_wasm_factory.js";\nconst singleton = createInstance(true);\nexport const { ${exports.join(", ")} } = singleton;\nexport default singleton.init;\n`,

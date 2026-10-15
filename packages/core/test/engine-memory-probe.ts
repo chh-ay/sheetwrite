@@ -64,6 +64,7 @@ const pagedWorkbook = makeWorkbook(1_000_000);
 const paged = new SheetwriteStore(pagedWorkbook, undefined, { storage: "paged", chunkRows: 4 });
 const address = { sheet: "s1", row: 0, col: 0 };
 const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 7, col: 2 } };
+
 dense.applyTransaction({
   patches: [
     {
@@ -75,10 +76,13 @@ dense.applyTransaction({
     { op: "set", addr: { ...address, col: 1 }, value: { kind: "formula", src: "=NOW()" } },
   ],
 });
+
 const history = dense.captureRangeHistory(range);
 if (!history) throw new Error("Expected compact history");
+
 const edit: DocumentOp = { op: "set", addr: address, value: { kind: "literal", value: "unsaved" } };
 paged.applyTransaction({ patches: [edit] });
+
 const denseBefore = dense.exportSnapshot();
 const statsBefore = dense.getRangeMutationAllocationStats();
 const previousMemory = getEngine().getMemory();
@@ -150,6 +154,7 @@ try {
     },
     1_000_000,
   );
+
   try {
     controller.ensureLoaded(4, 5, [0]);
     candidateCreated = Promise.withResolvers<void>();
@@ -160,7 +165,7 @@ try {
     });
     await candidateCreated.promise;
 
-    // Instantiation has completed; only the active datasource request can block cutover.
+    // Drain instantiation microtasks so only the datasource request can block cutover.
     for (let turn = 0; turn < 8; turn++) await Promise.resolve();
     assert.equal(settled, false);
     assert.equal(getEngine().getMemory(), memoryBeforeLoad);
@@ -239,6 +244,7 @@ for (const keepHistory of [false, true]) {
         },
       ],
     });
+
     const report = await releaseEngineMemory();
     const freshFloor = freshStoreBytes + (retained?.byteLength ?? 0);
     assert.ok(report.wasmBytesAfter <= report.wasmBytesBefore, "Release must not grow memory");

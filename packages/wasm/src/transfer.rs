@@ -43,6 +43,7 @@ impl Writer {
         while start < value.len() {
             let is_zero = value[start] == 0;
             let mut end = start + 1;
+
             while end < value.len()
                 && end - start < (u32::MAX >> 1) as usize
                 && (value[end] == 0) == is_zero
@@ -78,9 +79,11 @@ impl Writer {
 
     pub(crate) fn strings(&mut self, strings: &StringStorage) {
         self.usize(strings.len());
+
         for id in 0..strings.len() {
             self.text(strings.get(id as u32).expect("pool ID"));
         }
+
         self.u32(strings.epoch);
     }
 
@@ -106,6 +109,7 @@ impl<'a> Reader<'a> {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn new(bytes: &'a [u8], tag: u32) -> TransferResult<Self> {
         let mut input = Self { bytes };
+
         if input.u32()? != tag {
             return Err("invalid engine memory transfer".into());
         }
@@ -121,6 +125,7 @@ impl<'a> Reader<'a> {
             buffer: Vec::new(),
             offset: 0,
         };
+
         if input.u32()? != tag {
             return Err("invalid engine memory transfer".into());
         }
@@ -133,6 +138,7 @@ impl<'a> Reader<'a> {
         {
             self.source.length() as usize - self.offset
         }
+
         #[cfg(not(target_arch = "wasm32"))]
         {
             self.bytes.len()
@@ -166,6 +172,7 @@ impl<'a> Reader<'a> {
                 written += length;
             }
         }
+
         #[cfg(not(target_arch = "wasm32"))]
         {
             let (value, rest) = self.bytes.split_at(output.len());
@@ -266,6 +273,7 @@ impl<'a> Reader<'a> {
 
     pub(crate) fn strings(&mut self) -> TransferResult<StringStorage> {
         let mut strings = StringStorage::new();
+
         for id in 0..self.count()? {
             if strings.intern(&self.text()?) != id as u32 {
                 return Err("duplicate transfer string".into());

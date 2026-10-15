@@ -28,9 +28,12 @@ export declare function isLoaded(): boolean;
 /** Engine objects and caches owned by one independently collectible WASM instance. */
 export type EngineInstance = Omit<typeof WasmExports, "default"> & {
   getModule(): WebAssembly.Module;
+
   getMemory(): WebAssembly.Memory;
+
   /** Drop all glue roots after releasing owned resources. This instance is then unusable. */
   retire(): void;
+
   functionNames?: () => string[];
 };
 

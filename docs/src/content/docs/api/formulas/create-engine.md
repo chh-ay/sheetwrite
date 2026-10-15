@@ -8,7 +8,7 @@ description: "Initialize a fresh engine; a compiled module can be reused without
 Initialize a fresh engine; a compiled module can be reused without retaining its memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L38"><code>packages/formulas/loader.d.ts#L38</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L41"><code>packages/formulas/loader.d.ts#L41</code></a></dd></div>
 </dl>
 
 ## Declaration

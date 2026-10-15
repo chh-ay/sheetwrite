@@ -82,10 +82,12 @@ export class PagedDirtyPreflight {
     });
     const removeAfter = new Array<boolean>(patches.length);
     let laterRemove = false;
+
     for (let index = patches.length - 1; index >= 0; index--) {
       removeAfter[index] = laterRemove;
       if (applicableRemove[index]) laterRemove = true;
     }
+
     let trackVirtualRefs = false;
     let referenceSimulationExceeded = false;
     let referenceSimulationActual = 0;
@@ -98,14 +100,17 @@ export class PagedDirtyPreflight {
       max: referenceSimulationLimit,
       message: `Paged reference simulation exceeds the ${referenceSimulationLimit} entry limit`,
     });
+
     const materializeVirtualRefs = (force = false): Map<string, CellAddress> | null => {
       if (!trackVirtualRefs && !force) return null;
       if (virtualRefs) return virtualRefs;
+
       const refs = new Map<string, CellAddress>();
       for (const sheet of this.workbook.sheets) {
         if (!this.handles.has(sheet.id) || sheet.rowCount === 0 || sheet.columns.length === 0) {
           continue;
         }
+
         this.noteRangeMutationFfi(resourceOperation);
         const snapshot = this.wasm.captureReferences(
           this.handleOf(sheet.id),
@@ -116,6 +121,7 @@ export class PagedDirtyPreflight {
           referenceSimulationExceeded = true;
           return null;
         }
+
         const projection = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
         for (const [offset, target] of projection.references()) {
           referenceSimulationActual++;
@@ -124,6 +130,7 @@ export class PagedDirtyPreflight {
             referenceSimulationExceeded = true;
             return null;
           }
+
           const source = {
             sheet: sheet.id,
             row: Math.floor(offset / sheet.columns.length),
@@ -132,13 +139,16 @@ export class PagedDirtyPreflight {
           refs.set(cellKey(source), target);
         }
       }
+
       virtualRefs = refs;
       this.stats.admissionReferenceMapsMaterialized++;
       return virtualRefs;
     };
+
     const setVirtualRef = (source: CellAddress, target: CellAddress | null): void => {
       const refs = materializeVirtualRefs();
       if (!refs) return;
+
       const key = cellKey(source);
       const replaced = refs.delete(key);
       if (target) {
@@ -147,9 +157,11 @@ export class PagedDirtyPreflight {
           referenceSimulationExceeded = true;
           return;
         }
+
         refs.set(key, { ...target });
       }
     };
+
     const rebaseVirtualRefs = (
       sheet: SheetId,
       rowAt: (row: number) => number | null,
@@ -157,6 +169,7 @@ export class PagedDirtyPreflight {
     ): void => {
       const refs = materializeVirtualRefs();
       if (!refs) return;
+
       this.stats.admissionReferenceMapsMaterialized++;
       const rebased = new Map<string, CellAddress>();
       for (const [sourceKey, target] of refs) {
@@ -168,6 +181,7 @@ export class PagedDirtyPreflight {
         if (sourceRow === null || sourceCol === null || targetRow === null || targetCol === null) {
           continue;
         }
+
         const nextSource = { sheet: source.sheet, row: sourceRow, col: sourceCol };
         rebased.set(cellKey(nextSource), {
           sheet: target.sheet,
@@ -175,12 +189,14 @@ export class PagedDirtyPreflight {
           col: targetCol,
         });
       }
+
       virtualRefs = rebased;
       if (rebased.size > referenceSimulationLimit) {
         referenceSimulationActual = rebased.size;
         referenceSimulationExceeded = true;
       }
     };
+
     const clearVirtualRefs = (
       sheet: SheetId,
       startRow: number,
@@ -190,6 +206,7 @@ export class PagedDirtyPreflight {
     ): void => {
       const refs = materializeVirtualRefs();
       if (!refs) return;
+
       for (const sourceKey of refs.keys()) {
         const source = parseCellKey(sourceKey);
         if (
@@ -203,13 +220,17 @@ export class PagedDirtyPreflight {
         }
       }
     };
+
     const keyOf = (row: number, col: number) => `${row}:${col}`;
+
     const stateFor = (sheet: SheetId) => {
       const existing = states.get(sheet);
       if (existing) return existing;
       if (!this.handles.has(sheet)) return undefined;
+
       const meta = this.workbook.sheets.find((candidate) => candidate.id === sheet);
       if (!meta) throw new Error(`unknown sheet: ${sheet}`);
+
       const state: PagedDirtyPreflightState = {
         handle: this.handleOf(sheet),
         rows: meta.rowCount,
@@ -220,9 +241,11 @@ export class PagedDirtyPreflight {
         existing: null,
         seen: new Set<string>(),
       };
+
       states.set(sheet, state);
       return state;
     };
+
     const issue = (actual: number): MutationIssue => ({
       kind: "resource-limit",
       severity: "error",
@@ -231,18 +254,21 @@ export class PagedDirtyPreflight {
       max: limit,
       message: `Paged dirty cells exceed the ${limit} cell limit`,
     });
+
     const invalid = (operationIndex: number, message: string): MutationIssue => ({
       kind: "invalid-operation",
       severity: "error",
       operationIndex,
       message,
     });
+
     const consume = (state: PagedDirtyPreflightState): MutationIssue | null => {
       const actual = state.dirty + state.additional + 1;
       if (actual > limit) return issue(actual);
       state.additional += 1;
       return null;
     };
+
     const materializeExisting = (state: PagedDirtyPreflightState) => {
       if (state.existing) return;
       const existing = new Set<string>();
@@ -252,9 +278,11 @@ export class PagedDirtyPreflight {
           existing.add(keyOf(coordinates[index]!, coordinates[index + 1]!));
         }
       }
+
       state.existing = existing;
       state.dirty = existing.size;
     };
+
     const rebaseSet = (
       source: ReadonlySet<string>,
       rowAt: (row: number) => number | null,
@@ -269,8 +297,10 @@ export class PagedDirtyPreflight {
         const nextCol = colAt(col);
         if (nextRow !== null && nextCol !== null) rebased.add(keyOf(nextRow, nextCol));
       }
+
       return rebased;
     };
+
     const rebaseState = (
       state: PagedDirtyPreflightState,
       rowAt: (row: number) => number | null,
@@ -282,9 +312,11 @@ export class PagedDirtyPreflight {
       state.dirty = state.existing.size;
       state.additional = state.seen.size;
     };
+
     const addSparse = (sheet: SheetId, row: number, col: number): MutationIssue | null => {
       const state = stateFor(sheet);
       if (!state || row < 0 || col < 0 || row >= state.rows || col >= state.cols) return null;
+
       const key = keyOf(row, col);
       if (state.seen.has(key)) return null;
       if (
@@ -295,14 +327,17 @@ export class PagedDirtyPreflight {
       ) {
         return null;
       }
+
       const rejection = consume(state);
       if (!rejection) state.seen.add(key);
       return rejection;
     };
+
     const cellApplies = (sheet: SheetId, row: number, col: number): boolean => {
       const state = stateFor(sheet);
       return Boolean(state && row >= 0 && col >= 0 && row < state.rows && col < state.cols);
     };
+
     const rectangleApplies = (
       sheet: SheetId,
       startRow: number,
@@ -323,6 +358,7 @@ export class PagedDirtyPreflight {
         cols <= state.cols - startCol,
       );
     };
+
     const addRectangle = (
       sheet: SheetId,
       startRow: number,
@@ -331,6 +367,7 @@ export class PagedDirtyPreflight {
       cols: number,
     ): MutationIssue | null => {
       if (rows === 1 && cols === 1) return addSparse(sheet, startRow, startCol);
+
       const state = stateFor(sheet);
       if (!state) return null;
       if (startRow < 0 || startCol < 0) return null;
@@ -343,10 +380,12 @@ export class PagedDirtyPreflight {
       ) {
         return issue(Number.MAX_SAFE_INTEGER);
       }
+
       if (rows > state.rows - startRow || cols > state.cols - startCol) {
         const actual = state.dirty + state.additional + rows * cols;
         return actual > limit ? issue(actual) : null;
       }
+
       materializeExisting(state);
       for (let row = startRow; row < startRow + rows; row++) {
         for (let col = startCol; col < startCol + cols; col++) {
@@ -357,12 +396,14 @@ export class PagedDirtyPreflight {
           state.seen.add(key);
         }
       }
+
       return null;
     };
 
     for (let operationIndex = 0; operationIndex < patches.length; operationIndex++) {
       const patch = patches[operationIndex]!;
       trackVirtualRefs = removeAfter[operationIndex] ?? false;
+
       if (patch.op === "addSheet") {
         if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
         const snapshot = patch.sheet;
@@ -398,9 +439,11 @@ export class PagedDirtyPreflight {
             }
           }
         }
+
         if (referenceSimulationExceeded) return referenceSimulationIssue();
         continue;
       }
+
       if (patch.op === "removeSheet") {
         if (applySheetLifecycleOperation(sheetLifecycle, patch)?.ok !== true) continue;
         if (referenceSimulationExceeded) return referenceSimulationIssue();
@@ -414,6 +457,7 @@ export class PagedDirtyPreflight {
             referenceSimulationActual = referenceSimulationLimit + 1;
             return referenceSimulationIssue();
           }
+
           this.stats.admissionReferenceEntriesScanned += sources.length / 3;
           for (let index = 0; index < sources.length; index += 3) {
             const sourceSheet = this.sheetIdsByHandle[sources[index]!];
@@ -421,9 +465,11 @@ export class PagedDirtyPreflight {
             const rejection = addSparse(sourceSheet, sources[index + 1]!, sources[index + 2]!);
             if (rejection) return rejection;
           }
+
           states.delete(patch.sheet);
           continue;
         }
+
         const materializedRefs = materializeVirtualRefs(true);
         if (!materializedRefs) return referenceSimulationIssue();
         const entries = (function* (): IterableIterator<[CellAddress, CellAddress]> {
@@ -431,6 +477,7 @@ export class PagedDirtyPreflight {
             yield [parseCellKey(sourceKey), target];
           }
         })();
+
         const remaining = trackVirtualRefs ? new Map<string, CellAddress>() : null;
         for (const [source, target] of entries) {
           if (source.sheet !== patch.sheet && target.sheet === patch.sheet) {
@@ -441,10 +488,12 @@ export class PagedDirtyPreflight {
             remaining.set(cellKey(source), { ...target });
           }
         }
+
         virtualRefs = remaining;
         states.delete(patch.sheet);
         continue;
       }
+
       if (
         patch.op === "renameSheet" ||
         patch.op === "moveSheet" ||
@@ -453,6 +502,7 @@ export class PagedDirtyPreflight {
         applySheetLifecycleOperation(sheetLifecycle, patch);
         continue;
       }
+
       const sheet = patchSheetId(patch);
       if (
         sheet !== null &&
@@ -470,6 +520,7 @@ export class PagedDirtyPreflight {
           if (patch.at > state.rows || patch.count > wasmIndexLimit - state.rows) {
             return invalid(operationIndex, "addRows exceeds the current sheet bounds");
           }
+
           rebaseState(state, (row) => (row >= patch.at ? row + patch.count : row), keep);
           rebaseVirtualRefs(sheet, (row) => (row >= patch.at ? row + patch.count : row), keep);
           state.rows += patch.count;
@@ -477,6 +528,7 @@ export class PagedDirtyPreflight {
           if (patch.at > state.rows || patch.count > state.rows - patch.at) {
             return invalid(operationIndex, "removeRows exceeds the current sheet bounds");
           }
+
           rebaseState(
             state,
             (row) =>
@@ -498,6 +550,7 @@ export class PagedDirtyPreflight {
           ) {
             return invalid(operationIndex, "moveRows exceeds the current sheet bounds");
           }
+
           rebaseState(state, (row) => moveIndex(row, patch.from, patch.count, patch.to), keep);
           rebaseVirtualRefs(
             sheet,
@@ -515,6 +568,7 @@ export class PagedDirtyPreflight {
           ) {
             return invalid(operationIndex, "addColumns exceeds the current sheet bounds");
           }
+
           rebaseState(state, keep, (col) => (col >= patch.at ? col + patch.columns.length : col));
           rebaseVirtualRefs(sheet, keep, (col) =>
             col >= patch.at ? col + patch.columns.length : col,
@@ -529,6 +583,7 @@ export class PagedDirtyPreflight {
           ) {
             return invalid(operationIndex, "removeColumns exceeds the current sheet bounds");
           }
+
           rebaseState(state, keep, (col) =>
             col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count,
           );
@@ -545,6 +600,7 @@ export class PagedDirtyPreflight {
           ) {
             return invalid(operationIndex, "moveColumns exceeds the current sheet bounds");
           }
+
           rebaseState(state, keep, (col) => moveIndex(col, patch.from, patch.count, patch.to));
           rebaseVirtualRefs(sheet, keep, (col) =>
             moveIndex(col, patch.from, patch.count, patch.to),
@@ -552,9 +608,11 @@ export class PagedDirtyPreflight {
           const movedKeys = state.columnKeys.splice(patch.from, patch.count);
           state.columnKeys.splice(patch.to, 0, ...movedKeys);
         }
+
         if (referenceSimulationExceeded) return referenceSimulationIssue();
         continue;
       }
+
       let rejection: MutationIssue | null = null;
       if (patch.op === "set") {
         if (!cellApplies(patch.addr.sheet, patch.addr.row, patch.addr.col)) continue;
@@ -578,6 +636,7 @@ export class PagedDirtyPreflight {
         ) {
           continue;
         }
+
         for (const cell of patch.cells) {
           rejection = addSparse(
             range.sheet,
@@ -629,6 +688,7 @@ export class PagedDirtyPreflight {
               if (referenceSimulationExceeded) return referenceSimulationIssue();
             }
           }
+
           for (const [offset, target] of block.refs ?? []) {
             setVirtualRef(
               {
@@ -671,9 +731,11 @@ export class PagedDirtyPreflight {
           );
         }
       }
+
       if (referenceSimulationExceeded) return referenceSimulationIssue();
       if (rejection) return rejection;
     }
+
     return null;
   }
 }

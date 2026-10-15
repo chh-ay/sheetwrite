@@ -92,7 +92,6 @@ describe("SheetwriteStore", () => {
       rowCount: 3,
       columns: {
         name: ["a", "b", "c"],
-        // Numeric column mixing literals and formulas, per the ColumnarData contract.
         amount: [10, { kind: "formula", src: "=B1*2" }, { kind: "formula", src: "=SUM(B1:B2)" }],
       },
     });
@@ -108,12 +107,10 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(50), makeColumnarData(50));
     const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
     expect(view.rows).toEqual({ start: 3, end: 6 });
-    expect(view.values.length).toBe(3 * 3); // 3 rows x 3 cols, row-major
-    // row 3 -> [name, amount, city]
+    expect(view.values.length).toBe(3 * 3);
     expect(view.values[0]).toBe("Customer 3");
-    expect(view.values[1]).toBe(30.5); // row 3 amount = 3 * 10 + 0.5
-    expect(view.values[2]).toBe("Phnom Penh"); // row 3 city = cities[3 % 3]
-    // row 4 begins at index 3
+    expect(view.values[1]).toBe(30.5);
+    expect(view.values[2]).toBe("Phnom Penh");
     expect(view.values[3]).toBe("Customer 4");
     expect(view.styleIds.length).toBe(9);
     expect(view.ffiOutputBytes).toBeGreaterThan(0);
@@ -130,16 +127,13 @@ describe("SheetwriteStore", () => {
       ],
     });
 
-    // The window reads the ref's shadow without a JS overlay, so the raw
-    // typed-array fields stay attached (worker zero-copy path).
+    // The worker zero-copy path requires attached typed-array fields.
     const view = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0]);
     expect(view.values[1]).toBe(41);
     expect(view.valueKinds).toBeDefined();
 
-    // Formulas now see the ref cell's displayed value (was empty pre-port).
     expect(store.getCell(addr(2, 0)).resolved).toBe(42);
 
-    // Editing the target refreshes the shadow and dependents.
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: 10 } }],
     });
@@ -578,8 +572,8 @@ describe("SheetwriteStore", () => {
 
     const store = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
     expect(store.getCell(addr(500, 1)).resolved).toBe(5000.5);
-    // sum of amount column: sum(r*10 + 0.5) for r in [0, 1000)
     expect(store.aggregate("s1", 1, "sum")).toBe(4995500);
+
     store.dispose();
   });
 
@@ -612,7 +606,6 @@ describe("SheetwriteStore", () => {
   it("composes a values filter, hidden rows, and a multi-key sort into one view", () => {
     const store = new SheetwriteStore(makeWorkbook(6), makeColumnarData(6));
 
-    // Keep only Phnom Penh + Tokyo cities → data rows [0, 1, 3, 4].
     store.setColumnFilter("s1", 2, { kind: "values", values: ["Phnom Penh", "Tokyo"] });
     expect(store.viewRowCount("s1")).toBe(4);
     expect(store.columnFilters("s1").get(2)).toEqual({
@@ -620,11 +613,9 @@ describe("SheetwriteStore", () => {
       values: ["Phnom Penh", "Tokyo"],
     });
 
-    // Hide one survivor → [0, 1, 3].
     store.hideRows("s1", [4]);
     expect(store.viewRowCount("s1")).toBe(3);
 
-    // Sort city ascending, then amount descending: Phnom Penh {3 (30.5), 0 (0.5)}, Tokyo {1}.
     store.sortByMulti("s1", [
       { col: 2, ascending: true },
       { col: 1, ascending: false },

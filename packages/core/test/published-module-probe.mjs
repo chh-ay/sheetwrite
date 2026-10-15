@@ -1,4 +1,3 @@
-// Usage: bun published-module-probe.mjs <wasm|formulas>
 // Runs in a fresh process: the published exports and their adopted module are process-global.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -11,6 +10,7 @@ function RecordingInstance(module, imports) {
   instantiated.push(module);
   return new NativeInstance(module, imports);
 }
+
 RecordingInstance.prototype = NativeInstance.prototype;
 WebAssembly.Instance = RecordingInstance;
 

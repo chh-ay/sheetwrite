@@ -21,6 +21,7 @@ export const { load, isLoaded } = loader;
 /** Create an independently collectible engine, optionally reusing compiled code. */
 export async function createEngine(source) {
   const engine = createInstance();
+
   if (source === undefined) {
     engine.initSync({
       module: await readFile(new URL("./pkg/sheetwrite_wasm_bg.wasm", import.meta.url)),
@@ -30,5 +31,6 @@ export async function createEngine(source) {
   }
 
   await loader.adopt(source, () => adoptPublishedModule(engine.getModule()));
+
   return engine;
 }

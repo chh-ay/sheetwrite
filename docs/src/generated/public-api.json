@@ -7126,7 +7126,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L38",
+              "source": "loader.d.ts#L41",
               "jsDocTags": [],
               "documentation": "Initialize a fresh engine; a compiled module can be reused without retaining its memory.",
               "memberDocs": []
@@ -10292,7 +10292,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L38",
+              "source": "loader.d.ts#L41",
               "jsDocTags": [],
               "documentation": "Initialize a fresh engine; a compiled module can be reused without retaining its memory.",
               "memberDocs": []

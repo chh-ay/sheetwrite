@@ -24,11 +24,13 @@ impl SheetData {
         out.words(&self.payload);
         out.ints(&self.style);
         out.bool(self.paged.is_some());
+
         if let Some(paged) = &self.paged {
             out.usize(paged.chunk_rows);
             out.usize(paged.byte_budget);
             out.usize(paged.max_dirty_cells);
             out.usize(paged.chunks.len());
+
             for (&(col, chunk), value) in &paged.chunks {
                 out.usize(col);
                 out.usize(chunk);
@@ -40,6 +42,7 @@ impl SheetData {
             }
 
             out.usize(paged.dirty.len());
+
             for (&(row, col), value) in &paged.dirty {
                 out.usize(row);
                 out.usize(col);
@@ -51,9 +54,11 @@ impl SheetData {
             }
 
             out.usize(paged.dirty_by_revision.len());
+
             for (&revision, keys) in &paged.dirty_by_revision {
                 out.u64(revision);
                 out.usize(keys.len());
+
                 for &(row, col) in keys {
                     out.usize(row);
                     out.usize(col);
@@ -72,6 +77,7 @@ impl SheetData {
 
             let evictable = paged.evictable.borrow();
             out.usize(evictable.len());
+
             for &(access, col, chunk) in evictable.iter() {
                 out.u64(access);
                 out.usize(col);
@@ -84,6 +90,7 @@ impl SheetData {
         }
 
         out.usize(self.spill_ranges.len());
+
         for (&(row, col), range) in &self.spill_ranges {
             out.u32(row);
             out.u32(col);
@@ -94,6 +101,7 @@ impl SheetData {
         }
 
         out.usize(self.spill_owners.len());
+
         for (&(row, col), &(anchor_row, anchor_col)) in &self.spill_owners {
             out.u32(row);
             out.u32(col);
@@ -102,6 +110,7 @@ impl SheetData {
         }
 
         out.usize(self.spill_errors.len());
+
         for (&(row, col), &error) in &self.spill_errors {
             out.u32(row);
             out.u32(col);
@@ -109,6 +118,7 @@ impl SheetData {
         }
 
         out.usize(self.spill_blockers.len());
+
         for blocker in &self.spill_blockers {
             out.u32(blocker.row_start);
             out.u32(blocker.col_start);
@@ -117,6 +127,7 @@ impl SheetData {
         }
 
         out.usize(self.dirty_cells.len());
+
         for &(row, col) in &self.dirty_cells {
             out.u32(row);
             out.u32(col);
@@ -132,12 +143,14 @@ impl SheetData {
         let kind = input.bytes()?;
         let payload = input.words()?;
         let style = input.ints()?;
+
         if kind.len() != payload.len() || kind.len() != style.len() {
             return Err("invalid transferred cell arrays".into());
         }
 
         let paged = if input.bool()? {
             let mut paged = PagedStorage::new(input.usize()?, input.usize()?, input.usize()?);
+
             for _ in 0..input.count()? {
                 let key = (input.usize()?, input.usize()?);
                 let chunk = CellChunk {
@@ -147,6 +160,7 @@ impl SheetData {
                     loaded: input.words()?,
                     last_access: Cell::new(input.u64()?),
                 };
+
                 if chunk.kind.len() != paged.chunk_rows
                     || chunk.payload.len() != paged.chunk_rows
                     || chunk.style.len() != paged.chunk_rows
@@ -183,6 +197,7 @@ impl SheetData {
             paged.pin_scratch = read_keys(input)?;
             paged.viewport_pinned = read_keys(input)?;
             paged.viewport_pin_scratch = read_keys(input)?;
+
             for _ in 0..input.count()? {
                 paged
                     .evictable

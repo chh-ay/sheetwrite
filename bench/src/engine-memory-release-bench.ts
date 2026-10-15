@@ -10,16 +10,15 @@ import type * as Wasm from "@sheetwrite/wasm";
 import type * as Core from "../../packages/core/src/index.js";
 import type { CompactRangeHistory } from "../../packages/core/src/store/data-engine.js";
 
-// Run the entire comparison under one bench-run slot. Children inherit that
-// affinity; no nested wrappers or concurrent samples are used.
-// Module specifiers are runtime-selected so the same harness measures detached
-// baseline and changed worktrees without sharing module initialization state.
+// One bench-run slot gives children the same affinity without concurrent samples.
+// Runtime-selected modules isolate initialization across compared worktrees.
 interface MemoryObservation {
   wasmBytes: number;
   jsHeapBytes: number;
   jscExternalBytes: number;
   rssBytes: number;
 }
+
 const { values } = parseArgs({
   options: {
     root: { type: "string", default: "." },
@@ -30,13 +29,17 @@ const { values } = parseArgs({
     output: { type: "string" },
   },
 });
+
 const root = resolve(values.root);
 const engineName = values.engine;
 if (engineName !== "wasm" && engineName !== "formulas")
   throw new Error("Expected wasm or formulas");
+
 const metrics = ["edit", "read", "ingest", "recalculation"] as const;
+
 type Metric = (typeof metrics)[number];
 type PathCapture = Record<Metric, { medianMs: number; samplesMs: number[] }>;
+
 // Short samples otherwise measure JSC tier-up rather than steady-state engine work.
 const WARMUPS = 40;
 const SAMPLES = 21;
@@ -104,6 +107,7 @@ async function paths(): Promise<PathCapture> {
     pathToFileURL(resolve(root, `packages/${engineName}/loader-node.mjs`)).href
   );
   await core.initSheetwrite(undefined, provider);
+
   const source = columnar(PATH_ROWS);
   const editStore = new core.SheetwriteStore(workbook(PATH_ROWS), source);
   const calcStore = new core.SheetwriteStore(workbook(PATH_ROWS), source);
@@ -112,7 +116,9 @@ async function paths(): Promise<PathCapture> {
       { op: "set", addr: address(0, 2), value: { kind: "formula", src: `=SUM(B1:B${PATH_ROWS})` } },
     ],
   });
+
   const capture = {} as PathCapture;
+
   try {
     for (const metric of metrics.filter((metric) => !values.metric || values.metric === metric)) {
       const samplesMs: number[] = [];
@@ -165,6 +171,7 @@ async function paths(): Promise<PathCapture> {
             }
             break;
         }
+
         const elapsed = (performance.now() - started) / operations;
         if (sample >= 0) samplesMs.push(elapsed);
         if (metric === "edit")
@@ -178,8 +185,10 @@ async function paths(): Promise<PathCapture> {
             PATH_ROWS * 17 - 17 + RECALCULATIONS_PER_SAMPLE - 1 + sample,
           );
       }
+
       capture[metric] = { medianMs: median(samplesMs), samplesMs };
     }
+
     return capture;
   } finally {
     editStore.dispose();
@@ -208,17 +217,20 @@ async function compare(baseline: string) {
       child.exited,
     ]);
     if (code !== 0) throw new Error(`Benchmark child failed (${code}): ${stderr}`);
+
     const capture = JSON.parse(stdout) as PathCapture;
     for (const metric of metrics)
       assert.ok(Number.isFinite(capture[metric].medianMs) && capture[metric].medianMs > 0);
     return capture;
   }
+
   const controls: Array<{ first: PathCapture[]; second: PathCapture[] }> = [];
   for (let round = 0; round < 3; round++) {
     const first = [await sample(baseline), await sample(baseline)];
     const second = [await sample(baseline), await sample(baseline)];
     controls.push({ first, second });
   }
+
   const rounds: Array<{ order: string[]; baseline: PathCapture[]; changed: PathCapture[] }> = [];
   for (let round = 0; round < 5; round++) {
     const order = round % 2 === 0 ? ["A", "B", "B", "A"] : ["B", "A", "A", "B"];
@@ -233,6 +245,7 @@ async function compare(baseline: string) {
     }
     rounds.push(captures);
   }
+
   const summary = metrics.map((metric) => {
     const noisePct = Math.max(
       ...controls.map(
@@ -264,6 +277,7 @@ async function compare(baseline: string) {
       pass: deltaPct <= 3 + noisePct,
     };
   });
+
   return {
     baseline,
     changed: root,
@@ -287,6 +301,7 @@ async function memory() {
   const testing = await import(pathToFileURL(resolve(root, "packages/core/src/testing.ts")).href);
   const engine = await import(pathToFileURL(resolve(root, "packages/core/src/engine.ts")).href);
   await core.initSheetwrite(undefined, provider);
+
   const restoreCanvas = testing.installCanvasTestStubs();
   const observations: Array<{
     scenario: string;
@@ -299,12 +314,12 @@ async function memory() {
     compactHistoryBytes: number;
     bytesAboveFreshFloor: number;
   }> = [];
+
   function observe(): MemoryObservation {
     const heap = heapStats();
     return {
       wasmBytes: engine.getEngine().getMemory().buffer.byteLength,
-      // JSC counts WASM/ArrayBuffer backing memory as extra heap, sometimes twice.
-      // Report non-external JS allocations separately from actual process RSS.
+      // JSC may count WASM backing memory twice; exclude it from JS heap attribution.
       jsHeapBytes: heap.heapSize - heap.extraMemorySize,
       jscExternalBytes: heap.extraMemorySize,
       rssBytes: process.memoryUsage().rss,
@@ -362,6 +377,7 @@ async function memory() {
   }
 
   await core.releaseEngineMemory();
+
   async function capture(scenario: string, verify: () => void, compactHistoryBytes = 0) {
     const freshWasmBytesFloor = freshFloors.get(scenario);
     if (freshWasmBytesFloor === undefined) throw new Error(`Missing fresh floor for ${scenario}`);
@@ -399,6 +415,7 @@ async function memory() {
       bytesAboveFreshFloor: Math.max(0, after.wasmBytes - freshWasmBytesFloor),
     });
   }
+
   try {
     const empty = new core.SheetwriteStore(workbook(MEMORY_ROWS));
 
@@ -518,6 +535,7 @@ async function memory() {
       grid.destroy();
       host.remove();
     }
+
     return {
       engine: engineName,
       root,
