@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { cellScalarToText, parseCellInput } from "../src/cell-input.js";
 
 describe("parseCellInput", () => {

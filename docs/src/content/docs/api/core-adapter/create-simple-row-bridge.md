@@ -8,7 +8,7 @@ description: "Creates the optional row bridge for a simple data-first input."
 Creates the optional row bridge for a simple data-first input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L258"><code>packages/core/src/adapter.ts#L258</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L436"><code>packages/core/src/adapter.ts#L436</code></a></dd></div>
 </dl>
 
 ## Declaration

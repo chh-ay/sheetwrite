@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
+
 import {
   isCallSignatureDeclaration,
   isClassDeclaration,
@@ -17,6 +18,7 @@ import {
   type SourceFile,
 } from "typescript/unstable/ast";
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
+
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -30,12 +32,6 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
-  COMPATIBILITY_FIXTURES,
-  COMPATIBILITY_INVENTORY,
-  type CompatibilityFixture,
-  type CompatibilityRecord,
-} from "../docs/src/showcases/compatibility.js";
-import {
   buildCompatibilityResults,
   type CompatibilityResults,
 } from "../docs/src/showcases/compatibility-results.js";
@@ -43,6 +39,12 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
@@ -126,12 +128,8 @@ const FORBIDDEN_NAMES = [
   "toXlsx(",
   "fromXlsx(",
 ] as const;
-/**
- * Sheetwrite-owned adapter surface every framework package must document.
- * `inputs` mirrors `GRID_OPTION_POLICY` plus explicit WASM initialization, and
- * `vueEvents` mirrors `handlerEvents` in template casing; `docs.test.ts` locks
- * both mirrors against `@sheetwrite/core/adapter`.
- */
+
+/** Required adapter inputs and template event names, checked against `@sheetwrite/core/adapter`. */
 export const ADAPTER_DOC_CONTRACT = {
   packages: ["@sheetwrite/react", "@sheetwrite/svelte", "@sheetwrite/vue"],
   inputs: [
@@ -182,13 +180,7 @@ export const ADAPTER_DOC_CONTRACT = {
   readyReasons: ["initial", "input-reset", "renderer-reset"],
 } as const;
 
-/**
- * Every adapter package must document the canonical advanced inputs, event
- * surface, and readiness contract through its generated API pages: the
- * flattened props/emits interfaces must declare each member with source JSDoc,
- * and the core adapter entry must document exactly the implemented readiness
- * reasons.
- */
+/** Report missing adapter member documentation and mismatched readiness reasons. */
 export function adapterContractIssues(manifest: PublicApiManifest): string[] {
   const failures: string[] = [];
   const exportOf = (packageName: string, name: string): ApiExport | undefined =>
@@ -421,10 +413,7 @@ function uniqueDocumentationCandidate(
   return candidates.length === 1 ? candidates[0] : undefined;
 }
 
-/**
- * The same symbol is re-exported from several entry points, so a reference resolves to
- * the page's own entry first, then its package, then an unambiguous match anywhere.
- */
+// Prefer the current entry point because symbols can be re-exported by several entries.
 function closestCandidate<
   T extends { readonly packageName: string; readonly entry: ApiEntryPoint },
 >(candidates: readonly T[], packageName: string, entry: ApiEntryPoint): T | undefined {
@@ -570,9 +559,7 @@ function anchor(value: string): string {
 const DECLARATION_KEYWORD =
   /^(?:declare|export|abstract|interface|type|class|enum|function|const|let|var|namespace)\b/;
 
-/** Member lists longer than this get an anchor index at the top of the page. */
 const MEMBER_INDEX_MINIMUM = 6;
-/** References listed per group before the remainder is summarized. */
 const REFERENCE_DISPLAY_LIMIT = 12;
 
 /** Bare call-signature or type strings from the checker are not statements; wrap them so the TS parser and printer cannot mangle them. */
@@ -585,17 +572,9 @@ function parseableDeclaration(item: Pick<ApiExport, "name" | "signature">): stri
   return `declare const ${item.name}: ${signature};`;
 }
 
-/**
- * Declaration shapes keyed by signature text. The TypeScript 7 API only parses files that
- * belong to a project, so shapes are parsed in batches by {@link prepareDeclarationShapes}
- * and then read synchronously by the link resolution and page renderers.
- */
+// TypeScript 7 only parses project files, so batch shapes before synchronous rendering.
 const declarationShapes = new Map<string, DeclarationShape>();
 
-/**
- * Parse declarations with the TypeScript 7 API: each signature becomes a file in a scratch
- * inferred project, printed by its emitter and read back as `typescript/unstable/ast` nodes.
- */
 async function prepareDeclarationShapes(signatures: Iterable<string>): Promise<void> {
   const pending = [...new Set(signatures)].filter((signature) => !declarationShapes.has(signature));
   if (pending.length === 0) return;
@@ -663,7 +642,6 @@ async function readDeclarationShape(
   };
 }
 
-/** Named members carry their name; signature-only members fall back to a positional label. */
 function declarationMemberName(member: Node, index: number, sourceFile: SourceFile): string {
   const named = member as Node & { name?: Node };
   if (named.name !== undefined) {
@@ -680,10 +658,7 @@ function declarationShape(signature: string): DeclarationShape {
   return declarationShapes.get(signature) ?? { formatted: signature, members: [], variants: [] };
 }
 
-/**
- * Split `text` on `separator` where it is not nested in brackets and not inside a
- * string literal. Member signatures are one-liners, so a single scan is enough.
- */
+// Member signatures are one-liners, so nested separators need only a single scan.
 function splitTopLevel(text: string, separator: string): string[] {
   const parts: string[] = [];
   let depth = 0;
@@ -711,17 +686,12 @@ function splitTopLevel(text: string, separator: string): string[] {
 }
 
 interface MemberTypeParts {
-  /** Everything up to and including the member's top-level colon. */
   readonly prefix: string;
-  /** The declared type, without the statement terminator. */
   readonly type: string;
   readonly terminated: boolean;
 }
 
-/**
- * The declared type of a member row. Call signatures, constructors, and index
- * signatures keep every colon inside their brackets and have no type of their own.
- */
+// Call, constructor, and index signatures have no top-level type colon.
 function memberTypeParts(signature: string): MemberTypeParts | undefined {
   const parts = splitTopLevel(signature, ":");
   if (parts.length < 2) return undefined;
@@ -734,12 +704,10 @@ function memberTypeParts(signature: string): MemberTypeParts | undefined {
   };
 }
 
-/** Order- and duplicate-insensitive identity of a string-literal union. */
 function literalUnionKey(literals: readonly string[]): string {
   return [...new Set(literals)].sort().join("\u0000");
 }
 
-/** A union of string literals prints every value inline; its alias prints one name. */
 function stringLiteralUnionVariants(type: string): string[] | undefined {
   const variants = splitTopLevel(type, "|").map((variant) => variant.trim());
   if (variants.length < 2) return undefined;
@@ -752,12 +720,7 @@ interface UnionAlias {
   readonly route: string;
 }
 
-/**
- * The checker expands an aliased union at every use site, so `code: SheetwriteErrorCode`
- * prints as its 47 literals. This index maps that expansion back to the alias that names
- * it: an alias qualifies when its declaration is a string-literal union, or the
- * `(typeof SOME_EXPORTED_ARRAY)[number]` form whose array holds the same literals.
- */
+// The checker expands union aliases at use sites; recover their names for readable member rows.
 async function unionAliasIndex(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
@@ -790,7 +753,6 @@ async function unionAliasIndex(
               candidate.packageName,
               candidate.entry,
             );
-      // The referenced array is an export of its own; its literals are the expansion.
       literals =
         source === undefined
           ? undefined
@@ -836,8 +798,7 @@ interface WorkspaceManifest {
   peerDependencies?: Record<string, string>;
 }
 
-/** Declaration order is precedence: a package that both depends on and dev-depends on
- * another workspace reports the runtime edge, which is what a reader needs. */
+// Runtime dependencies take precedence when a package also lists a development dependency.
 const DEPENDENCY_KINDS: ReadonlyArray<
   readonly [WorkspaceDependent["kind"], keyof WorkspaceManifest]
 > = [
@@ -847,7 +808,6 @@ const DEPENDENCY_KINDS: ReadonlyArray<
   ["dev", "devDependencies"],
 ];
 
-/** Every workspace package manifest the repository declares, in workspace order. */
 async function workspaceManifests(): Promise<WorkspaceManifest[]> {
   const root = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8")) as {
     workspaces?: string[];
@@ -873,12 +833,7 @@ async function workspaceManifests(): Promise<WorkspaceManifest[]> {
   return manifests;
 }
 
-/**
- * Reverse indexes behind "Referenced by", built once per generation: the workspace
- * packages that depend on each package, and the documented exports whose declaration
- * names a symbol. Both come from repository manifests, so the section never claims a
- * consumer the repository cannot show.
- */
+/** Repository-backed package dependents and symbol references, indexed once per generation. */
 export interface ConsumerIndex {
   readonly dependents: ReadonlyMap<string, readonly WorkspaceDependent[]>;
   readonly references: ReadonlyMap<string, readonly SymbolReference[]>;
@@ -928,10 +883,6 @@ async function consumerIndex(manifest: PublicApiManifest): Promise<ConsumerIndex
   return { dependents, references };
 }
 
-/**
- * Who consumes the symbol: the workspaces that depend on its package, and the
- * documented exports that name it. Each entry names the consumer and its relationship.
- */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
   const dependents = consumers.dependents.get(pkg.name) ?? [];
   const references = (consumers.references.get(item.name) ?? []).filter(
@@ -974,8 +925,7 @@ function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: Consume
 }
 
 async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
-  // Pretty-printed so long unions wrap per variant instead of scrolling; no
-  // fence title - the surrounding "Declaration" heading already names it.
+  // Wrap long unions so declarations do not require horizontal scrolling.
   const formatted = await formatDeclaration(signature);
   if (expanded) {
     return [
@@ -1000,10 +950,6 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   ].join("\n");
 }
 
-/**
- * Member rows plus an anchor index for long lists. Members start collapsed;
- * explicit fragment navigation reveals its target through the docs shell.
- */
 function renderMembers(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
@@ -1033,9 +979,7 @@ function renderMembers(
     const searchAnchor = searchTargets.has(member.name)
       ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
       : "";
-    // Overload rows repeat a member name; the merged documentation renders once,
-    // on the first row. Distinct per-overload docs need AST-ordinal extraction and
-    // wait until the public surface actually contains such a case.
+    // Overloads share merged documentation, which belongs only on their first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
     const summary = documentation === undefined ? "" : compactSummary(documentation);
@@ -1046,7 +990,6 @@ function renderMembers(
     const parts = memberTypeParts(member.signature);
     const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
     const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
-    // The alias names the type; its expansion stays in the Declaration section.
     const signature =
       alias === undefined || parts === undefined
         ? member.signature
@@ -1060,12 +1003,10 @@ function renderMembers(
       `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
       `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
       "",
-      // A fenced block so member signatures get real syntax highlighting.
       "```ts generated",
       signature,
       "```",
       "",
-      // Skip the body paragraph when it would only restate the summary line.
       ...(documentation === undefined ||
       documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
         ? []
@@ -1130,9 +1071,8 @@ export async function renderSymbolPage(
     if (members.index.length > 0) body.push(members.index, "");
     body.push(members.list, "");
   }
-  // A variants section earns its space only for structured unions; scalar
-  // unions read best inline in the (expanded) declaration, where identifiers
-  // are highlighted, hoverable, and linked.
+
+  // Scalar unions are clearer inline in the expanded declaration.
   const structuredVariants = shape.variants.some((variant) => variant.includes("{"))
     ? shape.variants
     : [];
@@ -1148,9 +1088,8 @@ export async function renderSymbolPage(
     }
     body.push("</div>", "");
   }
-  // One consistent model: the code section is always "Declaration", always
-  // pretty-printed. It collapses only when Members/Variants already tell the
-  // story above it; otherwise it is the page's primary content and expands.
+
+  // Collapse declarations only when members or variants already explain the shape.
   body.push(
     "## Declaration",
     "",
@@ -1357,12 +1296,7 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
   return { commit: meta.commit, dirty: meta.dirty, timestamp: meta.timestamp };
 }
 
-/**
- * Landing-page benchmark summary. Each engine is aggregated across rounds
- * exactly like the evidence page, then ratios pair per scenario - never a
- * ratio of cross-scenario medians. Real numbers only: when the artifact is
- * missing or invalid the landing renders a "run the protocol" placeholder.
- */
+// Pair ratios per scenario; cross-scenario medians would compare unrelated workloads.
 async function renderLandingBench(): Promise<string> {
   return landingBenchPayload(
     await loadEvidence(
@@ -1373,7 +1307,7 @@ async function renderLandingBench(): Promise<string> {
   );
 }
 
-/** Pure payload builder, exported so the finite/fallback contract is testable. */
+/** Build finite landing-page metrics, or an unavailable payload without complete evidence. */
 export function landingBenchPayload(
   scale: { evidence: ValidatedRenderEvidence; source: string } | EvidenceState,
 ): string {
@@ -1394,17 +1328,14 @@ export function landingBenchPayload(
         result.scenarioId === scenario &&
         result.status === "success",
     );
-  // Sizes with zero full-round pairs are omitted rather than emitted as NaN
-  // (JSON.stringify silently turns NaN into null and the landing would render
-  // it as a number).
+
+  // JSON serializes NaN as null, which the landing would render as a number.
   const sizes = evidence.config.rows.flatMap((size) => {
     const ratios: Array<{ scenario: string; ratio: number }> = [];
     let handsontableIncomplete = 0;
     for (const scenario of evidence.config.scenarios) {
       const ours = successes(size, "sheetwrite", scenario);
       const theirs = successes(size, "handsontable", scenario);
-      // Round-aware: a bucket with fewer successes than the declared round
-      // count is incomplete, and only full-round pairs enter the ratios.
       if (theirs.length < evidence.metadata.rounds) handsontableIncomplete += 1;
       if (ours.length < evidence.metadata.rounds || theirs.length < evidence.metadata.rounds)
         continue;
@@ -1430,7 +1361,6 @@ export function landingBenchPayload(
   const scenarioHeaps: number[] = [];
   for (const scenario of evidence.config.scenarios) {
     const bucket = successes(1_000_000, "sheetwrite", scenario);
-    // Hero stats hold the same full-round bar as the ratio pairs.
     if (bucket.length < evidence.metadata.rounds) continue;
     scenarioMedians.push(mid(bucket.map((r) => r.medianMs)));
     scenarioHeaps.push(mid(bucket.map((r) => r.memory.afterBytes)));
@@ -1445,9 +1375,8 @@ export function landingBenchPayload(
     heroStats.millionRowMedianMs,
     heroStats.millionRowHeapMb,
   ];
-  // Never publish a payload whose displayed values are not all finite: a
-  // structurally valid artifact with no comparable pairs must fall back to
-  // the "run the protocol" placeholder, not render null.
+
+  // Incomplete comparisons must show the protocol placeholder, not null metrics.
   if (sizes.length === 0 || displayed.some((value) => !Number.isFinite(value))) {
     return `${JSON.stringify(
       { available: false, reason: "artifact has no full-round engine pairs to compare" },
@@ -1519,9 +1448,8 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   ) {
     return "artifact does not match controlled render protocol version 1";
   }
-  // Failed cells are allowed - the page reports them as crashes - but every
-  // present result must be internally valid.
-  // Failed cells legitimately carry null samples; only successes must be finite.
+
+  // Failures may carry null samples; successful results must be finite.
   const valid = results.every(
     (result) =>
       result.status !== "success" ||
@@ -1558,11 +1486,6 @@ interface CorePathsEvidence {
   }>;
 }
 
-/**
- * Full-mode core-path capture. The artifact is written by `bench:core-paths`;
- * only a complete scenario matrix with finite timings and a written validation
- * checkpoint per scenario is publishable.
- */
 function validateCorePathsArtifact(value: Record<string, unknown>): CorePathsEvidence | string {
   const artifact = value as unknown as Partial<CorePathsEvidence>;
   if (
@@ -1731,7 +1654,6 @@ interface BenchPairStat {
   faded: number;
 }
 
-/** One widget row: label, ratio chip, and a bar per engine (or a crash card). */
 function benchPairRow(
   label: string,
   ours: BenchPairStat | undefined,
@@ -1827,12 +1749,7 @@ function benchRuler(ticks: string[]): string {
   );
 }
 
-/**
- * Shared per-panel log scale: every bar maps through the same decade domain,
- * so lengths compare across rows, and the ruler labels each 10x tick. The
- * domain is the observed values' decade envelope (capped at five decades so
- * sub-microsecond noise cannot flatten the axis).
- */
+// A shared decade domain makes rows comparable; cap it so tiny noise cannot flatten the axis.
 function benchLogScale(values: number[], fmt: (value: number) => string): BenchScale {
   const positive = values.filter((value) => value > 0);
   const maxValue = positive.length ? Math.max(...positive) : 1;
@@ -1856,21 +1773,17 @@ function benchLogScale(values: number[], fmt: (value: number) => string): BenchS
   return { pct, ruler: benchRuler(ticks), segments };
 }
 
-/** Shared linear scale (memory panels: footprints live within one decade). */
 function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
   const maxValue = Math.max(...values.filter((value) => value > 0), 1);
   const pct = (value: number): string =>
     `${Math.min(100, Math.max(0.6, (value / maxValue) * 100)).toFixed(2)}%`;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
-    // Every nonzero tick goes through the panel formatter - these are raw
-    // values (bytes for memory), not display numbers.
     const label = t === 0 ? "0" : fmt(maxValue * t);
     return `<span class="bench-ruler__tick" style="left:${(t * 100).toFixed(2)}%">${label}</span>`;
   });
   return { pct, ruler: benchRuler(ticks), segments: 4 };
 }
 
-/** Collapsible methodology block: protocol prose plus per-scenario meanings. */
 function benchMethod(
   summary: string,
   paragraphs: string[],
@@ -1982,11 +1895,7 @@ const FORMULA_METHOD = benchMethod(
   ],
 );
 
-/**
- * Single-engine scaling figure: one row per operation/workload, one bar per
- * input size. Every bar maps through the figure-wide log scale, so even a
- * single-size workload's bar carries information - its position on the ruler.
- */
+// A shared log scale keeps even single-size workloads comparable across rows.
 function benchScaleFigure(
   lead: string,
   groups: Array<{
@@ -2027,7 +1936,6 @@ function benchScaleFigure(
   return lines;
 }
 
-/** The two-axis (size x metric) CSS-only tab widget for the render benchmark. */
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -2125,11 +2033,7 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   return parts.join("\n");
 }
 
-/**
- * Run-completion arithmetic for the evidence headline. `results` already
- * contains failed entries - failedKeys must never be added on top (that
- * double-count published 1120/1140 for a 1120-cell matrix).
- */
+/** Count completed and successful results; failed entries are already included in the total. */
 export function runCompletionSummary(results: ReadonlyArray<{ status: string }>): {
   successes: number;
   total: number;
@@ -2139,14 +2043,12 @@ export function runCompletionSummary(results: ReadonlyArray<{ status: string }>)
   return { successes, total: results.length, failures: results.length - successes };
 }
 
-/** One validated artifact that the page publishes numbers from. */
 interface EvidenceCapture {
   readonly label: string;
   readonly source: string;
   readonly meta: CaptureMeta;
 }
 
-/** Every loaded artifact states its capture stamp as either `meta` or `metadata`. */
 type CapturedEvidence =
   | { evidence: { meta?: CaptureMeta; metadata?: CaptureMeta }; source: string }
   | EvidenceState;
@@ -2155,12 +2057,7 @@ function formatCaptureTime(timestamp: string): string {
   return timestamp.slice(0, 16).replace("T", " ");
 }
 
-/**
- * One capture header for the whole page. A page assembled from artifacts of one
- * commit states that single point-in-time capture; a page assembled from
- * different commits lists every vintage instead of letting each section's own
- * commit line hide the mismatch.
- */
+// Show mixed capture commits together so section-local stamps cannot hide a mismatch.
 function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
   const first = captures[0];
   if (first === undefined) return [];
@@ -2205,11 +2102,7 @@ function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
   ];
 }
 
-/**
- * Failures grouped by the cell that produced them. A run that did not finish is
- * never converted into a timing, so the failure list is part of the evidence:
- * it names the stage and the recorded error behind every missing cell.
- */
+// Missing timings need the recorded failure stage and error as part of the evidence.
 function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
   const failures = evidence.results.filter((result) => result.status !== "success");
   if (failures.length === 0) return [];
@@ -2262,11 +2155,7 @@ function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
 /** Markdown table cells cannot carry a raw pipe. */
 const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
 
-/**
- * Core write-path evidence: the packed block writes, CSV import, large restore,
- * and paged residency work that the core hot paths changed. Every scenario
- * carries the checkpoint it proved, so a timing is never published alone.
- */
+// Publish each core-path timing with its validation checkpoint.
 function renderCorePathsSection(evidence: CorePathsEvidence, source: string): string[] {
   const counters = evidence.scenarios.filter(
     (scenario) => Object.keys(scenario.counters).length > 0,
@@ -2327,11 +2216,6 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
   ];
 }
 
-/**
- * XLSX codec evidence: the current tree against the codec at the recorded
- * baseline commit, both reading the same checked fixture. A ratio below 1 means
- * the current codec is faster; peak RSS is the largest raw process peak.
- */
 function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
   const summaryFor = (
     engine: string,
@@ -2462,6 +2346,22 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
     ).trimEnd(),
     "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
+    "",
+    "## Release retained engine memory",
+    "",
+    "WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.",
+    "",
+    '```ts prelude="core" partial="requires an initialized application at an idle point" title="Explicit idle memory release"',
+    'import { releaseEngineMemory } from "@sheetwrite/core";',
+    "",
+    "const report = await releaseEngineMemory();",
+    "```",
+    "",
+    "The call waits for synchronous transactions and active datasource page loads, then moves all live stores together into a fresh instance of the selected engine. Cell sources, styles, cached formula results (including volatile results), resident datasource pages, unsaved dirty edits, and compact undo/redo history survive. Unloaded clean pages remain unloaded and can be fetched again from the datasource. Worker renderers rebuild their frames without document-change events.",
+    "",
+    "The main-thread pause scales with resident cells and compact history, so do not invoke it on an interaction-critical path. Migration temporarily needs both instances and packed transfer buffers; it can increase peak memory before garbage collection reclaims the retired instance. If preparation fails, every live store stays on the original instance. Concurrent calls share the same release.",
+    "",
+    "`report.wasmBytesBefore` and `report.wasmBytesAfter` are committed linear-memory bytes, not live-cell bytes or process memory. `report.pauseMs` measures migration, excluding the idle wait. A release is not guaranteed to reduce committed bytes: surviving data, compact history, and migration scratch can still require substantial memory. Actual process-memory reclamation depends on garbage collection.",
     "",
     ...renderCaptureHeader(captures),
     "`bench:release` captures render-scale, the performance showcase's paged storage at `bench/results/paged-results.json`, the interaction evidence at `bench/results/interaction-results.json`, data, core paths, formula, formula engines, matched engines, and XLSX, then re-records the render regression baseline last. Its smoke rehearsal writes only to `bench/results/smoke/`.",
@@ -2650,9 +2550,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "</dl>",
       "",
     );
-    // The scalar-edit-affects-N workloads are one scaling series (recompute
-    // cost tracks affected dependents, not sheet size); published as separate
-    // one-row groups their near-zero baselines read like broken benchmarks.
+
+    // Group scalar-edit workloads by affected dependents so tiny baselines remain readable.
     const SCALAR_FAMILY = /^scalar-edit-affects-(\d+)$/;
     const scalarEntries = evidence.workloads
       .filter((workload) => SCALAR_FAMILY.test(workload.id))
@@ -2964,8 +2863,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     loadFormulaContractInventory(repositoryRoot),
     compatibilityResults(),
   ]);
-  // Link resolution and entry pages read declaration shapes synchronously, so every
-  // manifest declaration is parsed up front, in one batch.
+
   await prepareDeclarationShapes(
     manifest.packages.flatMap((pkg) =>
       pkg.entryPoints.flatMap((entry) => entry.exports.map((item) => parseableDeclaration(item))),
@@ -2973,9 +2871,8 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   );
   const documentationLinkIssues = unresolvedDocumentationLinks(manifest);
   if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
+
   const linkRoutes = documentationLinkRoutes(manifest);
-  // "Referenced by" reads repository manifests and the whole API surface, so it is
-  // indexed once here rather than per symbol page.
   const consumers = await consumerIndex(manifest);
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
@@ -3067,7 +2964,6 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
     {
-      // Sidebar navigation source: one entry per package's primary entry point.
       path: join(generatedDataRoot, "api-nav.json"),
       content: stableJson(
         manifest.packages.map((pkg) => ({
@@ -3276,10 +3172,7 @@ function validateImports(
   return failures;
 }
 
-/**
- * Compiler options for the compiled snippets. TypeScript 7 removed `baseUrl`, so the
- * `paths` targets are relative to the scratch tsconfig beside the snippets.
- */
+// TypeScript 7 paths are relative to the scratch tsconfig; baseUrl is unsupported.
 const SNIPPET_COMPILER_OPTIONS = {
   jsx: "react-jsx",
   lib: ["esnext", "dom", "dom.iterable"],
@@ -3299,12 +3192,10 @@ const SNIPPET_COMPILER_OPTIONS = {
   target: "es2022",
 } as const;
 
-/** Flattens a diagnostic and its message chain the way `flattenDiagnosticMessageText` did. */
 function diagnosticText(diagnostic: Diagnostic): string {
   return [diagnostic.text, ...(diagnostic.messageChain ?? []).map(diagnosticText)].join("\n");
 }
 
-/** The TypeScript 7 equivalent of `getPreEmitDiagnostics`: config, syntax, options, global, semantic. */
 async function preEmitDiagnostics(project: Project): Promise<readonly Diagnostic[]> {
   const diagnostics = [...(await project.program.getConfigFileParsingDiagnostics())];
   const configFileCount = diagnostics.length;
@@ -3695,8 +3586,7 @@ export async function verifyDocs(): Promise<void> {
   const analysis = await analyzePublicApi(repositoryRoot);
   const expected = await expectedGeneratedFiles(analysis.manifest);
   const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
-  // The showcase capability contract gates the docs build: a capability
-  // without an owner, route, browser contract, or shared binding must not ship.
+
   failures.push(
     ...collectCapabilityIssues(CAPABILITY_INVENTORY, CAPABILITY_OWNERS),
     ...collectMissingCapabilityFiles(CAPABILITY_INVENTORY, CAPABILITY_OWNERS, (path) =>

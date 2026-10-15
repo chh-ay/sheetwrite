@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import {
   fromXlsxWorkbook,
   initSheetwrite,
@@ -6,6 +7,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
+
 import { registerXlsxBackends } from "../src/index.js";
 
 interface FormulaContractInventory {

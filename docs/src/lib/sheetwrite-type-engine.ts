@@ -60,7 +60,7 @@ function tagText(parts: readonly ts.SymbolDisplayPart[] | undefined): string | u
       !/\s$/.test(out) &&
       part.text.length > 0 &&
       !/^[\s.,;:)\]}]/.test(part.text) &&
-      (/^link/.test(part.kind) || /https?:\/\/\S+$/.test(out))
+      (part.kind.startsWith("link") || /https?:\/\/\S+$/.test(out))
     ) {
       out += " ";
     }

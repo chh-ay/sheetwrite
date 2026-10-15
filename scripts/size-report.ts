@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
+
 import {
   assertPublishedFilePolicy,
   readReleaseManifestDigest,
@@ -1483,13 +1484,13 @@ async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot)
     releases: [...history.releases, release],
   };
   await writeFile(historyPath, `${JSON.stringify(updated, null, 2)}\n`);
-  await runCommand(["bunx", "biome", "format", "--write", historyPath]);
+  await runCommand(["bunx", "oxfmt", historyPath]);
 }
 
 async function writeReport(report: SizeReport): Promise<void> {
   await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  await runCommand(["bunx", "biome", "format", "--write", reportPath]);
+  await runCommand(["bunx", "oxfmt", reportPath]);
 }
 
 async function writeFailure(error: unknown): Promise<void> {

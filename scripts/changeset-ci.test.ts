@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { changesetComparisonFromBaseRef } from "./changeset-ci.js";
 
 const CASES = [

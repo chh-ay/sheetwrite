@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useState } from "react";
+
 import { onTabListKey } from "./tabKeys.js";
 import { useScenePlayback } from "./useScenePlayback.js";
 
@@ -406,6 +407,7 @@ export function StoryReel() {
       ref={ref}
       style={{ "--sr-loop": `${STORY_SECONDS}s` } as CSSProperties}
     >
+      {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Stories"
         className="sw-reel__tabs"

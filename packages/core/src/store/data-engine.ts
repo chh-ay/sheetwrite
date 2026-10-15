@@ -1,9 +1,10 @@
-import type { CellSnapshot, RangeSnapshot } from "@sheetwrite/wasm";
+import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wasm";
+
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
-import { getEngine, isEngineLoaded as isLoaded } from "../engine.js";
+import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
   cloneCellHyperlink,
@@ -130,6 +131,11 @@ export interface CompactRangeHistory {
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
   toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
+}
+
+export interface PreparedEngineMemoryRelease {
+  commit(): void;
+  abort(): void;
 }
 
 export interface RangeMutationAllocationStats {
@@ -327,7 +333,7 @@ class PackedTextBuffer {
  * transaction facade. It never owns public listeners, epochs, or policy.
  */
 export class StoreDataEngine {
-  private readonly wasm: RecomputingCellStore;
+  private wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
   private readonly storageOptions: SheetwriteStoreOptions;
   private readonly handles = new Map<SheetId, number>();
@@ -342,6 +348,18 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+
+  private readonly rangeHistory = new Map<
+    CompactRangeHistory,
+    { sheetHandle: number; replace(resource: RangeSnapshot): void }
+  >();
+
+  private pendingPageRequests = 0;
+
+  private pageIdleWaiters: Array<() => void> | undefined;
+
+  private readonly memoryReleaseListeners = new Set<() => void>();
+
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
@@ -361,7 +379,9 @@ export class StoreDataEngine {
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
     if (!isLoaded()) {
-      throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
+      throw new Error(
+        `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
+      );
     }
     if (
       options.referenceSimulationLimit !== undefined &&
@@ -830,6 +850,13 @@ export class StoreDataEngine {
     );
   }
 
+  /** Empty protection releases remain valid after their sheet has been removed. */
+  pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
+    const handle = this.handles.get(sheet);
+    if (handle === undefined && bands.length === 0) return;
+    this.wasm.pinViewportBands(handle ?? this.handleOf(sheet), bands);
+  }
+
   canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -900,14 +927,16 @@ export class StoreDataEngine {
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
     this.noteRangeMutationFfi();
-    const resource = this.wasm.captureRange(
+    const capturedResource = this.wasm.captureRange(
       this.handleOf(range.sheet),
       range.start.row,
       range.start.col,
       rows,
       cols,
     );
-    if (!resource) return null;
+    if (!capturedResource) return null;
+
+    let resource: RangeSnapshot = capturedResource;
     this.rangeMutationStats.historySnapshots += 1;
     this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
 
@@ -940,10 +969,14 @@ export class StoreDataEngine {
     }
 
     let disposed = false;
-    return {
+    const history: CompactRangeHistory = {
       range,
       byteLength: resource.byteLength(),
-      resource,
+
+      get resource() {
+        return resource;
+      },
+
       refs,
       toDocumentOp: (target) => {
         if (disposed) throw new Error("history range snapshot already disposed");
@@ -996,9 +1029,21 @@ export class StoreDataEngine {
         if (disposed) return;
         disposed = true;
         resource.free();
+        this.rangeHistory.delete(history);
         this.rangeMutationStats.historyDisposals += 1;
       },
     };
+
+    this.rangeHistory.set(history, {
+      sheetHandle: this.handleOf(range.sheet),
+      replace: (replacement) => {
+        const previous = resource;
+        resource = replacement;
+        previous.free();
+      },
+    });
+
+    return history;
   }
 
   getWorkbook(): Workbook {
@@ -3095,12 +3140,96 @@ export class StoreDataEngine {
     for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
   }
 
+  beginPageRequest(): void {
+    this.pendingPageRequests += 1;
+  }
+
+  endPageRequest(): void {
+    this.pendingPageRequests -= 1;
+
+    if (this.pendingPageRequests === 0) {
+      const waiters = this.pageIdleWaiters;
+      this.pageIdleWaiters = undefined;
+      if (waiters) for (const resolve of waiters) resolve();
+    }
+  }
+
+  waitForPageLoads(): Promise<void> | undefined {
+    if (this.disposed || this.pendingPageRequests === 0) return undefined;
+
+    const { promise, resolve } = Promise.withResolvers<void>();
+    this.pageIdleWaiters ??= [];
+    this.pageIdleWaiters.push(resolve);
+
+    return promise;
+  }
+
+  onMemoryRelease(listener: () => void): () => void {
+    this.memoryReleaseListeners.add(listener);
+    return () => this.memoryReleaseListeners.delete(listener);
+  }
+
+  notifyMemoryRelease(): void {
+    for (const listener of this.memoryReleaseListeners) listener();
+  }
+
+  /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
+  prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
+    if (this.disposed) return null;
+
+    const replacement = instance.CellStore.importMemoryState(
+      this.wasm.exportMemoryState(),
+    ) as RecomputingCellStore;
+    const history: Array<{
+      replacement: RangeSnapshot;
+      replace(resource: RangeSnapshot): void;
+    }> = [];
+
+    try {
+      for (const [snapshot, owner] of this.rangeHistory) {
+        history.push({
+          replacement: replacement.importRangeMemoryState(
+            snapshot.resource.exportMemoryState(owner.sheetHandle),
+            owner.sheetHandle,
+            snapshot.range.start.row,
+            snapshot.range.start.col,
+          ),
+          replace: owner.replace,
+        });
+      }
+    } catch (cause) {
+      for (const snapshot of history) snapshot.replacement.free();
+      replacement.free();
+      throw new Error("Sheetwrite: compact history migration failed", { cause });
+    }
+
+    return {
+      abort: () => {
+        for (const snapshot of history) snapshot.replacement.free();
+        replacement.free();
+      },
+      commit: () => {
+        const previous = this.wasm;
+        this.wasm = replacement;
+        this.view.replaceEngine(replacement);
+        this.windowReader.replaceEngine(replacement);
+        this.pagedDirtyPreflight?.replaceEngine(replacement);
+
+        for (const snapshot of history) snapshot.replace(snapshot.replacement);
+
+        previous.free();
+      },
+    };
+  }
+
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
   dispose(): void {
     if (this.disposed) return;
     const committed = this.wasm.wasmCommittedBytes();
     this.committedBytesAfterDispose = committed > 0 ? committed : null;
     this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
+    for (const history of this.rangeHistory.keys()) history.dispose();
+    this.memoryReleaseListeners.clear();
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();

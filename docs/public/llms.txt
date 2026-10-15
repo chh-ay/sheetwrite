@@ -59,17 +59,18 @@ Sheetwrite packages are released together at version 0.4.0. This index is genera
 
 - [Calculation engine](https://sheetwrite.vercel.app/docs/concepts/calculation-engine/): How Sheetwrite calculates formulas: two engine builds, incremental recalculation, spills, paged data, errors, and limits.
 - [Analysis formulas](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/): Summarize, forecast, and clean data with the full formula engine. Worked examples for every function family in @sheetwrite/formulas.
-- [What's new in 0.5.0](https://sheetwrite.vercel.app/docs/start/whats-new/): The full formula engine, spill references, large undo, faster loading and import, and the upgrade checklist for Sheetwrite 0.5.0.
+- [Releases](https://sheetwrite.vercel.app/docs/releases/): Release notes for each Sheetwrite version, with new features, changes, fixes, performance results, and upgrade steps.
+- [Sheetwrite 0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/): The full formula engine, spill references, large undo, in-place conflict recovery, bounded string storage, faster loading and import, every fix, and the upgrade checklist for Sheetwrite 0.5.0.
 
 ## Public API
 
 - [API reference](https://sheetwrite.vercel.app/docs/api/): Generated reference for every classified Sheetwrite package entry point.
-- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 317 exports across 8 entry points (primary entry point: supported).
-- [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/api/formulas/): 14 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/core`](https://sheetwrite.vercel.app/docs/api/core/): 319 exports across 8 entry points (primary entry point: supported).
+- [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/api/formulas/): 16 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/react`](https://sheetwrite.vercel.app/docs/api/react/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/svelte`](https://sheetwrite.vercel.app/docs/api/svelte/): 19 exports across 2 entry points (primary entry point: supported).
 - [`@sheetwrite/vue`](https://sheetwrite.vercel.app/docs/api/vue/): 22 exports across 2 entry points (primary entry point: supported).
-- [`@sheetwrite/wasm`](https://sheetwrite.vercel.app/docs/api/wasm/): 13 exports across 2 entry points (primary entry point: internal).
+- [`@sheetwrite/wasm`](https://sheetwrite.vercel.app/docs/api/wasm/): 15 exports across 2 entry points (primary entry point: internal).
 - [`@sheetwrite/xlsx`](https://sheetwrite.vercel.app/docs/api/xlsx/): 7 exports across 2 entry points (primary entry point: supported).
 - [Public API declarations](https://sheetwrite.vercel.app/llms-full.txt): every export signature grouped by package and entry point. Do not invent symbols absent from it.
 

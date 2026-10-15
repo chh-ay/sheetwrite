@@ -23,6 +23,7 @@ export function createLoader(initialize) {
       if (source !== undefined && source !== selectedSource) {
         console.warn(DIFFERENT_SOURCE_AFTER_INIT);
       }
+
       return;
     }
 
@@ -30,6 +31,7 @@ export function createLoader(initialize) {
       if (source !== undefined && source !== selectedSource) {
         throw new Error(DIFFERENT_SOURCE_IN_FLIGHT);
       }
+
       return inFlight;
     }
 
@@ -50,5 +52,28 @@ export function createLoader(initialize) {
     return ready;
   }
 
-  return { load, isLoaded };
+  /**
+   * Mark the published exports ready from an engine instance that already compiled the module.
+   * A load() in flight wins; `publish` runs only when this call makes the loader ready.
+   *
+   * @param {BufferSource | URL | string | Request | WebAssembly.Module | undefined} source
+   * @param {() => void} publish
+   */
+  async function adopt(source, publish) {
+    if (inFlight) {
+      try {
+        await inFlight;
+      } catch {
+        // A failed load() leaves the loader free for this instance to adopt.
+      }
+    }
+
+    if (ready) return;
+
+    publish();
+    selectedSource = source;
+    ready = true;
+  }
+
+  return { load, isLoaded, adopt };
 }

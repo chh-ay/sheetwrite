@@ -20,12 +20,13 @@ import {
   createSelectionStatus,
   type ShellPiece,
 } from "@sheetwrite/core/shell";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import compatibilityData from "../generated/compatibility.json";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
+import compatibilityData from "../generated/compatibility.json";
 import { pageMeta } from "../lib/seo.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
@@ -59,6 +60,7 @@ import {
   sha256Hex,
   tsvOfSelection,
 } from "../showcases/scenarios/interoperability.js";
+
 import stylesheet from "../styles/showcase-interoperability.css?url";
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -77,6 +79,9 @@ export const Route = createFileRoute("/showcases/interoperability")({
     meta: pageMeta("Spreadsheet interoperability — Sheetwrite showcases", description),
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),
+  // `?compatibility=<record id>` opens one compatibility record.
+  validateSearch: (search: Record<string, unknown>): { compatibility?: string } =>
+    typeof search.compatibility === "string" ? { compatibility: search.compatibility } : {},
   component: InteroperabilityRoute,
 });
 
@@ -434,13 +439,13 @@ function InteroperabilityRoute() {
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
   const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
 
+  const { compatibility: requestedCompatibility } = Route.useSearch();
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("compatibility");
-    if (compatibilityData.records.some((record) => record.id === requested)) {
-      setSelectedCompatibilityId(requested);
+    if (compatibilityData.records.some((record) => record.id === requestedCompatibility)) {
+      setSelectedCompatibilityId(requestedCompatibility ?? null);
       document.getElementById("contract")?.scrollIntoView();
     }
-  }, []);
+  }, [requestedCompatibility]);
 
   const fixtureBytes = useCallback(async (fixture: InteropFixture): Promise<Uint8Array> => {
     const cached = bytesCache.current.get(fixture.file);
@@ -601,9 +606,7 @@ function InteroperabilityRoute() {
     return () => observer.disconnect();
   }, []);
 
-  // The engine resolves --sheetwrite-* custom properties once per grid mount.
-  // When the site theme flips, re-run that resolution (DEFAULT < CSS < metrics)
-  // so the canvas repaints with the new palette instead of going stale.
+  // CSS theme properties resolve at mount, so site theme changes need an explicit refresh.
   useEffect(() => {
     const observer = new MutationObserver(() => gridRef.current?.replaceTheme(CANVAS_THEME));
     observer.observe(document.documentElement, {
@@ -918,7 +921,9 @@ function InteroperabilityRoute() {
             <>
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
-              <a href="/docs/guides/xlsx-export/">XLSX interchange guide →</a>
+              <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+                XLSX interchange guide →
+              </Link>
             </>
           }
           eyebrow="CAPABILITY / SPREADSHEET INTEROPERABILITY"
@@ -948,6 +953,7 @@ function InteroperabilityRoute() {
         </nav>
 
         <section aria-label="Workbook exchange workbench" className="sw-si-section" id="xlsx">
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path. */}
           <section
             className="sw-si-workbench"
             aria-label="Live workbook and spreadsheet drop target"
@@ -1195,7 +1201,7 @@ function InteroperabilityRoute() {
                   className="sheetwrite-shell-row sheetwrite-shell-formula-row"
                   ref={formulaRowRef}
                 />
-                {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this canvas host into a virtualized ARIA grid; a table cannot host the runtime. */}
+                {/* Sheetwrite upgrades this host into a virtualized ARIA grid; a table cannot host the runtime. */}
                 <div
                   aria-label="Interoperability workbench grid"
                   role="grid"
@@ -1409,9 +1415,9 @@ function InteroperabilityRoute() {
                 This page publishes a fixed, checked test set and the product&apos;s declared
                 feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
                 OpenFormula compatibility.{" "}
-                <a href="/docs/reference/compatibility-results/">
+                <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
                   Read the detailed checked results →
-                </a>
+                </Link>
               </p>
 
               <section
@@ -2129,7 +2135,9 @@ function InteroperabilityRoute() {
               <p>
                 Every import and export reports what it could not preserve as structured{" "}
                 <code>XlsxWorkbookWarning</code> records — coded, per sheet, per cell.{" "}
-                <a href="/docs/api/core/xlsx-workbook-warning/">Warning codes →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-workbook-warning" }}>
+                  Warning codes →
+                </Link>
               </p>
               <div className="sw-si-panel sw-si-warnings" data-testid="interop-warnings">
                 {warningLog === null ? (
@@ -2292,7 +2300,9 @@ function InteroperabilityRoute() {
               <p>
                 Ceilings are enforced before anything allocates, and hand-authored hostile
                 OPC/SpreadsheetML packages are rejected with typed errors.{" "}
-                <a href="/docs/api/core/xlsx-resource-limits/">Resource limits →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-resource-limits" }}>
+                  Resource limits →
+                </Link>
               </p>
               <div className="sw-si-panel">
                 <h3>Formula-injection probe</h3>

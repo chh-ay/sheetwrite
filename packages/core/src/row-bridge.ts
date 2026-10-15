@@ -73,40 +73,45 @@ interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId> extends RowBr
 }
 
 /** A setRange/setBlock/restoreBlock effect expanded to its exact changed cells. */
-export interface RowBridgeRangeDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeRangeDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "range";
   readonly range: Range;
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
 /** A clearRange effect expanded to its exact changed cells. */
-export interface RowBridgeClearDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeClearDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "clear";
   readonly range: Range;
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
 /** A paste transaction effect. A paste can contain multiple canonical patches. */
-export interface RowBridgePasteDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgePasteDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "paste";
   readonly range: Range | null;
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
 /** A fill-series transaction effect. */
-export interface RowBridgeFillDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeFillDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "fill";
   readonly range: Range | null;
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
 /** Stable row identity effects for insert, delete, and move operations. */
-export interface RowBridgeRowStructureDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeRowStructureDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "row-structure";
   readonly action: "insert" | "delete" | "move";
   readonly sheet: SheetId;
@@ -119,8 +124,9 @@ export interface RowBridgeRowStructureDelta<Id extends RowBridgeId = RowBridgeId
 }
 
 /** A document operation that changes workbook or column metadata. */
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeMetadataDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "metadata";
   readonly metadata:
     | "column"
@@ -136,8 +142,9 @@ export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId>
 }
 
 /** A document operation that needs a host-side action rather than row mutation. */
-export interface RowBridgeHostActionDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeHostActionDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "host-action";
   readonly action:
     | "add-sheet"
@@ -148,8 +155,9 @@ export interface RowBridgeHostActionDelta<Id extends RowBridgeId = RowBridgeId>
 }
 
 /** An explicit projection record for an operation with no row-space meaning. */
-export interface RowBridgeUnprojectableDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+export interface RowBridgeUnprojectableDelta<
+  Id extends RowBridgeId = RowBridgeId,
+> extends RowBridgeDeltaBase<Id> {
   readonly kind: "unprojectable";
   readonly reason: string;
 }

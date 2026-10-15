@@ -1,5 +1,6 @@
 import { expect, it } from "bun:test";
 import { createHash } from "node:crypto";
+
 import { expectedFormulaOutput } from "../src/formula-bench.js";
 import {
   MATCHED_ENGINE_WORKLOADS,

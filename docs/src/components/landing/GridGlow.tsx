@@ -94,7 +94,6 @@ export function GridGlow() {
         const [column = 0, row = 0] = key.split(",").map(Number);
         const x = origin.left + column * size;
         const y = origin.top + row * size;
-        // Fill the cell, and brighten its grid lines a little more.
         context.globalAlpha = FILL_ALPHA * next;
         context.fillRect(x + 1, y + 1, size - 1, size - 1);
         context.globalAlpha = LINE_ALPHA * next;

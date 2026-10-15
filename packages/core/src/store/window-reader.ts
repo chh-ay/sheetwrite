@@ -1,4 +1,5 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -8,6 +9,7 @@ import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
@@ -170,11 +172,17 @@ export class StoreWindowReader {
   private conditionalRuleLargestInputBytes = 0;
 
   constructor(
-    private readonly wasm: RecomputingCellStore,
+    private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
     private readonly styles: StyleDictionary,
   ) {}
+
+  replaceEngine(wasm: RecomputingCellStore): void {
+    this.clear();
+    this.wasm = wasm;
+  }
+
   spillDerivedMask(
     sheet: SheetId,
     rows: { start: number; end: number },
@@ -317,14 +325,42 @@ export class StoreWindowReader {
     applyConditionalRules: boolean,
   ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
+    const isPaged = this.wasm.isPaged(handle);
+    try {
+      return this.readPinned(sheet, rows, cols, order, applyConditionalRules, isPaged);
+    } finally {
+      if (isPaged) {
+        this.wasm.pinReadWindow(handle, 0, 0, EMPTY_PIN_COLUMNS, EMPTY_PIN_COLUMNS);
+      }
+    }
+  }
+
+  private readPinned(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    applyConditionalRules: boolean,
+    isPaged: boolean,
+  ): InstrumentedVisibleWindowView {
+    const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    const dataRows = order?.subarray(rows.start, Math.min(rows.end, order.length));
     let ffiCalls = 1;
     let ffiInputBytes = colsU32.byteLength;
     let ffiLargestTransferBytes = colsU32.byteLength;
-    if (this.wasm.isPaged(handle)) {
-      this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
-      ffiCalls += 1;
+    if (isPaged) {
+      this.wasm.pinReadWindow(
+        handle,
+        dataRows ? 0 : rows.start,
+        dataRows ? 0 : rows.end,
+        dataRows ?? EMPTY_PIN_COLUMNS,
+        colsU32,
+      );
+      ffiCalls += 2;
       ffiInputBytes += colsU32.byteLength;
+      ffiInputBytes += dataRows?.byteLength ?? 0;
+      ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows?.byteLength ?? 0);
     }
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
     const hasCondRules = (conditionalSync & 1) !== 0;
@@ -339,8 +375,7 @@ export class StoreWindowReader {
 
     let view: ConsumingWindowView;
     let expectedRows: number;
-    if (order) {
-      const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+    if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
@@ -400,7 +435,6 @@ export class StoreWindowReader {
       this.stringCache.clear();
       this.visibleStringPoolEpoch = stringPoolEpoch;
     }
-    ffiCalls += 1;
     const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
     const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
     let ffiBoundaryCalls = ffiCalls + 3 + stringOutputAllocationEvents;
@@ -636,9 +670,6 @@ export class StoreWindowReader {
   }
 
   private syncStringPoolEpoch(epoch: number): void {
-    if (epoch !== this.wasm.stringPoolEpoch()) {
-      throw new Error("Sheetwrite: stale string-pool epoch");
-    }
     if (epoch !== this.stringPoolEpoch) {
       this.stringCache.clear();
       this.stringPoolEpoch = epoch;

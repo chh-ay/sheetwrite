@@ -88,5 +88,5 @@ For a server, save each change as an ordered operation instead of whole snapshot
 - Open the [Vanilla example](/vanilla/) to exercise the same lifecycle in a production build.
 - Choose a [framework integration](/docs/frameworks/lifecycle/).
 - Learn when the [`Grid` and `Store` own state](/docs/concepts/runtime-ownership/).
-- Read [what is new in 0.5.0](/docs/start/whats-new/).
+- Read [what is new in 0.5.0](/docs/releases/0.5.0/).
 - Browse the generated [`@sheetwrite/core` API](/docs/api/core/).

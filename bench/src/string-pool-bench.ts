@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import type * as WasmModule from "@sheetwrite/wasm";
 import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 

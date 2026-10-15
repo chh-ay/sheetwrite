@@ -30,6 +30,7 @@ import {
   validateSheetName,
   validateWorkbookTableName,
 } from "@sheetwrite/core";
+
 import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
 import {
@@ -261,7 +262,7 @@ function translateFormula(
     );
   let output = "";
   let segmentStart = 0;
-  for (let cursor = 0; cursor < formula.length; ) {
+  for (let cursor = 0; cursor < formula.length;) {
     const quote = formula[cursor];
     const closing = quote === '"' ? '"' : quote === "'" ? "'" : quote === "[" ? "]" : "";
     if (!closing) {
@@ -1992,7 +1993,6 @@ export function readWorkbook(
       rowOffset: cell.row,
       colOffset: cell.col,
       value: cell.value ?? { kind: "literal", value: null },
-      // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
       ...(cell.style ? { style: copyStyleData(cell.style) as CellStyle } : {}),
     }));
     const nativeValidations = source.validations.map((validation, index) => {

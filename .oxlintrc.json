@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "no-unused-vars": [
+      "error",
+      {
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "unicorn/no-new-array": "off",
+    "unicorn/no-useless-spread": "off",
+    "unicorn/no-useless-fallback-in-spread": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/purity": "off",
+    "react/globals": "off",
+    "react/immutability": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/static-components": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/test/**", "**/*.test.ts"],
+      "rules": {
+        "typescript/no-this-alias": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "**/dist",
+    "**/pkg",
+    "**/*.d.ts",
+    "bench/results",
+    "docs/src/generated",
+    "docs/src/routeTree.gen.ts"
+  ]
+}

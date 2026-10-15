@@ -14,6 +14,7 @@
     "bench:interaction": "bun run src/interaction-bench.ts",
     "bench:interaction:smoke": "bun run src/interaction-bench.ts --smoke",
     "bench:interaction-sessions": "bun run src/interaction-sessions-bench.ts",
+    "bench:windows": "bun run src/window-ownership-bench.ts",
     "bench:core-paths": "bun run src/core-paths-bench.ts --output results/core-paths-results.json",
     "bench:core-paths:smoke": "bun run src/core-paths-bench.ts --smoke",
     "bench:release": "bun run src/release-capture.ts",
@@ -44,7 +45,7 @@
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@playwright/test": "^1.63.0",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {

@@ -1,5 +1,7 @@
 import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
+import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -17,6 +19,7 @@ import {
   PLAYGROUND_EXAMPLE,
 } from "./scenarios/formulas.js";
 import FormulasSetupSnippet from "./snippets/formulas-setup.mdx";
+
 import "@sheetwrite/core/styles.css";
 
 declare global {
@@ -350,7 +353,7 @@ export default function FormulasShowcase() {
             </ol>
           </nav>
 
-          {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this host into an ARIA grid. */}
+          {/* Sheetwrite upgrades this host into an ARIA grid. */}
           <div
             aria-label="Sales analysis workbook"
             className="sw-fx-grid"
@@ -411,7 +414,9 @@ export default function FormulasShowcase() {
               is the same engine with the full function set. Select it once, before you create a
               Grid. Everything else stays the same.
             </p>
-            <a href="/docs/reference/formula-functions/">See every supported function →</a>
+            <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
+              See every supported function →
+            </Link>
           </div>
           <div className="sw-fx-engine__code">
             <FormulasSetupSnippet />

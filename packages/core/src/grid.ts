@@ -19,7 +19,12 @@ import {
   validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
-import { isEngineLoaded as isLoaded, loadEngine, type SheetwriteEngine } from "./engine.js";
+import {
+  ENGINE_LOAD_HINT,
+  isEngineLoaded as isLoaded,
+  loadEngine,
+  type SheetwriteEngine,
+} from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
@@ -28,7 +33,7 @@ import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hy
 import { InteractionSessions } from "./interaction-sessions.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { RenderCoordinator } from "./render-coordinator.js";
+import { ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -40,8 +45,8 @@ import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
-import { visibleSheetNeighbor } from "./store/ranges.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { visibleSheetNeighbor } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
@@ -343,7 +348,7 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
     throw new SheetwriteError(
       "initialization-required",
       "create-grid",
-      "Sheetwrite: await initSheetwrite() before createGrid()",
+      `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
   return new GridImpl(host, opts);
@@ -374,7 +379,7 @@ export class GridImpl implements Grid {
   private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
   private readonly domOverlay: DomOverlay;
-  private readonly renderCoordinator: RenderCoordinator;
+  private readonly readWindows: ReadWindowController;
   private overscan: number;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
@@ -445,7 +450,7 @@ export class GridImpl implements Grid {
     if (this.destroyed) return;
     this.armResolutionListener();
     this.syncSizer();
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   };
   private readonly onScroll = () => this.scheduleRender();
@@ -490,7 +495,7 @@ export class GridImpl implements Grid {
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
-    const virtualTarget = padTarget(host, opts.minColumns);
+    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
@@ -711,12 +716,7 @@ export class GridImpl implements Grid {
       colLeftOf: (col) => this.colLeftOf(col),
       rowTop: (row) => this.geometry.rowOffset(row),
       rowHeight: (row) => this.geometry.rowHeight(row),
-      visibleRowWindow: () =>
-        this.geometry.visibleRowWindow(
-          this.geometry.toContent(this.scroller.scrollTop),
-          this.viewportH(),
-          this.overscan,
-        ),
+      visibleRowWindow: () => this.readWindows.sampleRows(),
       previewColumnWidth: (col, width) => {
         this.geometry.previewColumnWidth(col, width);
         this.applyLayout();
@@ -725,7 +725,7 @@ export class GridImpl implements Grid {
       previewRowHeight: (row, height) => {
         this.geometry.previewRowHeight(row, height);
         this.syncSizer();
-        this.renderCoordinator.invalidate();
+        this.readWindows.invalidate();
         this.scheduleRender();
       },
       clearResizePreview: () => {
@@ -788,7 +788,7 @@ export class GridImpl implements Grid {
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
-      geometryVersion: () => this.renderCoordinator.geometryVersion,
+      geometryVersion: () => this.readWindows.geometryVersion,
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -815,13 +815,14 @@ export class GridImpl implements Grid {
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
-    this.renderCoordinator = new RenderCoordinator({
+    this.readWindows = new ReadWindowController({
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,
       ariaMirror: this.ariaMirror,
       geometry: this.geometry,
       datasource: this.datasourceController,
+      datasourceEnabled: Boolean(datasource),
       store: this.store,
       activeSheet: () => this.activeSheet,
       theme: () => this.theme,
@@ -1017,8 +1018,6 @@ export class GridImpl implements Grid {
     return this.activeRendererKind;
   }
 
-  // ── sheet / layout geometry ────────────────────────────────────────────────
-
   private sheet(id: SheetId = this.activeSheet): Sheet {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
 
@@ -1179,7 +1178,7 @@ export class GridImpl implements Grid {
   }
 
   private applyLayout(): void {
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     const sheet = this.sheet();
     const columns = sheet.columns.map((column, c) => ({
       ...column,
@@ -1244,7 +1243,7 @@ export class GridImpl implements Grid {
 
   private rebuildColumnIndex(): void {
     this.geometry.rebuildColumns();
-    this.renderCoordinator.invalidateColumns();
+    this.readWindows.invalidateColumns();
     this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
   }
 
@@ -1271,11 +1270,11 @@ export class GridImpl implements Grid {
   }
 
   private scheduleRender(): void {
-    this.renderCoordinator.schedule();
+    this.readWindows.schedule();
   }
 
   private render(): void {
-    this.renderCoordinator.renderNow();
+    this.readWindows.renderNow();
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
@@ -1759,7 +1758,10 @@ export class GridImpl implements Grid {
   setMinColumns(minColumns?: number): void {
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
     if (!stored) return;
-    const target = Math.max(stored.columns.length, padTarget(this.host, minColumns));
+    const target = Math.max(
+      stored.columns.length,
+      padTarget(this.host, minColumns, this.presentation),
+    );
     if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
     this.virtualColumnTargets.set(this.activeSheet, target);
     this.activeSheetCache = null;
@@ -1772,11 +1774,9 @@ export class GridImpl implements Grid {
     if (next === this.overscan) return;
     this.overscan = next;
     // Read per frame by the window calculations; a repaint picks it up.
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   }
-
-  // ── public API ─────────────────────────────────────────────────────────────
 
   /** Internal structural counters used by allocation regression tests and range benchmarks. */
   getMutationRevisionStats(): MutationRevisionStats {
@@ -2423,8 +2423,6 @@ export class GridImpl implements Grid {
     return additions.length > 0 ? [...additions, ...patches] : patches;
   }
 
-  // ── toolbar actions (operate on the current selection) ──────────────────────
-
   private buildActions(): GridActions {
     return {
       toggleBold: () => this.styleActions.toggleStyle("bold"),
@@ -2865,7 +2863,7 @@ export class GridImpl implements Grid {
     // The view permutation lives outside the store, so it must invalidate the
     // data signature itself — a view change with an identical window/scroll
     // (e.g. sorting while already at the top) would otherwise reuse stale rows.
-    this.renderCoordinator.invalidateData();
+    this.readWindows.invalidateData();
     this.syncSizer();
     this.render();
   }
@@ -2896,7 +2894,7 @@ export class GridImpl implements Grid {
     this.cancelAutoFit();
     this.datasourceController.destroy();
     this.mutationRevisions.clear();
-    this.renderCoordinator.destroy();
+    this.readWindows.destroy();
     this.interactions.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
     this.resizeObserver?.disconnect();
@@ -2943,8 +2941,17 @@ function appendPadColumns(columns: Column[], target: number): void {
   }
 }
 
-/** Columns needed to satisfy `minColumns` and fill the host width. */
-function padTarget(host: HTMLElement, minColumns: number | undefined): number {
+/**
+ * Columns needed to satisfy `minColumns` and, for a spreadsheet, to fill the
+ * host width. A data grid's columns come from the data, so it adds empty
+ * columns only when the host asks for them with `minColumns`.
+ */
+function padTarget(
+  host: HTMLElement,
+  minColumns: number | undefined,
+  presentation: GridPresentation,
+): number {
+  if (presentation === "data-grid") return minColumns ?? 0;
   const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
   const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
   return Math.max(minColumns ?? 0, fillCols);

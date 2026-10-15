@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L472"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L472</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L491"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L491</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -33,7 +33,6 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-add-paged-sheet"><code>cellstore_addPagedSheet</code></a>
 <a href="#init-output-cellstore-add-rows"><code>cellstore_addRows</code></a>
 <a href="#init-output-cellstore-add-sheet"><code>cellstore_addSheet</code></a>
-<a href="#init-output-cellstore-admit-source-range"><code>cellstore_admitSourceRange</code></a>
 <a href="#init-output-cellstore-aggregate"><code>cellstore_aggregate</code></a>
 <a href="#init-output-cellstore-begin-mutation"><code>cellstore_beginMutation</code></a>
 <a href="#init-output-cellstore-begin-page-load"><code>cellstore_beginPageLoad</code></a>
@@ -48,12 +47,14 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-clear-range"><code>cellstore_clearRange</code></a>
 <a href="#init-output-cellstore-col-count"><code>cellstore_colCount</code></a>
 <a href="#init-output-cellstore-columns-fully-loaded"><code>cellstore_columnsFullyLoaded</code></a>
-<a href="#init-output-cellstore-commit-sources"><code>cellstore_commitSources</code></a>
 <a href="#init-output-cellstore-compact-string-storage"><code>cellstore_compactStringStorage</code></a>
 <a href="#init-output-cellstore-data-edge"><code>cellstore_dataEdge</code></a>
 <a href="#init-output-cellstore-data-edge-ordered"><code>cellstore_dataEdgeOrdered</code></a>
 <a href="#init-output-cellstore-dirty-revision"><code>cellstore_dirtyRevision</code></a>
 <a href="#init-output-cellstore-distinct-values"><code>cellstore_distinctValues</code></a>
+<a href="#init-output-cellstore-end-mutation"><code>cellstore_endMutation</code></a>
+<a href="#init-output-cellstore-end-page-load"><code>cellstore_endPageLoad</code></a>
+<a href="#init-output-cellstore-export-memory-state"><code>cellstore_exportMemoryState</code></a>
 <a href="#init-output-cellstore-filter-rows"><code>cellstore_filterRows</code></a>
 <a href="#init-output-cellstore-filter-rows-multi"><code>cellstore_filterRowsMulti</code></a>
 <a href="#init-output-cellstore-formula-matrix-resource-stats"><code>cellstore_formulaMatrixResourceStats</code></a>
@@ -64,6 +65,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-get-window-rows"><code>cellstore_getWindowRows</code></a>
 <a href="#init-output-cellstore-hydrate-page-numbers"><code>cellstore_hydratePageNumbers</code></a>
 <a href="#init-output-cellstore-hydrate-page-strings-packed"><code>cellstore_hydratePageStringsPacked</code></a>
+<a href="#init-output-cellstore-import-memory-state"><code>cellstore_importMemoryState</code></a>
+<a href="#init-output-cellstore-import-range-memory-state"><code>cellstore_importRangeMemoryState</code></a>
 <a href="#init-output-cellstore-insert-cols"><code>cellstore_insertCols</code></a>
 <a href="#init-output-cellstore-is-fully-loaded"><code>cellstore_isFullyLoaded</code></a>
 <a href="#init-output-cellstore-is-paged"><code>cellstore_isPaged</code></a>
@@ -77,11 +80,14 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-paged-stats"><code>cellstore_pagedStats</code></a>
 <a href="#init-output-cellstore-persisted-cell-data"><code>cellstore_persistedCellData</code></a>
 <a href="#init-output-cellstore-pin-range"><code>cellstore_pinRange</code></a>
+<a href="#init-output-cellstore-pin-read-window"><code>cellstore_pinReadWindow</code></a>
+<a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
 <a href="#init-output-cellstore-pool-strings"><code>cellstore_poolStrings</code></a>
 <a href="#init-output-cellstore-query-resource-stats"><code>cellstore_queryResourceStats</code></a>
 <a href="#init-output-cellstore-range-fully-loaded"><code>cellstore_rangeFullyLoaded</code></a>
 <a href="#init-output-cellstore-range-style-ids"><code>cellstore_rangeStyleIds</code></a>
 <a href="#init-output-cellstore-recompute"><code>cellstore_recompute</code></a>
+<a href="#init-output-cellstore-recompute-changed"><code>cellstore_recomputeChanged</code></a>
 <a href="#init-output-cellstore-recompute-volatile"><code>cellstore_recomputeVolatile</code></a>
 <a href="#init-output-cellstore-reference-target"><code>cellstore_referenceTarget</code></a>
 <a href="#init-output-cellstore-references-targeting"><code>cellstore_referencesTargeting</code></a>
@@ -127,6 +133,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
 <a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
+<a href="#init-output-rangesnapshot-export-memory-state"><code>rangesnapshot_exportMemoryState</code></a>
 <a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
 <a href="#init-output-rangesnapshot-formula-sources"><code>rangesnapshot_formulaSources</code></a>
 <a href="#init-output-rangesnapshot-kinds"><code>rangesnapshot_kinds</code></a>
@@ -153,7 +160,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>139</span>
+## Members <span class="api-count" data-pagefind-ignore>146</span>
 
 <div class="api-member-list">
 
@@ -346,15 +353,6 @@ readonly cellstore_addSheet: (a: number, b: number, c: number) => number;
 
 </details>
 
-<details class="api-member" id="init-output-cellstore-admit-source-range" data-pagefind-weight="1">
-<summary><code>cellstore_admitSourceRange</code></summary>
-
-```ts generated
-readonly cellstore_admitSourceRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
-```
-
-</details>
-
 <details class="api-member" id="init-output-cellstore-aggregate" data-pagefind-weight="1">
 <summary><code>cellstore_aggregate</code></summary>
 
@@ -481,15 +479,6 @@ readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: numb
 
 </details>
 
-<details class="api-member" id="init-output-cellstore-commit-sources" data-pagefind-weight="1">
-<summary><code>cellstore_commitSources</code></summary>
-
-```ts generated
-readonly cellstore_commitSources: (a: number) => void;
-```
-
-</details>
-
 <details class="api-member" id="init-output-cellstore-compact-string-storage" data-pagefind-weight="1">
 <summary><code>cellstore_compactStringStorage</code></summary>
 
@@ -531,6 +520,33 @@ readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) =
 
 ```ts generated
 readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-end-mutation" data-pagefind-weight="1">
+<summary><code>cellstore_endMutation</code></summary>
+
+```ts generated
+readonly cellstore_endMutation: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-end-page-load" data-pagefind-weight="1">
+<summary><code>cellstore_endPageLoad</code></summary>
+
+```ts generated
+readonly cellstore_endPageLoad: (a: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-export-memory-state" data-pagefind-weight="1">
+<summary><code>cellstore_exportMemoryState</code></summary>
+
+```ts generated
+readonly cellstore_exportMemoryState: (a: number) => [number, number];
 ```
 
 </details>
@@ -621,6 +637,24 @@ readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: numb
 
 ```ts generated
 readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-import-memory-state" data-pagefind-weight="1">
+<summary><code>cellstore_importMemoryState</code></summary>
+
+```ts generated
+readonly cellstore_importMemoryState: (a: any) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-import-range-memory-state" data-pagefind-weight="1">
+<summary><code>cellstore_importRangeMemoryState</code></summary>
+
+```ts generated
+readonly cellstore_importRangeMemoryState: (a: number, b: any, c: number, d: number, e: number) => number;
 ```
 
 </details>
@@ -742,6 +776,24 @@ readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: num
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-pin-read-window" data-pagefind-weight="1">
+<summary><code>cellstore_pinReadWindow</code></summary>
+
+```ts generated
+readonly cellstore_pinReadWindow: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>cellstore_pinViewportBands</code></summary>
+
+```ts generated
+readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number) => void;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-pool-strings" data-pagefind-weight="1">
 <summary><code>cellstore_poolStrings</code></summary>
 
@@ -783,6 +835,15 @@ readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e
 
 ```ts generated
 readonly cellstore_recompute: (a: number, b: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-recompute-changed" data-pagefind-weight="1">
+<summary><code>cellstore_recomputeChanged</code></summary>
+
+```ts generated
+readonly cellstore_recomputeChanged: (a: number) => void;
 ```
 
 </details>
@@ -1192,6 +1253,15 @@ readonly rangesnapshot_byteLength: (a: number) => number;
 
 </details>
 
+<details class="api-member" id="init-output-rangesnapshot-export-memory-state" data-pagefind-weight="1">
+<summary><code>rangesnapshot_exportMemoryState</code></summary>
+
+```ts generated
+readonly rangesnapshot_exportMemoryState: (a: number, b: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-rangesnapshot-formula-offsets" data-pagefind-weight="1">
 <summary><code>rangesnapshot_formulaOffsets</code></summary>
 
@@ -1449,14 +1519,6 @@ export interface InitOutput {
     d: number,
   ) => void;
   readonly cellstore_addSheet: (a: number, b: number, c: number) => number;
-  readonly cellstore_admitSourceRange: (
-    a: number,
-    b: number,
-    c: number,
-    d: number,
-    e: number,
-    f: number,
-  ) => number;
   readonly cellstore_aggregate: (
     a: number,
     b: number,
@@ -1540,7 +1602,6 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => number;
-  readonly cellstore_commitSources: (a: number) => void;
   readonly cellstore_compactStringStorage: (a: number) => void;
   readonly cellstore_dataEdge: (
     a: number,
@@ -1572,6 +1633,9 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => number;
+  readonly cellstore_endMutation: (a: number) => void;
+  readonly cellstore_endPageLoad: (a: number) => void;
+  readonly cellstore_exportMemoryState: (a: number) => [number, number];
   readonly cellstore_filterRows: (
     a: number,
     b: number,
@@ -1663,6 +1727,14 @@ export interface InitOutput {
     j: number,
     k: number,
   ) => void;
+  readonly cellstore_importMemoryState: (a: any) => number;
+  readonly cellstore_importRangeMemoryState: (
+    a: number,
+    b: any,
+    c: number,
+    d: number,
+    e: number,
+  ) => number;
   readonly cellstore_insertCols: (
     a: number,
     b: number,
@@ -1713,6 +1785,22 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_pinReadWindow: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+    g: number,
+    h: number,
+  ) => void;
+  readonly cellstore_pinViewportBands: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+  ) => void;
   readonly cellstore_poolStrings: (
     a: number,
     b: number,
@@ -1736,6 +1824,7 @@ export interface InitOutput {
     f: number,
   ) => [number, number];
   readonly cellstore_recompute: (a: number, b: number) => void;
+  readonly cellstore_recomputeChanged: (a: number) => void;
   readonly cellstore_recomputeVolatile: (a: number, b: number) => number;
   readonly cellstore_referenceTarget: (
     a: number,
@@ -2070,6 +2159,10 @@ export interface InitOutput {
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
   readonly rangesnapshot_byteLength: (a: number) => number;
+  readonly rangesnapshot_exportMemoryState: (
+    a: number,
+    b: number,
+  ) => [number, number];
   readonly rangesnapshot_formulaOffsets: (a: number) => [number, number];
   readonly rangesnapshot_formulaSources: (a: number) => [number, number];
   readonly rangesnapshot_kinds: (a: number) => [number, number];

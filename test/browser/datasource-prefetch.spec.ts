@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import type { RendererPrefetchReport } from "../../docs/src/lib/prefetch-report.js";
 
 declare global {

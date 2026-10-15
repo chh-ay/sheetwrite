@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { type DataBenchmarkResult, validateDataBenchmark } from "./data-bench.js";
 import {
   type PrefetchBenchmarkReport,

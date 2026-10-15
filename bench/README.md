@@ -28,6 +28,78 @@ constants, checks the computed value after each edit, and reports ten samples
 after two warmups. The scalar `formula-constant-edit` workload remains available
 through `--sample formula-constant-edit 100000` for comparison.
 
+### Engine memory-release gate
+
+From the repository root, run `bun bench/src/engine-memory-release-bench.ts --compare <detached-base-worktree> --engine wasm --output <artifact.json>` under the machine's benchmark runner. Repeat with `--engine formulas`, keeping one CPU slot for all rounds. Both worktrees need release-built engines.
+
+The harness discards forty warmups and records twenty-one samples for edit, read, ingest, and recalculation. Each sample covers 1,024 edits, 2,048 scrolling windows, one 100,000-row ingest, or 32 recalculations, respectively, so JSC tier-up and finalizer scheduling do not dominate a short batch. It runs three A/A controls, then five alternating ABBA/BAAB rounds; the artifact retains every sample, per-round medians, the A/A noise band, and the median-of-round-medians verdict. Ordinary paths may not exceed a 3% slowdown beyond the measured A/A spread. Use `--metric read` with Bun's `--cpu-prof` to isolate read-loop profiles on either worktree.
+
+Use `--mode memory --engine wasm --output <artifact.json>` (and `formulas`) for million-row dense-clear, paged dirty-edit, and large-clear history scenarios. It checks preserved values, undo/redo, no history materialization during migration, a cleared WeakRef to the retired memory, and lower committed WASM/process memory. JavaScript heap is JSC's non-external heap (`heapSize - extraMemorySize`); external accounting is retained separately because JSC counts WASM/ArrayBuffer backing allocations there. Process memory is RSS after five full-GC/event-loop turns, not an estimate from that external counter.
+
+The memory-release captures compare `5a16a55` with this branch on Bun 1.4.3, using runner slot 4. `results/engine-memory-release-read-profiles.json` records isolated A/B read profiles of the implementation at `9915236`, before the lazy-singleton compatibility repair. Both profiles spend their read samples in the same WASM/window-copy paths; neither samples an engine lookup. The reader already keeps a direct store reference, rebound only during migration. The short original read batches mixed JSC tier-up and allocation bursts; the retained protocol uses longer warmed batches rather than adding a lookup cache or changing Rust. The final unprofiled comparison includes the lazy-singleton repair.
+
+Memory observations below are MiB before → after, after five GC/event-loop turns. Empty-dense is a new million-row, three-column dense store with no data. Dense-clear keeps ten populated rows of the same store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history keeps the compact inverse of a three-column million-row clear. The fresh floor is the WASM memory of a store newly built with the same surviving content and row count, plus the compact history bytes. The scenarios run in sequence in one engine.
+
+| Engine | Scenario | WASM MiB | Fresh floor MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | empty-dense | 38.44 → 38.44 | 38.44 | 5.61 → 5.62 | 110.26 → 110.55 | 52.83 |
+| wasm | dense-clear | 173.25 → 38.44 | 38.44 | 5.63 → 5.64 | 250.66 → 111.88 | 50.29 |
+| wasm | paged-dirty | 38.44 → 1.19 | 1.19 | 5.65 → 5.66 | 132.97 → 80.63 | 5.47 |
+| wasm | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.82 → 7.83 | 270.43 → 159.74 | 274.26 |
+| formulas | empty-dense | 38.44 → 38.44 | 38.44 | 5.69 → 5.70 | 110.86 → 109.86 | 51.98 |
+| formulas | dense-clear | 173.25 → 38.44 | 38.44 | 5.71 → 5.72 | 251.73 → 111.54 | 55.26 |
+| formulas | paged-dirty | 38.44 → 1.19 | 1.19 | 5.73 → 5.74 | 134.39 → 82.24 | 4.07 |
+| formulas | large-clear-history | 173.31 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.89 → 7.90 | 265.95 → 161.40 | 224.24 |
+
+Release never grows the WASM memory, and every scenario lands on its fresh floor. The transfer is sized by content, not row count: runs of empty or default values are encoded as runs, and the new instance decodes from a JavaScript buffer through a bounded 64 KiB reader straight into its final vectors, so no full transfer image stays in its heap. All eight retired-memory WeakRefs cleared. Raw bytes and pause measurements are in `results/engine-memory-release-memory-{wasm,formulas}.json`. These local captures are not portable memory ceilings.
+
+| Engine | Baseline raw B | Changed raw B | Baseline Brotli B | Changed Brotli B | Brotli increase B |
+| --- | --- | --- | --- | --- | --- |
+| wasm | 804818 | 848920 | 241093 | 250209 | 9116 |
+| formulas | 1087813 | 1131855 | 329268 | 338637 | 9369 |
+
+Brotli uses quality 11. The default engine grows by 9,116 B, which the maintainer accepted for memory release. Core boot creates only its collectible instance. The published synchronous exports initialize once, on first use, from the module that instance compiled, and the first instance marks the published loader ready. A fresh-process regression counts real instances to guard against a second eager boot instance.
+
+Ordinary-path verdicts (milliseconds per operation; 3 A/A controls, then 5 ABBA rounds on slot 4; the A/A spread is the maximum absolute paired-control delta):
+
+| Engine | Path | A median ms | B median ms | Delta | A/A spread | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | edit | 0.0031 | 0.0032 | +3.05% | 12.11% | pass |
+| wasm | scroll/read | 0.0059 | 0.0059 | +0.64% | 1.19% | pass |
+| wasm | ingest | 33.108 | 33.337 | +0.69% | 1.39% | pass |
+| wasm | recalculation | 0.6959 | 0.6996 | +0.53% | 2.13% | pass |
+| formulas | edit | 0.0031 | 0.0030 | −1.59% | 5.77% | pass |
+| formulas | scroll/read | 0.0058 | 0.0059 | +1.91% | 5.39% | pass |
+| formulas | ingest | 33.463 | 33.313 | −0.45% | 0.53% | pass |
+| formulas | recalculation | 0.6956 | 0.6941 | −0.22% | 1.25% | pass |
+
+Every path is within the A/A noise plus 3 points; these measurements do not show a speedup. Every unrounded per-round median, raw sample and A/A control is in `results/engine-memory-release-paths-{wasm,formulas}.json`.
+
+The adapter lifetime microbenchmark measures real React, Vue, and Svelte
+mount/unmount and mount/reset/unmount commits, with direct Grid mounting and
+selection controls. Each workload runs in a fresh process to prevent queued
+rendering from contaminating other workloads. Initialization is excluded; each
+workload discards 30 warmup iterations and reports the median of seven
+150-iteration samples in microseconds. Run from the repository root (increase
+`ADAPTER_BENCH_ITERATIONS` to reduce noise, or set `ADAPTER_BENCH_WORKLOAD` to run
+one named workload):
+
+```sh
+/home/vvin/learn/bench-run --slot 4 timeout 1200 bun \
+  --preload ./test-setup.ts --preload ./test-setup-svelte.ts \
+  bench/src/adapter-lifetime-bench.ts
+```
+
+Compare the same harness on both revisions using A/A control captures followed
+by alternating ABBA rounds; compare medians of each round's paired medians.
+Use the same Svelte client-runtime preload in the baseline checkout: a server
+`untrack` implementation changes reactive scheduling and invalidates comparison.
+The recorded gate in `results/adapter-lifetime-gate.json` includes two A/A controls
+and five alternating ABBA rounds on CPU 4. Control medians changed by -0.1% and
+-0.5%; adapter medians improved by 15.8–37.8%. A/A spread reached 16.2%, so these
+captures establish no regression rather than a precise speedup claim.
+
+
 ─────────────────────────────────────────────────────────────────────────────
 
 ## Methodology

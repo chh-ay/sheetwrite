@@ -36,10 +36,7 @@ export class AriaMirror {
   /** Last `aria-activedescendant` written to the host; avoids redundant writes. */
   private lastFocusId: string | null = null;
 
-  // ── Retained node references ─────────────────────────────────────────────
-  // Shape of the last rebuild plus the live nodes it produced. When a fresh
-  // window has the same nRows × nCols we patch these in place; a differing
-  // node count forces a full rebuild.
+  // Reuse nodes when the window shape is unchanged to avoid rebuilding the tree.
   private lastNRows = -1;
   private lastNCols = -1;
   private headerCells: HTMLDivElement[] = [];
@@ -100,7 +97,6 @@ export class AriaMirror {
     const nCols = view.cols.length;
     const nRows = view.rows.end - view.rows.start;
 
-    // Same node count → reuse the existing tree and rewrite only what moved.
     if (nRows === this.lastNRows && nCols === this.lastNCols) {
       this.patchInPlace(view, focus, nRows, nCols);
     } else {

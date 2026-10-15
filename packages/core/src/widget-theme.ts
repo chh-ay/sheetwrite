@@ -1,7 +1,5 @@
 import type { Theme } from "./types/render.js";
 
-// ── Widget custom-property seeding ───────────────────────────────────────────
-
 /**
  * Custom properties the built-in widgets (find bar, toolbar, context menu) read
  * for their cosmetic styling. They are declared in `styles.css` via `var(...)`

@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import { fromXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
+
 import { registerXlsxBackends } from "../src/index.js";
 
 interface ExternalFixture {

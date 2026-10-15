@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+
 import { defineConfig } from "vite";
 
 const output = process.env.SHEETWRITE_FIRST_PAINT_OUTPUT;

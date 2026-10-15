@@ -17,6 +17,7 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
 import { defineConfig, type Plugin } from "vite";
+
 import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
 import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
 
@@ -155,6 +156,13 @@ export default defineConfig({
         { path: "/showcases/performance/" },
         { path: "/showcases/collaboration/" },
         { path: "/docs/proof/", sitemap: { exclude: true } },
+        // Static hosts serve /404.html for every URL without a page: the
+        // root notFoundComponent prerendered for an unknown path.
+        {
+          path: "/404/",
+          prerender: { enabled: true, outputPath: "/404.html" },
+          sitemap: { exclude: true },
+        },
         // Test fixtures stay reachable for Playwright but out of search surfaces.
         { path: "/test/xlsx/", sitemap: { exclude: true } },
         { path: "/test/collaboration/", sitemap: { exclude: true } },

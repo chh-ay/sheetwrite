@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import { CAPABILITY_OWNERS } from "../../docs/src/showcases/capabilities.js";
 import { siteUrl } from "./playwright.config.js";
 

@@ -79,8 +79,6 @@ export interface Sheet {
   tables?: WorkbookTable[];
 }
 
-// ── Views: sorting, filtering, hidden rows, grouping ─────────────────────────
-
 /** One key of a multi-column sort, applied in array order (first = primary). */
 export interface SortKey {
   col: number;

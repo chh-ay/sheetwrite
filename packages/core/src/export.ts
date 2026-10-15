@@ -362,8 +362,6 @@ export async function toXlsxTable(
   }
 }
 
-// ── xlsx import ──────────────────────────────────────────────────────────────
-
 /**
  * Pluggable table import backend. Parses raw `.xlsx` bytes into the same
  * `ColumnarData` shape `fromCsv` returns, so host ingestion code can stay
@@ -405,8 +403,6 @@ export async function fromXlsxTable(
     });
   }
 }
-
-// ── Workbook-level XLSX round-trip ───────────────────────────────────────────
 
 /** Structured fidelity warning emitted during XLSX conversion. */
 export interface XlsxWorkbookWarning {

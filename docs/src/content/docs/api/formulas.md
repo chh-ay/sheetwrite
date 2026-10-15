@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/formulas."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./loader.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>14</dd></div>
+<div><dt>Exports</dt><dd>16</dd></div>
 </dl>
 
 Source entry: `packages/formulas/loader.d.ts`
@@ -27,9 +27,10 @@ Source entry: `packages/formulas/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/formulas/window-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>WindowView</code></span><span class="api-symbol-card__desc">A bulk window of resolved cells, row-major over nrows x ncols.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>4</span>
+### Functions <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/formulas/create-engine/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createEngine</code></span><span class="api-symbol-card__desc">Initialize a fresh engine; a compiled module can be reused without retaining its memory.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/function-names/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>functionNames</code></span><span class="api-symbol-card__desc">Names accepted by the full engine, including aliases.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/init-sync/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>initSync</code></span><span class="api-symbol-card__desc">Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/is-loaded/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>isLoaded</code></span><span class="api-symbol-card__desc">Whether the WASM module has finished initializing.</span></a>
@@ -42,9 +43,10 @@ Source entry: `packages/formulas/loader.d.ts`
 <a class="api-symbol-card" href="/docs/api/formulas/init-output/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>InitOutput</code></span><span class="api-symbol-card__desc">Result of module initialization: the instantiated exports plus the shared linear memory.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>2</span>
+### Types <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/formulas/engine-instance/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>EngineInstance</code></span><span class="api-symbol-card__desc">Engine objects and caches owned by one independently collectible WASM instance.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/init-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>InitInput</code></span><span class="api-symbol-card__desc">Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled WebAssembly.Module.</span></a>
 <a class="api-symbol-card" href="/docs/api/formulas/sync-init-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>SyncInitInput</code></span><span class="api-symbol-card__desc">Sources accepted by synchronous initialization: raw module bytes or a precompiled WebAssembly.Module.</span></a>
 </div>

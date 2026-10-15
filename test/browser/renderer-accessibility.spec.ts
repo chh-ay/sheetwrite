@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { siteUrl } from "./playwright.config.js";
 
 const FIXTURE_URL = siteUrl("/test/renderers/");
@@ -95,9 +96,9 @@ test("DOM renderer lifecycle and absolute accessibility indices", async ({ page 
       );
       return Boolean(
         hostBox &&
-          visibleBoxes.every(
-            (box) => box.left >= hostBox.x && box.right <= hostBox.x + hostBox.width + 0.5,
-          ),
+        visibleBoxes.every(
+          (box) => box.left >= hostBox.x && box.right <= hostBox.x + hostBox.width + 0.5,
+        ),
       );
     })
     .toBe(true);

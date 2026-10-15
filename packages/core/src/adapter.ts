@@ -1,4 +1,5 @@
 import type { SheetwriteError } from "./errors.js";
+import { initSheetwrite, isSheetwriteReady } from "./grid.js";
 
 export {
   isSheetwriteError,
@@ -43,7 +44,6 @@ import {
   type RowBridge as RowBridgeInstance,
   type RowBridgeOptions,
 } from "./row-bridge.js";
-
 import type {
   CellFormat,
   CellScalar,
@@ -63,7 +63,7 @@ export {
   type GridControllerHandlers,
 } from "./grid-controller.js";
 
-import type { GridController } from "./grid-controller.js";
+import { createGridController, type GridController } from "./grid-controller.js";
 
 /** Classification of adapter options as live-updatable or reset-sensitive. */
 export const GRID_OPTION_POLICY = {
@@ -213,6 +213,184 @@ export function applyChangedLiveGridOptions(
   if (previous.config !== next.config) controller.setConfig(next.config);
   if (previous.overscan !== next.overscan) controller.setOverscan(next.overscan);
   if (previous.minColumns !== next.minColumns) controller.setMinColumns(next.minColumns);
+}
+
+/** Committed inputs to a framework adapter lifetime. */
+export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> {
+  options: GridOptions;
+  rowBridge?: RowBridgeInstance<Id>;
+  wasmSource?: SheetwriteInitializationProps["wasmSource"];
+}
+
+/** Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication. */
+export interface GridPublicationAdapter {
+  /** Resolves only after the imperative handle is visible to consumers. */
+  publish(grid: Grid | null): void | Promise<void>;
+  setInitializationState(state: "loading" | "ready" | "error"): void;
+  /**
+   * Receives asynchronous construction or consumer failures unchanged.
+   * The value may be any thrown value, including a SheetwriteError from construction;
+   * it is never reclassified as an initialization error.
+   */
+  reportConsumerFailure(thrown: unknown): void;
+}
+
+/** Owns adapter attachment and monotonically numbered Grid generations. */
+export interface AdapterGridController<Id extends RowBridgeId = RowBridgeId> {
+  mount(host: HTMLElement, input: AdapterGridInput<Id>): void;
+  update(input: AdapterGridInput<Id>): void;
+  /** Idempotent; a later mount preserves generation numbering. */
+  unmount(): void;
+}
+
+/** Owns initialization, replacement, publication, and retirement for framework adapters. */
+export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId>(
+  handlers: GridAdapterEventHandlers<Id>,
+  publication: GridPublicationAdapter,
+): AdapterGridController<Id> {
+  let host: HTMLElement | null = null;
+  let input: AdapterGridInput<Id> | null = null;
+  let owned: GridController | null = null;
+  let applied: GridOptions | null = null;
+  let previous: GridOptions | null = null;
+  let generation = 0;
+  let epoch = 0;
+  let request = 0;
+
+  function retire(): void {
+    const retiring = owned;
+    owned = null;
+    applied = null;
+    if (!retiring) return;
+    let failure: unknown;
+    let failed = false;
+    try {
+      const pending = publication.publish(null);
+      if (pending) void pending.catch(publication.reportConsumerFailure);
+    } catch (error) {
+      failure = error;
+      failed = true;
+    }
+    try {
+      retiring.destroy();
+    } catch (error) {
+      failure = failed ? new AggregateError([failure, error], "Grid retirement failed") : error;
+      failed = true;
+    }
+    if (failed) throw failure;
+  }
+
+  function create(): void {
+    if (!host || !input || owned || !isSheetwriteReady()) return;
+    const options = input.options;
+    const reason =
+      generation === 0
+        ? "initial"
+        : ((previous && getGridResetReason(previous, options)) ?? "input-reset");
+    const created = createGridController(host, options, handlers, input.rowBridge);
+    owned = created;
+    applied = previous = options;
+    const currentGeneration = ++generation;
+    const attachment = epoch;
+    function failed(error: unknown): never {
+      try {
+        if (owned === created) retire();
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], "Grid publication and retirement failed");
+      }
+      throw error;
+    }
+    function ready(): void {
+      if (epoch !== attachment || owned !== created) return;
+      try {
+        publication.setInitializationState("ready");
+        handlers.onReady?.({ grid: created.grid, generation: currentGeneration, reason });
+      } catch (error) {
+        failed(error);
+      }
+    }
+    try {
+      const pending = publication.publish(created.grid);
+      if (pending) {
+        void pending.then(ready, failed).catch(publication.reportConsumerFailure);
+      } else {
+        ready();
+      }
+    } catch (error) {
+      failed(error);
+    }
+  }
+
+  function initialize(): void {
+    if (!input) return;
+    const token = ++request;
+    const attachment = epoch;
+    const alreadyReady = isSheetwriteReady();
+    if (!alreadyReady) publication.setInitializationState("loading");
+    const pending = initSheetwrite(input.wasmSource);
+    void pending
+      .then(
+        () => {
+          if (alreadyReady || !host || epoch !== attachment) return;
+          try {
+            create();
+          } catch (error) {
+            publication.reportConsumerFailure(error);
+          }
+        },
+        (error: SheetwriteError) => {
+          if (!host || epoch !== attachment || token !== request) return;
+          publication.setInitializationState("error");
+          handlers.onInitializationError?.(error);
+        },
+      )
+      .catch(publication.reportConsumerFailure);
+    create();
+  }
+
+  function update(next: AdapterGridInput<Id>): void {
+    const old = input;
+    input = {
+      ...next,
+      options: {
+        ...next.options,
+        renderer: next.options.renderer ?? "canvas",
+        readOnly: next.options.readOnly ?? false,
+      },
+    };
+    if (!host) return;
+    const sourceChanged = !old || old.wasmSource !== input.wasmSource;
+    if (
+      owned &&
+      old &&
+      (getGridResetReason(old.options, input.options) || old.rowBridge !== input.rowBridge)
+    ) {
+      retire();
+    }
+    if (owned && applied) {
+      applyChangedLiveGridOptions(owned, applied, input.options);
+      applied = input.options;
+    }
+    if (sourceChanged) initialize();
+    else create();
+  }
+
+  return {
+    mount(element, next) {
+      if (host) throw new Error("Adapter lifetime is already mounted");
+      host = element;
+      epoch += 1;
+      input = null;
+      update(next);
+    },
+    update,
+    unmount() {
+      host = null;
+      epoch += 1;
+      request += 1;
+      retire();
+    },
+  };
 }
 
 /** Default pixel width assigned to simple adapter columns. */

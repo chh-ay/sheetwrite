@@ -153,13 +153,12 @@ function createDraw(root: HTMLElement): (t: number) => void {
     // The whole picture fades back to empty during the last half second.
     const reset = 1 - span(t, LOOP_SECONDS - 0.6, LOOP_SECONDS - 0.1);
 
-    // 1. Paste: the cells fill in a diagonal sweep, with a running count.
     const paste = span(t, 0.3, 1.5);
     for (const [index, cell] of cells.entries()) {
       const { col = 0, row = 0 } = CELLS[index] ?? {};
       const at = (col + row * 2) / (GRID_CELLS.cols + GRID_CELLS.rows * 2);
       cell.dataset.filled = String(paste > at && reset > 0.5);
-      // 3. The render window repaints only the visible cells.
+
       const inWindow = col < WINDOW_CELLS.cols && row < WINDOW_CELLS.rows;
       const repaint = inWindow ? windowed(t, 6.3, 7.0, 0.1) : 0;
       cell.dataset.painted = String(repaint > 0.5);
@@ -188,27 +187,24 @@ function createDraw(root: HTMLElement): (t: number) => void {
     );
     opacity(packets.get("tx"), windowed(t, 2.2, 3.05, 0.1));
 
-    // 2. Engine: the column store fills and formulas recalculate.
     for (const [index, column] of columns.entries()) {
       const k = span(t, 3.0 + index * 0.12, 3.5 + index * 0.12) * reset;
       column.setAttribute("height", String(COLUMN.h * k));
       column.setAttribute("y", String(VISUAL_Y + COLUMN.h - 14 - COLUMN.h * k));
     }
+
     formulas.textContent = `${count(312 * span(t, 3.4, 4.8) * reset)} formulas recalculated`;
 
-    // 3. One render window crosses back.
     const back = span(t, 5.3, 6.1);
     move(packets.get("window"), lerp(LANE.window.from, LANE.window.to, back), LANE.window.y);
     opacity(packets.get("window"), windowed(t, 5.2, 6.15, 0.1));
 
-    // 4. One change event to the application, which logs it.
     const change = span(t, 7.3, 8.1);
     move(packets.get("change"), lerp(LANE.change.from, LANE.change.to, change), LANE.change.y);
     opacity(packets.get("change"), windowed(t, 7.2, 8.15, 0.1));
     opacity(logLines[0], clamp((t - 8.1) / 0.3) * reset);
     opacity(logLines[1], clamp((t - 9.0) / 0.3) * reset);
 
-    // 5. Save to your server; its version goes up when the save lands.
     const save = span(t, 9.1, 9.9);
     move(packets.get("save"), LANE.save.x, lerp(LANE.save.from, LANE.save.to, save));
     opacity(packets.get("save"), windowed(t, 9.0, 9.95, 0.1));

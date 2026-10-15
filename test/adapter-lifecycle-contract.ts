@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
   GridAdapterEventHandlers,
@@ -262,7 +263,10 @@ interface InitializationProbeResult {
   editPreserved: boolean;
 }
 
-async function runInitializationProbe(adapter: string): Promise<InitializationProbeResult> {
+async function runInitializationProbe(
+  adapter: string,
+  pendingLive = false,
+): Promise<InitializationProbeResult | { pendingLiveOptions: true }> {
   const repositoryRoot = new URL("../", import.meta.url).pathname;
   const probe = new URL("./adapter-initialization-probe.ts", import.meta.url).pathname;
   const domSetup = new URL("../test-setup.ts", import.meta.url).pathname;
@@ -271,6 +275,7 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
     ["bun", "--preload", domSetup, "--preload", svelteSetup, probe, adapter],
     {
       cwd: repositoryRoot,
+      env: { ...Bun.env, ADAPTER_PENDING_LIVE_ONLY: pendingLive ? "1" : "0" },
       stdout: "pipe",
       stderr: "pipe",
     },
@@ -286,6 +291,12 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
 
 export function runSharedAdapterLifecycleContract(adapter: string, mount: MountAdapter): void {
   describe(`${adapter} shared lifecycle contract`, () => {
+    it("applies pending committed live options before publishing readiness", async () => {
+      expect(await runInitializationProbe(adapter.toLowerCase(), true)).toEqual({
+        pendingLiveOptions: true,
+      });
+    });
+
     it("shares fallback, current-error, retry, and stale-generation semantics", async () => {
       expect(await runInitializationProbe(adapter.toLowerCase())).toEqual({
         adapter: adapter.toLowerCase(),
@@ -300,6 +311,58 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         selectionPreserved: true,
         editPreserved: true,
       });
+    });
+
+    it("retires a generation when onReady throws without reclassifying the consumer error", async () => {
+      const recorder = createLifecycleRecorder();
+      const failure = new Error("ready consumer failed");
+      const initializationErrors: unknown[] = [];
+      const consumerErrors: unknown[] = [];
+      const originalReportError = globalThis.reportError;
+      globalThis.reportError = (error) => consumerErrors.push(error);
+      let mounted: MountedAdapter | undefined;
+      try {
+        try {
+          mounted = await mount({
+            ...initialProps(recorder),
+            onReady(event) {
+              recorder.onReady(event);
+              throw failure;
+            },
+            onInitializationError: (error) => initializationErrors.push(error),
+          });
+        } catch (error) {
+          consumerErrors.push(error);
+        }
+        await Promise.resolve();
+        expect(consumerErrors).toContain(failure);
+        expect(initializationErrors).toEqual([]);
+        expect(document.querySelector('[role="grid"]')).toBeNull();
+        expect(mounted?.getPublishedGrid() ?? null).toBeNull();
+        expect(recorder.ready).toHaveLength(1);
+        expect([...recorder.destroyCalls.values()]).toEqual([1]);
+      } finally {
+        globalThis.reportError = originalReportError;
+        if (mounted) await mounted.unmount();
+      }
+    });
+
+    it("treats the effective default renderer as unchanged and preserves reset precedence", async () => {
+      const recorder = createLifecycleRecorder();
+      const props = initialProps(recorder);
+      const mounted = await mount(props);
+      const first = mounted.getPublishedGrid();
+      await mounted.render({ ...props, renderer: "canvas" });
+      expect(mounted.getPublishedGrid()).toBe(first);
+      expect(recorder.ready).toHaveLength(1);
+      await mounted.render({
+        ...props,
+        workbook: makeConformanceWorkbook("Replacement"),
+        renderer: "worker",
+      });
+      expect(recorder.ready).toHaveLength(2);
+      expect(recorder.ready[1]?.reason).toBe("input-reset");
+      await mounted.unmount();
     });
 
     it("publishes exactly one live grid before generation-one readiness and clears it once", async () => {
@@ -404,7 +467,6 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       const props: AdapterConformanceProps = { ...base, workbook, ...handlersFor(first) };
       const mounted = await mount(props);
       const grid = mounted.getPublishedGrid()!;
-      // Select on the active sheet, then switch to `next`.
       const exercise = (value: string, row: number, active: string, next: string) => {
         grid.store.applyTransaction({
           patches: [

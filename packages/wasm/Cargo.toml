@@ -19,6 +19,9 @@ analysis = ["formula-engine", "dep:regex-lite"]
 wasm-bindgen = "0.2"
 regex-lite = { version = "0.1.9", optional = true, default-features = false, features = ["std", "string"] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "=0.3.102"
+
 # v0.4.0 interleaved captures keep `3`: `"s"` saves 14,218 Brotli bytes
 # but slows the resolved 100k formula paths by 8.60–11.71%.
 [profile.release]

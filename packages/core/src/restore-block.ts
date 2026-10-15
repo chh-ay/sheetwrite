@@ -1,4 +1,5 @@
 import { deflateSync } from "fflate";
+
 import { validateDocumentOperationShape } from "./document-protocol.js";
 import { boundedJsonByteLength, JsonByteLengthError } from "./errors.js";
 import { MAX_RESTORE_BLOCK_CELLS, MAX_RESTORE_BLOCK_DECODED_BYTES } from "./restore-block-codec.js";

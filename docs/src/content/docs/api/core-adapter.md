@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core/adapter."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/adapter.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>51</dd></div>
+<div><dt>Exports</dt><dd>55</dd></div>
 </dl>
 
 Source entry: `packages/core/src/adapter.ts`
@@ -22,10 +22,11 @@ Source entry: `packages/core/src/adapter.ts`
 <a class="api-symbol-card" href="/docs/api/core-adapter/sheetwrite-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>SheetwriteError</code></span><span class="api-symbol-card__desc">Canonical envelope for thrown and callback-delivered Sheetwrite failures.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>10</span>
+### Functions <span class="api-count" data-pagefind-ignore>11</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core-adapter/apply-changed-live-grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>applyChangedLiveGridOptions</code></span><span class="api-symbol-card__desc">Applies live-updatable adapter option changes to an existing Grid.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/create-adapter-grid-controller/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createAdapterGridController</code></span><span class="api-symbol-card__desc">Owns initialization, replacement, publication, and retirement for framework adapters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/create-grid-controller/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createGridController</code></span><span class="api-symbol-card__desc">Create a grid and wire its lifecycle once, so the React/Vue/Svelte adapters (and any plain host) share a single, drift-free implementation instead of each re-deriving the same create → subscribe → teardown behavior.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/create-row-bridge/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createRowBridge</code></span><span class="api-symbol-card__desc">Create a typed bridge while preserving row and identity inference.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/create-simple-grid-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createSimpleGridInput</code></span><span class="api-symbol-card__desc">Converts simple columns and row objects into canonical workbook and columnar input.</span></a>
@@ -37,12 +38,15 @@ Source entry: `packages/core/src/adapter.ts`
 <a class="api-symbol-card" href="/docs/api/core-adapter/row-bridge-transaction-id/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>rowBridgeTransactionId</code></span><span class="api-symbol-card__desc">Compute a deterministic identity for a canonical transaction.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>25</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>28</span>
 
 <div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/core-adapter/adapter-grid-controller/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>AdapterGridController</code></span><span class="api-symbol-card__desc">Owns adapter attachment and monotonically numbered Grid generations.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/adapter-grid-input/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>AdapterGridInput</code></span><span class="api-symbol-card__desc">Committed inputs to a framework adapter lifetime.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-adapter-event-handlers/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridAdapterEventHandlers</code></span><span class="api-symbol-card__desc">Framework-neutral readiness, change, and error callbacks shared by adapters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-controller/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridController</code></span><span class="api-symbol-card__desc">The lifecycle handle returned by createGridController: the live grid, a theme passthrough, and a single teardown that detaches every subscription and destroys the grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-controller-handlers/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridControllerHandlers</code></span><span class="api-symbol-card__desc">Event callbacks a host (a framework adapter, or any plain app) hangs off a grid's lifecycle.</span></a>
+<a class="api-symbol-card" href="/docs/api/core-adapter/grid-publication-adapter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridPublicationAdapter</code></span><span class="api-symbol-card__desc">Inbound hooks implemented by framework adapters for scheduling and imperative-handle publication.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/grid-ready-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridReadyEvent</code></span><span class="api-symbol-card__desc">Grid handle, generation, and reason published after adapter initialization.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/optional-grid-size-props/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>OptionalGridSizeProps</code></span><span class="api-symbol-card__desc">Optional width and height accepted by advanced framework adapters.</span></a>
 <a class="api-symbol-card" href="/docs/api/core-adapter/row-bridge-cell/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>RowBridgeCell</code></span><span class="api-symbol-card__desc">A cell effect with semantic column and host row identity.</span></a>

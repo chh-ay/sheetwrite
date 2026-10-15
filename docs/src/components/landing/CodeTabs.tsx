@@ -1,4 +1,5 @@
 import { type ComponentType, lazy, Suspense, useState } from "react";
+
 import { InstallCommand } from "../InstallCommand.js";
 import VanillaSnippet from "./snippets/vanilla.mdx";
 import { onTabListKey } from "./tabKeys.js";
@@ -15,9 +16,7 @@ function deferredSnippet(load: () => Promise<SnippetModule>) {
   return { Snippet: lazy(preload), preload };
 }
 
-// Kept out of the route file: TanStack's route splitter leaves `.mdx` imports
-// in the always-loaded route module, which put these snippets into every page.
-// Only the default tab ships with the landing page; the others load on intent.
+// Keep MDX imports outside the route so TanStack does not load every snippet on every page.
 const FRAMEWORKS = [
   {
     id: "vanilla",
@@ -53,6 +52,7 @@ export function CodeTabs() {
   const current = FRAMEWORKS.find((framework) => framework.id === active) ?? FRAMEWORKS[0];
   return (
     <div className="sw-code-tabs">
+      {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Framework"
         className="sw-code-tabs__list"

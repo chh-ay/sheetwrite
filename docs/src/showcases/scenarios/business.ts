@@ -20,6 +20,7 @@ import type {
   Workbook,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
+
 import { VUE_SHOWCASE_THEME } from "../revenue.js";
 
 export const BUSINESS_DOCUMENT_ID = "sheetwrite-business-orders";

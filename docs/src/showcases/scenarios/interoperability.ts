@@ -29,6 +29,7 @@ import {
   toTsv,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+
 import compressionRatioUrl from "../../../../packages/xlsx/test/fixtures/compression-ratio.xlsx?url";
 import corruptDeflateUrl from "../../../../packages/xlsx/test/fixtures/corrupt-deflate.xlsx?url";
 import deepXmlUrl from "../../../../packages/xlsx/test/fixtures/deep-xml.xlsx?url";
@@ -39,8 +40,6 @@ import libreofficeRichUrl from "../../../../packages/xlsx/test/fixtures/libreoff
 import fixtureManifest from "../../../../packages/xlsx/test/fixtures/manifest.json";
 import positiveUrl from "../../../../packages/xlsx/test/fixtures/sheetwrite-libreoffice-positive.xlsx?url";
 import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx?url";
-
-// ── Canonical interchange workbook ───────────────────────────────────────────
 
 export const INTEROP_ORDERS_SHEET = "orders";
 export const INTEROP_INVOICE_SHEET = "invoice";
@@ -85,15 +84,13 @@ export function createBulkSalesCsv(): { text: string; columns: Column[] } {
     { key: "region", header: "Region", width: 110, type: "text" },
     { key: "channel", header: "Channel", width: 115, type: "text" },
     { key: "units", header: "Units", width: 90, type: "number" },
-    ...["Unit price", "Revenue", "Discount", "Net revenue"].map(
-      (header, index): Column => ({
-        key: `amount${index}`,
-        header,
-        width: 140,
-        type: "currency",
-        numberFormat: "$#,##0.00",
-      }),
-    ),
+    ...["Unit price", "Revenue", "Discount", "Net revenue"].map((header, index): Column => ({
+      key: `amount${index}`,
+      header,
+      width: 140,
+      type: "currency",
+      numberFormat: "$#,##0.00",
+    })),
   ];
   const records = [columns.map((column) => column.header).join(",")];
   for (let row = 0; row < BULK_SALES_ROWS; row++) {
@@ -406,8 +403,6 @@ export function createInteropSnapshot(): WorkbookSnapshot {
   };
 }
 
-// ── Optional package boundary ────────────────────────────────────────────────
-
 /**
  * Probe the workbook-backend registration state. The core boundary rejects an
  * unregistered backend asynchronously, so this must await the tiny discarded
@@ -446,8 +441,6 @@ export async function probeXlsxRegistration(): Promise<{
 export async function ensureXlsxRegistered(): Promise<void> {
   await import("@sheetwrite/xlsx/register");
 }
-
-// ── Committed independent fixtures ───────────────────────────────────────────
 
 export interface InteropFixture {
   id: string;
@@ -522,8 +515,6 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// ── Producer verification matrix ─────────────────────────────────────────────
-
 export interface ProducerVerification {
   producer: string;
   status: "verified-live" | "unverified";
@@ -572,8 +563,6 @@ export const PRODUCER_MATRIX: readonly ProducerVerification[] = [
     evidence: "packages/xlsx/test/fixtures/external-corpus.json",
   },
 ];
-
-// ── Import / export protocol ─────────────────────────────────────────────────
 
 export interface WorkbookImportOutcome {
   snapshot: WorkbookSnapshot;
@@ -625,8 +614,6 @@ function cellsByAddress(snapshot: WorkbookSnapshot): Map<string, SnapshotValue> 
   }
   return values;
 }
-
-// ── The exported package, read back ──────────────────────────────────────────
 
 const ZIP_END_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
@@ -892,8 +879,6 @@ export async function roundTripWorkbook(
   };
 }
 
-// ── CSV / TSV protocol ───────────────────────────────────────────────────────
-
 function activeSheetOf(grid: Grid): Sheet {
   const active = grid.getActiveSheet();
   const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === active);
@@ -991,8 +976,6 @@ export function importDelimitedText(text: string): DelimitedImport {
   const data = fromCsv(csvText, columns);
   return { columns, data, delimiter, rows: body.length };
 }
-
-// ── Limits, aborts, and hostile input ────────────────────────────────────────
 
 export interface RejectionReport {
   rejected: boolean;

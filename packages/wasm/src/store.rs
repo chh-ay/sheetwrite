@@ -23,6 +23,9 @@ use crate::types::{
     StringStorage, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
+mod range_transfer;
+mod transfer;
+
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);
     if buf.is_ascii() {
@@ -577,10 +580,35 @@ impl CellStore {
         }
     }
 
+    /// Replaces caller-owned persistent pins; empty row ranges leave them unchanged.
     #[wasm_bindgen(js_name = pinRange)]
     pub fn pin_range(&mut self, sheet: usize, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(data) = self.sheets.get_mut(sheet) {
             data.pin_range(start_row, end_row, cols);
+        }
+    }
+
+    /// Replaces transient read protection without changing explicit or viewport pins.
+    /// Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.
+    #[wasm_bindgen(js_name = pinReadWindow)]
+    pub fn pin_read_window(
+        &mut self,
+        sheet: usize,
+        start_row: usize,
+        end_row: usize,
+        rows: &[u32],
+        cols: &[u32],
+    ) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.pin_read_window(start_row, end_row, rows, cols);
+        }
+    }
+
+    /// Replaces viewport-owned protection independently of transient read pins.
+    #[wasm_bindgen(js_name = pinViewportBands)]
+    pub fn pin_viewport_bands(&mut self, sheet: usize, bands: &[u32]) {
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.pin_viewport_bands(bands);
         }
     }
 

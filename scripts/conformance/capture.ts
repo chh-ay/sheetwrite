@@ -1,5 +1,6 @@
 import { mkdir, open, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+
 import { canonicalJson, isNonemptyString, isObject, sha256Bytes } from "./normalize.js";
 import { scanSecrets, validateResult } from "./schema.js";
 import type { CaptureArtifact, ConformanceCorpus, ConformanceObservation } from "./types.js";

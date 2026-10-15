@@ -15,6 +15,7 @@ import type { GridReadyEvent } from "@sheetwrite/vue";
 import { SheetwriteGrid } from "@sheetwrite/vue";
 import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+
 import {
   BUSINESS_DOCUMENT_ID,
   BUSINESS_ROWS,
@@ -23,16 +24,10 @@ import {
   createBusinessData,
   createBusinessWorkbook,
 } from "./scenarios/business.js";
+
 import "@sheetwrite/vue/styles.css";
 
-// ── Showcase: composed business workflow over one Vue component ──────────────
-// The scenario module owns the governed workbook (validation rules, protected
-// totals, notes, merges, frozen panes). This component owns what Vue is for:
-// reactive configuration bound to adapter props, structured rejection state,
-// notes/metadata and workbook operations through the public Grid API, and a
-// host persistence pipeline mirrored into plain refs. The in-memory reference
-// adapter demonstrates host state only — the durable IndexedDB protocol proof
-// lives at /showcases/database/.
+// Persistence here demonstrates host state only; /showcases/database/ proves the durable protocol.
 
 interface VueGridHandle {
   grid: Grid | null;

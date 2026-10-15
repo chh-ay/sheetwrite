@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
 import {
   formatNumber,

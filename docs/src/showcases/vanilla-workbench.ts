@@ -34,6 +34,7 @@ import {
   type ShellPiece,
 } from "@sheetwrite/core/shell";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
+
 import {
   buildEngineData,
   createEngineWorkbook,
@@ -180,7 +181,6 @@ export function createWorkbench(
   spec: WorkbenchSpec,
   events: WorkbenchEvents,
 ): Workbench {
-  // 1. Static chrome skeleton, styled by @sheetwrite/core/shell.css.
   const root = document.createElement("div");
   root.className = "sheetwrite-shell";
 
@@ -200,8 +200,7 @@ export function createWorkbench(
   root.append(toolbarRow, formulaRow, gridHost, bottomRow);
   host.appendChild(root);
 
-  // 2. Construction-bound options are decided here and only here. Changing
-  //    any of them means destroying this generation and creating a new one.
+  // Construction-bound options require replacing the grid generation when changed.
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
     presentation: "data-grid",
     theme: ENGINE_THEME,
@@ -257,9 +256,7 @@ export function createWorkbench(
     throw error;
   }
 
-  // 3. Renderer truth. `rendererKind()` reports what actually constructed;
-  //    a worker that fails to boot emits `renderer-fallback` asynchronously,
-  //    so subscribe before yielding to the event loop.
+  // Subscribe before yielding because worker fallback arrives asynchronously.
   const unsubscribes: Array<() => void> = [];
   events.onRendererChange({
     requested: spec.renderer,
@@ -277,7 +274,6 @@ export function createWorkbench(
     }),
   );
 
-  // 4. Every activity line below is fed by a public grid event.
   unsubscribes.push(grid.on("selection", ({ selection }) => events.onSelectionChange(selection)));
   unsubscribes.push(
     grid.on("change", ({ transaction, source }) => {
@@ -308,8 +304,7 @@ export function createWorkbench(
     }),
   );
 
-  // 5. Paged allocation is observable: pages land asynchronously after
-  //    scrolls, so poll the cheap WASM stats read while this generation lives.
+  // Pages land asynchronously, so poll allocation stats while this generation lives.
   let statsTimer: ReturnType<typeof setInterval> | null = null;
   if (spec.snapshot === undefined && spec.data === "paged") {
     const report = (): void => events.onPagedStats(pagedStatsOf(grid, WORKBENCH_SHEET));
@@ -320,7 +315,6 @@ export function createWorkbench(
     events.onPagedStats(null);
   }
 
-  // 6. Compose the chrome pieces around the live grid handle.
   const focusGrid = (): void => gridHost.focus();
   const pieces: ShellPiece[] = [];
   pieces.push(createToolbar(toolbarRow, grid));
@@ -339,7 +333,6 @@ export function createWorkbench(
   pieces.push(formulaBar);
   pieces.push(createSelectionStatus(bottomRow, grid));
 
-  // 7. Teardown mirrors construction in reverse; nothing survives it.
   let destroyed = false;
   return {
     grid,

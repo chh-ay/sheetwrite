@@ -31,7 +31,7 @@ type CreateGrid = (host: HTMLElement, opts: GridOptions) => Grid;
 | `renderers` | `Record<string, CellRenderer>` | `{}` | Custom cell renderers registered up front; reference one by name via `Column.renderer`. Also see `defineCellRenderer`. |
 | `editors` | `Record<string, CellEditor>` | `{}` | Host-owned cell editors registered up front; reference one by name via `Column.editor`. |
 | `overscan` | `number` | `6` | Row and visible-column positions painted on each viewport edge; `0` disables the buffer. |
-| `minColumns` | `number` | workbook width | Minimum rendered/store column count, including empty spreadsheet padding columns. |
+| `minColumns` | `number` | workbook width | Minimum rendered/store column count. A spreadsheet also adds empty columns to fill the host width; a `data-grid` shows only its own columns unless you set `minColumns`. |
 | `config` | `GridConfig` | `undefined` | Presence opts into the built-in toolbar (see below). Omit for no toolbar. |
 
 Framework adapters classify every `GridOptions` field centrally. `workbook`,
@@ -317,11 +317,15 @@ Default chunk/cache values and eviction behavior are listed in [Compatibility an
 
 A visible formula can read cells outside the visible window, for example a
 variance column that reads a plan column far to the right. The Grid asks the
-engine which same-sheet cells the visible formulas read, also through other
-formulas, and requests those cells with the window. The formula then resolves
-instead of staying `#LOADING!`. A cell budget equal to the prefetch byte limit
-bounds this work, so a whole-column read does not load the full column in one
-window. Reads from other sheets are not loaded this way; return those values
+engine which same-sheet cells the painted formulas read, also through other
+formulas, and requests those cells with the window. This includes frozen bands,
+overscan, and merge anchors reached by the paint plan. The formula then resolves
+instead of staying `#LOADING!`. One shared 32,768-cell budget bounds dependency
+loading across these roots, so a whole-column read does not load the full column
+in one window. The painted cells and their bounded dependency closure remain
+protected from clean-cache eviction while visible. Bulk reads such as exports
+and search use separate, transient protection and do not replace the viewport's
+pins. Reads from other sheets are not loaded this way; return those values
 from the datasource or keep that sheet dense.
 
 ### Serializable documents

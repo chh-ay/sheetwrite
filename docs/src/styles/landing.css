@@ -1124,21 +1124,21 @@
 
 /* Glyph animations: a six-second loop per card. */
 .sw-features
-:where(
-  .fg-tile[data-path],
-  .fg-viewport,
-  .fg-spill-row,
-  .fg-spill-edge,
-  .fg-cursor,
-  .fg-edit,
-  .fg-version,
-  .fg-commit,
-  .fg-reload,
-  .fg-file,
-  .fg-mini-grid,
-  .fg-check,
-  .fg-host-row
-) {
+  :where(
+    .fg-tile[data-path],
+    .fg-viewport,
+    .fg-spill-row,
+    .fg-spill-edge,
+    .fg-cursor,
+    .fg-edit,
+    .fg-version,
+    .fg-commit,
+    .fg-reload,
+    .fg-file,
+    .fg-mini-grid,
+    .fg-check,
+    .fg-host-row
+  ) {
   animation: 6s cubic-bezier(0.45, 0, 0.25, 1) infinite both;
 }
 

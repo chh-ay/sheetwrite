@@ -1,20 +1,26 @@
 import type { AriaMirror } from "./aria-mirror.js";
+import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import type { DatasourceController } from "./datasource-controller.js";
 import type { DomMergeAnchorRequest, DomOverlay } from "./dom-overlay.js";
 import type { GeometryLayoutController } from "./geometry-layout-controller.js";
 import type { OverlayPainter } from "./overlay-painter.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { PanePaint, Renderer, Theme, Viewport } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 
-export interface RenderCoordinatorOptions {
+const FORMULA_CLOSURE_MAX_CELLS = 32_768;
+const EMPTY_BANDS = new Uint32Array(0);
+
+export interface ReadWindowControllerOptions {
   renderer: () => Renderer;
   domOverlay: DomOverlay;
   overlayPainter: OverlayPainter;
   ariaMirror: AriaMirror;
   geometry: GeometryLayoutController;
   datasource: DatasourceController;
+  datasourceEnabled?: boolean;
   store: Store;
   activeSheet: () => SheetId;
   theme: () => Theme;
@@ -37,8 +43,8 @@ export interface RenderCoordinatorOptions {
   }) => void;
 }
 
-/** Sole owner of frame scheduling, paint-window caches, and renderer/overlay updates. */
-export class RenderCoordinator {
+/** Owns paint/read plans, hydration demand, formula closure and residency. */
+export class ReadWindowController {
   private frame = 0;
   private paintInvalidationEpoch = 0;
   private dataInvalidationEpoch = 0;
@@ -72,12 +78,30 @@ export class RenderCoordinator {
   private readonly domMergeSourceViews: VisibleWindowView[] = [];
   private mainViewValuePool: CellScalar[] = [];
   private readonly domMergeAnchorState: Array<SheetId | number> = [];
+  private formulaBands = EMPTY_BANDS;
+  private pinnedSheet: SheetId | null = null;
   private destroyed = false;
+  private readonly stopMemoryRelease: (() => void) | undefined;
 
-  constructor(private readonly options: RenderCoordinatorOptions) {}
+  constructor(private readonly options: ReadWindowControllerOptions) {
+    this.stopMemoryRelease = storeEngine(options.store)?.onMemoryRelease(() => {
+      this.invalidateData();
+      this.schedule();
+    });
+  }
 
   get geometryVersion(): number {
     return this.options.storeEpoch() + this.paintInvalidationEpoch + this.dataInvalidationEpoch;
+  }
+
+  /** Preserve autofit's operation-owned sampling band without changing viewport protection. */
+  sampleRows(): { start: number; end: number } {
+    const { geometry } = this.options;
+    return geometry.visibleRowWindow(
+      geometry.toContent(this.options.scrollTop()),
+      this.options.viewportHeight(),
+      this.options.overscan(),
+    );
   }
 
   /** Invalidates pixel/layout paint state without discarding stable data windows. */
@@ -101,6 +125,7 @@ export class RenderCoordinator {
 
   schedule(): void {
     if (this.frame || this.destroyed) return;
+
     const requestFrame =
       globalThis.requestAnimationFrame ??
       ((callback: FrameRequestCallback) => setTimeout(callback, 16));
@@ -122,10 +147,17 @@ export class RenderCoordinator {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.stopMemoryRelease?.();
+    if (this.pinnedSheet !== null) {
+      storeEngine(this.options.store)?.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
+      this.pinnedSheet = null;
+    }
+
     if (this.frame) {
       (globalThis.cancelAnimationFrame ?? clearTimeout)(this.frame);
       this.frame = 0;
     }
+
     this.lastPaintView = null;
     this.cachedPaneViews = [];
     this.cachedDomMergeAnchorViews = [];
@@ -142,6 +174,7 @@ export class RenderCoordinator {
     const contentTop = geometry.toContent(this.options.scrollTop());
     const scrollLeft = this.options.scrollLeft();
     const cellViewportWidth = Math.max(0, clientWidth - theme.rowHeaderWidth);
+
     const paintWindow = geometry.paintWindow(
       contentTop,
       scrollLeft,
@@ -155,6 +188,7 @@ export class RenderCoordinator {
     const frozenColumns = paintWindow.frozenColumns;
     const frozenHeight = paintWindow.frozenHeight;
     const frozenWidth = paintWindow.frozenWidth;
+
     const visibleColumns = geometry.columnWindow(scrollLeft, cellViewportWidth, 0);
     const firstBodyVisibleColumn = geometry.columnIndices[visibleColumns.start] ?? null;
     const lastBodyVisibleColumn = geometry.columnIndices[visibleColumns.end - 1] ?? null;
@@ -177,6 +211,7 @@ export class RenderCoordinator {
             end: Math.max(rawVisibleRows.end, frozenRows),
           }
         : rawVisibleRows;
+
     const usePanes =
       (frozenRows > 0 || frozenColumns > 0) && this.options.renderer().paintPanes !== undefined;
     const rowGeometry = geometry.rowGeometry(rows);
@@ -190,12 +225,14 @@ export class RenderCoordinator {
           contentsChanged = true;
         }
       }
+
       this.columnWindowStart = columns.start;
       this.columnWindowEnd = columns.end;
       this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
       if (contentsChanged) this.columnWindowRevision += 1;
       this.options.ariaMirror.bumpVersion();
     }
+
     if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
       const frozenColumnIndices =
         frozenColumns > 0 ? geometry.columnIndices.slice(0, frozenColumns) : [];
@@ -214,18 +251,11 @@ export class RenderCoordinator {
           demanded[write++] = column;
         }
       }
+
       demanded.length = write;
       this.datasourceColumnIndices = demanded;
       this.datasourceFrozenColumns = frozenColumns;
     }
-    if (frozenRows > 0) {
-      this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
-    }
-    this.options.datasource.updateViewport(
-      visibleRows.start,
-      visibleRows.end,
-      this.datasourceColumnIndices,
-    );
 
     const activeSheet = this.options.activeSheet();
     const storeEpoch = this.options.storeEpoch();
@@ -240,6 +270,7 @@ export class RenderCoordinator {
       viewport.rowTops = rowGeometry.rowTops;
       viewport.rowHeights = rowGeometry.rowHeights;
     }
+
     this.options.renderer().setViewport(viewport);
 
     const zoom = this.options.zoom();
@@ -263,6 +294,8 @@ export class RenderCoordinator {
       !Object.is(frozenHeight, this.lastPaintFrozenHeight) ||
       !Object.is(frozenWidth, this.lastPaintFrozenWidth) ||
       !Object.is(zoom, this.lastPaintZoom);
+
+    this.updateDemand(activeSheet, rows, visibleRows, frozenRows, refreshData);
 
     let view: VisibleWindowView;
     if (usePanes) {
@@ -291,7 +324,10 @@ export class RenderCoordinator {
           this.windowedColumnIndices,
         );
       }
-      view = this.lastPaintView!;
+
+      const cachedView = this.lastPaintView;
+      if (!cachedView) throw new Error("Sheetwrite: paint window was not resolved");
+      view = cachedView;
       if (repaint) {
         this.domMergeSourceViews[0] = view;
         this.domMergeSourceViews.length = 1;
@@ -302,11 +338,13 @@ export class RenderCoordinator {
           this.lastPaintView = view;
           this.domMergeSourceViews[0] = view;
         }
+
         if (refreshAnchors) this.loadDomMergeAnchorViews(requests);
         this.options.domOverlay.paint(view, viewport, this.cachedDomMergeAnchorViews);
         this.options.renderer().paint(view);
       }
     }
+
     this.lastPaintView = view;
     this.lastDataSheet = activeSheet;
     this.lastDataRowStart = rows.start;
@@ -324,6 +362,7 @@ export class RenderCoordinator {
     this.lastPaintFrozenHeight = frozenHeight;
     this.lastPaintFrozenWidth = frozenWidth;
     this.lastPaintZoom = zoom;
+
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);
@@ -364,6 +403,7 @@ export class RenderCoordinator {
     const frozenGeometry =
       frozenRows > 0 ? this.options.geometry.frozenRowGeometry(frozenRows) : null;
     const panes: PanePaint[] = [];
+
     const paneView = (
       rows: { start: number; end: number },
       columns: readonly number[],
@@ -377,6 +417,7 @@ export class RenderCoordinator {
         );
         this.cachedPaneViews[slot] = view;
       }
+
       return view;
     };
 
@@ -390,6 +431,7 @@ export class RenderCoordinator {
         rowHeights: frozenGeometry?.rowHeights,
       });
     }
+
     if (frozenRows > 0) {
       panes.push({
         view: paneView(frozenRowWindow, bodyColumns),
@@ -400,6 +442,7 @@ export class RenderCoordinator {
         rowHeights: frozenGeometry?.rowHeights,
       });
     }
+
     if (frozenColumns > 0) {
       panes.push({
         view: paneView(bodyRows, frozenColumnIndices),
@@ -426,21 +469,27 @@ export class RenderCoordinator {
       rowHeights: bodyGeometry?.rowHeights,
     });
     this.cachedPaneViews.length = panes.length;
+
     if (repaint) {
       this.domMergeSourceViews.length = panes.length;
       for (let slot = 0; slot < panes.length; slot++) {
-        this.domMergeSourceViews[slot] = panes[slot]!.view;
+        const pane = panes[slot];
+        if (!pane) throw new Error("Sheetwrite: missing frozen pane");
+        this.domMergeSourceViews[slot] = pane.view;
       }
+
       const requests = this.options.domOverlay.mergeAnchorRequests(this.domMergeSourceViews);
       if (this.domMergeAnchorsNeedRefresh(requests, refreshData)) {
         this.loadDomMergeAnchorViews(requests);
       }
+
       this.options.domOverlay.paintPanes(panes, this.cachedDomMergeAnchorViews);
       this.options.renderer().paintPanes?.(panes, {
         x: frozenColumns > 0 ? xSplit - 0.5 : null,
         y: frozenRows > 0 ? ySplit - 0.5 : null,
       });
     }
+
     return bodyView;
   }
 
@@ -450,6 +499,7 @@ export class RenderCoordinator {
   ): boolean {
     let changed = refreshData;
     let stateIndex = 0;
+
     for (const request of requests) {
       if (this.domMergeAnchorState[stateIndex] !== request.sheet) changed = true;
       this.domMergeAnchorState[stateIndex++] = request.sheet;
@@ -462,6 +512,7 @@ export class RenderCoordinator {
         this.domMergeAnchorState[stateIndex++] = col;
       }
     }
+
     if (this.domMergeAnchorState.length !== stateIndex) changed = true;
     this.domMergeAnchorState.length = stateIndex;
     return changed;
@@ -470,8 +521,9 @@ export class RenderCoordinator {
   private loadDomMergeAnchorViews(requests: readonly DomMergeAnchorRequest[]): void {
     this.cachedDomMergeAnchorViews.length = requests.length;
     for (let slot = 0; slot < requests.length; slot++) {
-      const request = requests[slot]!;
-      this.options.datasource.ensureLoaded(request.row, request.row + 1, request.cols);
+      const request = requests[slot];
+      if (!request) throw new Error("Sheetwrite: missing merge anchor request");
+
       const view = this.options.store.getVisibleWindow(
         request.sheet,
         { start: request.row, end: request.row + 1 },
@@ -482,10 +534,130 @@ export class RenderCoordinator {
         values = new Array<CellScalar>(view.values.length);
         this.domMergeAnchorValuePools[slot] = values;
       }
+
       for (let index = 0; index < values.length; index++)
         values[index] = view.values[index] ?? null;
       this.cachedDomMergeAnchorViews[slot] = { ...view, values };
     }
+  }
+
+  private updateDemand(
+    sheet: SheetId,
+    paintRows: { start: number; end: number },
+    visibleRows: { start: number; end: number },
+    frozenRows: number,
+    refreshData: boolean,
+  ): void {
+    const engine = storeEngine(this.options.store);
+    const refreshClosure =
+      refreshData &&
+      engine !== null &&
+      (this.options.datasourceEnabled === true || engine.isPaged(sheet));
+
+    if (refreshData && !refreshClosure) {
+      this.formulaBands = EMPTY_BANDS;
+      if (engine && this.pinnedSheet !== null) {
+        engine.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
+        this.pinnedSheet = null;
+      }
+    }
+
+    const anchors: DomMergeAnchorRequest[] = [];
+    if (refreshClosure) {
+      const merges =
+        this.options.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)
+          ?.merges ?? [];
+      if (merges.length > 0) {
+        const index = prepareMergeIndex(merges);
+        const reached = new Set(
+          intersectingMerges(index, paintRows.start, paintRows.end, this.datasourceColumnIndices),
+        );
+        if (frozenRows > 0) {
+          for (const merge of intersectingMerges(
+            index,
+            0,
+            frozenRows,
+            this.datasourceColumnIndices,
+          )) {
+            reached.add(merge);
+          }
+        }
+
+        for (const merge of reached) {
+          anchors.push({ sheet, row: merge.r0, cols: [merge.c0] });
+        }
+      }
+    }
+
+    if (engine && refreshClosure) {
+      const roots = [
+        { sheet, row: paintRows.start, end: paintRows.end, cols: this.datasourceColumnIndices },
+        ...(frozenRows > 0
+          ? [{ sheet, row: 0, end: frozenRows, cols: this.datasourceColumnIndices }]
+          : []),
+        ...anchors.map((anchor) => ({ ...anchor, end: anchor.row + 1 })),
+      ];
+      const protectedBands: number[] = [];
+      const formulaBands: number[] = [];
+      let remainingCells = FORMULA_CLOSURE_MAX_CELLS;
+
+      for (const root of roots) {
+        if (root.sheet !== sheet) continue;
+        // Formula discovery and engine pins use backing rows, never display rows.
+        for (let row = root.row; row < root.end;) {
+          const start = engine.dataRowAt(sheet, row);
+          let end = start + 1;
+          row += 1;
+          while (row < root.end && engine.dataRowAt(sheet, row) === end) {
+            end += 1;
+            row += 1;
+          }
+
+          for (const col of root.cols) protectedBands.push(start, end, col, col + 1);
+          const bands = engine.formulaReadBands(sheet, start, end, root.cols, remainingCells);
+          for (let index = 0; index < bands.length; index += 4) {
+            const rowStart = bands[index];
+            const rowEnd = bands[index + 1];
+            const colStart = bands[index + 2];
+            const colEnd = bands[index + 3];
+            if (
+              rowStart === undefined ||
+              rowEnd === undefined ||
+              colStart === undefined ||
+              colEnd === undefined
+            ) {
+              throw new Error("Sheetwrite: invalid formula closure band");
+            }
+
+            formulaBands.push(rowStart, rowEnd, colStart, colEnd);
+            protectedBands.push(rowStart, rowEnd, colStart, colEnd);
+            remainingCells -= (rowEnd - rowStart) * (colEnd - colStart);
+          }
+        }
+      }
+
+      if (this.pinnedSheet !== null && this.pinnedSheet !== sheet) {
+        engine.pinViewportBands(this.pinnedSheet, EMPTY_BANDS);
+      }
+
+      this.formulaBands = formulaBands.length === 0 ? EMPTY_BANDS : Uint32Array.from(formulaBands);
+      engine.pinViewportBands(sheet, Uint32Array.from(protectedBands));
+      this.pinnedSheet = sheet;
+    }
+
+    // Protection is committed before any page can hydrate or evict a chunk.
+    if (frozenRows > 0)
+      this.options.datasource.ensureLoaded(0, frozenRows, this.datasourceColumnIndices);
+    for (const anchor of anchors) {
+      this.options.datasource.ensureLoaded(anchor.row, anchor.row + 1, anchor.cols);
+    }
+
+    this.options.datasource.updateViewport(
+      visibleRows.start,
+      visibleRows.end,
+      this.datasourceColumnIndices,
+      this.formulaBands,
+    );
   }
 
   private retainMainView(view: VisibleWindowView): VisibleWindowView {
@@ -504,6 +676,7 @@ export class RenderCoordinator {
       values = new Array<CellScalar>(view.values.length);
       this.paneValuePools[slot] = values;
     }
+
     for (let index = 0; index < values.length; index++) values[index] = view.values[index] ?? null;
     return { ...view, values };
   }

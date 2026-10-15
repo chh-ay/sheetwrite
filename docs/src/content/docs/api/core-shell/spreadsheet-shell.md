@@ -8,7 +8,7 @@ description: "Disposable controller for the framework-neutral spreadsheet shell.
 Disposable controller for the framework-neutral spreadsheet shell.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L35"><code>packages/core/src/shell/spreadsheet-shell.ts#L35</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L29"><code>packages/core/src/shell/spreadsheet-shell.ts#L29</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

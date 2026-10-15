@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
+
 import stylesheet from "../styles/showcase-host-rows.css?url";
 
 const HostRowsShowcase = lazy(() => import("../showcases/HostRowsShowcase.js"));

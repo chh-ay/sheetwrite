@@ -508,7 +508,7 @@
 /* The hint line carries no event marker: the forgiving-selector form keeps
    enough specificity to override the entry marker above. */
 :is(.sw-dbx__log, .sw-clb__log, .sw-clb__server-log)
-li:is(.sw-dbx__log-empty, .sw-clb__log-empty)::before {
+  li:is(.sw-dbx__log-empty, .sw-clb__log-empty)::before {
   content: none;
 }
 

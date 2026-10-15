@@ -7,6 +7,7 @@ import {
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid } from "@sheetwrite/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import { revenueAccountName } from "./revenue.js";

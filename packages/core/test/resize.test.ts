@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { autofitColumnWidth, resizeTargetAt } from "../src/resize.js";
 
 describe("resize gesture geometry", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { runDatasourcePrefetchBenchmark } from "../src/datasource-prefetch-bench.js";
 
 describe("directional datasource prefetch gate", () => {

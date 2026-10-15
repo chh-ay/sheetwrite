@@ -1584,6 +1584,42 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 }
 
 #[test]
+fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 32, 4, 64, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.pin_range(sheet, 0, 1, &[0]);
+    store.pin_viewport_bands(sheet, &[4, 5, 0, 1]);
+    store.pin_read_window(sheet, 0, 1, &[8], &[0]);
+    store.begin_page_load();
+    for row in [0, 4, 8] {
+        store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
+    }
+    store.end_page_load();
+
+    store.pin_read_window(sheet, 0, 0, &[], &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
+    store.end_page_load();
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_close(number(&store, sheet, 4, 0), 5.0);
+    assert_eq!(store.cell_state(sheet, 8, 0), 0);
+
+    store.pin_viewport_bands(sheet, &[]);
+    store.pin_range(sheet, 0, 0, &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
+    store.end_page_load();
+    assert_close(number(&store, sheet, 0, 0), 1.0);
+    assert_eq!(store.cell_state(sheet, 4, 0), 0);
+
+    store.pin_range(sheet, 0, 1, &[]);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
+    store.end_page_load();
+    assert_eq!(store.cell_state(sheet, 0, 0), 0);
+}
+
+#[test]
 fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounting() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);

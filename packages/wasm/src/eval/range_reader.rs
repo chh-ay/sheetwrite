@@ -1,10 +1,4 @@
-//! Streaming, row-major reads of one cell range.
-//!
-//! The reduction and criteria functions used to materialize every cell of a
-//! range into a list before folding it. [`RangeReader`] hands the values out
-//! one at a time instead, so the same fold runs without the list. It reports
-//! the same failures as the list-building path (`CellStore::eval_range_values`):
-//! an unloaded cell and an error cell both stop the walk at the same cell.
+//! Stream range values without allocating a list, preserving row-major failure order.
 
 use std::collections::{HashMap, HashSet};
 
@@ -153,7 +147,6 @@ mod tests {
     use crate::store::CellStore;
     use crate::types::{CellRange, FormulaError, Value};
 
-    /// The list-building path's row-major values, used as the reference.
     fn listed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
         let affected = HashSet::new();
         let mut memo = HashMap::new();
@@ -167,7 +160,6 @@ mod tests {
             .collect())
     }
 
-    /// The streaming path's row-major values, stopping at the first error.
     fn streamed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
         let affected = HashSet::new();
         let mut memo = HashMap::new();

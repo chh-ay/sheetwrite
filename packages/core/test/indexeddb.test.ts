@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
+
 import {
   IndexedDbPendingCommitStorage,
   IndexedDbPendingCommitStorageError,
