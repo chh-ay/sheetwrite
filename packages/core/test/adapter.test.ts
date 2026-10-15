@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import { GRID_OPTION_CONFORMANCE } from "../../../test/adapter-lifecycle-contract.js";
 import {
   applyChangedLiveGridOptions,

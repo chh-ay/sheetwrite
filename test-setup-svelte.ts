@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+
 import { compile } from "svelte/compiler";
 
 const typescript = new Bun.Transpiler({ loader: "ts", target: "browser" });

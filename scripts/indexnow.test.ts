@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
+
 import { submitIndexNow, urlsFromSitemap } from "./indexnow.js";
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>

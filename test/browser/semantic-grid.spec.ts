@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { siteUrl } from "./playwright.config.js";
 
 const FIXTURE_URL = siteUrl("/test/semantic-grid/");

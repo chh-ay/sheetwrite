@@ -1,9 +1,11 @@
 import type { Grid } from "@sheetwrite/core";
 import type { GridReadyEvent } from "@sheetwrite/core/adapter";
 import { SheetwriteGrid, type SheetwriteGridExpose } from "@sheetwrite/vue";
+
 import "@sheetwrite/vue/styles.css";
 import wasmUrl from "@sheetwrite/wasm/wasm?url";
 import { createApp, defineComponent, h, ref, type VNodeRef } from "vue";
+
 import {
   assertUnmounted,
   editReadyGrid,

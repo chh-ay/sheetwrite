@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+
 import { EditController } from "../src/editor.js";
 import { type AssistDeps, FormulaAssist } from "../src/formula-assist.js";
 import type { HighlightRange, Theme } from "../src/types.js";

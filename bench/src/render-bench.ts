@@ -8,8 +8,10 @@ import {
   parseDateInput,
   type Workbook,
 } from "@sheetwrite/core";
+
 import "@sheetwrite/core/styles.css";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
+
 import {
   getMergeIndexResourceStatsForTest,
   intersectingMerges,
@@ -23,6 +25,7 @@ import {
 } from "../../packages/core/src/number-format.js";
 import type { InstrumentedVisibleWindowView } from "../../packages/core/src/store/window-reader.js";
 import type { PanePaint } from "../../packages/core/src/types/render.js";
+
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import {

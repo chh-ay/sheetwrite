@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import {
   RANGE_AUTO_FIT_CHUNK_CELLS,

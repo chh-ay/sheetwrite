@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { InstallCommand } from "../components/InstallCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { CapabilityHero } from "./CapabilityHero.js";
+
 import "../styles/workbench-stage.css";
 
 export interface ShowcaseProof {

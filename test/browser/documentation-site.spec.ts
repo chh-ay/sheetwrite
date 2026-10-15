@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+
 import { expect, type Page, test } from "@playwright/test";
+
 import { SITE_BASE, SITE_PORT, siteUrl } from "./playwright.config.js";
 
 interface PageErrors {

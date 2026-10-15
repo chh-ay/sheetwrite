@@ -1,4 +1,5 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 
 /** Sentinel shown for a reference that participates in a cycle. */

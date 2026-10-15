@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "@playwright/test";
 
 const requestedSitePort = Number(process.env.SHEETWRITE_TEST_PORT ?? 4173);

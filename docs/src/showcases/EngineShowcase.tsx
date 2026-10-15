@@ -3,6 +3,7 @@ import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -38,6 +39,7 @@ import {
   formatEngineEvent,
   formatEngineValue,
 } from "./scenarios/engine-live.js";
+
 import "@sheetwrite/core/styles.css";
 
 interface EngineShowcaseHandle {

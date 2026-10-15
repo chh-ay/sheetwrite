@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { decideWasmProfile, parseWasmProfileMatrix } from "../src/wasm-profile-matrix.js";
 
 const HASH = {

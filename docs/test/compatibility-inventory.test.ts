@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
 import {
   assertCompatibilityInventory,
   collectCompatibilityIssues,

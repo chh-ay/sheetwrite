@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import type { RecomputingCellStore } from "../src/store/wasm-contract.js";
 import { decodePackedWindow, StoreWindowReader } from "../src/store/window-reader.js";
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING } from "../src/store/wire-tags.js";

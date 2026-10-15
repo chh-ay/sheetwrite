@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import type { WorkbookSnapshot, XlsxWorkbookBackend } from "@sheetwrite/core";
+
 import { createXlsxCorpus, type XlsxCorpusMode, type XlsxCorpusScenario } from "./xlsx-corpus.js";
 
 interface WorkerResult {

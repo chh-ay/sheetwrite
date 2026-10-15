@@ -1,5 +1,6 @@
 import { appendFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
 import {
   type ReleaseArtifactManifest,
   type ReleasePackageArtifact,

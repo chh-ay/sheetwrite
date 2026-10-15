@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
+
 import { pageMeta } from "../lib/seo.js";
+
 import stylesheet from "../styles/showcase-formulas.css?url";
 
 const FormulasShowcase = lazy(() => import("../showcases/FormulasShowcase.js"));

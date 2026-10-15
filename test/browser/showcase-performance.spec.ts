@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import type { Grid, PagedStoreStats } from "../../packages/core/src/types.js";
 import { siteUrl } from "./playwright.config.js";
 

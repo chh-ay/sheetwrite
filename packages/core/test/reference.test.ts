@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
+
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import {
   consumeSourceSnapshot,
   RangeSourceProjection,

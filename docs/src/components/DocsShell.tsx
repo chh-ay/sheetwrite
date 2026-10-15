@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+
 import { DOCS_NAVIGATION, type DocumentNeighbours, documentNeighbours } from "../lib/navigation.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";

@@ -1,4 +1,5 @@
 import { inflateSync } from "fflate";
+
 import type { DocumentOp, PackedCellBlock } from "./types/document.js";
 
 export const MAX_RESTORE_BLOCK_DECODED_BYTES = 64 * 1024 * 1024;

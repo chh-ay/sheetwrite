@@ -1,4 +1,5 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";

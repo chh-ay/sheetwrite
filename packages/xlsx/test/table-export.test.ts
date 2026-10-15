@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { Workbook } from "@sheetwrite/core";
 import { fromXlsxWorkbook, initSheetwrite, SheetwriteStore, toXlsxTable } from "@sheetwrite/core";
+
 import { buildXlsxModel, registerXlsxBackends } from "../src/index.js";
 
 beforeAll(async () => {

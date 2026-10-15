@@ -1,9 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import type { Grid, Workbook } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { act, createRef, type ReactElement, StrictMode, Suspense, startTransition } from "react";
 import { createRoot } from "react-dom/client";
+
 import {
   type AdapterConformanceProps,
   type MountedAdapter,

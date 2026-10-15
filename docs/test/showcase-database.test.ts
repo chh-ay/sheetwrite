@@ -1,7 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import { createGridFromSnapshot, type DocumentOp, initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
+
 import {
   DATABASE_DOCUMENT_ID,
   DATABASE_REVENUE_ROWS,

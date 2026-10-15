@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { DEFAULT_SEED } from "./dataset.js";
 import { RENDER_PROTOCOL_VERSION } from "./render-protocol.js";
 import type { Stat } from "./stats.js";

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { pageMeta } from "../lib/seo.js";
 import DatabaseShowcase from "../showcases/DatabaseShowcase.js";
 import { ProofPage } from "../showcases/ProofPage.js";
+
 import proofStylesheet from "../styles/showcase-proofs.css?url";
 
 const description =

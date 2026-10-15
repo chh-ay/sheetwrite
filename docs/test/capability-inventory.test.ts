@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   CAPABILITY_INVENTORY,
   CAPABILITY_OWNERS,

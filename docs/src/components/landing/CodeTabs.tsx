@@ -1,4 +1,5 @@
 import { type ComponentType, lazy, Suspense, useState } from "react";
+
 import { InstallCommand } from "../InstallCommand.js";
 import VanillaSnippet from "./snippets/vanilla.mdx";
 import { onTabListKey } from "./tabKeys.js";

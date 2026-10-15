@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+
 import "../styles/showcase-capability-hero.css";
 
 export interface CapabilityHeroFact {

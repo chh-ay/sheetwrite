@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { MutationRevisionIndex } from "../src/mutation-revision-index.js";
 import type { CellAddress, DocumentOp } from "../src/types.js";
 

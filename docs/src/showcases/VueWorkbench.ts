@@ -15,6 +15,7 @@ import type { GridReadyEvent } from "@sheetwrite/vue";
 import { SheetwriteGrid } from "@sheetwrite/vue";
 import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+
 import {
   BUSINESS_DOCUMENT_ID,
   BUSINESS_ROWS,
@@ -23,6 +24,7 @@ import {
   createBusinessData,
   createBusinessWorkbook,
 } from "./scenarios/business.js";
+
 import "@sheetwrite/vue/styles.css";
 
 // ── Showcase: composed business workflow over one Vue component ──────────────

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { UndoManager } from "../src/history.js";
 import type { DocumentOp } from "../src/types/document.js";
 

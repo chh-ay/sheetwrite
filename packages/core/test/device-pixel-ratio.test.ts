@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+
 import { GridImpl } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, Store, Workbook } from "../src/types.js";

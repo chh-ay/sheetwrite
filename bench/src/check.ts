@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import {
   CONTROLLED_COMPARISON_POLICY,
   type ControlledRenderBaseline,

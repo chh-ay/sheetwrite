@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   BUN_VERSION,

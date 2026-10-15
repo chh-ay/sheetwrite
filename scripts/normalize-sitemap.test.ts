@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { normalizeSitemap } from "./normalize-sitemap.js";
 
 const wrap = (urls: string[]): string =>

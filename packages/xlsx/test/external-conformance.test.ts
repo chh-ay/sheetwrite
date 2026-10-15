@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   SheetwriteError,
   type WorkbookSnapshot,
@@ -6,6 +7,7 @@ import {
   type XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 import {
   BASE_STYLES_BODY,

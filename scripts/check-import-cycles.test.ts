@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { analyzeImportGraph } from "./check-import-cycles.js";
 
 // The live core graph is checked in CI by `bun run check:cycles`; these cases

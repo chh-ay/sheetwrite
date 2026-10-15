@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { ColumnIndex } from "../src/column-index.js";
 import { computeColumnWindow } from "../src/virtualization.js";
 

@@ -1,4 +1,5 @@
 import type { CellScalar, ColumnarData, XlsxTableImportBackend } from "@sheetwrite/core";
+
 import { readWorkbook } from "./reader.js";
 import { assertResource, createCodecContext, xlsxFailure } from "./resources.js";
 

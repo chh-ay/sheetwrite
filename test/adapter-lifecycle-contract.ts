@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
   GridAdapterEventHandlers,
