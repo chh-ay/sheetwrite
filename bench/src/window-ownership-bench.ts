@@ -7,6 +7,7 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+
 import { runDatasourcePrefetchBenchmark } from "./datasource-prefetch-bench.js";
 
 const ROW_COUNT = 1_000_000;

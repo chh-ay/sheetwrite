@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { Workbook, WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import {
   formatNumber,
@@ -11,6 +12,7 @@ import {
   XlsxResourceError,
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
 import { registerXlsxBackends } from "../src/index.js";
 import { rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
 

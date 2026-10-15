@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+
 import {
   type CoverageLanguage,
   type CoverageRecord,

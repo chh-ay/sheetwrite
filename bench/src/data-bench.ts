@@ -35,10 +35,12 @@
 import "./dom-setup.js";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
+
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import { CellStore, initSync } from "@sheetwrite/wasm";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
+
 import {
   AGG_COL,
   COL,

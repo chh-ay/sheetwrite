@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import { createGridController, type GridControllerHandlers } from "../src/grid-controller.js";
 import { initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";

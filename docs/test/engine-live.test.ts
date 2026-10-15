@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
+
 import type { ChangeEvent, Grid } from "@sheetwrite/core";
+
 import { ENGINE_LIVE_SHEET } from "../src/showcases/scenarios/engine-live-data.js";
 import {
   bindEngineEvents,

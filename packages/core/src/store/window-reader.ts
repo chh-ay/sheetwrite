@@ -1,4 +1,5 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -441,7 +442,6 @@ export class StoreWindowReader {
       this.stringCache.clear();
       this.visibleStringPoolEpoch = stringPoolEpoch;
     }
-    ffiCalls += 1;
     const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
     const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
     let ffiBoundaryCalls = ffiCalls + 3 + stringOutputAllocationEvents;
@@ -677,9 +677,6 @@ export class StoreWindowReader {
   }
 
   private syncStringPoolEpoch(epoch: number): void {
-    if (epoch !== this.wasm.stringPoolEpoch()) {
-      throw new Error("Sheetwrite: stale string-pool epoch");
-    }
     if (epoch !== this.stringPoolEpoch) {
       this.stringCache.clear();
       this.stringPoolEpoch = epoch;

@@ -7,6 +7,7 @@ import {
   type RuntimeResourceSnapshot,
   type TransientResourcePeak,
 } from "@sheetwrite/core";
+
 import type { BenchmarkMode } from "./gate-protocol.js";
 
 export const RESOURCE_BENCHMARK_SCHEMA_VERSION = 1 as const;

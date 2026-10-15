@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
+
 import { CONTROLLED_SAMPLING_FINGERPRINT } from "./check.js";
 import {
   buildControlledBaseline,

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { initSheetwrite } from "../src/grid.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";

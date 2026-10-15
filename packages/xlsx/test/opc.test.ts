@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
+
 import { SheetwriteError } from "@sheetwrite/core";
+
 import { OpcPackage } from "../src/opc.js";
 import { createCodecContext, xlsxFailure } from "../src/resources.js";
 import { rawZip } from "./raw-opc.js";

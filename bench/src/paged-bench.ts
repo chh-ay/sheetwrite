@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import {
   type DataSourceColumnBand,
   type DocumentOp,
@@ -8,6 +9,7 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import { initSync } from "@sheetwrite/wasm";
+
 import {
   assertFiniteNonNegative,
   assertGateIdentity,

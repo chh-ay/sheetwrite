@@ -1,4 +1,5 @@
 import { Inflate, zipSync } from "fflate";
+
 import { assertResource, checkAbort, inputView, type XlsxCodecContext } from "./resources.js";
 
 const CENTRAL_SIGNATURE = 0x02014b50;

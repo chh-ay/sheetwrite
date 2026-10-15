@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+
 import { buildReleaseArtifacts, verifyReleaseArtifacts } from "./release-artifacts.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");

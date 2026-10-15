@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
+
 import { DEFAULT_THEME } from "../src/grid.js";
 import type { CellScalar, DataValidationRule } from "../src/types.js";
 import { ValidationEditor } from "../src/validation-editor.js";

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { siteUrl } from "./playwright.config.js";
 
 const route = siteUrl("/showcases/host-rows/");

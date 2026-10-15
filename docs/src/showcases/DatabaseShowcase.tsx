@@ -10,8 +10,10 @@ import {
   type Theme,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
 import "@sheetwrite/core/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { ShowcaseLinkError, ShowcaseNetworkLink } from "./collaboration-protocol.js";
 import {
   DATABASE_DOCUMENT_ID,

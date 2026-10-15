@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
+
 import {
   type Expression,
   type ExpressionWithTypeArguments,
@@ -50,6 +51,7 @@ import {
   SymbolFlags,
   type Type,
 } from "typescript/unstable/async";
+
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";

@@ -1,5 +1,6 @@
 import { cpus } from "node:os";
 import { relative, resolve } from "node:path";
+
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 

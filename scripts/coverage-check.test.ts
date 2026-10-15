@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   COVERAGE_SCHEMA_VERSION,
   type CoveragePolicy,

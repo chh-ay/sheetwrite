@@ -13,8 +13,10 @@ import {
   type SyncStateSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
 import "@sheetwrite/core/styles.css";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import {
   COLLABORATION_ACTORS,
   type ShowcaseActor,

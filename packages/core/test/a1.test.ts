@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { cellA1, colToA1, rangeA1, remapFormulaA1Refs, shiftA1Refs } from "../src/a1.js";
 
 describe("A1 column labels", () => {

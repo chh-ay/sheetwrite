@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   FIRST_PAINT_BROTLI_GATE_BYTES,
   FIRST_PAINT_DEFERRED_MODULE,

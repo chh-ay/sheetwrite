@@ -1,8 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import type { ColumnarData, Grid, Workbook } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { createApp, defineComponent, h, nextTick, reactive, ref, shallowRef } from "vue";
+
 import {
   type AdapterConformanceProps,
   type MountedAdapter,

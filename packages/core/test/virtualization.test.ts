@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { OffsetIndex } from "../src/fenwick.js";
 import { computeWindow, windowContains } from "../src/virtualization.js";
 

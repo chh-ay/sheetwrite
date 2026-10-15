@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { SelectionModel } from "../src/selection.js";
 import type { Selection } from "../src/types.js";
 

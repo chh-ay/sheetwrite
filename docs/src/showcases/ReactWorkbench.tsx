@@ -11,11 +11,13 @@ import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, Monitor } from "lucide-react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
 import { money, useAnalyticsWorkbench } from "./react-analytics.js";
 import { ANALYTICS_MARKETS, ANALYTICS_SEGMENTS, ANALYTICS_THEME } from "./scenarios/analytics.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRenderingMode } from "./ui/DemoRenderingMode.js";
 import { DemoSelect } from "./ui/DemoSelect.js";
+
 import "@sheetwrite/react/styles.css";
 
 const GRID_CONFIG = { toolbar: true } as const;

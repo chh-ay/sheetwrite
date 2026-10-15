@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import { hasOpaqueForeground } from "./canvas-assertions.js";
 import { siteUrl } from "./playwright.config.js";
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { sheetNameKey, validateSheetName } from "../src/sheet-name.js";
 
 describe("worksheet name contract", () => {

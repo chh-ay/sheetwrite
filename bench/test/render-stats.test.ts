@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { counterbalancedOrder, summarizeFinite } from "../src/stats.js";
 
 describe("auditable render statistics", () => {

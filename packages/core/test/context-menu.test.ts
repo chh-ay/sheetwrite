@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import { ContextMenu } from "../src/context-menu.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";

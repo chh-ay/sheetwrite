@@ -1,6 +1,7 @@
 import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -18,6 +19,7 @@ import {
   PLAYGROUND_EXAMPLE,
 } from "./scenarios/formulas.js";
 import FormulasSetupSnippet from "./snippets/formulas-setup.mdx";
+
 import "@sheetwrite/core/styles.css";
 
 declare global {

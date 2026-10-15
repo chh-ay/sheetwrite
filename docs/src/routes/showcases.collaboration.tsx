@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { pageMeta } from "../lib/seo.js";
 import CollaborationShowcase from "../showcases/CollaborationShowcase.js";
 import { ProofPage } from "../showcases/ProofPage.js";
+
 import collaborationStylesheet from "../styles/showcase-collaboration.css?url";
 import proofStylesheet from "../styles/showcase-proofs.css?url";
 

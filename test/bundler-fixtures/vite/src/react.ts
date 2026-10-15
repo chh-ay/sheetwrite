@@ -1,9 +1,11 @@
 import type { Grid } from "@sheetwrite/core";
 import { SheetwriteGrid } from "@sheetwrite/react";
+
 import "@sheetwrite/react/styles.css";
 import wasmUrl from "@sheetwrite/wasm/wasm?url";
 import { createElement, useState } from "react";
 import { createRoot } from "react-dom/client";
+
 import {
   assertUnmounted,
   editReadyGrid,

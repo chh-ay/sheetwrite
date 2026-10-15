@@ -2,6 +2,7 @@ import { createElement, createRef } from "react";
 import { flushSync as flushReact } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createApp, defineComponent, h, nextTick, shallowRef } from "vue";
+
 // Bun's public entry selects the server runtime even with the compiler preload.
 import {
   flushSync as flushSvelte,

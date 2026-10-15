@@ -1,5 +1,6 @@
 import "./dom-setup.js";
 import { readFileSync } from "node:fs";
+
 import {
   createGrid,
   type DataSourcePage,
@@ -13,6 +14,7 @@ import {
 } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
 import { initSync } from "@sheetwrite/wasm";
+
 import { COLUMNS, makeColumnar, toSheetwriteColumnar } from "./dataset.js";
 import {
   type BenchmarkMode,

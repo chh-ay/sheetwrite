@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 const pixel = (red: number, green: number, blue: number, alpha = 255) => [red, green, blue, alpha];

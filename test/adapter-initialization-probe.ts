@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+
 import { act, createElement, createRef } from "react";
 import { createRoot } from "react-dom/client";
 import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
+
 // Bun resolves the public `svelte` entry to its server runtime outside a browser
 // bundle, so this lifecycle boundary intentionally selects Svelte's client entry.
 import { flushSync, mount, unmount } from "../node_modules/svelte/src/index-client.js";

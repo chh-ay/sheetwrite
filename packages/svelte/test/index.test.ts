@@ -1,7 +1,9 @@
 import { afterEach, beforeAll, beforeEach } from "bun:test";
+
 import type { Grid } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { installCanvasTestStubs } from "@sheetwrite/core/testing";
+
 // Bun resolves the public `svelte` entry to its server runtime outside a browser
 // bundle, so this component test intentionally selects Svelte's client entry.
 import { flushSync, mount, unmount } from "../../../node_modules/svelte/src/index-client.js";

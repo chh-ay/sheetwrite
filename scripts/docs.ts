@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
+
 import {
   isCallSignatureDeclaration,
   isClassDeclaration,
@@ -17,6 +18,7 @@ import {
   type SourceFile,
 } from "typescript/unstable/ast";
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
+
 import {
   collectFenceHovers,
   formatDeclaration,

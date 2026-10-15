@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import type {
   SheetSnapshot,
   SheetVisibility,
@@ -6,6 +7,7 @@ import type {
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
+
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
 

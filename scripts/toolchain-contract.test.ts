@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   CARGO_AUDIT_VERSION,

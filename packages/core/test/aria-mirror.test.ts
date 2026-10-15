@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { AriaMirror } from "../src/aria-mirror.js";
 import type { VisibleWindowView } from "../src/types.js";
 
