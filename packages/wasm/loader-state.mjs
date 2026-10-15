@@ -51,13 +51,24 @@ export function createLoader(initialize) {
   }
 
   /**
-   * Mark the published exports ready once an engine instance has compiled the module;
-   * they initialize from that compiled module on first use.
+   * Mark the published exports ready from an engine instance that already compiled the module.
+   * A load() in flight wins; `publish` runs only when this call makes the loader ready.
    *
-   * @param {BufferSource | URL | string | Request | WebAssembly.Module} [source]
+   * @param {BufferSource | URL | string | Request | WebAssembly.Module | undefined} source
+   * @param {() => void} publish
    */
-  function adopt(source) {
-    if (ready || inFlight) return;
+  async function adopt(source, publish) {
+    if (inFlight) {
+      try {
+        await inFlight;
+      } catch {
+        // A failed load() leaves the loader free for this instance to adopt.
+      }
+    }
+
+    if (ready) return;
+
+    publish();
     selectedSource = source;
     ready = true;
   }

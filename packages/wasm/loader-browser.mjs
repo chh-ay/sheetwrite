@@ -1,6 +1,6 @@
 import { createLoader } from "./loader-state.mjs";
 import init from "./pkg/sheetwrite_wasm.js";
-import { createInstance } from "./pkg/sheetwrite_wasm_factory.js";
+import { adoptPublishedModule, createInstance } from "./pkg/sheetwrite_wasm_factory.js";
 
 export * from "./pkg/sheetwrite_wasm.js";
 
@@ -18,6 +18,6 @@ export const { load, isLoaded } = loader;
 export async function createEngine(source) {
   const engine = createInstance();
   await engine.init(source === undefined ? undefined : { module_or_path: source });
-  loader.adopt(source);
+  await loader.adopt(source, () => adoptPublishedModule(engine.getModule()));
   return engine;
 }
