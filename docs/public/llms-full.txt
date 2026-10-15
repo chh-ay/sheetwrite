@@ -9312,7 +9312,9 @@ emits a safe resolved target; `internal-navigation` additionally moves to
 stable internal destinations; `disabled` rejects every activation request.
 - `inputMode` — Hints at the type of data that might be entered by the user while editing the element or its contents
 - `is` — Specify that a standard HTML element should behave like a defined custom built-in element
-- `minColumns` — Render at least this many columns (empty padding columns past the data, like a spreadsheet).
+- `minColumns` — Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.
 - `mutationPolicy` — Atomic rejects the transaction; partial skips denied operation objects.
 - `onActiveSheetChange` — Fires after the visible sheet changes.
 - `onCommandStateChange` — Receives observable undo/redo and formatting command state.
