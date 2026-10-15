@@ -202,7 +202,7 @@ function splitBlock(
   const lineCells = alongRows ? block.colCount : 1;
   let bandLength = Math.max(1, Math.floor(limits.pieceBytes / (FIRST_BAND_CELL_BYTES * lineCells)));
 
-  for (let start = 0; start < length; ) {
+  for (let start = 0; start < length;) {
     const lines = Math.min(bandLength, length - start);
     const band = alongRows
       ? sliceBlock(operation, start, lines, 0, block.colCount)
