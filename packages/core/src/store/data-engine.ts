@@ -62,6 +62,7 @@ import type {
   RowGroup,
   Sheet,
   SheetSnapshot,
+  SnapshotCell,
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
@@ -1266,6 +1267,60 @@ export class StoreDataEngine {
     const additions = columns.slice(meta.columns.length);
     this.wasm.insertCols(this.handleOf(sheet), meta.columns.length, additions.length);
     meta.columns.push(...additions);
+  }
+
+  /** Persisted cells only: empty space and unstyled spill children need no history payload. */
+  captureSheetCells(sheet: SheetId): SnapshotCell[] {
+    const captured = this.windowReader.capturePersistedCells(sheet);
+    const formulas = new Map<number, string>();
+    const references = new Map<number, CellAddress>();
+    for (const [index, offset] of captured.formulaOffsets.entries()) {
+      const source = captured.formulaSources[index];
+      if (source === undefined) throw new Error("Missing persisted formula source");
+
+      formulas.set(offset, source);
+    }
+    for (const [index, offset] of captured.referenceOffsets.entries()) {
+      const target = referenceTargetFromPacked(
+        captured.referenceTargets.subarray(index * 3, index * 3 + 3),
+        this.sheetIdsByHandle,
+      );
+      if (!target) throw new Error("Missing persisted reference target");
+
+      references.set(offset, target);
+    }
+
+    const cells = captured.values.map((value, index): SnapshotCell => {
+      const row = captured.coordinates[index * 2];
+      const col = captured.coordinates[index * 2 + 1];
+      if (row === undefined || col === undefined)
+        throw new Error("Missing persisted cell coordinate");
+      const formula = formulas.get(index);
+      const reference = references.get(index);
+
+      return {
+        rowOffset: row,
+        colOffset: col,
+        value: formula
+          ? { kind: "formula", src: formula }
+          : reference
+            ? { kind: "ref", target: reference }
+            : { kind: "literal", value },
+        style: captured.styles[index],
+      };
+    });
+
+    return cells.sort(
+      (left, right) => left.rowOffset - right.rowOffset || left.colOffset - right.colOffset,
+    );
+  }
+
+  /** Sources for a whole logical sheet, without reading every resolved cell. */
+  captureSheetSources(sheet: SheetId): RangeSourceProjection | null {
+    const metadata = this.sheetMeta(sheet);
+    if (metadata.rowCount === 0 || metadata.columns.length === 0) return null;
+
+    return this.captureSourceProjection(sheet, 0, 0, metadata.rowCount, metadata.columns.length);
   }
 
   /** Whether a rectangular write would include a derived spill child. */

@@ -17,6 +17,36 @@ beforeAll(async () => {
 });
 
 describe("DocumentController", () => {
+  it("keeps an out-of-range sparse write a no-op without adding history", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    const controller = new DocumentController({
+      store,
+      loadable: store,
+      readOnly: () => false,
+      epoch: () => 0,
+      materializeVirtualColumns: (patches) => patches,
+      onMutationRejected: () => {},
+      onHistoryApplied: () => {},
+    });
+
+    expect(
+      controller.commit(
+        [
+          {
+            op: "setRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+            cells: [{ rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "outside" } }],
+          },
+        ],
+        "api",
+      ).status,
+    ).toBe("noop");
+    expect(controller.canUndo).toBe(false);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
+    controller.destroy();
+    store.dispose();
+  });
+
   it.each(["dense", "sparse"])(
     "restores %s batched formulas, references, styles and spill children through undo/redo",
     (layout) => {

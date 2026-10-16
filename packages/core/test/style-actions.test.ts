@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import type { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
+import type { CellChange, Grid } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
@@ -79,6 +79,40 @@ describe("StyleActions underline/strikethrough toggles", () => {
 });
 
 describe("StyleActions merge policy", () => {
+  it("restores formula and reference sources and styles when undoing a merge", () => {
+    const grid = makeGrid(4);
+    const anchor = { sheet: "s1", row: 1, col: 0 };
+    const covered = { ...anchor, row: 2, col: 1 };
+    const target = { ...anchor, row: 0, col: 1 };
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: target, value: { kind: "literal", value: 7 } },
+        {
+          op: "set",
+          addr: anchor,
+          value: { kind: "formula", src: "=B1*2" },
+          style: { bold: true },
+        },
+        { op: "set", addr: covered, value: { kind: "ref", target }, style: { italic: true } },
+      ],
+    });
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+    });
+
+    grid.actions.merge();
+    expect(grid.store.getCell(covered).resolved).toBeNull();
+    grid.actions.undo();
+    expect(grid.store.getFormula(anchor)).toBe("=B1*2");
+    expect(grid.store.getRefTarget(covered)).toEqual(target);
+    expect(grid.store.getCell(anchor)).toMatchObject({ resolved: 14, style: { bold: true } });
+    expect(grid.store.getCell(covered)).toMatchObject({ resolved: 7, style: { italic: true } });
+    grid.actions.redo();
+    expect(grid.store.getCell(covered).resolved).toBeNull();
+    grid.destroy();
+  });
+
   it("styles distinct merge anchors and adjacent formulas without styling covered cells", () => {
     const grid = makeGrid(4);
     const anchor = { sheet: "s1", row: 0, col: 0 };
@@ -101,6 +135,8 @@ describe("StyleActions merge policy", () => {
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 2 } },
     });
+    const effects: CellChange[][] = [];
+    grid.on("change", ({ changes }) => effects.push(changes));
 
     grid.actions.toggleUnderline();
     expect(grid.store.getCell(anchor).style).toEqual({ italic: true, underline: true });
@@ -110,11 +146,26 @@ describe("StyleActions merge policy", () => {
     expect(grid.store.getFormula(adjacent)).toBe("=A1*2");
     expect(grid.store.getCell({ ...anchor, row: 2, col: 1 }).style.underline).toBe(true);
     expect(grid.store.getCell({ ...anchor, row: 2 }).style.underline).toBeUndefined();
+    const addresses = [
+      anchor,
+      adjacent,
+      { ...anchor, row: 1, col: 1 },
+      { ...anchor, row: 1, col: 2 },
+      { ...anchor, row: 2, col: 1 },
+      { ...anchor, row: 2, col: 2 },
+    ];
+    expect(effects[0]?.map(({ addr }) => addr)).toEqual(addresses);
+    expect(effects[0]?.[0]).toMatchObject({
+      newValue: { kind: "formula", src: "=2+3" },
+      oldStyle: { italic: true },
+      newStyle: { italic: true, underline: true },
+    });
 
     grid.actions.undo();
     expect(grid.store.getCell(anchor).style).toEqual({ italic: true });
     expect(grid.store.getCell(adjacent).style.underline).toBeUndefined();
     expect(grid.store.getCell({ ...anchor, row: 2, col: 1 }).style.underline).toBeUndefined();
+    expect(effects[1]?.map(({ addr }) => addr)).toEqual(addresses);
     grid.actions.redo();
     expect(grid.store.getCell(adjacent).resolved).toBe(10);
     expect(grid.store.getCell(child)).toEqual(childBefore);

@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
+import type { CellChange, Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -183,7 +183,11 @@ describe("pointer input: touch policy", () => {
     const { grid, store, scroller, workbook, capture } = makeGrid();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
     const reasons: string[] = [];
-    grid.on("change", (event) => reasons.push(event.commitReason));
+    const effects: CellChange[][] = [];
+    grid.on("change", (event) => {
+      reasons.push(event.commitReason);
+      effects.push(event.changes);
+    });
 
     const handle = fillHandlePoint(0, 1, workbook);
     const down = pointer("pointerdown", { ...handle, pointerType: "touch" });
@@ -198,12 +202,41 @@ describe("pointer input: touch policy", () => {
       pointer("pointerup", { ...cellPoint(2, 1, workbook), pointerType: "touch" }),
     );
 
-    // Single-source fill repeats the source value down the dragged range.
     const source = store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved;
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(source);
     expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(source);
     expect(capture.released).toEqual([1]);
     expect(reasons).toEqual(["fill"]);
+    expect(effects[0]).toEqual([
+      {
+        addr: { sheet: "s1", row: 1, col: 1 },
+        oldValue: { kind: "literal", value: 10.5 },
+        newValue: { kind: "literal", value: 0.5 },
+        oldStyle: {},
+        newStyle: undefined,
+      },
+      {
+        addr: { sheet: "s1", row: 2, col: 1 },
+        oldValue: { kind: "literal", value: 20.5 },
+        newValue: { kind: "literal", value: 0.5 },
+        oldStyle: {},
+        newStyle: undefined,
+      },
+    ]);
+
+    grid.actions.undo();
+    expect(effects[1]?.map(({ addr }) => addr)).toEqual([
+      { sheet: "s1", row: 1, col: 1 },
+      { sheet: "s1", row: 2, col: 1 },
+    ]);
+    expect(effects[1]?.map(({ newValue }) => newValue)).toEqual([
+      { kind: "literal", value: 10.5 },
+      { kind: "literal", value: 20.5 },
+    ]);
+    grid.actions.redo();
+    expect(effects[2]).toEqual(effects[0]);
+    grid.destroy();
+    store.dispose();
   });
 
   it.each([
@@ -282,7 +315,7 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
-  it("rejects an over-byte-budget packed fill without changing cells or selection", () => {
+  it("rejects an over-byte-budget bulk fill without changing cells or selection", () => {
     const { grid, store, scroller, workbook } = makeGrid(20, { maxEncodedBytes: 128 });
     const selection = { kind: "cell" as const, addr: { sheet: "s1", row: 0, col: 0 } };
     const target = { sheet: "s1", row: 19, col: 0 };

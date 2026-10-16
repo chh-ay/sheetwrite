@@ -12,13 +12,7 @@ import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
-import type {
-  CommitReason,
-  DocumentOp,
-  PackedCellBlock,
-  Sheet,
-  SnapshotCell,
-} from "./types/document.js";
+import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
@@ -1091,7 +1085,6 @@ export class InteractionSessions {
     const firstRow = dataRows[0];
     if (firstRow === undefined) return false;
 
-    const dense = dataRows.every((row, index) => row === firstRow + index);
     const startRow = dataRows.reduce((minimum, row) => Math.min(minimum, row), firstRow);
     const endRow = dataRows.reduce((maximum, row) => Math.max(maximum, row), firstRow);
     const range = {
@@ -1107,11 +1100,6 @@ export class InteractionSessions {
       storeEngine(this.deps.store)?.hasSpillChildren(range),
     );
     const patches: DocumentOp[] = [];
-    const block: PackedCellBlock = {
-      rowCount: dataRows.length,
-      colCount: output.c1 - output.c0 + 1,
-      values: [],
-    };
     const cells: SnapshotCell[] = [];
 
     for (let r = output.r0; r <= output.r1; r++) {
@@ -1143,20 +1131,12 @@ export class InteractionSessions {
 
         if (scalarWrites) {
           patches.push({ op: "set", addr: { sheet, row: targetDataRow, col: c }, value });
-        } else if (dense) {
-          const offset = block.values.length;
-          block.values.push(value.kind === "literal" ? value.value : null);
-          if (value.kind === "formula") {
-            block.formulas ??= [];
-            block.formulas.push([offset, value.src]);
-          }
         } else cells.push({ rowOffset: targetDataRow - startRow, colOffset: c - output.c0, value });
       }
     }
 
-    const patch: DocumentOp = dense
-      ? { op: "setBlock", range, block }
-      : { op: "setRange", range, cells };
+    // setRange keeps per-cell change events; setBlock reports them only on opt-in.
+    const patch: DocumentOp = { op: "setRange", range, cells };
     return this.deps.commit(scalarWrites ? patches : [patch], "fill").status === "applied";
   }
 
