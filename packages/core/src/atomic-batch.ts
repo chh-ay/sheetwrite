@@ -13,6 +13,7 @@ import type { TransactionResourceLimits } from "./types/transaction.js";
 export const MAX_ATOMIC_BATCH_VERSIONS = 16;
 export const MAX_ATOMIC_BATCH_ENCODED_BYTES = 64 * 1024 * 1024;
 
+/** Bytes of the `[` and `]` that enclose the operation array of one version. */
 const ARRAY_ENVELOPE_BYTES = 2;
 /**
  * A split block piece targets this fraction of the version limit, so packing
@@ -213,6 +214,7 @@ function splitBlock(
       pieces.push(band);
       sizes.push(bytes);
       start += lines;
+      // Size the next band from the measured bytes per line of this one.
       bandLength = Math.max(
         1,
         Math.floor((lines * limits.pieceBytes * BAND_FILL_RATIO) / Math.max(1, bytes)),

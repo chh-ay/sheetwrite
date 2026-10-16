@@ -1,5 +1,17 @@
-// Excel serial 60 represents the nonexistent 1900-02-29; JavaScript dates use
-// 1900-02-28 for that serial. UTC prevents host time zones from shifting dates.
+// Excel/Sheets-style date serials: a date is a plain number — whole days with
+// the fractional part carrying the time of day. Dates therefore live in
+// ordinary number cells, so sorting, filtering, and aggregation work on their
+// numeric values; rendering (a date `numberFormat`) and input parsing interpret
+// those values as dates.
+//
+// Excel's 1900 date system treats serial 60 as the non-existent 1900-02-29.
+// Real JavaScript Dates before 1900-03-01 use days since 1899-12-31; dates on or
+// after that cutoff receive one extra serial day. Serial 60 maps to
+// 1900-02-28 when converted to a Date, while numeric formula/XLSX paths can
+// preserve the serial itself.
+//
+// Calendar construction and access use UTC (`Date.UTC` / `getUTC*`) so host
+// timezone offsets never shift calendar dates.
 
 /** Real-date base used before Excel's synthetic leap day. */
 const EPOCH_MS = Date.UTC(1899, 11, 31);

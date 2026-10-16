@@ -260,6 +260,7 @@ function sameTransactionResourceLimits(
   );
 }
 
+/** True when both arrays reference the same operations in the same order. */
 function sameOperations(left: readonly DocumentOp[], right: readonly DocumentOp[]): boolean {
   if (left === right) return true;
   if (left.length !== right.length) return false;

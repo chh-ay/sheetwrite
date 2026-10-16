@@ -8,7 +8,7 @@ description: "Validation and allocation policy for an untrusted workbook snapsho
 Validation and allocation policy for an untrusted workbook snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L312"><code>packages/core/src/document-protocol.ts#L312</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L313"><code>packages/core/src/document-protocol.ts#L313</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>
