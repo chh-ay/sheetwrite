@@ -6,9 +6,9 @@
     "version": "2.0.0"
   },
   "meta": {
-    "commit": "f1e139ae982e125404b293f4a98a9a512e268c18",
+    "commit": "0c02ec3103feb71c7f32c6d0edb87593badd1e5a",
     "dirty": true,
-    "timestamp": "2026-10-16T07:05:48.542Z"
+    "timestamp": "2026-10-16T09:49:38.328Z"
   },
   "toolchain": {
     "bun": "1.4.3",
@@ -38,7 +38,7 @@
       "owner": "next:@sheetwrite/core"
     },
     "attribution.next.coreFirstPaint.sheetwriteRawBytes": {
-      "actual": 467811,
+      "actual": 467786,
       "unit": "bytes",
       "category": "browser-module-attribution",
       "owner": "next:@sheetwrite/core"
@@ -98,7 +98,7 @@
       "owner": "vite:@sheetwrite/core"
     },
     "attribution.vite.coreFirstPaint.sheetwriteRawBytes": {
-      "actual": 475881,
+      "actual": 475856,
       "unit": "bytes",
       "category": "browser-module-attribution",
       "owner": "vite:@sheetwrite/core"
@@ -158,19 +158,19 @@
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.brotliBytes": {
-      "actual": 237645,
+      "actual": 237753,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.gzipBytes": {
-      "actual": 283603,
+      "actual": 283597,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
     },
     "bundler.next.coreAttributionInitial.javascript.rawBytes": {
-      "actual": 964885,
+      "actual": 964860,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-attribution-initial"
@@ -194,19 +194,19 @@
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.brotliBytes": {
-      "actual": 243412,
+      "actual": 243511,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.gzipBytes": {
-      "actual": 289974,
+      "actual": 289969,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
     },
     "bundler.next.coreInitial.javascript.rawBytes": {
-      "actual": 984661,
+      "actual": 984638,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:core-initial"
@@ -230,13 +230,13 @@
       "owner": "next:core-initial"
     },
     "bundler.next.nextAsync.javascript.brotliBytes": {
-      "actual": 83818,
+      "actual": 83815,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:next-async"
     },
     "bundler.next.nextAsync.javascript.gzipBytes": {
-      "actual": 98194,
+      "actual": 98193,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "next:next-async"
@@ -266,19 +266,19 @@
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.brotliBytes": {
-      "actual": 125886,
+      "actual": 125910,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.gzipBytes": {
-      "actual": 148617,
+      "actual": 148618,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
     },
     "bundler.vite.coreInitial.javascript.rawBytes": {
-      "actual": 515993,
+      "actual": 515969,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:core-initial"
@@ -320,19 +320,19 @@
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.brotliBytes": {
-      "actual": 182747,
+      "actual": 182860,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.gzipBytes": {
-      "actual": 214271,
+      "actual": 214272,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
     },
     "bundler.vite.reactInitial.javascript.rawBytes": {
-      "actual": 722248,
+      "actual": 722224,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:react-initial"
@@ -374,19 +374,19 @@
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.brotliBytes": {
-      "actual": 145434,
+      "actual": 145466,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.gzipBytes": {
-      "actual": 170138,
+      "actual": 170137,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
     },
     "bundler.vite.svelteInitial.javascript.rawBytes": {
-      "actual": 573613,
+      "actual": 573589,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:svelte-initial"
@@ -428,19 +428,19 @@
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.brotliBytes": {
-      "actual": 154479,
+      "actual": 154543,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.gzipBytes": {
-      "actual": 180179,
+      "actual": 180180,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
     },
     "bundler.vite.vueInitial.javascript.rawBytes": {
-      "actual": 598653,
+      "actual": 598629,
       "unit": "bytes",
       "category": "browser-javascript",
       "owner": "vite:vue-initial"
@@ -590,7 +590,7 @@
       "owner": "webpack:worker-async"
     },
     "closure.core-xlsx.logicalBytes": {
-      "actual": 3691545,
+      "actual": 3691466,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core-xlsx"
@@ -602,7 +602,7 @@
       "owner": "core-xlsx"
     },
     "closure.core.logicalBytes": {
-      "actual": 3457814,
+      "actual": 3457735,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "core"
@@ -620,7 +620,7 @@
       "owner": "core"
     },
     "closure.react.logicalBytes": {
-      "actual": 3647087,
+      "actual": 3647008,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "react"
@@ -638,7 +638,7 @@
       "owner": "react"
     },
     "closure.svelte.logicalBytes": {
-      "actual": 8508374,
+      "actual": 8508295,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "svelte"
@@ -656,7 +656,7 @@
       "owner": "svelte"
     },
     "closure.vue.logicalBytes": {
-      "actual": 20337467,
+      "actual": 20337388,
       "unit": "bytes",
       "category": "install-closure",
       "owner": "vue"
@@ -740,7 +740,7 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.runtimeJsBytes": {
-      "actual": 1277716,
+      "actual": 1277637,
       "unit": "bytes",
       "category": "package-unpacked-runtime-js",
       "owner": "@sheetwrite/core"
@@ -758,7 +758,7 @@
       "owner": "@sheetwrite/core"
     },
     "package.@sheetwrite/core.unpackedBytes": {
-      "actual": 1647959,
+      "actual": 1647880,
       "unit": "bytes",
       "category": "package-unpacked",
       "owner": "@sheetwrite/core"
@@ -1134,14 +1134,14 @@
     {
       "name": "@sheetwrite/core",
       "tarballBytes": 344339,
-      "unpackedBytes": 1647959,
+      "unpackedBytes": 1647880,
       "fileCount": 188,
       "categories": {
         "css": 19374,
         "declarations": 345681,
         "maps": 0,
         "metadata": 5188,
-        "runtime-js": 1277716,
+        "runtime-js": 1277637,
         "runtime-source": 0,
         "wasm": 0
       }
@@ -1241,13 +1241,13 @@
     {
       "name": "core",
       "packageCount": 3,
-      "logicalBytes": 3457814,
+      "logicalBytes": 3457735,
       "packages": ["@sheetwrite/core@0.4.0", "@sheetwrite/wasm@0.4.0", "fflate@0.8.3"]
     },
     {
       "name": "core-xlsx",
       "packageCount": 4,
-      "logicalBytes": 3691545,
+      "logicalBytes": 3691466,
       "packages": [
         "@sheetwrite/core@0.4.0",
         "@sheetwrite/wasm@0.4.0",
@@ -1258,7 +1258,7 @@
     {
       "name": "react",
       "packageCount": 5,
-      "logicalBytes": 3647087,
+      "logicalBytes": 3647008,
       "packages": [
         "@sheetwrite/core@0.4.0",
         "@sheetwrite/react@0.4.0",
@@ -1270,7 +1270,7 @@
     {
       "name": "svelte",
       "packageCount": 24,
-      "logicalBytes": 8508374,
+      "logicalBytes": 8508295,
       "packages": [
         "@jridgewell/gen-mapping@0.3.13",
         "@jridgewell/remapping@2.3.5",
@@ -1301,7 +1301,7 @@
     {
       "name": "vue",
       "packageCount": 27,
-      "logicalBytes": 20337467,
+      "logicalBytes": 20337388,
       "packages": [
         "@babel/helper-string-parser@7.29.7",
         "@babel/helper-validator-identifier@7.29.7",
@@ -1360,20 +1360,20 @@
               "sha256": "4ba8283a24d0bdae7333962d50de4b47a38fdd3b3f6c5125103c8a4bd00d9fc6"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/422-2a54e1edf342f3de.js",
-              "sha256": "09c449239b609cb2cdf3d45170c8d3dbfc8864f9d80f226a3df37475460bbcb6"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/422-c5a77f37105386f6.js",
+              "sha256": "ea8ac0368a36d47dd8c0baaaec9cb7687e9e3e6dd790f9f1cb70373d379c16e8"
             },
             {
               "path": "test/bundler-fixtures/next/.next/static/chunks/4bd1b696-c023c6e3521b1417.js",
               "sha256": "2c752a401191671d5bbbe7514f5828bbb0a7cc50bfbe77ddaf1b1ccba4412ed2"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-5a70f1579a005774.js",
-              "sha256": "af38d9dce72b69483a906cc2a744e8f54c6ff5687056b9510d31700059f137da"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-9b9949bd5550ade4.js",
+              "sha256": "ce9bf496da953fbc9e7d99d90da28aa3393aaa34650fdcab5bac9658e19a9d29"
             },
             {
-              "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-04340e66859af914.js",
-              "sha256": "d672d9d74736ea616958f2a4c3cdb3375b2ddb6f85efd2f013b6228003cb9de9"
+              "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-e884bb86376b0e4d.js",
+              "sha256": "4de65d1ea450e755bdfd84c73b4422d278662a04cc7693ed07c3d7a08bdfeb3b"
             },
             {
               "path": "test/bundler-fixtures/next/.next/static/chunks/polyfills-42372ed130431b0a.js",
@@ -1384,7 +1384,7 @@
               "sha256": "4d0142299f56123d5512a7aa6f5f8cd18690043c27648acbaa0c5c18dd06472e"
             }
           ],
-          "generatedBytes": 964885,
+          "generatedBytes": 964860,
           "modules": [
             {
               "id": "@sheetwrite/core/dist/a1.js",
@@ -1415,8 +1415,8 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 10197,
-              "gzipBytes": 4270,
-              "brotliBytes": 3883
+              "gzipBytes": 4272,
+              "brotliBytes": 3879
             },
             {
               "id": "@sheetwrite/core/dist/canvas-renderer.js",
@@ -1558,9 +1558,9 @@
               "id": "@sheetwrite/core/dist/export.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 1833,
+              "rawBytes": 1834,
               "gzipBytes": 1030,
-              "brotliBytes": 854
+              "brotliBytes": 853
             },
             {
               "id": "@sheetwrite/core/dist/fenwick.js",
@@ -1574,9 +1574,9 @@
               "id": "@sheetwrite/core/dist/fill-series.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 520,
-              "gzipBytes": 329,
-              "brotliBytes": 287
+              "rawBytes": 527,
+              "gzipBytes": 332,
+              "brotliBytes": 290
             },
             {
               "id": "@sheetwrite/core/dist/find-bar.js",
@@ -1598,17 +1598,17 @@
               "id": "@sheetwrite/core/dist/geometry-layout-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6790,
+              "rawBytes": 6774,
               "gzipBytes": 1919,
-              "brotliBytes": 1762
+              "brotliBytes": 1759
             },
             {
               "id": "@sheetwrite/core/dist/grid.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 52441,
-              "gzipBytes": 14200,
-              "brotliBytes": 12693
+              "rawBytes": 52440,
+              "gzipBytes": 14197,
+              "brotliBytes": 12690
             },
             {
               "id": "@sheetwrite/core/dist/history.js",
@@ -1630,9 +1630,9 @@
               "id": "@sheetwrite/core/dist/interaction-sessions.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 19106,
-              "gzipBytes": 5416,
-              "brotliBytes": 4871
+              "rawBytes": 19102,
+              "gzipBytes": 5413,
+              "brotliBytes": 4873
             },
             {
               "id": "@sheetwrite/core/dist/mutation-revision-index.js",
@@ -1678,9 +1678,9 @@
               "id": "@sheetwrite/core/dist/resize.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 228,
-              "gzipBytes": 175,
-              "brotliBytes": 152
+              "rawBytes": 225,
+              "gzipBytes": 173,
+              "brotliBytes": 150
             },
             {
               "id": "@sheetwrite/core/dist/resource-accounting.js",
@@ -1766,9 +1766,9 @@
               "id": "@sheetwrite/core/dist/store/data-engine.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 51605,
-              "gzipBytes": 13623,
-              "brotliBytes": 12064
+              "rawBytes": 51599,
+              "gzipBytes": 13621,
+              "brotliBytes": 12053
             },
             {
               "id": "@sheetwrite/core/dist/store/engine-registry.js",
@@ -1782,9 +1782,9 @@
               "id": "@sheetwrite/core/dist/store/mutation-policy.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 7355,
-              "gzipBytes": 2327,
-              "brotliBytes": 2117
+              "rawBytes": 7353,
+              "gzipBytes": 2325,
+              "brotliBytes": 2116
             },
             {
               "id": "@sheetwrite/core/dist/store/paged-dirty-preflight.js",
@@ -1798,9 +1798,9 @@
               "id": "@sheetwrite/core/dist/store/ranges.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 5086,
-              "gzipBytes": 1701,
-              "brotliBytes": 1533
+              "rawBytes": 5088,
+              "gzipBytes": 1702,
+              "brotliBytes": 1534
             },
             {
               "id": "@sheetwrite/core/dist/store/snapshot-codec.js",
@@ -1822,17 +1822,17 @@
               "id": "@sheetwrite/core/dist/store/window-reader.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13511,
-              "gzipBytes": 4279,
+              "rawBytes": 13492,
+              "gzipBytes": 4278,
               "brotliBytes": 3884
             },
             {
               "id": "@sheetwrite/core/dist/store/wire-tags.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 72,
-              "gzipBytes": 62,
-              "brotliBytes": 49
+              "rawBytes": 97,
+              "gzipBytes": 74,
+              "brotliBytes": 60
             },
             {
               "id": "@sheetwrite/core/dist/style-actions.js",
@@ -1886,8 +1886,8 @@
               "id": "@sheetwrite/core/dist/virtualization.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 468,
-              "gzipBytes": 244,
+              "rawBytes": 459,
+              "gzipBytes": 241,
               "brotliBytes": 214
             },
             {
@@ -2984,7 +2984,7 @@
               "attribution": "source-map",
               "rawBytes": 1142,
               "gzipBytes": 382,
-              "brotliBytes": 351
+              "brotliBytes": 348
             },
             {
               "id": "next:runtime/webpack/bootstrap",
@@ -3271,6 +3271,26 @@
       ],
       "assets": [
         {
+          "path": "test/bundler-fixtures/next/.next/static/9ALEiXMaI7gNycVEfGV_m/_buildManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 543,
+          "gzipBytes": 306,
+          "brotliBytes": 262,
+          "sha256": "9de87d6d2d392f8791be55e547eb3eb7764d034dcc178ed624a3c5a339f35807"
+        },
+        {
+          "path": "test/bundler-fixtures/next/.next/static/9ALEiXMaI7gNycVEfGV_m/_ssgManifest.js",
+          "kind": "javascript",
+          "owner": "next-async",
+          "roles": ["next-async"],
+          "rawBytes": 80,
+          "gzipBytes": 64,
+          "brotliBytes": 67,
+          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
+        },
+        {
           "path": "test/bundler-fixtures/next/.next/static/chunks/255-293e44824f2ec188.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
@@ -3281,14 +3301,14 @@
           "sha256": "4ba8283a24d0bdae7333962d50de4b47a38fdd3b3f6c5125103c8a4bd00d9fc6"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/422-2a54e1edf342f3de.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/422-c5a77f37105386f6.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
-          "rawBytes": 502178,
-          "gzipBytes": 141182,
-          "brotliBytes": 115891,
-          "sha256": "09c449239b609cb2cdf3d45170c8d3dbfc8864f9d80f226a3df37475460bbcb6"
+          "rawBytes": 502153,
+          "gzipBytes": 141177,
+          "brotliBytes": 115998,
+          "sha256": "ea8ac0368a36d47dd8c0baaaec9cb7687e9e3e6dd790f9f1cb70373d379c16e8"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/4bd1b696-c023c6e3521b1417.js",
@@ -3301,44 +3321,44 @@
           "sha256": "2c752a401191671d5bbbe7514f5828bbb0a7cc50bfbe77ddaf1b1ccba4412ed2"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-c452bb5c940d5588.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/_not-found/page-2107610aa0cb3e7a.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
           "rawBytes": 2670,
-          "gzipBytes": 998,
+          "gzipBytes": 996,
           "brotliBytes": 822,
-          "sha256": "d64a7da915e724bf9a1d7dbc2f5c69c449d34908d99d80d474f33e286a9c2884"
+          "sha256": "19993820641bcbc68e11025d6a8e929c19378416af6130b5927ead41306e6256"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-5a70f1579a005774.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/attribution/page-9b9949bd5550ade4.js",
           "kind": "javascript",
           "owner": "core-attribution-initial",
           "roles": ["core-attribution-initial"],
           "rawBytes": 390,
           "gzipBytes": 305,
-          "brotliBytes": 261,
-          "sha256": "af38d9dce72b69483a906cc2a744e8f54c6ff5687056b9510d31700059f137da"
+          "brotliBytes": 262,
+          "sha256": "ce9bf496da953fbc9e7d99d90da28aa3393aaa34650fdcab5bac9658e19a9d29"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/layout-5e599145abb78cf4.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/layout-c63f5d3d6b031a6c.js",
           "kind": "javascript",
           "owner": "next-async",
           "roles": ["next-async"],
           "rawBytes": 195,
-          "gzipBytes": 169,
-          "brotliBytes": 162,
-          "sha256": "754b9c79af4f100ec2cad8ecb53cfbe043d987f04564efb15737939889131683"
+          "gzipBytes": 170,
+          "brotliBytes": 159,
+          "sha256": "4b3568bedc62be279be3e0b1ea4ec6c07678682d8ef686626f3995b3643b9e84"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/app/page-c639404c19700caa.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/app/page-266847b200322aa2.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
-          "rawBytes": 20166,
-          "gzipBytes": 6676,
-          "brotliBytes": 6028,
-          "sha256": "93545c8fa311d1f8f5ebce1fcb7637ff3a48591056e0b38d8e02b6247815bea0"
+          "rawBytes": 20168,
+          "gzipBytes": 6677,
+          "brotliBytes": 6020,
+          "sha256": "eef099cf126ff979e06a34eebfc35f6d11e5b43cb13f1090ab2979134c8b305a"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/framework-acd67e14855de5a2.js",
@@ -3361,14 +3381,14 @@
           "sha256": "bf9d75ff4e23b0cfa620adc48dc19d4ad62e48bb34d5f7925e33d09c583ab7e1"
         },
         {
-          "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-04340e66859af914.js",
+          "path": "test/bundler-fixtures/next/.next/static/chunks/main-app-e884bb86376b0e4d.js",
           "kind": "javascript",
           "owner": "shared:core-initial+core-attribution-initial",
           "roles": ["core-attribution-initial", "core-initial"],
           "rawBytes": 557,
-          "gzipBytes": 227,
+          "gzipBytes": 226,
           "brotliBytes": 206,
-          "sha256": "d672d9d74736ea616958f2a4c3cdb3375b2ddb6f85efd2f013b6228003cb9de9"
+          "sha256": "4de65d1ea450e755bdfd84c73b4422d278662a04cc7693ed07c3d7a08bdfeb3b"
         },
         {
           "path": "test/bundler-fixtures/next/.next/static/chunks/pages/_app-7d307437aca18ad4.js",
@@ -3439,26 +3459,6 @@
           "gzipBytes": 1539,
           "brotliBytes": 1388,
           "sha256": "fe149eee4b2393ad8f4248ebd7024d5a005450890212632d6f817f5764b62c5f"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/r2tU6S89IV0VbVsESJbI6/_buildManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 543,
-          "gzipBytes": 306,
-          "brotliBytes": 262,
-          "sha256": "9de87d6d2d392f8791be55e547eb3eb7764d034dcc178ed624a3c5a339f35807"
-        },
-        {
-          "path": "test/bundler-fixtures/next/.next/static/r2tU6S89IV0VbVsESJbI6/_ssgManifest.js",
-          "kind": "javascript",
-          "owner": "next-async",
-          "roles": ["next-async"],
-          "rawBytes": 80,
-          "gzipBytes": 64,
-          "brotliBytes": 67,
-          "sha256": "678f6ce2cb80b1fe72fc67e7412be6e2ab6ada083111b64f7c40d35e3cba5e00"
         }
       ]
     },
@@ -3484,23 +3484,23 @@
           "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
           "assets": [
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/core-DOgGPpjQ.js",
-              "sha256": "833907611009c60bbc40febddb3bd0baee416844bea4b77961fac5a7e29de4de"
+              "path": "test/bundler-fixtures/vite/dist/assets/core-TAfl822U.js",
+              "sha256": "b78d2ce02e02e9cc6af5d7a89b9be5e1e096fc9feacd158eb25fbae2afdad25a"
             },
             {
               "path": "test/bundler-fixtures/vite/dist/assets/export-B1VcFCRw.js",
               "sha256": "aff0a7692fe46cf49f034b24abe66ba857e3d74f181ca80bc5b5d139e162efc8"
             },
             {
-              "path": "test/bundler-fixtures/vite/dist/assets/grid-BxX6s-3h.js",
-              "sha256": "e155edc1ab44f2d4e61ac28334eb75debb3057849204c01a9e50e0a0c3c6c09f"
+              "path": "test/bundler-fixtures/vite/dist/assets/grid-B54JC4gQ.js",
+              "sha256": "5160cde8866fcc64c99c23fe2ea65253f7cdf86e1c17a08802681ae0b0dfb49d"
             },
             {
               "path": "test/bundler-fixtures/vite/dist/assets/modulepreload-polyfill-B5Qt9EMX.js",
               "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0"
             }
           ],
-          "generatedBytes": 515993,
+          "generatedBytes": 515969,
           "modules": [
             {
               "id": "@sheetwrite/core/dist/a1.js",
@@ -3531,7 +3531,7 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 10746,
-              "gzipBytes": 4508,
+              "gzipBytes": 4509,
               "brotliBytes": 4136
             },
             {
@@ -3554,9 +3554,9 @@
               "id": "@sheetwrite/core/dist/clipboard-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 13098,
-              "gzipBytes": 4570,
-              "brotliBytes": 4166
+              "rawBytes": 13090,
+              "gzipBytes": 4568,
+              "brotliBytes": 4163
             },
             {
               "id": "@sheetwrite/core/dist/clipboard.js",
@@ -3604,7 +3604,7 @@
               "attribution": "source-map",
               "rawBytes": 27145,
               "gzipBytes": 7586,
-              "brotliBytes": 6870
+              "brotliBytes": 6875
             },
             {
               "id": "@sheetwrite/core/dist/date-serial.js",
@@ -3627,7 +3627,7 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 14858,
-              "gzipBytes": 4098,
+              "gzipBytes": 4097,
               "brotliBytes": 3719
             },
             {
@@ -3642,9 +3642,9 @@
               "id": "@sheetwrite/core/dist/dom-overlay.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 10254,
-              "gzipBytes": 3535,
-              "brotliBytes": 3128
+              "rawBytes": 10252,
+              "gzipBytes": 3530,
+              "brotliBytes": 3124
             },
             {
               "id": "@sheetwrite/core/dist/editor.js",
@@ -3652,7 +3652,7 @@
               "attribution": "source-map",
               "rawBytes": 3091,
               "gzipBytes": 1109,
-              "brotliBytes": 957
+              "brotliBytes": 940
             },
             {
               "id": "@sheetwrite/core/dist/engine.js",
@@ -3692,7 +3692,7 @@
               "attribution": "source-map",
               "rawBytes": 580,
               "gzipBytes": 348,
-              "brotliBytes": 329
+              "brotliBytes": 316
             },
             {
               "id": "@sheetwrite/core/dist/find-bar.js",
@@ -3714,8 +3714,8 @@
               "id": "@sheetwrite/core/dist/geometry-layout-controller.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 6817,
-              "gzipBytes": 1918,
+              "rawBytes": 6801,
+              "gzipBytes": 1916,
               "brotliBytes": 1762
             },
             {
@@ -3723,8 +3723,8 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 52995,
-              "gzipBytes": 14584,
-              "brotliBytes": 13070
+              "gzipBytes": 14585,
+              "brotliBytes": 13061
             },
             {
               "id": "@sheetwrite/core/dist/history.js",
@@ -3732,7 +3732,7 @@
               "attribution": "source-map",
               "rawBytes": 3426,
               "gzipBytes": 1080,
-              "brotliBytes": 999
+              "brotliBytes": 998
             },
             {
               "id": "@sheetwrite/core/dist/hyperlink.js",
@@ -3747,8 +3747,8 @@
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
               "rawBytes": 19354,
-              "gzipBytes": 5547,
-              "brotliBytes": 4960
+              "gzipBytes": 5546,
+              "brotliBytes": 4958
             },
             {
               "id": "@sheetwrite/core/dist/mutation-revision-index.js",
@@ -3764,7 +3764,7 @@
               "attribution": "source-map",
               "rawBytes": 6301,
               "gzipBytes": 2505,
-              "brotliBytes": 2267
+              "brotliBytes": 2266
             },
             {
               "id": "@sheetwrite/core/dist/overlay-painter.js",
@@ -3772,7 +3772,7 @@
               "attribution": "source-map",
               "rawBytes": 16791,
               "gzipBytes": 5427,
-              "brotliBytes": 4844
+              "brotliBytes": 4839
             },
             {
               "id": "@sheetwrite/core/dist/read-window-controller.js",
@@ -3780,7 +3780,7 @@
               "attribution": "source-map",
               "rawBytes": 10935,
               "gzipBytes": 3274,
-              "brotliBytes": 2997
+              "brotliBytes": 2993
             },
             {
               "id": "@sheetwrite/core/dist/reference.js",
@@ -3874,7 +3874,7 @@
               "id": "@sheetwrite/core/dist/store.js",
               "owner": "@sheetwrite/core",
               "attribution": "source-map",
-              "rawBytes": 11650,
+              "rawBytes": 11651,
               "gzipBytes": 3523,
               "brotliBytes": 3139
             },
@@ -3972,7 +3972,7 @@
               "attribution": "source-map",
               "rawBytes": 6613,
               "gzipBytes": 2541,
-              "brotliBytes": 2241
+              "brotliBytes": 2242
             },
             {
               "id": "@sheetwrite/core/dist/transaction-admission.js",
@@ -4082,9 +4082,9 @@
               "id": "vite:runtime",
               "owner": "vite:runtime",
               "attribution": "source-map",
-              "rawBytes": 1349,
+              "rawBytes": 1350,
               "gzipBytes": 726,
-              "brotliBytes": 629
+              "brotliBytes": 613
             }
           ]
         }
@@ -4101,14 +4101,14 @@
           "sha256": "80b36f658c4b7f5cee2690544082216149a53601f3c8a81307d99b71fe6f8a19"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/core-DOgGPpjQ.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/core-TAfl822U.js",
           "kind": "javascript",
           "owner": "core-initial",
           "roles": ["core-initial"],
           "rawBytes": 220,
           "gzipBytes": 193,
-          "brotliBytes": 152,
-          "sha256": "833907611009c60bbc40febddb3bd0baee416844bea4b77961fac5a7e29de4de"
+          "brotliBytes": 150,
+          "sha256": "b78d2ce02e02e9cc6af5d7a89b9be5e1e096fc9feacd158eb25fbae2afdad25a"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/export-B1VcFCRw.js",
@@ -4121,14 +4121,14 @@
           "sha256": "aff0a7692fe46cf49f034b24abe66ba857e3d74f181ca80bc5b5d139e162efc8"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/grid-BxX6s-3h.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/grid-B54JC4gQ.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["core-initial", "react-initial", "svelte-initial", "vue-initial"],
-          "rawBytes": 297605,
-          "gzipBytes": 84490,
-          "brotliBytes": 71425,
-          "sha256": "e155edc1ab44f2d4e61ac28334eb75debb3057849204c01a9e50e0a0c3c6c09f"
+          "rawBytes": 297581,
+          "gzipBytes": 84491,
+          "brotliBytes": 71451,
+          "sha256": "5160cde8866fcc64c99c23fe2ea65253f7cdf86e1c17a08802681ae0b0dfb49d"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/index-DTk4ih99.js",
@@ -4141,14 +4141,14 @@
           "sha256": "bd53c8d75341805404d3cb28d2a0c6e5acf49c0136bb5d5f212d234777363c93"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-CLUZM7Iz.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/lifecycle-mnf3pUho.js",
           "kind": "javascript",
           "owner": "shared-initial",
           "roles": ["react-initial", "svelte-initial", "vue-initial"],
           "rawBytes": 17187,
-          "gzipBytes": 5912,
-          "brotliBytes": 5331,
-          "sha256": "3a02ab10d4a84907c8b8cc0ee20a40ea3ce59715d91eb18cec4818e785308eba"
+          "gzipBytes": 5914,
+          "brotliBytes": 5332,
+          "sha256": "f8300b679312d8865ce937ccb50d28ac103b7408c2f840c2661606c07117a29d"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/modulepreload-polyfill-B5Qt9EMX.js",
@@ -4168,16 +4168,6 @@
           "sha256": "d2a32840421496e872ade591618d2fa5c33797605d1aec04301717e5a90757d0"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/react-0eXBOkmR.js",
-          "kind": "javascript",
-          "owner": "react-initial",
-          "roles": ["react-initial"],
-          "rawBytes": 189288,
-          "gzipBytes": 59935,
-          "brotliBytes": 51682,
-          "sha256": "037b18625e14cc03f3f16947b4a5aa06c7c3cb3a01a5763766ee7d4be91d4a3f"
-        },
-        {
           "path": "test/bundler-fixtures/vite/dist/assets/react-bn7iQgEK.css",
           "kind": "css",
           "owner": "shared-initial",
@@ -4186,6 +4176,16 @@
           "gzipBytes": 2511,
           "brotliBytes": 2169,
           "sha256": "f83ede118e63b7b6ac9011928df26934042997780b3d0469ec663f73b9853aa8"
+        },
+        {
+          "path": "test/bundler-fixtures/vite/dist/assets/react-sTl19JjG.js",
+          "kind": "javascript",
+          "owner": "react-initial",
+          "roles": ["react-initial"],
+          "rawBytes": 189288,
+          "gzipBytes": 59933,
+          "brotliBytes": 51768,
+          "sha256": "be63bd936aace06c275842dff63c6c2d0aa6a6fee096ec87dba65efeb66669b9"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/sheetwrite_wasm_bg-TWQCJRTj.wasm",
@@ -4198,24 +4198,24 @@
           "sha256": "86aa0d014ab8a77641903d62345a536276103c656e48c16049c7291230c21357"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/svelte-BC8Yat8L.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/svelte-D02_ogc0.js",
           "kind": "javascript",
           "owner": "svelte-initial",
           "roles": ["svelte-initial"],
           "rawBytes": 40653,
-          "gzipBytes": 15802,
-          "brotliBytes": 14369,
-          "sha256": "e907a75d8ef6c2a76f8662faac588a41aaa8f3335afedcdf1d51304f1f7c8cd4"
+          "gzipBytes": 15798,
+          "brotliBytes": 14374,
+          "sha256": "799a505718f24cf2bbbd16f83b6c3d055ed9d9e4f138098009dcd259e4ea07e4"
         },
         {
-          "path": "test/bundler-fixtures/vite/dist/assets/vue-D6zeyUMQ.js",
+          "path": "test/bundler-fixtures/vite/dist/assets/vue-CvAjIKUo.js",
           "kind": "javascript",
           "owner": "vue-initial",
           "roles": ["vue-initial"],
           "rawBytes": 65693,
-          "gzipBytes": 25843,
-          "brotliBytes": 23414,
-          "sha256": "488813f24e4aebbf89cbbb1d15079b886ceb11c1f9505da9a90e260c2291a621"
+          "gzipBytes": 25841,
+          "brotliBytes": 23451,
+          "sha256": "827783df4c02a69f499c934f40b82e29e303b7557c03629a24186176d5aa47c1"
         },
         {
           "path": "test/bundler-fixtures/vite/dist/assets/worker-ug_waEJr.js",
@@ -4505,7 +4505,7 @@
         {
           "bundler": "vite",
           "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
-          "nonSheetwriteRawBytes": 40112,
+          "nonSheetwriteRawBytes": 40113,
           "opaqueFrameworkRawBytes": 0
         }
       ]
@@ -4513,15 +4513,15 @@
     "firstPaint": [
       {
         "bundler": "next",
-        "generatedBytes": 964885,
-        "sheetwriteRawBytes": 467811,
+        "generatedBytes": 964860,
+        "sheetwriteRawBytes": 467786,
         "rootBarrelRawBytes": 0,
         "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"]
       },
       {
         "bundler": "vite",
-        "generatedBytes": 515993,
-        "sheetwriteRawBytes": 475881,
+        "generatedBytes": 515969,
+        "sheetwriteRawBytes": 475856,
         "rootBarrelRawBytes": 0,
         "eagerImports": ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"]
       }

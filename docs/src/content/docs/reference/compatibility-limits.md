@@ -74,6 +74,8 @@ If the restore exceeds the batch ceilings, cannot be split, or needs an unsuppor
 
 [`DEFAULT_SNAPSHOT_RESOURCE_LIMITS`](/docs/api/core/default-snapshot-resource-limits/) owns validation and allocation defaults. Exceeding one produces a path-qualified validation error or `SnapshotResourceError` before store allocation; an allocation failure within a configured ceiling still surfaces as a resource failure.
 
+`maxRowsPerSheet` bounds snapshot admission and direct workbook construction, not the lifetime row count of an admitted grid. Ordinary row insertion may grow a million-row sheet beyond that default, and layout refresh does not reapply the snapshot row ceiling. Importing or restoring a snapshot of the enlarged sheet still requires an explicit higher snapshot limit.
+
 | Owner / resource | Default and unit | Why / evidence class | Behavior above the ceiling | Supported override |
 | --- | --- | --- | --- | --- |
 | `maxSheets` | 256 sheets per workbook | Resource defense: bound sheet-indexed schema/store state | Snapshot or direct workbook construction is rejected | `SnapshotValidationOptions.resourceLimits`, `SheetwriteStoreOptions.snapshotResourceLimits`, or `SnapshotGridOptions.snapshotResourceLimits` |
