@@ -63,10 +63,8 @@ impl CellStore {
                 for run_row in row..run_end {
                     let src = s.idx(run_row, col);
                     let dst = (run_row - row_start) * n_cols + col_index;
-                    let resolved = if !s.is_loaded(run_row, col) {
-                        None
-                    } else if s.is_paged() {
-                        Some(s.resolved_cell_at(src))
+                    let resolved = if s.is_paged() {
+                        s.is_loaded(run_row, col).then(|| s.resolved_cell_at(src))
                     } else {
                         Some(
                             chunk
@@ -171,10 +169,8 @@ impl CellStore {
 
                 let dst = row_index * n_cols + col_index;
                 let src = s.idx(row, col);
-                let resolved = if !s.is_loaded(row, col) {
-                    None
-                } else if s.is_paged() {
-                    Some(s.resolved_cell_at(src))
+                let resolved = if s.is_paged() {
+                    s.is_loaded(row, col).then(|| s.resolved_cell_at(src))
                 } else {
                     if src / DERIVED_CHUNK_CELLS != chunk_index {
                         chunk_index = src / DERIVED_CHUNK_CELLS;
