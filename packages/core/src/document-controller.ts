@@ -63,8 +63,6 @@ export interface DocumentControllerOptions {
  * DOM or renderer dependency; GridImpl remains responsible for visual
  * invalidation after the store emits its document change.
  */
-const SET_BATCH_INVERSE_MIN_CELLS = 2048;
-
 export class DocumentController {
   private readonly history = new UndoManager();
   private applyingHistory = false;
@@ -211,11 +209,6 @@ export class DocumentController {
         const engine = storeEngine(this.options.store);
         if (engine) {
           for (const [sheet, sets] of setsBySheet) {
-            // Below this size the batch snapshot's grouping and decode cost matches the
-            // per-cell reads and makes timings bimodal; measured neutral at 1,000 cells,
-            // faster from 3,000.
-            if (sets.length < SET_BATCH_INVERSE_MIN_CELLS) continue;
-
             const captured = this.snapshotSetBatch(sheet, sets);
 
             for (const [index, patch] of sets.entries()) {
