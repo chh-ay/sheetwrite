@@ -32,6 +32,17 @@ pub(crate) struct DerivedChunk {
     count: usize,
 }
 
+impl DerivedChunk {
+    #[cold]
+    #[inline(never)]
+    fn new() -> Self {
+        Self {
+            values: vec![ABSENT_TAG; DERIVED_CHUNK_CELLS].into_boxed_slice(),
+            count: 0,
+        }
+    }
+}
+
 pub(crate) enum DerivedOverlay {
     Dense {
         chunks: Vec<Option<DerivedChunk>>,
@@ -148,10 +159,7 @@ impl DerivedOverlay {
             } => {
                 let chunk = chunks[index / DERIVED_CHUNK_CELLS].get_or_insert_with(|| {
                     *live_chunks += 1;
-                    DerivedChunk {
-                        values: vec![ABSENT_TAG; DERIVED_CHUNK_CELLS].into_boxed_slice(),
-                        count: 0,
-                    }
+                    DerivedChunk::new()
                 });
 
                 let value = &mut chunk.values[index % DERIVED_CHUNK_CELLS];
