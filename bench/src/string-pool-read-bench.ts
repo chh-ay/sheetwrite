@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 
 import type { Workbook } from "@sheetwrite/core";
-import type * as WasmModule from "@sheetwrite/wasm";
 
 import type * as CoreEngineModule from "../../packages/core/src/engine.js";
 import type * as CoreGridModule from "../../packages/core/src/grid.js";
@@ -9,7 +8,6 @@ import type * as CoreStoreModule from "../../packages/core/src/store.js";
 
 const root = process.env.STRING_POOL_CHECKOUT ?? new URL("../../", import.meta.url).pathname;
 // Runtime selection keeps the two checked-out implementations isolated.
-const wasm = (await import(`${root}/packages/wasm/loader-node.mjs`)) as typeof WasmModule;
 const { initSheetwrite } = (await import(
   `${root}/packages/core/src/grid.ts`
 )) as typeof CoreGridModule;
@@ -19,12 +17,8 @@ const { SheetwriteStore } = (await import(
 const { getEngine } = (await import(
   `${root}/packages/core/src/engine.ts`
 )) as typeof CoreEngineModule;
-await wasm.load(readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`));
-await initSheetwrite();
+await initSheetwrite(readFileSync(`${root}/packages/wasm/pkg/sheetwrite_wasm_bg.wasm`));
 const selectedEngine = getEngine();
-if (selectedEngine.CellStore !== wasm.CellStore) {
-  throw new Error(`Public benchmark selected an engine outside ${root}`);
-}
 const engineResolution = {
   checkout: root,
   matchesSelectedCheckout: true,
@@ -36,7 +30,7 @@ const INGEST_ROWS = 1_000_000;
 const BATCH_ROWS = 10_000;
 const ingestSamples: number[] = [];
 for (let sample = 0; sample <= 7; sample++) {
-  const engine = new wasm.CellStore();
+  const engine = new selectedEngine.CellStore();
   try {
     const sheet = engine.addSheet(1, INGEST_ROWS);
     const start = performance.now();

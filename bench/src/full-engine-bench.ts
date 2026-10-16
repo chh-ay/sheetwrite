@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
 
-import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
 import {
@@ -314,7 +313,7 @@ async function capture(): Promise<void> {
       initialization: { node, samplesMs, stat: summarize(samplesMs) },
     });
   }
-  await initSheetwrite(undefined, formulas);
+  await formulas.load();
   const analysis = ANALYSIS_CASES.map((scenario) =>
     collectFixture(
       scenario.id,

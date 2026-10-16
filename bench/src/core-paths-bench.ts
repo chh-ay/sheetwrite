@@ -23,6 +23,11 @@ import { cpus } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
+  createGridController,
+  type GridControllerHandlers,
+} from "../../packages/core/src/adapter.js";
+import { getEngine } from "../../packages/core/src/engine.js";
+import {
   type CellAddress,
   type CellLoadState,
   type CellScalar,
@@ -55,12 +60,9 @@ import {
   SyncCoordinator,
   type Workbook,
   type WorkbookSnapshot,
-} from "@sheetwrite/core";
-import { createGridController, type GridControllerHandlers } from "@sheetwrite/core/adapter";
-import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import { initSync } from "@sheetwrite/wasm";
-
+} from "../../packages/core/src/index.js";
 import { encodeRestoreBlock } from "../../packages/core/src/restore-block.js";
+import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import { assertFiniteNonNegative, type BenchmarkMode, validateRawStat } from "./gate-protocol.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, now, type Stat, summarize } from "./stats.js";
@@ -1269,17 +1271,21 @@ async function revisitEvictedBand(
 const FAILED_EVICTION = -1;
 
 /**
- * Runs in a fresh Node process. The child loads `@sheetwrite/wasm` through a
- * dynamic import so nothing else is imported before the timer starts: `load()`
- * is timed as a cold module initialization, and the heartbeat records how long
- * the event loop stalls while the module initializes.
+ * Runs in a fresh Node process. Core is imported before timing, as in an app;
+ * the measured span is initSheetwrite() through first-store construction.
+ * The heartbeat records event-loop stalls during that cold initialization.
  */
 const NODE_CHILD_PROGRAM = `
-const wasm = await import("@sheetwrite/wasm");
+import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 const ticks = [];
 const heartbeat = setInterval(() => { ticks.push(performance.now()); }, ${NODE_HEARTBEAT_MS});
 const startedAt = performance.now();
-await wasm.load();
+await initSheetwrite();
+const workbook = {
+  activeSheet: "s1",
+  sheets: [{ id: "s1", name: "Core paths", rowCount: 4, columns: [{ key: "c0", header: "C0", width: 80, type: "number" }] }],
+};
+const store = new SheetwriteStore(workbook);
 const endedAt = performance.now();
 const loadMs = endedAt - startedAt;
 clearInterval(heartbeat);
@@ -1290,19 +1296,13 @@ for (const tick of ticks) {
   previousTick = tick;
 }
 largestGapMs = Math.max(largestGapMs, endedAt - previousTick);
-const { SheetwriteStore } = await import("@sheetwrite/core");
-const workbook = {
-  activeSheet: "s1",
-  sheets: [{ id: "s1", name: "Core paths", rowCount: 4, columns: [{ key: "c0", header: "C0", width: 80, type: "number" }] }],
-};
-const store = new SheetwriteStore(workbook);
 const applied = store.applyTransaction({
   patches: [{ op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
 });
 process.stdout.write(JSON.stringify({
   loadMs,
   largestGapMs,
-  loaded: wasm.isLoaded(),
+  loaded: true,
   heartbeatTicks: ticks.length,
   engineStatus: applied.status,
   engineValue: store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved,
@@ -1391,7 +1391,7 @@ async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioRe
   }
   return scenarioResult(
     "node-cold-init",
-    `one cold load() of @sheetwrite/wasm in a fresh Node process (${
+    `one cold initSheetwrite() through first store in a fresh Node process (${
       plan.warmup + plan.iters
     } processes)`,
     samplesMs,
@@ -1486,7 +1486,7 @@ export async function runCorePathsBenchmark(
   const scale = mode === "smoke" ? SMOKE_SCALE : FULL_SCALE;
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
-  const wasm = initSync({ module: bytes });
+  const memory = getEngine().getMemory();
   const restoreCanvas = installCanvasTestStubs();
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
   const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
@@ -1535,7 +1535,7 @@ export async function runCorePathsBenchmark(
     scale,
     scenarios,
   };
-  if (wasm.memory.buffer.byteLength <= 0) fail("the loaded module exposes no memory");
+  if (memory.buffer.byteLength <= 0) fail("core's engine exposes no memory");
   validateCorePathsBenchmark(artifact, mode, scenarioIds);
   return artifact;
 }

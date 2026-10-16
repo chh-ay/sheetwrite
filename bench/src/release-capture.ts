@@ -269,7 +269,7 @@ async function main(): Promise<void> {
         : `writing evidence to ${resultsDir}`,
       smoke
         ? "the engine captures and the regression baseline have no smoke matrix and are skipped; run without --smoke for the release set"
-        : "run on an otherwise idle machine, pinned to one CPU (e.g. `taskset -c 4 bun run bench:release` on Linux); no concurrent builds or timing captures, because competing work adds scheduler and CPU noise",
+        : "run unpinned on an otherwise idle machine, with no concurrent builds or timing captures; the 0.4.0 and 0.5.0 captures both ran unpinned on the same machine",
       "",
     ].join("\n"),
   );

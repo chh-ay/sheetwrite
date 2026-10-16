@@ -83,6 +83,29 @@ interface CombinationOutput {
   readonly launchAttempts: readonly BrowserLaunchAttempt[];
 }
 
+/** Exit policy keeps comparison failures visible without hiding product regressions. */
+export function renderCaptureExitCode(results: readonly ScenarioResult[]): 0 | 1 {
+  return results.some((result) => {
+    if (result.status !== "failed") return false;
+
+    // Handsontable also overflowed these million-row alterations in 0.4.0.
+    return !(
+      result.engine === "handsontable" &&
+      result.rows === 1_000_000 &&
+      (result.scenarioId === "altering.insert-5-rows-top" ||
+        result.scenarioId === "altering.remove-5-rows-top") &&
+      result.errorClass === "RangeError" &&
+      result.message === "Maximum call stack size exceeded" &&
+      !result.timeout &&
+      !result.crash &&
+      result.consoleErrors.length === 0 &&
+      result.pageErrors.length === 0
+    );
+  })
+    ? 1
+    : 0;
+}
+
 interface RuntimeDiagnostics {
   readonly consoleErrors: readonly string[];
   readonly pageErrors: readonly string[];
@@ -760,7 +783,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
     process.stdout.write(json);
   }
 
-  if (!parsed.completeness.successful) process.exitCode = 1;
+  process.exitCode = renderCaptureExitCode(parsed.results);
 }
 
 if (import.meta.main) {

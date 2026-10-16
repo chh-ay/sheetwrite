@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { getEngine } from "../../packages/core/src/engine.js";
 import {
   type DataSourceColumnBand,
   type DocumentOp,
@@ -7,9 +8,7 @@ import {
   type RowData,
   SheetwriteStore,
   type Workbook,
-} from "@sheetwrite/core";
-import { initSync } from "@sheetwrite/wasm";
-
+} from "../../packages/core/src/index.js";
 import {
   assertFiniteNonNegative,
   assertGateIdentity,
@@ -536,9 +535,9 @@ async function runProbe(
 ): Promise<ProbeResult> {
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
-  const wasm = initSync({ module: bytes });
+  const memory = getEngine().getMemory();
   Bun.gc(true);
-  const wasmBefore = wasm.memory.buffer.byteLength;
+  const wasmBefore = memory.buffer.byteLength;
   const store = new SheetwriteStore(workbook(rowCount), undefined, {
     storage: "paged",
     chunkRows,
@@ -573,7 +572,7 @@ async function runProbe(
       : 0;
   const result = {
     scenario,
-    wasmDeltaBytes: wasm.memory.buffer.byteLength - wasmBefore,
+    wasmDeltaBytes: memory.buffer.byteLength - wasmBefore,
     ...stats,
     dirtyAllocatedBytes,
     retainedBytes: stats.allocatedBytes + dirtyAllocatedBytes,

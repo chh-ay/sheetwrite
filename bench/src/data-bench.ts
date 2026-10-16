@@ -37,10 +37,10 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
-import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
-import { CellStore, initSync } from "@sheetwrite/wasm";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
+import { getEngine } from "../../packages/core/src/engine.js";
+import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
 import {
   AGG_COL,
   COL,
@@ -622,7 +622,7 @@ function makeSeededQueryStore(ds: ColumnarDataset): SheetwriteStore {
 }
 
 function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
-  const store = new CellStore();
+  const store = new (getEngine().CellStore)();
   try {
     const sheet = store.addSheet(2, ds.rowCount);
     for (const [col, values] of [ds.city, ds.customer].entries()) {
@@ -1280,19 +1280,19 @@ function buildSheetwriteStore(rows: number): SheetwriteStore {
 }
 
 function probeSheetwriteMemory(rows: number): MemoryProfile {
-  const wasmExports = initSync(readFileSync(WASM_PATH));
+  const memory = getEngine().getMemory();
   forceGc();
   // Snapshot BEFORE building anything: the transient JS dataset is allocated
   // after this point and collected before the second snapshot, so the heap
   // delta reflects only what the store keeps on the JS heap (≈ 0 — data is WASM).
   const heap0 = process.memoryUsage().heapUsed;
-  const wasm0 = wasmExports.memory.buffer.byteLength;
+  const wasm0 = memory.buffer.byteLength;
   const store = buildSheetwriteStore(rows);
   store.aggregate(SHEET, AGG_COL, "sum"); // touch so the load is not elided
   retain.push(store);
   forceGc();
   const heap1 = process.memoryUsage().heapUsed;
-  const wasm1 = wasmExports.memory.buffer.byteLength;
+  const wasm1 = memory.buffer.byteLength;
   return { heapDeltaBytes: Math.max(0, heap1 - heap0), wasmDeltaBytes: wasm1 - wasm0 };
 }
 

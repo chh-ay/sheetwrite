@@ -310,15 +310,15 @@ artifact above. `bench:release` captures render-scale, the interaction
 evidence, paged storage, data, core paths, formula, formula engines, matched
 engines, and XLSX, then records the render regression baseline last. Every
 capture stamps its artifact with the commit, tree state, and timestamp.
-Use one pinned CPU on an otherwise idle machine, with no concurrent
-builds or timing captures. The example below uses CPU 4 on Linux:
+Run unpinned on an otherwise idle machine, with no concurrent builds or timing
+captures. The 0.4.0 and 0.5.0 captures both ran unpinned on the same machine.
 
 ```sh
 # Build first: every capture needs the built packages and WASM binaries.
 bun run build:packages
 
 # Then, from bench/, with the prepared XLSX comparison checkout:
-taskset -c 4 bun run bench:release --xlsx-baseline-root /path/to/sheetwrite-xlsx-baseline
+bun run bench:release --xlsx-baseline-root /path/to/sheetwrite-xlsx-baseline
 ```
 
 `bench:release` refuses a dirty tree, runs the captures in page order, stops at
@@ -332,6 +332,18 @@ rehearses the same order with the smoke
 matrices of the suites that have one, writing to `results/smoke/` (ignored by
 git) so a rehearsal never overwrites published evidence. Regenerate the page
 after a release capture with `bun run docs:generate`.
+
+Render captures retain structured failures, but only Handsontable's million-row
+`altering.insert-5-rows-top` and `altering.remove-5-rows-top` RangeErrors with
+`Maximum call stack size exceeded` are allowed to complete the capture. These
+same comparison-engine overflows occurred in 0.4.0; every other failed cell,
+including every Sheetwrite failure, still fails the run.
+
+The core-paths cold Node metric imports core before timing and measures
+`initSheetwrite()` through construction of the first store, rather than the
+published WASM singleton's `load()`. Core-backed memory probes observe core's
+own engine instance; raw formula-engine probes continue to observe their own
+published singleton.
 
 The performance showcase reads `results/paged-results.json` and
 `results/interaction-results.json`. `bench:paged` writes the paged capture;
