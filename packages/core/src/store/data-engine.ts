@@ -62,6 +62,7 @@ import type {
   RowGroup,
   Sheet,
   SheetSnapshot,
+  SnapshotCell,
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
@@ -1268,6 +1269,166 @@ export class StoreDataEngine {
     meta.columns.push(...additions);
   }
 
+  /** Persisted cells only: empty space and unstyled spill children need no history payload. */
+  captureSheetCells(sheet: SheetId): SnapshotCell[] {
+    const captured = this.windowReader.capturePersistedCells(sheet);
+    const formulas = new Map<number, string>();
+    const references = new Map<number, CellAddress>();
+    for (const [index, offset] of captured.formulaOffsets.entries()) {
+      const source = captured.formulaSources[index];
+      if (source === undefined) throw new Error("Missing persisted formula source");
+
+      formulas.set(offset, source);
+    }
+    for (const [index, offset] of captured.referenceOffsets.entries()) {
+      const target = referenceTargetFromPacked(
+        captured.referenceTargets.subarray(index * 3, index * 3 + 3),
+        this.sheetIdsByHandle,
+      );
+      if (!target) throw new Error("Missing persisted reference target");
+
+      references.set(offset, target);
+    }
+
+    const cells = captured.values.map((value, index): SnapshotCell => {
+      const row = captured.coordinates[index * 2];
+      const col = captured.coordinates[index * 2 + 1];
+      if (row === undefined || col === undefined)
+        throw new Error("Missing persisted cell coordinate");
+      const formula = formulas.get(index);
+      const reference = references.get(index);
+
+      return {
+        rowOffset: row,
+        colOffset: col,
+        value: formula
+          ? { kind: "formula", src: formula }
+          : reference
+            ? { kind: "ref", target: reference }
+            : { kind: "literal", value },
+        style: captured.styles[index],
+      };
+    });
+
+    return cells.sort(
+      (left, right) => left.rowOffset - right.rowOffset || left.colOffset - right.colOffset,
+    );
+  }
+
+  /** Sources for a whole logical sheet, without reading every resolved cell. */
+  captureSheetSources(sheet: SheetId): RangeSourceProjection | null {
+    const metadata = this.sheetMeta(sheet);
+    if (metadata.rowCount === 0 || metadata.columns.length === 0) return null;
+
+    return this.captureSourceProjection(sheet, 0, 0, metadata.rowCount, metadata.columns.length);
+  }
+
+  /** Whether a rectangular write would include a derived spill child. */
+  hasSpillChildren(range: Range): boolean {
+    const bounds = normalizedRange(range);
+    const columns = Array.from(
+      { length: bounds.end.col - bounds.start.col + 1 },
+      (_, index) => bounds.start.col + index,
+    );
+
+    return this.windowReader
+      .spillDerivedMask(bounds.sheet, { start: bounds.start.row, end: bounds.end.row + 1 }, columns)
+      .some((derived) => derived !== 0);
+  }
+
+  /**
+   * Capture resolved cells and serializable sources in input order. Rows with
+   * the same selected columns share a source read, without capturing the empty
+   * bounding rectangle of a sparse selection.
+   */
+  captureCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): Array<ResolvedCell & { value: CellValue; isSpillChild: boolean }> {
+    if (coordinates.length === 0) return [];
+
+    const resolved = this.captureSparseBeforeCells(
+      { sheet, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      coordinates.map(({ row, col }) => ({ rowOffset: row, colOffset: col })),
+    );
+    const captured = resolved.map((cell) => ({
+      ...cell,
+      value: { kind: "literal", value: cell.resolved } as CellValue,
+      isSpillChild: false,
+    }));
+
+    const byRow = new Map<number, Map<number, number[]>>();
+    for (const [index, coordinate] of coordinates.entries()) {
+      let columns = byRow.get(coordinate.row);
+      if (!columns) {
+        columns = new Map();
+        byRow.set(coordinate.row, columns);
+      }
+
+      const indices = columns.get(coordinate.col) ?? [];
+      indices.push(index);
+      columns.set(coordinate.col, indices);
+    }
+
+    const groups = new Map<string, { rows: number[]; cols: number[] }>();
+    for (const [row, columns] of byRow) {
+      const cols = [...columns.keys()].sort((left, right) => left - right);
+      const key = cols.join(",");
+      const group = groups.get(key);
+      if (group) group.rows.push(row);
+      else groups.set(key, { rows: [row], cols });
+    }
+
+    for (const { rows, cols } of groups.values()) {
+      const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
+      if (!snapshot) continue;
+
+      const spillDerived = snapshot.spillDerived();
+      const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
+      for (const [rowIndex, row] of rows.entries()) {
+        const columns = byRow.get(row);
+        if (!columns) throw new Error("Missing row in cell capture");
+
+        for (const [colIndex, col] of cols.entries()) {
+          const offset = rowIndex * cols.length + colIndex;
+          const formula = sources.formulaAt(offset);
+          const reference = sources.referenceAt(offset);
+          for (const index of columns.get(col) ?? []) {
+            const cell = captured[index];
+            if (!cell) throw new Error("Missing resolved cell in cell capture");
+
+            cell.isSpillChild = Boolean(spillDerived[offset]);
+            cell.value = formula
+              ? { kind: "formula", src: formula }
+              : reference
+                ? { kind: "ref", target: reference }
+                : { kind: "literal", value: spillDerived[offset] ? null : cell.resolved };
+          }
+        }
+      }
+    }
+
+    return captured;
+  }
+
+  captureResolvedCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): ResolvedCell[] {
+    const rows = new Uint32Array(coordinates.length);
+    const columns = new Uint32Array(coordinates.length);
+
+    for (const [index, cell] of coordinates.entries()) {
+      rows[index] = cell.row;
+      columns[index] = cell.col;
+    }
+
+    return consumeCellSnapshots(
+      this.wasm.cellSnapshots(this.handleOf(sheet), rows, columns),
+      (styleId) => this.styles.get(styleId),
+    );
+  }
+
   /**
    * Previous values of a sparse cell list, read in one batched call.
    *
@@ -1607,6 +1768,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+        // Grouped source snapshots allocate more than scalar admission for sparse writes.
         if (
           patch.cells.some((cell) => {
             const row = bounds.start.row + cell.rowOffset;
@@ -1763,21 +1925,10 @@ export class StoreDataEngine {
         const clearStyle = patch.style ?? true;
         const beforeCells =
           changes && captureDetailedChanges && clearContents
-            ? Array.from(
-                {
-                  length:
-                    (bounds.end.row - bounds.start.row + 1) *
-                    (bounds.end.col - bounds.start.col + 1),
-                },
-                (_, offset) => {
-                  const cols = bounds.end.col - bounds.start.col + 1;
-                  const row = bounds.start.row + Math.floor(offset / cols);
-                  const col = bounds.start.col + (offset % cols);
-                  return {
-                    addr: { sheet: bounds.sheet, row, col },
-                    before: this.getCell({ sheet: bounds.sheet, row, col }),
-                  };
-                },
+            ? this.captureBlockBeforeCells(
+                bounds,
+                bounds.end.row - bounds.start.row + 1,
+                bounds.end.col - bounds.start.col + 1,
               )
             : null;
         const applied = this.wasm.clearRange(
@@ -2908,13 +3059,15 @@ export class StoreDataEngine {
     style: CellStyle | undefined,
     sources?: RangeSourceProjection | null,
     sourceOffset = 0,
+    current: ResolvedCell = this.getCell(addr),
   ): boolean {
-    const current = this.getCell(addr);
     if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
+
     const formula =
       sources === undefined ? this.getFormula(addr) : sources?.formulaAt(sourceOffset);
     const target =
       sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(sourceOffset);
+
     if (value.kind === "formula") return formula === value.src;
     if (value.kind === "ref") {
       return (
@@ -2923,6 +3076,7 @@ export class StoreDataEngine {
         target.col === value.target.col
       );
     }
+
     return formula == null && target == null && Object.is(current.resolved, value.value);
   }
 
@@ -2931,11 +3085,14 @@ export class StoreDataEngine {
       this.wasm.acknowledgeRevision(storageRevision);
       return;
     }
+
     for (const operation of operations) {
       if (operation.op === "set") {
+        // Read in operation order so a later invalid address cannot prevent earlier acknowledgements.
         if (!this.acknowledgedSetStillMatches(operation.addr, operation.value, operation.style)) {
           continue;
         }
+
         this.wasm.markRangeClean(
           this.handleOf(operation.addr.sheet),
           operation.addr.row,
@@ -2954,9 +3111,16 @@ export class StoreDataEngine {
           rows,
           cols,
         );
-        for (const cell of operation.cells) {
+
+        const currentCells = this.captureSparseBeforeCells(range, operation.cells);
+        const matchedRowsByColumn = new Map<number, Set<number>>();
+
+        for (const [index, cell] of operation.cells.entries()) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
+          const current = currentCells[index];
+          if (!current) continue;
+
           if (
             !this.acknowledgedSetStillMatches(
               { sheet: range.sheet, row, col },
@@ -2964,11 +3128,39 @@ export class StoreDataEngine {
               cell.style,
               sources,
               cell.rowOffset * cols + cell.colOffset,
+              current,
             )
           ) {
             continue;
           }
-          this.wasm.markRangeClean(this.handleOf(range.sheet), row, row + 1, col, col + 1);
+
+          let matchedRows = matchedRowsByColumn.get(col);
+          if (!matchedRows) {
+            matchedRows = new Set<number>();
+            matchedRowsByColumn.set(col, matchedRows);
+          }
+
+          matchedRows.add(row);
+        }
+
+        for (const [col, matchedRows] of matchedRowsByColumn) {
+          const sortedRows = [...matchedRows].sort((left, right) => left - right);
+          let start: number | undefined;
+          let end: number | undefined;
+
+          for (const row of sortedRows) {
+            if (end !== undefined && row !== end && start !== undefined) {
+              this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+              start = undefined;
+            }
+
+            start ??= row;
+            end = row + 1;
+          }
+
+          if (start !== undefined && end !== undefined) {
+            this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+          }
         }
       } else if (
         operation.op === "setBlock" ||

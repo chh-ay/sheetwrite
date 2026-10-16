@@ -51,6 +51,69 @@ afterEach(() => {
 });
 
 describe("Grid worksheet lifecycle", () => {
+  it("restores deleted-sheet formulas, spills, cross-sheet sources and styles with one undo", () => {
+    const model = workbook([
+      { id: "one", name: "One" },
+      { id: "two", name: "Two" },
+    ]);
+    for (const sheet of model.sheets) {
+      sheet.rowCount = 4;
+      sheet.columns.push({ key: "second", header: "Second", width: 100, type: "number" });
+    }
+
+    const grid = new GridImpl(mountHost(), { workbook: model });
+    const anchor = { sheet: "one", row: 0, col: 0 };
+    const outgoing = { sheet: "one", row: 3, col: 1 };
+    const target = { sheet: "two", row: 0, col: 0 };
+    const externalFormula = { ...target, col: 1 };
+    const incoming = { ...target, row: 1, col: 1 };
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: target, value: { kind: "literal", value: 10 } },
+        {
+          op: "set",
+          addr: anchor,
+          value: { kind: "formula", src: "=SEQUENCE(3)" },
+          style: { bold: true },
+        },
+        {
+          op: "setRangeStyle",
+          range: { sheet: "one", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+          style: { italic: true },
+        },
+        { op: "set", addr: outgoing, value: { kind: "ref", target }, style: { italic: true } },
+        { op: "set", addr: externalFormula, value: { kind: "formula", src: "='One'!A2+1" } },
+        {
+          op: "set",
+          addr: incoming,
+          value: { kind: "ref", target: { ...anchor, row: 2 } },
+          style: { underline: true },
+        },
+      ],
+    });
+    const before = grid.exportSnapshot().sheets;
+
+    expect(grid.removeSheet("one").status).toBe("applied");
+    grid.actions.undo();
+    expect(grid.exportSnapshot().sheets).toEqual(before);
+    expect(grid.store.getFormula(anchor)).toBe("=SEQUENCE(3)");
+    expect(grid.store.getCell({ ...anchor, row: 2 }).resolved).toBe(3);
+    expect(grid.store.getSpillAnchor({ ...anchor, row: 2 })).toEqual(anchor);
+    expect(grid.store.getCell({ ...anchor, row: 1 })).toMatchObject({
+      resolved: 2,
+      style: { italic: true },
+    });
+    expect(grid.store.getRefTarget(outgoing)).toEqual(target);
+    expect(grid.store.getRefTarget(incoming)).toEqual({ ...anchor, row: 2 });
+    expect(grid.store.getFormula(externalFormula)).toBe("='One'!A2+1");
+    expect(grid.store.getCell(externalFormula).resolved).toBe(3);
+    expect(grid.store.getCell(incoming)).toMatchObject({ resolved: 3, style: { underline: true } });
+
+    grid.actions.redo();
+    expect(model.sheets.map((sheet) => sheet.id)).toEqual(["two"]);
+    grid.destroy();
+  });
+
   it("returns stable targets and structured canonical-name outcomes", () => {
     const model = workbook([
       { id: "one", name: "Sheet 1" },

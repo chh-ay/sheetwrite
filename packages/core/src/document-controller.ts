@@ -22,6 +22,7 @@ import {
 import { cloneCellHyperlink } from "./hyperlink.js";
 import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
 import { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
@@ -195,7 +196,35 @@ export class DocumentController {
     let outcome: ApplyTransactionResult;
 
     try {
-      for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
+      // One edit avoids the coordinate/grouping allocation of a batch snapshot.
+      if (patches.length > 1) {
+        const setsBySheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
+        for (const patch of patches) {
+          if (patch.op !== "set") continue;
+          const sets = setsBySheet.get(patch.addr.sheet) ?? [];
+          sets.push(patch);
+          setsBySheet.set(patch.addr.sheet, sets);
+        }
+
+        const engine = storeEngine(this.options.store);
+        if (engine) {
+          for (const [sheet, sets] of setsBySheet) {
+            const captured = this.snapshotSetBatch(sheet, sets);
+
+            for (const [index, patch] of sets.entries()) {
+              const cell = captured[index];
+              if (!cell) throw new Error("Missing captured inverse cell");
+
+              inverseByPatch.set(patch, [cell]);
+            }
+          }
+        }
+      }
+
+      // Custom stores without an engine retain their scalar snapshot contract.
+      for (const patch of patches) {
+        if (!inverseByPatch.has(patch)) inverseByPatch.set(patch, this.inversePatch(patch));
+      }
 
       outcome = this.storeApply(patches, reason, admittedPatches);
     } catch (error) {
@@ -230,7 +259,13 @@ export class DocumentController {
     const appliedSet = new Set(applied);
     const inverse: HistoryAction = [];
 
-    for (const [patch, items] of inverseByPatch) {
+    // Bulk capture groups by sheet; history still follows input order and
+    // captures a reused operation object only once.
+    for (const patch of patches) {
+      const items = inverseByPatch.get(patch);
+      if (!items) continue;
+      inverseByPatch.delete(patch);
+
       if (!appliedSet.has(patch)) {
         for (const item of items) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
@@ -320,7 +355,59 @@ export class DocumentController {
     switch (patch.op) {
       case "set":
         return [this.snapshotCell(patch.addr)];
-      case "setRange":
+      case "setRange": {
+        const engine = storeEngine(this.options.store);
+        const width = Math.abs(patch.range.end.col - patch.range.start.col) + 1;
+        const height = Math.abs(patch.range.end.row - patch.range.start.row) + 1;
+
+        if (
+          engine &&
+          (patch.cells.length !== width * height ||
+            patch.cells.some((cell) => cell.rowOffset >= height || cell.colOffset >= width))
+        ) {
+          const rowStart = Math.min(patch.range.start.row, patch.range.end.row);
+          const colStart = Math.min(patch.range.start.col, patch.range.end.col);
+          const captured = engine.captureCells(
+            patch.range.sheet,
+            patch.cells.map((cell) => ({
+              row: rowStart + cell.rowOffset,
+              col: colStart + cell.colOffset,
+            })),
+          );
+
+          return [
+            {
+              op: "setRange",
+              range: patch.range,
+              cells: patch.cells.map((cell, index) => {
+                const previous = captured[index];
+                if (!previous) throw new Error("Missing captured sparse inverse cell");
+
+                return {
+                  rowOffset: cell.rowOffset,
+                  colOffset: cell.colOffset,
+                  value: previous.value,
+                  style: previous.style,
+                };
+              }),
+            },
+          ];
+        }
+
+        const captured = this.snapshotRangeCells(patch.range);
+        return [
+          {
+            op: "setRange",
+            range: patch.range,
+            cells: patch.cells.map((cell) => {
+              const previous = captured[cell.rowOffset * width + cell.colOffset];
+              if (!previous) throw new Error("Missing captured dense inverse cell");
+
+              return { ...cell, value: previous.value, style: previous.style };
+            }),
+          },
+        ];
+      }
       case "setBlock":
       case "restoreBlock":
       case "setRangeStyle":
@@ -709,6 +796,66 @@ export class DocumentController {
     return patches;
   }
 
+  private snapshotSetBatch(
+    sheet: SheetId,
+    sets: readonly Extract<DocumentOp, { op: "set" }>[],
+  ): Array<Extract<DocumentOp, { op: "set" }>> {
+    const engine = storeEngine(this.options.store);
+    // Custom stores without an engine retain their scalar snapshot contract.
+    if (!engine) return sets.map((patch) => this.snapshotCell(patch.addr));
+
+    const first = sets[0];
+    if (!first) return [];
+
+    let rowStart = first.addr.row;
+    let rowEnd = rowStart;
+    let colStart = first.addr.col;
+    let colEnd = colStart;
+    for (const { addr } of sets) {
+      rowStart = Math.min(rowStart, addr.row);
+      rowEnd = Math.max(rowEnd, addr.row);
+      colStart = Math.min(colStart, addr.col);
+      colEnd = Math.max(colEnd, addr.col);
+    }
+
+    const width = colEnd - colStart + 1;
+    const dense =
+      sets.length === (rowEnd - rowStart + 1) * width &&
+      sets.every(
+        ({ addr }, index) =>
+          addr.row === rowStart + Math.floor(index / width) &&
+          addr.col === colStart + (index % width),
+      );
+    const range = {
+      sheet,
+      start: { row: rowStart, col: colStart },
+      end: { row: rowEnd, col: colEnd },
+    };
+    const capturedRange = dense ? this.captureRangeCells(range) : null;
+
+    // Per-operation inverses retain only applied cells when a batch partially
+    // succeeds; the range resource itself cannot represent that subset.
+    if (capturedRange) {
+      return sets.map((patch, offset) => {
+        const cell = capturedRange[offset];
+        if (!cell) throw new Error("Missing captured dense inverse cell");
+
+        return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
+      });
+    }
+
+    const captured = engine.captureCells(
+      sheet,
+      sets.map((patch) => patch.addr),
+    );
+    return sets.map((patch, index) => {
+      const cell = captured[index];
+      if (!cell) throw new Error("Missing captured inverse cell");
+
+      return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
+    });
+  }
+
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
     const formula = this.options.loadable?.getFormula(addr) ?? this.options.store.getFormula(addr);
     const refTarget = this.options.store.getRefTarget(addr);
@@ -723,7 +870,42 @@ export class DocumentController {
     return { op: "set", addr, value, style: cell.style };
   }
 
+  private captureRangeCells(range: Range): SnapshotCell[] | null {
+    const snapshot = storeEngine(this.options.store)?.captureRangeHistory(range);
+    if (!snapshot) return null;
+
+    let block: Extract<DocumentOp, { op: "setBlock" }>["block"];
+    try {
+      block = snapshot.toDocumentOp(range).block;
+    } finally {
+      snapshot.dispose();
+    }
+
+    const formulas = new Map(block.formulas);
+    const references = new Map(block.refs);
+    return block.values.map((value, offset) => {
+      const formula = formulas.get(offset);
+      const reference = references.get(offset);
+      const styleId = block.styleIds?.[offset];
+
+      return {
+        rowOffset: Math.floor(offset / block.colCount),
+        colOffset: offset % block.colCount,
+        value: formula
+          ? { kind: "formula", src: formula }
+          : reference
+            ? { kind: "ref", target: reference }
+            : { kind: "literal", value },
+        style: styleId === undefined ? undefined : block.styleTable?.[styleId],
+      };
+    });
+  }
+
   private snapshotRangeCells(range: Range): SnapshotCell[] {
+    const captured = this.captureRangeCells(range);
+    if (captured) return captured;
+
+    // Custom stores and unavailable range captures retain their scalar snapshot contract.
     const r0 = Math.min(range.start.row, range.end.row);
     const r1 = Math.max(range.start.row, range.end.row);
     const c0 = Math.min(range.start.col, range.end.col);
@@ -740,35 +922,48 @@ export class DocumentController {
         });
       }
     }
+
     return cells;
   }
 
   private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): DocumentOp[] {
-    const patches: DocumentOp[] = [];
+    const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     const r0 = Math.min(merge.r0, merge.r1);
     const r1 = Math.max(merge.r0, merge.r1);
     const c0 = Math.min(merge.c0, merge.c1);
     const c1 = Math.max(merge.c0, merge.c1);
+
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
-        patches.push(this.snapshotCell({ sheet, row, col }));
+        patches.push({
+          op: "set",
+          addr: { sheet, row, col },
+          value: { kind: "literal", value: null },
+        });
       }
     }
-    return patches;
+
+    return this.snapshotSetBatch(sheet, patches);
   }
 
   private snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
-    const cells: SnapshotCell[] = [];
-    for (let row = 0; row < sheet.rowCount; row++) {
-      for (let col = 0; col < sheet.columns.length; col++) {
-        const patch = this.snapshotCell({ sheet: id, row, col });
-        const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
-        if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
-        cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
+
+    const engine = storeEngine(this.options.store);
+    const cells: SnapshotCell[] = engine?.captureSheetCells(id) ?? [];
+    // Custom stores without an engine retain their scalar snapshot contract.
+    if (!engine) {
+      for (let row = 0; row < sheet.rowCount; row++) {
+        for (let col = 0; col < sheet.columns.length; col++) {
+          const patch = this.snapshotCell({ sheet: id, row, col });
+          const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
+          if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
+          cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
+        }
       }
     }
+
     const rowMeta: Array<[number, { height?: number; hidden?: boolean }]> = [];
     const rows = new Set([
       ...(sheet.rowHeights?.keys() ?? []),
@@ -822,14 +1017,39 @@ export class DocumentController {
     const patches: DocumentOp[] = [];
     for (const sheet of this.options.store.getWorkbook().sheets) {
       if (sheet.id === removedSheet) continue;
-      for (let row = 0; row < sheet.rowCount; row++) {
-        for (let col = 0; col < sheet.columns.length; col++) {
-          const addr = { sheet: sheet.id, row, col };
-          if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
-            patches.push(this.snapshotCell(addr));
+      const engine = storeEngine(this.options.store);
+      if (engine) {
+        const sources = engine.captureSheetSources(sheet.id);
+        const offsets = new Set([
+          ...(sources?.formulaOffsets ?? []),
+          ...(sources?.referenceOffsets ?? []),
+        ]);
+        const addresses = [...offsets]
+          .sort((left, right) => left - right)
+          .map((offset) => ({
+            sheet: sheet.id,
+            row: Math.floor(offset / sheet.columns.length),
+            col: offset % sheet.columns.length,
+          }));
+        const captured = engine.captureCells(sheet.id, addresses);
+        for (const [index, addr] of addresses.entries()) {
+          const cell = captured[index];
+          if (!cell) throw new Error("Missing external source snapshot");
+
+          patches.push({ op: "set", addr, value: cell.value, style: cell.style });
+        }
+      } else {
+        // Custom stores without an engine retain their scalar source discovery contract.
+        for (let row = 0; row < sheet.rowCount; row++) {
+          for (let col = 0; col < sheet.columns.length; col++) {
+            const addr = { sheet: sheet.id, row, col };
+            if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
+              patches.push(this.snapshotCell(addr));
+            }
           }
         }
       }
+
       for (const hyperlink of sheet.hyperlinks ?? []) {
         if (hyperlink.target.kind === "internal" && hyperlink.target.range.sheet === removedSheet) {
           patches.push({
@@ -840,6 +1060,7 @@ export class DocumentController {
         }
       }
     }
+
     return patches;
   }
 

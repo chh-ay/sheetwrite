@@ -8,7 +8,7 @@ description: "Default canvas theme used before CSS and explicit theme overrides.
 Default canvas theme used before CSS and explicit theme overrides.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L255"><code>packages/core/src/grid.ts#L255</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L256"><code>packages/core/src/grid.ts#L256</code></a></dd></div>
 </dl>
 
 ## Declaration

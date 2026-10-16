@@ -8,7 +8,7 @@ description: "Creates and mounts an imperative Grid in the supplied host element
 Creates and mounts an imperative Grid in the supplied host element.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L346"><code>packages/core/src/grid.ts#L346</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L347"><code>packages/core/src/grid.ts#L347</code></a></dd></div>
 </dl>
 
 ## Declaration

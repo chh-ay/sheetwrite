@@ -1,8 +1,9 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellStyle, CellValue } from "./types/cell.js";
-import type { SheetId } from "./types/coordinates.js";
-import type { DocumentOp, Sheet } from "./types/document.js";
+import type { CellAddress, SheetId } from "./types/coordinates.js";
+import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 
@@ -61,8 +62,8 @@ export class StyleActions {
   }
 
   /**
-   * Re-set selected cells, preserving each value, with `patch` merged into the
-   * style (cleared when `patch` is null).
+   * Preserve selected values while merging `patch` into their stored styles
+   * (or clearing styles when `patch` is null).
    */
   applyStyle(patch: Partial<CellStyle> | null): void {
     const selection = this.deps.selection();
@@ -112,6 +113,8 @@ export class StyleActions {
       this.deps.commit(patches);
       return;
     }
+
+    const anchors: CellAddress[] = [];
     for (const rect of rects) {
       for (let r = rect.r0; r <= rect.r1; r++) {
         for (let c = rect.c0; c <= rect.c1; c++) {
@@ -125,20 +128,52 @@ export class StyleActions {
             row: this.deps.toDataRow(cellRef.row),
             col: cellRef.col,
           };
-          const formula = this.deps.loadable?.getFormula(addr) ?? null;
-          const cell = this.deps.store.getCell(addr);
-          const value: CellValue = formula
-            ? { kind: "formula", src: formula }
-            : { kind: "literal", value: cell.resolved };
-          patches.push({
-            op: "set",
-            addr,
-            value,
-            style: patch ? { ...cell.style, ...patch } : undefined,
-          });
+          anchors.push(addr);
         }
       }
     }
+
+    const captured = storeEngine(this.deps.store)?.captureCells(activeSheet, anchors);
+    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    const scalarWrites =
+      !captured ||
+      Boolean(
+        sheet.validationRules?.length ||
+        sheet.protectedRanges?.length ||
+        captured.some((cell) => cell.isSpillChild),
+      );
+    const cells: SnapshotCell[] = [];
+    let endRow = 0;
+    let endCol = 0;
+    for (const [index, addr] of anchors.entries()) {
+      const cell = captured?.[index] ?? this.deps.store.getCell(addr);
+      // Custom stores without an engine retain their scalar source read contract.
+      const persisted = captured?.[index]?.value;
+      const formula = captured
+        ? persisted?.kind === "formula"
+          ? persisted.src
+          : null
+        : (this.deps.loadable?.getFormula(addr) ?? null);
+      const value: CellValue = formula
+        ? { kind: "formula", src: formula }
+        : { kind: "literal", value: cell.resolved };
+      const style = patch ? { ...cell.style, ...patch } : undefined;
+      if (scalarWrites) patches.push({ op: "set", addr, value, style });
+      else {
+        cells.push({ rowOffset: addr.row, colOffset: addr.col, value, style });
+        endRow = Math.max(endRow, addr.row);
+        endCol = Math.max(endCol, addr.col);
+      }
+    }
+
+    // setRange preserves per-cell change events; setRangeStyle reports no cell effects.
+    if (cells.length > 0)
+      patches.push({
+        op: "setRange",
+        range: { sheet: activeSheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
+        cells,
+      });
+
     this.deps.commit(patches);
   }
 
@@ -176,17 +211,38 @@ export class StyleActions {
       return;
     }
 
+    const range = {
+      sheet: activeSheet,
+      start: { row: merge.r0, col: merge.c0 },
+      end: { row: merge.r1, col: merge.c1 },
+    };
+    const engine = storeEngine(this.deps.store);
+    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    const scalarWrites =
+      !engine ||
+      Boolean(
+        sheet.validationRules?.length ||
+        sheet.protectedRanges?.length ||
+        engine.hasSpillChildren(range),
+      );
+    const cells: SnapshotCell[] = [];
     const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
     for (let row = merge.r0; row <= merge.r1; row++) {
       for (let col = merge.c0; col <= merge.c1; col++) {
         if (row === merge.r0 && col === merge.c0) continue;
-        patches.push({
-          op: "set",
-          addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
-          value: { kind: "literal", value: null },
-        });
+        const value: CellValue = { kind: "literal", value: null };
+        if (scalarWrites) {
+          patches.push({
+            op: "set",
+            addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
+            value,
+          });
+        } else cells.push({ rowOffset: row - merge.r0, colOffset: col - merge.c0, value });
       }
     }
+
+    if (cells.length > 0) patches.push({ op: "setRange", range, cells });
+
     this.deps.commit(patches);
   }
 

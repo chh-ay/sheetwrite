@@ -9,9 +9,10 @@ import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
-import type { CommitReason, DocumentOp, Sheet } from "./types/document.js";
+import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
@@ -1034,59 +1035,109 @@ export class InteractionSessions {
 
   private commitFill(source: SelRect, target: SelRect): boolean {
     if (this.deps.readOnly()) return false;
-    const srcCols = source.c1 - source.c0 + 1;
-    const series = new Map<number, FillSeries>();
-    const patches: DocumentOp[] = [];
 
-    for (let c = target.c0; c <= target.c1; c++) {
-      const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
-      series.set(sc, this.seriesForColumn(source, sc));
+    const sheet = this.deps.activeSheet();
+    const srcCols = source.c1 - source.c0 + 1;
+    const coordinates: Array<{ row: number; col: number }> = [];
+    for (let row = source.r0; row <= source.r1; row++) {
+      for (let col = source.c0; col <= source.c1; col++) {
+        coordinates.push({ row: this.deps.toDataRow(row), col });
+      }
     }
 
-    for (let r = target.r0; r <= target.r1; r++) {
-      for (let c = target.c0; c <= target.c1; c++) {
-        if (r >= source.r0 && r <= source.r1 && c >= source.c0 && c <= source.c1) continue;
+    const captured = storeEngine(this.deps.store)?.captureCells(sheet, coordinates);
+    // Custom stores without an engine retain their scalar read contract.
+    const sources = coordinates.map((coordinate, index) => {
+      const cell = captured?.[index];
+      const addr = { sheet, ...coordinate };
+      return {
+        resolved: cell ? cell.resolved : this.deps.store.getCell(addr).resolved,
+        formula: cell
+          ? cell.value.kind === "formula"
+            ? cell.value.src
+            : null
+          : (this.deps.loadable?.getFormula(addr) ?? null),
+      };
+    });
 
+    const series = new Map<number, FillSeries>();
+    for (let col = source.c0; col <= source.c1; col++) {
+      const cells: FillSourceCell[] = [];
+      for (let row = source.r0; row <= source.r1; row++) {
+        const cell = sources[(row - source.r0) * srcCols + col - source.c0];
+        if (!cell) throw new Error("Missing captured fill source");
+
+        cells.push({ value: cell.resolved, isFormula: cell.formula !== null });
+      }
+
+      series.set(col, detectFillSeries(cells));
+    }
+
+    const output = { ...target };
+    if (target.r0 < source.r0) output.r1 = source.r0 - 1;
+    else if (target.r1 > source.r1) output.r0 = source.r1 + 1;
+    else if (target.c0 < source.c0) output.c1 = source.c0 - 1;
+    else if (target.c1 > source.c1) output.c0 = source.c1 + 1;
+    else return false;
+
+    const dataRows: number[] = [];
+    for (let row = output.r0; row <= output.r1; row++) dataRows.push(this.deps.toDataRow(row));
+    const firstRow = dataRows[0];
+    if (firstRow === undefined) return false;
+
+    const startRow = dataRows.reduce((minimum, row) => Math.min(minimum, row), firstRow);
+    const endRow = dataRows.reduce((maximum, row) => Math.max(maximum, row), firstRow);
+    const range = {
+      sheet,
+      start: { row: startRow, col: output.c0 },
+      end: { row: endRow, col: output.c1 },
+    };
+    const metadata = this.deps.sheet();
+    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    const scalarWrites = Boolean(
+      metadata.validationRules?.length ||
+      metadata.protectedRanges?.length ||
+      storeEngine(this.deps.store)?.hasSpillChildren(range),
+    );
+    const patches: DocumentOp[] = [];
+    const cells: SnapshotCell[] = [];
+
+    for (let r = output.r0; r <= output.r1; r++) {
+      for (let c = output.c0; c <= output.c1; c++) {
         const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
         const columnSeries = series.get(sc);
         if (!columnSeries) throw new Error(`Missing fill series for column ${sc}`);
+
         const step = columnSeries.stepAt(r - source.r0);
         const targetDataRow = this.deps.toDataRow(r);
-        patches.push({
-          op: "set",
-          addr: { sheet: this.deps.activeSheet(), row: targetDataRow, col: c },
-          value:
-            step.kind === "value"
-              ? { kind: "literal", value: step.value }
-              : this.fillValueFrom(
-                  source.r0 + step.sourceIndex,
-                  sc,
-                  targetDataRow - this.deps.toDataRow(source.r0 + step.sourceIndex),
+        let value: CellValue;
+        if (step.kind === "value") value = { kind: "literal", value: step.value };
+        else {
+          const sourceRow = source.r0 + step.sourceIndex;
+          const cell = sources[step.sourceIndex * srcCols + sc - source.c0];
+          if (!cell) throw new Error("Missing captured fill source");
+
+          value = cell.formula
+            ? {
+                kind: "formula",
+                src: shiftA1Refs(
+                  cell.formula,
+                  targetDataRow - this.deps.toDataRow(sourceRow),
                   c - sc,
                 ),
-        });
+              }
+            : { kind: "literal", value: cell.resolved };
+        }
+
+        if (scalarWrites) {
+          patches.push({ op: "set", addr: { sheet, row: targetDataRow, col: c }, value });
+        } else cells.push({ rowOffset: targetDataRow - startRow, colOffset: c - output.c0, value });
       }
     }
-    return this.deps.commit(patches, "fill").status === "applied";
-  }
 
-  private seriesForColumn(source: SelRect, col: number): FillSeries {
-    const cells: FillSourceCell[] = [];
-    for (let row = source.r0; row <= source.r1; row++) {
-      const addr = { sheet: this.deps.activeSheet(), row: this.deps.toDataRow(row), col };
-      cells.push({
-        value: this.deps.store.getCell(addr).resolved,
-        isFormula: (this.deps.loadable?.getFormula(addr) ?? null) !== null,
-      });
-    }
-    return detectFillSeries(cells);
-  }
-
-  private fillValueFrom(sr: number, sc: number, dRow: number, dCol: number): CellValue {
-    const addr = { sheet: this.deps.activeSheet(), row: this.deps.toDataRow(sr), col: sc };
-    const formula = this.deps.loadable?.getFormula(addr) ?? null;
-    if (formula) return { kind: "formula", src: shiftA1Refs(formula, dRow, dCol) };
-    return { kind: "literal", value: this.deps.store.getCell(addr).resolved };
+    // setRange keeps per-cell change events; setBlock reports them only on opt-in.
+    const patch: DocumentOp = { op: "setRange", range, cells };
+    return this.deps.commit(scalarWrites ? patches : [patch], "fill").status === "applied";
   }
 
   /**

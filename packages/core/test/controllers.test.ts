@@ -17,6 +17,103 @@ beforeAll(async () => {
 });
 
 describe("DocumentController", () => {
+  it("keeps an out-of-range sparse write a no-op without adding history", () => {
+    const store = new SheetwriteStore(makeWorkbook(4));
+    const controller = new DocumentController({
+      store,
+      loadable: store,
+      readOnly: () => false,
+      epoch: () => 0,
+      materializeVirtualColumns: (patches) => patches,
+      onMutationRejected: () => {},
+      onHistoryApplied: () => {},
+    });
+
+    expect(
+      controller.commit(
+        [
+          {
+            op: "setRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+            cells: [{ rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "outside" } }],
+          },
+        ],
+        "api",
+      ).status,
+    ).toBe("noop");
+    expect(controller.canUndo).toBe(false);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
+    controller.destroy();
+    store.dispose();
+  });
+
+  it.each(["dense", "sparse"])(
+    "restores %s batched formulas, references, styles and spill children through undo/redo",
+    (layout) => {
+      const store = new SheetwriteStore(makeWorkbook(6));
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 5, col: 2 } };
+      const formula = { sheet: "s1", row: 0, col: 0 };
+      const reference =
+        layout === "dense" ? { sheet: "s1", row: 3, col: 0 } : { sheet: "s1", row: 5, col: 2 };
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: formula,
+            value: { kind: "formula", src: "=SEQUENCE(3)" },
+            style: { bold: true },
+          },
+          {
+            op: "set",
+            addr: reference,
+            value: { kind: "ref", target: formula },
+            style: { italic: true },
+          },
+        ],
+      });
+      const controller = new DocumentController({
+        store,
+        loadable: store,
+        readOnly: () => false,
+        epoch: () => 0,
+        materializeVirtualColumns: (patches) => patches,
+        onMutationRejected: () => {},
+        onHistoryApplied: () => {},
+      });
+
+      expect(
+        controller.commit(
+          [
+            { op: "clearRange", range },
+            { op: "set", addr: formula, value: { kind: "literal", value: "changed" } },
+            { op: "set", addr: { ...formula, row: 1 }, value: { kind: "literal", value: "child" } },
+            {
+              op: "set",
+              addr: { ...formula, row: 2 },
+              value: { kind: "literal", value: "child-two" },
+            },
+            { op: "set", addr: reference, value: { kind: "literal", value: "replaced" } },
+          ],
+          "api",
+        ).status,
+      ).toBe("applied");
+      controller.undo();
+
+      expect(store.getFormula(formula)).toBe("=SEQUENCE(3)");
+      expect(store.getRefTarget(reference)).toEqual(formula);
+      expect(store.getCell(formula).style).toEqual({ bold: true });
+      expect(store.getCell(reference).style).toEqual({ italic: true });
+      expect(store.getCell({ ...formula, row: 2 }).resolved).toBe(3);
+      expect(store.getSpillAnchor({ ...formula, row: 1 })).toEqual(formula);
+
+      controller.redo();
+      expect(store.getCell({ ...formula, row: 1 }).resolved).toBe("child");
+      expect(store.getCell(reference).resolved).toBe("replaced");
+      controller.destroy();
+      store.dispose();
+    },
+  );
+
   it("rejects nested payload growth from callbacks that retain operation identity", () => {
     const maxEncodedBytes = 256;
     const oversizedValue = "x".repeat(maxEncodedBytes * 2);
