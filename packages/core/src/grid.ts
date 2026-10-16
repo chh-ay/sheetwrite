@@ -46,6 +46,7 @@ import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import { visibleSheetNeighbor } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
@@ -2546,33 +2547,53 @@ export class GridImpl implements Grid {
   private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
     const summary: Partial<Record<GridCommandName, number>> = {};
     for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
+
     if (this.selection.isEmpty) return summary;
 
-    let visited = 0;
+    const coordinates: Array<{ row: number; col: number }> = [];
     let complete = true;
     this.selection.forEachRect((rect) => {
       if (!complete) return;
+
       for (let row = rect.r0; row <= rect.r1; row++) {
         const dataRow = this.toDataRow(row);
         for (let col = rect.c0; col <= rect.c1; col++) {
-          if (visited >= COMMAND_STATE_CELL_LIMIT) {
+          if (coordinates.length >= COMMAND_STATE_CELL_LIMIT) {
             complete = false;
             return;
           }
+
           const column = this.sheet().columns[col];
           if (!column) continue;
-          visited += 1;
-          const cell = this.store.getCell({ sheet: this.activeSheet, row: dataRow, col });
-          for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
-            const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
-            summary[command] = (summary[command] ?? 0) | bit;
-          }
+          coordinates.push({ row: dataRow, col });
         }
       }
     });
+
     if (!complete) {
       for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
+      return summary;
     }
+
+    const engine = storeEngine(this.store);
+    // Custom stores without an engine retain their single-cell read contract.
+    const cells = engine
+      ? engine.captureResolvedCells(this.activeSheet, coordinates)
+      : coordinates.map(({ row, col }) =>
+          this.store.getCell({ sheet: this.activeSheet, row, col }),
+        );
+
+    for (const [index, coordinate] of coordinates.entries()) {
+      const cell = cells[index];
+      const column = this.sheet().columns[coordinate.col];
+      if (!cell || !column) continue;
+
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
+        const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
+        summary[command] = (summary[command] ?? 0) | bit;
+      }
+    }
+
     return summary;
   }
 

@@ -1411,6 +1411,24 @@ export class StoreDataEngine {
     return captured;
   }
 
+  captureResolvedCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): ResolvedCell[] {
+    const rows = new Uint32Array(coordinates.length);
+    const columns = new Uint32Array(coordinates.length);
+
+    for (const [index, cell] of coordinates.entries()) {
+      rows[index] = cell.row;
+      columns[index] = cell.col;
+    }
+
+    return consumeCellSnapshots(
+      this.wasm.cellSnapshots(this.handleOf(sheet), rows, columns),
+      (styleId) => this.styles.get(styleId),
+    );
+  }
+
   /**
    * Previous values of a sparse cell list, read in one batched call.
    *
@@ -1750,6 +1768,7 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+        // Grouped source snapshots allocate more than scalar admission for sparse writes.
         if (
           patch.cells.some((cell) => {
             const row = bounds.start.row + cell.rowOffset;
@@ -1906,21 +1925,10 @@ export class StoreDataEngine {
         const clearStyle = patch.style ?? true;
         const beforeCells =
           changes && captureDetailedChanges && clearContents
-            ? Array.from(
-                {
-                  length:
-                    (bounds.end.row - bounds.start.row + 1) *
-                    (bounds.end.col - bounds.start.col + 1),
-                },
-                (_, offset) => {
-                  const cols = bounds.end.col - bounds.start.col + 1;
-                  const row = bounds.start.row + Math.floor(offset / cols);
-                  const col = bounds.start.col + (offset % cols);
-                  return {
-                    addr: { sheet: bounds.sheet, row, col },
-                    before: this.getCell({ sheet: bounds.sheet, row, col }),
-                  };
-                },
+            ? this.captureBlockBeforeCells(
+                bounds,
+                bounds.end.row - bounds.start.row + 1,
+                bounds.end.col - bounds.start.col + 1,
               )
             : null;
         const applied = this.wasm.clearRange(
@@ -3051,13 +3059,15 @@ export class StoreDataEngine {
     style: CellStyle | undefined,
     sources?: RangeSourceProjection | null,
     sourceOffset = 0,
+    current: ResolvedCell = this.getCell(addr),
   ): boolean {
-    const current = this.getCell(addr);
     if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
+
     const formula =
       sources === undefined ? this.getFormula(addr) : sources?.formulaAt(sourceOffset);
     const target =
       sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(sourceOffset);
+
     if (value.kind === "formula") return formula === value.src;
     if (value.kind === "ref") {
       return (
@@ -3066,6 +3076,7 @@ export class StoreDataEngine {
         target.col === value.target.col
       );
     }
+
     return formula == null && target == null && Object.is(current.resolved, value.value);
   }
 
@@ -3074,11 +3085,14 @@ export class StoreDataEngine {
       this.wasm.acknowledgeRevision(storageRevision);
       return;
     }
+
     for (const operation of operations) {
       if (operation.op === "set") {
+        // Read in operation order so a later invalid address cannot prevent earlier acknowledgements.
         if (!this.acknowledgedSetStillMatches(operation.addr, operation.value, operation.style)) {
           continue;
         }
+
         this.wasm.markRangeClean(
           this.handleOf(operation.addr.sheet),
           operation.addr.row,
@@ -3097,9 +3111,16 @@ export class StoreDataEngine {
           rows,
           cols,
         );
-        for (const cell of operation.cells) {
+
+        const currentCells = this.captureSparseBeforeCells(range, operation.cells);
+        const matchedRowsByColumn = new Map<number, Set<number>>();
+
+        for (const [index, cell] of operation.cells.entries()) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
+          const current = currentCells[index];
+          if (!current) continue;
+
           if (
             !this.acknowledgedSetStillMatches(
               { sheet: range.sheet, row, col },
@@ -3107,11 +3128,39 @@ export class StoreDataEngine {
               cell.style,
               sources,
               cell.rowOffset * cols + cell.colOffset,
+              current,
             )
           ) {
             continue;
           }
-          this.wasm.markRangeClean(this.handleOf(range.sheet), row, row + 1, col, col + 1);
+
+          let matchedRows = matchedRowsByColumn.get(col);
+          if (!matchedRows) {
+            matchedRows = new Set<number>();
+            matchedRowsByColumn.set(col, matchedRows);
+          }
+
+          matchedRows.add(row);
+        }
+
+        for (const [col, matchedRows] of matchedRowsByColumn) {
+          const sortedRows = [...matchedRows].sort((left, right) => left - right);
+          let start: number | undefined;
+          let end: number | undefined;
+
+          for (const row of sortedRows) {
+            if (end !== undefined && row !== end && start !== undefined) {
+              this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+              start = undefined;
+            }
+
+            start ??= row;
+            end = row + 1;
+          }
+
+          if (start !== undefined && end !== undefined) {
+            this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+          }
         }
       } else if (
         operation.op === "setBlock" ||

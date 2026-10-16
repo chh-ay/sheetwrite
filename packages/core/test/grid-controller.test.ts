@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { createGridController, type GridControllerHandlers } from "../src/grid-controller.js";
 import { initSheetwrite } from "../src/grid.js";
+import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, GridEvents, Selection, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
@@ -121,12 +122,14 @@ describe("createGridController command-state subscriptions", () => {
     const host = mountHost();
     const handlers: GridControllerHandlers = {};
     const controller = createGridController(host, { workbook: wideWorkbook(128, 64) }, handlers);
-    const store = controller.grid.store;
-    const readCell = store.getCell.bind(store);
+    const engine = storeEngine(controller.grid.store);
+    if (!engine) throw new Error("Expected a registered engine");
+
+    const readCells = engine.captureResolvedCells.bind(engine);
     let cellReads = 0;
-    store.getCell = (addr) => {
-      cellReads += 1;
-      return readCell(addr);
+    engine.captureResolvedCells = (sheet, coordinates) => {
+      cellReads += coordinates.length;
+      return readCells(sheet, coordinates);
     };
     const selectRows = (startRow: number): void => {
       const selection: Selection = {
@@ -156,6 +159,82 @@ describe("createGridController command-state subscriptions", () => {
     expect(cellReads).toBe(readsWithHandler);
     expect(events).toHaveLength(1);
 
+    controller.destroy();
+  });
+
+  it("summarizes raw styles in displayed row order, including hidden columns and merged cells", () => {
+    const workbook = wideWorkbook(4, 2);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("Expected sheet fixture");
+
+    sheet.hiddenRows = new Set([1]);
+    sheet.conditionalFormats = [
+      {
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+        when: { kind: "formula", source: "=TRUE" },
+        style: { bold: true },
+      },
+    ];
+    const controller = createGridController(mountHost(), { workbook }, {});
+    const grid = controller.grid;
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 10 } },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 0 },
+          value: { kind: "literal", value: 30 },
+          style: { bold: true },
+        },
+        { op: "set", addr: { sheet: "s1", row: 3, col: 0 }, value: { kind: "literal", value: 20 } },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 2, col: 1 },
+          value: { kind: "literal", value: 2 },
+          style: { bold: true },
+        },
+      ],
+    });
+    grid.sortBy(0, false);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    expect(grid.getCommandState("bold").activity).toBe("active");
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+    });
+    expect(grid.getCommandState("bold").activity).toBe("mixed");
+    grid.filterBy(0, "30");
+    grid.hideColumns([1]);
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
+    });
+    expect(grid.getCommandState("bold").activity).toBe("active");
+    grid.clearView();
+    grid.applyTransaction({
+      patches: [{ op: "addMerge", sheet: "s1", merge: { r0: 2, c0: 0, r1: 2, c1: 1 } }],
+    });
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } },
+    });
+    expect(grid.getCommandState("bold").activity).toBe("active");
+    controller.destroy();
+  });
+
+  it("keeps the selection scan boundary conservative", () => {
+    const controller = createGridController(mountHost(), { workbook: wideWorkbook(65, 64) }, {});
+    const grid = controller.grid;
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 63, col: 63 } },
+    });
+    expect(grid.getCommandState("bold").activity).toBe("inactive");
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 64, col: 63 } },
+    });
+    expect(grid.getCommandState("bold").activity).toBe("mixed");
     controller.destroy();
   });
 
