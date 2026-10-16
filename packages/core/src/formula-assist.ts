@@ -408,7 +408,8 @@ export class FormulaAssist {
     ta.setSelectionRange(next, next);
     ta.focus();
 
-    // The inserted "(" ends the function token, so updating also closes the popup.
+    // Re-derive highlights/popup from the inserted "(": the token is now empty,
+    // so this also closes the popup.
     this.update();
   }
 

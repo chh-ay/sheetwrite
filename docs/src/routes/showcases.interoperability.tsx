@@ -606,7 +606,9 @@ function InteroperabilityRoute() {
     return () => observer.disconnect();
   }, []);
 
-  // CSS theme properties resolve at mount, so site theme changes need an explicit refresh.
+  // The engine resolves --sheetwrite-* custom properties at grid mount.
+  // When the site theme flips, re-run that resolution (DEFAULT < CSS < options)
+  // so the canvas repaints with the new palette instead of going stale.
   useEffect(() => {
     const observer = new MutationObserver(() => gridRef.current?.replaceTheme(CANVAS_THEME));
     observer.observe(document.documentElement, {

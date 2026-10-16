@@ -683,7 +683,9 @@ function benchSheetwrite(
     {
       ...plan("ingest", rows),
       before: () => {
-        // Dispose deterministically so WASM memory does not accumulate across rounds.
+        // Free the previous iteration's store: its WASM allocations are
+        // reclaimed deterministically instead of accumulating across
+        // iterations/rounds. The shared linear memory remains reusable.
         storeSink?.dispose();
         storeSink = undefined;
       },

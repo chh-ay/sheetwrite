@@ -36,7 +36,8 @@ export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
 }
 
 async function release(): Promise<EngineMemoryReleaseReport> {
-  // Yield so synchronous transactions and their listeners finish before cutover.
+  // Instantiation yields: a caller inside a synchronous transaction cannot cut
+  // the engine over before that transaction and its listeners have returned.
   const replacement = await prepareEngineInstance();
 
   for (;;) {
@@ -93,7 +94,7 @@ async function release(): Promise<EngineMemoryReleaseReport> {
   replaceEngineInstance(replacement);
   previous.retire();
 
-  // Defer renderer callbacks until every store has committed.
+  // Renderers rebuild frames after the whole cutover, without document events.
   queueMicrotask(() => {
     for (const engine of engines) engine.notifyMemoryRelease();
   });

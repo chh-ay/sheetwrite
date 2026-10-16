@@ -306,7 +306,10 @@ export function blitVerticalScroll(
   const bodyH = viewport.height - bodyTop;
   if (bodyH <= 0) return undefined;
 
-  // Fractional device-pixel shifts leave stale glyph slices when the exposed strip repaints.
+  // Blit only exact device-pixel shifts. A fractional shift would copy pixels
+  // rounded to the nearest device pixel while the exposed strip repaints at
+  // the true offset - each touchpad scroll then strands sub-pixel-shifted
+  // stale glyph slices that accumulate into visible ghosting.
   const deltaDevice = (viewport.scrollTop - prev.scrollTop) * dpr;
   const deltaPx = Math.round(deltaDevice);
   if (Math.abs(deltaDevice - deltaPx) > 0.001) return undefined;
@@ -469,7 +472,10 @@ export function paintFrame(
       const style = view.styles[styleId] ?? EMPTY_STYLE;
       const styleKey = col * styleStride + styleId;
 
-      // Text may spill through empty cells, but numbers and custom renderers keep cell bounds.
+      // Sheets lets text spill through adjacent empty cells, but never through
+      // occupied cells. Compute the contiguous empty run around this cell; the
+      // painter chooses the relevant side after resolving alignment. Numbers
+      // and custom renderers deliberately keep their own cell bounds.
       let spillX = x;
       let spillRight = x + cw;
       if (!merge && typeof value === "string" && value !== "") {
