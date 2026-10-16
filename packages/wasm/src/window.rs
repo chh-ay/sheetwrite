@@ -53,6 +53,7 @@ impl CellStore {
             if col >= s.n_cols {
                 continue;
             }
+
             let mut row = row_start;
             while row < row_end {
                 let start = s.idx(row, col);
@@ -149,13 +150,17 @@ impl CellStore {
             if col >= s.n_cols {
                 continue;
             }
+
             let mut chunk_index = usize::MAX;
             let mut chunk = None;
+
+            // Explicit rows preserve view order; cache a chunk until that order leaves it.
             for (row_index, &row_u) in rows.iter().enumerate() {
                 let row = row_u as usize;
                 if row >= s.row_count {
                     continue;
                 }
+
                 let dst = row_index * n_cols + col_index;
                 let src = s.idx(row, col);
                 let resolved = if s.is_paged() {

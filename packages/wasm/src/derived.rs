@@ -1,5 +1,6 @@
 //! Calculated payloads have their own lifetime, independent of source residency.
-//! Dense reads keep column-major indexing; paged sheets retain only derived cells.
+//! Dense chunks retain column-major indexing without allocating untouched chunks.
+//! Paged sheets retain their sparse calculated-cell map.
 //! Unlike source storage, calculated values need no separate kind buffer: reserved
 //! NaN tags encode booleans, blanks and errors alongside the existing text tag.
 
@@ -25,6 +26,8 @@ pub(crate) const DERIVED_CHUNK_CELLS: usize = 4096;
 
 pub(crate) struct DerivedChunk {
     values: Box<[u64]>,
+
+    // Counts live tags so removing the last value can immediately release the chunk.
     count: usize,
 }
 
@@ -138,6 +141,7 @@ impl DerivedOverlay {
                         values: vec![ABSENT_TAG; DERIVED_CHUNK_CELLS].into_boxed_slice(),
                         count: 0,
                     });
+
                 let value = &mut chunk.values[index % DERIVED_CHUNK_CELLS];
                 chunk.count += usize::from(*value == ABSENT_TAG);
                 *value = encoded;
@@ -308,6 +312,7 @@ impl DerivedOverlay {
                 if chunks[index].is_some() {
                     return Err("duplicate transferred calculated chunk".into());
                 }
+
                 chunks[index] = Some(DerivedChunk {
                     values: values.into_boxed_slice(),
                     count: present,
@@ -362,6 +367,7 @@ mod tests {
         for (ordinal, index) in positions.into_iter().enumerate() {
             overlay.set(index, KIND_NUMBER, encode_num(ordinal as f64));
         }
+
         for (ordinal, index) in positions.into_iter().enumerate() {
             assert_eq!(
                 overlay.get(index),
@@ -375,6 +381,7 @@ mod tests {
         for index in positions {
             overlay.remove(index);
         }
+
         assert_eq!(allocated(&overlay), directory_bytes);
         overlay.compact();
         assert_eq!(allocated(&overlay), 0);

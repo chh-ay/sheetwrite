@@ -31,6 +31,9 @@ pub(crate) struct RangeReader<'a> {
     col_start: usize,
     col_end: usize,
     depth: usize,
+
+    // Criteria folds require row-major scalar delivery. Per-column runs avoid
+    // repeating directory reads while preserving that order, including blank runs.
     calculated_chunks: Vec<(usize, Option<&'a [u64]>)>,
     calculated_chunk: (usize, Option<&'a [u64]>),
 }
@@ -147,6 +150,7 @@ impl<'a> RangeReader<'a> {
 
                 &mut self.calculated_chunks[self.col - self.col_start]
             };
+
             if *chunk_index != index / DERIVED_CHUNK_CELLS {
                 *chunk_index = index / DERIVED_CHUNK_CELLS;
                 *chunk = self.data.calculated_chunk_at(index);
