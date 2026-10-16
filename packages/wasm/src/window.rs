@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::translate_relative_refs;
+use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
 use crate::query::matches_needle;
 use crate::sheet::{formula_error_with_entry, payload_num, payload_str_id, CondPred, SheetData};
 use crate::store::CellStore;
@@ -52,23 +53,42 @@ impl CellStore {
             if col >= s.n_cols {
                 continue;
             }
-            for row_index in 0..n_rows {
-                let row = row_start + row_index;
-                let dst = row_index * n_cols + col_index;
-                fill_window_cell(
-                    s,
-                    row,
-                    col,
-                    dst,
-                    &mut kind,
-                    &mut num,
-                    &mut str_local,
-                    &mut style_local,
-                    &mut string_ids,
-                    &mut error_slots,
-                    &mut strings,
-                    &mut style_dict,
-                );
+            let mut row = row_start;
+            while row < row_end {
+                let start = s.idx(row, col);
+                let chunk = s.calculated_chunk_at(start);
+                let run_end = row_end.min(row + DERIVED_CHUNK_CELLS - start % DERIVED_CHUNK_CELLS);
+
+                for run_row in row..run_end {
+                    let src = s.idx(run_row, col);
+                    let dst = (run_row - row_start) * n_cols + col_index;
+                    let resolved = if s.is_paged() {
+                        s.resolved_cell_at(src)
+                    } else {
+                        chunk
+                            .and_then(|values| {
+                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
+                            })
+                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src)))
+                    };
+                    fill_window_cell(
+                        s,
+                        run_row,
+                        col,
+                        dst,
+                        resolved,
+                        &mut kind,
+                        &mut num,
+                        &mut str_local,
+                        &mut style_local,
+                        &mut string_ids,
+                        &mut error_slots,
+                        &mut strings,
+                        &mut style_dict,
+                    );
+                }
+
+                row = run_end;
             }
         }
 
@@ -129,17 +149,35 @@ impl CellStore {
             if col >= s.n_cols {
                 continue;
             }
+            let mut chunk_index = usize::MAX;
+            let mut chunk = None;
             for (row_index, &row_u) in rows.iter().enumerate() {
                 let row = row_u as usize;
                 if row >= s.row_count {
                     continue;
                 }
                 let dst = row_index * n_cols + col_index;
+                let src = s.idx(row, col);
+                let resolved = if s.is_paged() {
+                    s.resolved_cell_at(src)
+                } else {
+                    if src / DERIVED_CHUNK_CELLS != chunk_index {
+                        chunk_index = src / DERIVED_CHUNK_CELLS;
+                        chunk = s.calculated_chunk_at(src);
+                    }
+
+                    chunk
+                        .and_then(|values| {
+                            DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
+                        })
+                        .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src)))
+                };
                 fill_window_cell(
                     s,
                     row,
                     col,
                     dst,
+                    resolved,
                     &mut kind,
                     &mut num,
                     &mut str_local,
@@ -187,6 +225,7 @@ pub(crate) fn fill_window_cell(
     row: usize,
     col: usize,
     dst: usize,
+    resolved: (u8, u64),
     kind: &mut [u8],
     num: &mut [f64],
     str_local: &mut [i32],
@@ -202,7 +241,7 @@ pub(crate) fn fill_window_cell(
         return;
     }
     let src = sheet.idx(row, col);
-    let (stored_kind, payload) = sheet.resolved_cell_at(src);
+    let (stored_kind, payload) = resolved;
     kind[dst] = stored_kind;
     style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 

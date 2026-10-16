@@ -1174,6 +1174,11 @@ impl SheetData {
     }
 
     #[inline]
+    pub(crate) fn calculated_chunk_at(&self, index: usize) -> Option<&[u64]> {
+        self.derived.chunk_at(index)
+    }
+
+    #[inline]
     pub(crate) fn calculated_error_at(&self, index: usize) -> Option<FormulaError> {
         self.derived.error_at(index)
     }

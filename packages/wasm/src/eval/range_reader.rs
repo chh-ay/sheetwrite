@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::LiteralSources;
 
+use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
@@ -30,6 +31,8 @@ pub(crate) struct RangeReader<'a> {
     col_start: usize,
     col_end: usize,
     depth: usize,
+    calculated_chunks: Vec<(usize, Option<&'a [u64]>)>,
+    calculated_chunk: (usize, Option<&'a [u64]>),
 }
 
 impl<'a> RangeReader<'a> {
@@ -77,6 +80,8 @@ impl<'a> RangeReader<'a> {
             col_start,
             col_end,
             depth,
+            calculated_chunks: Vec::new(),
+            calculated_chunk: (usize::MAX, None),
         })
     }
 
@@ -131,6 +136,33 @@ impl<'a> RangeReader<'a> {
             .and_then(|sources| sources.value_at(&self.store.strings, index))
         {
             value
+        } else if !self.data.is_paged() && self.data.source_kind_at(index) == KIND_EMPTY {
+            let (chunk_index, chunk) = if self.col_start == self.col_end {
+                &mut self.calculated_chunk
+            } else {
+                if self.calculated_chunks.is_empty() {
+                    self.calculated_chunks
+                        .resize(self.col_end - self.col_start + 1, (usize::MAX, None));
+                }
+
+                &mut self.calculated_chunks[self.col - self.col_start]
+            };
+            if *chunk_index != index / DERIVED_CHUNK_CELLS {
+                *chunk_index = index / DERIVED_CHUNK_CELLS;
+                *chunk = self.data.calculated_chunk_at(index);
+            }
+
+            match chunk.and_then(|values| {
+                DerivedOverlay::decode_present(values[index % DERIVED_CHUNK_CELLS])
+            }) {
+                Some((crate::types::KIND_FORMULA, payload)) => {
+                    Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
+                }
+                Some((kind, payload)) => {
+                    super::literal_cell_value(&self.store.strings, kind, payload)
+                }
+                None => Value::Blank,
+            }
         } else if self.data.kind_at(index) == KIND_EMPTY {
             Value::Blank
         } else {
