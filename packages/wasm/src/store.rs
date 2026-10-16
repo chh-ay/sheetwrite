@@ -19,8 +19,8 @@ use crate::sheet::{
     MAX_SPILL_OWNER_CELLS,
 };
 use crate::types::{
-    cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, FormulaValueKind,
-    StringStorage, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, StringStorage, KIND_BOOL,
+    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 mod range_transfer;
@@ -2070,58 +2070,48 @@ impl CellStore {
             };
         }
 
-        let i = s.idx(row, col);
-        let kind = s.kind_at(i);
+        let index = s.idx(row, col);
+        let source_kind = s.source_kind_at(index);
+        let (kind, payload) = if source_kind == KIND_EMPTY || source_kind == KIND_FORMULA {
+            s.calculated_cell_at(index)
+                .unwrap_or_else(|| (source_kind, s.source_payload_at(index)))
+        } else {
+            (source_kind, s.source_payload_at(index))
+        };
         let key = cell_key(row, col);
-        if kind == KIND_FORMULA {
+
+        if source_kind == KIND_FORMULA || kind == KIND_FORMULA {
             if let Some(error) = key.and_then(|key| formula_error_at(s, key)) {
                 return CellOut {
                     kind: KIND_STRING,
                     num: 0.0,
                     string: Some(error.sentinel().to_string()),
-                    style: s.style_at(i),
+                    style: s.style_at(index),
                 };
-            }
-            if key.is_some_and(|key| s.formulas.contains_key(&key)) {
-                match s.formula_value_kind(i) {
-                    FormulaValueKind::Bool => {
-                        return CellOut {
-                            kind: KIND_BOOL,
-                            num: s.num_at(i),
-                            string: None,
-                            style: s.style_at(i),
-                        };
-                    }
-                    FormulaValueKind::Text => {
-                        return CellOut {
-                            kind: KIND_STRING,
-                            num: 0.0,
-                            string: string_from_pool(&self.strings, s.str_id_at(i)),
-                            style: s.style_at(i),
-                        };
-                    }
-                    FormulaValueKind::Number => {}
-                    FormulaValueKind::Blank => {
-                        return CellOut {
-                            kind: KIND_EMPTY,
-                            num: 0.0,
-                            string: None,
-                            style: s.style_at(i),
-                        };
-                    }
-                }
             }
         }
 
+        let has_formula =
+            source_kind == KIND_FORMULA && key.is_some_and(|key| s.formulas.contains_key(&key));
+        let output_kind = if source_kind == KIND_FORMULA && (!has_formula || kind == KIND_NUMBER) {
+            KIND_FORMULA
+        } else {
+            kind
+        };
+
         CellOut {
-            kind,
-            num: s.num_at(i),
-            string: if kind == KIND_STRING {
-                string_from_pool(&self.strings, s.str_id_at(i))
+            kind: output_kind,
+            num: if has_formula && matches!(kind, KIND_STRING | KIND_EMPTY) {
+                0.0
+            } else {
+                payload_num(payload)
+            },
+            string: if output_kind == KIND_STRING {
+                string_from_pool(&self.strings, payload_str_id(payload))
             } else {
                 None
             },
-            style: s.style_at(i),
+            style: s.style_at(index),
         }
     }
 
