@@ -342,7 +342,7 @@ describe("SheetwriteStore", () => {
     expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
-  for (const operation of ["setBlock", "setRange"] as const) {
+  for (const operation of ["setBlock", "setRange", "clearRange"] as const) {
     it(`preserves resolved before-values and styles in ${operation} rollback events`, () => {
       const store = new SheetwriteStore(makeWorkbook(3));
       const initialValues = ["雪😀", true, null, 7, null, null] as const;
@@ -378,15 +378,17 @@ describe("SheetwriteStore", () => {
               range,
               block: { rowCount: 2, colCount: 3, values: [null, null, null, null, null, null] },
             }
-          : {
-              op: "setRange",
-              range,
-              cells: Array.from({ length: initialValues.length }, (_, offset) => ({
-                rowOffset: Math.floor(offset / 3),
-                colOffset: offset % 3,
-                value: { kind: "literal" as const, value: null },
-              })),
-            };
+          : operation === "clearRange"
+            ? { op: "clearRange", range, style: false }
+            : {
+                op: "setRange",
+                range,
+                cells: Array.from({ length: initialValues.length }, (_, offset) => ({
+                  rowOffset: Math.floor(offset / 3),
+                  colOffset: offset % 3,
+                  value: { kind: "literal" as const, value: null },
+                })),
+              };
       expect(store.applyTransaction({ patches: [replacement] }).status).toBe("applied");
       expect(
         events.map((event) =>
@@ -1403,6 +1405,103 @@ describe("paged datasource storage", () => {
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     store.dispose();
   });
+
+  it("acknowledges matching sparse runs without cleaning newer values, sources or styles", () => {
+    const store = new SheetwriteStore(makeWorkbook(12), undefined, { storage: "paged" });
+    const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 11, col: 1 } };
+    const cells = Array.from({ length: 12 }, (_, rowOffset) => ({
+      rowOffset,
+      colOffset: 0,
+      value: { kind: "literal" as const, value: rowOffset },
+      style: { bold: true },
+    }));
+    const operation: DocumentOp = { op: "setRange", range, cells };
+    store.applyTransaction({ patches: [operation] });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(3, 1),
+          value: { kind: "literal", value: 300 },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(7, 1),
+          value: { kind: "formula", src: "=7" },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(8, 1),
+          value: { kind: "ref", target: addr(0, 1) },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(9, 1),
+          value: { kind: "literal", value: 9 },
+          style: { italic: true },
+        },
+      ],
+    });
+
+    store.acknowledgeOperations([{ ...operation, cells: [...cells, ...cells.slice(0, 1)] }]);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(4);
+    for (let row = 0; row < 12; row++) {
+      expect(store.getCellLoadState(addr(row, 1))).toBe(
+        [3, 7, 8, 9].includes(row) ? "local-edit" : "loaded-value",
+      );
+    }
+    expect(store.getCell(addr(3, 1)).resolved).toBe(300);
+    expect(store.getFormula(addr(7, 1))).toBe("=7");
+    expect(store.getRefTarget(addr(8, 1))).toEqual(addr(0, 1));
+    store.dispose();
+  });
+
+  for (const mode of ["set", "setRange"] as const) {
+    it(`counts existing and duplicate sparse ${mode} targets once at the dirty limit`, () => {
+      const store = new SheetwriteStore(makeWorkbook(1_200), undefined, {
+        storage: "paged",
+        dirtyCellLimit: 1_100,
+      });
+      const patchesFor = (count: number, distinct: number): DocumentOp[] => {
+        const cells = Array.from({ length: count }, (_, index) => ({
+          rowOffset: index % distinct,
+          colOffset: 0,
+          value: { kind: "literal" as const, value: index },
+        }));
+        return mode === "setRange"
+          ? [cells.slice(0, distinct), cells.slice(distinct)]
+              .filter((batch) => batch.length > 0)
+              .map((batch) => ({
+                op: "setRange" as const,
+                range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1_199, col: 0 } },
+                cells: batch,
+              }))
+          : cells.map((cell) => ({ op: "set", addr: addr(cell.rowOffset, 0), value: cell.value }));
+      };
+      store.applyTransaction({ patches: patchesFor(100, 100) });
+      let events = 0;
+      store.on("change", () => {
+        events += 1;
+      });
+
+      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_100) }).status).toBe("applied");
+      expect(store.getPagedStats("s1").dirtyCells).toBe(1_100);
+      expect(events).toBe(1);
+      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_101) })).toMatchObject({
+        status: "rejected",
+        issues: [
+          { kind: "resource-limit", resource: "paged-dirty-cells", actual: 1_101, max: 1_100 },
+        ],
+      });
+      expect(store.getPagedStats("s1").dirtyCells).toBe(1_100);
+      expect(events).toBe(1);
+      expect(store.getCellLoadState(addr(1_100, 0))).toBe("unloaded");
+      store.dispose();
+    });
+  }
 
   it("keeps paged edits pinned until their operations are acknowledged", () => {
     const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {

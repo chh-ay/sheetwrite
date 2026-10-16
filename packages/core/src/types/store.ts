@@ -142,6 +142,11 @@ export interface Store {
    * NOT for the render hot path — renderers use `getVisibleWindow`.
    */
   getCell(addr: CellAddress): ResolvedCell;
+  /** Raw resolved values and styles in coordinate order, without view or conditional styles. */
+  captureResolvedCells?(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): ResolvedCell[];
   /** Formula source at `addr`, or null when the cell is not a formula. */
   getFormula(addr: CellAddress): string | null;
   /** Owning dynamic-array formula cell, or null when `addr` is not spilled. */

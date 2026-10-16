@@ -17,6 +17,11 @@ export interface PagedDirtyPreflightStats {
   admissionReferenceMapsMaterialized: number;
 }
 
+// Sparse batches amortize the dirty-coordinate set after 64 probes and eight probes
+// per dirty cell; measurements favor scalar reads below this transfer/setup cost.
+const SPARSE_BULK_MIN_PROBES = 64;
+const SPARSE_BULK_DIRTY_RATIO = 8;
+
 interface PagedDirtyPreflightState {
   handle: number | null;
   rows: number;
@@ -26,6 +31,7 @@ interface PagedDirtyPreflightState {
   additional: number;
   existing: Set<string> | null;
   seen: Set<string>;
+  sparseProbes: number;
 }
 
 function cellKey(addr: CellAddress): string {
@@ -240,6 +246,7 @@ export class PagedDirtyPreflight {
         additional: 0,
         existing: null,
         seen: new Set<string>(),
+        sparseProbes: 0,
       };
 
       states.set(sheet, state);
@@ -319,6 +326,16 @@ export class PagedDirtyPreflight {
 
       const key = keyOf(row, col);
       if (state.seen.has(key)) return null;
+
+      state.sparseProbes += 1;
+      if (
+        state.existing === null &&
+        state.sparseProbes >=
+          Math.max(SPARSE_BULK_MIN_PROBES, state.dirty * SPARSE_BULK_DIRTY_RATIO)
+      ) {
+        materializeExisting(state);
+      }
+
       if (
         state.existing?.has(key) ||
         (state.existing === null &&
@@ -348,14 +365,14 @@ export class PagedDirtyPreflight {
       const state = stateFor(sheet);
       return Boolean(
         state &&
-        startRow >= 0 &&
-        startCol >= 0 &&
-        Number.isSafeInteger(rows) &&
-        Number.isSafeInteger(cols) &&
-        rows > 0 &&
-        cols > 0 &&
-        rows <= state.rows - startRow &&
-        cols <= state.cols - startCol,
+          startRow >= 0 &&
+          startCol >= 0 &&
+          Number.isSafeInteger(rows) &&
+          Number.isSafeInteger(cols) &&
+          rows > 0 &&
+          cols > 0 &&
+          rows <= state.rows - startRow &&
+          cols <= state.cols - startCol,
       );
     };
 
@@ -416,6 +433,7 @@ export class PagedDirtyPreflight {
           additional: 0,
           existing: new Set<string>(),
           seen: new Set<string>(),
+          sparseProbes: 0,
         };
         states.set(snapshot.id, state);
         for (const block of snapshot.cells) {
