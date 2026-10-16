@@ -76,6 +76,11 @@ describe("Grid worksheet lifecycle", () => {
           value: { kind: "formula", src: "=SEQUENCE(3)" },
           style: { bold: true },
         },
+        {
+          op: "setRangeStyle",
+          range: { sheet: "one", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+          style: { italic: true },
+        },
         { op: "set", addr: outgoing, value: { kind: "ref", target }, style: { italic: true } },
         { op: "set", addr: externalFormula, value: { kind: "formula", src: "='One'!A2+1" } },
         {
@@ -94,6 +99,10 @@ describe("Grid worksheet lifecycle", () => {
     expect(grid.store.getFormula(anchor)).toBe("=SEQUENCE(3)");
     expect(grid.store.getCell({ ...anchor, row: 2 }).resolved).toBe(3);
     expect(grid.store.getSpillAnchor({ ...anchor, row: 2 })).toEqual(anchor);
+    expect(grid.store.getCell({ ...anchor, row: 1 })).toMatchObject({
+      resolved: 2,
+      style: { italic: true },
+    });
     expect(grid.store.getRefTarget(outgoing)).toEqual(target);
     expect(grid.store.getRefTarget(incoming)).toEqual({ ...anchor, row: 2 });
     expect(grid.store.getFormula(externalFormula)).toBe("='One'!A2+1");

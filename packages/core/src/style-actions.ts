@@ -211,17 +211,38 @@ export class StyleActions {
       return;
     }
 
+    const range = {
+      sheet: activeSheet,
+      start: { row: merge.r0, col: merge.c0 },
+      end: { row: merge.r1, col: merge.c1 },
+    };
+    const engine = storeEngine(this.deps.store);
+    // Per-cell operations preserve policy issue indices and partial spill rejection.
+    const scalarWrites =
+      !engine ||
+      Boolean(
+        sheet.validationRules?.length ||
+        sheet.protectedRanges?.length ||
+        engine.hasSpillChildren(range),
+      );
+    const cells: SnapshotCell[] = [];
     const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
     for (let row = merge.r0; row <= merge.r1; row++) {
       for (let col = merge.c0; col <= merge.c1; col++) {
         if (row === merge.r0 && col === merge.c0) continue;
-        patches.push({
-          op: "set",
-          addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
-          value: { kind: "literal", value: null },
-        });
+        const value: CellValue = { kind: "literal", value: null };
+        if (scalarWrites) {
+          patches.push({
+            op: "set",
+            addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
+            value,
+          });
+        } else cells.push({ rowOffset: row - merge.r0, colOffset: col - merge.c0, value });
       }
     }
+
+    if (cells.length > 0) patches.push({ op: "setRange", range, cells });
+
     this.deps.commit(patches);
   }
 
