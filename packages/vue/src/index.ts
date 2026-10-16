@@ -277,8 +277,11 @@ const SheetwriteGridComponent = defineComponent({
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
-      // Vue strips emit listeners from attrs; use vnode props to avoid unnecessary snapshots.
-      // An unreadable listener table retains the subscription to avoid dropping events.
+      // The controller only subscribes to command state while this is defined.
+      // Vue removes declared emit listeners from `attrs`, so presence is read
+      // from the vnode props under the same keys `emit` itself looks up. An
+      // unreadable listener table keeps the subscription instead of risking a
+      // dropped event.
       get onCommandStateChange() {
         const listenerProps = instance?.vnode.props;
         if (!listenerProps) return forwardCommandStateChange;

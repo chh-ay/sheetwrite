@@ -33,12 +33,16 @@ Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs f
 
 oxfmt and rustfmt own formatting. Two rules they cannot check:
 
-- **Comments say why, not what.** Write a comment only for a reason the code
-  cannot show: a constraint, an invariant, a non-obvious trade-off, or a link to
-  an external rule. Do not restate the next line, narrate the steps of a
-  function, or describe history ("before, this…", "now we…"); that belongs in
-  the commit message. Doc comments on exported symbols are the API reference:
-  keep them to what a caller needs, one or two sentences where possible.
+- **Keep explanations, not narration.** Keep comments that explain design, data
+  layout, invariants, safety arguments, non-obvious trade-offs, or why an
+  approach was chosen, at whatever length they need. Delete only history or
+  change narration ("before…", "now…", "exactly as before", issue/plan labels),
+  comments that restate the next line or a name, and commented-out code.
+  When restoring an over-shortened explanation, use the original text and
+  drop only narrating sentences. Verify every remaining statement against
+  the current code; correct stale statements and drop claims you cannot confirm.
+  Doc comments (`/** */`, `///`, `//!`) stay doc comments; never downgrade
+  them to `//`.
 - **Separate the steps.** Put one blank line between the logical steps of a
   function (setup, the main work, the result), after a block that closes in the
   middle of a function, and between declarations and members. A function body

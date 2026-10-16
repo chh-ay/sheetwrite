@@ -262,7 +262,10 @@ export class OverlayPainter {
   private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
   private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
 
-  // Retain surplus nodes so later paint passes can reuse them without allocation.
+  // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
+  // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
+  // div only when the pool runs short. Surplus divs are hidden with
+  // `display:none`, never removed, so subsequent passes can reclaim them.
   private readonly pool: HTMLDivElement[] = [];
   private cursor = 0;
   private readonly presenceLabelPool: HTMLDivElement[] = [];
@@ -297,6 +300,8 @@ export class OverlayPainter {
   /** Note indices of the painted band, kept in note order. */
   private readonly notePaintOrder: number[] = [];
 
+  // `paint` skips when every field below is unchanged and the theme identity
+  // still matches.
   private lastPaintTheme: Theme | null = null;
   private lastContentTop = 0;
   private lastScrollLeft = 0;

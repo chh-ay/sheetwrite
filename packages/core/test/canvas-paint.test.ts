@@ -619,7 +619,9 @@ describe("scroll blit and damage-band integrity", () => {
     const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
     const view = makeView(new Uint32Array(3), [{}], [0]);
     const theme = makeTheme({ rowHeaderWidth: 40 });
-    // Center-point culling would skip a label whose lower glyphs intersect this strip.
+    // Row 1 band: y in [44, 68), center 56. Strip covers only its lower
+    // quarter [62, 80): center-point culling would skip the label and let the
+    // strip's background erase the glyph half inside it - sliced digits.
     const ctx = render(view, layout, UNIFORM_VIEWPORT, theme, { x: 0, y: 62, w: 400, h: 18 });
     const label = ctx.fillTexts.find((call) => call.text === "2");
     expect(label).toBeDefined();

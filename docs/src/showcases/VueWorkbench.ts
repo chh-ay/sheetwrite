@@ -27,7 +27,13 @@ import {
 
 import "@sheetwrite/vue/styles.css";
 
-// Persistence here demonstrates host state only; /showcases/database/ proves the durable protocol.
+// The scenario module owns the governed workbook (validation rules, protected
+// totals, notes, merges, frozen panes). This component owns what Vue is for:
+// reactive configuration bound to adapter props, structured rejection state,
+// notes/metadata and workbook operations through the public Grid API, and a
+// host persistence pipeline mirrored into plain refs. The in-memory reference
+// adapter demonstrates host state only — the durable IndexedDB protocol proof
+// lives at /showcases/database/.
 
 interface VueGridHandle {
   grid: Grid | null;

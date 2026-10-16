@@ -16,7 +16,9 @@ function deferredSnippet(load: () => Promise<SnippetModule>) {
   return { Snippet: lazy(preload), preload };
 }
 
-// Keep MDX imports outside the route so TanStack does not load every snippet on every page.
+// Kept out of the route file so snippet imports stay behind the landing
+// component boundary rather than in the always-loaded route module.
+// Only the default tab is eagerly imported; the others load on intent.
 const FRAMEWORKS = [
   {
     id: "vanilla",
