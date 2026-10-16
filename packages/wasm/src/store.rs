@@ -2072,6 +2072,8 @@ impl CellStore {
 
         let index = s.idx(row, col);
         let source_kind = s.source_kind_at(index);
+
+        // Separate kind and payload accessors would each walk the chunk directory.
         let (kind, payload) = if source_kind == KIND_EMPTY || source_kind == KIND_FORMULA {
             s.calculated_cell_at(index)
                 .unwrap_or_else(|| (source_kind, s.source_payload_at(index)))
@@ -2093,6 +2095,8 @@ impl CellStore {
 
         let has_formula =
             source_kind == KIND_FORMULA && key.is_some_and(|key| s.formulas.contains_key(&key));
+
+        // The scalar read contract keeps the formula kind for numeric anchors.
         let output_kind = if source_kind == KIND_FORMULA && (!has_formula || kind == KIND_NUMBER) {
             KIND_FORMULA
         } else {

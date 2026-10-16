@@ -345,8 +345,10 @@ fn text_functions_surface_string_and_boolean_values() {
 
     assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_STRING);
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("Hello \"Q\""));
+
     let length = store.get_cell(sheet, 1, 0);
     assert_eq!((length.kind(), length.num()), (KIND_FORMULA, 5.0));
+
     assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some("abc"));
     assert_eq!(string(&store, sheet, 3, 0).as_deref(), Some("def"));
     assert_eq!(string(&store, sheet, 4, 0).as_deref(), Some("bcd"));
