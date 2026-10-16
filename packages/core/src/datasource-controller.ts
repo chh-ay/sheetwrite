@@ -82,11 +82,13 @@ class SparseIntervals {
   atOrAfter(row: number): RowBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
@@ -104,51 +106,63 @@ class SparseIntervals {
   intersections(start: number, end: number): RowBand[] {
     const result: RowBand[] = [];
     let band = this.atOrAfter(start);
+
     while (band && band.start < end) {
       result.push({ start: Math.max(start, band.start), end: Math.min(end, band.end) });
       band = this.atOrAfter(band.end);
     }
+
     return result;
   }
 
   add(start: number, end: number): void {
     if (start >= end) return;
+
     let index = 0;
     while (index < this.bands.length && this.bands[index]!.end < start) index += 1;
+
     let nextStart = start;
     let nextEnd = end;
     const first = index;
+
     while (index < this.bands.length && this.bands[index]!.start <= nextEnd) {
       const band = this.bands[index]!;
       nextStart = Math.min(nextStart, band.start);
       nextEnd = Math.max(nextEnd, band.end);
       index += 1;
     }
+
     this.bands.splice(first, index - first, { start: nextStart, end: nextEnd });
   }
 
   remove(start: number, end: number): void {
     if (start >= end) return;
+
     const next: RowBand[] = [];
+
     for (const band of this.bands) {
       if (band.end <= start || band.start >= end) {
         next.push(band);
         continue;
       }
+
       if (band.start < start) next.push({ start: band.start, end: start });
       if (band.end > end) next.push({ start: end, end: band.end });
     }
+
     this.bands.splice(0, this.bands.length, ...next);
   }
 
   forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         visit(cursor, end);
         return;
       }
+
       if (band.start > cursor) visit(cursor, Math.min(end, band.start));
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -180,12 +194,15 @@ class SparseColumnIntervals {
 
   add(columns: readonly number[], start: number, end: number): void {
     if (start >= end) return;
+
     for (const column of columns) {
       let rows = this.columns.get(column);
+
       if (!rows) {
         rows = new SparseIntervals();
         this.columns.set(column, rows);
       }
+
       rows.add(start, end);
     }
   }
@@ -211,13 +228,18 @@ class SparseColumnIntervals {
   firstRectangle(): { start: number; end: number; columns: number[] } | null {
     const firstColumn = [...this.columns.keys()].sort((a, b) => a - b)[0];
     if (firstColumn === undefined) return null;
+
     const band = this.columns.get(firstColumn)!.first();
     if (!band) return null;
+
     const columns: number[] = [];
+
     for (const [column, rows] of this.columns) {
       if (rows.covers(band.start, band.end)) columns.push(column);
     }
+
     columns.sort((a, b) => a - b);
+
     return { start: band.start, end: band.end, columns };
   }
 }
@@ -236,11 +258,13 @@ class SparseOwnerIntervals {
   atOrAfter(row: number): OwnerBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
@@ -252,11 +276,13 @@ class SparseOwnerIntervals {
   forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         visit(cursor, end);
         return;
       }
+
       if (band.start > cursor) visit(cursor, Math.min(end, band.start));
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -272,6 +298,7 @@ class SparseOwnerIntervals {
     if ((previous && previous.end > start) || (next && next.start < end)) {
       throw new Error("Overlapping datasource request ownership");
     }
+
     this.bands.splice(insertAt, 0, { start, end, owner });
   }
 
@@ -307,10 +334,12 @@ class SparseColumnOwners {
   add(columns: readonly number[], start: number, end: number, owner: number): void {
     for (const column of columns) {
       let rows = this.columns.get(column);
+
       if (!rows) {
         rows = new SparseOwnerIntervals();
         this.columns.set(column, rows);
       }
+
       rows.add(start, end, owner);
     }
   }
@@ -319,6 +348,7 @@ class SparseColumnOwners {
     for (const column of columns) {
       const rows = this.columns.get(column);
       if (!rows) continue;
+
       rows.removeOwner(owner);
       if (rows.bandCount === 0) this.columns.delete(column);
     }
@@ -354,23 +384,28 @@ class SparseVisibleWaits {
   atOrAfter(row: number): VisibleWaitBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
   addMissing(start: number, end: number, startedAt: number): void {
     if (start >= end) return;
+
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         this.insert(cursor, end, startedAt);
         return;
       }
+
       if (band.start > cursor) this.insert(cursor, Math.min(end, band.start), startedAt);
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -379,23 +414,29 @@ class SparseVisibleWaits {
 
   discard(start: number, end: number): void {
     if (start >= end) return;
+
     const next: VisibleWaitBand[] = [];
+
     for (const band of this.bands) {
       if (band.end <= start || band.start >= end) {
         next.push(band);
         continue;
       }
+
       if (band.start < start) next.push({ ...band, end: start });
       if (band.end > end) next.push({ ...band, start: end });
     }
+
     this.bands.splice(0, this.bands.length, ...next);
   }
 
   complete(start: number, end: number, completedAt: number): VisibleWaitSample[] {
     const samples: VisibleWaitSample[] = [];
+
     for (const band of this.bands) {
       const overlapStart = Math.max(start, band.start);
       const overlapEnd = Math.min(end, band.end);
+
       if (overlapStart < overlapEnd) {
         samples.push({
           duration: Math.max(0, completedAt - band.startedAt),
@@ -403,7 +444,9 @@ class SparseVisibleWaits {
         });
       }
     }
+
     this.discard(start, end);
+
     return samples;
   }
 
@@ -422,6 +465,7 @@ class SparseColumnVisibleWaits {
     for (const waits of this.columns.values()) count += waits.bandCount;
     return count;
   }
+
   get columnCount(): number {
     return this.columns.size;
   }
@@ -444,11 +488,13 @@ class SparseColumnVisibleWaits {
 
   retain(columns: readonly number[], start: number, end: number, owners: SparseColumnOwners): void {
     const retained = new Set(columns);
+
     for (const [column, waits] of this.columns) {
       if (!retained.has(column)) {
         this.columns.delete(column);
         continue;
       }
+
       const owned = owners.rows(column);
       if (owned) {
         owned.forEachGap(0, start, (gapStart, gapEnd) => waits.discard(gapStart, gapEnd));
@@ -459,17 +505,20 @@ class SparseColumnVisibleWaits {
         waits.discard(0, start);
         waits.discard(end, Number.MAX_SAFE_INTEGER);
       }
+
       if (waits.bandCount === 0) this.columns.delete(column);
     }
   }
 
   addMissing(column: number, start: number, end: number, startedAt: number): void {
     if (start >= end) return;
+
     let waits = this.columns.get(column);
     if (!waits) {
       waits = new SparseVisibleWaits();
       this.columns.set(column, waits);
     }
+
     waits.addMissing(start, end, startedAt);
   }
 
@@ -477,10 +526,12 @@ class SparseColumnVisibleWaits {
     for (const column of columns) {
       const waits = this.columns.get(column);
       if (!waits) continue;
+
       waits.discard(start, end);
       if (waits.bandCount === 0) this.columns.delete(column);
     }
   }
+
   complete(
     columns: readonly number[],
     start: number,
@@ -488,12 +539,15 @@ class SparseColumnVisibleWaits {
     completedAt: number,
   ): VisibleWaitSample[] {
     const samples: VisibleWaitSample[] = [];
+
     for (const column of columns) {
       const waits = this.columns.get(column);
       if (!waits) continue;
+
       samples.push(...waits.complete(start, end, completedAt));
       if (waits.bandCount === 0) this.columns.delete(column);
     }
+
     return samples;
   }
 }
@@ -716,10 +770,13 @@ export class DatasourceController {
   /** Requests demand-critical rows for exact canonical physical column indices. */
   ensureLoaded(start: number, end: number, indices: readonly number[]): void {
     if (!this.options.datasource || !this.options.loadable || this.destroyed) return;
+
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) return;
+
     const columns = this.requestColumns(indices);
     if (columns.length === 0) return;
+
     this.durableDemand.add(columns, bounds.start, bounds.end);
     this.drainDemand();
   }
@@ -735,6 +792,7 @@ export class DatasourceController {
     formulaBands: Uint32Array = EMPTY_FORMULA_BANDS,
   ): void {
     if (this.destroyed) return;
+
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) {
       this.viewportDemand = null;
@@ -747,6 +805,7 @@ export class DatasourceController {
       this.drainDemand();
       return;
     }
+
     const columns = this.requestColumns(indices);
     if (columns.length === 0) return;
 
@@ -757,11 +816,15 @@ export class DatasourceController {
     const delta = previous ? bounds.start - previous.start : 0;
     const movementDirection: -1 | 0 | 1 = delta === 0 ? 0 : delta > 0 ? 1 : -1;
     const elapsed = previous ? Math.max(0, now - previous.at) : 0;
+
     if (elapsed > 0 && movementDirection !== 0) this.velocityRowsPerMs = delta / elapsed;
+
     const reversal =
       movementDirection !== 0 && this.direction !== 0 && movementDirection !== this.direction;
     const jump = previous !== null && Math.abs(delta) > Math.max(visibleRows, previousRows) * 2;
+
     if (movementDirection !== 0) this.direction = movementDirection;
+
     const effectiveDirection: -1 | 1 = this.direction === 0 ? 1 : this.direction;
 
     const speculative = this.speculativeIntervals(
@@ -771,8 +834,10 @@ export class DatasourceController {
       visibleRows,
       columns.length,
     );
+
     this.lastViewport = { ...bounds, columns, at: now };
     const formulaReads = this.formulaReadDemands(formulaBands);
+
     this.cancelObsoleteSpeculation(
       { ...bounds, columns },
       speculative,
@@ -783,8 +848,10 @@ export class DatasourceController {
 
     this.refreshPagedResidency(this.options.loadable, bounds.start, bounds.end, columns);
     this.visibleWaitStarted.retain(columns, bounds.start, bounds.end, this.owners);
+
     for (const column of columns) {
       const resident = this.loaded.rows(column);
+
       if (!resident) {
         this.visibleWaitStarted.addMissing(column, bounds.start, bounds.end, now);
       } else {
@@ -793,6 +860,7 @@ export class DatasourceController {
         });
       }
     }
+
     const fullyResident = this.loaded.covers(bounds.start, bounds.end, columns);
     this.telemetry.measuredFrames += 1;
     if (fullyResident) this.telemetry.residentFrames += 1;
@@ -822,23 +890,29 @@ export class DatasourceController {
     const waits = [...this.visibleWaitDurations].sort((a, b) => a.duration - b.duration);
     let visibleWaitSamples = 0;
     for (const wait of waits) visibleWaitSamples += wait.rows;
+
     const p95Rank = Math.max(1, Math.ceil(visibleWaitSamples * 0.95));
     let p95VisibleWaitMs = 0;
     let rankedRows = 0;
+
     for (const wait of waits) {
       rankedRows += wait.rows;
       if (rankedRows < p95Rank) continue;
+
       p95VisibleWaitMs = wait.duration;
       break;
     }
 
     const speculativeRows = new SparseIntervals();
     let activeSpeculativeRequests = 0;
+
     for (const request of this.requests) {
       if (!request.speculativeOrigin) continue;
+
       activeSpeculativeRequests += 1;
       speculativeRows.add(request.start, request.end);
     }
+
     const loadable = this.options.loadable;
     const sheet = this.options.activeSheet();
     const cache = loadable?.isPaged(sheet) ? loadable.getPagedStats(sheet) : null;
@@ -893,13 +967,16 @@ export class DatasourceController {
     const tileColumns =
       this.loaded.columnCount + this.owners.columnCount + this.visibleWaitStarted.columnCount;
     const tileBytes = tileEntries * 32 + tileColumns * 48;
+
     let pendingRequestBytes = 0;
+
     for (const request of this.requests) {
       pendingRequestBytes +=
         192 +
         request.columns.length * 8 +
         request.bands.reduce((bytes, band) => bytes + 32 + band.keys.length * 8, 0);
     }
+
     const requestIndexBytes = this.activeIds.size * 48;
     const queuedDemandBytes = queuedDemandEntries * 40;
     const waitSampleBytes = this.visibleWaitDurations.length * 16;
@@ -910,6 +987,7 @@ export class DatasourceController {
       (this.schemaCache?.keys.length ?? 0) * 8 +
       (this.schemaCache?.allIndices?.length ?? 0) * 8 +
       (this.schemaCache?.singletonIndices.size ?? 0) * 16;
+
     return [
       {
         owner: "js.datasource.tile-state",

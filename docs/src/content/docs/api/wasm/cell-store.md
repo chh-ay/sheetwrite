@@ -462,9 +462,8 @@ getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array
 ```
 
 <p class="api-member-doc">One bulk read of a rectangular window for the renderer. Returns
-contiguous packed cell data (row-major over `rows x cols`) plus the
-unique strings referenced by the window, so the host paints without
-crossing the boundary per cell.</p>
+contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+and window-local formula-error strings, avoiding per-cell boundary reads.</p>
 </details>
 
 <details class="api-member" id="cell-store-get-window-rows" data-pagefind-weight="1">
@@ -696,8 +695,7 @@ recompute: (sheet: number) => void;
 
 The pass first grows the dirty cell set through formula read-sets to find
 all dependent formulas. It then evaluates only those formulas, using a
-per-pass memo table so each formula cell is evaluated at most once even
-when many downstream formulas reference it.</p>
+per-pass memo table to reuse formula results across dependent reads.</p>
 </details>
 
 <details class="api-member" id="cell-store-recompute-volatile" data-pagefind-weight="1">
@@ -856,8 +854,8 @@ whose text payload arrives packed instead of once per cell.
 in cell-offset order. `text_offsets` carries their byte boundaries: the
 n-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the
 last entry equals the buffer length, so a block without strings passes an
-empty buffer and `&amp;[0]`. Strings are interned in the same order as a
-per-cell write would intern them, so pool ids do not move. The compact
+empty buffer and `&amp;[0]`. Literal strings are interned in cell-offset order;
+source-owned text slots are consumed without interning. The compact
 status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
 source metadata, and `3` paged dirty-capacity rejection.</p>
 </details>
@@ -937,19 +935,19 @@ Formula strings are parsed once here, never once per visible cell.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-formula" data-pagefind-weight="1">
-<summary><code>setFormula</code> <span class="api-member-summary">Parse and store an arithmetic formula at (row, col).</span></summary>
+<summary><code>setFormula</code> <span class="api-member-summary">Parse and store a formula at (row, col).</span></summary>
 
 ```ts generated
 setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number;
 ```
 
-<p class="api-member-doc">Parse and store an arithmetic formula at `(row, col)`.
+<p class="api-member-doc">Parse and store a formula at `(row, col)`.
 
 Setters only mark cells dirty; they do not recompute formulas. The host
 calls `recompute(sheet)` once at the transaction barrier so a multi-cell
 edit performs one dependency-scoped pass instead of one full-sheet pass
-per setter. The returned value is the previous cached value until that
-barrier recompute runs, and the store facade ignores it for batched edits.
+per setter. A successful parse returns the pre-write cached scalar; a
+parse rejection returns `0.0`, and a rejected write returns `NaN`.
 
 The dependency index is invalidated only when the rewrite changes what
 the formula reads or whether it produces an array. A constant-only edit

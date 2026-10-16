@@ -58,6 +58,7 @@ impl MemoryOwnerStats {
         let bucket_bytes = std::mem::size_of::<K>()
             .saturating_add(std::mem::size_of::<V>())
             .saturating_add(1);
+
         self.logical_bytes = self
             .logical_bytes
             .saturating_add(len.saturating_mul(bucket_bytes));
@@ -107,16 +108,20 @@ impl StoreMemoryStats {
     /// `[schema, ownerCount, hashEstimateVersion, owner(logical, allocated, entries)*, totals]`.
     pub(crate) fn encode(&self) -> Vec<f64> {
         let mut encoded = Vec::with_capacity(5 + STORE_MEMORY_OWNER_COUNT * 3);
+
         encoded.push(STORE_MEMORY_SCHEMA_VERSION as f64);
         encoded.push(STORE_MEMORY_OWNER_COUNT as f64);
         encoded.push(HASH_TABLE_ESTIMATE_VERSION as f64);
+
         for owner in &self.owners {
             encoded.push(owner.logical_bytes as f64);
             encoded.push(owner.allocated_bytes as f64);
             encoded.push(owner.entries as f64);
         }
+
         encoded.push(self.logical_bytes() as f64);
         encoded.push(self.allocated_bytes() as f64);
+
         encoded
     }
 }
@@ -140,7 +145,9 @@ mod tests {
         let mut stats = StoreMemoryStats::default();
         stats.owner_mut(DENSE_KINDS).add_payload(3, 4);
         stats.owner_mut(DENSE_PAYLOADS).add_payload(8, 16);
+
         let encoded = stats.encode();
+
         assert_eq!(encoded.len(), 5 + STORE_MEMORY_OWNER_COUNT * 3);
         assert_eq!(encoded[encoded.len() - 2], 11.0);
         assert_eq!(encoded[encoded.len() - 1], 20.0);
@@ -150,12 +157,15 @@ mod tests {
     fn bulk_string_compaction_releases_only_admitted_owner_slack() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(1, 3_000);
+
         for row in 0..3_000 {
             store.set_string(sheet, row, 0, &format!("unique-string-{row:04}"), 0);
         }
+
         let before = store.memory_stats();
         store.compact_string_storage();
         let after = store.memory_stats();
+
         for index in 0..STORE_MEMORY_OWNER_COUNT {
             assert_eq!(
                 owner(&after, index).0,

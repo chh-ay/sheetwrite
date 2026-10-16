@@ -81,10 +81,6 @@ function scrollerOf(host: HTMLElement): HTMLDivElement {
 }
 
 describe("find-bar keystroke isolation", () => {
-  // Contract: keydowns whose target is an editable widget (the find bar's
-  // <input>) inside the host must be ignored by the grid's key handler. Before
-  // the fix a printable key started a cell edit and Backspace destructively
-  // cleared the selected cell.
   it("does not clear the selected cell when Backspace is pressed in the find input", () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
@@ -100,8 +96,6 @@ describe("find-bar keystroke isolation", () => {
 
     findInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
 
-    // Pre-fix: Backspace fell through to the grid and ran clearSelection(),
-    // nulling the cell under the selection.
     expect(store.getCell(addr).resolved).toBe("Customer 3");
 
     grid.destroy();
@@ -140,15 +134,9 @@ function makePaintRecorder(): PaintRecorder {
 }
 
 describe("row-resize repaint invalidation", () => {
-  // Contract: a row-height change via the row-header drag path must force the
-  // next render to issue a fresh Renderer.paint carrying the new per-row
-  // geometry. Before the fix the paint signature ignored the resize, so the
-  // canvas stayed stale until an unrelated interaction repainted it.
-  //
   // A 5-row sheet keeps every row inside the render window regardless of height,
   // so the paint signature's window/scroll/store components are all invariant
-  // across the resize. The only way a repaint can fire is the row-height epoch
-  // the fix bumps — which gives this test teeth against the pre-fix behavior.
+  // across the resize. The only way a repaint can fire is the row-height epoch.
   it("repaints with the new row height after a row-header drag", () => {
     const workbook = makeWorkbook(5);
     const store = new SheetwriteStore(workbook, makeColumnarData(5));
@@ -157,7 +145,6 @@ describe("row-resize repaint invalidation", () => {
 
     const recorder = makePaintRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
-    // Construction's paint went to the real renderer; the recorder starts clean.
     expect(recorder.paints.length).toBe(0);
 
     const scroller = scrollerOf(host);
@@ -180,9 +167,7 @@ describe("row-resize repaint invalidation", () => {
       new PointerEvent("pointerup", { clientX: 10, clientY: boundaryY + 30, bubbles: true }),
     );
 
-    // Pre-fix: no signature component changed, so paint() was skipped entirely.
     expect(recorder.paints.length).toBeGreaterThan(0);
-    // The forced repaint carried the resized geometry into the frame.
     expect(recorder.paints.at(-1)?.rowHeights?.[0]).toBe(58);
 
     grid.destroy();

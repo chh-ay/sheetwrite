@@ -5,7 +5,6 @@ import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 
 const wasmRoot =
   process.env.STRING_POOL_WASM_ROOT ?? new URL("../../packages/wasm/", import.meta.url).pathname;
-// The performance protocol selects the unchanged baseline or candidate at runtime.
 const { CellStore, load } = (await import(`${wasmRoot}/loader-node.mjs`)) as typeof WasmModule;
 
 const ROWS = 1_000_000;
@@ -13,16 +12,20 @@ const BATCH = 10_000;
 const EDITS = 100_000;
 const SAMPLES = 7;
 const mode = process.env.STRING_POOL_BENCH_MODE ?? "controls";
+
 await load(readFileSync(`${wasmRoot}/pkg/sheetwrite_wasm_bg.wasm`));
+
 function median(values: number[]): number {
   const sorted = values.toSorted((left, right) => left - right);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
+
 function measure(operation: () => void): number {
   const start = performance.now();
   operation();
   return performance.now() - start;
 }
+
 function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
   for (let start = 0; start < ROWS; start += BATCH) {
     store.setColumnStrings(
@@ -36,10 +39,13 @@ function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
     );
   }
 }
+
 function controls() {
   const samples: Record<string, number[]> = { ingest: [], edit: [], read: [], distinct: [] };
+
   for (let sample = 0; sample <= SAMPLES; sample++) {
     const store = new CellStore();
+
     try {
       const sheet = store.addSheet(1, ROWS);
       const timings = {
@@ -67,12 +73,14 @@ function controls() {
           }
         }),
       };
+
       if (sample > 0)
         for (const [name, duration] of Object.entries(timings)) samples[name]?.push(duration);
     } finally {
       store.free();
     }
   }
+
   return {
     samples,
     medians: Object.fromEntries(
@@ -80,27 +88,34 @@ function controls() {
     ),
   };
 }
+
 function lifetime() {
   const store = new CellStore();
+
   try {
     const sheet = store.addSheet(1, ROWS);
     ingest(store, sheet, true);
     const sweepPausesMs = Array.from({ length: SAMPLES + 1 }, () =>
       measure(() => store.compactStringStorage()),
     );
+
     const last = store.getCell(sheet, ROWS - 1, 0);
+
     try {
       if (last.string !== `distinct-${ROWS - 1}`) throw new Error("Sweep corrupted live text");
     } finally {
       last.free();
     }
+
     store.clearRange(sheet, 0, 0, ROWS - 1, 0, true, true);
     store.compactStringStorage();
+
     for (let edit = 0; edit < EDITS; edit++) {
       store.beginMutation();
       store.setString(sheet, 0, 0, `unique-edit-${edit}-${"x".repeat(128)}`, 0);
       store.commitSources();
     }
+
     return {
       pauseMs: Math.max(...sweepPausesMs),
       warmupPauseMs: sweepPausesMs[0],
@@ -111,4 +126,5 @@ function lifetime() {
     store.free();
   }
 }
+
 process.stdout.write(`${JSON.stringify(mode === "lifetime" ? lifetime() : controls())}\n`);

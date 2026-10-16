@@ -123,30 +123,38 @@ impl<'a> ReadWalk<'a> {
         ) else {
             return;
         };
+
         if row_count == 0 || col_count == 0 {
             return;
         }
+
         let row_start = range.row_start.min(range.row_end);
         let col_start = range.col_start.min(range.col_end);
         let row_end = range.row_start.max(range.row_end).min(row_count - 1);
         let col_end = range.col_start.max(range.col_end).min(col_count - 1);
+
         if row_start > row_end || col_start > col_end {
             return;
         }
+
         let rows = (row_end - row_start + 1) as usize;
         let cols = (col_end - col_start + 1) as usize;
         let Some(cells) = rows.checked_mul(cols) else {
             return;
         };
+
         if cells > self.remaining_cells {
             return;
         }
+
         self.remaining_cells -= cells;
+
         for col in col_start..=col_end {
             self.rows_by_col
                 .entry(col)
                 .or_default()
                 .push((row_start, row_end + 1));
+
             for row in row_start..=row_end {
                 self.visit((row, col));
             }
@@ -156,35 +164,44 @@ impl<'a> ReadWalk<'a> {
     /// Merges each column's rows, then joins adjacent columns with equal rows.
     fn into_rectangles(self) -> Vec<u32> {
         let mut merged: Vec<(u32, Vec<(u32, u32)>)> = Vec::with_capacity(self.rows_by_col.len());
+
         for (col, mut rows) in self.rows_by_col {
             rows.sort_unstable();
             let mut disjoint: Vec<(u32, u32)> = Vec::with_capacity(rows.len());
+
             for (start, end) in rows {
                 match disjoint.last_mut() {
                     Some(last) if start <= last.1 => last.1 = last.1.max(end),
                     _ => disjoint.push((start, end)),
                 }
             }
+
             merged.push((col, disjoint));
         }
 
         let mut out = Vec::new();
         let mut index = 0;
+
         while index < merged.len() {
             let (first_col, rows) = &merged[index];
             let mut next = index + 1;
+
             while next < merged.len()
                 && merged[next].0 == merged[next - 1].0 + 1
                 && merged[next].1 == *rows
             {
                 next += 1;
             }
+
             let col_end = merged[next - 1].0 + 1;
+
             for &(row_start, row_end) in rows {
                 out.extend_from_slice(&[row_start, row_end, *first_col, col_end]);
             }
+
             index = next;
         }
+
         out
     }
 }

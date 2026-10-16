@@ -1,4 +1,5 @@
 //! Same-build instance migration; never exposed as the document persistence format.
+
 use super::*;
 use crate::transfer::{Reader, TransferInput, TransferResult, Writer};
 use crate::types::{CellRange, ReadSet};
@@ -63,12 +64,14 @@ impl CellStore {
         col: u32,
     ) -> TransferResult<FormulaEntry> {
         let source = input.text()?;
+
         let mut entry = if input.bool()? {
             let target = AbsCellKey {
                 sheet: input.u32()?,
                 row: input.u32()?,
                 col: input.u32()?,
             };
+
             FormulaEntry::reference(
                 target,
                 self.sheet_names
@@ -90,6 +93,7 @@ impl CellStore {
         entry.volatile = input.bool()?;
         entry.has_spill_refs = input.bool()?;
         entry.produces_array = input.bool()?;
+
         let cells = (0..input.count()?)
             .map(|_| {
                 Ok(AbsCellKey {
@@ -99,6 +103,7 @@ impl CellStore {
                 })
             })
             .collect::<TransferResult<Vec<_>>>()?;
+
         let ranges = (0..input.count()?)
             .map(|_| {
                 Ok(CellRange {
@@ -112,11 +117,13 @@ impl CellStore {
             .collect::<TransferResult<Vec<_>>>()?;
 
         entry.reads = ReadSet { cells, ranges };
+
         Ok(entry)
     }
 
     fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
         let mut input = Reader::new(bytes, STORE_TAG)?;
+
         let mut store = Self::new();
         store.strings = input.strings()?;
         store.strings.epoch = store.strings.epoch.wrapping_add(1);
@@ -135,6 +142,7 @@ impl CellStore {
             } else {
                 None
             };
+
             let key = input.text()?;
             let range = NamedRangeRef {
                 name: input.text()?,
@@ -145,6 +153,7 @@ impl CellStore {
                 row_end: input.u32()?,
                 col_end: input.u32()?,
             };
+
             store.named_ranges.insert((scope, key), range);
         }
 
@@ -162,6 +171,7 @@ impl CellStore {
                 totals_row: input.bool()?,
                 columns: Vec::new(),
             };
+
             for _ in 0..input.count()? {
                 table.columns.push(TableColumnDefinition {
                     id: input.text()?,
@@ -179,6 +189,7 @@ impl CellStore {
         store.spill_owner_cell_limit = input.usize()?;
 
         let sheets = input.count()?;
+
         if sheets != store.sheet_names.len() {
             return Err("invalid transferred sheet handles".into());
         }
@@ -197,6 +208,7 @@ impl CellStore {
         }
 
         input.finish()?;
+
         Ok(store)
     }
 }

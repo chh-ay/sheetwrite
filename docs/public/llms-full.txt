@@ -8835,9 +8835,8 @@ window demand the full column. Rectangles are disjoint and ascend by
 column, then by row.
 - `getCell` — Single-cell read for interactions/tests — never the render hot path.
 - `getWindow` — One bulk read of a rectangular window for the renderer. Returns
-contiguous packed cell data (row-major over `rows x cols`) plus the
-unique strings referenced by the window, so the host paints without
-crossing the boundary per cell.
+contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+and window-local formula-error strings, avoiding per-cell boundary reads.
 - `getWindowRows` — Bulk read of an explicit row list (sorted/filtered views) — same output
 shape as `get_window`, rows taken from `rows` rather than a range.
 - `hydratePageNumbers` — Hydrate one datasource page column while retaining local dirty cells and
@@ -8868,8 +8867,7 @@ Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.
 
 The pass first grows the dirty cell set through formula read-sets to find
 all dependent formulas. It then evaluates only those formulas, using a
-per-pass memo table so each formula cell is evaluated at most once even
-when many downstream formulas reference it.
+per-pass memo table to reuse formula results across dependent reads.
 - `recomputeVolatile` — Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
 the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.
 - `referencesTargeting` — Return packed `[source_sheet, source_row, source_col, ...]` references
@@ -8888,8 +8886,8 @@ whose text payload arrives packed instead of once per cell.
 in cell-offset order. `text_offsets` carries their byte boundaries: the
 n-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the
 last entry equals the buffer length, so a block without strings passes an
-empty buffer and `&[0]`. Strings are interned in the same order as a
-per-cell write would intern them, so pool ids do not move. The compact
+empty buffer and `&[0]`. Literal strings are interned in cell-offset order;
+source-owned text slots are consumed without interning. The compact
 status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
 source metadata, and `3` paged dirty-capacity rejection.
 - `setColumnBlockPacked` — Atomically write one column-major mixed literal/formula/reference block
@@ -8912,13 +8910,13 @@ one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
 per rule; `nums` carries the numeric operand; `strs` the text/formula
 operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
 Formula strings are parsed once here, never once per visible cell.
-- `setFormula` — Parse and store an arithmetic formula at `(row, col)`.
+- `setFormula` — Parse and store a formula at `(row, col)`.
 
 Setters only mark cells dirty; they do not recompute formulas. The host
 calls `recompute(sheet)` once at the transaction barrier so a multi-cell
 edit performs one dependency-scoped pass instead of one full-sheet pass
-per setter. The returned value is the previous cached value until that
-barrier recompute runs, and the store facade ignores it for batched edits.
+per setter. A successful parse returns the pre-write cached scalar; a
+parse rejection returns `0.0`, and a rejected write returns `NaN`.
 
 The dependency index is invalidated only when the rewrite changes what
 the formula reads or whether it produces an array. A constant-only edit
@@ -10339,9 +10337,8 @@ window demand the full column. Rectangles are disjoint and ascend by
 column, then by row.
 - `getCell` — Single-cell read for interactions/tests — never the render hot path.
 - `getWindow` — One bulk read of a rectangular window for the renderer. Returns
-contiguous packed cell data (row-major over `rows x cols`) plus the
-unique strings referenced by the window, so the host paints without
-crossing the boundary per cell.
+contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+and window-local formula-error strings, avoiding per-cell boundary reads.
 - `getWindowRows` — Bulk read of an explicit row list (sorted/filtered views) — same output
 shape as `get_window`, rows taken from `rows` rather than a range.
 - `hydratePageNumbers` — Hydrate one datasource page column while retaining local dirty cells and
@@ -10372,8 +10369,7 @@ Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.
 
 The pass first grows the dirty cell set through formula read-sets to find
 all dependent formulas. It then evaluates only those formulas, using a
-per-pass memo table so each formula cell is evaluated at most once even
-when many downstream formulas reference it.
+per-pass memo table to reuse formula results across dependent reads.
 - `recomputeVolatile` — Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
 the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.
 - `referencesTargeting` — Return packed `[source_sheet, source_row, source_col, ...]` references
@@ -10392,8 +10388,8 @@ whose text payload arrives packed instead of once per cell.
 in cell-offset order. `text_offsets` carries their byte boundaries: the
 n-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the
 last entry equals the buffer length, so a block without strings passes an
-empty buffer and `&[0]`. Strings are interned in the same order as a
-per-cell write would intern them, so pool ids do not move. The compact
+empty buffer and `&[0]`. Literal strings are interned in cell-offset order;
+source-owned text slots are consumed without interning. The compact
 status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
 source metadata, and `3` paged dirty-capacity rejection.
 - `setColumnBlockPacked` — Atomically write one column-major mixed literal/formula/reference block
@@ -10416,13 +10412,13 @@ one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
 per rule; `nums` carries the numeric operand; `strs` the text/formula
 operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
 Formula strings are parsed once here, never once per visible cell.
-- `setFormula` — Parse and store an arithmetic formula at `(row, col)`.
+- `setFormula` — Parse and store a formula at `(row, col)`.
 
 Setters only mark cells dirty; they do not recompute formulas. The host
 calls `recompute(sheet)` once at the transaction barrier so a multi-cell
 edit performs one dependency-scoped pass instead of one full-sheet pass
-per setter. The returned value is the previous cached value until that
-barrier recompute runs, and the store facade ignores it for batched edits.
+per setter. A successful parse returns the pre-write cached scalar; a
+parse rejection returns `0.0`, and a rejected write returns `NaN`.
 
 The dependency index is invalidated only when the rewrite changes what
 the formula reads or whether it produces an array. A constant-only edit

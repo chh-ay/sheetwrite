@@ -323,7 +323,6 @@ describe("ReadWindowController", () => {
       emitScroll: () => {},
     });
 
-    // Runs one frame and reports whether it read a new logical data window.
     const readsWindow = (change: () => void): boolean => {
       const before = windowReads;
       change();
@@ -342,13 +341,11 @@ describe("ReadWindowController", () => {
       expect(ariaUpdates).toBe(1);
       expect(windowReads).toBeGreaterThan(0);
 
-      // Nothing changed: no frame.
       const readsBefore = windowReads;
       coordinator.renderNow();
       expect(paints).toHaveLength(1);
       expect(windowReads).toBe(readsBefore);
 
-      // Pixel-only changes repaint without reading data.
       const revision = viewports.at(-1)?.contentRevision;
       expect(readsWindow(() => coordinator.invalidate())).toBe(false);
       expect(paints).toHaveLength(2);
@@ -357,7 +354,6 @@ describe("ReadWindowController", () => {
       expect(readsWindow(() => (scrollLeft = 1))).toBe(false);
       expect(paints).toHaveLength(4);
 
-      // Crossing a row or column, a store change, or a data invalidation reads data.
       expect(readsWindow(() => (scrollTop = DEFAULT_THEME.rowHeight + 1))).toBe(true);
       expect(readsWindow(() => (scrollLeft = 170))).toBe(true);
       expect(readsWindow(() => (storeEpoch += 1))).toBe(true);
@@ -367,7 +363,6 @@ describe("ReadWindowController", () => {
       expect(readsWindow(() => (zoom = 1.25))).toBe(false);
       expect(paints).toHaveLength(paintsBeforeZoom + 1);
 
-      // Merge anchors outside the window are read once per changed request set.
       const invalidate = () => coordinator.invalidate();
       anchorRequests = [{ sheet: "s1", row: 0, cols: [0] }];
       expect(readsWindow(invalidate)).toBe(true);

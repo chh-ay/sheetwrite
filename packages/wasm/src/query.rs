@@ -21,17 +21,14 @@ enum DistinctKey<'a> {
     Text(&'a str),
 }
 
-/// Bits per word in [`PoolIdStamps`].
 const STAMP_WORD_BITS: usize = 64;
-/// Words in a fresh [`PoolIdStamps`]; growth doubles from here.
 const STAMP_WORDS_INITIAL: usize = 64;
 
 /// One bit per string-pool id, so text that is already dictionary-encoded
 /// dedupes without hashing or comparing a single character.
 ///
-/// Words are zero-filled when the marks grow, and capacity doubles, so a column
-/// whose ids span the whole pool allocates O(log ids) times and never exceeds
-/// twice the words its highest id needs.
+/// Words are zero-filled when the marks grow. Growth doubles the current word
+/// count (with an initial floor) or reaches the requested id, whichever is larger.
 struct PoolIdStamps {
     words: Vec<u64>,
 }
@@ -41,17 +38,19 @@ impl PoolIdStamps {
         Self { words: Vec::new() }
     }
 
-    /// Marks `id` and reports whether it had not been marked before.
     fn insert(&mut self, id: u32) -> bool {
         let index = id as usize;
         let word = index / STAMP_WORD_BITS;
+
         if word >= self.words.len() {
             let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
             self.words.resize(doubled.max(word + 1), 0);
         }
+
         let mask = 1u64 << (index % STAMP_WORD_BITS);
         let fresh = self.words[word] & mask == 0;
         self.words[word] |= mask;
+
         fresh
     }
 }
@@ -63,21 +62,21 @@ thread_local! {
 /// Longest picked-value list still scanned linearly: below this, building a
 /// lookup costs more than the comparisons it saves.
 const VALUE_SET_LINEAR_MAX: usize = 8;
+
 /// Sentinel the view layer sends for a picked `TRUE`. The `\0` prefix keeps it
 /// distinct from a cell that holds the text `TRUE`.
 const VALUE_SET_TRUE: &str = "\0TRUE";
+
 /// Sentinel for a picked `FALSE`; see [`VALUE_SET_TRUE`].
 const VALUE_SET_FALSE: &str = "\0FALSE";
-/// [`ValueSet::Lookup::bools`] bit set when `FALSE` was picked.
 const VALUE_SET_FALSE_BIT: u8 = 1;
-/// [`ValueSet::Lookup::bools`] bit set when `TRUE` was picked.
 const VALUE_SET_TRUE_BIT: u8 = 2;
 
 /// Picked values of one "values" filter column, prepared once per scan.
 ///
-/// The row loop then answers membership in constant time per cell instead of
-/// comparing the cell with every picked value. `Linear` keeps the original scan
-/// for lists short enough that a lookup costs more than it saves.
+/// The row loop then answers membership without comparing the cell with every
+/// picked value: numeric picks use binary search and text picks use a hash set.
+/// `Linear` keeps the scan for lists short enough that a lookup costs more than it saves.
 enum ValueSet<'a> {
     Linear,
     Lookup {
@@ -85,7 +84,6 @@ enum ValueSet<'a> {
         /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
         /// equality can match.
         numbers: Vec<u64>,
-        /// Picked text; a cell matches when its resolved text equals an entry.
         texts: HashSet<&'a str>,
         /// Picked booleans, as the two bits above.
         bools: u8,
@@ -93,29 +91,33 @@ enum ValueSet<'a> {
 }
 
 impl<'a> ValueSet<'a> {
-    /// Prepares the lookup for one column, or `Linear` when the picked list is
-    /// short enough that a scan beats a table.
     fn build(picked_numbers: &[f64], picked_texts: &'a [String]) -> Self {
         if picked_numbers.len() + picked_texts.len() <= VALUE_SET_LINEAR_MAX {
             return ValueSet::Linear;
         }
+
         let mut numbers: Vec<u64> = picked_numbers
             .iter()
             .filter(|value| !value.is_nan())
             .map(|value| (if *value == 0.0 { 0.0 } else { *value }).to_bits())
             .collect();
+
         numbers.sort_unstable();
         numbers.dedup();
+
         let mut texts = HashSet::with_capacity(picked_texts.len());
         let mut bools = 0u8;
+
         for picked in picked_texts {
             match picked.as_str() {
                 VALUE_SET_TRUE => bools |= VALUE_SET_TRUE_BIT,
                 VALUE_SET_FALSE => bools |= VALUE_SET_FALSE_BIT,
                 _ => {}
             }
+
             texts.insert(picked.as_str());
         }
+
         ValueSet::Lookup {
             numbers,
             texts,
@@ -136,6 +138,7 @@ impl CellStore {
     pub fn reset_query_resource_stats(&self) {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
     }
+
     /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.
     #[wasm_bindgen(js_name = aggregate)]
     pub fn aggregate(&self, sheet: usize, col: usize, op: u8) -> f64 {
@@ -161,7 +164,6 @@ impl CellStore {
                 }
             }
         } else {
-            // The dense aggregate keeps its proven unchecked contiguous loop.
             for row in 0..s.row_count {
                 let i = base + row;
                 // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
@@ -293,7 +295,6 @@ impl CellStore {
                 }
             }
         } else {
-            // Dense string columns keep the slice-based bounds-check-free path.
             let kinds = &s.kind[base..base + s.row_count];
             let payloads = &s.payload[base..base + s.row_count];
             for (row, (&kind, &bits)) in kinds.iter().zip(payloads.iter()).enumerate() {
@@ -363,7 +364,6 @@ impl CellStore {
         let next = next as usize;
 
         if occupied(pos) && occupied(next) {
-            // Inside a run: land on its last non-empty cell.
             let mut p = next;
             loop {
                 let ahead = p as isize + step;
@@ -374,8 +374,6 @@ impl CellStore {
             }
         }
 
-        // In a gap (or leaving a lone cell): land on the next non-empty cell,
-        // falling back to the sheet edge.
         let mut p = next as isize;
         while p >= 0 && p as usize <= last {
             if occupied(p as usize) {
@@ -423,8 +421,6 @@ impl CellStore {
                 continue;
             }
 
-            // 2026-06 release harness: unchecked search scanning was 1.03x here,
-            // below the 2x threshold; keep the safe indexing.
             let base = col * s.row_count;
             for row in 0..s.row_count {
                 let i = base + row;
@@ -510,9 +506,7 @@ impl CellStore {
             }
         }
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
-        // The comparator stays total only when every key is a number or text: a
-        // NaN key compares equal to everything. A stable sort keeps the output
-        // identical to the previous comparator for that case too.
+        // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
                 let a = &keys[key * row_count + left as usize];
@@ -577,7 +571,6 @@ impl CellStore {
             current[0] = current[0].saturating_add(match_caches.len() as u64);
             stats.set(current);
         });
-        // One membership table per "values" column, built once for the scan.
         let mut value_sets: Vec<ValueSet<'_>> = Vec::with_capacity(kinds.len());
         for (i, &kind) in kinds.iter().enumerate() {
             if kind != 0 {
@@ -987,10 +980,8 @@ pub(crate) fn ascii_contains_ignore_case(hay: &[u8], needle: &[u8]) -> bool {
 }
 
 /// Match a numeric cell's textual form against `needle` without the per-cell
-/// `f64::to_string` heap allocation. An `f64`'s `Display` output fits the stack
-/// buffer for every magnitude a sheet realistically holds; a pathological
-/// exponent overflows it and falls back to an owned string so results stay
-/// correct.
+/// `f64::to_string` heap allocation. Formatting uses a stack buffer and falls
+/// back to an owned string on overflow so results stay correct.
 pub(crate) fn number_matches_text(
     value: f64,
     needle: &str,
@@ -1008,8 +999,7 @@ pub(crate) fn number_matches_text(
 }
 
 /// Fixed stack buffer implementing [`std::fmt::Write`], used to format an `f64`
-/// off the heap. Overflow (only very large magnitudes) reports an error so the
-/// caller can fall back to an owned string.
+/// off the heap. Overflow reports an error so the caller can fall back to an owned string.
 pub(crate) struct NumBuf {
     buf: [u8; 32],
     len: usize,
@@ -1043,18 +1033,16 @@ impl std::fmt::Write for NumBuf {
 }
 
 /// Number of direct-mapped slots in [`MatchCache`]. A power of two so the slot
-/// index is a mask; sized to stay L1-resident while covering the distinct-value
-/// count of any realistic categorical column in one scan.
+/// index is a mask; sized to stay L1-resident while covering common categorical columns.
 pub(crate) const MATCH_CACHE_SLOTS: usize = 1024;
 
 /// Direct-mapped cache of string-pool match results for one scan.
 ///
 /// Cells are dictionary-encoded (`str_id` into a shared pool), so a
-/// low-cardinality column — the common filter target: status, category, city —
-/// matches each *distinct* value once instead of once per row. The table is
-/// fixed-size and L1-resident: high-cardinality columns simply keep missing and
-/// fall through to a direct match, paying only a tag check, so it never
-/// allocates per scan nor degrades a unique-valued column into an O(pool) table.
+/// low-cardinality column can reuse matches for cached distinct values.
+/// The table is fixed-size and L1-resident: high-cardinality columns simply
+/// keep missing and fall through to a direct match, paying only a tag check,
+/// so it never allocates per scan or builds an O(pool) table.
 pub(crate) struct MatchCache {
     tag: [u32; MATCH_CACHE_SLOTS],
     hit: [bool; MATCH_CACHE_SLOTS],

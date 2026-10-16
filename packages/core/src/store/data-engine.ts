@@ -285,12 +285,11 @@ const MAX_UTF8_BYTES_PER_CODE_UNIT = 3;
  * Text crosses into WASM once per block instead of once per cell: `add` appends
  * each string after the previous one and `offsets` records the byte boundary of
  * every string, so the native side slices the buffer and never re-encodes.
- * Strings must be added in the row-major order of their cells.
+ * Strings must be added in the flat input order of their cells: row-major for
+ * document blocks and column-major for columnar imports.
  */
 class PackedTextBuffer {
-  /** Byte position where the next string starts. */
   private written = 0;
-  /** Number of strings added so far. */
   private count = 0;
   private bytes: Uint8Array;
   /** Start of each string, plus the packed length as the final entry. */
@@ -314,7 +313,6 @@ class PackedTextBuffer {
     this.offsets[this.count] = this.written;
   }
 
-  /** Bytes written so far, trimmed to exactly what was packed. */
   packedBytes(): Uint8Array {
     return this.written === this.bytes.length ? this.bytes : this.bytes.subarray(0, this.written);
   }
@@ -822,7 +820,7 @@ export class StoreDataEngine {
    *
    * The pairs are the per-row view of {@link areColumnsFullyLoaded}: a row is in
    * a run only when the store reports it loaded. One call reconciles a whole
-   * column, where probing the band row by row took one call per probe.
+   * column instead of probing the band row by row with one call per probe.
    */
   loadedSpans(sheet: SheetId, startRow: number, endRow: number, column: number): Uint32Array {
     return this.wasm.loadedSpans(this.handleOf(sheet), startRow, endRow, column);
@@ -895,7 +893,6 @@ export class StoreDataEngine {
     return meta;
   }
 
-  /** True when a set patch can affect an existing cell in workbook metadata. */
   private isCellInBounds(addr: CellAddress): boolean {
     const meta = this.workbook.sheets.find((s) => s.id === addr.sheet);
     return (
@@ -1191,7 +1188,6 @@ export class StoreDataEngine {
   /**
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
-   * Feeds a values-filter picker.
    */
   distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
     this.requireCompleteQuery(sheet);
@@ -1212,7 +1208,7 @@ export class StoreDataEngine {
    * Ctrl+Arrow destination. With an active view order `row` is a VIEW position
    * and the scan runs in view space (`dataEdgeOrdered`): a vertical move returns
    * the destination VIEW position, a horizontal move returns a column index.
-   * Without a view it scans data space (`dataEdge`) exactly as before.
+   * Without a view it scans data space (`dataEdge`).
    */
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
     this.requireCompleteQuery(sheet);
@@ -1228,9 +1224,11 @@ export class StoreDataEngine {
     const flat = this.searchCellsFlat(sheet, query, opts);
 
     const out: CellAddress[] = [];
+
     for (let i = 0; i + 1 < flat.length; i += 2) {
       out.push({ sheet, row: flat[i]!, col: flat[i + 1]! });
     }
+
     return out;
   }
 
@@ -1243,6 +1241,7 @@ export class StoreDataEngine {
     this.requireCompleteQuery(sheet);
     const handle = this.handleOf(sheet);
     const columns = opts.columns ?? this.sheetMeta(sheet).columns.map((_, i) => i);
+
     return this.wasm.search(
       handle,
       Uint32Array.from(columns),
@@ -1282,10 +1281,12 @@ export class StoreDataEngine {
   ): ResolvedCell[] {
     const rows = new Uint32Array(cells.length);
     const columns = new Uint32Array(cells.length);
+
     for (const [index, cell] of cells.entries()) {
       rows[index] = bounds.start.row + cell.rowOffset;
       columns[index] = bounds.start.col + cell.colOffset;
     }
+
     return consumeCellSnapshots(
       this.wasm.cellSnapshots(this.handleOf(bounds.sheet), rows, columns),
       (styleId) => this.styles.get(styleId),
@@ -1306,8 +1307,10 @@ export class StoreDataEngine {
   ): Array<{ addr: CellAddress; before: ResolvedCell }> {
     const columns: number[] = new Array(cols);
     for (let col = 0; col < cols; col += 1) columns[col] = bounds.start.col + col;
+
     const snapshot = this.windowReader.readRectangle(bounds.sheet, bounds.start.row, rows, columns);
     const cells = new Array<{ addr: CellAddress; before: ResolvedCell }>(rows * cols);
+
     for (let offset = 0; offset < rows * cols; offset += 1) {
       const row = bounds.start.row + Math.floor(offset / cols);
       const col = bounds.start.col + (offset % cols);
@@ -1319,6 +1322,7 @@ export class StoreDataEngine {
         },
       };
     }
+
     return cells;
   }
 
@@ -1332,17 +1336,22 @@ export class StoreDataEngine {
     const numbers = new Float64Array(cellCount);
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
+
     // Sizing the text buffer up front costs one extra pass over `values` and
     // keeps the packing pass free of reallocations for ASCII text.
     let textCount = 0;
     let textBytes = 0;
+
     for (let offset = 0; offset < cellCount; offset += 1) {
       const value = values[offset];
       if (typeof value !== "string") continue;
+
       textCount += 1;
       textBytes += value.length;
     }
+
     const texts = new PackedTextBuffer(textBytes, textCount);
+
     for (let offset = 0; offset < cellCount; offset++) {
       const value = values[offset];
       if (value === null || value === undefined) {
@@ -1357,6 +1366,7 @@ export class StoreDataEngine {
         kinds[offset] = KIND_STRING;
         texts.add(value);
       }
+
       const styleId = styleIds === undefined ? undefined : styleIds[offset];
       wasmStyles[offset] = this.styles.intern(
         styleId === undefined ? undefined : styleTable[styleId],
@@ -1366,10 +1376,12 @@ export class StoreDataEngine {
     const formulas = block.formulas ?? [];
     const refs = block.refs ?? [];
     const referenceTargets = new Uint32Array(refs.length * 3);
+
     for (let index = 0; index < refs.length; index++) {
       const target = refs[index]![1];
       const targetHandle = this.handles.get(target.sheet);
       if (targetHandle === undefined || !this.isCellInBounds(target)) return false;
+
       const packed = index * 3;
       referenceTargets[packed] = targetHandle;
       referenceTargets[packed + 1] = target.row;
@@ -1377,6 +1389,7 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi(cellCount);
+
     return (
       this.wasm.setBlockPacked(
         this.handleOf(bounds.sheet),
@@ -1410,10 +1423,12 @@ export class StoreDataEngine {
     const formulaSources: string[] = [];
     const referenceOffsets: number[] = [];
     const referenceTargets: number[] = [];
+
     for (let index = 0; index < cells.length; index++) {
       const cell = cells[index]!;
       offsets[index] = cell.offset;
       styles[index] = this.styles.intern(cell.style);
+
       if (cell.value.kind === "formula") {
         formulaOffsets.push(cell.offset);
         formulaSources.push(cell.value.src);
@@ -1421,6 +1436,7 @@ export class StoreDataEngine {
       } else if (cell.value.kind === "ref") {
         const targetHandle = this.handles.get(cell.value.target.sheet);
         if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
+
         referenceOffsets.push(cell.offset);
         referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
         texts[index] = "";
@@ -1444,6 +1460,7 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi(cells.length);
+
     return (
       this.wasm.setSparseBlock(
         this.handleOf(bounds.sheet),
@@ -3341,7 +3358,6 @@ function writeColumnarValue(
   }
 }
 
-/** Resolved scalar of one stored cell, mirroring the fields of `CellOut`. */
 function resolvedScalar(kind: number, num: number, text: string | null): CellScalar {
   if (kind === KIND_NUMBER || kind === KIND_FORMULA) return num;
   if (kind === KIND_BOOL) return num !== 0;

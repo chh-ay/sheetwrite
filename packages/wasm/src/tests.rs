@@ -1001,7 +1001,6 @@ fn match_cache_handles_repeats_eviction_and_collisions() {
         .collect();
     assert_eq!(store.filter_rows(sheet, 0, "7"), expected);
 
-    // Low-cardinality column: heavy cache reuse, every third row matches.
     let tokyo: Vec<u32> = (0..rows).step_by(3).map(|r| r as u32).collect();
     assert_eq!(store.filter_rows(sheet, 1, "tokyo"), tokyo);
 }
@@ -1090,30 +1089,26 @@ fn pure_string_filter_fast_path_matches_mixed_and_unicode_fallbacks() {
 fn data_edge_follows_google_ctrl_arrow_semantics() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 12);
-    // Column 0 occupancy: rows 0-2 run, gap, rows 6-7 run, gap to the edge.
     for row in [0, 1, 2, 6, 7] {
         store.set_string(sheet, row, 0, "x", 0);
     }
-    // Row 1 occupancy across columns: 0 (from above), 2.
     store.set_number(sheet, 1, 2, 1.0, 0);
 
-    // Inside a run → end of the run.
     assert_eq!(store.data_edge(sheet, 0, 0, 1, 0), 2);
     assert_eq!(store.data_edge(sheet, 7, 0, -1, 0), 6);
-    // At a run end (next is empty) → next non-empty cell.
+
     assert_eq!(store.data_edge(sheet, 2, 0, 1, 0), 6);
     assert_eq!(store.data_edge(sheet, 6, 0, -1, 0), 2);
-    // From an empty cell → next non-empty cell.
+
     assert_eq!(store.data_edge(sheet, 4, 0, 1, 0), 6);
     assert_eq!(store.data_edge(sheet, 4, 0, -1, 0), 2);
-    // Nothing ahead → sheet edge.
+
     assert_eq!(store.data_edge(sheet, 7, 0, 1, 0), 11);
     assert_eq!(store.data_edge(sheet, 0, 0, -1, 0), 0);
 
-    // Horizontal: from (1,0) right lands on the lone occupied col 2, then edge.
     assert_eq!(store.data_edge(sheet, 1, 0, 0, 1), 2);
     assert_eq!(store.data_edge(sheet, 1, 2, 0, 1), 2);
-    // Out-of-range inputs bail to 0 without panicking.
+
     assert_eq!(store.data_edge(99, 0, 0, 1, 0), 0);
     assert_eq!(store.data_edge(sheet, 50, 0, 1, 0), 0);
 }
@@ -1867,7 +1862,6 @@ fn fill_mixed_distinct_column(store: &mut CellStore, sheet: usize) {
     store.set_number(sheet, 7, 0, 0.0, 0);
     store.set_number(sheet, 8, 0, f64::NAN, 0);
     store.set_number(sheet, 9, 0, f64::NAN, 0);
-    // Row 10 stays blank.
     store.set_string(sheet, 11, 0, "Alpha", 0);
     store.set_formula(sheet, 12, 0, "=\"Alpha\"", 0);
     store.set_string(sheet, 13, 0, "Beta", 0);
@@ -1892,8 +1886,6 @@ fn distinct_values_keep_first_seen_order_across_mixed_kinds() {
     store.compact_string_storage();
 
     let mut column = store.distinct_values(sheet, 0, 0);
-    // Text, number, error text, boolean, `-0.0`, `0.0`, NaN, blank, the pooled
-    // "Alpha" a formula also returns, false, then the numeric formula result.
     assert_eq!(column.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0, 2, 3, 1]);
     assert_eq!(
         distinct_number_bits(&mut column),
@@ -1923,7 +1915,6 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
     assert_eq!(distinct_number_bits(&mut three), vec![2.0f64.to_bits()]);
     assert_eq!(three.take_texts(), vec!["Beta", "#DIV/0!"]);
 
-    // Eight entries include the blank, the `-0.0`/`0.0` pair and NaN.
     let mut eight = store.distinct_values(sheet, 0, 8);
     assert_eq!(eight.take_kinds(), vec![2, 1, 2, 3, 1, 1, 1, 0]);
     assert_eq!(
@@ -1938,7 +1929,6 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
     );
     assert_eq!(eight.take_texts(), vec!["Beta", "#DIV/0!"]);
 
-    // A limit past the distinct count returns the whole list.
     let mut all = store.distinct_values(sheet, 0, 64);
     assert_eq!(all.take_kinds().len(), 11);
     assert_eq!(all.take_texts(), vec!["Beta", "#DIV/0!", "Alpha"]);
@@ -2765,7 +2755,6 @@ struct ProbeCell {
     is_reference: bool,
 }
 
-/// Append the probe's string cells to a packed text payload in the given order.
 fn push_probe_text(
     cells: &[ProbeCell],
     order: impl Iterator<Item = usize>,
@@ -2961,7 +2950,6 @@ fn column_major_block_input_matches_row_major_for_mixed_cells() {
     );
 }
 
-/// Compact status the store returns for invalid or duplicate source metadata.
 const INVALID_SOURCE_STATUS: u32 = 2;
 
 #[test]
@@ -3182,8 +3170,6 @@ mod value_set_filter {
             "TRUE",
             "delta",
         ];
-        // Rows: both pooled text values, the text cell spelling TRUE, both real
-        // booleans, and the error formula whose sentinel text is a pick.
         let expected = vec![5, 6, 7, 8, 9, 11, 12];
         assert_eq!(filter_values(&store, sheet, &[], &long, false), expected);
         assert_eq!(filter_values(&store, sheet, &[], &short, false), expected);
@@ -3221,7 +3207,6 @@ mod value_set_filter {
 mod multi_key_sort_fixtures {
     use super::*;
 
-    /// Two keys of five rows: (col0 text, col1 number).
     fn text_number_fixture() -> (CellStore, usize) {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(2, 5);
@@ -3241,17 +3226,16 @@ mod multi_key_sort_fixtures {
     #[test]
     fn multi_key_sort_ties_keep_the_row_id() {
         let (store, sheet) = text_number_fixture();
-        // Rows 1 and 3 share both keys, so the row id keeps them in order.
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[]),
             vec![1, 3, 2, 0, 4]
         );
-        // Descending leading key, ascending second key.
+
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[0, 1], &[]),
             vec![4, 2, 0, 1, 3]
         );
-        // Both keys descending.
+
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[0, 0], &[]),
             vec![4, 0, 2, 1, 3]
@@ -3261,12 +3245,11 @@ mod multi_key_sort_fixtures {
     #[test]
     fn multi_key_sort_filters_candidates_and_keeps_their_order() {
         let (store, sheet) = text_number_fixture();
-        // 99 is out of range and drops out; the rest sort as the full list does.
         assert_eq!(
             store.sort_rows_multi(sheet, &[0, 1], &[1, 1], &[0, 2, 3, 99]),
             vec![3, 2, 0]
         );
-        // One key over a candidate list takes the multi-key path too.
+
         assert_eq!(
             store.sort_rows_multi(sheet, &[1], &[0], &[0, 2, 3]),
             vec![3, 0, 2]
@@ -3280,7 +3263,6 @@ mod multi_key_sort_fixtures {
         let sheet = store.add_sheet(2, 9);
         store.set_number(sheet, 0, 0, 2.0, 0);
         store.set_string(sheet, 1, 0, "a", 0);
-        // Row 2 stays blank.
         store.set_bool(sheet, 3, 0, true, 0);
         store.set_number(sheet, 4, 0, 1.0, 0);
         store.set_string(sheet, 5, 0, "b", 0);

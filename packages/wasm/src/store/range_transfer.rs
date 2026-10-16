@@ -9,6 +9,7 @@ impl RangeSnapshot {
     #[wasm_bindgen(js_name = exportMemoryState)]
     pub fn export_memory_state(&self, sheet: u32) -> Vec<u8> {
         let mut out = Writer::new(RANGE_TAG);
+
         out.usize(self.rows);
         out.usize(self.cols);
         out.bytes(&self.kind);
@@ -41,6 +42,7 @@ impl CellStore {
         let kind = input.bytes()?;
         let payload = input.words()?;
         let style = input.ints()?;
+
         if rows.checked_mul(cols) != Some(kind.len())
             || kind.len() != payload.len()
             || kind.len() != style.len()
@@ -62,10 +64,12 @@ impl CellStore {
                     .checked_add(col)
                     .ok_or("history column overflow")?,
             )?;
+
             formulas.push((row, col, entry));
         }
 
         input.finish()?;
+
         Ok(RangeSnapshot {
             rows,
             cols,

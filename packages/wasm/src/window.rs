@@ -16,9 +16,8 @@ use crate::types::{
 #[wasm_bindgen]
 impl CellStore {
     /// One bulk read of a rectangular window for the renderer. Returns
-    /// contiguous packed cell data (row-major over `rows x cols`) plus the
-    /// unique strings referenced by the window, so the host paints without
-    /// crossing the boundary per cell.
+    /// contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+    /// and window-local formula-error strings, avoiding per-cell boundary reads.
     #[wasm_bindgen(js_name = getWindow)]
     pub fn get_window(
         &self,
@@ -48,8 +47,6 @@ impl CellStore {
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
-        // 2026-06 release harness: unchecked indexing was 1.02x here,
-        // below the 2x threshold; keep the clearer safe loop.
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
             if col >= s.n_cols {
@@ -127,8 +124,6 @@ impl CellStore {
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
-        // 2026-06 release harness: unchecked indexing was 0.88x here,
-        // below the 2x threshold; keep the clearer safe loop.
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
             if col >= s.n_cols {
@@ -248,8 +243,8 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
     (style_dict.len() - 1) as u32
 }
 
-/// Window-local index of a formula-error sentinel; `slots` is a fixed 6-entry
-/// table (one per `FormulaError` variant), allocation-free.
+/// Window-local index of a formula-error sentinel; `slots` has one entry per
+/// `FormulaError` variant and requires no allocation.
 pub(crate) fn local_error_index(
     error: FormulaError,
     slots: &mut [i32; FormulaError::COUNT],

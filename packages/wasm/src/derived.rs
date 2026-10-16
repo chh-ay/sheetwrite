@@ -103,6 +103,7 @@ impl DerivedOverlay {
                 }
 
                 payload.resize(dense_cells, ABSENT_TAG);
+
                 true
             }
             Self::Paged(cells) => cells.try_reserve(additional).is_ok(),
@@ -191,6 +192,7 @@ impl DerivedOverlay {
             Self::Paged(cells) => {
                 out.bool(true);
                 out.usize(cells.len());
+
                 for (&index, &value) in cells {
                     out.usize(index);
                     out.u64(value);
@@ -207,22 +209,28 @@ impl DerivedOverlay {
         if input.bool()? != is_paged {
             return Err("transferred overlay storage mismatch".into());
         }
+
         if is_paged {
             let count = input.count()?;
             let mut cells = HashMap::with_capacity(count);
+
             for _ in 0..count {
                 let index = input.usize()?;
                 let value = input.u64()?;
+
                 if index >= maximum || value == ABSENT_TAG || cells.insert(index, value).is_some() {
                     return Err("invalid transferred calculated cell".into());
                 }
             }
+
             Ok(Self::Paged(cells))
         } else {
             let values = input.word_runs(ABSENT_TAG, maximum)?;
+
             if !values.is_empty() && values.len() != maximum {
                 return Err("invalid transferred calculated dimensions".into());
             }
+
             Ok(Self::Dense(values))
         }
     }

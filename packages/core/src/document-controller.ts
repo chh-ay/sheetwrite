@@ -85,6 +85,7 @@ export class DocumentController {
       ? atomicBatchLimits(this.transactionResourceLimits)
       : this.transactionResourceLimits;
     const resourceValidation = validateTransactionResources(operations, limits);
+
     if (!resourceValidation.ok) {
       return {
         status: "rejected",
@@ -92,11 +93,13 @@ export class DocumentController {
         issues: [resourceValidation.issue],
       };
     }
+
     // The store receives a private copy of the caller's operations; the copy is
     // verified to hold the measured operations before its record is handed over.
     const patches = operations.slice();
     if (atomic) markAtomicBatch(patches);
     const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
+
     const outcome = this.options.store.applyTransaction(
       withAdmittedTransactionResources({ patches }, admitted),
       {
@@ -105,11 +108,13 @@ export class DocumentController {
         localReplay: options.localReplay,
       },
     );
+
     // Undo entries hold addresses from before this change: a remote row or
     // column insert or delete moves them exactly as a local one does.
     if (outcome.status === "applied") {
       for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
     }
+
     return outcome;
   }
 
@@ -124,27 +129,32 @@ export class DocumentController {
       : this.transactionResourceLimits;
     const inputResources = resolveTransactionResourceValidation(input, limits, admitted);
     if (!inputResources.result.ok) return this.rejectResources(inputResources.result.issue);
+
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
     }
+
     if (input.length === 0) {
       return { status: "noop", epoch: this.options.epoch(), reason: "empty" };
     }
+
     // Custom callbacks may mutate nested operations while retaining identity.
     // Grid's engine-owned materializer only returns the input when unchanged.
     let admittedPatches = this.options.trustedResourceCallbacks
       ? inputResources.admitted
       : undefined;
     const patches = this.options.materializeVirtualColumns(input);
+
     if (patches !== input) {
       if (atomic) markAtomicBatch(patches);
       const materializedResources = resolveTransactionResourceValidation(patches, limits);
       if (!materializedResources.result.ok) {
         return this.rejectResources(materializedResources.result.issue);
       }
-      // Materialization replaced the operations, so they carry a new record.
+
       admittedPatches = materializedResources.admitted;
     }
+
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
       return { status: "noop", epoch: this.options.epoch(), reason: "incomplete-data" };
     }
@@ -158,66 +168,85 @@ export class DocumentController {
         issues: [admission.issue],
       };
     }
+
     if (admission && (!this.options.trustedResourceCallbacks || admission.inspectedOperations)) {
       admittedPatches = undefined;
     }
+
     const reservation = admission?.reservation;
 
     if (this.applyingHistory) {
       let outcome: ApplyTransactionResult;
+
       try {
         outcome = this.storeApply(patches, reason, admittedPatches);
       } catch (error) {
         reservation?.cancel();
         throw error;
       }
+
       reservation?.finish(outcome);
       if (outcome.status === "rejected") this.options.onMutationRejected(outcome.issues);
+
       return outcome;
     }
 
     const inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     let outcome: ApplyTransactionResult;
+
     try {
       for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
+
       outcome = this.storeApply(patches, reason, admittedPatches);
     } catch (error) {
       reservation?.cancel();
+
       for (const inverse of inverseByPatch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
       }
+
       throw error;
     }
+
     reservation?.finish(outcome);
+
     if (outcome.status !== "applied") {
       for (const inverse of inverseByPatch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
       }
+
       if (outcome.status === "rejected") this.options.onMutationRejected(outcome.issues);
+
       return outcome;
     }
+
     if (outcome.rejections?.length) this.options.onMutationRejected(outcome.rejections);
 
     const applied = outcome.transaction.patches;
     const appliedSet = new Set(applied);
     const inverse: HistoryAction = [];
+
     for (const [patch, items] of inverseByPatch) {
       if (!appliedSet.has(patch)) {
         for (const item of items) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
+
         continue;
       }
+
       for (const item of items) {
         inverse.push("kind" in item ? item : { kind: "patches", patches: [item] });
       }
     }
+
     for (const patch of applied) this.rebaseHistoryFor(patch);
     this.history.push(inverse, applied);
+
     return outcome;
   }
 
@@ -232,14 +261,18 @@ export class DocumentController {
   undo(): void {
     const action = this.history.undo();
     if (!action) return;
+
     let outcome: ApplyTransactionResult | null;
+
     try {
       outcome = this.applyHistoryPatches(action, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
     }
+
     if (outcome?.status === "applied") return;
+
     // The restore payload and the transaction limits never change, so these
     // rejections repeat on every retry; keeping the entry would block every
     // older undo behind it. Other rejections, such as a full sync queue, can
@@ -254,6 +287,7 @@ export class DocumentController {
   redo(): void {
     const action = this.history.redo();
     if (!action) return;
+
     try {
       if (this.applyHistoryPatches(action, "redo")?.status !== "applied")
         this.history.restoreRedo();
@@ -894,8 +928,6 @@ export class DocumentController {
       }
     }
     const split = splitOversizedBlocks(patches, limits);
-    // Without pieces that each fit one version, the original operations meet
-    // the ordinary limits and are rejected with the observed resource.
     if (!split) return { patches };
     const batch = markAtomicBatch(split.operations);
     const batchLimits = atomicBatchLimits(limits);
@@ -915,7 +947,7 @@ export class DocumentController {
     };
   }
 
-  /** Whether the sampled compression estimate of every block fits one transaction. */
+  /** Whether the combined block compression estimate fits one transaction. */
   private compactRestoreMayFit(patches: readonly DocumentOp[]): boolean {
     let estimate = 0;
     for (const patch of patches) {

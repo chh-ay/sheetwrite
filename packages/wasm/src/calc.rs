@@ -1,4 +1,4 @@
-//! Formula parser for the optional calc tier.
+//! Formula parser and reference rewriting for the formula engine.
 //!
 //! Grammar (A1 references with optional sheet qualifiers):
 //!   expr       := concat (comparison concat)?
@@ -8,7 +8,7 @@
 //!   power      := postfix ('^' postfix)*
 //!   postfix    := unary ('%')*
 //!   unary      := ('+' | '-') unary | primary
-//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell
+//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | structured_ref
 //!   range      := cell ':' cell
 //!   array      := '{' row (';' row)* '}'
 //!   row        := constant (',' constant)*
@@ -215,16 +215,19 @@ const fn ascii_upper(byte: u8) -> u8 {
 
 fn registered_name_cmp(registered: &str, input: &str) -> Ordering {
     let length_order = registered.len().cmp(&input.len());
+
     if length_order != Ordering::Equal {
         return length_order;
     }
 
     for (&expected, &actual) in registered.as_bytes().iter().zip(input.as_bytes()) {
         let byte_order = expected.cmp(&ascii_upper(actual));
+
         if byte_order != Ordering::Equal {
             return byte_order;
         }
     }
+
     Ordering::Equal
 }
 
@@ -247,10 +250,12 @@ macro_rules! define_function_registry {
             {
                 return Some(FUNCTION_NAMES[index].1);
             }
+
             #[cfg(feature = "analysis")]
             if let Some(id) = crate::eval::analysis::lookup(name) {
                 return Some(Func::Analysis(id));
             }
+
             FUNCTION_ALIASES
                 .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
                 .ok()
@@ -276,8 +281,10 @@ pub(crate) fn function_names() -> Vec<String> {
         .map(|(name, _)| (*name).to_owned())
         .chain(crate::eval::analysis::names().map(str::to_owned))
         .collect();
+
     names.sort_unstable();
     names.dedup();
+
     names
 }
 
@@ -658,14 +665,17 @@ fn parse_col(letters: &str) -> Option<u32> {
     }
 
     let mut col: u32 = 0;
+
     for ch in letters.chars() {
         if !ch.is_ascii_alphabetic() {
             return None;
         }
+
         col = col
             .checked_mul(26)?
             .checked_add((ch.to_ascii_uppercase() as u32) - ('A' as u32) + 1)?;
     }
+
     Some(col - 1)
 }
 
@@ -675,10 +685,12 @@ fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let token = token.strip_prefix('$').unwrap_or(token);
 
     let mut letters_end = 0;
+
     for (idx, ch) in token.char_indices() {
         if !ch.is_ascii_alphabetic() {
             break;
         }
+
         letters_end = idx + ch.len_utf8();
     }
 
@@ -697,9 +709,11 @@ fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
 
     let col = parse_col(letters)?;
     let row: u32 = digits.parse().ok()?;
+
     if row == 0 {
         return None;
     }
+
     Some((row - 1, col, RefFlags { row_abs, col_abs }))
 }
 
@@ -723,6 +737,7 @@ fn normalize_range(
             end_flags.col_abs
         },
     };
+
     let normalized_end_flags = RefFlags {
         row_abs: if row <= end_row {
             end_flags.row_abs
@@ -735,6 +750,7 @@ fn normalize_range(
             flags.col_abs
         },
     };
+
     (
         row.min(end_row),
         col.min(end_col),
@@ -1167,7 +1183,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse the rest of an array constant after `{`.
     fn array_constant(&mut self) -> Result<Ast, String> {
         let mut values = Vec::new();
         let mut cols = 0usize;

@@ -1,4 +1,5 @@
 //! Resident storage only: an unloaded clean datasource cell stays unloaded.
+
 use super::*;
 use crate::transfer::{Reader, TransferResult, Writer};
 
@@ -175,6 +176,7 @@ impl SheetData {
                     revision_index: input.usize()?,
                     kind: input.u32()? as u8,
                 };
+
                 paged.dirty.insert(key, value);
             }
 

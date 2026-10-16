@@ -209,25 +209,32 @@ const _: () = {
 // Keep named IDs tied to the registry when families or names move.
 const fn known_id(input: &str) -> u16 {
     let mut family = 0;
+
     while family < FAMILIES.len() {
         let mut index = 0;
+
         while index < FAMILIES[family].names.len() {
             let candidate = FAMILIES[family].names[index].as_bytes();
             let requested = input.as_bytes();
             let mut byte = 0;
+
             while byte < candidate.len()
                 && byte < requested.len()
                 && candidate[byte] == requested[byte]
             {
                 byte += 1;
             }
+
             if byte == candidate.len() && byte == requested.len() {
                 return ((family as u16) << FAMILY_SHIFT) | index as u16;
             }
+
             index += 1;
         }
+
         family += 1;
     }
+
     panic!("analysis name is not registered");
 }
 

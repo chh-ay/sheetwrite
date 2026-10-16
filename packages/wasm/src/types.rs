@@ -555,8 +555,8 @@ pub(crate) enum InternSlot {
 }
 
 /// The intern map's keys are already 64-bit string hashes; re-hashing them
-/// through SipHash on every probe is pure waste. This hasher passes the key
-/// through untouched, halving the hashing work per intern.
+/// through SipHash on every probe is unnecessary. This hasher passes the key
+/// through untouched.
 #[derive(Default)]
 pub(crate) struct IdentityHasher(u64);
 
@@ -581,7 +581,6 @@ fn string_hash(s: &str) -> u64 {
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-// ── String pool ──────────────────────────────────────────────────────────────
 const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 
 /// Dictionary-encoded string pool backed by one contiguous UTF-8 arena.
@@ -589,8 +588,8 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 /// `Vec<String>` costs a 12-byte header plus a separate heap allocation per
 /// entry on wasm32; at a million distinct strings that is tens of megabytes of
 /// headers and allocator slack. The arena stores every string back to back in
-/// one buffer with an 8-byte `(offset, len)` span per id, keeps pool text
-/// cache-contiguous for filter/search scans, and frees in two deallocations.
+/// one buffer with an 8-byte `(offset, len)` span per id, keeping pool text
+/// cache-contiguous for filter/search scans.
 pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
@@ -640,6 +639,7 @@ impl StringStorage {
 
     pub(crate) fn intern(&mut self, text: &str) -> u32 {
         let hash = string_hash(text);
+
         if let Some(slot) = self.lookup.get(&hash) {
             match slot {
                 InternSlot::One(id) if self.get(*id) == Some(text) => return *id,
@@ -653,7 +653,9 @@ impl StringStorage {
                 _ => {}
             }
         }
+
         let id = self.push(text);
+
         match self.lookup.get_mut(&hash) {
             None => {
                 self.lookup.insert(hash, InternSlot::One(id));
@@ -663,6 +665,7 @@ impl StringStorage {
                 InternSlot::Many(ids) => ids.push(id),
             },
         }
+
         id
     }
 
@@ -685,28 +688,34 @@ impl StringStorage {
             .map(|(span, _)| span.len as usize)
             .sum::<usize>();
         let live_bytes = live_utf8 + live_count * std::mem::size_of::<PoolSpan>();
+
         if !force
             && (self.retained_bytes() <= live_bytes.saturating_mul(2)
                 || self.retained_bytes() - live_bytes < STRING_COLLECTION_FLOOR_BYTES)
         {
             return None;
         }
+
         let mut replacement = Self::new();
         replacement.bytes.try_reserve_exact(live_utf8).ok()?;
         replacement.spans.try_reserve_exact(live_count).ok()?;
         replacement.lookup.try_reserve(live_count).ok()?;
+
         let mut remap = Vec::new();
         remap.try_reserve_exact(self.len()).ok()?;
         remap.resize(self.len(), NO_STRING);
+
         for (id, &marked) in marks.iter().enumerate() {
             if marked {
                 remap[id] = replacement.intern(self.get(id as u32)?);
             }
         }
+
         replacement.epoch = self.epoch.wrapping_add(1);
         replacement.next_collection_bytes = live_bytes
             .saturating_mul(2)
             .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
+
         Some((replacement, remap))
     }
 
@@ -720,11 +729,13 @@ impl StringStorage {
     pub(crate) fn index_memory_stats(&self) -> MemoryOwnerStats {
         let mut stats = MemoryOwnerStats::default();
         stats.add_hash_table::<u64, InternSlot>(self.lookup.len(), self.lookup.capacity());
+
         for slot in self.lookup.values() {
             if let InternSlot::Many(ids) = slot {
                 stats.add_vec::<u32>(ids.len(), ids.capacity());
             }
         }
+
         stats
     }
 

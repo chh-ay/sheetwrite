@@ -92,9 +92,8 @@ pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
 }
 
 /// Case-insensitive text order. ASCII text folds byte by byte without
-/// allocating, which is the common case for sheet text; anything else keeps
-/// the lowercase mapping, whose length can change and which is what the
-/// engine has always compared.
+/// allocating, which is the common case for sheet text; anything else uses
+/// the lowercase mapping, whose length can change.
 pub(super) fn compare_text_case_insensitive(left: &str, right: &str) -> Ordering {
     if left.is_ascii() && right.is_ascii() {
         return left
@@ -102,6 +101,7 @@ pub(super) fn compare_text_case_insensitive(left: &str, right: &str) -> Ordering
             .map(|byte| byte.to_ascii_lowercase())
             .cmp(right.bytes().map(|byte| byte.to_ascii_lowercase()));
     }
+
     left.to_lowercase().cmp(&right.to_lowercase())
 }
 
@@ -170,6 +170,7 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
     let Value::Number(number) = value else {
         return text_from_value(value);
     };
+
     if !number.is_finite() {
         return Err(FormulaError::Num);
     }
@@ -183,6 +184,7 @@ pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, F
             .chars()
             .take_while(|ch| matches!(ch, '0' | '#'))
             .count();
+
         return Ok(format!("{number:.digits$}"));
     }
 
@@ -221,6 +223,7 @@ mod tests {
             cached_formula_value(&sheet, &strings, 0, None),
             Value::text("cached")
         );
+
         sheet.set_derived(0, KIND_STRING, encode_str_id(text_id + 1));
         assert_eq!(
             cached_formula_value(&sheet, &strings, 0, None),

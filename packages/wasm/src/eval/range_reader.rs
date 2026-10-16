@@ -38,6 +38,7 @@ impl<'a> RangeReader<'a> {
         let Some(data) = store.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
+
         if data.row_count == 0
             || data.n_cols == 0
             || range.row_start as usize >= data.row_count
@@ -45,15 +46,18 @@ impl<'a> RangeReader<'a> {
         {
             return Err(FormulaError::Ref);
         }
+
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
         let row_end = (range.row_end as usize).min(data.row_count - 1);
         let col_end = (range.col_end as usize).min(data.n_cols - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
+
         if (rows as u64).saturating_mul(cols as u64) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+
         Ok(Self {
             store,
             data,
@@ -89,9 +93,11 @@ impl<'a> RangeReader<'a> {
         let Some(value) = self.next_allow_errors(affected, memo, visiting)? else {
             return Ok(None);
         };
+
         if let Value::Error(error) = value {
             return Err(error);
         }
+
         Ok(Some(value))
     }
 
@@ -107,9 +113,11 @@ impl<'a> RangeReader<'a> {
         if self.row > self.row_end {
             return Ok(None);
         }
+
         if !self.data.is_loaded(self.row, self.col) {
             return Err(FormulaError::Loading);
         }
+
         let index = self.data.idx(self.row, self.col);
         let value = if let Some(value) = self
             .literals
@@ -129,11 +137,14 @@ impl<'a> RangeReader<'a> {
                 self.depth + 1,
             )
         };
+
         self.col += 1;
+
         if self.col > self.col_end {
             self.col = self.col_start;
             self.row += 1;
         }
+
         Ok(Some(value))
     }
 }
@@ -172,7 +183,6 @@ mod tests {
         Ok(values)
     }
 
-    /// The streaming path's values with error cells handed back as values.
     fn streamed_values_allowing_errors(
         store: &CellStore,
         range: CellRange,

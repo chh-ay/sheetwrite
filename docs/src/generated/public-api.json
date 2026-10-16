@@ -6979,7 +6979,7 @@
                 },
                 {
                   "name": "getWindow",
-                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous packed cell data (row-major over `rows x cols`) plus the\nunique strings referenced by the window, so the host paints without\ncrossing the boundary per cell."
+                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous packed cell data (row-major over `rows x cols`) with pool IDs\nand window-local formula-error strings, avoiding per-cell boundary reads."
                 },
                 {
                   "name": "getWindowRows",
@@ -7031,7 +7031,7 @@
                 },
                 {
                   "name": "recompute",
-                  "documentation": "Recompute formulas affected by cells changed since the last call.\n\nThe pass first grows the dirty cell set through formula read-sets to find\nall dependent formulas. It then evaluates only those formulas, using a\nper-pass memo table so each formula cell is evaluated at most once even\nwhen many downstream formulas reference it."
+                  "documentation": "Recompute formulas affected by cells changed since the last call.\n\nThe pass first grows the dirty cell set through formula read-sets to find\nall dependent formulas. It then evaluates only those formulas, using a\nper-pass memo table to reuse formula results across dependent reads."
                 },
                 {
                   "name": "recomputeVolatile",
@@ -7063,7 +7063,7 @@
                 },
                 {
                   "name": "setBlockPacked",
-                  "documentation": "Atomically write one row-major mixed literal/formula/reference block\nwhose text payload arrives packed instead of once per cell.\n\n`text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`\nin cell-offset order. `text_offsets` carries their byte boundaries: the\nn-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the\nlast entry equals the buffer length, so a block without strings passes an\nempty buffer and `&[0]`. Strings are interned in the same order as a\nper-cell write would intern them, so pool ids do not move. The compact\nstatus is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate\nsource metadata, and `3` paged dirty-capacity rejection."
+                  "documentation": "Atomically write one row-major mixed literal/formula/reference block\nwhose text payload arrives packed instead of once per cell.\n\n`text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`\nin cell-offset order. `text_offsets` carries their byte boundaries: the\nn-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the\nlast entry equals the buffer length, so a block without strings passes an\nempty buffer and `&[0]`. Literal strings are interned in cell-offset order;\nsource-owned text slots are consumed without interning. The compact\nstatus is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate\nsource metadata, and `3` paged dirty-capacity rejection."
                 },
                 {
                   "name": "setColumnBlockPacked",
@@ -7087,7 +7087,7 @@
                 },
                 {
                   "name": "setFormula",
-                  "documentation": "Parse and store an arithmetic formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. The returned value is the previous cached value until that\nbarrier recompute runs, and the store facade ignores it for batched edits.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
+                  "documentation": "Parse and store a formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. A successful parse returns the pre-write cached scalar; a\nparse rejection returns `0.0`, and a rejected write returns `NaN`.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
                 },
                 {
                   "name": "setSparseBlock",
@@ -7142,7 +7142,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L414",
+              "source": "pkg/sheetwrite_wasm.d.ts#L412",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -7179,7 +7179,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L498",
+              "source": "pkg/sheetwrite_wasm.d.ts#L496",
               "jsDocTags": [],
               "documentation": "Names accepted by the full engine, including aliases.",
               "memberDocs": []
@@ -7191,7 +7191,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L500",
+              "source": "pkg/sheetwrite_wasm.d.ts#L498",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7203,7 +7203,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L502",
+              "source": "pkg/sheetwrite_wasm.d.ts#L500",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -7215,7 +7215,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L661",
+              "source": "pkg/sheetwrite_wasm.d.ts#L659",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -7254,7 +7254,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L440",
+              "source": "pkg/sheetwrite_wasm.d.ts#L438",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -7271,7 +7271,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L462",
+              "source": "pkg/sheetwrite_wasm.d.ts#L460",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -7283,7 +7283,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L651",
+              "source": "pkg/sheetwrite_wasm.d.ts#L649",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7295,7 +7295,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L477",
+              "source": "pkg/sheetwrite_wasm.d.ts#L475",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
@@ -10149,7 +10149,7 @@
                 },
                 {
                   "name": "getWindow",
-                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous packed cell data (row-major over `rows x cols`) plus the\nunique strings referenced by the window, so the host paints without\ncrossing the boundary per cell."
+                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous packed cell data (row-major over `rows x cols`) with pool IDs\nand window-local formula-error strings, avoiding per-cell boundary reads."
                 },
                 {
                   "name": "getWindowRows",
@@ -10201,7 +10201,7 @@
                 },
                 {
                   "name": "recompute",
-                  "documentation": "Recompute formulas affected by cells changed since the last call.\n\nThe pass first grows the dirty cell set through formula read-sets to find\nall dependent formulas. It then evaluates only those formulas, using a\nper-pass memo table so each formula cell is evaluated at most once even\nwhen many downstream formulas reference it."
+                  "documentation": "Recompute formulas affected by cells changed since the last call.\n\nThe pass first grows the dirty cell set through formula read-sets to find\nall dependent formulas. It then evaluates only those formulas, using a\nper-pass memo table to reuse formula results across dependent reads."
                 },
                 {
                   "name": "recomputeVolatile",
@@ -10233,7 +10233,7 @@
                 },
                 {
                   "name": "setBlockPacked",
-                  "documentation": "Atomically write one row-major mixed literal/formula/reference block\nwhose text payload arrives packed instead of once per cell.\n\n`text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`\nin cell-offset order. `text_offsets` carries their byte boundaries: the\nn-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the\nlast entry equals the buffer length, so a block without strings passes an\nempty buffer and `&[0]`. Strings are interned in the same order as a\nper-cell write would intern them, so pool ids do not move. The compact\nstatus is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate\nsource metadata, and `3` paged dirty-capacity rejection."
+                  "documentation": "Atomically write one row-major mixed literal/formula/reference block\nwhose text payload arrives packed instead of once per cell.\n\n`text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`\nin cell-offset order. `text_offsets` carries their byte boundaries: the\nn-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the\nlast entry equals the buffer length, so a block without strings passes an\nempty buffer and `&[0]`. Literal strings are interned in cell-offset order;\nsource-owned text slots are consumed without interning. The compact\nstatus is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate\nsource metadata, and `3` paged dirty-capacity rejection."
                 },
                 {
                   "name": "setColumnBlockPacked",
@@ -10257,7 +10257,7 @@
                 },
                 {
                   "name": "setFormula",
-                  "documentation": "Parse and store an arithmetic formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. The returned value is the previous cached value until that\nbarrier recompute runs, and the store facade ignores it for batched edits.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
+                  "documentation": "Parse and store a formula at `(row, col)`.\n\nSetters only mark cells dirty; they do not recompute formulas. The host\ncalls `recompute(sheet)` once at the transaction barrier so a multi-cell\nedit performs one dependency-scoped pass instead of one full-sheet pass\nper setter. A successful parse returns the pre-write cached scalar; a\nparse rejection returns `0.0`, and a rejected write returns `NaN`.\n\nThe dependency index is invalidated only when the rewrite changes what\nthe formula reads or whether it produces an array. A constant-only edit\nkeeps the cached index, so its next recompute visits just the edited\nformula and its dependents instead of every formula in the workbook."
                 },
                 {
                   "name": "setSparseBlock",
@@ -10312,7 +10312,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L414",
+              "source": "pkg/sheetwrite_wasm.d.ts#L412",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -10349,7 +10349,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L495",
+              "source": "pkg/sheetwrite_wasm.d.ts#L493",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -10361,7 +10361,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L497",
+              "source": "pkg/sheetwrite_wasm.d.ts#L495",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -10373,7 +10373,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L655",
+              "source": "pkg/sheetwrite_wasm.d.ts#L653",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -10412,7 +10412,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L440",
+              "source": "pkg/sheetwrite_wasm.d.ts#L438",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -10429,7 +10429,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L462",
+              "source": "pkg/sheetwrite_wasm.d.ts#L460",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -10441,7 +10441,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L645",
+              "source": "pkg/sheetwrite_wasm.d.ts#L643",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -10453,7 +10453,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L477",
+              "source": "pkg/sheetwrite_wasm.d.ts#L475",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [

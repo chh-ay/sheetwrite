@@ -77,12 +77,10 @@ pub(super) fn with_let_slots<Output>(slots: u32, evaluate: impl FnOnce() -> Outp
     result
 }
 
-/// The value a binding slot already produced in this evaluation.
 fn cached_let_slot(slot: u32) -> Option<EvalResult> {
     LET_SLOT_VALUES.with(|values| values.borrow().get(slot as usize).cloned().flatten())
 }
 
-/// Keeps a binding's value for the rest of the evaluation.
 fn remember_let_slot(slot: u32, value: EvalResult) {
     LET_SLOT_VALUES.with(|values| {
         if let Some(entry) = values.borrow_mut().get_mut(slot as usize) {
@@ -383,7 +381,6 @@ fn address_text(
     Ok(output)
 }
 
-/// Cells that one spill install or clear changed, and when it happened.
 struct SpillChange {
     sheet: usize,
     sequence: usize,
@@ -404,6 +401,7 @@ impl CellStore {
                 (!data.dirty_cells.is_empty() || data.all_dirty).then_some(sheet)
             })
             .collect();
+
         self.recompute_seed_sheets(&seeds);
     }
 
@@ -411,14 +409,17 @@ impl CellStore {
         if seeds.is_empty() {
             return;
         }
+
         RANGE_SUM_CACHE.with(|cache| cache.borrow_mut().clear());
         let _lookup_pass = LookupPassGuard::begin();
+
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
                     data.finish_recompute();
                 }
             }
+
             return;
         }
 
@@ -426,19 +427,25 @@ impl CellStore {
             .dep_index
             .as_ref()
             .is_none_or(|index| index.epoch != self.formula_epoch);
+
         if dep_index_stale {
             self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
         }
+
         let Some(index) = self.dep_index.as_ref() else {
             return;
         };
+
         let mut affected = HashSet::new();
+
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
             let data = &self.sheets[sheet];
+
             if data.spill_ranges.is_empty() {
                 continue;
             }
+
             if data.all_dirty {
                 affected.extend(
                     data.spill_ranges
@@ -447,12 +454,14 @@ impl CellStore {
                 );
                 continue;
             }
+
             // A dirty cell that lands inside a spilled range invalidates that
             // anchor, so scan the dirty cells once and mark every range they
             // fall inside, rather than rescanning the whole dirty set for each
             // range. Stop as soon as every range has been hit.
             let mut hit = vec![false; data.spill_ranges.len()];
             let mut unhit_ranges = hit.len();
+
             for &cell in &data.dirty_cells {
                 for (range_index, (_, range)) in data.spill_ranges.iter().enumerate() {
                     if !hit[range_index] && range.contains(cell) {
@@ -460,31 +469,38 @@ impl CellStore {
                         unhit_ranges -= 1;
                     }
                 }
+
                 if unhit_ranges == 0 {
                     break;
                 }
             }
+
             for (range_index, (&anchor, _)) in data.spill_ranges.iter().enumerate() {
                 if hit[range_index] {
                     affected.insert(AbsCellKey::from_local(sheet, anchor));
                 }
             }
         }
+
         if affected.is_empty() {
             for &sheet in seeds {
                 if let Some(data) = self.sheets.get_mut(sheet) {
                     data.finish_recompute();
                 }
             }
+
             return;
         }
 
         let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::with_capacity(affected.len());
+
         if let Some(index) = self.dep_index.as_ref() {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
+
         let mut visiting: HashSet<AbsCellKey> = HashSet::new();
         let mut processed_arrays: HashSet<AbsCellKey> = HashSet::new();
+
         if self
             .dep_index
             .as_ref()
@@ -493,19 +509,23 @@ impl CellStore {
             for key in &affected {
                 let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
             }
+
             for key in &affected {
                 if let Some(result) = memo.remove(key) {
                     self.store_formula_result(*key, result);
                 }
             }
+
             for &sheet in seeds {
                 self.sheets[sheet].finish_recompute();
             }
+
             return;
         }
 
         let mut seeded_sheets: HashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
+
         // Spills are evaluated in cell order, so a spill can read another
         // spill before that one is installed. `evaluated_at` and the change
         // log find readers that ran before a spill they read changed, and the
@@ -526,22 +546,27 @@ impl CellStore {
                         .get(key.sheet as usize)?
                         .formulas
                         .get(&key.local())?;
+
                     if !entry.produces_array {
                         return None;
                     }
+
                     let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()
                         .then(|| (key, ast.clone(), entry.has_spill_refs))
                 })
                 .collect();
+
             if pending.is_empty() {
                 break;
             }
+
             pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
 
             let mut changed_sheets = HashSet::new();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
+
             for (key, ast, has_spill_refs) in pending {
                 // Spill references read the spills installed so far in this pass.
                 let ast = if has_spill_refs {
@@ -549,13 +574,16 @@ impl CellStore {
                 } else {
                     ast
                 };
+
                 processed_arrays.insert(key);
                 sequence += 1;
                 evaluated_at.insert(key, sequence);
+
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let vacated_range = self.sheets[output_sheet].installed_spill(local);
                 let cleared = self.sheets[output_sheet].clear_spill(local);
+
                 if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,
@@ -566,6 +594,7 @@ impl CellStore {
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
                 }
+
                 if let Some(vacated) = vacated_range {
                     let collision_dependents: Vec<AbsCellKey> = self.sheets[output_sheet]
                         .spill_ranges
@@ -575,11 +604,13 @@ impl CellStore {
                         })
                         .map(|(&anchor, &_attempt)| AbsCellKey::from_local(output_sheet, anchor))
                         .collect();
+
                     for dependent in collision_dependents {
                         affected.insert(dependent);
                         processed_arrays.remove(&dependent);
                     }
                 }
+
                 memo.remove(&key);
 
                 let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
@@ -615,12 +646,15 @@ impl CellStore {
                         _ => Err(FormulaError::Value),
                     },
                 };
+
                 let changed = self.install_spill_result(key, evaluated, &mut memo);
+
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
                 // changed. A new anchor value alone needs no notice: a reader
                 // evaluates the anchor formula on demand when it reads it.
                 let installed_range = self.sheets[output_sheet].installed_spill(local);
+
                 if installed_range != vacated_range || !changed.is_empty() {
                     let mut cells = changed.clone();
                     cells.push(local);
@@ -630,6 +664,7 @@ impl CellStore {
                         cells,
                     });
                 }
+
                 if !changed.is_empty() {
                     self.sheets[output_sheet].dirty_cells.extend(changed);
                     changed_sheets.insert(output_sheet);
@@ -640,6 +675,7 @@ impl CellStore {
             let Some(index) = self.dep_index.as_ref() else {
                 return;
             };
+
             for changed_sheet in changed_sheets {
                 affected.extend(collect_affected_formulas(
                     &self.sheets,
@@ -647,38 +683,47 @@ impl CellStore {
                     index,
                 ));
             }
+
             for change in spill_changes {
                 for reader in direct_readers(index, change.sheet, &change.cells) {
                     let is_stale = evaluated_at
                         .get(&reader)
                         .is_some_and(|&evaluated| evaluated < change.sequence);
+
                     if !is_stale || cyclic.contains(&reader) {
                         continue;
                     }
+
                     let count = requeued.entry(reader).or_insert(0);
                     *count += 1;
+
                     // Without a cycle, a reader comes back at most once per
                     // spill in front of it.
                     if *count > affected.len() {
                         cyclic.insert(reader);
                     }
+
                     processed_arrays.remove(&reader);
                 }
             }
+
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
         if let Some(index) = self.dep_index.as_ref() {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
+
         for key in &affected {
             let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
         }
+
         for key in &affected {
             if let Some(result) = memo.remove(key) {
                 self.store_formula_result(*key, result);
             }
         }
+
         for seeded_sheet in seeded_sheets {
             self.sheets[seeded_sheet].finish_recompute();
         }
@@ -688,14 +733,17 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
+
         if range.row_end as usize >= data.row_count || range.col_end as usize >= data.n_cols {
             return Err(FormulaError::Spill);
         }
+
         if data.spill_blockers.iter().any(|blocker| {
             let row_start = blocker.row_start.max(range.anchor.0);
             let col_start = blocker.col_start.max(range.anchor.1);
             let row_end = blocker.row_end.min(range.row_end);
             let col_end = blocker.col_end.min(range.col_end);
+
             row_start <= row_end
                 && col_start <= col_end
                 && !(row_start == range.anchor.0
@@ -705,15 +753,19 @@ impl CellStore {
         }) {
             return Err(FormulaError::Spill);
         }
+
         for row in range.anchor.0..=range.row_end {
             for col in range.anchor.1..=range.col_end {
                 let cell = (row, col);
+
                 if cell == range.anchor {
                     continue;
                 }
+
                 if !data.is_loaded(row as usize, col as usize) {
                     return Err(FormulaError::Loading);
                 }
+
                 let index = data.idx(row as usize, col as usize);
                 if data.spill_owners.contains_key(&cell)
                     || data.formulas.contains_key(&cell)
@@ -1002,7 +1054,6 @@ impl CellStore {
             Ast::Str(text) => Value::text(text.as_str()),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
-            // A scalar position uses the first element, as other array results do.
             Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
             Ast::Cell(row, col, _) => self.eval_at(
                 sheet,
@@ -2220,7 +2271,6 @@ impl CellStore {
         }
     }
 
-    /// The table for a `VLOOKUP`/`HLOOKUP` argument.
     fn lookup_table_argument(
         &self,
         ast: &Ast,
@@ -2250,7 +2300,6 @@ impl CellStore {
         )
     }
 
-    /// The search list for a `MATCH`, `XMATCH` or `XLOOKUP` argument.
     fn lookup_list_argument(
         &self,
         ast: &Ast,
@@ -2276,7 +2325,6 @@ impl CellStore {
         )
     }
 
-    /// The result range for an `XLOOKUP` argument.
     fn lookup_result_argument(
         &self,
         ast: &Ast,
@@ -2307,8 +2355,7 @@ impl CellStore {
     /// A range is materialized once per pass. The first lookup only records
     /// that the range was seen; the second pays one reusability scan and,
     /// when nothing in the range can change mid-pass, every later lookup
-    /// reuses the entry. A range searched once therefore costs exactly what
-    /// it did before.
+    /// reuses the entry. A range searched once pays no reusability scan.
     fn reused_lookup_range<Materialized>(
         &self,
         ast: &Ast,
@@ -2695,8 +2742,7 @@ impl CellStore {
                 let index = data.idx(row, col);
                 let kind = data.kind_at(index);
                 // A sum over formula cells or spilled output can change without a
-                // write to this range, so only plain values are cached. Formula
-                // cells are exactly the `KIND_FORMULA` ones.
+                // write to this range, so only plain values are cached.
                 if cacheable
                     && (kind == KIND_FORMULA
                         || (has_spill_cells

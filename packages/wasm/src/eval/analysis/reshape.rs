@@ -25,7 +25,6 @@ pub(crate) const NAMES: &[&str] = &[
     "EXPAND", "HSTACK", "SORTBY", "TOCOL", "TOROW", "VSTACK", "WRAPCOLS", "WRAPROWS",
 ];
 
-/// Most arguments that a function call can have.
 const MAX_ARGUMENTS: usize = 255;
 
 /// Largest TOCOL and TOROW `ignore` code: 1 skips blanks, 2 skips errors.
@@ -53,7 +52,6 @@ fn check_arity(name: &str, args: &[Ast]) -> Result<(), FormulaError> {
     }
 }
 
-/// The arguments that hold arrays: all of them for the stacks, else the first.
 fn sources<'a>(name: &str, args: &'a [Ast]) -> &'a [Ast] {
     if matches!(name, "HSTACK" | "VSTACK") {
         args
@@ -74,11 +72,6 @@ fn output_value(value: &Value) -> Value {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Static size estimate for `shape` and `bound`.
-// ---------------------------------------------------------------------------
-
-/// A scalar argument as the parser left it.
 enum StaticArgument {
     Omitted,
     Literal(f64),
@@ -102,7 +95,6 @@ fn static_argument(args: &[Ast], index: usize) -> StaticArgument {
     }
 }
 
-/// Size of a result before evaluation.
 enum Estimate {
     /// `evaluate` returns this size or a source error.
     Exact { rows: usize, cols: usize },
@@ -145,7 +137,6 @@ fn source_extent(
     }
 }
 
-/// Literal EXPAND size, when it is not below the source size.
 fn literal_expand_size(argument: StaticArgument, source: usize) -> Option<usize> {
     match argument {
         StaticArgument::Omitted => Some(source),
@@ -330,10 +321,6 @@ pub(super) fn bound(
         Estimate::Unknown => Ok(SPILL_MAX_CELLS),
     }
 }
-
-// ---------------------------------------------------------------------------
-// Evaluation.
-// ---------------------------------------------------------------------------
 
 struct Evaluation<'a> {
     store: &'a CellStore,
@@ -562,7 +549,7 @@ struct SortKey {
 /// Sorts the rows (or columns) of `array` by one or more key vectors. Keys are
 /// compared in order, and the sort is stable, so items with equal keys keep
 /// their order. A column key sorts rows; a row key sorts columns; every key must
-/// have one value per item and all keys must use the same direction.
+/// have one value per item and all keys must use the same orientation.
 fn sort_by(evaluation: &mut Evaluation<'_>, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
     let source = &inputs.matrices[0];
     let args = evaluation.args;
@@ -760,8 +747,6 @@ mod tests {
     const SHEET_COLS: usize = 24;
     const SHEET_ROWS: usize = 40;
 
-    /// Puts `input` in a cell: `=` starts a formula, a number is a number, an
-    /// empty string leaves the cell blank, and other text is text.
     fn put(store: &mut CellStore, sheet: usize, row: usize, col: usize, input: &str) {
         if input.is_empty() {
             return;
@@ -920,7 +905,7 @@ mod tests {
             evaluate(letters, "=WRAPCOLS(A1:G1,3,\"x\")"),
             grid(&[&["A", "D", "G"], &["B", "E", "x"], &["C", "F", "x"]])
         );
-        // A wrap count at or above the length returns the vector in one row.
+
         assert_eq!(
             evaluate(letters, "=WRAPROWS(A1:C1,5)"),
             grid(&[&["A", "B", "C"]])
@@ -1021,21 +1006,17 @@ mod tests {
     fn documented_errors() {
         let data: &[&[&str]] = &[&["1", "2"], &["3", "4"], &["", ""]];
         let cases = [
-            // WRAPROWS and WRAPCOLS: a source that is not a vector, a wrap count below 1.
             ("=WRAPROWS(A1:B2,2)", "#VALUE!"),
             ("=WRAPCOLS(A1:B2,2)", "#VALUE!"),
             ("=WRAPROWS(A1:A2,0)", "#NUM!"),
             ("=WRAPCOLS(A1:A2,-1)", "#NUM!"),
             ("=WRAPROWS(A1:A2,\"two\")", "#VALUE!"),
-            // EXPAND: a size below the source size, or a result that is too large.
             ("=EXPAND(A1:B2,1)", "#VALUE!"),
             ("=EXPAND(A1:B2,2,1)", "#VALUE!"),
             ("=EXPAND(A1:B2,2000000,2)", "#NUM!"),
-            // TOCOL and TOROW: an ignore code out of range, nothing left to return.
             ("=TOCOL(A1:B2,4)", "#VALUE!"),
             ("=TOROW(A1:B2,-1)", "#VALUE!"),
             ("=TOCOL(A3:B3,1)", "#CALC!"),
-            // Argument counts.
             ("=TOCOL()", "#VALUE!"),
             ("=WRAPROWS(A1:A2)", "#VALUE!"),
             ("=EXPAND(A1:B2)", "#VALUE!"),
@@ -1056,7 +1037,6 @@ mod tests {
             &["Bob", "West", "30"],
             &["Eve", "East", "10"],
         ];
-        // Amy and Sal tie on 20, and Tom and Bob on 30: they keep their order.
         assert_eq!(
             evaluate(data, "=SORTBY(A1:A5,C1:C5)"),
             column(&["Eve", "Amy", "Sal", "Tom", "Bob"])
@@ -1071,7 +1051,7 @@ mod tests {
                 &["Amy", "West", "20"],
             ])
         );
-        // A row key sorts columns.
+
         assert_eq!(
             evaluate(data, "=SORTBY(E1:G1,E2:G2,-1)"),
             grid(&[&["y", "z", "x"]])
