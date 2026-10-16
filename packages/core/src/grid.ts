@@ -46,6 +46,7 @@ import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import { visibleSheetNeighbor } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
@@ -58,7 +59,6 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "./types/cell.js";
-import { storeEngine } from "./store/engine-registry.js";
 import type {
   CellAddress,
   HighlightRange,
@@ -2547,12 +2547,14 @@ export class GridImpl implements Grid {
   private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
     const summary: Partial<Record<GridCommandName, number>> = {};
     for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
+
     if (this.selection.isEmpty) return summary;
 
     const coordinates: Array<{ row: number; col: number }> = [];
     let complete = true;
     this.selection.forEachRect((rect) => {
       if (!complete) return;
+
       for (let row = rect.r0; row <= rect.r1; row++) {
         const dataRow = this.toDataRow(row);
         for (let col = rect.c0; col <= rect.c1; col++) {
@@ -2560,12 +2562,14 @@ export class GridImpl implements Grid {
             complete = false;
             return;
           }
+
           const column = this.sheet().columns[col];
           if (!column) continue;
           coordinates.push({ row: dataRow, col });
         }
       }
     });
+
     if (!complete) {
       for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
       return summary;
@@ -2578,6 +2582,7 @@ export class GridImpl implements Grid {
       : coordinates.map(({ row, col }) =>
           this.store.getCell({ sheet: this.activeSheet, row, col }),
         );
+
     for (const [index, coordinate] of coordinates.entries()) {
       const cell = cells[index];
       const column = this.sheet().columns[coordinate.col];

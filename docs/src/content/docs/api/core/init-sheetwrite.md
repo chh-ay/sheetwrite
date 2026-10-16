@@ -9,7 +9,7 @@ Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
 Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L289"><code>packages/core/src/grid.ts#L289</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L290"><code>packages/core/src/grid.ts#L290</code></a></dd></div>
 </dl>
 
 ## Declaration

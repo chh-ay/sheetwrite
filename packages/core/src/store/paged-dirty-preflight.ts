@@ -17,9 +17,9 @@ export interface PagedDirtyPreflightStats {
   admissionReferenceMapsMaterialized: number;
 }
 
-// Sparse batches amortize the dirty-coordinate set after 64 probes and eight probes
+// Sparse batches amortize the dirty-coordinate set after 128 probes and eight probes
 // per dirty cell; measurements favor scalar reads below this transfer/setup cost.
-const SPARSE_BULK_MIN_PROBES = 64;
+const SPARSE_BULK_MIN_PROBES = 128;
 const SPARSE_BULK_DIRTY_RATIO = 8;
 
 interface PagedDirtyPreflightState {
@@ -365,14 +365,14 @@ export class PagedDirtyPreflight {
       const state = stateFor(sheet);
       return Boolean(
         state &&
-          startRow >= 0 &&
-          startCol >= 0 &&
-          Number.isSafeInteger(rows) &&
-          Number.isSafeInteger(cols) &&
-          rows > 0 &&
-          cols > 0 &&
-          rows <= state.rows - startRow &&
-          cols <= state.cols - startCol,
+        startRow >= 0 &&
+        startCol >= 0 &&
+        Number.isSafeInteger(rows) &&
+        Number.isSafeInteger(cols) &&
+        rows > 0 &&
+        cols > 0 &&
+        rows <= state.rows - startRow &&
+        cols <= state.cols - startCol,
       );
     };
 

@@ -411,6 +411,34 @@ describe("SheetwriteStore", () => {
     });
   }
 
+  it("captures resolved spill children before clearing their complete spill", () => {
+    const store = new SheetwriteStore(makeWorkbook(2));
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=SEQUENCE(2,2)" } }],
+    });
+    store.setDetailedChangeCapture(true);
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    expect(
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+            style: false,
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+    expect(events.flatMap((event) => event.changes.map((change) => change.oldValue))).toEqual(
+      [1, 2, 3, 4].map((value) => ({ kind: "literal", value })),
+    );
+    expect(store.getFormula(addr(0, 0))).toBeNull();
+    expect(store.getCell(addr(1, 1)).resolved).toBeNull();
+    store.dispose();
+  });
+
   it("evaluates arithmetic formulas and recomputes on dependency edits", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
@@ -1402,6 +1430,25 @@ describe("paged datasource storage", () => {
     store.acknowledgeOperations([
       { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } },
     ]);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    store.dispose();
+  });
+
+  it("keeps earlier single-cell acknowledgements when a later address is invalid", () => {
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, { storage: "paged" });
+    const operation: DocumentOp = {
+      op: "set",
+      addr: addr(0, 1),
+      value: { kind: "literal", value: 7 },
+    };
+    store.applyTransaction({ patches: [operation] });
+
+    expect(() =>
+      store.acknowledgeOperations([
+        operation,
+        { ...operation, addr: { sheet: "missing", row: 0, col: 0 } },
+      ]),
+    ).toThrow("unknown sheet");
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     store.dispose();
   });

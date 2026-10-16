@@ -106,15 +106,12 @@ function wideWorkbook(rowCount: number, columnCount: number): Workbook {
         id: "s1",
         name: "Sheet 1",
         rowCount,
-        columns: Array.from(
-          { length: columnCount },
-          (_, index): Column => ({
-            key: `c${index}`,
-            header: `Column ${index + 1}`,
-            width: 120,
-            type: "number",
-          }),
-        ),
+        columns: Array.from({ length: columnCount }, (_, index): Column => ({
+          key: `c${index}`,
+          header: `Column ${index + 1}`,
+          width: 120,
+          type: "number",
+        })),
       },
     ],
   };
