@@ -1277,8 +1277,10 @@ const FAILED_EVICTION = -1;
  */
 const NODE_CHILD_PROGRAM = `
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
+
 const ticks = [];
 const heartbeat = setInterval(() => { ticks.push(performance.now()); }, ${NODE_HEARTBEAT_MS});
+
 const startedAt = performance.now();
 await initSheetwrite();
 const workbook = {
@@ -1289,6 +1291,7 @@ const store = new SheetwriteStore(workbook);
 const endedAt = performance.now();
 const loadMs = endedAt - startedAt;
 clearInterval(heartbeat);
+
 let previousTick = startedAt;
 let largestGapMs = 0;
 for (const tick of ticks) {
@@ -1296,9 +1299,11 @@ for (const tick of ticks) {
   previousTick = tick;
 }
 largestGapMs = Math.max(largestGapMs, endedAt - previousTick);
+
 const applied = store.applyTransaction({
   patches: [{ op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
 });
+
 process.stdout.write(JSON.stringify({
   loadMs,
   largestGapMs,
@@ -1487,9 +1492,11 @@ export async function runCorePathsBenchmark(
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
   const memory = getEngine().getMemory();
+
   const restoreCanvas = installCanvasTestStubs();
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
   const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+
   // Run scheduled paints inside the call that schedules them, so selection
   // scenarios do not depend on happy-dom's animation-frame timing.
   globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
@@ -1502,6 +1509,7 @@ export async function runCorePathsBenchmark(
   try {
     for (const id of scenarioIds) {
       const plan = samplePlan(id, mode);
+
       forceGc();
       scenarios.push(await CORE_PATH_SCENARIO_RUNNERS[id](scale, plan));
       forceGc();
@@ -1535,8 +1543,10 @@ export async function runCorePathsBenchmark(
     scale,
     scenarios,
   };
+
   if (memory.buffer.byteLength <= 0) fail("core's engine exposes no memory");
   validateCorePathsBenchmark(artifact, mode, scenarioIds);
+
   return artifact;
 }
 

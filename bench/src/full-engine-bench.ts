@@ -261,11 +261,13 @@ function analysisFixture(formula: string) {
     dispose: () => store.free(),
   };
 }
+
 async function capture(): Promise<void> {
   const meta = protocolCaptureMeta();
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const resultsDir = resultsDirectory(args);
   const engines: EngineCapture[] = [];
+
   for (const engine of ENGINE_IDS) {
     // Keep tracked results unchanged until both engines and all checks finish.
     const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--output", "-"], {
@@ -278,14 +280,18 @@ async function capture(): Promise<void> {
     const lastLine = child.stdout.toString().trim().split("\n").at(-1);
     if (!lastLine) throw new Error(`${engine} shared capture returned no evidence`);
     const shared = JSON.parse(lastLine) as CompleteFormulaBenchmarkResult;
+
     const bytes = readFileSync(
       new URL(
         `../../packages/${engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`,
         import.meta.url,
       ),
     );
+
     const samplesMs: number[] = [];
     let node = "";
+
+    // Each initialization sample needs a fresh process to exclude module reuse.
     for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
       const initialized = Bun.spawnSync(
         ["node", new URL("./node-engine-init.mjs", import.meta.url).pathname, engine],
@@ -301,6 +307,7 @@ async function capture(): Promise<void> {
       node = probe.node;
       samplesMs.push(probe.elapsedMs);
     }
+
     engines.push({
       engine,
       shared,
@@ -313,6 +320,7 @@ async function capture(): Promise<void> {
       initialization: { node, samplesMs, stat: summarize(samplesMs) },
     });
   }
+
   await formulas.load();
   const analysis = ANALYSIS_CASES.map((scenario) =>
     collectFixture(
@@ -323,6 +331,7 @@ async function capture(): Promise<void> {
       scenario.expected * ANALYSIS_COUNT,
     ),
   );
+
   const sourceFiles = Object.fromEntries(
     SOURCE_PATHS.map((path) => [
       path,
@@ -339,12 +348,14 @@ async function capture(): Promise<void> {
     analysis,
   };
   validateFullEngineResult(result);
+
   for (const capture of engines) {
     await Bun.write(
       resolve(resultsDir, `formula-${capture.engine}-results.json`),
       `${JSON.stringify(capture.shared, null, 2)}\n`,
     );
   }
+
   await Bun.write(
     resolve(resultsDir, "full-engine-results.json"),
     `${JSON.stringify(result, null, 2)}\n`,

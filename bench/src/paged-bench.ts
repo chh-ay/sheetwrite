@@ -536,8 +536,10 @@ async function runProbe(
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
   const memory = getEngine().getMemory();
+
   Bun.gc(true);
   const wasmBefore = memory.buffer.byteLength;
+
   const store = new SheetwriteStore(workbook(rowCount), undefined, {
     storage: "paged",
     chunkRows,
@@ -577,11 +579,14 @@ async function runProbe(
     dirtyAllocatedBytes,
     retainedBytes: stats.allocatedBytes + dirtyAllocatedBytes,
   };
+
   if (store.getWorkbook().sheets.length !== 1) {
     throw new Error("benchmark store was optimized away");
   }
   if (!admissionOnly && patches.length > 0) verifyDirtySemantics(store, rowCount, patches);
+
   store.dispose();
+
   return result;
 }
 

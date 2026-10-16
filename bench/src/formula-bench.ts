@@ -2529,8 +2529,10 @@ async function runBenchmark(
   }
 
   await initSheetwrite(undefined, engine);
+
   // Raw CellStore workloads use the published singleton, not core's instance.
   await engine.load();
+
   const capture = protocolCaptureMeta();
   const workloads = runWorkloads(smoke);
   const memory = smoke ? [probeMemory(1_000)] : FORMULA_SIZES.map(probeMemory);
@@ -2625,7 +2627,9 @@ if (import.meta.main) {
       Number.isInteger(warmupFixtures) && warmupFixtures > 0,
       "invalid sample warm-up fixture count",
     );
+
     await engine.load();
+
     process.stdout.write(
       `${JSON.stringify(
         collectAggregatedSample(id, size, factory, {

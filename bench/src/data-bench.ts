@@ -623,6 +623,7 @@ function makeSeededQueryStore(ds: ColumnarDataset): SheetwriteStore {
 
 function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   const store = new (getEngine().CellStore)();
+
   try {
     const sheet = store.addSheet(2, ds.rowCount);
     for (const [col, values] of [ds.city, ds.customer].entries()) {
@@ -635,6 +636,7 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
         0,
       );
     }
+
     store.resetQueryResourceStats();
     const matched = store.filterRowsMulti(
       sheet,
@@ -653,7 +655,9 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
     const highDistinctCount = high.takeKinds().length;
     low.free();
     high.free();
+
     const stats = store.queryResourceStats();
+
     return {
       composedFilterMatches: matched.length,
       containsCacheConstructions: stats[0] ?? 0,
@@ -1282,17 +1286,20 @@ function buildSheetwriteStore(rows: number): SheetwriteStore {
 function probeSheetwriteMemory(rows: number): MemoryProfile {
   const memory = getEngine().getMemory();
   forceGc();
-  // Snapshot BEFORE building anything: the transient JS dataset is allocated
-  // after this point and collected before the second snapshot, so the heap
-  // delta reflects only what the store keeps on the JS heap (≈ 0 — data is WASM).
+
+  // Collect the transient dataset before the second snapshot so only retained
+  // store allocations contribute to the heap delta.
   const heap0 = process.memoryUsage().heapUsed;
   const wasm0 = memory.buffer.byteLength;
+
   const store = buildSheetwriteStore(rows);
   store.aggregate(SHEET, AGG_COL, "sum"); // touch so the load is not elided
   retain.push(store);
   forceGc();
+
   const heap1 = process.memoryUsage().heapUsed;
   const wasm1 = memory.buffer.byteLength;
+
   return { heapDeltaBytes: Math.max(0, heap1 - heap0), wasmDeltaBytes: wasm1 - wasm0 };
 }
 

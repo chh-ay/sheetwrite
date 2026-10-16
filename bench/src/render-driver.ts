@@ -88,7 +88,7 @@ export function renderCaptureExitCode(results: readonly ScenarioResult[]): 0 | 1
   return results.some((result) => {
     if (result.status !== "failed") return false;
 
-    // Handsontable also overflowed these million-row alterations in 0.4.0.
+    // This known comparison-engine stack limit must not block release evidence.
     return !(
       result.engine === "handsontable" &&
       result.rows === 1_000_000 &&
