@@ -72,8 +72,10 @@ enum BucketKey {
     TrueBool,
 }
 
+/// First and last position of one class in the list.
 type Bucket = (usize, usize);
 
+/// Monotonicity of the list for one search direction.
 #[derive(Clone, Copy)]
 enum Sortedness {
     Pending,
@@ -93,7 +95,9 @@ enum BucketCache {
     Ready(Option<HashMap<BucketKey, Bucket>>),
 }
 
-/// Bound index memory per decoded table; larger lists still use the plain scan.
+/// Distinct classes the exact-match index keeps. A list with more distinct
+/// values than this still searches, but it does not hold a hash entry per
+/// value; the cap bounds what one decoded table can cost in memory.
 const LOOKUP_INDEX_MAX_CLASSES: usize = 262_144;
 
 /// One lookup list, decoded once per pass and searched any number of times.

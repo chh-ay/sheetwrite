@@ -1,4 +1,6 @@
-// Keep shell adaptation on the public Grid contract so chrome does not depend on store or DOM internals.
+// Consolidates how shell inputs interpret selections and commit cell text.
+// Everything here goes through the public `Grid` contract — never `Store`
+// internals, never private grid DOM.
 
 import { parseCellInput } from "../cell-input.js";
 import type { Selection } from "../types/coordinates.js";

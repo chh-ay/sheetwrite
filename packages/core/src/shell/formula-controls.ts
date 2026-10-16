@@ -1,4 +1,7 @@
-// Guard focused drafts so asynchronous grid events cannot overwrite in-progress typing.
+// Independent input factories for the two Sheets-style formula-row controls.
+// Both subscribe only to public grid events, keep a focused-draft guard so
+// asynchronous refreshes never clobber in-progress typing, and return focus to
+// the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";

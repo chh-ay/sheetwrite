@@ -137,6 +137,7 @@ export class ContextMenu {
     const menu = document.createElement("div");
     menu.className = "sheetwrite-context-menu";
     menu.setAttribute("role", "menu");
+    // Fixed positioning + visibility toggle are behavior; cosmetics live in styles.css.
     menu.style.position = "fixed";
     menu.style.display = "none";
 

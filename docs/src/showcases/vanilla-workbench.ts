@@ -200,7 +200,8 @@ export function createWorkbench(
   root.append(toolbarRow, formulaRow, gridHost, bottomRow);
   host.appendChild(root);
 
-  // Construction-bound options require replacing the grid generation when changed.
+  // Construction-bound options are decided here and only here. Changing
+  // any of them means destroying this generation and creating a new one.
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
     presentation: "data-grid",
     theme: ENGINE_THEME,
@@ -256,7 +257,9 @@ export function createWorkbench(
     throw error;
   }
 
-  // Subscribe before yielding because worker fallback arrives asynchronously.
+  // `rendererKind()` reports what actually constructed;
+  // a worker that fails to boot emits `renderer-fallback` asynchronously,
+  // so subscribe before yielding to the event loop.
   const unsubscribes: Array<() => void> = [];
   events.onRendererChange({
     requested: spec.renderer,
@@ -304,7 +307,8 @@ export function createWorkbench(
     }),
   );
 
-  // Pages land asynchronously, so poll allocation stats while this generation lives.
+  // Paged allocation is observable: pages land asynchronously after
+  // scrolls, so poll the cheap WASM stats read while this generation lives.
   let statsTimer: ReturnType<typeof setInterval> | null = null;
   if (spec.snapshot === undefined && spec.data === "paged") {
     const report = (): void => events.onPagedStats(pagedStatsOf(grid, WORKBENCH_SHEET));

@@ -216,7 +216,8 @@ const CRC_TABLE = (() => {
 
 function crc32(bytes: Uint8Array): number {
   let value = 0xffffffff;
-  // Avoid per-byte iterator overhead when checking decompressed parts.
+  // An indexed loop: `for...of` over a typed array goes through the iterator
+  // protocol per byte, which adds overhead to decompressed-part checks.
   for (let index = 0; index < bytes.length; index++) {
     value = (CRC_TABLE[(value ^ (bytes[index] ?? 0)) & 0xff] ?? 0) ^ (value >>> 8);
   }

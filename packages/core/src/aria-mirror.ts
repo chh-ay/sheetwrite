@@ -36,7 +36,9 @@ export class AriaMirror {
   /** Last `aria-activedescendant` written to the host; avoids redundant writes. */
   private lastFocusId: string | null = null;
 
-  // Reuse nodes when the window shape is unchanged to avoid rebuilding the tree.
+  // Shape of the last rebuild plus the live nodes it produced. When a fresh
+  // window has the same nRows × nCols we patch these in place; a differing
+  // window shape forces a full rebuild.
   private lastNRows = -1;
   private lastNCols = -1;
   private headerCells: HTMLDivElement[] = [];

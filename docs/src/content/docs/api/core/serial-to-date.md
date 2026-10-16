@@ -10,7 +10,7 @@ Convert a date serial back to a `Date`. Read the result with the UTC accessors
 calendar fields are stable regardless of the host time zone.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/date-serial.ts#L26"><code>packages/core/src/date-serial.ts#L26</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/date-serial.ts#L38"><code>packages/core/src/date-serial.ts#L38</code></a></dd></div>
 </dl>
 
 ## Declaration
