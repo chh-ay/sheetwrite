@@ -63,6 +63,8 @@ impl CellStore {
                 for run_row in row..run_end {
                     let src = s.idx(run_row, col);
                     let dst = (run_row - row_start) * n_cols + col_index;
+
+                    // Dense cells are resident; only paged reads need a load-state check.
                     let resolved = if s.is_paged() {
                         s.is_loaded(run_row, col).then(|| s.resolved_cell_at(src))
                     } else {
