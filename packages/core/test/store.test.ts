@@ -107,7 +107,7 @@ describe("SheetwriteStore", () => {
     const store = new SheetwriteStore(makeWorkbook(50), makeColumnarData(50));
     const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
     expect(view.rows).toEqual({ start: 3, end: 6 });
-    expect(view.values.length).toBe(3 * 3);
+    expect(view.values.length).toBe(3 * 3); // 3 rows x 3 cols, row-major
     expect(view.values[0]).toBe("Customer 3");
     expect(view.values[1]).toBe(30.5);
     expect(view.values[2]).toBe("Phnom Penh");
@@ -127,13 +127,15 @@ describe("SheetwriteStore", () => {
       ],
     });
 
-    // The worker zero-copy path requires attached typed-array fields.
+    // The window reads the ref's displayed value without a JS overlay, so the raw
+    // typed-array fields stay attached (worker zero-copy path).
     const view = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0]);
     expect(view.values[1]).toBe(41);
     expect(view.valueKinds).toBeDefined();
 
     expect(store.getCell(addr(2, 0)).resolved).toBe(42);
 
+    // Editing the target refreshes the displayed reference value and dependents.
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: 10 } }],
     });

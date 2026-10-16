@@ -1097,7 +1097,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L15",
+              "source": "src/date-serial.ts#L27",
               "jsDocTags": [],
               "documentation": "Convert a real UTC `Date` to the Excel 1900-system serial. It is the inverse\nof {@link serialToDate} except for synthetic serial 60, which JavaScript\ncannot represent as a Date. Construct calendar dates with `Date.UTC(...)`\n(or via {@link parseDateInput}) to avoid host-timezone shifts.",
               "memberDocs": []
@@ -1133,7 +1133,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L294",
+              "source": "src/document-protocol.ts#L295",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1323,7 +1323,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2965",
+              "source": "src/document-protocol.ts#L2966",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1347,7 +1347,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L341",
+              "source": "src/document-protocol.ts#L342",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1359,7 +1359,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L356",
+              "source": "src/document-protocol.ts#L357",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -2417,7 +2417,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L110",
+              "source": "src/cell-input.ts#L111",
               "jsDocTags": [],
               "documentation": "Parse a currency-formatted string into a plain number, or `null` when the\nremaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands\ngrouping (`,`), and whitespace, and reads accounting-style parentheses\n(`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the\nrenderer uses.",
               "memberDocs": []
@@ -2429,7 +2429,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L81",
+              "source": "src/date-serial.ts#L93",
               "jsDocTags": [],
               "documentation": "Parse a user-typed date string into a serial, or `null` when it is not a date.\nAccepted forms:\n\n- ISO `yyyy-mm-dd` (e.g. `2026-07-06`);\n- ISO date-time `yyyy-mm-dd hh:mm` or `yyyy-mm-dd hh:mm:ss` (a `T` separator is\n  also accepted); the fractional serial carries the time;\n- slash `dd/mm/yyyy` and `mm/dd/yyyy`, disambiguated **conservatively**: if one\n  component exceeds 12 it must be the day and the layout is unambiguous; when\n  both are ≤ 12 the value is ambiguous (e.g. `04/05/2026`) and is read as\n  **mm/dd** — Google Sheets' default (US) locale. Both > 12 is rejected.\n\nAnything else (bare numbers, free text) returns `null` so callers can fall back\nto a text literal.",
               "memberDocs": []
@@ -3541,7 +3541,7 @@
               "owners": [
                 "src/date-serial.ts"
               ],
-              "source": "src/date-serial.ts#L26",
+              "source": "src/date-serial.ts#L38",
               "jsDocTags": [],
               "documentation": "Convert a date serial back to a `Date`. Read the result with the UTC accessors\n(`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the\ncalendar fields are stable regardless of the host time zone.",
               "memberDocs": []
@@ -4083,7 +4083,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L320",
+              "source": "src/document-protocol.ts#L321",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -4095,7 +4095,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L276",
+              "source": "src/document-protocol.ts#L277",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -4136,7 +4136,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L273",
+              "source": "src/document-protocol.ts#L274",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -4148,7 +4148,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L361",
+              "source": "src/document-protocol.ts#L362",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -4160,7 +4160,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L312",
+              "source": "src/document-protocol.ts#L313",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -4940,7 +4940,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2927",
+              "source": "src/document-protocol.ts#L2928",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -6523,7 +6523,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L131",
+              "source": "src/shell/formula-controls.ts#L134",
               "jsDocTags": [],
               "documentation": "Detached formula bar: mirrors the focused cell's editable text (exact\nformula source, else literal text) and commits on Enter through the grid's\nundoable transaction path, targeting the data address captured with the\ndraft — correct even under an active sort/filter view. A focused, dirty\ndraft is never overwritten by selection/change events; Escape restores the\nlast stable text.",
               "memberDocs": []
@@ -6535,7 +6535,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L26",
+              "source": "src/shell/formula-controls.ts#L29",
               "jsDocTags": [],
               "documentation": "A1 jump box: shows the focused cell's reference and navigates on Enter.\nInvalid or out-of-bounds references set `aria-invalid` and make no grid\ncalls; Escape restores the displayed reference.",
               "memberDocs": []
@@ -6547,7 +6547,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L27",
+              "source": "src/shell/selection-status.ts#L29",
               "jsDocTags": [],
               "documentation": "`<output role=\"status\">` that follows the grid's selection. Text nodes only;\npolite live region so screen readers announce changes without interrupting.",
               "memberDocs": []
@@ -6559,7 +6559,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L54",
+              "source": "src/shell/spreadsheet-shell.ts#L58",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -6571,7 +6571,7 @@
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L23",
+              "source": "src/shell/toolbar-factory.ts#L25",
               "jsDocTags": [],
               "documentation": "Mount a toolbar bound to `grid.actions` (custom items receive the grid).\nMouse clicks never steal grid focus; keyboard users get local\nLeft/Right/Home/End movement across the controls while the toolbar has\nfocus. Returns the mounted piece with an idempotent `destroy`.",
               "memberDocs": []
@@ -6583,7 +6583,7 @@
               "owners": [
                 "src/shell/selection-status.ts"
               ],
-              "source": "src/shell/selection-status.ts#L8",
+              "source": "src/shell/selection-status.ts#L10",
               "jsDocTags": [],
               "documentation": "Human phrase for a selection's geometry; blank for null/single-cell.",
               "memberDocs": []
@@ -6595,7 +6595,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L111",
+              "source": "src/shell/formula-controls.ts#L114",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a formula bar to a Grid.",
               "memberDocs": [
@@ -6616,7 +6616,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L119",
+              "source": "src/shell/formula-controls.ts#L122",
               "jsDocTags": [],
               "documentation": "A formula bar piece; `setReadOnly` blocks commits without unmounting.",
               "memberDocs": []
@@ -6628,7 +6628,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L14",
+              "source": "src/shell/formula-controls.ts#L17",
               "jsDocTags": [],
               "documentation": "Host elements and callbacks used to bind a name box to a Grid.",
               "memberDocs": [
@@ -6649,7 +6649,7 @@
               "owners": [
                 "src/shell/formula-controls.ts"
               ],
-              "source": "src/shell/formula-controls.ts#L8",
+              "source": "src/shell/formula-controls.ts#L11",
               "jsDocTags": [],
               "documentation": "A mounted shell piece: its root element plus an idempotent teardown.",
               "memberDocs": []
@@ -6661,7 +6661,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L29",
+              "source": "src/shell/spreadsheet-shell.ts#L33",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -6686,7 +6686,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L17",
+              "source": "src/shell/spreadsheet-shell.ts#L21",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [
@@ -6711,7 +6711,7 @@
               "owners": [
                 "src/shell/toolbar-factory.ts"
               ],
-              "source": "src/shell/toolbar-factory.ts#L8",
+              "source": "src/shell/toolbar-factory.ts#L10",
               "jsDocTags": [],
               "documentation": "Host element and configuration used to create the built-in toolbar.",
               "memberDocs": [
@@ -6759,7 +6759,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L21",
+              "source": "src/testing.ts#L23",
               "jsDocTags": [],
               "documentation": "Layout dimensions installed by {@link installCanvasTestStubs} in DOM test environments.",
               "memberDocs": [
@@ -6780,7 +6780,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L72",
+              "source": "src/testing.ts#L74",
               "jsDocTags": [],
               "documentation": "Install the canvas + layout stubs a DOM test environment (jsdom/happy-dom)\nneeds before `createGrid` can mount — without them the renderer throws\n`\"Sheetwrite: 2D canvas context is unavailable\"`. Returns a restore\nfunction that undoes every patch.\n\nThe installed `getContext(\"2d\")` returns a per-canvas\n{@link RecordingContext2D}; re-request it from a mounted canvas to assert\npaint activity. Nothing is painted — assert grid STATE, not pixels.\nTest-only: never import from production code.",
               "memberDocs": []
@@ -6804,7 +6804,7 @@
               "owners": [
                 "src/testing.ts"
               ],
-              "source": "src/testing.ts#L8",
+              "source": "src/testing.ts#L10",
               "jsDocTags": [],
               "documentation": "The stub 2D context the canvas test stubs install: every method is a no-op\nthat counts its invocations in `calls`, so tests can assert paint activity\n(e.g. `ctx.calls.fillText > 0`) without a real canvas.",
               "memberDocs": [
@@ -9636,7 +9636,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L453",
+              "source": "src/index.ts#L456",
               "jsDocTags": [],
               "documentation": "Convenience component for local object rows with live option updates.",
               "memberDocs": []
@@ -9660,7 +9660,7 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L365",
+              "source": "src/index.ts#L368",
               "jsDocTags": [],
               "documentation": "Advanced framework component for workbook data or datasource input.",
               "memberDocs": []

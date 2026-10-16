@@ -597,7 +597,8 @@ describe("Grid transaction resource ingress", () => {
 
   it("reports an undo whose restore payload exceeds the limit and still undoes older edits", () => {
     const rows = 200;
-    // Undo must restore more cells than the forward-operation limit admits.
+    // The forward clear is one small range operation; its undo restores every
+    // cleared value, which is well above this limit.
     const grid = new GridImpl(mountHost(), {
       workbook: makeWorkbook(rows),
       data: makeColumnarData(rows),
@@ -765,11 +766,15 @@ describe("Grid store lifecycle", () => {
     const host = mountHost();
     const disposeSpy = spyOn(SheetwriteStore.prototype, "dispose");
 
+    // No store injected: the grid constructs and owns its SheetwriteStore, so
+    // destroy() must free the underlying WASM CellStore.
     const grid = new GridImpl(host, { workbook: makeWorkbook(20) });
     grid.destroy();
     expect(disposeSpy).toHaveBeenCalledTimes(1);
     disposeSpy.mockRestore();
 
+    // Each store owns an independent CellStore, so freeing one must not corrupt
+    // a brand-new grid/store built afterwards.
     const host2 = mountHost();
     const grid2 = new GridImpl(host2, { workbook: makeWorkbook(20) });
 
@@ -782,6 +787,8 @@ describe("Grid store lifecycle", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
     const host = mountHost();
 
+    // Store injected via the constructor: the caller owns it, so destroy() must
+    // leave it alone and fully usable.
     const grid = new GridImpl(host, { workbook }, store);
     const disposeSpy = spyOn(store, "dispose");
 
@@ -804,7 +811,9 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     const workbook = makeWorkbook(10);
     const host = mountHost();
 
-    // Tailwind arbitrary properties reach the theme through host custom properties.
+    // A Tailwind arbitrary property (`[--sheetwrite-bg:...]`) lands as a
+    // custom property on the host; construction and replaceTheme(undefined)
+    // must both resolve it.
     host.style.setProperty("--sheetwrite-bg", "#0b0b0c");
     const grid = new GridImpl(host, { workbook }, makeFakeStore(workbook));
     expect(grid.getEffectiveTheme().bg).toBe("#0b0b0c");
@@ -853,6 +862,8 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
       makeFakeStore(workbook),
     );
     expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
+    // The built-in widgets read their palette from custom properties seeded on
+    // the grid root (host CSS can still override them per widget).
     const widgetColor = (name: string) => host.style.getPropertyValue(name).trim();
 
     // A host switching to its dark palette.
