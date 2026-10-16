@@ -22,6 +22,7 @@ const BLANK_TAG: u64 = BLANK_TAG_PREFIX << 48;
 const COMPACT_SLACK_CELLS: usize = 4096;
 const ABSENT_TAG: u64 = 0xFFFA_0000_0000_0000;
 
+// Power-of-two runs bound sparse payload slack to 4 KiB without division on reads.
 pub(crate) const DERIVED_CHUNK_CELLS: usize = 512;
 
 pub(crate) struct DerivedChunk {
