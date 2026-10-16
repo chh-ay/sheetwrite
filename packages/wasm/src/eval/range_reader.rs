@@ -140,7 +140,10 @@ impl<'a> RangeReader<'a> {
         {
             value
         } else if !self.data.is_paged() && self.data.source_kind_at(index) == KIND_EMPTY {
-            let (chunk_index, chunk) = if self.col_start == self.col_end {
+            let (chunk_index, chunk) = if self.col_start == self.col_end
+                || self.row_start == self.row_end
+                || self.data.row_count < DERIVED_CHUNK_CELLS
+            {
                 &mut self.calculated_chunk
             } else {
                 if self.calculated_chunks.is_empty() {

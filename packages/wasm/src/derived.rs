@@ -33,7 +33,10 @@ pub(crate) struct DerivedChunk {
 }
 
 pub(crate) enum DerivedOverlay {
-    Dense(Vec<Option<DerivedChunk>>),
+    Dense {
+        chunks: Vec<Option<DerivedChunk>>,
+        live_chunks: usize,
+    },
     Paged(HashMap<usize, u64>),
 }
 
@@ -61,7 +64,10 @@ fn decode_cell(payload: u64) -> (u8, u64) {
 
 impl DerivedOverlay {
     pub(crate) fn dense() -> Self {
-        Self::Dense(Vec::new())
+        Self::Dense {
+            chunks: Vec::new(),
+            live_chunks: 0,
+        }
     }
 
     pub(crate) fn paged() -> Self {
@@ -77,7 +83,7 @@ impl DerivedOverlay {
     #[inline]
     pub(crate) fn chunk_at(&self, index: usize) -> Option<&[u64]> {
         match self {
-            Self::Dense(chunks) => chunks
+            Self::Dense { chunks, .. } => chunks
                 .get(index / DERIVED_CHUNK_CELLS)
                 .and_then(Option::as_ref)
                 .map(|chunk| chunk.values.as_ref()),
@@ -88,7 +94,7 @@ impl DerivedOverlay {
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
         match self {
-            Self::Dense(payload) => payload.is_empty(),
+            Self::Dense { live_chunks, .. } => *live_chunks == 0,
             Self::Paged(cells) => cells.is_empty(),
         }
     }
@@ -96,7 +102,7 @@ impl DerivedOverlay {
     #[inline(always)]
     pub(crate) fn get(&self, index: usize) -> Option<(u8, u64)> {
         match self {
-            Self::Dense(chunks) => chunks
+            Self::Dense { chunks, .. } => chunks
                 .get(index / DERIVED_CHUNK_CELLS)
                 .and_then(Option::as_ref)
                 .and_then(|chunk| Self::decode_present(chunk.values[index % DERIVED_CHUNK_CELLS])),
@@ -114,7 +120,7 @@ impl DerivedOverlay {
 
     pub(crate) fn reserve(&mut self, additional: usize, dense_cells: usize) -> bool {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense { chunks, .. } => {
                 let count = dense_cells.div_ceil(DERIVED_CHUNK_CELLS);
 
                 if chunks
@@ -136,12 +142,17 @@ impl DerivedOverlay {
         let encoded = encode_cell(kind, payload);
 
         match self {
-            Self::Dense(chunks) => {
-                let chunk =
-                    chunks[index / DERIVED_CHUNK_CELLS].get_or_insert_with(|| DerivedChunk {
+            Self::Dense {
+                chunks,
+                live_chunks,
+            } => {
+                let chunk = chunks[index / DERIVED_CHUNK_CELLS].get_or_insert_with(|| {
+                    *live_chunks += 1;
+                    DerivedChunk {
                         values: vec![ABSENT_TAG; DERIVED_CHUNK_CELLS].into_boxed_slice(),
                         count: 0,
-                    });
+                    }
+                });
 
                 let value = &mut chunk.values[index % DERIVED_CHUNK_CELLS];
                 chunk.count += usize::from(*value == ABSENT_TAG);
@@ -156,7 +167,10 @@ impl DerivedOverlay {
     #[inline]
     pub(crate) fn remove(&mut self, index: usize) {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense {
+                chunks,
+                live_chunks,
+            } => {
                 if let Some(slot) = chunks.get_mut(index / DERIVED_CHUNK_CELLS) {
                     if let Some(chunk) = slot {
                         let value = &mut chunk.values[index % DERIVED_CHUNK_CELLS];
@@ -165,6 +179,7 @@ impl DerivedOverlay {
 
                         if chunk.count == 0 {
                             *slot = None;
+                            *live_chunks -= 1;
                         }
                     }
                 }
@@ -177,14 +192,18 @@ impl DerivedOverlay {
 
     pub(crate) fn clear(&mut self) {
         *self = match self {
-            Self::Dense(_) => Self::dense(),
+            Self::Dense { .. } => Self::dense(),
             Self::Paged(_) => Self::paged(),
         };
     }
 
     pub(crate) fn compact(&mut self) {
-        if let Self::Dense(chunks) = self {
-            if chunks.iter().all(Option::is_none) {
+        if let Self::Dense {
+            chunks,
+            live_chunks,
+        } = self
+        {
+            if *live_chunks == 0 && !chunks.is_empty() {
                 *chunks = Vec::new();
             }
         }
@@ -200,7 +219,7 @@ impl DerivedOverlay {
 
     pub(crate) fn visit_payloads(&self, mut visit: impl FnMut(u64)) {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense { chunks, .. } => {
                 for chunk in chunks.iter().flatten() {
                     for &value in &chunk.values {
                         if value != ABSENT_TAG {
@@ -219,7 +238,7 @@ impl DerivedOverlay {
 
     pub(crate) fn remap_payloads(&mut self, mut remap: impl FnMut(&mut u64)) {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense { chunks, .. } => {
                 for chunk in chunks.iter_mut().flatten() {
                     for value in &mut chunk.values {
                         if *value != ABSENT_TAG {
@@ -238,9 +257,12 @@ impl DerivedOverlay {
 
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense {
+                chunks,
+                live_chunks,
+            } => {
                 out.bool(false);
-                out.usize(chunks.iter().flatten().count());
+                out.usize(*live_chunks);
 
                 for (index, chunk) in chunks.iter().enumerate() {
                     if let Some(chunk) = chunk {
@@ -324,13 +346,16 @@ impl DerivedOverlay {
                 chunks.resize_with(maximum.div_ceil(DERIVED_CHUNK_CELLS), || None);
             }
 
-            Ok(Self::Dense(chunks))
+            Ok(Self::Dense {
+                chunks,
+                live_chunks: count,
+            })
         }
     }
 
     pub(crate) fn add_memory_stats(&self, owner: &mut MemoryOwnerStats) {
         match self {
-            Self::Dense(chunks) => {
+            Self::Dense { chunks, .. } => {
                 owner.add_vec::<Option<DerivedChunk>>(chunks.len(), chunks.capacity());
                 for chunk in chunks.iter().flatten() {
                     owner.add_vec::<u64>(chunk.count, chunk.values.len());
@@ -356,6 +381,7 @@ mod tests {
         let mut overlay = DerivedOverlay::dense();
         let cells = DERIVED_CHUNK_CELLS * 5;
         assert!(overlay.reserve(4, cells));
+        assert!(overlay.is_empty());
         let directory_bytes = allocated(&overlay);
         assert!(directory_bytes < DERIVED_CHUNK_CELLS);
 
@@ -368,6 +394,7 @@ mod tests {
         for (ordinal, index) in positions.into_iter().enumerate() {
             overlay.set(index, KIND_NUMBER, encode_num(ordinal as f64));
         }
+        assert!(!overlay.is_empty());
 
         for (ordinal, index) in positions.into_iter().enumerate() {
             assert_eq!(
@@ -384,6 +411,7 @@ mod tests {
         }
 
         assert_eq!(allocated(&overlay), directory_bytes);
+        assert!(overlay.is_empty());
         overlay.compact();
         assert_eq!(allocated(&overlay), 0);
 

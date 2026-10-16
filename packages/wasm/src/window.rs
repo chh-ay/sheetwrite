@@ -63,14 +63,22 @@ impl CellStore {
                 for run_row in row..run_end {
                     let src = s.idx(run_row, col);
                     let dst = (run_row - row_start) * n_cols + col_index;
-                    let resolved = if s.is_paged() {
-                        s.resolved_cell_at(src)
+                    let resolved = if !s.is_loaded(run_row, col) {
+                        None
+                    } else if s.is_paged() {
+                        Some(s.resolved_cell_at(src))
                     } else {
-                        chunk
-                            .and_then(|values| {
-                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
-                            })
-                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src)))
+                        Some(
+                            chunk
+                                .and_then(|values| {
+                                    DerivedOverlay::decode_present(
+                                        values[src % DERIVED_CHUNK_CELLS],
+                                    )
+                                })
+                                .unwrap_or_else(|| {
+                                    (s.source_kind_at(src), s.source_payload_at(src))
+                                }),
+                        )
                     };
                     fill_window_cell(
                         s,
@@ -163,19 +171,23 @@ impl CellStore {
 
                 let dst = row_index * n_cols + col_index;
                 let src = s.idx(row, col);
-                let resolved = if s.is_paged() {
-                    s.resolved_cell_at(src)
+                let resolved = if !s.is_loaded(row, col) {
+                    None
+                } else if s.is_paged() {
+                    Some(s.resolved_cell_at(src))
                 } else {
                     if src / DERIVED_CHUNK_CELLS != chunk_index {
                         chunk_index = src / DERIVED_CHUNK_CELLS;
                         chunk = s.calculated_chunk_at(src);
                     }
 
-                    chunk
-                        .and_then(|values| {
-                            DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
-                        })
-                        .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src)))
+                    Some(
+                        chunk
+                            .and_then(|values| {
+                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
+                            })
+                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src))),
+                    )
                 };
                 fill_window_cell(
                     s,
@@ -230,7 +242,7 @@ pub(crate) fn fill_window_cell(
     row: usize,
     col: usize,
     dst: usize,
-    resolved: (u8, u64),
+    resolved: Option<(u8, u64)>,
     kind: &mut [u8],
     num: &mut [f64],
     str_local: &mut [i32],
@@ -240,13 +252,13 @@ pub(crate) fn fill_window_cell(
     strings: &mut Vec<String>,
     style_dict: &mut Vec<u32>,
 ) {
-    if !sheet.is_loaded(row, col) {
+    let Some((stored_kind, payload)) = resolved else {
         kind[dst] = KIND_STRING;
         str_local[dst] = local_error_index(FormulaError::Loading, error_slots, strings);
         return;
-    }
+    };
+
     let src = sheet.idx(row, col);
-    let (stored_kind, payload) = resolved;
     kind[dst] = stored_kind;
     style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 
