@@ -26,11 +26,8 @@ export interface GeometryPaintWindow {
 }
 
 function assertGeometryDimensions(rowCount: number, columnCount: number): void {
-  if (
-    !Number.isSafeInteger(rowCount) ||
-    rowCount < 0 ||
-    rowCount > DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet
-  ) {
+  // Snapshot row ceilings govern admission, not growth of an already-admitted sheet.
+  if (!Number.isSafeInteger(rowCount) || rowCount < 0) {
     throw new SnapshotResourceError(
       "maxRowsPerSheet",
       DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
