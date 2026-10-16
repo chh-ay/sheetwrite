@@ -1275,6 +1275,7 @@ export class StoreDataEngine {
       { length: bounds.end.col - bounds.start.col + 1 },
       (_, index) => bounds.start.col + index,
     );
+
     return this.windowReader
       .spillDerivedMask(bounds.sheet, { start: bounds.start.row, end: bounds.end.row + 1 }, columns)
       .some((derived) => derived !== 0);
@@ -1300,6 +1301,7 @@ export class StoreDataEngine {
       value: { kind: "literal", value: cell.resolved } as CellValue,
       isSpillChild: false,
     }));
+
     const byRow = new Map<number, Map<number, number[]>>();
     for (const [index, coordinate] of coordinates.entries()) {
       let columns = byRow.get(coordinate.row);
@@ -1307,6 +1309,7 @@ export class StoreDataEngine {
         columns = new Map();
         byRow.set(coordinate.row, columns);
       }
+
       const indices = columns.get(coordinate.col) ?? [];
       indices.push(index);
       columns.set(coordinate.col, indices);
@@ -1324,11 +1327,13 @@ export class StoreDataEngine {
     for (const { rows, cols } of groups.values()) {
       const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
       if (!snapshot) continue;
+
       const spillDerived = snapshot.spillDerived();
       const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
       for (const [rowIndex, row] of rows.entries()) {
         const columns = byRow.get(row);
         if (!columns) throw new Error("Missing row in cell capture");
+
         for (const [colIndex, col] of cols.entries()) {
           const offset = rowIndex * cols.length + colIndex;
           const formula = sources.formulaAt(offset);
@@ -1336,6 +1341,7 @@ export class StoreDataEngine {
           for (const index of columns.get(col) ?? []) {
             const cell = captured[index];
             if (!cell) throw new Error("Missing resolved cell in cell capture");
+
             cell.isSpillChild = Boolean(spillDerived[offset]);
             cell.value = formula
               ? { kind: "formula", src: formula }

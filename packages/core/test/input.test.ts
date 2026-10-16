@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid, Workbook } from "../src/types.js";
+import type { Grid, TransactionResourceLimits, Workbook } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -108,7 +108,10 @@ function pointer(type: string, init: PointerInit): PointerEvent {
   });
 }
 
-function makeGrid(): {
+function makeGrid(
+  rowCount = 10,
+  transactionResourceLimits?: Partial<TransactionResourceLimits>,
+): {
   grid: Grid;
   store: SheetwriteStore;
   workbook: Workbook;
@@ -116,8 +119,10 @@ function makeGrid(): {
   host: HTMLDivElement;
   capture: CaptureLog;
 } {
-  const workbook = makeWorkbook(10);
-  const store = new SheetwriteStore(workbook, makeColumnarData(10));
+  const workbook = makeWorkbook(rowCount);
+  const store = new SheetwriteStore(workbook, makeColumnarData(rowCount), {
+    transactionResourceLimits,
+  });
   const host = mountHost();
   const grid = new GridImpl(host, { workbook }, store);
   const scroller = scrollerOf(host);
@@ -199,6 +204,106 @@ describe("pointer input: touch policy", () => {
     expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(source);
     expect(capture.released).toEqual([1]);
     expect(reasons).toEqual(["fill"]);
+  });
+
+  it.each([
+    { row: 3, col: 1, formula: "=A4" },
+    { row: 0, col: 1, formula: "=A1" },
+    { row: 1, col: 2, formula: "=B2" },
+  ])("shifts a copied formula when filling toward $row,$col", ({ row, col, formula }) => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    const source = { sheet: "s1", row: 1, col: 1 };
+    const target = { sheet: "s1", row, col };
+    const before = store.getCell(target);
+    store.applyTransaction({
+      patches: [{ op: "set", addr: source, value: { kind: "formula", src: "=A2" } }],
+    });
+    grid.setSelection({ kind: "cell", addr: source });
+
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(row, col, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(row, col, workbook)));
+
+    expect(store.getFormula(target)).toBe(formula);
+    expect(store.getFormula(source)).toBe("=A2");
+    grid.actions.undo();
+    expect(store.getCell(target)).toEqual(before);
+    grid.actions.redo();
+    expect(store.getFormula(target)).toBe(formula);
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("keeps fill unavailable in a filtered view without changing visible or excluded rows", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    const source = { sheet: "s1", row: 1, col: 0 };
+    store.applyTransaction({
+      patches: [{ op: "set", addr: source, value: { kind: "formula", src: "=B2" } }],
+    });
+    grid.filterBy(2, "Tokyo");
+    const excluded = { ...source, row: 5 };
+    const beforeExcluded = store.getCell(excluded);
+    const beforeTarget = store.getCell({ ...source, row: 7 });
+    grid.setSelection({ kind: "cell", addr: { ...source, row: 0 } });
+
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 0, workbook)));
+
+    expect(store.getFormula({ ...source, row: 4 })).toBeNull();
+    expect(store.getFormula({ ...source, row: 7 })).toBeNull();
+    expect(store.getCell(excluded)).toEqual(beforeExcluded);
+    expect(store.getCell({ ...source, row: 7 })).toEqual(beforeTarget);
+    expect(store.getFormula(source)).toBe("=B2");
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("fills 20,000 cells under default limits and restores them with one undo", () => {
+    const targetRow = 20_000;
+    const { grid, store, scroller, workbook } = makeGrid(targetRow + 1);
+    const target = { sheet: "s1", row: targetRow, col: 0 };
+    const before = store.getCell(target).resolved;
+    const source = store.getCell({ ...target, row: 0 }).resolved;
+    const firstBefore = store.getCell({ ...target, row: 1 }).resolved;
+    grid.setSelection({ kind: "cell", addr: { ...target, row: 0 } });
+
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(targetRow, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(targetRow, 0, workbook)));
+    expect(store.getCell(target).resolved).toBe(source);
+
+    grid.actions.undo();
+    expect(store.getCell(target).resolved).toBe(before);
+    expect(store.getCell({ ...target, row: 1 }).resolved).toBe(firstBefore);
+    grid.actions.redo();
+    expect(store.getCell(target).resolved).toBe(source);
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("rejects an over-byte-budget packed fill without changing cells or selection", () => {
+    const { grid, store, scroller, workbook } = makeGrid(20, { maxEncodedBytes: 128 });
+    const selection = { kind: "cell" as const, addr: { sheet: "s1", row: 0, col: 0 } };
+    const target = { sheet: "s1", row: 19, col: 0 };
+    const before = store.getCell(target).resolved;
+    const rejected: string[] = [];
+    grid.on("mutation-rejected", ({ issues }) => {
+      for (const issue of issues) {
+        if (issue.kind === "resource-limit") rejected.push(issue.resource);
+      }
+    });
+    grid.setSelection(selection);
+
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(19, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(19, 0, workbook)));
+
+    expect(rejected).toEqual(["encoded-bytes"]);
+    expect(store.getCell(target).resolved).toBe(before);
+    expect(grid.getSelection()).toEqual(selection);
+    grid.destroy();
+    store.dispose();
   });
 });
 describe("pointer input: drag lifecycle", () => {

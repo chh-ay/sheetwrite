@@ -1,6 +1,7 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
-import type { CellStyle, CellValue } from "./types/cell.js";
+import { storeEngine } from "./store/engine-registry.js";
+import type { CellStyle } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
@@ -61,8 +62,8 @@ export class StyleActions {
   }
 
   /**
-   * Re-set selected cells, preserving each value, with `patch` merged into the
-   * style (cleared when `patch` is null).
+   * Preserve selected values while merging `patch` into their stored styles
+   * (or clearing styles when `patch` is null).
    */
   applyStyle(patch: Partial<CellStyle> | null): void {
     const selection = this.deps.selection();
@@ -112,6 +113,8 @@ export class StyleActions {
       this.deps.commit(patches);
       return;
     }
+
+    const anchorsByRow = new Map<number, number[]>();
     for (const rect of rects) {
       for (let r = rect.r0; r <= rect.r1; r++) {
         for (let c = rect.c0; c <= rect.c1; c++) {
@@ -125,20 +128,86 @@ export class StyleActions {
             row: this.deps.toDataRow(cellRef.row),
             col: cellRef.col,
           };
-          const formula = this.deps.loadable?.getFormula(addr) ?? null;
-          const cell = this.deps.store.getCell(addr);
-          const value: CellValue = formula
-            ? { kind: "formula", src: formula }
-            : { kind: "literal", value: cell.resolved };
-          patches.push({
-            op: "set",
-            addr,
-            value,
-            style: patch ? { ...cell.style, ...patch } : undefined,
-          });
+          const columns = anchorsByRow.get(addr.row) ?? [];
+          columns.push(addr.col);
+          anchorsByRow.set(addr.row, columns);
         }
       }
     }
+
+    const anchors = [...anchorsByRow].flatMap(([row, columns]) =>
+      columns.map((col) => ({ sheet: activeSheet, row, col })),
+    );
+    const captured = storeEngine(this.deps.store)?.captureCells(activeSheet, anchors);
+    // Value writes retain validation, reference materialization and partial spill rejection.
+    if (
+      !captured ||
+      sheet.validationRules?.length ||
+      sheet.protectedRanges?.length ||
+      captured.some((cell) => cell.isSpillChild || cell.value.kind === "ref")
+    ) {
+      for (const [index, addr] of anchors.entries()) {
+        const cell = captured?.[index] ?? this.deps.store.getCell(addr);
+        // Custom stores without an engine retain their scalar source read contract.
+        const formula = captured ? captured[index]?.value : null;
+        const source =
+          formula?.kind === "formula"
+            ? formula.src
+            : !captured
+              ? (this.deps.loadable?.getFormula(addr) ?? null)
+              : null;
+        patches.push({
+          op: "set",
+          addr,
+          value: source
+            ? { kind: "formula", src: source }
+            : { kind: "literal", value: cell.resolved },
+          style: patch ? { ...cell.style, ...patch } : undefined,
+        });
+      }
+
+      this.deps.commit(patches);
+      return;
+    }
+
+    // Style-only rectangles avoid replacing sources and exclude covered merge
+    // children; matching runs can extend across adjacent data rows.
+    const runsByColumns = new Map<string, Extract<DocumentOp, { op: "setRangeStyle" }>>();
+    const orderedRows = [...anchorsByRow].sort(([left], [right]) => left - right);
+    for (const [row, columns] of orderedRows) {
+      columns.sort((left, right) => left - right);
+      let start = columns[0];
+      if (start === undefined) continue;
+
+      let previous = start;
+      for (let index = 1; index <= columns.length; index++) {
+        const col = columns[index];
+        if (col !== undefined && col === previous + 1) {
+          previous = col;
+          continue;
+        }
+
+        const key = `${start}:${previous}`;
+        const run = runsByColumns.get(key);
+        if (run && run.range.end.row === row - 1) run.range.end.row = row;
+        else {
+          const operation: Extract<DocumentOp, { op: "setRangeStyle" }> = {
+            op: "setRangeStyle",
+            range: {
+              sheet: activeSheet,
+              start: { row, col: start },
+              end: { row, col: previous },
+            },
+            style: patch,
+          };
+          patches.push(operation);
+          runsByColumns.set(key, operation);
+        }
+
+        if (col !== undefined) start = previous = col;
+      }
+    }
+
     this.deps.commit(patches);
   }
 
