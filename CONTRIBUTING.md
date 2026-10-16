@@ -38,9 +38,8 @@ oxfmt and rustfmt own formatting. Two rules they cannot check:
   approach was chosen, at whatever length they need. Delete only history or
   change narration ("before…", "now…", "exactly as before", issue/plan labels),
   comments that restate the next line or a name, and commented-out code.
-  When restoring an over-shortened explanation, use the original text and
-  drop only narrating sentences. Verify every remaining statement against
-  the current code; correct stale statements and drop claims you cannot confirm.
+  When code changes, update its comments in the same commit; a comment that
+  no longer matches the code is worse than none.
   Doc comments (`/** */`, `///`, `//!`) stay doc comments; never downgrade
   them to `//`.
 - **Separate the steps.** Put one blank line between the logical steps of a
