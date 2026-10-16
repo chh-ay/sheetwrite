@@ -4097,10 +4097,10 @@ Releases before 0.5.0 are listed in each package's `CHANGELOG.md` in the
 Source: https://sheetwrite.vercel.app/docs/releases/0.5.0/
 
 Sheetwrite 0.5.0 adds an optional full formula engine, makes collaboration
-recover without a reload, and makes large documents faster to load, edit, and
-undo. All seven packages release as 0.5.0. Most apps upgrade with no code
-change; read the [upgrade checklist](#upgrade-checklist) if you run a
-persistence server or use `@sheetwrite/wasm` directly.
+recover without a reload, lets an app give engine memory back to the browser,
+and makes large documents faster to load, edit, and undo. All seven packages
+release as 0.5.0. Read the [breaking changes](#breaking-changes) first: most
+apps already call `initSheetwrite()` and need no change.
 
 ## Highlights
 
@@ -4112,6 +4112,9 @@ persistence server or use `@sheetwrite/wasm` directly.
 one compressed operation or one atomic batch.
 - **Conflict recovery without a reload.** `SyncCoordinator.recoverConflict()`
 recovers a cell-level conflict on the live Grid.
+- **Engine memory goes back to the browser.** `releaseEngineMemory()` moves
+the live stores to a fresh engine instance: after a million-row sheet is
+cleared to ten rows, WebAssembly memory drops from 173 MiB to 38 MiB.
 - **String storage stays bounded.** Text that edits overwrite or clear is
 reclaimed and reused instead of piling up for the life of the document.
 - **Faster.** Loading 100,000 to 1,000,000 rows is 26–35% faster, XLSX import
@@ -4184,6 +4187,25 @@ history. In every other case it returns `reload-required` with the reason and
 changes nothing, so the host reloads as before. See
 [Conflict and snapshot reload](https://sheetwrite.vercel.app/docs/guides/collaboration/#conflict-and-snapshot-reload).
 
+### Release engine memory
+
+A WebAssembly instance never gives memory back, so after a large import or
+clear the page used to keep its peak for its whole life. Call
+`releaseEngineMemory()` when the app is idle. It waits for running
+transactions and page loads, then moves every live store into a fresh engine
+instance and lets the browser free the old one. Values, formulas and their
+cached results, spills, loaded datasource pages, unsaved edits, and undo
+history all move. If any store cannot move, nothing changes.
+
+| After | WebAssembly memory | Pause |
+| --- | --- | --- |
+| A million-row, three-column sheet is cleared to ten rows | 173 MiB → 38 MiB | about 50 ms |
+| The same clear, with its undo history kept | 173 MiB → 76 MiB | about 270 ms |
+| A paged store with unsaved edits | 38 MiB → 1.2 MiB | about 5 ms |
+
+Release never makes memory larger, and the pause grows with the live data.
+See [Release retained engine memory](https://sheetwrite.vercel.app/docs/guides/performance-resources/#release-retained-engine-memory).
+
 ### Other new APIs
 
 | API | Package | Purpose |
@@ -4191,19 +4213,32 @@ changes nothing, so the host reloads as before. See
 | `grid.getTheme()`, `theme-change` event | core | Read the base theme and react to `setTheme` or `replaceTheme`. |
 | `maxRecentTransactions` in `createRowBridge` | core | Size the row bridge's window of recent transaction IDs (default 8,192). |
 | `SyncConflictRecovery`, `SyncConflictReloadReason`, `recovered` event | core | Result and reasons of in-place conflict recovery. |
+| `releaseEngineMemory()`, `EngineMemoryReleaseReport` | core | Give engine memory back to the browser. |
+| `createEngine()`, `EngineInstance` | wasm, formulas | Create an independent engine instance from shared compiled code. |
 | `setBlockPacked`, `setColumnBlockPacked`, `loadedSpans`, `cellSnapshots` | wasm | Packed bulk writes and reads for direct engine users. |
 | `formulaReadBands` | wasm | The cells that visible formulas read, for windowed loading. |
 | `stringPoolEpoch` | wasm | The string-pool generation that raw string IDs belong to. |
+
+## Breaking changes
+
+| Change | What to do |
+| --- | --- |
+| Core needs `initSheetwrite()`. Core now owns its own engine instance, so calling only `load()` from `@sheetwrite/wasm` or `@sheetwrite/formulas` no longer lets you create a Grid or a `SheetwriteStore`; the error says so. | Call `await initSheetwrite()` before you create a Grid or store. Apps that already do need no change. |
+| A Grid with `presentation: "data-grid"` no longer adds empty, unnamed columns to fill its width. A spreadsheet still does. | Set `minColumns` if you want empty columns in a data grid. |
+| `CellStore.setBlock` is removed from `@sheetwrite/wasm`. | Use `setBlockPacked` (row-major) or `setColumnBlockPacked` (column-major). |
+| Raw string IDs from `@sheetwrite/wasm` can change when the string pool is rebuilt. | Drop cached string IDs when `stringPoolEpoch` changes. |
 
 ## Changed
 
 - **String storage is reclaimed.** Text that edits overwrite or clear was kept
 for the life of the document. After a commit that leaves at least 256 KiB of
 dead text, and more dead text than live text, the engine rebuilds its string
-pool and reuses the freed space. The WebAssembly memory the browser has
-already reserved does not shrink; it stops growing for this reason. History
-keeps its own text, so undo is not affected. Direct `@sheetwrite/wasm` readers
-must drop cached string IDs when `stringPoolEpoch` changes.
+pool and reuses the freed space. History keeps its own text, so undo is not
+affected. To shrink WebAssembly memory itself, use `releaseEngineMemory()`.
+- **One owner for formula results.** The engine stores calculated values,
+spill output, and calculated errors apart from the cells you write. A write
+always wins over a calculated value, as before; spill reads and writes next
+to a spill are faster.
 - **Resize previews.** Row and column resize show a preview while you drag and
 record one undoable change on release, instead of changing the document on
 every step.
@@ -4212,10 +4247,6 @@ structure, or read-only state changes, and a second pointer cannot take over
 a drag.
 - **Selection before edit.** Selection changes are reported before
 `edit-begin`.
-- **Data grids show only their own columns.** A Grid with
-`presentation: "data-grid"` no longer adds empty, unnamed columns to fill
-its width. A spreadsheet still does. Set `minColumns` to keep empty columns
-in a data grid.
 - **Negative currency.** The minus sign comes before a currency prefix
 (`-$246`), as in Excel.
 - **Smaller packages.** Published packages no longer include source maps, and
@@ -4223,8 +4254,6 @@ the React, Vue, and Svelte adapters declare only CSS files as side effects, so
 bundlers can remove unused JavaScript.
 - **New dependency.** `@sheetwrite/core` depends on `fflate` 0.8.3 for the
 restore codec.
-- **Breaking for direct `@sheetwrite/wasm` users.** `CellStore.setBlock` is
-removed; use `setBlockPacked` or `setColumnBlockPacked`.
 
 ## Fixed
 
@@ -4260,7 +4289,6 @@ unchanged.
 - In the Svelte adapter, a live option such as `readOnly` changed while the
 Grid starts is applied before `ready` fires. In every adapter, a ref or
 `onReady` callback that throws now retires the new Grid, as React already did.
-
 - Every editor commits to the cell it opened on, through sorting and filtering.
 - A rejected fill leaves the selection unchanged.
 - Paste across hidden columns writes only the visible columns, and one undo
@@ -4300,13 +4328,17 @@ measurements and the package sizes of both engines.
 | Row resize | 0.218 ms → 0.144 ms (34% faster) |
 | Framework adapter mount (React, Vue, Svelte) | 16–38% faster mount and reset |
 | One-cell commit to a 110,000-cell `MemoryPersistenceAdapter` document | ~450 ms → no full rebuild |
+| Read a sheet with a spill | 32% faster |
+| Write next to a spill | 61% faster |
 | String-pool storage after 100,000 unique overwrites (not WebAssembly heap size) | 84.3 MB → 0.35 MB (99.6% lower) |
 
 ## Upgrade checklist
 
 | You | Do this |
 | --- | --- |
-| Use Sheetwrite through `@sheetwrite/core` or an adapter | Nothing. Upgrade all `@sheetwrite/*` packages to 0.5.0 together. |
+| Use Sheetwrite through `@sheetwrite/core` or an adapter | Make sure you `await initSheetwrite()` before you create a Grid or store. Upgrade all `@sheetwrite/*` packages to 0.5.0 together. |
+| Use `presentation: "data-grid"` and rely on filler columns | Set `minColumns`. |
+| Hold large documents for a long time | Optional: call `releaseEngineMemory()` when idle after a large clear or import. |
 | Want the analysis functions | Install `@sheetwrite/formulas` and select it before you create a Grid. |
 | Run a persistence or collaboration server | Accept `restoreBlock` operations before you accept 0.5.0 clients. Optional: implement `commitBatch` for undo that needs more than one version. See [Large undo and atomic batches](https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches). |
 | Recover from sync conflicts | Optional: call `sync.recoverConflict()` before your reload path. See [Conflict and snapshot reload](https://sheetwrite.vercel.app/docs/guides/collaboration/#conflict-and-snapshot-reload). |
