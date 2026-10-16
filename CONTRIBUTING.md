@@ -51,10 +51,12 @@ oxfmt and rustfmt own formatting. Three rules they cannot check:
   Rust/WASM export, update its TypeScript callers in the same change. Check
   `packages/core/src/store/wasm-contract.ts` and every call site of the
   capability, not only the one you were working on. Where a bulk or packed
-  export exists, TypeScript must use it instead of calling a per-cell or
-  per-row export in a loop, and callers of a superseded export move to its
-  replacement. A faster engine path that TypeScript does not call does not
-  make the product faster.
+  export exists, use it instead of calling a per-cell or per-row export in a
+  loop, and move callers of a superseded export to its replacement. Keep a
+  scalar loop only where the bulk call would change behaviour (validation,
+  ordering, partial failure) or measures slower, and say why in a comment.
+  A faster engine path that TypeScript does not call does not make the
+  product faster.
 
 ## Documentation deployment
 
