@@ -22,7 +22,7 @@ const BLANK_TAG: u64 = BLANK_TAG_PREFIX << 48;
 const COMPACT_SLACK_CELLS: usize = 4096;
 const ABSENT_TAG: u64 = 0xFFFA_0000_0000_0000;
 
-pub(crate) const DERIVED_CHUNK_CELLS: usize = 4096;
+pub(crate) const DERIVED_CHUNK_CELLS: usize = 512;
 
 pub(crate) struct DerivedChunk {
     values: Box<[u64]>,
