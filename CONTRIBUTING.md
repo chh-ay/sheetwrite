@@ -31,7 +31,7 @@ Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs f
 
 ## Code style
 
-oxfmt and rustfmt own formatting. Two rules they cannot check:
+oxfmt and rustfmt own formatting. Three rules they cannot check:
 
 - **Keep explanations, not narration.** Keep comments that explain design, data
   layout, invariants, safety arguments, non-obvious trade-offs, or why an
@@ -47,6 +47,16 @@ oxfmt and rustfmt own formatting. Two rules they cannot check:
   middle of a function, and between declarations and members. A function body
   that needs no blank line is usually short enough to read at a glance; one
   that needs many is usually several functions.
+- **Keep TypeScript in step with the engine.** When you add or change a
+  Rust/WASM export, update its TypeScript callers in the same change. Check
+  `packages/core/src/store/wasm-contract.ts` and every call site of the
+  capability, not only the one you were working on. Where a bulk or packed
+  export exists, use it instead of calling a per-cell or per-row export in a
+  loop, and move callers of a superseded export to its replacement. Keep a
+  scalar loop only where the bulk call would change behaviour (validation,
+  ordering, partial failure) or measures slower, and say why in a comment.
+  A faster engine path that TypeScript does not call does not make the
+  product faster.
 
 ## Documentation deployment
 
