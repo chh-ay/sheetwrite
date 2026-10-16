@@ -1268,6 +1268,88 @@ export class StoreDataEngine {
     meta.columns.push(...additions);
   }
 
+  /** Whether a rectangular write would include a derived spill child. */
+  hasSpillChildren(range: Range): boolean {
+    const bounds = normalizedRange(range);
+    const columns = Array.from(
+      { length: bounds.end.col - bounds.start.col + 1 },
+      (_, index) => bounds.start.col + index,
+    );
+    return this.windowReader
+      .spillDerivedMask(bounds.sheet, { start: bounds.start.row, end: bounds.end.row + 1 }, columns)
+      .some((derived) => derived !== 0);
+  }
+
+  /**
+   * Capture resolved cells and serializable sources in input order. Rows with
+   * the same selected columns share a source read, without capturing the empty
+   * bounding rectangle of a sparse selection.
+   */
+  captureCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): Array<ResolvedCell & { value: CellValue; isSpillChild: boolean }> {
+    if (coordinates.length === 0) return [];
+
+    const resolved = this.captureSparseBeforeCells(
+      { sheet, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      coordinates.map(({ row, col }) => ({ rowOffset: row, colOffset: col })),
+    );
+    const captured = resolved.map((cell) => ({
+      ...cell,
+      value: { kind: "literal", value: cell.resolved } as CellValue,
+      isSpillChild: false,
+    }));
+    const byRow = new Map<number, Map<number, number[]>>();
+    for (const [index, coordinate] of coordinates.entries()) {
+      let columns = byRow.get(coordinate.row);
+      if (!columns) {
+        columns = new Map();
+        byRow.set(coordinate.row, columns);
+      }
+      const indices = columns.get(coordinate.col) ?? [];
+      indices.push(index);
+      columns.set(coordinate.col, indices);
+    }
+
+    const groups = new Map<string, { rows: number[]; cols: number[] }>();
+    for (const [row, columns] of byRow) {
+      const cols = [...columns.keys()].sort((left, right) => left - right);
+      const key = cols.join(",");
+      const group = groups.get(key);
+      if (group) group.rows.push(row);
+      else groups.set(key, { rows: [row], cols });
+    }
+
+    for (const { rows, cols } of groups.values()) {
+      const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
+      if (!snapshot) continue;
+      const spillDerived = snapshot.spillDerived();
+      const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
+      for (const [rowIndex, row] of rows.entries()) {
+        const columns = byRow.get(row);
+        if (!columns) throw new Error("Missing row in cell capture");
+        for (const [colIndex, col] of cols.entries()) {
+          const offset = rowIndex * cols.length + colIndex;
+          const formula = sources.formulaAt(offset);
+          const reference = sources.referenceAt(offset);
+          for (const index of columns.get(col) ?? []) {
+            const cell = captured[index];
+            if (!cell) throw new Error("Missing resolved cell in cell capture");
+            cell.isSpillChild = Boolean(spillDerived[offset]);
+            cell.value = formula
+              ? { kind: "formula", src: formula }
+              : reference
+                ? { kind: "ref", target: reference }
+                : { kind: "literal", value: spillDerived[offset] ? null : cell.resolved };
+          }
+        }
+      }
+    }
+
+    return captured;
+  }
+
   /**
    * Previous values of a sparse cell list, read in one batched call.
    *
