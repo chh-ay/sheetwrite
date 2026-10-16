@@ -236,6 +236,7 @@ impl CellStore {
     }
 }
 
+/// `None` marks an unloaded cell; its payload must not be read before this check.
 #[inline(always)]
 pub(crate) fn fill_window_cell(
     sheet: &SheetData,

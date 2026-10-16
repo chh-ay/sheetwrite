@@ -34,6 +34,7 @@ pub(crate) struct RangeReader<'a> {
 
     // Criteria folds require row-major scalar delivery. Per-column runs avoid
     // repeating directory reads while preserving that order, including blank runs.
+    // Single-row and short-sheet walks share one run instead of a wide cache.
     calculated_chunks: Vec<(usize, Option<&'a [u64]>)>,
     calculated_chunk: (usize, Option<&'a [u64]>),
 }

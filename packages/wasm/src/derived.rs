@@ -33,6 +33,7 @@ pub(crate) struct DerivedChunk {
 }
 
 impl DerivedChunk {
+    // Keep allocation and ABSENT fill out of the inlined per-cell write path.
     #[cold]
     #[inline(never)]
     fn new() -> Self {
@@ -46,6 +47,8 @@ impl DerivedChunk {
 pub(crate) enum DerivedOverlay {
     Dense {
         chunks: Vec<Option<DerivedChunk>>,
+
+        // Source writes test emptiness often; they must not scan the directory.
         live_chunks: usize,
     },
     Paged(HashMap<usize, u64>),
@@ -159,6 +162,7 @@ impl DerivedOverlay {
             } => {
                 let chunk = chunks[index / DERIVED_CHUNK_CELLS].get_or_insert_with(|| {
                     *live_chunks += 1;
+
                     DerivedChunk::new()
                 });
 
@@ -402,6 +406,7 @@ mod tests {
         for (ordinal, index) in positions.into_iter().enumerate() {
             overlay.set(index, KIND_NUMBER, encode_num(ordinal as f64));
         }
+
         assert!(!overlay.is_empty());
 
         for (ordinal, index) in positions.into_iter().enumerate() {
