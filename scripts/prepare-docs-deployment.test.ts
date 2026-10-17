@@ -8,6 +8,7 @@ import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 const fixtureRoots: string[] = [];
 const builtFiles = {
   "index.html": "<h1>Home</h1>",
+  "404.html": "<h1>Page not found</h1>",
   "docs/index.html": "<h1>Docs</h1>",
   "docs/start/installation/index.html": "<h1>Install</h1>",
   "sitemap.xml": "<urlset />",
@@ -40,12 +41,13 @@ afterEach(async () => {
 
 type OutputRoute =
   | { handle: "filesystem" }
-  | { src: string; dest: string }
+  | { src: string; dest: string; status?: number }
   | { src: string; headers: Record<string, string>; continue: true };
 
 interface PackagedResponse {
   body: Buffer;
   headers: Record<string, string>;
+  status: number;
 }
 
 async function requestPackagedFile(
@@ -61,18 +63,19 @@ async function requestPackagedFile(
     return (await file.exists()) ? Buffer.from(await file.arrayBuffer()) : null;
   };
   const headers: Record<string, string> = {};
-  const respond = (body: Buffer | null) => (body === null ? null : { body, headers });
   // Exercise route matching against the emitted files, not just the JSON shape.
   for (const route of config.routes) {
     if ("handle" in route) {
       const contents = await readStatic(pathname);
-      if (contents !== null) return respond(contents);
+      if (contents !== null) return { body: contents, headers, status: 200 };
     } else if ("headers" in route) {
       if (new RegExp(route.src).test(pathname)) Object.assign(headers, route.headers);
     } else {
       const pattern = new RegExp(route.src);
-      if (pattern.test(pathname))
-        return respond(await readStatic(pathname.replace(pattern, route.dest)));
+      if (pattern.test(pathname)) {
+        const contents = await readStatic(pathname.replace(pattern, route.dest));
+        return contents === null ? null : { body: contents, headers, status: route.status ?? 200 };
+      }
     }
   }
   return null;
@@ -114,14 +117,17 @@ describe("prebuilt docs deployment", () => {
     );
   });
 
-  it("preserves the previous deployment when the search index is missing", async () => {
-    const root = await fixture();
-    await rm(join(root, "docs/dist/client/pagefind/pagefind-entry.json"));
-    await expect(prepareDocsDeployment(root)).rejects.toThrow("Docs build is incomplete");
-    expect(await readFile(join(root, ".vercel/output/static/old.html"), "utf8")).toBe(
-      "previous deployment",
-    );
-  });
+  it.each(["pagefind/pagefind-entry.json", "404.html"])(
+    "preserves the previous deployment when %s is missing",
+    async (path) => {
+      const root = await fixture();
+      await rm(join(root, "docs/dist/client", path));
+      await expect(prepareDocsDeployment(root)).rejects.toThrow("Docs build is incomplete");
+      expect(await readFile(join(root, ".vercel/output/static/old.html"), "utf8")).toBe(
+        "previous deployment",
+      );
+    },
+  );
 
   it.each(["file", "directory"])(
     "rejects an outside %s symlink without replacing output",
@@ -140,7 +146,7 @@ describe("prebuilt docs deployment", () => {
     },
   );
 
-  it("serves directory indexes and assets while unknown URLs remain missing", async () => {
+  it("serves directory indexes and assets with the site fallback for unknown URLs", async () => {
     const root = await fixture();
     await prepareDocsDeployment(root);
     for (const [url, contents] of [
@@ -156,8 +162,10 @@ describe("prebuilt docs deployment", () => {
     ] as const) {
       expect((await requestPackagedFile(root, url))?.body).toEqual(Buffer.from(contents));
     }
-    for (const url of ["/missing", "/docs/missing/", "/assets/missing.js", "/404.html"]) {
-      expect(await requestPackagedFile(root, url)).toBeNull();
+    for (const url of ["/missing", "/docs/missing/", "/assets/missing.js"]) {
+      const response = await requestPackagedFile(root, url);
+      expect(response?.body).toEqual(Buffer.from(builtFiles["404.html"]));
+      expect(response?.status).toBe(404);
     }
   });
 
