@@ -172,7 +172,7 @@ impl CellStore {
                 let value = match stored_kind {
                     KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
                     KIND_FORMULA => {
-                        let bits = unsafe { s.payload_unchecked(i) };
+                        let bits = s.resolved_payload_at(i);
                         if !payload_is_str(bits)
                             && key_for_index(s, i)
                                 .is_some_and(|key| formula_error_at(s, key).is_none())
@@ -1158,9 +1158,20 @@ fn sort_finite_number_column_comparison(
     order.sort_unstable_by(|&a, &b| {
         // SAFETY: `order` holds only rows from `0..row_count`, and the scan
         // above proved every value in this column is a finite number.
-        let va = sheet.num_at(base + a as usize);
-        let vb = sheet.num_at(base + b as usize);
-        let ord = va.partial_cmp(&vb).unwrap_or(Ordering::Equal);
+        let (left, right) = if sheet.is_paged() {
+            (
+                sheet.num_at(base + a as usize),
+                sheet.num_at(base + b as usize),
+            )
+        } else {
+            unsafe {
+                (
+                    f64::from_bits(sheet.payload_unchecked(base + a as usize)),
+                    f64::from_bits(sheet.payload_unchecked(base + b as usize)),
+                )
+            }
+        };
+        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
             a.cmp(&b)
@@ -1360,8 +1371,7 @@ impl<'a> ComparableCell<'a> {
                 if let Some(error) = formula_error_at(sheet, key) {
                     ComparableCell::Text(error.sentinel())
                 } else {
-                    // SAFETY: caller guarantees `index` is valid for all cell vectors.
-                    let bits = unsafe { sheet.payload_unchecked(index) };
+                    let bits = sheet.resolved_payload_at(index);
                     if sheet.formula_value_kind(index) == FormulaValueKind::Blank {
                         return ComparableCell::Empty;
                     }

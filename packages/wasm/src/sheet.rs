@@ -1125,7 +1125,7 @@ impl SheetData {
     }
 
     #[inline]
-    fn resolved_payload_at(&self, index: usize) -> u64 {
+    pub(crate) fn resolved_payload_at(&self, index: usize) -> u64 {
         if self.derived.is_empty() {
             return self.source_payload_at(index);
         }
@@ -1449,11 +1449,14 @@ impl SheetData {
         payload_str_id(self.resolved_payload_at(i))
     }
 
+    /// Reads the source payload without checking calculated values.
+    /// Literal kinds cannot have a calculated value; formulas must resolve it.
+    ///
     /// # Safety
-    /// `i` must be in-bounds for the cell vectors.
+    /// `i` must be in-bounds for the dense cell vectors.
     #[inline]
     pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        self.resolved_payload_at(i)
+        unsafe { *self.payload.get_unchecked(i) }
     }
 
     #[inline]
