@@ -141,10 +141,16 @@ function writeFailure(family: GateFamily, error: unknown): void {
 }
 
 async function verifyCommandFamily(
-  family: Exclude<GateFamily, "render" | "interaction">,
+  family: Exclude<GateFamily, "render">,
   script: string,
 ): Promise<void> {
-  const result = await command(["bun", "run", script, "--smoke"]);
+  const result = await command([
+    "bun",
+    "run",
+    script,
+    "--smoke",
+    ...(family === "interaction" ? ["--output", resolve(ARTIFACT_ROOT, "interaction.json")] : []),
+  ]);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.stdout`), result.stdout);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.stderr`), result.stderr);
   const value = commandArtifact(result.stdout, family);
@@ -183,13 +189,6 @@ async function verifyRender(): Promise<void> {
     throw new Error("render smoke Markdown is not the byte-stable view of its raw artifact");
   }
   if (result.exitCode !== 0) throw new Error(`render smoke exited ${result.exitCode}`);
-}
-
-function verifyCheckedInteraction(): void {
-  const sourcePath = resolve(BENCH_ROOT, "results/interaction-results.json");
-  const raw = readFileSync(sourcePath, "utf8");
-  validateFamily("interaction", JSON.parse(raw) as unknown);
-  writeFileSync(resolve(ARTIFACT_ROOT, "interaction.json"), raw);
 }
 
 async function verifyFixture(specification: string): Promise<void> {
@@ -234,6 +233,7 @@ export async function runVerification(args: readonly string[]): Promise<number> 
     ["datasource-prefetch", "src/datasource-prefetch-bench.ts"],
     ["view-index", "src/view-index-bench.ts"],
     ["xlsx", "src/xlsx-bench.ts"],
+    ["interaction", "src/interaction-bench.ts"],
   ] as const) {
     try {
       await verifyCommandFamily(family, script);
@@ -241,12 +241,6 @@ export async function runVerification(args: readonly string[]): Promise<number> 
       writeFailure(family, error);
       return 1;
     }
-  }
-  try {
-    verifyCheckedInteraction();
-  } catch (error) {
-    writeFailure("interaction", error);
-    return 1;
   }
   try {
     await verifyRender();
