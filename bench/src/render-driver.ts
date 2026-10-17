@@ -95,7 +95,7 @@ export function renderCaptureExitCode(results: readonly ScenarioResult[]): 0 | 1
       (result.scenarioId === "altering.insert-5-rows-top" ||
         result.scenarioId === "altering.remove-5-rows-top") &&
       result.errorClass === "RangeError" &&
-      result.message === "Maximum call stack size exceeded" &&
+      /^(?:\w+ step failed: )?Maximum call stack size exceeded$/u.test(result.message) &&
       !result.timeout &&
       !result.crash &&
       result.consoleErrors.length === 0 &&

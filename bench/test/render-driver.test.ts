@@ -34,12 +34,20 @@ describe("render capture failure exit policy", () => {
   const failures = createCombinationFailures(
     { ...configuration, engine: "handsontable", rows: 1_000_000 },
     "measure",
-    new RangeError("Maximum call stack size exceeded"),
-  ).filter(
-    (result) =>
-      result.scenarioId === "altering.insert-5-rows-top" ||
-      result.scenarioId === "altering.remove-5-rows-top",
-  );
+    new RangeError("action step failed: Maximum call stack size exceeded"),
+  )
+    .filter(
+      (result) =>
+        result.scenarioId === "altering.insert-5-rows-top" ||
+        result.scenarioId === "altering.remove-5-rows-top",
+    )
+    .map((result) => ({
+      ...result,
+      message:
+        result.scenarioId === "altering.remove-5-rows-top"
+          ? "cleanup step failed: Maximum call stack size exceeded"
+          : result.message,
+    }));
 
   test("retains both known comparison failures while allowing capture completion", () => {
     expect(failures).toHaveLength(2);
@@ -57,6 +65,8 @@ describe("render capture failure exit policy", () => {
       { scenarioId: "arrow-down.top-left" as const },
       { errorClass: "Error" },
       { message: "another error" },
+      { message: "action step failed: another error" },
+      { message: "action step failed: Maximum call stack size exceeded unexpectedly" },
       { timeout: true },
       { crash: true },
       { consoleErrors: ["unexpected console failure"] },
