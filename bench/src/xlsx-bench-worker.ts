@@ -176,7 +176,8 @@ async function main(): Promise<WorkerResult> {
     operation,
     scenario,
     durationMs,
-    maxRssBytes: maximumRssBytes(),
+    // Linux updates VmHWM lazily, so the observed final RSS can already exceed it.
+    maxRssBytes: Math.max(maximumRssBytes(), after.rss),
     rssBeforeBytes: before.rss,
     rssAfterBytes: after.rss,
     heapBeforeBytes: before.heapUsed,
