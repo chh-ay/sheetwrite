@@ -54,6 +54,7 @@ import {
 } from "typescript/unstable/async";
 
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
+import { readJson } from "./script-io.js";
 
 export type ApiEntryClassification = "supported" | "internal" | "asset" | "test-only";
 
@@ -172,10 +173,6 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, "utf8")) as T;
 }
 
 function posix(path: string): string {

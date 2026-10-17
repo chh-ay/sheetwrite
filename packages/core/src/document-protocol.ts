@@ -1569,12 +1569,7 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
 
   const merges = optionalArray(sheet, "merges", path, errors);
   merges?.forEach((entry, index) => {
-    const mergePath = `${path}.merges[${index}]`;
-    const merge = recordAt(entry, mergePath, errors);
-    if (!merge) return;
-    for (const key of ["r0", "c0", "r1", "c1"]) {
-      requireNonNegativeInteger(merge, key, mergePath, errors);
-    }
+    validateMergeShape(entry, `${path}.merges[${index}]`, errors);
   });
   const hyperlinks = optionalArray(sheet, "hyperlinks", path, errors);
   if (hyperlinks && hyperlinks.length > MAX_HYPERLINKS_PER_SHEET) {
@@ -1599,40 +1594,17 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     );
   }
   conditionalFormats?.forEach((entry, index) => {
-    const formatPath = `${path}.conditionalFormats[${index}]`;
-    const format = recordAt(entry, formatPath, errors);
-    if (!format) return;
-    validateRangeShape(ownValue(format, "range"), `${formatPath}.range`, errors);
-    validateConditionalPredicate(ownValue(format, "when"), `${formatPath}.when`, errors);
-    validateCellStyle(ownValue(format, "style"), `${formatPath}.style`, errors);
-    optionalBoolean(format, "stopIfTrue", formatPath, errors);
+    validateConditionalFormatShape(entry, `${path}.conditionalFormats[${index}]`, errors, true);
   });
 
   const validationRules = optionalArray(sheet, "validationRules", path, errors);
   validationRules?.forEach((entry, index) => {
-    const rulePath = `${path}.validationRules[${index}]`;
-    const rule = recordAt(entry, rulePath, errors);
-    if (!rule) return;
-    requireString(rule, "id", rulePath, errors, true);
-    validateRangeShape(ownValue(rule, "range"), `${rulePath}.range`, errors);
-    validateValidationCondition(ownValue(rule, "condition"), `${rulePath}.condition`, errors);
-    const policy = ownValue(rule, "policy");
-    if (!["reject", "warn", "allow"].includes(String(policy))) {
-      invalid(errors, `${rulePath}.policy`, "Validation policy is invalid");
-    }
-    optionalBoolean(rule, "allowBlank", rulePath, errors);
-    optionalString(rule, "helpText", rulePath, errors);
+    validateValidationRuleShape(entry, `${path}.validationRules[${index}]`, errors);
   });
 
   const protectedRanges = optionalArray(sheet, "protectedRanges", path, errors);
   protectedRanges?.forEach((entry, index) => {
-    const protectedPath = `${path}.protectedRanges[${index}]`;
-    const protectedRange = recordAt(entry, protectedPath, errors);
-    if (!protectedRange) return;
-    requireString(protectedRange, "id", protectedPath, errors, true);
-    validateRangeShape(ownValue(protectedRange, "range"), `${protectedPath}.range`, errors);
-    optionalString(protectedRange, "label", protectedPath, errors);
-    optionalString(protectedRange, "permissionKey", protectedPath, errors);
+    validateProtectedRangeShape(entry, `${path}.protectedRanges[${index}]`, errors);
   });
 
   const notes = optionalArray(sheet, "notes", path, errors);
@@ -1734,11 +1706,7 @@ function validateOperationCell(
   if (style !== undefined) validateCellStyle(style, `${path}.style`, errors);
 }
 
-function validateOperationMerge(
-  entry: unknown,
-  path: string,
-  errors: DocumentValidationError[],
-): void {
+function validateMergeShape(entry: unknown, path: string, errors: DocumentValidationError[]): void {
   const merge = recordAt(entry, path, errors);
   if (!merge) return;
   for (const key of ["r0", "c0", "r1", "c1"]) {
@@ -1746,19 +1714,22 @@ function validateOperationMerge(
   }
 }
 
-function validateOperationConditionalFormat(
+function validateConditionalFormatShape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
+  validateStopIfTrue = false,
 ): void {
   const format = recordAt(entry, path, errors);
   if (!format) return;
   validateRangeShape(ownValue(format, "range"), `${path}.range`, errors);
   validateConditionalPredicate(ownValue(format, "when"), `${path}.when`, errors);
   validateCellStyle(ownValue(format, "style"), `${path}.style`, errors);
+  // Snapshot validation checks this field; operation validation historically does not.
+  if (validateStopIfTrue) optionalBoolean(format, "stopIfTrue", path, errors);
 }
 
-function validateOperationValidationRule(
+function validateValidationRuleShape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -1776,7 +1747,7 @@ function validateOperationValidationRule(
   optionalString(rule, "helpText", path, errors);
 }
 
-function validateOperationProtectedRange(
+function validateProtectedRangeShape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -1789,7 +1760,7 @@ function validateOperationProtectedRange(
   optionalString(protectedRange, "permissionKey", path, errors);
 }
 
-function validateOperationNamedRange(
+function validateNamedRangeShape(
   entry: unknown,
   path: string,
   errors: DocumentValidationError[],
@@ -2108,7 +2079,7 @@ export function validateDocumentOperationShape(
     case "addMerge":
     case "removeMerge":
       validateOperationSheetId(operation, path, errors);
-      validateOperationMerge(ownValue(operation, "merge"), `${path}.merge`, errors);
+      validateMergeShape(ownValue(operation, "merge"), `${path}.merge`, errors);
       break;
     case "addSheet":
       validateSheetShape(ownValue(operation, "sheet"), `${path}.sheet`, errors);
@@ -2159,7 +2130,7 @@ export function validateDocumentOperationShape(
       if (conditionalFormats !== undefined) {
         const entries = arrayAt(conditionalFormats, `${patchPath}.conditionalFormats`, errors);
         entries?.forEach((entry, index) => {
-          validateOperationConditionalFormat(
+          validateConditionalFormatShape(
             entry,
             `${patchPath}.conditionalFormats[${index}]`,
             errors,
@@ -2199,7 +2170,7 @@ export function validateDocumentOperationShape(
       break;
     case "setValidationRule":
       validateOperationSheetId(operation, path, errors);
-      validateOperationValidationRule(ownValue(operation, "rule"), `${path}.rule`, errors);
+      validateValidationRuleShape(ownValue(operation, "rule"), `${path}.rule`, errors);
       break;
     case "removeValidationRule":
     case "removeProtectedRange":
@@ -2208,7 +2179,7 @@ export function validateDocumentOperationShape(
       break;
     case "setProtectedRange":
       validateOperationSheetId(operation, path, errors);
-      validateOperationProtectedRange(
+      validateProtectedRangeShape(
         ownValue(operation, "protectedRange"),
         `${path}.protectedRange`,
         errors,
@@ -2223,7 +2194,7 @@ export function validateDocumentOperationShape(
       break;
     }
     case "setNamedRange":
-      validateOperationNamedRange(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
+      validateNamedRangeShape(ownValue(operation, "namedRange"), `${path}.namedRange`, errors);
       break;
     case "removeNamedRange":
       requireString(operation, "name", path, errors, true);
@@ -2466,21 +2437,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     requireString(workbook, "activeSheet", "workbook", errors, true);
     const namedRanges = optionalArray(workbook, "namedRanges", "workbook", errors);
     namedRanges?.forEach((entry, index) => {
-      const namedPath = `workbook.namedRanges[${index}]`;
-      const namedRange = recordAt(entry, namedPath, errors);
-      if (!namedRange) return;
-      const name = requireString(namedRange, "name", namedPath, errors, true);
-      if (
-        name !== undefined &&
-        (name !== name.normalize("NFC") ||
-          !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(name) ||
-          /^[A-Za-z]+\d+$/.test(name) ||
-          /^(TRUE|FALSE)$/i.test(name))
-      ) {
-        invalid(errors, `${namedPath}.name`, "Named range name must be formula-safe");
-      }
-      optionalString(namedRange, "scope", namedPath, errors);
-      validateRangeShape(ownValue(namedRange, "range"), `${namedPath}.range`, errors);
+      validateNamedRangeShape(entry, `workbook.namedRanges[${index}]`, errors);
     });
   }
 

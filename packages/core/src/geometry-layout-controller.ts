@@ -2,6 +2,7 @@ import { ColumnIndex } from "./column-index.js";
 import { DEFAULT_SNAPSHOT_RESOURCE_LIMITS, SnapshotResourceError } from "./document-protocol.js";
 import { OffsetIndex, ScaledScroll } from "./fenwick.js";
 import type { SheetwriteStore } from "./store.js";
+import { visibleColumns } from "./store/ranges.js";
 import type { Range, SheetId } from "./types/coordinates.js";
 import type { Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
@@ -423,14 +424,6 @@ export class GeometryLayoutController {
     }
     return index;
   }
-}
-
-function visibleColumns(sheet: Sheet): number[] {
-  const columns: number[] = [];
-  for (let column = 0; column < sheet.columns.length; column++) {
-    if (sheet.columns[column]!.visible !== false) columns.push(column);
-  }
-  return columns;
 }
 
 function buildColumnIndex(

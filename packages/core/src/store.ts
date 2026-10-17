@@ -27,7 +27,7 @@ import {
 } from "./store/data-engine.js";
 import { registerStoreEngine } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
-import { patchSheetId } from "./store/ranges.js";
+import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
 import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
@@ -439,22 +439,15 @@ export class SheetwriteStore implements Store {
   }
 
   groupRows(sheet: SheetId, start: number, end: number): void {
-    const group = { start: Math.min(start, end), end: Math.max(start, end), collapsed: false };
-    const groups = (this.sheetMeta(sheet).rowGroups ?? []).filter(
-      (existing) => existing.start !== group.start || existing.end !== group.end,
-    );
+    const groups = addRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
     void this.applyTransaction(
-      { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: [...groups, group] } }] },
+      { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
     );
   }
 
   ungroupRows(sheet: SheetId, start: number, end: number): void {
-    const r0 = Math.min(start, end);
-    const r1 = Math.max(start, end);
-    const groups = (this.sheetMeta(sheet).rowGroups ?? []).filter(
-      (group) => group.start !== r0 || group.end !== r1,
-    );
+    const groups = removeRowGroup(this.sheetMeta(sheet).rowGroups, start, end);
     void this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",
@@ -462,9 +455,7 @@ export class SheetwriteStore implements Store {
   }
 
   setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): void {
-    const groups = (this.sheetMeta(sheet).rowGroups ?? []).map((group) =>
-      group.start === start ? { ...group, collapsed } : group,
-    );
+    const groups = collapseRowGroup(this.sheetMeta(sheet).rowGroups, start, collapsed);
     void this.applyTransaction(
       { patches: [{ op: "setSheetMeta", sheet, patch: { rowGroups: groups } }] },
       "structure",

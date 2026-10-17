@@ -10,6 +10,7 @@ import {
 } from "./delimited-text.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { IncompleteDataError } from "./store.js";
+import { visibleColumns } from "./store/ranges.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
 import type { ColumnarData } from "./types/data.js";
@@ -30,14 +31,6 @@ function safeText(value: CellScalar): string {
 /** Harden a column header (always text) exactly as a text cell value. */
 function safeHeader(header: string): string {
   return neutralizeInjection(header);
-}
-
-function visibleColumns(sheet: Sheet): number[] {
-  const out: number[] = [];
-  for (let c = 0; c < sheet.columns.length; c++) {
-    if (sheet.columns[c]!.visible !== false) out.push(c);
-  }
-  return out;
 }
 
 function assertCompleteData(store: Store, sheet: string): void {

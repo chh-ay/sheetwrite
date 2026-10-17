@@ -1,6 +1,7 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
+import { mergeCrossesFreeze, mergesOverlap } from "./store/ranges.js";
 import type { CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
@@ -76,15 +77,7 @@ export class StyleActions {
     selection.forEachRect((r) => rects.push(r));
     const intersectsMerge = this.deps
       .merges()
-      .some((merge) =>
-        rects.some(
-          (rect) =>
-            rect.r0 <= merge.r1 &&
-            merge.r0 <= rect.r1 &&
-            rect.c0 <= merge.c1 &&
-            merge.c0 <= rect.c1,
-        ),
-      );
+      .some((merge) => rects.some((rect) => mergesOverlap(rect, merge)));
 
     const patches: DocumentOp[] = [];
     if (!intersectsMerge) {
@@ -193,20 +186,9 @@ export class StyleActions {
     };
     if (merge.r0 === merge.r1 && merge.c0 === merge.c1) return;
     const sheet = this.deps.sheet();
-    const frozenRows = sheet.frozenRows ?? 0;
-    const frozenCols = sheet.frozenCols ?? 0;
     if (
-      (merge.r0 < frozenRows && merge.r1 >= frozenRows) ||
-      (merge.c0 < frozenCols && merge.c1 >= frozenCols) ||
-      this.deps
-        .merges()
-        .some(
-          (candidate) =>
-            merge.r0 <= candidate.r1 &&
-            candidate.r0 <= merge.r1 &&
-            merge.c0 <= candidate.c1 &&
-            candidate.c0 <= merge.c1,
-        )
+      mergeCrossesFreeze(sheet, merge) ||
+      this.deps.merges().some((candidate) => mergesOverlap(merge, candidate))
     ) {
       return;
     }

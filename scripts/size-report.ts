@@ -21,6 +21,7 @@ import {
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
+import { captureProcess, readJson } from "./script-io.js";
 
 export const SIZE_PROTOCOL_VERSION = 2;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
@@ -764,27 +765,12 @@ function processEnvironment(): Record<string, string> {
 }
 
 async function runCommand(command: string[], cwd = repositoryRoot): Promise<string> {
-  const child = Bun.spawn(command, {
+  return captureProcess(command, {
     cwd,
     env: processEnvironment(),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(
+    failure: ({ stdout, stderr, exitCode }) =>
       `${command.join(" ")} failed with exit code ${exitCode}\n${stdout.trim()}\n${stderr.trim()}`,
-    );
-  }
-  return stdout;
-}
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, "utf8")) as T;
+  });
 }
 
 function rewriteWorkspaceRanges(

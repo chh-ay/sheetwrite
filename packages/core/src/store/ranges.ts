@@ -5,6 +5,7 @@ import type {
   DataValidationRule,
   DocumentOp,
   ProtectedRange,
+  RowGroup,
   Sheet,
   SheetVisibility,
   SortKey,
@@ -25,6 +26,41 @@ export function uniqueColumnKeys(columns: readonly Column[]): boolean {
     keys.add(column.key);
   }
   return true;
+}
+
+export function visibleColumns(sheet: Sheet): number[] {
+  const indices: number[] = [];
+  for (const [index, column] of sheet.columns.entries()) {
+    if (column.visible !== false) indices.push(index);
+  }
+  return indices;
+}
+
+export function addRowGroup(
+  groups: readonly RowGroup[] = [],
+  start: number,
+  end: number,
+): RowGroup[] {
+  const group = { start: Math.min(start, end), end: Math.max(start, end), collapsed: false };
+  return [...removeRowGroup(groups, group.start, group.end), group];
+}
+
+export function removeRowGroup(
+  groups: readonly RowGroup[] = [],
+  start: number,
+  end: number,
+): RowGroup[] {
+  const first = Math.min(start, end);
+  const last = Math.max(start, end);
+  return groups.filter((group) => group.start !== first || group.end !== last);
+}
+
+export function collapseRowGroup(
+  groups: readonly RowGroup[] = [],
+  start: number,
+  collapsed: boolean,
+): RowGroup[] {
+  return groups.map((group) => (group.start === start ? { ...group, collapsed } : group));
 }
 
 /** Right visible neighbor, then left; `removedIndex` retains ordering after removal. */
