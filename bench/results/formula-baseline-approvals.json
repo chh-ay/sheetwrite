@@ -851,6 +851,384 @@
       "field": "p95",
       "maximum": 7.664584,
       "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "independent-parse-load",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.906734,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.406938,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "linear-chain",
+      "size": 8,
+      "field": "median",
+      "maximum": 0.614281,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "linear-chain",
+      "size": 16,
+      "field": "median",
+      "maximum": 0.623721,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "linear-chain",
+      "size": 32,
+      "field": "median",
+      "maximum": 0.640139,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "linear-chain",
+      "size": 64,
+      "field": "median",
+      "maximum": 0.67171,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 0.917529,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "diamond-edit",
+      "size": 32,
+      "field": "median",
+      "maximum": 0.695193,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "shared-range-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.116645,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "distinct-range-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 0.612403,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "cross-sheet-range-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.116121,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "scalar-edit-affects-0",
+      "size": 1000,
+      "field": "median",
+      "maximum": 0.602992,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "scalar-edit-affects-1",
+      "size": 1,
+      "field": "median",
+      "maximum": 0.603441,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "scalar-edit-affects-1000",
+      "size": 1000,
+      "field": "median",
+      "maximum": 0.90869,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "formula-constant-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 0.629877,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "removed-sheet-ref",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.008422,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "error-propagation",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.418094,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "unicode-text-date-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.951442,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "let-reuse-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 1.32667,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "incremental-dependency-closure-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 0.621426,
+      "reason": "Sub-millisecond fixture timed with 5 samples. The same 0.5.0 code gave independent-first-recompute/1000 medians of 0.66, 0.73, 0.75, 0.99 and 1.29 ms across five captures, and the baseline's own samples span 0.69-4.12 ms; the engine-only cross-point study found this row flat from the baseline to 0.5.0. The approved maximum is max(2x, +0.6 ms) of the baseline median."
+    },
+    {
+      "workload": "spill-sequence-admission",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 17.5,
+      "reason": "Median passes the gate (limit 13.23 ms). Six captures of 0.5.0 code gave medians of 11.2-13.2 ms against the baseline's 10.58 ms, so spill admission at 100,000 cells is 6-25% slower; a single slow sample (15.8 ms) then exceeds the p95 limit. The cost comes from spill output written through the derived-value store (#103/#107) and is tracked for 0.6.0 in #109. The approved maximum is 17.5 ms (1.64x the baseline p95)."
+    },
+    {
+      "workload": "independent-parse-load",
+      "size": 10000,
+      "field": "p95",
+      "maximum": 14.023604,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 10000,
+      "field": "p95",
+      "maximum": 11.149694,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "independent-parse-load",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 121.094242,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 198.830384,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 106.609615,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "scalar-edit-affects-100000",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 108.474119,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "topology-remove-add",
+      "size": 10000,
+      "field": "p95",
+      "maximum": 18.177992,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "text-lookup-many",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 174.542745,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "text-lookup-many-sorted",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 179.034644,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "spill-filter-resize",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 45.032486,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "criteria-multi-range-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 12.583414,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "sumifs-3-criteria",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 29.2807,
+      "reason": "With 5 samples, p95 is the single slowest sample. Ten captures of the 0.5.0 code kept this row's median within the gate, while single slow samples reached up to 1.8x the baseline p95; the approved maximum is 2x the baseline p95, and the median rule still applies."
+    },
+    {
+      "workload": "cycles",
+      "size": 1000,
+      "field": "median",
+      "maximum": 3.0,
+      "reason": "Ten captures of the 0.5.0 code gave medians of 1.33-2.39 ms (typical 1.41 ms against the baseline's 1.38 ms); the occasional slow run is noise, not a regression."
+    },
+    {
+      "workload": "percentile-covariance",
+      "size": 100000,
+      "field": "median",
+      "maximum": 6.75,
+      "reason": "Ten captures of the 0.5.0 code gave medians of 3.08-5.40 ms (typical 3.65 ms against the baseline's 3.78 ms); the occasional slow run is noise, not a regression."
+    },
+    {
+      "workload": "spill-sequence-admission",
+      "size": 100000,
+      "field": "median",
+      "maximum": 15.0,
+      "reason": "Real slowdown: ten captures of the 0.5.0 code gave medians of 11.15-13.46 ms (typical 13.08 ms) against the baseline's 10.58 ms, so spill admission at 100,000 cells is 6-27% slower. Spill output is written through the derived-value store (#103/#107); tracked for 0.6.0 in #109."
+    },
+    {
+      "workload": "criteria-range-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 4.967498,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "lookup-range-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 3.286638,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "vlookup-many",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.41249,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "vlookup-many-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.914237,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "vlookup-many-sorted",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.815366,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "vlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.498253,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "xlookup-many",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.16283,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "xlookup-many-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 1.863499,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "xlookup-many-sorted",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.847418,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "xlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 2.529347,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "text-lookup-many-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 3.180779,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "text-lookup-many-sorted-edit",
+      "size": 1000,
+      "field": "median",
+      "maximum": 5.204429,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "sumproduct-vector-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 3.712915,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "sumproduct-matrix-edit",
+      "size": 100000,
+      "field": "median",
+      "maximum": 3.258024,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "sum-multi-range",
+      "size": 100000,
+      "field": "median",
+      "maximum": 7.009395,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "countif-100k",
+      "size": 100000,
+      "field": "median",
+      "maximum": 2.406877,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "let-repeat",
+      "size": 100000,
+      "field": "median",
+      "maximum": 3.272992,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
+    },
+    {
+      "workload": "iterative-finance",
+      "size": 1000,
+      "field": "median",
+      "maximum": 5.034891,
+      "reason": "Medians of 1-5 ms fixtures vary with machine state between whole captures of identical code: across ten captures of 0.5.0, medians of the same row ranged up to 1.9x apart (cycles/1000: 1.33-2.39 ms), and a later capture put vlookup-many/1000 at 2.01 ms against a typical 1.5 ms. The approved maximum is the larger of 1.6x the baseline median and 1.2x the slowest of the ten 0.5.0 medians."
     }
   ]
 }

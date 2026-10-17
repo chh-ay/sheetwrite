@@ -4,12 +4,12 @@
   "matrixId": "formula-full-v1",
   "schemaVersion": 2,
   "meta": {
-    "bun": "1.4.2",
+    "bun": "1.4.3",
     "platform": "linux",
     "arch": "x64",
-    "commit": "a50a897e9f9330b3efce874af01479a58b528f8b",
+    "commit": "49e05e298c3f39a8cede038fe8d0062343abc21f",
     "dirty": false,
-    "timestamp": "2026-10-04T11:20:31.830Z"
+    "timestamp": "2026-10-17T06:44:14.512Z"
   },
   "runner": {
     "command": [
@@ -19,7 +19,7 @@
       "--output",
       "-"
     ],
-    "bun": "1.4.2",
+    "bun": "1.4.3",
     "node": "26.3.0",
     "platform": "linux",
     "kernel": "7.2.8-1-cachyos",
@@ -30,19 +30,19 @@
   },
   "source": {
     "protocol": "formula-benchmark-v2",
-    "commit": "a50a897e9f9330b3efce874af01479a58b528f8b",
+    "commit": "49e05e298c3f39a8cede038fe8d0062343abc21f",
     "files": {
-      "bench/package.json": "6e57a9b36e981d1587ddfc013a11c7a4507d6d5bafd8e0bac0b2ccd891e2dd8b",
-      "bench/src/formula-bench.ts": "0aeccaf57f093995fc87ee3626f92ba44e607da6723a99cc1c5a3c213b78284b",
+      "bench/package.json": "03d3efbb0a50fd7543ac5693b8cc9788af11447cb9d1c9f147db43af1f685b7e",
+      "bench/src/formula-bench.ts": "c63dbfa1cf0528e9d2abb13dd3f4c5968bc11abee63b6f6a7d930f98650c908b",
       "bench/src/formula-dataset.ts": "2e7d91f025d2447abb33efa7fa7d8b90a0e8787a9b9c54fe1064b82520ac079d",
-      "bench/src/gate-protocol.ts": "b681b1d0639c7018ab1af84bf38e7f48cd4a4544659bfbd337ca9e7512bab61b",
-      "bench/src/protocol-meta.ts": "229884d4d408527d6bb9a0983c92dbffe47b0f2b64ca32316494f22056da7aa6",
+      "bench/src/gate-protocol.ts": "e311fc4b5df8f758a73002e2ec8a26e6c2934cdc4a9b186a8ceede0722b2a7f8",
+      "bench/src/protocol-meta.ts": "091ac270db650da3afd35a11ab241cc9a6af384a1b05eba8789621902997fe16",
       "bench/src/stats.ts": "4659c44455c7beb012ce355e9c5863c7e2d7273faf377b43337ba7e4de4c000f",
-      "bun.lock": "9224dc57d5eed991746c1f2cd84a8b7b3a58897a726001667562db2e8e794371",
-      "packages/wasm/pkg/sheetwrite_wasm.js": "0f48fbbdd12390df8d5a46ab8965126c7729117471f39c3e7d2b439bc4d3e990",
-      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "4d6bdf50207fd81fd70d7814f024e2524769f7f9ef521afbe029f5d6bb531bb5"
+      "bun.lock": "89cb8420cdaaab7dcdaffa8a1ebde1a8bfae3fbfd0e060590361895de07e614d",
+      "packages/wasm/pkg/sheetwrite_wasm.js": "b87559772bbe21dbba58e70b81c42038a0eeed7ebbf32fc53a5a839caa6f7750",
+      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm": "8e83785d43e11d099646dde39a8340a749b20f27315ba09524a24933fa4422fd"
     },
-    "digest": "e70a1d487f22c1666360564601adf903fec3e670626eb67e4253107f7f67efe7"
+    "digest": "fc88868108fa27aa77e188732ecd185236af862ed16725bbe933c4104f5bdaae"
   },
   "methodology": {
     "warmupSamples": 1,
@@ -56,56 +56,56 @@
       "id": "independent-parse-load",
       "size": 1000,
       "samplesMs": [
-        1.0222689999999943,
-        0.9510480000000001,
-        0.9029989999999941,
-        0.8366729999999905,
-        0.8472799999999978
+        1.1001579999999933,
+        0.8377380000000016,
+        1.2860460000000131,
+        0.9078759999999875,
+        0.8337080000000014
       ],
       "stat": {
-        "median": 0.9029989999999941,
-        "p95": 1.0080247999999954,
-        "mean": 0.9120537999999954,
-        "stddev": 0.06874276328865546,
-        "min": 0.8366729999999905,
-        "max": 1.0222689999999943,
+        "median": 0.9078759999999875,
+        "p95": 1.2488684000000092,
+        "mean": 0.9931051999999994,
+        "stddev": 0.1755477513548991,
+        "min": 0.8337080000000014,
+        "max": 1.2860460000000131,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 368893,
+          "retainedBytes": 367621,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 368893,
+          "retainedBytes": 367621,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 368893,
+          "retainedBytes": 367621,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 368893,
+          "retainedBytes": 367621,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 368893,
+          "retainedBytes": 367621,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 368893,
-          "p95": 368893,
-          "mean": 368893,
+          "median": 367621,
+          "p95": 367621,
+          "mean": 367621,
           "stddev": 0,
-          "min": 368893,
-          "max": 368893,
+          "min": 367621,
+          "max": 367621,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -133,56 +133,56 @@
       "id": "independent-first-recompute",
       "size": 1000,
       "samplesMs": [
-        0.7242490000000146,
-        0.729754000000014,
-        0.6887810000000059,
-        2.279246999999998,
-        0.6785179999999968
+        0.6707170000000104,
+        1.2001120000000043,
+        1.2224439999999959,
+        0.7090529999999973,
+        1.279245000000003
       ],
       "stat": {
-        "median": 0.7242490000000146,
-        "p95": 1.969348400000001,
-        "mean": 1.020109800000006,
-        "stddev": 0.6298778172837612,
-        "min": 0.6785179999999968,
-        "max": 2.279246999999998,
+        "median": 1.2001120000000043,
+        "p95": 1.2678848000000016,
+        "mean": 1.0163142000000023,
+        "stddev": 0.26804872728472184,
+        "min": 0.6707170000000104,
+        "max": 1.279245000000003,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 461717,
+          "retainedBytes": 472781,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 461717,
+          "retainedBytes": 472781,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 461717,
+          "retainedBytes": 472781,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 461717,
+          "retainedBytes": 472781,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 461717,
+          "retainedBytes": 472781,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 461717,
-          "p95": 461717,
-          "mean": 461717,
+          "median": 472781,
+          "p95": 472781,
+          "mean": 472781,
           "stddev": 0,
-          "min": 461717,
-          "max": 461717,
+          "min": 472781,
+          "max": 472781,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -210,56 +210,56 @@
       "id": "independent-parse-load",
       "size": 10000,
       "samplesMs": [
-        13.64039900000003,
-        13.220463999999993,
-        12.694808999999964,
-        11.42197200000004,
-        6.424032000000011
+        6.261689000000018,
+        5.408196000000004,
+        5.1435109999999895,
+        5.274873999999983,
+        5.390543000000008
       ],
       "stat": {
-        "median": 12.694808999999964,
-        "p95": 13.556412000000023,
-        "mean": 11.480335200000008,
-        "stddev": 2.6358482044681826,
-        "min": 6.424032000000011,
-        "max": 13.64039900000003,
+        "median": 5.390543000000008,
+        "p95": 6.090990400000015,
+        "mean": 5.495762600000001,
+        "stddev": 0.39452637102967925,
+        "min": 5.1435109999999895,
+        "max": 6.261689000000018,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3300558,
+          "retainedBytes": 3286742,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3300558,
+          "retainedBytes": 3286742,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3300558,
+          "retainedBytes": 3286742,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3300558,
+          "retainedBytes": 3286742,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3300558,
+          "retainedBytes": 3286742,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3300558,
-          "p95": 3300558,
-          "mean": 3300558,
+          "median": 3286742,
+          "p95": 3286742,
+          "mean": 3286742,
           "stddev": 0,
-          "min": 3300558,
-          "max": 3300558,
+          "min": 3286742,
+          "max": 3286742,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -287,56 +287,56 @@
       "id": "independent-first-recompute",
       "size": 10000,
       "samplesMs": [
-        5.561262999999997,
-        11.693427999999983,
-        5.423928999999987,
-        6.053293999999994,
-        5.327143000000092
+        5.000314000000003,
+        5.106843999999995,
+        4.84595299999998,
+        5.0155639999999835,
+        4.899684000000036
       ],
       "stat": {
-        "median": 5.561262999999997,
-        "p95": 10.565401199999984,
-        "mean": 6.8118114000000105,
-        "stddev": 2.4535630576950256,
-        "min": 5.327143000000092,
-        "max": 11.693427999999983,
+        "median": 5.000314000000003,
+        "p95": 5.088587999999993,
+        "mean": 4.9736718,
+        "stddev": 0.09163611135005374,
+        "min": 4.84595299999998,
+        "max": 5.106843999999995,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 4009958,
-          "p95": 4009958,
-          "mean": 4009958,
+          "median": 4211662,
+          "p95": 4211662,
+          "mean": 4211662,
           "stddev": 0,
-          "min": 4009958,
-          "max": 4009958,
+          "min": 4211662,
+          "max": 4211662,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -364,56 +364,56 @@
       "id": "independent-parse-load",
       "size": 100000,
       "samplesMs": [
-        61.515644000000066,
-        59.01941499999998,
-        58.45613000000003,
-        58.37863799999991,
-        60.74785699999984
+        57.82751200000001,
+        57.61107300000003,
+        57.93311999999992,
+        56.918603000000076,
+        56.87761800000021
       ],
       "stat": {
-        "median": 59.01941499999998,
-        "p95": 61.36208660000002,
-        "mean": 59.62353679999997,
-        "stddev": 1.274499146848115,
-        "min": 58.37863799999991,
-        "max": 61.515644000000066,
+        "median": 57.61107300000003,
+        "p95": 57.91199839999994,
+        "mean": 57.43358520000005,
+        "stddev": 0.4495601079078138,
+        "min": 56.87761800000021,
+        "max": 57.93311999999992,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 30047871,
+          "retainedBytes": 29933703,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30047871,
+          "retainedBytes": 29933703,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30047871,
+          "retainedBytes": 29933703,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30047871,
+          "retainedBytes": 29933703,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30047871,
+          "retainedBytes": 29933703,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 30047871,
-          "p95": 30047871,
-          "mean": 30047871,
+          "median": 29933703,
+          "p95": 29933703,
+          "mean": 29933703,
           "stddev": 0,
-          "min": 30047871,
-          "max": 30047871,
+          "min": 29933703,
+          "max": 29933703,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -441,56 +441,56 @@
       "id": "independent-first-recompute",
       "size": 100000,
       "samplesMs": [
-        95.952358,
-        95.4810080000002,
-        97.85470799999985,
-        100.08560599999964,
-        99.10300700000016
+        85.28265999999985,
+        84.88259300000004,
+        84.41551000000004,
+        83.52536699999973,
+        83.32377900000029
       ],
       "stat": {
-        "median": 97.85470799999985,
-        "p95": 99.88908619999975,
-        "mean": 97.69533739999997,
-        "stddev": 1.7698332436464737,
-        "min": 95.4810080000002,
-        "max": 100.08560599999964,
+        "median": 84.41551000000004,
+        "p95": 85.2026465999999,
+        "mean": 84.28598179999999,
+        "stddev": 0.7576884604139644,
+        "min": 83.32377900000029,
+        "max": 85.28265999999985,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 36682903,
+          "retainedBytes": 38408435,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 36682903,
+          "retainedBytes": 38408435,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 36682903,
+          "retainedBytes": 38408435,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 36682903,
+          "retainedBytes": 38408435,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 36682903,
+          "retainedBytes": 38408435,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 36682903,
-          "p95": 36682903,
-          "mean": 36682903,
+          "median": 38408435,
+          "p95": 38408435,
+          "mean": 38408435,
           "stddev": 0,
-          "min": 36682903,
-          "max": 36682903,
+          "min": 38408435,
+          "max": 38408435,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -518,56 +518,56 @@
       "id": "linear-chain",
       "size": 8,
       "samplesMs": [
-        0.036987999999837484,
-        0.020221000000219647,
-        0.01499999999987267,
-        0.014496000000235654,
-        0.01498200000014549
+        0.03985199999988254,
+        0.022704999999859865,
+        0.017344999999750144,
+        0.018417999999655876,
+        0.017334000000118976
       ],
       "stat": {
-        "median": 0.01499999999987267,
-        "p95": 0.03363459999991392,
-        "mean": 0.02033740000006219,
-        "stddev": 0.008585407750265384,
-        "min": 0.014496000000235654,
-        "max": 0.036987999999837484,
+        "median": 0.018417999999655876,
+        "p95": 0.036422599999878,
+        "mean": 0.02313079999985348,
+        "stddev": 0.008591492196364337,
+        "min": 0.017334000000118976,
+        "max": 0.03985199999988254,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 4535,
+          "retainedBytes": 9219,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4535,
+          "retainedBytes": 9219,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4535,
+          "retainedBytes": 9219,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4535,
+          "retainedBytes": 9219,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4535,
+          "retainedBytes": 9219,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 4535,
-          "p95": 4535,
-          "mean": 4535,
+          "median": 9219,
+          "p95": 9219,
+          "mean": 9219,
           "stddev": 0,
-          "min": 4535,
-          "max": 4535,
+          "min": 9219,
+          "max": 9219,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -595,56 +595,56 @@
       "id": "linear-chain",
       "size": 16,
       "samplesMs": [
-        0.02724800000032701,
-        0.02452899999980218,
-        0.02476299999989351,
-        0.024266999999781547,
-        0.02352999999993699
+        0.027331000000231143,
+        0.02618899999970381,
+        0.028913999999986117,
+        0.026742000000012922,
+        0.0276929999999993
       ],
       "stat": {
-        "median": 0.02452899999980218,
-        "p95": 0.02675100000024031,
-        "mean": 0.024867399999948248,
-        "stddev": 0.001260300694449062,
-        "min": 0.02352999999993699,
-        "max": 0.02724800000032701,
+        "median": 0.027331000000231143,
+        "p95": 0.028669799999988754,
+        "mean": 0.02737379999998666,
+        "stddev": 0.000925079326395583,
+        "min": 0.02618899999970381,
+        "max": 0.028913999999986117,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 8909,
+          "retainedBytes": 13761,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 8909,
+          "retainedBytes": 13761,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 8909,
+          "retainedBytes": 13761,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 8909,
+          "retainedBytes": 13761,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 8909,
+          "retainedBytes": 13761,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 8909,
-          "p95": 8909,
-          "mean": 8909,
+          "median": 13761,
+          "p95": 13761,
+          "mean": 13761,
           "stddev": 0,
-          "min": 8909,
-          "max": 8909,
+          "min": 13761,
+          "max": 13761,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -672,56 +672,56 @@
       "id": "linear-chain",
       "size": 32,
       "samplesMs": [
-        0.06374199999982011,
-        0.03815999999960695,
-        0.03996300000017072,
-        0.043478999999933876,
-        0.044931999999789696
+        0.04511999999976979,
+        0.04922800000031202,
+        0.04134700000031444,
+        0.04642899999998917,
+        0.04072500000029322
       ],
       "stat": {
-        "median": 0.043478999999933876,
-        "p95": 0.05997999999981402,
-        "mean": 0.04605519999986427,
-        "stddev": 0.009167010011978562,
-        "min": 0.03815999999960695,
-        "max": 0.06374199999982011,
+        "median": 0.04511999999976979,
+        "p95": 0.04866820000024745,
+        "mean": 0.04456980000013573,
+        "stddev": 0.0031820464735239757,
+        "min": 0.04072500000029322,
+        "max": 0.04922800000031202,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 15953,
+          "retainedBytes": 21029,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 15953,
+          "retainedBytes": 21029,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 15953,
+          "retainedBytes": 21029,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 15953,
+          "retainedBytes": 21029,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 15953,
+          "retainedBytes": 21029,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 15953,
-          "p95": 15953,
-          "mean": 15953,
+          "median": 21029,
+          "p95": 21029,
+          "mean": 21029,
           "stddev": 0,
-          "min": 15953,
-          "max": 15953,
+          "min": 21029,
+          "max": 21029,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -749,56 +749,56 @@
       "id": "linear-chain",
       "size": 64,
       "samplesMs": [
-        0.6508420000000115,
-        0.06933799999978874,
-        0.07577500000024884,
-        0.0654210000002422,
-        0.06662999999980457
+        0.07204300000012154,
+        0.08378900000025169,
+        0.07216299999981857,
+        0.07997800000021016,
+        0.07221499999968728
       ],
       "stat": {
-        "median": 0.06933799999978874,
-        "p95": 0.5358286000000588,
-        "mean": 0.18560120000001917,
-        "stddev": 0.23264795497351504,
-        "min": 0.0654210000002422,
-        "max": 0.6508420000000115,
+        "median": 0.07221499999968728,
+        "p95": 0.08302680000024339,
+        "mean": 0.07603760000001784,
+        "stddev": 0.004923262723202651,
+        "min": 0.07204300000012154,
+        "max": 0.08378900000025169,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 30041,
+          "retainedBytes": 35565,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30041,
+          "retainedBytes": 35565,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30041,
+          "retainedBytes": 35565,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30041,
+          "retainedBytes": 35565,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 30041,
+          "retainedBytes": 35565,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 30041,
-          "p95": 30041,
-          "mean": 30041,
+          "median": 35565,
+          "p95": 35565,
+          "mean": 35565,
           "stddev": 0,
-          "min": 30041,
-          "max": 30041,
+          "min": 35565,
+          "max": 35565,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -826,56 +826,56 @@
       "id": "wide-fan-out-edit",
       "size": 1000,
       "samplesMs": [
-        0.41976400000021385,
-        0.29438299999992523,
-        0.2848579999999856,
-        0.31177900000011505,
-        0.2972759999997834
+        0.3547929999999724,
+        0.33198700000002646,
+        0.3285009999999602,
+        0.33845800000017334,
+        0.33097300000008545
       ],
       "stat": {
-        "median": 0.2972759999997834,
-        "p95": 0.39816700000019406,
-        "mean": 0.3216120000000046,
-        "stddev": 0.049829747834110885,
-        "min": 0.2848579999999856,
-        "max": 0.41976400000021385,
+        "median": 0.33198700000002646,
+        "p95": 0.35152600000001255,
+        "mean": 0.33694240000004355,
+        "stddev": 0.009511970597083752,
+        "min": 0.3285009999999602,
+        "max": 0.3547929999999724,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 396280,
-          "p95": 396280,
-          "mean": 396280,
+          "median": 423496,
+          "p95": 423496,
+          "mean": 423496,
           "stddev": 0,
-          "min": 396280,
-          "max": 396280,
+          "min": 423496,
+          "max": 423496,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -903,56 +903,56 @@
       "id": "wide-fan-out-edit",
       "size": 100000,
       "samplesMs": [
-        55.356366999999864,
-        54.56723099999999,
-        55.646897999999965,
-        52.6748579999994,
-        55.37533199999962
+        56.4933759999999,
+        54.714792000000216,
+        56.365808000000015,
+        55.839254999999866,
+        55.15676099999973
       ],
       "stat": {
-        "median": 55.356366999999864,
-        "p95": 55.5925847999999,
-        "mean": 54.72413719999977,
-        "stddev": 1.0862247904300943,
-        "min": 52.6748579999994,
-        "max": 55.646897999999965,
+        "median": 55.839254999999866,
+        "p95": 56.46786239999992,
+        "mean": 55.713998399999944,
+        "stddev": 0.6865713893888813,
+        "min": 54.714792000000216,
+        "max": 56.4933759999999,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 32088669,
-          "p95": 32088669,
-          "mean": 32088669,
+          "median": 33816541,
+          "p95": 33816541,
+          "mean": 33816541,
           "stddev": 0,
-          "min": 32088669,
-          "max": 32088669,
+          "min": 33816541,
+          "max": 33816541,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -980,56 +980,56 @@
       "id": "diamond-edit",
       "size": 32,
       "samplesMs": [
-        0.10338700000011158,
-        0.09843999999975495,
-        0.08934700000008888,
-        0.08416499999930238,
-        0.08382499999970605
+        0.1169739999995727,
+        0.09491799999977957,
+        0.09301200000027166,
+        0.09152099999982966,
+        0.09348200000022189
       ],
       "stat": {
-        "median": 0.08934700000008888,
-        "p95": 0.10239760000004025,
-        "mean": 0.09183279999979277,
-        "stddev": 0.007826287099439996,
-        "min": 0.08382499999970605,
-        "max": 0.10338700000011158,
+        "median": 0.09348200000022189,
+        "p95": 0.11256279999961406,
+        "mean": 0.09798139999993509,
+        "stddev": 0.009558028867738617,
+        "min": 0.09152099999982966,
+        "max": 0.1169739999995727,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 37570,
+          "retainedBytes": 43094,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 37570,
+          "retainedBytes": 43094,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 37570,
+          "retainedBytes": 43094,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 37570,
+          "retainedBytes": 43094,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 37570,
+          "retainedBytes": 43094,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 37570,
-          "p95": 37570,
-          "mean": 37570,
+          "median": 43094,
+          "p95": 43094,
+          "mean": 43094,
           "stddev": 0,
-          "min": 37570,
-          "max": 37570,
+          "min": 43094,
+          "max": 43094,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1057,56 +1057,56 @@
       "id": "shared-range-edit",
       "size": 1000,
       "samplesMs": [
-        0.5348330000006172,
-        0.5176110000002154,
-        0.48145000000022264,
-        0.5796280000004117,
-        0.47882599999957165
+        0.5618280000003324,
+        0.5526530000001912,
+        0.5174520000000484,
+        0.5081289999998262,
+        0.5018820000000233
       ],
       "stat": {
-        "median": 0.5176110000002154,
-        "p95": 0.5706690000004528,
-        "mean": 0.5184696000002077,
-        "stddev": 0.03728515455053838,
-        "min": 0.47882599999957165,
-        "max": 0.5796280000004117,
+        "median": 0.5174520000000484,
+        "p95": 0.5599930000003042,
+        "mean": 0.5283888000000843,
+        "stddev": 0.024247123684413625,
+        "min": 0.5018820000000233,
+        "max": 0.5618280000003324,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 519472,
+          "retainedBytes": 530563,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 519472,
+          "retainedBytes": 530563,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 519472,
+          "retainedBytes": 530563,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 519472,
+          "retainedBytes": 530563,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 519472,
+          "retainedBytes": 530563,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 519472,
-          "p95": 519472,
-          "mean": 519472,
+          "median": 530563,
+          "p95": 530563,
+          "mean": 530563,
           "stddev": 0,
-          "min": 519472,
-          "max": 519472,
+          "min": 530563,
+          "max": 530563,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1134,56 +1134,56 @@
       "id": "distinct-range-edit",
       "size": 1000,
       "samplesMs": [
-        0.022452000000157568,
-        0.014191000000209897,
-        0.012977999999748135,
-        0.013151999999536201,
-        0.014809000000241213
+        0.022242000000005646,
+        0.014329999999972642,
+        0.013167999999950553,
+        0.012434000000212109,
+        0.012079000000085216
       ],
       "stat": {
-        "median": 0.014191000000209897,
-        "p95": 0.020923400000174296,
-        "mean": 0.015516399999978604,
-        "stddev": 0.003532520607293321,
-        "min": 0.012977999999748135,
-        "max": 0.022452000000157568,
+        "median": 0.013167999999950553,
+        "p95": 0.020659599999999043,
+        "mean": 0.014850600000045233,
+        "stddev": 0.0037750942557446382,
+        "min": 0.012079000000085216,
+        "max": 0.022242000000005646,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 853574,
+          "retainedBytes": 865097,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 853574,
+          "retainedBytes": 865097,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 853574,
+          "retainedBytes": 865097,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 853574,
+          "retainedBytes": 865097,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 853574,
+          "retainedBytes": 865097,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 853574,
-          "p95": 853574,
-          "mean": 853574,
+          "median": 865097,
+          "p95": 865097,
+          "mean": 865097,
           "stddev": 0,
-          "min": 853574,
-          "max": 853574,
+          "min": 865097,
+          "max": 865097,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1211,56 +1211,56 @@
       "id": "cross-sheet-range-edit",
       "size": 1000,
       "samplesMs": [
-        0.5102780000006533,
-        0.49555600000076083,
-        0.5022509999998874,
-        0.5376280000000406,
-        0.5099599999994098
+        0.5701180000000932,
+        0.5181469999997717,
+        0.5918919999999162,
+        0.5541520000001583,
+        0.5219440000000759
       ],
       "stat": {
-        "median": 0.5099599999994098,
-        "p95": 0.5321580000001631,
-        "mean": 0.5111346000001504,
-        "stddev": 0.014322184324890635,
-        "min": 0.49555600000076083,
-        "max": 0.5376280000000406,
+        "median": 0.5541520000001583,
+        "p95": 0.5875371999999516,
+        "mean": 0.551250600000003,
+        "stddev": 0.028181005784777405,
+        "min": 0.5181469999997717,
+        "max": 0.5918919999999162,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 616857,
+          "retainedBytes": 639902,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 616857,
+          "retainedBytes": 639902,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 616857,
+          "retainedBytes": 639902,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 616857,
+          "retainedBytes": 639902,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 616857,
+          "retainedBytes": 639902,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 616857,
-          "p95": 616857,
-          "mean": 616857,
+          "median": 639902,
+          "p95": 639902,
+          "mean": 639902,
           "stddev": 0,
-          "min": 616857,
-          "max": 616857,
+          "min": 639902,
+          "max": 639902,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1288,56 +1288,56 @@
       "id": "scalar-edit-affects-0",
       "size": 1000,
       "samplesMs": [
-        0.0029729999996561673,
-        0.003404999999474967,
-        0.002666999999746622,
-        0.003306999999949767,
-        0.0031159999998635612
+        0.0029669999998986896,
+        0.0026830000001609733,
+        0.0026569999999992433,
+        0.0030079999996814877,
+        0.002746999999999389
       ],
       "stat": {
-        "median": 0.0031159999998635612,
-        "p95": 0.0033853999995699267,
-        "mean": 0.003093599999738217,
-        "stddev": 0.0002605928625056995,
-        "min": 0.002666999999746622,
-        "max": 0.003404999999474967,
+        "median": 0.002746999999999389,
+        "p95": 0.002999799999724928,
+        "mean": 0.0028123999999479566,
+        "stddev": 0.00014651361697994356,
+        "min": 0.0026569999999992433,
+        "max": 0.0030079999996814877,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 396280,
-          "p95": 396280,
-          "mean": 396280,
+          "median": 423496,
+          "p95": 423496,
+          "mean": 423496,
           "stddev": 0,
-          "min": 396280,
-          "max": 396280,
+          "min": 423496,
+          "max": 423496,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1365,56 +1365,56 @@
       "id": "scalar-edit-affects-1",
       "size": 1,
       "samplesMs": [
-        0.004173000000264437,
-        0.0035200000002078013,
-        0.003208000000086031,
-        0.0030259999994086684,
-        0.004149000000325032
+        0.003922000000329717,
+        0.0033580000003894384,
+        0.0034009999999398133,
+        0.002996000000166532,
+        0.003741999999874679
       ],
       "stat": {
-        "median": 0.0035200000002078013,
-        "p95": 0.004168200000276556,
-        "mean": 0.003615200000058394,
-        "stddev": 0.0004728878939514536,
-        "min": 0.0030259999994086684,
-        "max": 0.004173000000264437,
+        "median": 0.0034009999999398133,
+        "p95": 0.00388600000023871,
+        "mean": 0.003483800000140036,
+        "stddev": 0.00032227838896636054,
+        "min": 0.002996000000166532,
+        "max": 0.003922000000329717,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 2703,
+          "retainedBytes": 7355,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2703,
+          "retainedBytes": 7355,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2703,
+          "retainedBytes": 7355,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2703,
+          "retainedBytes": 7355,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2703,
+          "retainedBytes": 7355,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 2703,
-          "p95": 2703,
-          "mean": 2703,
+          "median": 7355,
+          "p95": 7355,
+          "mean": 7355,
           "stddev": 0,
-          "min": 2703,
-          "max": 2703,
+          "min": 7355,
+          "max": 7355,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1442,56 +1442,56 @@
       "id": "scalar-edit-affects-1000",
       "size": 1000,
       "samplesMs": [
-        0.2936359999994238,
-        0.29638900000009016,
-        0.32070000000021537,
-        0.32993400000032125,
-        0.3113809999995283
+        0.29920099999981176,
+        0.30068000000028405,
+        0.31867000000011103,
+        0.32940899999994144,
+        0.30581400000028225
       ],
       "stat": {
-        "median": 0.3113809999995283,
-        "p95": 0.32808720000030006,
-        "mean": 0.31040799999991575,
-        "stddev": 0.01389941735493154,
-        "min": 0.2936359999994238,
-        "max": 0.32993400000032125,
+        "median": 0.30581400000028225,
+        "p95": 0.3272611999999754,
+        "mean": 0.3107548000000861,
+        "stddev": 0.01157612165446969,
+        "min": 0.29920099999981176,
+        "max": 0.32940899999994144,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 396280,
+          "retainedBytes": 423496,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 396280,
-          "p95": 396280,
-          "mean": 396280,
+          "median": 423496,
+          "p95": 423496,
+          "mean": 423496,
           "stddev": 0,
-          "min": 396280,
-          "max": 396280,
+          "min": 423496,
+          "max": 423496,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1519,56 +1519,56 @@
       "id": "scalar-edit-affects-100000",
       "size": 100000,
       "samplesMs": [
-        55.3404959999998,
-        54.312119999999595,
-        53.837281000000075,
-        55.038354000000254,
-        54.34785099999954
+        55.00209799999993,
+        53.29655300000013,
+        55.56339099999968,
+        55.82433900000069,
+        55.32835900000009
       ],
       "stat": {
-        "median": 54.34785099999954,
-        "p95": 55.280067599999896,
-        "mean": 54.57522039999985,
-        "stddev": 0.5414079234760877,
-        "min": 53.837281000000075,
-        "max": 55.3404959999998,
+        "median": 55.32835900000009,
+        "p95": 55.77214940000049,
+        "mean": 55.0029480000001,
+        "stddev": 0.8951487550766514,
+        "min": 53.29655300000013,
+        "max": 55.82433900000069,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 32088669,
+          "retainedBytes": 33816541,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 32088669,
-          "p95": 32088669,
-          "mean": 32088669,
+          "median": 33816541,
+          "p95": 33816541,
+          "mean": 33816541,
           "stddev": 0,
-          "min": 32088669,
-          "max": 32088669,
+          "min": 33816541,
+          "max": 33816541,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1596,56 +1596,56 @@
       "id": "formula-constant-edit",
       "size": 100000,
       "samplesMs": [
-        0.03363400000034744,
-        0.02570099999957165,
-        0.024787999999716703,
-        0.03517699999974866,
-        0.026812999999492604
+        0.03904099999999744,
+        0.03109000000040396,
+        0.029604000000290398,
+        0.02878300000065792,
+        0.03407500000048458
       ],
       "stat": {
-        "median": 0.026812999999492604,
-        "p95": 0.03486839999986842,
-        "mean": 0.02922259999977541,
-        "stddev": 0.004307872913818305,
-        "min": 0.024787999999716703,
-        "max": 0.03517699999974866,
+        "median": 0.03109000000040396,
+        "p95": 0.03804780000009487,
+        "mean": 0.03251860000036686,
+        "stddev": 0.003727051950099771,
+        "min": 0.02878300000065792,
+        "max": 0.03904099999999744,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 55939025,
+          "retainedBytes": 57666897,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 55939025,
+          "retainedBytes": 57666897,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 55939025,
+          "retainedBytes": 57666897,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 55939025,
+          "retainedBytes": 57666897,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 55939025,
+          "retainedBytes": 57666897,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 55939025,
-          "p95": 55939025,
-          "mean": 55939025,
+          "median": 57666897,
+          "p95": 57666897,
+          "mean": 57666897,
           "stddev": 0,
-          "min": 55939025,
-          "max": 55939025,
+          "min": 57666897,
+          "max": 57666897,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1673,56 +1673,56 @@
       "id": "topology-remove-add",
       "size": 10000,
       "samplesMs": [
-        8.56840800000009,
-        8.175459999999475,
-        8.784107000000404,
-        8.087399000000005,
-        8.095683000000463
+        8.798721000000114,
+        8.333985000000212,
+        8.533798000000388,
+        8.506239000000278,
+        8.271641999999702
       ],
       "stat": {
-        "median": 8.175459999999475,
-        "p95": 8.740967200000341,
-        "mean": 8.342211400000087,
-        "stddev": 0.28282442035776967,
-        "min": 8.087399000000005,
-        "max": 8.784107000000404,
+        "median": 8.506239000000278,
+        "p95": 8.745736400000169,
+        "mean": 8.488877000000139,
+        "stddev": 0.18412235959284218,
+        "min": 8.271641999999702,
+        "max": 8.798721000000114,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 4009958,
+          "retainedBytes": 4211662,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 4009958,
-          "p95": 4009958,
-          "mean": 4009958,
+          "median": 4211662,
+          "p95": 4211662,
+          "mean": 4211662,
           "stddev": 0,
-          "min": 4009958,
-          "max": 4009958,
+          "min": 4211662,
+          "max": 4211662,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1750,56 +1750,56 @@
       "id": "cycles",
       "size": 1000,
       "samplesMs": [
-        1.4086130000005141,
-        2.250347000000147,
-        1.4714620000004288,
-        1.4118200000002616,
-        1.7222830000000613
+        1.4827410000007148,
+        1.3904569999995147,
+        1.361866000000191,
+        1.3158179999991262,
+        1.369166000000405
       ],
       "stat": {
-        "median": 1.4714620000004288,
-        "p95": 2.14473420000013,
-        "mean": 1.6529050000002825,
-        "stddev": 0.32014758190111364,
-        "min": 1.4086130000005141,
-        "max": 2.250347000000147,
+        "median": 1.369166000000405,
+        "p95": 1.4642842000004748,
+        "mean": 1.3840095999999904,
+        "stddev": 0.055045842904680085,
+        "min": 1.3158179999991262,
+        "max": 1.4827410000007148,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 699362,
+          "retainedBytes": 744986,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 699362,
+          "retainedBytes": 744986,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 699362,
+          "retainedBytes": 744986,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 699362,
+          "retainedBytes": 744986,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 699362,
+          "retainedBytes": 744986,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 699362,
-          "p95": 699362,
-          "mean": 699362,
+          "median": 744986,
+          "p95": 744986,
+          "mean": 744986,
           "stddev": 0,
-          "min": 699362,
-          "max": 699362,
+          "min": 744986,
+          "max": 744986,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1827,56 +1827,56 @@
       "id": "removed-sheet-ref",
       "size": 1000,
       "samplesMs": [
-        0.47211000000061176,
-        0.4156519999996817,
-        0.40507999999954336,
-        0.3966920000002574,
-        0.4246689999999944
+        0.40712900000016816,
+        0.41925499999979365,
+        0.3990270000003875,
+        0.4120379999994839,
+        0.40814399999999296
       ],
       "stat": {
-        "median": 0.4156519999996817,
-        "p95": 0.4626218000004883,
-        "mean": 0.4228406000000177,
-        "stddev": 0.02638818291306773,
-        "min": 0.3966920000002574,
-        "max": 0.47211000000061176,
+        "median": 0.40814399999999296,
+        "p95": 0.4178115999997317,
+        "mean": 0.40911859999996525,
+        "stddev": 0.006603305917255796,
+        "min": 0.3990270000003875,
+        "max": 0.41925499999979365,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 213178,
+          "retainedBytes": 236250,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 213178,
+          "retainedBytes": 236250,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 213178,
+          "retainedBytes": 236250,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 213178,
+          "retainedBytes": 236250,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 213178,
+          "retainedBytes": 236250,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 213178,
-          "p95": 213178,
-          "mean": 213178,
+          "median": 236250,
+          "p95": 236250,
+          "mean": 236250,
           "stddev": 0,
-          "min": 213178,
-          "max": 213178,
+          "min": 236250,
+          "max": 236250,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1904,56 +1904,56 @@
       "id": "error-propagation",
       "size": 1000,
       "samplesMs": [
-        0.7011830000001282,
-        0.7073710000004212,
-        0.7280550000004951,
-        1.2208630000004632,
-        0.6765960000002451
+        0.7285080000001471,
+        0.7739870000004885,
+        0.718300000000454,
+        0.7275209999997969,
+        0.7978430000002845
       ],
       "stat": {
-        "median": 0.7073710000004212,
-        "p95": 1.1223014000004694,
-        "mean": 0.8068136000003505,
-        "stddev": 0.2076743125258061,
-        "min": 0.6765960000002451,
-        "max": 1.2208630000004632,
+        "median": 0.7285080000001471,
+        "p95": 0.7930718000003253,
+        "mean": 0.7492318000002343,
+        "stddev": 0.031091734164650508,
+        "min": 0.718300000000454,
+        "max": 0.7978430000002845,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 283487,
+          "retainedBytes": 314775,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 283487,
+          "retainedBytes": 314775,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 283487,
+          "retainedBytes": 314775,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 283487,
+          "retainedBytes": 314775,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 283487,
+          "retainedBytes": 314775,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 283487,
-          "p95": 283487,
-          "mean": 283487,
+          "median": 314775,
+          "p95": 314775,
+          "mean": 314775,
           "stddev": 0,
-          "min": 283487,
-          "max": 283487,
+          "min": 314775,
+          "max": 314775,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -1981,56 +1981,56 @@
       "id": "criteria-range-edit",
       "size": 100000,
       "samplesMs": [
-        3.128335999999763,
-        3.04466500000035,
-        3.0575220000000627,
-        3.503967000000557,
-        3.0540499999997337
+        1.6753949999992983,
+        1.7037909999999101,
+        1.6431859999993321,
+        1.6398819999994885,
+        1.6596869999993942
       ],
       "stat": {
-        "median": 3.0575220000000627,
-        "p95": 3.4288408000003985,
-        "mean": 3.157708000000093,
-        "stddev": 0.17568092945699215,
-        "min": 3.04466500000035,
-        "max": 3.503967000000557,
+        "median": 1.6596869999993942,
+        "p95": 1.6981117999997877,
+        "mean": 1.6643881999994847,
+        "stddev": 0.02343466961079912,
+        "min": 1.6398819999994885,
+        "max": 1.7037909999999101,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3902997,
+          "retainedBytes": 3914669,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902997,
+          "retainedBytes": 3914669,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902997,
+          "retainedBytes": 3914669,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902997,
+          "retainedBytes": 3914669,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902997,
+          "retainedBytes": 3914669,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3902997,
-          "p95": 3902997,
-          "mean": 3902997,
+          "median": 3914669,
+          "p95": 3914669,
+          "mean": 3914669,
           "stddev": 0,
-          "min": 3902997,
-          "max": 3902997,
+          "min": 3914669,
+          "max": 3914669,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2058,56 +2058,56 @@
       "id": "lookup-range-edit",
       "size": 100000,
       "samplesMs": [
-        1.978769999999713,
-        2.142812000000049,
-        1.983556000000135,
-        2.228602000000137,
-        2.042551000000458
+        1.7366849999998522,
+        1.6942799999997078,
+        1.6967059999997218,
+        1.7256850000003396,
+        1.6746290000000954
       ],
       "stat": {
-        "median": 2.042551000000458,
-        "p95": 2.2114440000001196,
-        "mean": 2.0752582000000985,
-        "stddev": 0.09681618051632625,
-        "min": 1.978769999999713,
-        "max": 2.228602000000137,
+        "median": 1.6967059999997218,
+        "p95": 1.7344849999999497,
+        "mean": 1.7055969999999434,
+        "stddev": 0.02252169124204532,
+        "min": 1.6746290000000954,
+        "max": 1.7366849999998522,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 5203155,
+          "retainedBytes": 5217179,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203155,
+          "retainedBytes": 5217179,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203155,
+          "retainedBytes": 5217179,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203155,
+          "retainedBytes": 5217179,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203155,
+          "retainedBytes": 5217179,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 5203155,
-          "p95": 5203155,
-          "mean": 5203155,
+          "median": 5217179,
+          "p95": 5217179,
+          "mean": 5217179,
           "stddev": 0,
-          "min": 5203155,
-          "max": 5203155,
+          "min": 5217179,
+          "max": 5217179,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2135,56 +2135,56 @@
       "id": "vlookup-many",
       "size": 1000,
       "samplesMs": [
-        2.8418650000003254,
-        2.1347869999999602,
-        1.8986959999992905,
-        1.4471400000002177,
-        1.374377000000095
+        1.4772269999994023,
+        1.4194049999996423,
+        1.346548999999868,
+        1.241026000000602,
+        1.2401209999998173
       ],
       "stat": {
-        "median": 1.8986959999992905,
-        "p95": 2.7004494000002524,
-        "mean": 1.9393729999999778,
-        "stddev": 0.5321366114249813,
-        "min": 1.374377000000095,
-        "max": 2.8418650000003254,
+        "median": 1.346548999999868,
+        "p95": 1.4656625999994504,
+        "mean": 1.3448655999998664,
+        "stddev": 0.09469169969421955,
+        "min": 1.2401209999998173,
+        "max": 1.4772269999994023,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1088835,
-          "p95": 1088835,
-          "mean": 1088835,
+          "median": 1100799,
+          "p95": 1100799,
+          "mean": 1100799,
           "stddev": 0,
-          "min": 1088835,
-          "max": 1088835,
+          "min": 1100799,
+          "max": 1100799,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2212,56 +2212,56 @@
       "id": "vlookup-many-edit",
       "size": 1000,
       "samplesMs": [
-        1.2381550000000061,
-        1.22864699999991,
-        1.1642109999993409,
-        1.175521000000117,
-        1.1780740000003789
+        1.1659689999996772,
+        1.1452159999998912,
+        1.1289770000003045,
+        1.1215469999997367,
+        1.1536360000000059
       ],
       "stat": {
-        "median": 1.1780740000003789,
-        "p95": 1.236253399999987,
-        "mean": 1.1969215999999505,
-        "stddev": 0.030298169381065308,
-        "min": 1.1642109999993409,
-        "max": 1.2381550000000061,
+        "median": 1.1452159999998912,
+        "p95": 1.163502399999743,
+        "mean": 1.143068999999923,
+        "stddev": 0.016139777235065055,
+        "min": 1.1215469999997367,
+        "max": 1.1659689999996772,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1088835,
+          "retainedBytes": 1100826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1088835,
-          "p95": 1088835,
-          "mean": 1088835,
+          "median": 1100826,
+          "p95": 1100826,
+          "mean": 1100826,
           "stddev": 0,
-          "min": 1088835,
-          "max": 1088835,
+          "min": 1100826,
+          "max": 1100826,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2289,56 +2289,56 @@
       "id": "vlookup-many-sorted",
       "size": 1000,
       "samplesMs": [
-        2.173240000000078,
-        1.7709699999995792,
-        2.076644999999189,
-        1.7252419999995254,
-        1.7898489999997764
+        1.701071000000411,
+        1.6815489999999045,
+        1.6590930000002118,
+        1.6470140000001265,
+        1.6825779999999213
       ],
       "stat": {
-        "median": 1.7898489999997764,
-        "p95": 2.1539209999999,
-        "mean": 1.9071891999996295,
-        "stddev": 0.18161909200681878,
-        "min": 1.7252419999995254,
-        "max": 2.173240000000078,
+        "median": 1.6815489999999045,
+        "p95": 1.697372400000313,
+        "mean": 1.674261000000115,
+        "stddev": 0.019044845843461253,
+        "min": 1.6470140000001265,
+        "max": 1.701071000000411,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099799,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1087835,
-          "p95": 1087835,
-          "mean": 1087835,
+          "median": 1099799,
+          "p95": 1099799,
+          "mean": 1099799,
           "stddev": 0,
-          "min": 1087835,
-          "max": 1087835,
+          "min": 1099799,
+          "max": 1099799,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2366,56 +2366,56 @@
       "id": "vlookup-many-sorted-edit",
       "size": 1000,
       "samplesMs": [
-        1.6176400000003923,
-        1.9297430000005988,
-        1.5298830000001544,
-        1.5852240000003803,
-        1.5743490000004385
+        1.5215760000000955,
+        1.5258260000000519,
+        1.5375010000007023,
+        1.5550090000006094,
+        1.5259619999997085
       ],
       "stat": {
-        "median": 1.5852240000003803,
-        "p95": 1.8673224000005575,
-        "mean": 1.6473678000003928,
-        "stddev": 0.14395538956980197,
-        "min": 1.5298830000001544,
-        "max": 1.9297430000005988,
+        "median": 1.5259619999997085,
+        "p95": 1.551507400000628,
+        "mean": 1.5331748000002334,
+        "stddev": 0.012132681507679283,
+        "min": 1.5215760000000955,
+        "max": 1.5550090000006094,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1087835,
+          "retainedBytes": 1099826,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1087835,
-          "p95": 1087835,
-          "mean": 1087835,
+          "median": 1099826,
+          "p95": 1099826,
+          "mean": 1099826,
           "stddev": 0,
-          "min": 1087835,
-          "max": 1087835,
+          "min": 1099826,
+          "max": 1099826,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2443,56 +2443,56 @@
       "id": "xlookup-many",
       "size": 1000,
       "samplesMs": [
-        1.3916860000008455,
-        1.3258289999994304,
-        1.366574000001492,
-        1.4511270000002696,
-        1.421249999999418
+        1.2780949999996665,
+        1.2603650000000926,
+        1.267041000000063,
+        1.2601750000003449,
+        1.2467440000000352
       ],
       "stat": {
-        "median": 1.3916860000008455,
-        "p95": 1.4451516000000992,
-        "mean": 1.391293200000291,
-        "stddev": 0.043299533740674086,
-        "min": 1.3258289999994304,
-        "max": 1.4511270000002696,
+        "median": 1.2603650000000926,
+        "p95": 1.2758841999997457,
+        "mean": 1.2624840000000404,
+        "stddev": 0.010218011665554784,
+        "min": 1.2467440000000352,
+        "max": 1.2780949999996665,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1103155,
-          "p95": 1103155,
-          "mean": 1103155,
+          "median": 1115119,
+          "p95": 1115119,
+          "mean": 1115119,
           "stddev": 0,
-          "min": 1103155,
-          "max": 1103155,
+          "min": 1115119,
+          "max": 1115119,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2520,56 +2520,56 @@
       "id": "xlookup-many-edit",
       "size": 1000,
       "samplesMs": [
-        1.1591840000000957,
-        1.13911299999927,
-        1.3589940000001661,
-        1.1567999999988388,
-        1.1811830000006012
+        1.103877999999895,
+        1.148232999999891,
+        1.092663000000357,
+        1.0981200000005629,
+        1.1225549999999203
       ],
       "stat": {
-        "median": 1.1591840000000957,
-        "p95": 1.3234318000002532,
-        "mean": 1.1990547999997943,
-        "stddev": 0.08107788494405818,
-        "min": 1.13911299999927,
-        "max": 1.3589940000001661,
+        "median": 1.103877999999895,
+        "p95": 1.1430973999998968,
+        "mean": 1.1130898000001253,
+        "stddev": 0.020252608951744105,
+        "min": 1.092663000000357,
+        "max": 1.148232999999891,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1103155,
+          "retainedBytes": 1115146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1103155,
-          "p95": 1103155,
-          "mean": 1103155,
+          "median": 1115146,
+          "p95": 1115146,
+          "mean": 1115146,
           "stddev": 0,
-          "min": 1103155,
-          "max": 1103155,
+          "min": 1115146,
+          "max": 1115146,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2597,56 +2597,56 @@
       "id": "xlookup-many-sorted",
       "size": 1000,
       "samplesMs": [
-        1.7588849999992817,
-        2.2920780000004015,
-        1.8180260000008275,
-        1.7884739999990416,
-        1.838474000000133
+        1.6668690000005881,
+        1.6459559999993871,
+        1.6370260000003327,
+        1.7196759999997084,
+        1.7697799999996278
       ],
       "stat": {
-        "median": 1.8180260000008275,
-        "p95": 2.2013572000003476,
-        "mean": 1.8991873999999371,
-        "stddev": 0.19828188709197764,
-        "min": 1.7588849999992817,
-        "max": 2.2920780000004015,
+        "median": 1.6668690000005881,
+        "p95": 1.7597591999996438,
+        "mean": 1.6878613999999288,
+        "stddev": 0.050007613618554735,
+        "min": 1.6370260000003327,
+        "max": 1.7697799999996278,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361119,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1349155,
-          "p95": 1349155,
-          "mean": 1349155,
+          "median": 1361119,
+          "p95": 1361119,
+          "mean": 1361119,
           "stddev": 0,
-          "min": 1349155,
-          "max": 1349155,
+          "min": 1361119,
+          "max": 1361119,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2674,56 +2674,56 @@
       "id": "xlookup-many-sorted-edit",
       "size": 1000,
       "samplesMs": [
-        1.6662349999987782,
-        1.614770000000135,
-        1.582115999999587,
-        1.5507890000008047,
-        1.6218239999998332
+        1.5309750000005806,
+        1.4951960000007603,
+        1.5150360000006913,
+        1.5466630000000805,
+        1.5450119999995877
       ],
       "stat": {
-        "median": 1.614770000000135,
-        "p95": 1.6573527999989892,
-        "mean": 1.6071467999998277,
-        "stddev": 0.038904219119737515,
-        "min": 1.5507890000008047,
-        "max": 1.6662349999987782,
+        "median": 1.5309750000005806,
+        "p95": 1.5463327999999819,
+        "mean": 1.5265764000003401,
+        "stddev": 0.019393817907413027,
+        "min": 1.4951960000007603,
+        "max": 1.5466630000000805,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1349155,
+          "retainedBytes": 1361146,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1349155,
-          "p95": 1349155,
-          "mean": 1349155,
+          "median": 1361146,
+          "p95": 1361146,
+          "mean": 1361146,
           "stddev": 0,
-          "min": 1349155,
-          "max": 1349155,
+          "min": 1361146,
+          "max": 1361146,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2751,56 +2751,56 @@
       "id": "text-lookup-many",
       "size": 1000,
       "samplesMs": [
-        89.1771289999997,
-        88.35458599999947,
-        89.38139199999932,
-        88.4709870000006,
-        88.62980299999981
+        2.1250819999995656,
+        2.2526859999998123,
+        2.0350579999994807,
+        2.0249680000006265,
+        2.0354049999996278
       ],
       "stat": {
-        "median": 88.62980299999981,
-        "p95": 89.3405393999994,
-        "mean": 88.80277939999978,
-        "stddev": 0.4039342816242083,
-        "min": 88.35458599999947,
-        "max": 89.38139199999932,
+        "median": 2.0354049999996278,
+        "p95": 2.227165199999763,
+        "mean": 2.0946397999998227,
+        "stddev": 0.0869692371045451,
+        "min": 2.0249680000006265,
+        "max": 2.2526859999998123,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1682995,
+          "retainedBytes": 1711087,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1682995,
+          "retainedBytes": 1711087,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1682995,
+          "retainedBytes": 1711087,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1682995,
+          "retainedBytes": 1711087,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1682995,
+          "retainedBytes": 1711087,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1682995,
-          "p95": 1682995,
-          "mean": 1682995,
+          "median": 1711087,
+          "p95": 1711087,
+          "mean": 1711087,
           "stddev": 0,
-          "min": 1682995,
-          "max": 1682995,
+          "min": 1711087,
+          "max": 1711087,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2828,56 +2828,56 @@
       "id": "text-lookup-many-edit",
       "size": 1000,
       "samplesMs": [
-        1.9028130000006058,
-        2.005482000000484,
-        2.018391999999949,
-        2.083074000000124,
-        1.991197999999713
+        1.9664609999999811,
+        1.9651359999998022,
+        1.9206779999994978,
+        1.960891000000629,
+        1.9978070000006483
       ],
       "stat": {
-        "median": 2.005482000000484,
-        "p95": 2.070137600000089,
-        "mean": 2.000191800000175,
-        "stddev": 0.057952069334426745,
-        "min": 1.9028130000006058,
-        "max": 2.083074000000124,
+        "median": 1.9651359999998022,
+        "p95": 1.9915378000005148,
+        "mean": 1.9621946000001116,
+        "stddev": 0.024578138600328963,
+        "min": 1.9206779999994978,
+        "max": 1.9978070000006483,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1683022,
+          "retainedBytes": 1711114,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1683022,
+          "retainedBytes": 1711114,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1683022,
+          "retainedBytes": 1711114,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1683022,
+          "retainedBytes": 1711114,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         },
         {
-          "retainedBytes": 1683022,
+          "retainedBytes": 1711114,
           "peakTransientBytes": 160000,
           "transientAllocations": 4
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1683022,
-          "p95": 1683022,
-          "mean": 1683022,
+          "median": 1711114,
+          "p95": 1711114,
+          "mean": 1711114,
           "stddev": 0,
-          "min": 1683022,
-          "max": 1683022,
+          "min": 1711114,
+          "max": 1711114,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2905,56 +2905,56 @@
       "id": "text-lookup-many-sorted",
       "size": 1000,
       "samplesMs": [
-        90.51983199999995,
-        90.29628000000048,
-        89.42219300000033,
-        92.39221299999917,
-        90.13450699999885
+        3.3856880000003002,
+        3.413382000000638,
+        3.5482470000006288,
+        3.3369199999997363,
+        3.2019850000006045
       ],
       "stat": {
-        "median": 90.29628000000048,
-        "p95": 92.01773679999933,
-        "mean": 90.55300499999976,
-        "stddev": 0.9903101126579419,
-        "min": 89.42219300000033,
-        "max": 92.39221299999917,
+        "median": 3.3856880000003002,
+        "p95": 3.5212740000006306,
+        "mean": 3.3772444000003814,
+        "stddev": 0.1122149938691578,
+        "min": 3.2019850000006045,
+        "max": 3.5482470000006288,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1667675,
+          "retainedBytes": 1695767,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667675,
+          "retainedBytes": 1695767,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667675,
+          "retainedBytes": 1695767,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667675,
+          "retainedBytes": 1695767,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667675,
+          "retainedBytes": 1695767,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1667675,
-          "p95": 1667675,
-          "mean": 1667675,
+          "median": 1695767,
+          "p95": 1695767,
+          "mean": 1695767,
           "stddev": 0,
-          "min": 1667675,
-          "max": 1667675,
+          "min": 1695767,
+          "max": 1695767,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -2982,56 +2982,56 @@
       "id": "text-lookup-many-sorted-edit",
       "size": 1000,
       "samplesMs": [
-        3.3421049999997194,
-        3.3232630000002246,
-        3.2117850000013277,
-        3.226565999999366,
-        3.183379000000059
+        3.1027479999993375,
+        3.1227689999996073,
+        3.080283999999665,
+        3.7635789999994813,
+        3.139027000000169
       ],
       "stat": {
-        "median": 3.226565999999366,
-        "p95": 3.3383365999998205,
-        "mean": 3.2574196000001394,
-        "stddev": 0.06328260755545913,
-        "min": 3.183379000000059,
-        "max": 3.3421049999997194,
+        "median": 3.1227689999996073,
+        "p95": 3.638668599999619,
+        "mean": 3.241681399999652,
+        "stddev": 0.2616894342387593,
+        "min": 3.080283999999665,
+        "max": 3.7635789999994813,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1667702,
+          "retainedBytes": 1695794,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667702,
+          "retainedBytes": 1695794,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667702,
+          "retainedBytes": 1695794,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667702,
+          "retainedBytes": 1695794,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 1667702,
+          "retainedBytes": 1695794,
           "peakTransientBytes": 320000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1667702,
-          "p95": 1667702,
-          "mean": 1667702,
+          "median": 1695794,
+          "p95": 1695794,
+          "mean": 1695794,
           "stddev": 0,
-          "min": 1667702,
-          "max": 1667702,
+          "min": 1695794,
+          "max": 1695794,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3059,56 +3059,56 @@
       "id": "spill-filter-resize",
       "size": 100000,
       "samplesMs": [
-        22.577535000000353,
-        23.126603000000614,
-        22.312944999999672,
-        22.12744600000042,
-        22.25158200000078
+        22.831718999999794,
+        23.513506999999663,
+        22.949829000000136,
+        23.006102000000283,
+        25.167453000000023
       ],
       "stat": {
-        "median": 22.312944999999672,
-        "p95": 23.01678940000056,
-        "mean": 22.47922220000037,
-        "stddev": 0.3555227052201093,
-        "min": 22.12744600000042,
-        "max": 23.126603000000614,
+        "median": 23.006102000000283,
+        "p95": 24.83666379999995,
+        "mean": 23.49372199999998,
+        "stddev": 0.8687471137729224,
+        "min": 22.831718999999794,
+        "max": 25.167453000000023,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 5852724,
+          "retainedBytes": 6663116,
           "peakTransientBytes": 4800000,
           "transientAllocations": 3
         },
         {
-          "retainedBytes": 5852724,
+          "retainedBytes": 6663116,
           "peakTransientBytes": 4800000,
           "transientAllocations": 3
         },
         {
-          "retainedBytes": 5852724,
+          "retainedBytes": 6663116,
           "peakTransientBytes": 4800000,
           "transientAllocations": 3
         },
         {
-          "retainedBytes": 5852724,
+          "retainedBytes": 6663116,
           "peakTransientBytes": 4800000,
           "transientAllocations": 3
         },
         {
-          "retainedBytes": 5852724,
+          "retainedBytes": 6663116,
           "peakTransientBytes": 4800000,
           "transientAllocations": 3
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 5852724,
-          "p95": 5852724,
-          "mean": 5852724,
+          "median": 6663116,
+          "p95": 6663116,
+          "mean": 6663116,
           "stddev": 0,
-          "min": 5852724,
-          "max": 5852724,
+          "min": 6663116,
+          "max": 6663116,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3136,56 +3136,56 @@
       "id": "sumproduct-vector-edit",
       "size": 100000,
       "samplesMs": [
-        10.695368000000599,
-        2.332898999999088,
-        2.3061190000007628,
-        2.24097299999994,
-        2.2342029999999795
+        2.5344829999994545,
+        2.483672999999726,
+        2.646987000000081,
+        2.778081999999813,
+        2.251470999999583
       ],
       "stat": {
-        "median": 2.3061190000007628,
-        "p95": 9.022874200000295,
-        "mean": 3.961912400000074,
-        "stddev": 3.366938459412764,
-        "min": 2.2342029999999795,
-        "max": 10.695368000000599,
+        "median": 2.5344829999994545,
+        "p95": 2.7518629999998665,
+        "mean": 2.5389391999997315,
+        "stddev": 0.17582706416760926,
+        "min": 2.251470999999583,
+        "max": 2.778081999999813,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3902984,
+          "retainedBytes": 3914656,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902984,
+          "retainedBytes": 3914656,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902984,
+          "retainedBytes": 3914656,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902984,
+          "retainedBytes": 3914656,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902984,
+          "retainedBytes": 3914656,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3902984,
-          "p95": 3902984,
-          "mean": 3902984,
+          "median": 3914656,
+          "p95": 3914656,
+          "mean": 3914656,
           "stddev": 0,
-          "min": 3902984,
-          "max": 3902984,
+          "min": 3914656,
+          "max": 3914656,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3213,56 +3213,56 @@
       "id": "sumproduct-matrix-edit",
       "size": 100000,
       "samplesMs": [
-        2.0346709999994346,
-        2.1380299999982526,
-        2.0087509999993927,
-        2.0060689999991155,
-        2.042145999999775
+        2.0083420000000842,
+        1.9414880000003905,
+        2.003429999999753,
+        1.9642480000002251,
+        2.0245910000003278
       ],
       "stat": {
-        "median": 2.0346709999994346,
-        "p95": 2.118853199998557,
-        "mean": 2.045933399999194,
-        "stddev": 0.048155313395321746,
-        "min": 2.0060689999991155,
-        "max": 2.1380299999982526,
+        "median": 2.003429999999753,
+        "p95": 2.021341200000279,
+        "mean": 1.988419800000156,
+        "stddev": 0.0307162029970246,
+        "min": 1.9414880000003905,
+        "max": 2.0245910000003278,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 2732982,
+          "retainedBytes": 2742554,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2732982,
+          "retainedBytes": 2742554,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2732982,
+          "retainedBytes": 2742554,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2732982,
+          "retainedBytes": 2742554,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2732982,
+          "retainedBytes": 2742554,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 2732982,
-          "p95": 2732982,
-          "mean": 2732982,
+          "median": 2742554,
+          "p95": 2742554,
+          "mean": 2742554,
           "stddev": 0,
-          "min": 2732982,
-          "max": 2732982,
+          "min": 2742554,
+          "max": 2742554,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3290,56 +3290,56 @@
       "id": "criteria-multi-range-edit",
       "size": 100000,
       "samplesMs": [
-        6.632755000000543,
-        6.302934999999707,
-        6.111802999999782,
-        6.067039999999906,
-        6.2809049999996205
+        5.551779999999781,
+        5.806412999999338,
+        5.860936000000038,
+        5.773000999999567,
+        5.773979000000509
       ],
       "stat": {
-        "median": 6.2809049999996205,
-        "p95": 6.566791000000376,
-        "mean": 6.279087599999912,
-        "stddev": 0.19929924902802898,
-        "min": 6.067039999999906,
-        "max": 6.632755000000543,
+        "median": 5.773979000000509,
+        "p95": 5.850031399999898,
+        "mean": 5.753221799999847,
+        "stddev": 0.10567168923683408,
+        "min": 5.551779999999781,
+        "max": 5.860936000000038,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 5203622,
+          "retainedBytes": 5217646,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 5203622,
+          "retainedBytes": 5217646,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 5203622,
+          "retainedBytes": 5217646,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 5203622,
+          "retainedBytes": 5217646,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 5203622,
+          "retainedBytes": 5217646,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 5203622,
-          "p95": 5203622,
-          "mean": 5203622,
+          "median": 5217646,
+          "p95": 5217646,
+          "mean": 5217646,
           "stddev": 0,
-          "min": 5203622,
-          "max": 5203622,
+          "min": 5217646,
+          "max": 5217646,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3367,56 +3367,56 @@
       "id": "sum-multi-range",
       "size": 100000,
       "samplesMs": [
-        4.232276999999158,
-        4.604887999999846,
-        4.277239000000918,
-        4.3768810000001395,
-        4.42423300000155
+        4.507098999999471,
+        4.552021999999852,
+        4.619838000000527,
+        4.592254999999568,
+        4.490643000000091
       ],
       "stat": {
-        "median": 4.3768810000001395,
-        "p95": 4.568757000000187,
-        "mean": 4.3831036000003225,
-        "stddev": 0.1302878698723079,
-        "min": 4.232276999999158,
-        "max": 4.604887999999846,
+        "median": 4.552021999999852,
+        "p95": 4.614321400000335,
+        "mean": 4.552371399999902,
+        "stddev": 0.04899500242529533,
+        "min": 4.490643000000091,
+        "max": 4.619838000000527,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3902977,
+          "retainedBytes": 3914622,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902977,
+          "retainedBytes": 3914622,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902977,
+          "retainedBytes": 3914622,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902977,
+          "retainedBytes": 3914622,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3902977,
+          "retainedBytes": 3914622,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3902977,
-          "p95": 3902977,
-          "mean": 3902977,
+          "median": 3914622,
+          "p95": 3914622,
+          "mean": 3914622,
           "stddev": 0,
-          "min": 3902977,
-          "max": 3902977,
+          "min": 3914622,
+          "max": 3914622,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3444,56 +3444,56 @@
       "id": "sumifs-3-criteria",
       "size": 100000,
       "samplesMs": [
-        14.35917900000095,
-        14.686530000000857,
-        14.02912599999945,
-        14.826274000000922,
-        14.286160999999993
+        7.432606999999734,
+        7.2894790000000285,
+        7.299587999999858,
+        7.143001000000368,
+        7.292133000000831
       ],
       "stat": {
-        "median": 14.35917900000095,
-        "p95": 14.798325200000908,
-        "mean": 14.437454000000434,
-        "stddev": 0.28599585634601277,
-        "min": 14.02912599999945,
-        "max": 14.826274000000922,
+        "median": 7.292133000000831,
+        "p95": 7.406003199999759,
+        "mean": 7.2913616000001635,
+        "stddev": 0.09168745121445435,
+        "min": 7.143001000000368,
+        "max": 7.432606999999734,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 6503465,
+          "retainedBytes": 6519829,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 6503465,
+          "retainedBytes": 6519829,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 6503465,
+          "retainedBytes": 6519829,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 6503465,
+          "retainedBytes": 6519829,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 6503465,
+          "retainedBytes": 6519829,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 6503465,
-          "p95": 6503465,
-          "mean": 6503465,
+          "median": 6519829,
+          "p95": 6519829,
+          "mean": 6519829,
           "stddev": 0,
-          "min": 6503465,
-          "max": 6503465,
+          "min": 6519829,
+          "max": 6519829,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3521,56 +3521,56 @@
       "id": "countif-100k",
       "size": 100000,
       "samplesMs": [
-        1.5081969999991998,
-        1.5269120000011753,
-        1.5046480000000884,
-        1.855359999999564,
-        1.494275999999445
+        1.1108110000004672,
+        1.105532999999923,
+        1.086699999999837,
+        1.1379180000003544,
+        1.1411819999993895
       ],
       "stat": {
-        "median": 1.5081969999991998,
-        "p95": 1.7896703999998862,
-        "mean": 1.5778785999998945,
-        "stddev": 0.13914105256395728,
-        "min": 1.494275999999445,
-        "max": 1.855359999999564,
+        "median": 1.1108110000004672,
+        "p95": 1.1405291999995826,
+        "mean": 1.1164287999999942,
+        "stddev": 0.020535755699711302,
+        "min": 1.086699999999837,
+        "max": 1.1411819999993895,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 2602908,
+          "retainedBytes": 2612213,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2602908,
+          "retainedBytes": 2612213,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2602908,
+          "retainedBytes": 2612213,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2602908,
+          "retainedBytes": 2612213,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2602908,
+          "retainedBytes": 2612213,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 2602908,
-          "p95": 2602908,
-          "mean": 2602908,
+          "median": 2612213,
+          "p95": 2612213,
+          "mean": 2612213,
           "stddev": 0,
-          "min": 2602908,
-          "max": 2602908,
+          "min": 2612213,
+          "max": 2612213,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3598,56 +3598,56 @@
       "id": "unicode-text-date-edit",
       "size": 1000,
       "samplesMs": [
-        1.1158720000003086,
-        0.9725819999985106,
-        0.9675719999995636,
-        1.0086260000007314,
-        1.0428780000002007
+        1.0717459999996208,
+        1.064795000000231,
+        1.0708300000005693,
+        1.1972700000005716,
+        1.0191999999988184
       ],
       "stat": {
-        "median": 1.0086260000007314,
-        "p95": 1.101273200000287,
-        "mean": 1.021505999999863,
-        "stddev": 0.054461055575963264,
-        "min": 0.9675719999995636,
-        "max": 1.1158720000003086,
+        "median": 1.0708300000005693,
+        "p95": 1.1721652000003815,
+        "mean": 1.0847681999999623,
+        "stddev": 0.05952919230943477,
+        "min": 1.0191999999988184,
+        "max": 1.1972700000005716,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 1191522,
+          "retainedBytes": 1218714,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 1191522,
+          "retainedBytes": 1218714,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 1191522,
+          "retainedBytes": 1218714,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 1191522,
+          "retainedBytes": 1218714,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 1191522,
+          "retainedBytes": 1218714,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 1191522,
-          "p95": 1191522,
-          "mean": 1191522,
+          "median": 1218714,
+          "p95": 1218714,
+          "mean": 1218714,
           "stddev": 0,
-          "min": 1191522,
-          "max": 1191522,
+          "min": 1218714,
+          "max": 1218714,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3675,56 +3675,56 @@
       "id": "percentile-covariance",
       "size": 100000,
       "samplesMs": [
-        3.8865939999996044,
-        3.7111670000012964,
-        3.7202140000008512,
-        3.6779659999992873,
-        3.7421679999988555
+        3.009618000000046,
+        3.1083419999995385,
+        3.1564049999997223,
+        3.501713000001473,
+        3.6917000000012195
       ],
       "stat": {
-        "median": 3.7202140000008512,
-        "p95": 3.857708799999455,
-        "mean": 3.747621799999979,
-        "stddev": 0.0724914984321067,
-        "min": 3.6779659999992873,
-        "max": 3.8865939999996044,
+        "median": 3.1564049999997223,
+        "p95": 3.65370260000127,
+        "mean": 3.2935556000004,
+        "stddev": 0.25906886799729734,
+        "min": 3.009618000000046,
+        "max": 3.6917000000012195,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3903305,
+          "retainedBytes": 3914950,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3903305,
+          "retainedBytes": 3914950,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3903305,
+          "retainedBytes": 3914950,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3903305,
+          "retainedBytes": 3914950,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 3903305,
+          "retainedBytes": 3914950,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3903305,
-          "p95": 3903305,
-          "mean": 3903305,
+          "median": 3914950,
+          "p95": 3914950,
+          "mean": 3914950,
           "stddev": 0,
-          "min": 3903305,
-          "max": 3903305,
+          "min": 3914950,
+          "max": 3914950,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3752,56 +3752,56 @@
       "id": "let-reuse-edit",
       "size": 100000,
       "samplesMs": [
-        0.660848999999871,
-        0.6700110000001587,
-        0.6909140000007028,
-        0.7832029999990482,
-        0.6536379999997735
+        0.6631699999998091,
+        0.6728919999986829,
+        0.6544170000015583,
+        0.6954750000004424,
+        0.6700849999997445
       ],
       "stat": {
-        "median": 0.6700110000001587,
-        "p95": 0.7647451999993791,
-        "mean": 0.6917229999999108,
-        "stddev": 0.04742220350393484,
-        "min": 0.6536379999997735,
-        "max": 0.7832029999990482,
+        "median": 0.6700849999997445,
+        "p95": 0.6909584000000905,
+        "mean": 0.6712078000000474,
+        "stddev": 0.013707891149030515,
+        "min": 0.6544170000015583,
+        "max": 0.6954750000004424,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 2603271,
+          "retainedBytes": 2612603,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2603271,
+          "retainedBytes": 2612603,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2603271,
+          "retainedBytes": 2612603,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2603271,
+          "retainedBytes": 2612603,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 2603271,
+          "retainedBytes": 2612603,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 2603271,
-          "p95": 2603271,
-          "mean": 2603271,
+          "median": 2612603,
+          "p95": 2612603,
+          "mean": 2612603,
           "stddev": 0,
-          "min": 2603271,
-          "max": 2603271,
+          "min": 2612603,
+          "max": 2612603,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3829,56 +3829,56 @@
       "id": "let-repeat",
       "size": 100000,
       "samplesMs": [
-        1.9974830000010115,
-        2.0006219999995665,
-        2.060347999999067,
-        2.015175000000454,
-        2.0326089999998658
+        2.003899999999703,
+        1.964321999999811,
+        1.9600930000015069,
+        1.9865890000000945,
+        1.9587869999995746
       ],
       "stat": {
-        "median": 2.015175000000454,
-        "p95": 2.0548001999992267,
-        "mean": 2.021247399999993,
-        "stddev": 0.023173134225168014,
-        "min": 1.9974830000010115,
-        "max": 2.060347999999067,
+        "median": 1.964321999999811,
+        "p95": 2.0004377999997813,
+        "mean": 1.974738200000138,
+        "stddev": 0.017710290380218492,
+        "min": 1.9587869999995746,
+        "max": 2.003899999999703,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 5203510,
+          "retainedBytes": 5217534,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203510,
+          "retainedBytes": 5217534,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203510,
+          "retainedBytes": 5217534,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203510,
+          "retainedBytes": 5217534,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         },
         {
-          "retainedBytes": 5203510,
+          "retainedBytes": 5217534,
           "peakTransientBytes": 1600000,
           "transientAllocations": 2
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 5203510,
-          "p95": 5203510,
-          "mean": 5203510,
+          "median": 5217534,
+          "p95": 5217534,
+          "mean": 5217534,
           "stddev": 0,
-          "min": 5203510,
-          "max": 5203510,
+          "min": 5217534,
+          "max": 5217534,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3906,56 +3906,56 @@
       "id": "iterative-finance",
       "size": 1000,
       "samplesMs": [
-        3.925547999999253,
-        3.1959640000004583,
-        3.117623000000094,
-        3.114184000000023,
-        3.6477579999991576
+        3.759369000001243,
+        3.7343550000005052,
+        3.792959999998857,
+        3.967727000001105,
+        3.464864999999918
       ],
       "stat": {
-        "median": 3.1959640000004583,
-        "p95": 3.869989999999234,
-        "mean": 3.400215399999797,
-        "stddev": 0.3288290559429761,
-        "min": 3.114184000000023,
-        "max": 3.925547999999253,
+        "median": 3.759369000001243,
+        "p95": 3.9327736000006555,
+        "mean": 3.7438552000003256,
+        "stddev": 0.16167642234120422,
+        "min": 3.464864999999918,
+        "max": 3.967727000001105,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 872472,
+          "retainedBytes": 899664,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 872472,
+          "retainedBytes": 899664,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 872472,
+          "retainedBytes": 899664,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 872472,
+          "retainedBytes": 899664,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 872472,
+          "retainedBytes": 899664,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 872472,
-          "p95": 872472,
-          "mean": 872472,
+          "median": 899664,
+          "p95": 899664,
+          "mean": 899664,
           "stddev": 0,
-          "min": 872472,
-          "max": 872472,
+          "min": 899664,
+          "max": 899664,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -3983,56 +3983,56 @@
       "id": "incremental-dependency-closure-edit",
       "size": 100000,
       "samplesMs": [
-        0.02904300000045623,
-        0.019367000000784174,
-        0.019086000000243075,
-        0.02010800000061863,
-        0.020072999999683816
+        0.031735000000480795,
+        0.019324999999298598,
+        0.020900999999867054,
+        0.02379800000016985,
+        0.021394999999756692
       ],
       "stat": {
-        "median": 0.020072999999683816,
-        "p95": 0.02725600000048871,
-        "mean": 0.021535400000357186,
-        "stddev": 0.0037746963110008606,
-        "min": 0.019086000000243075,
-        "max": 0.02904300000045623,
+        "median": 0.021394999999756692,
+        "p95": 0.030147600000418606,
+        "mean": 0.023430799999914598,
+        "stddev": 0.004393097695602339,
+        "min": 0.019324999999298598,
+        "max": 0.031735000000480795,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 72063761,
+          "retainedBytes": 75507857,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 72063761,
+          "retainedBytes": 75507857,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 72063761,
+          "retainedBytes": 75507857,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 72063761,
+          "retainedBytes": 75507857,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         },
         {
-          "retainedBytes": 72063761,
+          "retainedBytes": 75507857,
           "peakTransientBytes": 0,
           "transientAllocations": 0
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 72063761,
-          "p95": 72063761,
-          "mean": 72063761,
+          "median": 75507857,
+          "p95": 75507857,
+          "mean": 75507857,
           "stddev": 0,
-          "min": 72063761,
-          "max": 72063761,
+          "min": 75507857,
+          "max": 75507857,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -4060,56 +4060,56 @@
       "id": "spill-sequence-admission",
       "size": 100000,
       "samplesMs": [
-        11.31174800000008,
-        10.063748000000487,
-        11.098588999999265,
-        11.021081000000777,
-        10.313130999998975
+        14.135846999999558,
+        13.84408600000097,
+        13.39817199999925,
+        13.496825000000172,
+        12.908857000000353
       ],
       "stat": {
-        "median": 11.021081000000777,
-        "p95": 11.269116199999917,
-        "mean": 10.761659399999917,
-        "stddev": 0.4840819429826803,
-        "min": 10.063748000000487,
-        "max": 11.31174800000008,
+        "median": 13.496825000000172,
+        "p95": 14.07749479999984,
+        "mean": 13.55675740000006,
+        "stddev": 0.41627362135715634,
+        "min": 12.908857000000353,
+        "max": 14.135846999999558,
         "iters": 5
       },
       "allocationSamples": [
         {
-          "retainedBytes": 3252343,
+          "retainedBytes": 4058055,
           "peakTransientBytes": 1600000,
           "transientAllocations": 1
         },
         {
-          "retainedBytes": 3252343,
+          "retainedBytes": 4058055,
           "peakTransientBytes": 1600000,
           "transientAllocations": 1
         },
         {
-          "retainedBytes": 3252343,
+          "retainedBytes": 4058055,
           "peakTransientBytes": 1600000,
           "transientAllocations": 1
         },
         {
-          "retainedBytes": 3252343,
+          "retainedBytes": 4058055,
           "peakTransientBytes": 1600000,
           "transientAllocations": 1
         },
         {
-          "retainedBytes": 3252343,
+          "retainedBytes": 4058055,
           "peakTransientBytes": 1600000,
           "transientAllocations": 1
         }
       ],
       "allocationStat": {
         "retainedBytes": {
-          "median": 3252343,
-          "p95": 3252343,
-          "mean": 3252343,
+          "median": 4058055,
+          "p95": 4058055,
+          "mean": 4058055,
           "stddev": 0,
-          "min": 3252343,
-          "max": 3252343,
+          "min": 4058055,
+          "max": 4058055,
           "iters": 5
         },
         "peakTransientBytes": {
@@ -4142,11 +4142,11 @@
     },
     {
       "formulas": 10000,
-      "wasmDeltaBytes": 5832704
+      "wasmDeltaBytes": 6291456
     },
     {
       "formulas": 100000,
-      "wasmDeltaBytes": 52887552
+      "wasmDeltaBytes": 53542912
     }
   ],
   "gates": {
