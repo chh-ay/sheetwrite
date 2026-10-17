@@ -8,8 +8,22 @@ description: "Load one WASM engine before createGrid."
 Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
 Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
 
+### Examples
+
+```ts compile
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+### See also
+
+- [/docs/guides/formulas/](/docs/guides/formulas/)
+- [createGrid](/docs/api/core/create-grid/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L293"><code>packages/core/src/grid.ts#L293</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L303"><code>packages/core/src/grid.ts#L303</code></a></dd></div>
 </dl>
 
 ## Declaration

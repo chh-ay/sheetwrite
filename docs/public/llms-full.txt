@@ -9737,6 +9737,16 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
@@ -9767,8 +9777,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -9834,6 +9876,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -9841,6 +9893,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type
@@ -10205,6 +10268,16 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
@@ -10235,8 +10308,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -10302,6 +10407,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -10309,6 +10424,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type
@@ -10656,6 +10782,16 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
@@ -10686,8 +10822,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -10753,6 +10921,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -10760,6 +10938,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type

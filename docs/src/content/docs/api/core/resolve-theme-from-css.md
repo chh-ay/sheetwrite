@@ -8,7 +8,7 @@ description: "Read --sheetwrite- CSS custom properties into a partial theme."
 Read `--sheetwrite-*` CSS custom properties into a partial theme.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L310"><code>packages/core/src/grid.ts#L310</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L320"><code>packages/core/src/grid.ts#L320</code></a></dd></div>
 </dl>
 
 ## Declaration
