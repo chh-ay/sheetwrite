@@ -21,6 +21,8 @@ bun run verify:ci
 
 Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm`.
 
+A change to the engine (the Rust source in `packages/wasm`, which also builds `@sheetwrite/formulas`) or to its TypeScript callers must also pass two benchmark checks before it merges, not only at the release capture. Run the formula gate, `bun run src/formula-bench.ts` from `bench/`, which compares a fresh capture with the committed baseline. Run the engine memory probe described in [`bench/README.md`](bench/README.md#engine-memory-release-gate). Retained bytes are deterministic, so any growth must be fixed or approved in the same change, with a measured reason in `bench/results/formula-baseline-approvals.json` (see [the formula-engine protocol](bench/README.md#formula-engine-protocol)).
+
 `verify:ci` is the broadest local pre-submit gate, though not a complete mirror of the pipeline — CI additionally runs the full browser matrix, coverage, and the production docs build. Matched timing comparisons run deliberately through the local protocol in `bench/README.md`, not as a required CI job. `verify:ci` prints `::workspace-node::<id>` before each step; `bun scripts/workspace-tooling.ts verify-ci --dry-run` lists every id with the exact command it runs, so you can re-run just the step that failed. [`scripts/README.md`](scripts/README.md) explains how the repository's scripts are organised and which handful you actually need.
 
 Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are owned by `bun run docs:generate`. Do not hand-edit generated files. `bun run docs:check` rejects stale output, including the AI-readable endpoints. Build output, benchmark evidence, and release artifacts remain uncommitted.

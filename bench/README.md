@@ -194,6 +194,63 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
+A full `bench:formula` capture compares every row with the committed
+`results/formula-results.json` and stops on the first exceedance. A timing
+median may reach `max(baseline × 1.25, baseline + 0.1 ms)`. The p95 has the
+same limit, but only for workloads whose baseline median is at least 1 ms:
+with five samples, p95 is the slowest single sample, and below 1 ms that
+sample is dominated by GC and timer noise (the 0.5.0 A/A study measured a
+33–466% spread on those rows). Retained bytes, peak transient bytes, transient
+allocation counts, and the isolated WASM deltas may not grow at all.
+
+A baseline must itself carry a passed gate, so a regression the maintainer has
+reviewed and accepted cannot be recorded by recapturing the baseline. It is
+recorded in `results/formula-baseline-approvals.json` instead:
+
+```json
+{
+  "baselineCommit": "<meta.commit of formula-results.json>",
+  "baselineSourceDigest": "<source.digest of formula-results.json>",
+  "approvals": [
+    {
+      "workload": "linear-chain",
+      "size": 8,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 9283,
+      "reason": "+4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "field": "memory.10000.wasmDeltaBytes",
+      "maximum": 6291520,
+      "reason": "+524,288 B from the FormulaEntry spill-reference flag (e725d980)"
+    }
+  ]
+}
+```
+
+Use it only for an exceedance that has been measured and explained: a
+deterministic byte cost of a reviewed design, or a timing row whose A/A spread
+on this machine is wider than the gate's tolerance. Every row needs a reason
+that names its measurement; "noise" or "expected" is not a reason. A workload
+row names `workload`, `size`, and one of `median`, `p95` (only where the gate
+checks it), `allocation.retainedBytes.median`, or
+`allocation.retainedBytes.p95`; an aggregate memory row names only
+`memory.<formulas>.wasmDeltaBytes`. Peak transient bytes and transient
+allocation counts cannot be approved. `maximum` is the highest candidate value
+the row may reach: the observed value plus a stated margin, the measured A/A
+spread for timing rows and a small fixed margin for byte rows, which are
+deterministic. A listed row passes at or below its maximum; every other row
+keeps the baseline rule. The gate rejects the file if it has unknown keys,
+duplicate rows, rows missing from the baseline or not checked by it, a blank
+reason, or a maximum that is not a positive number (whole bytes for byte rows).
+
+The file is bound to the baseline it amends. Once `formula-results.json` is
+recaptured, its approvals are stale and the gate rejects them: delete the file
+in the change that records the new baseline, or review every row again against
+it. The passed gate record in `formula-results.json` keeps its exact schema,
+so it does not list the approvals; the committed approval file and its
+`baselineCommit` are the record.
+
 Latest checked capture: `bench:formula:smoke` at
 `2026-07-13T08:56:07Z`, core commit `844da4e`, Bun 1.3.14, linux/x64,
 12th Gen Intel Core i9-12900H (14 cores / 20 logical CPUs). Times are local-run

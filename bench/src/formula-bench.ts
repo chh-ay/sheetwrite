@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
@@ -146,6 +146,26 @@ export interface PassedRegressionGate {
 export interface BlockedRegressionGate {
   status: "blocked";
   blocker: string;
+}
+
+/**
+ * One reviewed exceedance of the committed baseline. Workload rows name the
+ * workload and size; aggregate memory rows carry the formula count in `field`
+ * (`memory.<formulas>.wasmDeltaBytes`) instead.
+ */
+export interface FormulaGateApproval {
+  workload?: string;
+  size?: number;
+  field: string;
+  maximum: number;
+  reason: string;
+}
+
+/** The reviewed approval file, bound to the one baseline it amends. */
+export interface FormulaBaselineApprovals {
+  baselineCommit: string;
+  baselineSourceDigest: string;
+  approvals: FormulaGateApproval[];
 }
 
 export interface FormulaBenchmarkResult extends GateIdentity {
@@ -2260,6 +2280,18 @@ function timingRegressionLimit(baseline: number): number {
   return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + TIMING_REGRESSION_FLOOR_MS);
 }
 
+/**
+ * With five samples, p95 is the slowest single sample. Below a 1 ms baseline
+ * median that sample is dominated by GC and timer noise: the 0.5.0
+ * timing-rounds A/A study measured a 33–466% spread on those rows. Such
+ * workloads gate their median only.
+ */
+const P95_GATE_MIN_BASELINE_MEDIAN_MS = 1;
+
+function gatesP95(baseline: FormulaWorkloadResult): boolean {
+  return baseline.stat.median >= P95_GATE_MIN_BASELINE_MEDIAN_MS;
+}
+
 function validateLegacyFormulaBaseline(result: FormulaBenchmarkResult): void {
   validateArtifactBound(result);
   assertGateIdentity("formula", "full", result);
@@ -2372,14 +2404,167 @@ function validateFormulaBaselineBinding(
   }
 }
 
+const FORMULA_APPROVALS_URL = new URL(
+  "../results/formula-baseline-approvals.json",
+  import.meta.url,
+);
+
+/** Workload gate fields a review may raise, and whether each counts bytes or milliseconds. */
+const APPROVABLE_WORKLOAD_FIELDS: Record<string, "timing" | "bytes"> = {
+  median: "timing",
+  p95: "timing",
+  "allocation.retainedBytes.median": "bytes",
+  "allocation.retainedBytes.p95": "bytes",
+};
+const MEMORY_APPROVAL_FIELD = /^memory\.([1-9]\d*)\.wasmDeltaBytes$/u;
+
+/**
+ * Peak transient bytes and transient allocation counts measure evaluator
+ * scratch work that a storage design has no reason to grow, so no review can
+ * accept them.
+ */
+const UNAPPROVABLE_FIELD = /^allocation\.(?:peakTransientBytes|transientAllocations)\./u;
+
+/** Read the committed approval file; most baselines have none. */
+function readFormulaBaselineApprovals(): FormulaBaselineApprovals | undefined {
+  if (!existsSync(FORMULA_APPROVALS_URL)) return undefined;
+  return JSON.parse(readFileSync(FORMULA_APPROVALS_URL, "utf8")) as FormulaBaselineApprovals;
+}
+
+/** The gate row an approval raises, in the `<row>.<field>` form the gate reports. */
+interface ApprovalTarget {
+  row: string;
+  bytes: boolean;
+}
+
+function approvalTarget(
+  entry: Record<string, unknown>,
+  path: string,
+  baseline: FormulaBenchmarkResult,
+): ApprovalTarget {
+  const field = entry.field;
+  exactString(field, `${path}.field`);
+  if (UNAPPROVABLE_FIELD.test(field)) {
+    throw new Error(`${path}.field ${field} may not be approved`);
+  }
+
+  const memory = MEMORY_APPROVAL_FIELD.exec(field);
+  if (memory) {
+    exactObjectKeys(entry, ["field", "maximum", "reason"], path);
+    const formulas = Number(memory[1]);
+    if (!baseline.memory.some((measured) => measured.formulas === formulas)) {
+      throw new Error(`${path} names memory=formulas=${formulas}, which the baseline lacks`);
+    }
+    return { row: `memory=formulas=${formulas}.wasmDeltaBytes`, bytes: true };
+  }
+
+  if (!Object.hasOwn(APPROVABLE_WORKLOAD_FIELDS, field)) {
+    throw new Error(`${path}.field ${field} is not an approvable gate field`);
+  }
+  exactObjectKeys(entry, ["workload", "size", "field", "maximum", "reason"], path);
+  exactString(entry.workload, `${path}.workload`);
+  if (typeof entry.size !== "number" || !Number.isSafeInteger(entry.size)) {
+    throw new Error(`${path}.size must be an integer`);
+  }
+  const key = formulaWorkloadKey({ id: entry.workload, size: entry.size });
+  const bytes = APPROVABLE_WORKLOAD_FIELDS[field] === "bytes";
+  const previous = baseline.workloads.find((workload) => formulaWorkloadKey(workload) === key);
+  if (previous === undefined || (bytes && previous.allocationStat === undefined)) {
+    throw new Error(`${path} names ${key}.${field}, which the baseline lacks`);
+  }
+  if (field === "p95" && !gatesP95(previous)) {
+    throw new Error(`${path} names ${key}.p95, which the gate does not check`);
+  }
+  return { row: `${key}.${field}`, bytes };
+}
+
+function approvalMaximum(value: unknown, bytes: boolean, path: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new Error(`${path}.maximum must be a positive finite number`);
+  }
+  if (bytes && !Number.isSafeInteger(value)) {
+    throw new Error(`${path}.maximum must be a whole number of bytes`);
+  }
+  return value;
+}
+
+/**
+ * Validate the approval file against the baseline it claims to amend and
+ * return each approved maximum keyed by the gate row it raises. A file for
+ * any other baseline is stale: recapturing the baseline retires every
+ * approval, so the file must be removed or reviewed again.
+ */
+export function formulaApprovalMaximums(
+  approvals: FormulaBaselineApprovals,
+  baseline: FormulaBenchmarkResult,
+): ReadonlyMap<string, number> {
+  exactObjectKeys(
+    approvals,
+    ["baselineCommit", "baselineSourceDigest", "approvals"],
+    "formula baseline approvals",
+  );
+  const identity = formulaRegressionBaselineIdentity(baseline);
+  if (
+    approvals.baselineCommit !== identity.commit ||
+    approvals.baselineSourceDigest !== identity.sourceDigest
+  ) {
+    throw new Error(
+      `formula baseline approvals are stale: they amend ${String(approvals.baselineCommit)}, not the committed baseline ${identity.commit}`,
+    );
+  }
+  if (!Array.isArray(approvals.approvals) || approvals.approvals.length === 0) {
+    throw new Error("formula baseline approvals must list at least one approval");
+  }
+
+  const maximums = new Map<string, number>();
+  for (const [index, approval] of (approvals.approvals as unknown[]).entries()) {
+    const path = `formula baseline approvals[${index}]`;
+    const entry = objectRecord(approval, path);
+    const { row, bytes } = approvalTarget(entry, path, baseline);
+    if (typeof entry.reason !== "string" || entry.reason.trim().length === 0) {
+      throw new Error(`${path}.reason must state the measured reason`);
+    }
+    if (maximums.has(row)) {
+      throw new Error(`${path} duplicates the approval for ${row}`);
+    }
+    maximums.set(row, approvalMaximum(entry.maximum, bytes, path));
+  }
+  return maximums;
+}
+
+/** One compared gate value and the limit the baseline rule allows it. */
+interface GateRow {
+  row: string;
+  baseline: number;
+  candidate: number;
+  ruleLimit: number;
+}
+
+/** A row with a reviewed approval passes up to its approved maximum instead of the baseline rule. */
+function assertWithinGate(gate: GateRow, approved: ReadonlyMap<string, number>): void {
+  const maximum = approved.get(gate.row);
+  const limit = maximum ?? gate.ruleLimit;
+  if (gate.candidate > limit) {
+    throw new Error(
+      `${gate.row} regression: baseline ${gate.baseline}, candidate ${gate.candidate}, ${maximum === undefined ? "limit" : "approved maximum"} ${limit}`,
+    );
+  }
+}
+
 export function validateFormulaRegression(
   candidate: FormulaBenchmarkResult,
   baseline: FormulaBenchmarkResult,
+  approvals?: FormulaBaselineApprovals,
 ): void {
   validateFormulaBaselineBinding(candidate, baseline);
+  const approved =
+    approvals === undefined
+      ? new Map<string, number>()
+      : formulaApprovalMaximums(approvals, baseline);
   const baselineWorkloads = new Map(
     baseline.workloads.map((workload) => [formulaWorkloadKey(workload), workload]),
   );
+
   let comparedWorkloads = 0;
   for (const workload of candidate.workloads) {
     const key = formulaWorkloadKey(workload);
@@ -2387,12 +2572,17 @@ export function validateFormulaRegression(
     if (previous === undefined) continue;
     comparedWorkloads += 1;
     for (const field of ["median", "p95"] as const) {
-      const limit = timingRegressionLimit(previous.stat[field]);
-      if (workload.stat[field] > limit) {
-        throw new Error(
-          `${key}.${field} regression: baseline ${previous.stat[field]}, candidate ${workload.stat[field]}, limit ${limit}`,
-        );
-      }
+      if (field === "p95" && !gatesP95(previous)) continue;
+      const before = previous.stat[field];
+      assertWithinGate(
+        {
+          row: `${key}.${field}`,
+          baseline: before,
+          candidate: workload.stat[field],
+          ruleLimit: timingRegressionLimit(before),
+        },
+        approved,
+      );
     }
     if (previous.allocationStat !== undefined) {
       for (const allocation of [
@@ -2402,12 +2592,15 @@ export function validateFormulaRegression(
       ] as const) {
         for (const field of ["median", "p95"] as const) {
           const before = previous.allocationStat[allocation][field];
-          const after = workload.allocationStat[allocation][field];
-          if (after > before) {
-            throw new Error(
-              `${key}.allocation.${allocation}.${field} regression: baseline ${before}, candidate ${after}`,
-            );
-          }
+          assertWithinGate(
+            {
+              row: `${key}.allocation.${allocation}.${field}`,
+              baseline: before,
+              candidate: workload.allocationStat[allocation][field],
+              ruleLimit: before,
+            },
+            approved,
+          );
         }
       }
     }
@@ -2415,30 +2608,36 @@ export function validateFormulaRegression(
   if (comparedWorkloads === 0) {
     throw new Error("formula regression baseline has no workloads compatible with the candidate");
   }
+
   const baselineMemory = new Map(
     baseline.memory.map((entry) => [entry.formulas, entry.wasmDeltaBytes]),
   );
   for (const memory of candidate.memory) {
     const before = baselineMemory.get(memory.formulas);
     if (before === undefined) continue;
-    if (memory.wasmDeltaBytes > before) {
-      throw new Error(
-        `memory=formulas=${memory.formulas}.wasmDeltaBytes regression: baseline ${before}, candidate ${memory.wasmDeltaBytes}`,
-      );
-    }
+    assertWithinGate(
+      {
+        row: `memory=formulas=${memory.formulas}.wasmDeltaBytes`,
+        baseline: before,
+        candidate: memory.wasmDeltaBytes,
+        ruleLimit: before,
+      },
+      approved,
+    );
   }
 }
 
 export function validateFormulaCapture(
   candidate: FormulaBenchmarkResult,
   baseline?: FormulaBenchmarkResult,
+  approvals?: FormulaBaselineApprovals,
 ): void {
   if (baseline === undefined) {
     validateFormulaEvidence(candidate, candidate.mode, false);
   } else if (candidate.mode === "smoke") {
     validateFormulaBaselineBinding(candidate, baseline);
   } else {
-    validateFormulaRegression(candidate, baseline);
+    validateFormulaRegression(candidate, baseline, approvals);
   }
 }
 
@@ -2503,6 +2702,7 @@ async function runBenchmark(
   }
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
+  let approvals: FormulaBaselineApprovals | undefined;
   if (captureKind === "gated") {
     const rawBaseline = readFileSync(
       new URL("../results/formula-results.json", import.meta.url),
@@ -2526,6 +2726,11 @@ async function runBenchmark(
       validateLegacyFormulaBaseline(parsedBaseline);
     }
     baseline = parsedBaseline;
+
+    // Only the full matrix is compared row by row. A stale or malformed file
+    // fails here, before the capture spends its minutes.
+    approvals = smoke ? undefined : readFormulaBaselineApprovals();
+    if (approvals !== undefined) formulaApprovalMaximums(approvals, baseline);
   }
 
   await initSheetwrite(undefined, engine);
@@ -2577,7 +2782,7 @@ async function runBenchmark(
     },
   };
   validateCurrentCaptureProvenance(result, captureKind, outputPath);
-  validateFormulaCapture(result, baseline);
+  validateFormulaCapture(result, baseline, approvals);
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   if (outputPath === "-") {
     process.stdout.write(serialized);
