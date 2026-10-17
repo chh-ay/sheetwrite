@@ -146,6 +146,7 @@ describe("documentation generation", () => {
       os: "linux",
       arch: "x64",
       cpu: "test",
+      engineVersions: { sheetwrite: "0.4.0", handsontable: "18.1.2" },
       rounds: 2,
       launchAttempts: [],
     },

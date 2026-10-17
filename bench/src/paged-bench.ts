@@ -9,6 +9,7 @@ import {
   SheetwriteStore,
   type Workbook,
 } from "../../packages/core/src/index.js";
+import { validateEngineVersions } from "./engine-versions.js";
 import {
   assertFiniteNonNegative,
   assertGateIdentity,
@@ -19,7 +20,6 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
-import { validateEngineVersions } from "./engine-versions.js";
 import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { type Stat, summarize } from "./stats.js";
 

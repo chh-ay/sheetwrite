@@ -123,10 +123,10 @@ function artifact(): XlsxBenchmarkArtifact {
   };
 }
 
-function comparedArtifact(): XlsxBenchmarkArtifact {
+function comparedArtifact(importDurationMs = 2): XlsxBenchmarkArtifact {
   const currentOnly = artifact();
   const current = currentOnly.samples.map((value) =>
-    value.operation === "import" ? { ...value, durationMs: 2 } : value,
+    value.operation === "import" ? { ...value, durationMs: importDurationMs } : value,
   );
   const baseline = current
     .filter((value) => value.operation !== "reject")
@@ -149,7 +149,7 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
       ([operation, scenario]) => ({
         operation: operation as "import" | "export",
         scenario,
-        medianWallRatio: operation === "import" ? 2 : 1,
+        medianWallRatio: operation === "import" ? importDurationMs : 1,
         peakRssRatio: 1,
       }),
     ),
@@ -158,7 +158,7 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
 
 describe("XLSX benchmark gate", () => {
   it("requires versions for the engines actually measured", () => {
-    const valid = comparedArtifact();
+    const valid = comparedArtifact(1);
     expect(() => validateXlsxBenchmarkArtifact(valid)).not.toThrow();
     for (const engine of ["sheetwrite", "exceljs"] as const) {
       for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {

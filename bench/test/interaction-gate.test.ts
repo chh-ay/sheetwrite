@@ -151,7 +151,7 @@ describe("interaction performance artifact", () => {
   });
 
   test("requires the measured Sheetwrite semantic version", () => {
-    const valid = fixture();
+    const valid = validateInteractionArtifact(fixture());
     for (const version of [undefined, "", "0.4", "^0.4.0"]) {
       expect(() =>
         validateInteractionArtifact({

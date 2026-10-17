@@ -54,6 +54,7 @@ import {
   toAoA,
   toSheetwriteColumnar,
 } from "./dataset.js";
+import { validateEngineVersions } from "./engine-versions.js";
 import {
   assertFiniteNonNegative,
   assertGateIdentity,
@@ -65,7 +66,6 @@ import {
   validateRawStat,
 } from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
-import { validateEngineVersions } from "./engine-versions.js";
 import { packageVersion, protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, type MeasureOptions, mib, ms, type Stat, summarize } from "./stats.js";
 

@@ -1,6 +1,6 @@
+import { validateEngineVersions } from "./engine-versions.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
 import { validateRawStat, validateStat } from "./gate-protocol.js";
-import { validateEngineVersions } from "./engine-versions.js";
 import type { ProtocolCaptureMeta } from "./protocol-meta.js";
 import type { Stat } from "./stats.js";
 
