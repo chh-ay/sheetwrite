@@ -7,12 +7,14 @@
 // XLSX interchange all happen through the public core API.
 
 import type {
+  CellAddress,
   DataSource,
   DataSourcePage,
   Grid,
   GridConfig,
   GridOptions,
   PagedStoreStats,
+  Range,
   RowData,
   Selection,
   SheetId,
@@ -91,56 +93,57 @@ export interface Workbench {
   destroy(): void;
 }
 
-function workbenchGridConfig(events: WorkbenchEvents): GridConfig {
-  let highlighted: { sheet: SheetId; row: number; col: number } | null = null;
-  const clearHighlight = (instance: Grid): void => {
-    instance.highlightCells(null);
-    highlighted = null;
-    events.onActivity("Temporary highlight cleared");
-  };
+/** Fill the "Highlight cell" menu item paints; readers expect Undo to remove it. */
+const HIGHLIGHT_FILL = "#d946ef4d";
 
+function cellRange(cell: CellAddress): Range {
+  return { sheet: cell.sheet, start: { row: cell.row, col: cell.col }, end: cell };
+}
+
+/**
+ * A highlight is a real cell fill, so it is one undoable edit like any other
+ * formatting: Ctrl+Z removes it, and it survives export. Clearing restores the
+ * cell's other formatting in the same transaction.
+ */
+function setHighlight(grid: Grid, cell: CellAddress, on: boolean): void {
+  const { backgroundColor: _previousFill, ...otherStyle } = grid.store.getCell(cell).style;
+  const range = cellRange(cell);
+  grid.applyTransaction({
+    patches: on
+      ? [{ op: "setRangeStyle", range, style: { backgroundColor: HIGHLIGHT_FILL } }]
+      : [
+          { op: "setRangeStyle", range, style: null },
+          { op: "setRangeStyle", range, style: otherStyle },
+        ],
+  });
+}
+
+function workbenchGridConfig(events: WorkbenchEvents, grid: () => Grid | null): GridConfig {
   return {
     toolbar: false,
     contextMenu: (context) => {
-      const isHighlighted =
-        context.cell !== null &&
-        highlighted?.sheet === context.cell.sheet &&
-        highlighted?.row === context.cell.row &&
-        highlighted?.col === context.cell.col;
+      const cell = context.cell;
+      const highlighted =
+        cell !== null && grid()?.store.getCell(cell).style.backgroundColor === HIGHLIGHT_FILL;
       return [
         { id: "copy", action: "copy", label: "Copy value", shortcut: "copy" },
         { action: "separator" },
         {
           id: "highlight-cell",
-          label: isHighlighted
-            ? "Clear highlight"
-            : context.cell === null
-              ? "Highlight cell (temporary)"
-              : `Highlight cell R${context.cell.row + 1} C${context.cell.col + 1} (temporary)`,
-          visible: context.cell !== null,
-          onClick(instance, cell) {
-            if (isHighlighted) {
-              clearHighlight(instance);
-              return;
-            }
-            if (cell === null) return;
-            highlighted = cell;
-            instance.highlightCells([
-              {
-                sheet: cell.sheet,
-                start: { row: cell.row, col: cell.col },
-                end: { row: cell.row, col: cell.col },
-                color: "rgba(217, 70, 239, 0.28)",
-              },
-            ]);
-            events.onActivity(`Temporary highlight at R${cell.row + 1} C${cell.col + 1}`);
+          label:
+            cell === null
+              ? "Highlight cell"
+              : highlighted
+                ? `Clear highlight R${cell.row + 1} C${cell.col + 1}`
+                : `Highlight cell R${cell.row + 1} C${cell.col + 1}`,
+          visible: cell !== null,
+          onClick(instance, target) {
+            if (target === null) return;
+            setHighlight(instance, target, !highlighted);
+            events.onActivity(
+              `${highlighted ? "Highlight cleared" : "Highlighted"} R${target.row + 1} C${target.col + 1} · Ctrl+Z undoes it`,
+            );
           },
-        },
-        {
-          id: "clear-highlight",
-          label: "Clear highlight",
-          visible: highlighted !== null && !isHighlighted,
-          onClick: clearHighlight,
         },
         { action: "separator" },
         { action: "exportXlsx" },
@@ -231,10 +234,13 @@ export function createWorkbench(
 
   // Construction-bound options are decided here and only here. Changing
   // any of them means destroying this generation and creating a new one.
+  // The menu reads cell fills from the live grid, which exists only after
+  // construction; the getter keeps the config construction-bound.
+  let grid: Grid | null = null;
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
     presentation: "data-grid",
     theme: ENGINE_THEME,
-    config: workbenchGridConfig(events),
+    config: workbenchGridConfig(events, () => grid),
     renderer: spec.renderer,
     ...(spec.renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
   };
@@ -257,7 +263,6 @@ export function createWorkbench(
     for (const column of sheet.columns) column.width = Math.ceil(column.width * columnScale);
   }
 
-  let grid: Grid;
   try {
     if (spec.snapshot !== undefined) {
       grid = createGridFromSnapshot(gridHost, spec.snapshot, base);

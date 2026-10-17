@@ -8,4 +8,4 @@ API change: a key combination is a string such as `"Mod+Shift+K"` or `"Ctrl+Alt+
 
 A context-menu item with a key combination and an `onClick` now runs `onClick` when the grid has focus and the user presses that combination. A combination with `Mod`, `Ctrl` or `Meta` also works in the inline editor. Two commands with the same combination throw a `SheetwriteError` with code `shortcut-conflict`; a malformed combination throws `invalid-shortcut`.
 
-Document `highlightCells(null)` to clear temporary highlights. Update showcase menus for their tasks and add a clear action and host event log entries to the Vanilla highlight menu.
+Document `highlightCells(null)` to clear temporary highlights. Update showcase menus for their tasks. The Vanilla "Highlight cell" menu item now applies a cell fill, so Undo removes it, and the same item clears it.
