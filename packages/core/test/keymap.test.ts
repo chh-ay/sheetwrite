@@ -360,6 +360,66 @@ describe("custom key combinations", () => {
     }
   });
 
+  it("runs Mod or Ctrl + Shift combinations with letters, digits and symbols", () => {
+    setPlatform("Linux x86_64");
+    const host = mountHost();
+    const runs: string[] = [];
+    const item = (id: string, shortcut: KeyShortcut) => ({
+      id,
+      label: id,
+      shortcut,
+      onClick: () => runs.push(id),
+    });
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: makeColumnarData(3),
+      config: {
+        contextMenu: [
+          item("letter", "Mod+Shift+K"),
+          item("digit", "Ctrl+Shift+1"),
+          item("symbol", "Mod+Shift+/"),
+          item("alt", "Mod+Alt+L"),
+        ],
+      },
+    });
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      // With Shift held, the browser reports the shifted character in `key`.
+      press(host, "K", { ctrlKey: true, shiftKey: true, code: "KeyK" });
+      press(host, "!", { ctrlKey: true, shiftKey: true, code: "Digit1" });
+      press(host, "?", { ctrlKey: true, shiftKey: true, code: "Slash" });
+      press(host, "¬", { ctrlKey: true, altKey: true, code: "KeyL" });
+      // A plain "1" without Shift must not run the Shift+1 command.
+      press(host, "1", { ctrlKey: true, code: "Digit1" });
+      expect(runs).toEqual(["letter", "digit", "symbol", "alt"]);
+    } finally {
+      grid.destroy();
+    }
+  });
+
+  it("keeps letter meaning on other layouts: AZERTY A on the Q key is A", () => {
+    setPlatform("Linux x86_64");
+    const host = mountHost();
+    const runs: string[] = [];
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: makeColumnarData(3),
+      config: {
+        contextMenu: [
+          { id: "a", label: "A", shortcut: "Mod+Shift+A", onClick: () => runs.push("a") },
+          { id: "q", label: "Q", shortcut: "Mod+Shift+Q", onClick: () => runs.push("q") },
+        ],
+      },
+    });
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      press(host, "A", { ctrlKey: true, shiftKey: true, code: "KeyQ" });
+      expect(runs).toEqual(["a"]);
+    } finally {
+      grid.destroy();
+    }
+  });
+
   it("rejects malformed combinations from untyped callers", () => {
     // The type already rejects "Hyper+K"; JavaScript callers still reach the parser.
     const malformed = ["Mod+", "Hyper+K", "Shift+Shift+K", "Ctrl+Alt"] as unknown as KeyShortcut[];

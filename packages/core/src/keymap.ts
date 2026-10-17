@@ -192,9 +192,39 @@ function acceptedModifiers(shortcut: ParsedShortcut): ReadonlyArray<readonly [bo
     : [[shortcut.ctrl, shortcut.meta]];
 }
 
+/** Unshifted US-layout characters for the punctuation `KeyboardEvent.code` values. */
+const PUNCTUATION_CODES: Readonly<Record<string, string>> = {
+  Minus: "-",
+  Equal: "=",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Semicolon: ";",
+  Quote: "'",
+  Comma: ",",
+  Period: ".",
+  Slash: "/",
+  Backquote: "`",
+};
+
+/**
+ * The key a shortcut names when Shift or Alt changed the typed character:
+ * Shift+1 types "!" and Option+K types "˚", but "Mod+Shift+1" names the 1 key.
+ * Only a typed symbol falls back to the physical key, so a letter or digit
+ * typed on another layout (AZERTY "a" on the Q key) still matches by meaning.
+ */
+function physicalKey(event: KeyboardEvent, typed: string): string | undefined {
+  if (!event.shiftKey && !event.altKey) return undefined;
+  if (typed.length !== 1 || /[\p{L}\p{N}]/u.test(typed)) return undefined;
+  const code = event.code;
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  return PUNCTUATION_CODES[code];
+}
+
 function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShortcut): boolean {
   return (
-    key === shortcut.key &&
+    (key === shortcut.key || physicalKey(event, key) === shortcut.key) &&
     event.shiftKey === shortcut.shift &&
     event.altKey === shortcut.alt &&
     acceptedModifiers(shortcut).some(
