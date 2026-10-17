@@ -1,4 +1,5 @@
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
+import { actionFeedbackFor } from "./action-feedback.js";
 import type {
   ContextMenuActionName,
   ContextMenuContext,
@@ -63,7 +64,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
 function actionHandler(
   action: ContextMenuActionName | undefined,
   actions: GridActions,
-): () => void {
+): () => unknown {
   switch (action) {
     case "cut":
       return () => actions.cut();
@@ -243,9 +244,14 @@ export class ContextMenu {
       const run = item.onClick
         ? () => item.onClick?.(this.grid, context.cell)
         : actionHandler(action, this.actions);
+      const key = item.id ?? action ?? label.textContent ?? "item";
       row.addEventListener("click", () => {
         if (disabled) return;
-        run();
+        // The menu closes at once; a refused clipboard or a failed export
+        // still reaches the user through the grid's action status.
+        const feedback = actionFeedbackFor(this.grid);
+        if (feedback) void feedback.run(key, run);
+        else run();
         this.close();
       });
       this.el.appendChild(row);

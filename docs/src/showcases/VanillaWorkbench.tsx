@@ -2,8 +2,16 @@ import type { PagedStoreStats, Selection, WorkbookSnapshot } from "@sheetwrite/c
 import { initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
+import { isRepeatClick } from "../lib/action-guard.js";
+import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import { ENGINE_THEME } from "./scenarios/engine.js";
 import { DemoButton } from "./ui/DemoButton.js";
 import { DemoRadioGroup, DemoRadioItem } from "./ui/DemoRadioGroup.js";
@@ -100,6 +108,8 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
   const [activity, setActivity] = useState<string | null>(null);
   const [scenario, setScenario] = useState<WorkbenchScenario>("lifecycle");
   const scenarioTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const exportAction = useAction();
+  const importAction = useAction();
 
   // The URL owns the construction options, but /vanilla/ is prerendered
   // without a query string: the first client render must match that HTML.
@@ -242,6 +252,13 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     record("Grid destroyed — no listeners, chrome, or canvas survive teardown");
   }
 
+  function toggleGrid(event: ReactMouseEvent<HTMLButtonElement>): void {
+    // A double-click would destroy and then immediately re-create the grid.
+    if (isRepeatClick(event) || transitioning) return;
+    if (alive) destroyWorkbench();
+    else setAlive(true);
+  }
+
   function toggleReadOnly(next: boolean): void {
     readOnlyRef.current = next;
     setReadOnly(next);
@@ -273,33 +290,39 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     });
   }
 
-  async function exportWorkbook(): Promise<void> {
+  function exportWorkbook(): void {
     const workbench = workbenchRef.current;
     if (workbench === null) return;
-    try {
-      const bytes = await exportWorkbookXlsx(workbench.grid, "sheetwrite-workbench.xlsx");
-      record(`Exported workbook — ${kilobytes.format(bytes / 1024)} KB of XLSX`);
-    } catch (error) {
-      record(describeActionError(error));
-    }
+    void exportAction.run(
+      async () => {
+        const bytes = await exportWorkbookXlsx(workbench.grid, "sheetwrite-workbench.xlsx");
+        record(`Exported workbook — ${kilobytes.format(bytes / 1024)} KB of XLSX`);
+      },
+      (error) => `Export failed: ${describeActionError(error)} Try again.`,
+    );
   }
 
-  async function importWorkbook(file: File): Promise<void> {
-    try {
-      const { snapshot, warnings } = await importWorkbookXlsx(await file.arrayBuffer());
-      setImported({ snapshot, label: file.name });
-      setAlive(true);
-      if (warnings.length > 0) {
-        record(
-          `${file.name}: ${warnings.length} fidelity warning${warnings.length === 1 ? "" : "s"}`,
-        );
-      }
-    } catch (error) {
-      record(describeActionError(error));
-    }
+  function importWorkbook(file: File): void {
+    void importAction.run(
+      async () => {
+        const { snapshot, warnings } = await importWorkbookXlsx(await file.arrayBuffer());
+        setImported({ snapshot, label: file.name });
+        setAlive(true);
+        if (warnings.length > 0) {
+          record(
+            `${file.name}: ${warnings.length} fidelity warning${warnings.length === 1 ? "" : "s"}`,
+          );
+        }
+      },
+      (error) =>
+        `${file.name} could not be imported: ${describeActionError(error)} Choose another file.`,
+    );
   }
 
   const live = alive && phase === "live";
+  // Between Create and the first booting render the phase still reads
+  // "destroyed"; the button stays locked until this generation settles.
+  const transitioning = phase === "booting" || (alive && phase === "destroyed");
   // Only a live generation has a store and a paint loop; before that the
   // instrument reads the requested spec, never the previous generation.
   const requested = live ? (rendererState?.requested ?? spec.renderer) : spec.renderer;
@@ -362,10 +385,10 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               className="sw-workbench-primary"
               type="button"
               data-tone={alive ? "danger" : undefined}
-              disabled={phase === "booting"}
-              onClick={alive ? destroyWorkbench : () => setAlive(true)}
+              {...pendingProps(transitioning)}
+              onClick={toggleGrid}
             >
-              {alive ? "Destroy grid" : "Create grid"}
+              {transitioning ? "Creating grid…" : alive ? "Destroy grid" : "Create grid"}
             </button>
           </header>
 
@@ -634,15 +657,21 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
               <DemoButton type="button" onClick={total} disabled={!live}>
                 Total ARR
               </DemoButton>
-              <DemoButton type="button" onClick={() => void exportWorkbook()} disabled={!live}>
-                Export XLSX
+              <DemoButton
+                type="button"
+                onClick={exportWorkbook}
+                disabled={!live || exportAction.pending}
+                aria-busy={exportAction.pending || undefined}
+              >
+                {exportAction.pending ? "Exporting…" : "Export XLSX"}
               </DemoButton>
               <DemoButton
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                disabled={phase === "booting"}
+                disabled={transitioning || importAction.pending}
+                aria-busy={importAction.pending || undefined}
               >
-                Import XLSX
+                {importAction.pending ? "Importing…" : "Import XLSX"}
               </DemoButton>
               <input
                 ref={fileRef}
@@ -653,10 +682,11 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
-                  if (file !== undefined) void importWorkbook(file);
+                  if (file !== undefined) importWorkbook(file);
                 }}
               />
             </div>
+            <ActionError error={exportAction.error ?? importAction.error} />
           </section>
 
           <details className="sw-vw-details">

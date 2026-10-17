@@ -2358,3 +2358,52 @@
   line-height: 1.4;
   text-transform: none;
 }
+
+/* A button working on its action keeps its size and shows a small spinner
+   after its label, so the layout does not jump and the wait is visible. */
+button[aria-busy="true"] {
+  cursor: progress;
+}
+
+button[aria-busy="true"]::after {
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-left: 0.5em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sw-action-spin 700ms linear infinite;
+}
+
+@keyframes sw-action-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[aria-busy="true"]::after {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
+  }
+}
+
+/* One readable failure line next to the controls it belongs to. */
+.sw-action-error {
+  margin: 0.5rem 0 0;
+  border-left: 3px solid var(--sw-demo-danger);
+  border-radius: 0 0.4rem 0.4rem 0;
+  padding: 0.45rem 0.7rem;
+  color: var(--sw-demo-fg);
+  background: color-mix(in srgb, var(--sw-demo-danger) 12%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.sw-action-error[hidden] {
+  display: none;
+}

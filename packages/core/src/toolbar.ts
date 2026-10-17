@@ -1,4 +1,5 @@
 import { isKeyboardAction } from "./keymap.js";
+import { actionFeedbackFor } from "./action-feedback.js";
 import type {
   Grid,
   GridActions,
@@ -83,8 +84,11 @@ const DEFAULT_TITLE: Record<Exclude<ToolbarActionName, "separator">, string> = {
 /** Shared mousedown guard so a control click never steals focus from the grid. */
 const preventDefault = (event: Event): void => event.preventDefault();
 
-/** Dispatch one built-in toolbar action to its `GridActions` method. */
-function runAction(actions: GridActions, action: ToolbarActionName): void {
+/**
+ * Dispatch one built-in toolbar action to its `GridActions` method. Returns
+ * the action's promise when it has one, so the caller can track it.
+ */
+function runAction(actions: GridActions, action: ToolbarActionName): unknown {
   switch (action) {
     case "undo":
       actions.undo();
@@ -135,8 +139,7 @@ function runAction(actions: GridActions, action: ToolbarActionName): void {
       actions.exportCsv();
       break;
     case "exportXlsx":
-      actions.exportXlsx();
-      break;
+      return actions.exportXlsx();
   }
 }
 
@@ -311,6 +314,14 @@ export function renderToolbarItems(
     return input;
   };
 
+  // One command at a time per button: a second click while an export or a
+  // large edit runs is ignored, and a failure becomes a visible message.
+  const guarded = (key: string, command: () => unknown, button: HTMLButtonElement): void => {
+    const feedback = actionFeedbackFor(grid);
+    if (feedback) void feedback.run(key, command, button);
+    else command();
+  };
+
   for (const item of items) {
     const action = item.action;
 
@@ -330,7 +341,9 @@ export function renderToolbarItems(
 
     if (item.onClick) {
       const onClick = item.onClick;
-      const button = addButton(action ?? "custom", icon, title, () => onClick(grid));
+      const button = addButton(action ?? "custom", icon, title, () =>
+        guarded(`custom:${title || action || "item"}`, () => onClick(grid), button),
+      );
       if (action) controls.set(action, button);
       continue;
     }
@@ -362,10 +375,10 @@ export function renderToolbarItems(
     }
 
     if (action) {
-      controls.set(
-        action,
-        addButton(action, icon, title, () => runAction(grid.actions, action)),
+      const button = addButton(action, icon, title, () =>
+        guarded(action, () => runAction(grid.actions, action), button),
       );
+      controls.set(action, button);
     }
   }
 
@@ -379,7 +392,7 @@ export function renderToolbarItems(
         control.setAttribute("aria-label", title);
       }
       const state = states?.[action] ?? grid.getCommandState(action);
-      control.disabled = state.disabled;
+      control.disabled = state.disabled || control.getAttribute("aria-busy") === "true";
       if (
         control instanceof HTMLButtonElement &&
         (action === "bold" ||

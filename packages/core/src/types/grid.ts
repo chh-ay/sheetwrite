@@ -152,8 +152,13 @@ export interface GridActions {
   /** Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects. */
   pasteValues(): Promise<ClipboardOutcome>;
   clearContents(): void;
+  /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
   exportCsv(filename?: string): void;
-  exportXlsx(filename?: string): void;
+  /**
+   * Download the workbook as XLSX. Resolves when the download starts and never
+   * rejects; a failure emits `export-error`.
+   */
+  exportXlsx(filename?: string): Promise<void>;
   undo(): void;
   redo(): void;
 }
@@ -519,7 +524,7 @@ export interface GridEvents {
     error: SheetwriteError;
   };
   /** Built-in toolbar/context-menu export failed after its action was dispatched. */
-  "export-error": { format: "xlsx"; error: SheetwriteError };
+  "export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
 }
 
 /** Imperative grid handle for document commands, events, rendering, and teardown. */
