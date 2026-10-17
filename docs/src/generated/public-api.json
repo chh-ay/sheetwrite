@@ -1205,7 +1205,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L269",
+              "source": "src/export.ts#L274",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1383,7 +1383,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L198",
+              "source": "src/export.ts#L203",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -1460,7 +1460,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L411",
+              "source": "src/export.ts#L416",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1475,7 +1475,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L529",
+              "source": "src/export.ts#L534",
               "jsDocTags": [
                 "example",
                 "see"
@@ -3645,7 +3645,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L324",
+              "source": "src/export.ts#L329",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -3657,7 +3657,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L389",
+              "source": "src/export.ts#L394",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -3669,7 +3669,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L470",
+              "source": "src/export.ts#L475",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -4903,7 +4903,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L356",
+              "source": "src/export.ts#L361",
               "jsDocTags": [
                 "example",
                 "see"
@@ -4918,7 +4918,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L496",
+              "source": "src/export.ts#L501",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5457,7 +5457,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L295",
+              "source": "src/export.ts#L300",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -5469,7 +5469,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L228",
+              "source": "src/export.ts#L233",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -5550,7 +5550,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L316",
+              "source": "src/export.ts#L321",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -5562,7 +5562,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L378",
+              "source": "src/export.ts#L383",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -5574,7 +5574,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L458",
+              "source": "src/export.ts#L463",
               "jsDocTags": [],
               "documentation": "Optional backend contract for complete workbook XLSX interchange.",
               "memberDocs": []
@@ -5586,7 +5586,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L447",
+              "source": "src/export.ts#L452",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -5611,7 +5611,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L428",
+              "source": "src/export.ts#L433",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
