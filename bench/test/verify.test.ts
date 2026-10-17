@@ -73,5 +73,44 @@ describe("CI-facing deterministic verifier", () => {
     expect(existsSync(resolve(artifactRoot, "formula.json"))).toBe(true);
     const error = readFileSync(resolve(artifactRoot, "formula-error.json"), "utf8");
     expect(error).toContain("missing workload=independent-parse-load;size=1000");
+    expect(result.stderr.toString()).toContain("formula");
+    expect(result.stderr.toString()).toContain("missing workload=independent-parse-load;size=1000");
+  });
+
+  test("prints the failing view-index gate and measured values", () => {
+    const path = resolve(directory, "view-index.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        rows: 1_000_000,
+        repeats: 5,
+        runs: { map: Array(5).fill({}), packed: Array(5).fill({}) },
+        heapReduction: 0.6,
+        lookupP95Regression: 0.25,
+        baseline: { lookupP95Ns: 100 },
+        packed: { lookupP95Ns: 125 },
+        gates: { heapReduction: true, lookupP95: false },
+      }),
+    );
+    const result = Bun.spawnSync(
+      [
+        "bun",
+        "run",
+        resolve(repositoryRoot, "bench/src/verify.ts"),
+        "--fixture",
+        `view-index:${path}`,
+      ],
+      { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("view-index runtime gates failed: lookupP95");
+    const measurements = result.stderr.toString().split("Failing view-index measurements: ")[1];
+    expect(measurements).toBeDefined();
+    expect(JSON.parse(measurements ?? "")).toMatchObject({
+      lookupP95Regression: 0.25,
+      baseline: { lookupP95Ns: 100 },
+      packed: { lookupP95Ns: 125 },
+    });
   });
 });
