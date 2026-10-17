@@ -189,6 +189,10 @@ describe("documentation generation", () => {
       handsontableIncomplete: 1,
     });
     expect(payload.heroStats).toMatchObject({ millionRowScenarios: 2, millionRowMedianMs: 2 });
+    expect(payload.capture.engineVersions).toEqual({
+      sheetwrite: "0.4.0",
+      handsontable: "18.1.2",
+    });
 
     // A structurally valid artifact with no comparable pairs downgrades to the
     // placeholder payload - null must never reach the landing.

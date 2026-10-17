@@ -38,7 +38,13 @@ interface LandingBenchSize {
 
 interface LandingBenchData {
   available: boolean;
-  capture?: { commit: string; timestamp: string; browser: string; rounds: number };
+  capture?: {
+    commit: string;
+    timestamp: string;
+    browser: string;
+    rounds: number;
+    engineVersions: { sheetwrite: string; handsontable: string };
+  };
   heroStats?: {
     millionRowScenarios: number;
     millionRowMedianMs: number;
@@ -111,27 +117,33 @@ function fmtRows(rows: number): string {
 }
 
 /** Shared log scale across every ratio bar: ×1 is parity (zero width). */
-function ratioWidth(ratio: number, maxRatio: number): string {
-  const domain = Math.log10(maxRatio * 1.25);
+function ratioWidth(ratio: number, scaleMax: number): string {
+  const domain = Math.log10(scaleMax);
   const pct = (Math.log10(Math.max(ratio, 1)) / domain) * 100;
   return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
 }
 
 function BenchmarkBars({ evidence }: Readonly<{ evidence: Required<LandingBenchData> }>) {
   const { ref } = useScenePlayback<HTMLDivElement>();
-  const maxRatio = Math.max(...evidence.sizes.map((entry) => entry.medianRatio));
+  const scaleMax = Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) * 1.25;
   return (
-    <div className="sw-bench" ref={ref}>
+    <div
+      className="sw-bench"
+      ref={ref}
+      data-scale="logarithmic"
+      data-scale-min={1}
+      data-scale-max={scaleMax}
+    >
       <ul className="sw-bench__bars">
         {evidence.sizes.map((entry) => (
           <li key={entry.size}>
             <span className="sw-bench__size">{fmtRows(entry.size)} rows</span>
             <span aria-hidden="true" className="sw-bench__track">
-              <i style={{ width: ratioWidth(entry.medianRatio, maxRatio) }} />
+              <i style={{ width: ratioWidth(entry.medianRatio, scaleMax) }} />
             </span>
             <strong>{entry.medianRatio}×</strong>
             <span className="sw-bench__detail">
-              median of {entry.comparedScenarios} interactions · best {entry.bestRatio}×
+              median of {entry.comparedScenarios} interactions
               {entry.handsontableIncomplete > 0
                 ? ` · Handsontable did not finish ${entry.handsontableIncomplete}`
                 : ""}
@@ -354,8 +366,10 @@ function Landing() {
             <p className="sw-lp-eyebrow">Results you can check</p>
             <h2 id="landing-bench">Measured, not promised.</h2>
             <p>
-              Median interaction ratios against Handsontable in one saved browser capture. Every
-              interaction must return the correct result; failed runs stay failed.
+              Median interaction ratios against Handsontable
+              {evidence ? ` ${evidence.capture.engineVersions.handsontable}` : ""} in one saved
+              browser capture. Every interaction must return the correct result; failed runs stay
+              failed.
             </p>
           </header>
           {evidence ? (

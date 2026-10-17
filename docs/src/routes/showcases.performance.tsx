@@ -1256,9 +1256,9 @@ function PerformanceRoute() {
             <p className="sw-sp-kicker">Measured ownership</p>
             <h2 id="resource-title">Cache capacity is not logical size</h2>
             <p>
-              Public resource report v
-              <span data-testid="scale-resource-schema">
-                {stats.resource?.schemaVersion ?? "—"}
+              The public resource report
+              <span data-testid="scale-resource-schema" data-empty={!stats.resource}>
+                {stats.resource ? ` v${stats.resource.schemaVersion}` : " (loading report)"}
               </span>{" "}
               separates logical live bytes, allocated owner capacity, and observed WASM committed
               pages. The clean page cache and sparse dirty overlay remain distinct owners.

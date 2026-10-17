@@ -68,6 +68,22 @@ test("@portability compatibility results expose every truthful state from checke
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
   await expect(page.locator("select")).toHaveCount(0);
+  const exampleButtons = page.locator(".sw-si-results .sw-si-compat__records button");
+  await expect(exampleButtons).toHaveCount(20);
+  const firstExample = await exampleButtons.first().textContent();
+  const examplePage = page.getByTestId("compatibility-example-page");
+  await examplePage.click();
+  await examplePage
+    .locator("..")
+    .getByRole("button", { name: /^2 of /u })
+    .click();
+  await expect(exampleButtons.first()).not.toHaveText(firstExample ?? "");
+  await examplePage.click();
+  await examplePage
+    .locator("..")
+    .getByRole("button", { name: /^1 of /u })
+    .click();
+  await expect(exampleButtons.first()).toHaveText(firstExample ?? "");
 
   const inventoryDetail = page.getByTestId("compatibility-detail");
   await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");

@@ -1462,6 +1462,7 @@ export function landingBenchPayload(
       timestamp: evidence.metadata.timestamp,
       browser: `Chromium ${evidence.metadata.browserVersion}`,
       rounds: evidence.metadata.rounds,
+      engineVersions: evidence.metadata.engineVersions,
     },
     heroStats,
     sizes,
@@ -3079,6 +3080,34 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       .update(JSON.stringify(formulaInventory))
       .digest("hex"),
   };
+  const formulaNames = new Set<string>();
+  if (
+    !formulaInventory ||
+    typeof formulaInventory !== "object" ||
+    !("functions" in formulaInventory) ||
+    !Array.isArray(formulaInventory.functions)
+  ) {
+    throw new Error("Formula inventory must contain functions");
+  }
+  const formulas: unknown[] = formulaInventory.functions;
+  for (const formula of formulas) {
+    if (
+      !formula ||
+      typeof formula !== "object" ||
+      !("canonical" in formula) ||
+      typeof formula.canonical !== "string" ||
+      !("aliases" in formula) ||
+      !Array.isArray(formula.aliases)
+    ) {
+      throw new Error("Formula inventory must contain canonical names and aliases");
+    }
+    formulaNames.add(formula.canonical);
+    for (const alias of formula.aliases) {
+      if (typeof alias !== "string") throw new Error("Formula aliases must be strings");
+      formulaNames.add(alias);
+    }
+  }
+
   const files: ExpectedFile[] = [
     ...apiFiles,
     {
@@ -3096,6 +3125,10 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     {
       path: join(contentRoot, "reference/formula-functions.md"),
       content: renderFormulaFunctionContract(formulaInventory),
+    },
+    {
+      path: join(generatedDataRoot, "formula-summary.json"),
+      content: stableJson({ functionCount: formulaNames.size }),
     },
     {
       path: join(generatedDataRoot, "compatibility.json"),

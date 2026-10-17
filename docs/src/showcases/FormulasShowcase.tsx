@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { functionCount } from "../generated/formula-summary.json";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
   ANALYSIS_SHEET_ID,
@@ -93,7 +94,6 @@ export default function FormulasShowcase() {
   const ledgerRef = useRef<OrdersLedger | null>(null);
   const [state, setState] = useState<GridState>("loading");
   const [error, setError] = useState("");
-  const [functionCount, setFunctionCount] = useState<number | null>(null);
   const [activeSheet, setActiveSheet] = useState<string>(ANALYSIS_SHEET_ID);
   const [selected, setSelected] = useState<FormulaPanel["id"]>(FORMULA_PANELS[0]!.id);
   const [promotion, setPromotion] = useState(false);
@@ -128,7 +128,6 @@ export default function FormulasShowcase() {
       if (disposed) return;
       await whenStylesReady();
       if (disposed) return;
-      setFunctionCount(formulas.functionNames().length);
       const ledger = buildOrdersLedger();
       ledgerRef.current = ledger;
       grid = createGrid(host, {
@@ -275,7 +274,7 @@ export default function FormulasShowcase() {
           facts={[
             {
               label: "Function names",
-              value: functionCount === null ? "Full engine" : functionCount.toLocaleString(),
+              value: functionCount.toLocaleString(),
             },
             { label: "Orders", value: ORDER_ROWS.toLocaleString() },
             { label: "Live panels", value: `${FORMULA_PANELS.length} formulas` },

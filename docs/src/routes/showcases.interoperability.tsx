@@ -90,6 +90,7 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 /** Canvas colors come from the dark stage's shared demo tokens. */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 36 };
 const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
+const COMPATIBILITY_PAGE_SIZE = 20;
 
 const RESULT_STATUS_LABELS: Record<CompatibilityResultStatus, string> = {
   "local-pass": "Local check passed",
@@ -438,6 +439,8 @@ function InteroperabilityRoute() {
   const [compatibilityArea, setCompatibilityArea] = useState("all");
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
   const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
+  const [resultPage, setResultPage] = useState(0);
+  const [inventoryPage, setInventoryPage] = useState(0);
 
   const { compatibility: requestedCompatibility } = Route.useSearch();
   useEffect(() => {
@@ -886,6 +889,8 @@ function InteroperabilityRoute() {
       (resultFeature === "all" || entry.featureValue === resultFeature) &&
       (resultBehavior === "all" || entry.behavior === resultBehavior),
   );
+  const resultPageCount = Math.max(1, Math.ceil(visibleResults.length / COMPATIBILITY_PAGE_SIZE));
+  const currentResultPage = Math.min(resultPage, resultPageCount - 1);
   const selectedResult =
     visibleResults.find((entry) => entry.id === selectedResultId) ?? visibleResults[0];
   const selectedResultSource = selectedResult
@@ -901,6 +906,11 @@ function InteroperabilityRoute() {
       (compatibilityArea === "all" || record.area === compatibilityArea) &&
       (compatibilityDialect === "all" || record.dialect === compatibilityDialect),
   );
+  const inventoryPageCount = Math.max(
+    1,
+    Math.ceil(visibleCompatibility.length / COMPATIBILITY_PAGE_SIZE),
+  );
+  const currentInventoryPage = Math.min(inventoryPage, inventoryPageCount - 1);
   const selectedCompatibility =
     visibleCompatibility.find((record) => record.id === selectedCompatibilityId) ??
     visibleCompatibility[0];
@@ -1016,27 +1026,41 @@ function InteroperabilityRoute() {
               >
                 <div>
                   <dt>Cells compared</dt>
-                  <dd data-testid="interop-cells-compared">
-                    {roundTrip ? roundTrip.cellsCompared.toLocaleString() : "—"}
+                  <dd data-testid="interop-cells-compared" data-empty={!roundTrip}>
+                    {roundTrip
+                      ? roundTrip.cellsCompared.toLocaleString()
+                      : "Run an exchange to compare"}
                   </dd>
                 </div>
                 <div>
                   <dt>Formulas preserved</dt>
-                  <dd>
-                    {roundTrip ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}` : "—"}
+                  <dd data-empty={!roundTrip}>
+                    {roundTrip
+                      ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}`
+                      : "Run an exchange to check"}
                   </dd>
                 </div>
                 <div>
                   <dt>Warnings</dt>
-                  <dd>{warningLog ? warningLog.warnings.length : "—"}</dd>
+                  <dd data-empty={!warningLog}>
+                    {warningLog ? warningLog.warnings.length : "Run an exchange to check"}
+                  </dd>
                 </div>
                 <div>
                   <dt>XLSX bytes</dt>
-                  <dd>{roundTrip ? roundTrip.exportedBytes.toLocaleString() : "—"}</dd>
+                  <dd data-empty={!roundTrip}>
+                    {roundTrip
+                      ? roundTrip.exportedBytes.toLocaleString()
+                      : "Run an exchange to measure"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Exchange time</dt>
-                  <dd>{roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : "—"}</dd>
+                  <dd data-empty={!roundTrip}>
+                    {roundTrip
+                      ? `${roundTrip.elapsedMs.toFixed(0)} ms`
+                      : "Run an exchange to measure"}
+                  </dd>
                 </div>
               </dl>
               {/* One status line for the whole page: actions in the labs below
@@ -1552,34 +1576,55 @@ function InteroperabilityRoute() {
                   {visibleResults.length}/{COMPATIBILITY_RESULTS.testSet.publishedExamples} examples
                 </span>
               </fieldset>
+              {resultPageCount > 1 && (
+                <ChoiceMenu
+                  label="Example page"
+                  value={String(currentResultPage)}
+                  onChange={(value) => {
+                    const page = Number(value);
+                    setResultPage(page);
+                    setSelectedResultId(visibleResults[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null);
+                  }}
+                  testId="compatibility-example-page"
+                  options={Array.from({ length: resultPageCount }, (_, page) => ({
+                    value: String(page),
+                    label: `${page + 1} of ${resultPageCount}`,
+                  }))}
+                />
+              )}
 
               <div className="sw-si-compat sw-si-results">
                 <ul aria-label="Checked compatibility tests" className="sw-si-compat__records">
-                  {visibleResults.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        aria-pressed={selectedResult?.id === entry.id}
-                        data-behavior={entry.behavior}
-                        data-status={entry.statusTags.join(" ")}
-                        data-testid={`compatibility-result-${entry.position}`}
-                        data-tolerance={entry.tolerance.kind}
-                        onClick={() => setSelectedResultId(entry.id)}
-                        type="button"
-                      >
-                        <span>
-                          {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
-                        </span>
-                        <strong>{entry.label}</strong>
-                        <small className="sw-si-compat__tags">
-                          {entry.statusTags.map((tag) => (
-                            <i data-state={tag} key={tag}>
-                              {RESULT_STATUS_LABELS[tag]}
-                            </i>
-                          ))}
-                        </small>
-                      </button>
-                    </li>
-                  ))}
+                  {visibleResults
+                    .slice(
+                      currentResultPage * COMPATIBILITY_PAGE_SIZE,
+                      (currentResultPage + 1) * COMPATIBILITY_PAGE_SIZE,
+                    )
+                    .map((entry) => (
+                      <li key={entry.id}>
+                        <button
+                          aria-pressed={selectedResult?.id === entry.id}
+                          data-behavior={entry.behavior}
+                          data-status={entry.statusTags.join(" ")}
+                          data-testid={`compatibility-result-${entry.position}`}
+                          data-tolerance={entry.tolerance.kind}
+                          onClick={() => setSelectedResultId(entry.id)}
+                          type="button"
+                        >
+                          <span>
+                            {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
+                          </span>
+                          <strong>{entry.label}</strong>
+                          <small className="sw-si-compat__tags">
+                            {entry.statusTags.map((tag) => (
+                              <i data-state={tag} key={tag}>
+                                {RESULT_STATUS_LABELS[tag]}
+                              </i>
+                            ))}
+                          </small>
+                        </button>
+                      </li>
+                    ))}
                 </ul>
                 {selectedResult && selectedResultSource && selectedResultEvidence ? (
                   <article
@@ -1925,32 +1970,55 @@ function InteroperabilityRoute() {
                   {visibleCompatibility.length}/{compatibilityData.records.length} records
                 </span>
               </fieldset>
+              {inventoryPageCount > 1 && (
+                <ChoiceMenu
+                  label="Record page"
+                  value={String(currentInventoryPage)}
+                  onChange={(value) => {
+                    const page = Number(value);
+                    setInventoryPage(page);
+                    setSelectedCompatibilityId(
+                      visibleCompatibility[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null,
+                    );
+                  }}
+                  testId="compatibility-record-page"
+                  options={Array.from({ length: inventoryPageCount }, (_, page) => ({
+                    value: String(page),
+                    label: `${page + 1} of ${inventoryPageCount}`,
+                  }))}
+                />
+              )}
               <div className="sw-si-compat sw-si-inventory">
                 <ul
                   aria-label="Declared feature boundary records"
                   className="sw-si-compat__records"
                 >
-                  {visibleCompatibility.map((record) => (
-                    <li key={record.id}>
-                      <button
-                        aria-label={`${record.label}; ${areaName(record.area)}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
-                        aria-pressed={selectedCompatibility?.id === record.id}
-                        data-result={record.resultMode}
-                        data-status={record.status}
-                        data-testid={`compatibility-${record.id}`}
-                        onClick={() => setSelectedCompatibilityId(record.id)}
-                        type="button"
-                      >
-                        <span>
-                          {areaName(record.area)} · {BEHAVIOR_LABELS[record.dialect]}
-                        </span>
-                        <strong>{record.label}</strong>
-                        <small className="sw-si-compat__record-status">
-                          {compatibilityStatusSummary(record)}
-                        </small>
-                      </button>
-                    </li>
-                  ))}
+                  {visibleCompatibility
+                    .slice(
+                      currentInventoryPage * COMPATIBILITY_PAGE_SIZE,
+                      (currentInventoryPage + 1) * COMPATIBILITY_PAGE_SIZE,
+                    )
+                    .map((record) => (
+                      <li key={record.id}>
+                        <button
+                          aria-label={`${record.label}; ${areaName(record.area)}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
+                          aria-pressed={selectedCompatibility?.id === record.id}
+                          data-result={record.resultMode}
+                          data-status={record.status}
+                          data-testid={`compatibility-${record.id}`}
+                          onClick={() => setSelectedCompatibilityId(record.id)}
+                          type="button"
+                        >
+                          <span>
+                            {areaName(record.area)} · {BEHAVIOR_LABELS[record.dialect]}
+                          </span>
+                          <strong>{record.label}</strong>
+                          <small className="sw-si-compat__record-status">
+                            {compatibilityStatusSummary(record)}
+                          </small>
+                        </button>
+                      </li>
+                    ))}
                 </ul>
                 {selectedCompatibility ? (
                   <article

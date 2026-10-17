@@ -336,14 +336,26 @@ export function ScaleFlightDeck({
         </div>
         <div>
           <dt>Frames per second</dt>
-          <dd data-testid="scale-flight-fps">
-            {live ? live.fps.toFixed(0) : report && !report.instant ? report.fps.toFixed(0) : "—"}
+          <dd data-testid="scale-flight-fps" data-empty={!live && (!report || report.instant)}>
+            {live
+              ? live.fps.toFixed(0)
+              : report && !report.instant
+                ? report.fps.toFixed(0)
+                : report?.instant
+                  ? "Reduced motion: no frames measured"
+                  : "Run a flight to measure"}
           </dd>
         </div>
         <div>
           <dt>Slowest 5% of frames</dt>
-          <dd>
-            {report && !flying && !report.instant ? `${report.p95FrameMs.toFixed(1)} ms` : "—"}
+          <dd data-empty={!report || flying || report.instant}>
+            {report && !flying && !report.instant
+              ? `${report.p95FrameMs.toFixed(1)} ms`
+              : flying
+                ? "Flight in progress"
+                : report?.instant
+                  ? "Reduced motion: no frames measured"
+                  : "Run a flight to measure"}
           </dd>
         </div>
         <div>
