@@ -20,6 +20,25 @@
   outline: none;
 }
 
+.sheetwrite-action-status {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
+  max-width: min(420px, calc(100% - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--sheetwrite-selection-border);
+  border-radius: 6px;
+  background: var(--sheetwrite-bg);
+  color: var(--sheetwrite-fg);
+  font: var(--sheetwrite-font);
+  box-shadow: 0 2px 8px #0002;
+}
+
+.sheetwrite-action-status[hidden] {
+  display: none;
+}
+
 [data-theme="dark"] .sheetwrite,
 .dark .sheetwrite {
   --sheetwrite-bg: #0b0b0c;

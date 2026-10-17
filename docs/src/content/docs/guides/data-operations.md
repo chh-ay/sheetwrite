@@ -119,11 +119,13 @@ await grid.exportXlsx("sales.xlsx");
 ```
 
 `grid.exportXlsx(...)` rejects when registration or encoding fails, preserving
-the backend error. Built-in toolbar and context-menu actions cannot return that
-promise, so the grid emits one `export-error` event with
-`{ format: "xlsx", error }` instead:
+the backend error. Built-in toolbar and context-menu actions show an alert and
+emit one `export-error` event with `{ format: "csv" | "xlsx", error }`.
+`grid.actions.exportXlsx()` returns a promise that resolves after the command
+finishes, including when the export fails. Built-in buttons ignore a repeated
+start while the same command is pending and show a busy state.
 
-```ts prelude="core" partial="requires an initialized Grid host" title="Observe built-in XLSX failures"
+```ts prelude="core" partial="requires an initialized Grid host" title="Observe built-in export failures"
 grid.on("export-error", ({ format, error }) => {
   console.error(`${format} export failed`, error);
 });

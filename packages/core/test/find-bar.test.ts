@@ -30,7 +30,7 @@ function mountHost(): HTMLDivElement {
 }
 
 describe("FindBar", () => {
-  it("searches and replaces live cells without leaking field keystrokes", () => {
+  it("searches and replaces live cells without leaking field keystrokes", async () => {
     const host = mountHost();
     const grid = createGrid(host, {
       workbook: makeWorkbook(3),
@@ -84,6 +84,7 @@ describe("FindBar", () => {
     expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
     expect(changes).toBe(1);
     expect(count.textContent?.match(/\d+/g)).toEqual(["1", "1"]);
+    await Promise.resolve();
 
     replacement.value = "Lovelace";
     replacement.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));

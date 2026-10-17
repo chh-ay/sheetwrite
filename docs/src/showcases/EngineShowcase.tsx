@@ -5,6 +5,8 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { isRepeatClick } from "../lib/action-guard.js";
+import { ActionError, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
   createEngineLiveWorkbook,
@@ -113,6 +115,8 @@ function nextEngineFrame(signal: AbortSignal): Promise<void> {
 }
 
 export default function EngineShowcase() {
+  const command = useAction();
+  const { run: runCommand } = command;
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<Grid | null>(null);
   const bindingsRef = useRef<EngineEventBindings | null>(null);
@@ -307,7 +311,7 @@ export default function EngineShowcase() {
     return () => viewport.removeEventListener("change", updateFrozenColumns);
   }, []);
 
-  const runAction = useCallback(
+  const executeAction = useCallback(
     async (action: EngineAction, rowOverride?: number) => {
       const grid = gridRef.current;
       const bindings = bindingsRef.current;
@@ -439,6 +443,16 @@ export default function EngineShowcase() {
     [saver],
   );
 
+  const runAction = useCallback(
+    async (action: EngineAction, rowOverride?: number) => {
+      await runCommand(
+        () => executeAction(action, rowOverride),
+        (cause) => `The engine action failed: ${String(cause)}. Try again.`,
+      );
+    },
+    [executeAction, runCommand],
+  );
+
   const followChange = useCallback(async () => {
     const grid = gridRef.current;
     if (!grid || followControllerRef.current) return;
@@ -455,7 +469,7 @@ export default function EngineShowcase() {
     setFollowDuration(null);
     setFollowSteps(null);
     try {
-      await runAction("jump", anchor);
+      await executeAction("jump", anchor);
       // The annual total sits twelve rows below the account's first month. Scrolling there
       // keeps the whole account, its annual formulas, and the plan band in one window.
       grid.scrollToCell({
@@ -485,7 +499,7 @@ export default function EngineShowcase() {
       }
       controller.signal.throwIfAborted();
       loadedAt = performance.now();
-      await runAction("edit");
+      await executeAction("edit");
       grid.refresh();
       recalculatedAt = performance.now();
       const paintStartedAt = performance.now();
@@ -493,7 +507,7 @@ export default function EngineShowcase() {
       await nextEngineFrame(controller.signal);
       emit({ type: "browser-frame", durationMs: performance.now() - paintStartedAt });
       paintedAt = performance.now();
-      await runAction("save");
+      await executeAction("save");
       controller.signal.throwIfAborted();
       const finishedAt = performance.now();
       setFollowSteps([
@@ -506,6 +520,7 @@ export default function EngineShowcase() {
     } catch (cause) {
       if (!controller.signal.aborted && mountedRef.current) {
         setStatus(cause instanceof Error ? cause.message : String(cause));
+        setError(`Cannot follow the change: ${String(cause)}. Try again.`);
       }
     } finally {
       if (followControllerRef.current === controller) {
@@ -513,7 +528,7 @@ export default function EngineShowcase() {
         if (mountedRef.current) setFollowing(false);
       }
     }
-  }, [emit, runAction]);
+  }, [emit, executeAction]);
 
   const rewriteFormula = useCallback(() => {
     const grid = gridRef.current;
@@ -555,6 +570,7 @@ export default function EngineShowcase() {
   }, [emit]);
 
   const reset = useCallback(() => {
+    setReady(false);
     followControllerRef.current?.abort();
     followControllerRef.current = null;
     planRequestRef.current = null;
@@ -648,6 +664,7 @@ export default function EngineShowcase() {
           className="sw-engine-stage"
           data-running={following}
         >
+          <ActionError error={command.error ?? error} />
           <header className="sw-engine-stage__head">
             <div className="sw-engine-stage__intro">
               <p className="sw-engine__eyebrow">FY26 regional forecast · USD</p>
@@ -700,6 +717,7 @@ export default function EngineShowcase() {
             <button
               className="sw-engine-primary"
               data-testid="engine-follow"
+              aria-busy={following || undefined}
               disabled={disabled}
               onClick={() => void followChange()}
               type="button"
@@ -854,8 +872,13 @@ export default function EngineShowcase() {
                   value={jumpInput}
                   disabled={following}
                 />
-                <button data-testid="engine-jump" disabled={disabled} type="submit">
-                  Jump
+                <button
+                  data-testid="engine-jump"
+                  disabled={disabled || command.pending}
+                  aria-busy={command.pending || undefined}
+                  type="submit"
+                >
+                  {command.pending ? "Moving to row…" : "Jump"}
                 </button>
               </form>
             </fieldset>
@@ -864,27 +887,30 @@ export default function EngineShowcase() {
               <div className="sw-engine-controls__actions">
                 <button
                   data-testid="engine-edit"
-                  disabled={disabled}
+                  aria-busy={command.pending || undefined}
+                  disabled={disabled || command.pending}
                   onClick={() => void runAction("edit")}
                   type="button"
                 >
-                  Actual +$1,250
+                  {command.pending ? "Updating actual…" : "Actual +$1,250"}
                 </button>
                 <button
                   data-testid="engine-undo"
-                  disabled={disabled}
+                  aria-busy={command.pending || undefined}
+                  disabled={disabled || command.pending}
                   onClick={() => void runAction("undo")}
                   type="button"
                 >
-                  Undo
+                  {command.pending ? "Undoing…" : "Undo"}
                 </button>
                 <button
                   data-testid="engine-save"
-                  disabled={disabled || pendingOperations === 0}
+                  aria-busy={command.pending || undefined}
+                  disabled={disabled || command.pending || pendingOperations === 0}
                   onClick={() => void runAction("save")}
                   type="button"
                 >
-                  Save to host
+                  {command.pending ? "Saving to host…" : "Save to host"}
                 </button>
               </div>
             </fieldset>
@@ -915,8 +941,16 @@ export default function EngineShowcase() {
                     </label>
                   ))}
                 </div>
-                <button data-testid="engine-reset" onClick={reset} type="button">
-                  Reset
+                <button
+                  data-testid="engine-reset"
+                  disabled={(!ready && error === null) || command.pending}
+                  aria-busy={(!ready && error === null) || undefined}
+                  onClick={(event) => {
+                    if (!isRepeatClick(event)) reset();
+                  }}
+                  type="button"
+                >
+                  {!ready && error === null ? "Resetting…" : "Reset"}
                 </button>
               </div>
             </fieldset>
@@ -936,11 +970,17 @@ export default function EngineShowcase() {
             </div>
             <button
               data-testid="engine-rewrite"
-              disabled={disabled}
-              onClick={rewriteFormula}
+              aria-busy={command.pending || undefined}
+              disabled={disabled || command.pending}
+              onClick={() =>
+                void command.run(
+                  rewriteFormula,
+                  (cause) => `Cannot update the formula: ${String(cause)}. Try again.`,
+                )
+              }
               type="button"
             >
-              Apply the +2% scenario
+              {command.pending ? "Updating formula…" : "Apply the +2% scenario"}
             </button>
             <output data-testid="engine-rewrite-duration" data-empty={rewriteDuration === null}>
               {rewriteDuration === null ? (

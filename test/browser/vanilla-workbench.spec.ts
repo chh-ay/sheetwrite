@@ -337,7 +337,7 @@ test("destroy, create, and reset bound explicit grid generations", async ({ page
   await expect.poll(() => readB2(page)).toBe("generation-one-edit");
 
   // Explicit destroy: nothing of the grid survives.
-  await page.getByRole("button", { name: "Destroy" }).click();
+  await page.getByRole("button", { name: "Destroy grid", exact: true }).click();
   await expect(page.getByTestId("destroyed")).toBeVisible();
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "destroyed");
   await expect(page.locator(GRID)).toHaveCount(0);
@@ -592,4 +592,36 @@ test("the paged data path serves host pages and reports allocation honestly", as
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
+});
+
+test("a rejected import shows an alert and restores the import button", async ({ page }) => {
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  await page.getByRole("tab", { name: /XLSX/ }).click();
+  await page.evaluate(() => {
+    File.prototype.arrayBuffer = () => Promise.reject(new Error("Forced import failure"));
+  });
+  await page.getByLabel("Import an XLSX workbook").setInputFiles({
+    name: "failed.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: Buffer.from("failed import"),
+  });
+  const alert = page.locator("[data-action-error]").filter({ hasText: "Forced import failure" });
+  await expect(alert).toBeVisible();
+  await expect(alert).toHaveAttribute("role", "alert");
+  await expect(actionButton(page, "Import XLSX")).toBeEnabled();
+  await expect(actionButton(page, "Import XLSX")).not.toHaveAttribute("aria-busy", "true");
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
+});
+
+test("a double-click on Create or Destroy makes one lifecycle transition", async ({ page }) => {
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const toggle = page.getByRole("button", { name: "Destroy grid", exact: true });
+  await toggle.dblclick();
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "destroyed");
+  await expect(page.locator(GRID)).toHaveCount(0);
+  await page.getByRole("button", { name: "Create grid", exact: true }).dblclick();
+  await waitForLive(page);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-generation", "2");
 });

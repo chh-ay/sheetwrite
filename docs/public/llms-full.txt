@@ -1882,8 +1882,11 @@ createGrid(host, { workbook });                            // no toolbar (config
 The export flag always enables CSV. Its XLSX button requires an explicit
 optional installation and `import "@sheetwrite/xlsx/register"` before use; the
 framework packages do not install an XLSX backend.
-Direct `grid.exportXlsx(...)` calls reject on failure; built-in toolbar and
-context-menu actions report the same failure through one `export-error` event.
+Direct `grid.exportXlsx(...)` calls reject on failure. Built-in toolbar and
+context-menu actions show an alert and emit one `export-error` event for CSV or
+XLSX failures. `grid.actions.exportXlsx()` returns a promise that does not reject.
+Built-in buttons show a busy state and ignore repeated starts while their
+command is pending.
 
 Every control acts on the current selection — see [Interaction](https://sheetwrite.vercel.app/docs/guides/interaction/).
 
@@ -2311,9 +2314,11 @@ await grid.exportXlsx("sales.xlsx");
 ```
 
 `grid.exportXlsx(...)` rejects when registration or encoding fails, preserving
-the backend error. Built-in toolbar and context-menu actions cannot return that
-promise, so the grid emits one `export-error` event with
-`{ format: "xlsx", error }` instead:
+the backend error. Built-in toolbar and context-menu actions show an alert and
+emit one `export-error` event with `{ format: "csv" | "xlsx", error }`.
+`grid.actions.exportXlsx()` returns a promise that resolves after the command
+finishes, including when the export fails. Built-in buttons ignore a repeated
+start while the same command is pending and show a busy state.
 
 ```ts
 grid.on("export-error", ({ format, error }) => {
@@ -5741,7 +5746,7 @@ transaction resource limits, nothing changes: the Grid emits
 ##### `GridActions` — interface
 
 ```ts
-export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string): void; setFillColor(color: string): void; toggleBorder(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): void; undo(): void; redo(): void; }
+export interface GridActions { toggleBold(): void; toggleItalic(): void; toggleUnderline(): void; toggleStrikethrough(): void; setAlign(align: CellAlign): void; setTextColor(color: string): void; setFillColor(color: string): void; toggleBorder(): void; clearFormat(): void; merge(): void; unmerge(): void; sort(ascending: boolean): void; insertRowAbove(): void; insertRowBelow(): void; deleteRow(): void; insertColumnLeft(): void; insertColumnRight(): void; deleteColumn(): void; hideRows(rows?: readonly number[]): void; showRows(rows?: readonly number[]): void; autoFitRows(): void; hideColumns(cols?: readonly number[]): void; showColumns(cols?: readonly number[]): void; autoFitColumns(cols?: readonly number[]): void; clearFilter(col?: number): void; copy(): Promise<ClipboardOutcome>; cut(): Promise<ClipboardOutcome>; paste(): Promise<ClipboardOutcome>; pasteValues(): Promise<ClipboardOutcome>; clearContents(): void; exportCsv(filename?: string): void; exportXlsx(filename?: string): Promise<void>; undo(): void; redo(): void; }
 ```
 
 Imperative operations the toolbar and context menu bind to; also exposed as `Grid.actions`.
@@ -5749,6 +5754,9 @@ Imperative operations the toolbar and context menu bind to; also exposed as `Gri
 Members:
 - `copy` — Copy the focused rectangle to the system clipboard. Never rejects.
 - `cut` — Copy + clear the source (after the clipboard accepted). Never rejects.
+- `exportCsv` — Download the active sheet as CSV. Never throws; a failure emits `export-error`.
+- `exportXlsx` — Download the workbook as XLSX. Resolves when the download starts and never
+rejects; a failure emits `export-error`.
 - `paste` — Paste at the focus cell. Never rejects.
 - `pasteValues` — Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects.
 
@@ -5813,7 +5821,7 @@ return true to consume it, false to let the built-in handler continue.
 ##### `GridEvents` — interface
 
 ```ts
-export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; "edit-begin": { addr: CellAddress }; "edit-commit": { addr: CellAddress; value: CellValue }; search: SearchResult; "command-state-change": GridCommandStateChangeEvent; "mutation-rejected": { issues: MutationIssue[] }; "active-sheet": { sheet: SheetId }; "hyperlink-activate": HyperlinkActivationEvent; "theme-change": { theme: Theme }; "renderer-fallback": { requested: "worker"; error: SheetwriteError }; "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: SheetwriteError; }; "export-error": { format: "xlsx"; error: SheetwriteError }; }
+export interface GridEvents { change: ChangeEvent; selection: { selection: Selection | null }; scroll: { scrollTop: number; firstRow: number; lastRow: number; scrollLeft: number; firstVisibleColumn: number | null; lastVisibleColumn: number | null; }; "edit-begin": { addr: CellAddress }; "edit-commit": { addr: CellAddress; value: CellValue }; search: SearchResult; "command-state-change": GridCommandStateChangeEvent; "mutation-rejected": { issues: MutationIssue[] }; "active-sheet": { sheet: SheetId }; "hyperlink-activate": HyperlinkActivationEvent; "theme-change": { theme: Theme }; "renderer-fallback": { requested: "worker"; error: SheetwriteError }; "datasource-error": { request: Omit<DataSourceRequest, "signal">; error: SheetwriteError; }; "export-error": { format: "csv" | "xlsx"; error: SheetwriteError }; }
 ```
 
 Payload map for events emitted by a Grid.

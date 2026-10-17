@@ -21,6 +21,7 @@ import { downloadBytes, fromCsv, parseCellInput, toCsv } from "@sheetwrite/core"
 import type { GridReadyEvent, GridReadyReason } from "@sheetwrite/core/adapter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useAction } from "../lib/use-action.js";
 import {
   ANALYTICS_COLUMNS,
   ANALYTICS_MARKETS,
@@ -148,6 +149,13 @@ export interface AnalyticsWorkbenchOptions {
 export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   const { gridHostWidth = 0 } = options;
   const gridRef = useRef<Grid>(null);
+  const csvAction = useAction();
+  const xlsxAction = useAction();
+  const importAction = useAction();
+  const { run: runCsv } = csvAction;
+  const { run: runXlsx } = xlsxAction;
+  const { run: runImport } = importAction;
+  const [initializationError, setInitializationError] = useState<string | null>(null);
   const activityId = useRef(0);
   const rendererCleanup = useRef<() => void>(() => {});
   const formulaDirty = useRef(false);
@@ -265,6 +273,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
 
   const onReady = useCallback(
     ({ grid, generation: nextGeneration, reason }: GridReadyEvent): void => {
+      setInitializationError(null);
       grid.setFrozen(0, 1);
       grid.store.applyTransaction({ patches: analyticsSummarySeedOps() });
 
@@ -488,35 +497,37 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     if (!grid) return;
     const sheet = grid.store.getWorkbook().sheets.find((entry) => entry.id === ANALYTICS_SHEET_ID);
     if (!sheet) return;
-    try {
-      // `grid.exportCsv` counts the viewport's presentation-padding columns
-      // against the default 1M-cell ceiling (100k rows × ~14 padded columns),
-      // so the workbench drives the same public codec with an explicit ceiling
-      // sized to the padded sheet width.
-      const csv = toCsv(sheet, grid.store, {
-        resourceLimits: { maxCells: (sheet.rowCount + 1) * sheet.columns.length },
-      });
-      downloadBytes(csv, "analytics-pipeline.csv", "text/csv;charset=utf-8");
-      record("CSV export prepared · current view order");
-    } catch (error) {
-      record(`CSV export failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [record]);
+    void runCsv(
+      () => {
+        // `grid.exportCsv` counts the viewport's presentation-padding columns
+        // against the default 1M-cell ceiling (100k rows × ~14 padded columns),
+        // so the workbench drives the same public codec with an explicit ceiling
+        // sized to the padded sheet width.
+        const csv = toCsv(sheet, grid.store, {
+          resourceLimits: { maxCells: (sheet.rowCount + 1) * sheet.columns.length },
+        });
+        downloadBytes(csv, "analytics-pipeline.csv", "text/csv;charset=utf-8");
+        record("CSV export prepared · current view order");
+      },
+      (error) => `Cannot export CSV: ${String(error)}. Try again.`,
+    );
+  }, [record, runCsv]);
 
   const exportXlsx = useCallback(async (): Promise<void> => {
     const grid = gridRef.current;
     if (!grid) return;
-    try {
-      // Dynamic on purpose: the XLSX backend is an optional package boundary
-      // this workbench demonstrates — a static import would bundle it into the
-      // route chunk and defeat the isolation story.
-      await import("@sheetwrite/xlsx/register");
-      await grid.exportXlsx("analytics-pipeline.xlsx");
-      record("XLSX export prepared");
-    } catch (error) {
-      record(`XLSX export failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [record]);
+    await runXlsx(
+      async () => {
+        // Dynamic on purpose: the XLSX backend is an optional package boundary
+        // this workbench demonstrates — a static import would bundle it into the
+        // route chunk and defeat the isolation story.
+        await import("@sheetwrite/xlsx/register");
+        await grid.exportXlsx("analytics-pipeline.xlsx");
+        record("XLSX export prepared");
+      },
+      (error) => `Cannot export XLSX: ${String(error)}. Try again.`,
+    );
+  }, [record, runXlsx]);
 
   /**
    * CSV workflow entry point: parse with the shared core codec and overlay the
@@ -526,37 +537,41 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     async (file: File): Promise<void> => {
       const grid = gridRef.current;
       if (!grid || readOnly) return;
-      try {
-        const columns = workbook.sheets[0]?.columns ?? [];
-        const parsed = fromCsv(await file.text(), columns);
-        const rows = Math.min(parsed.rowCount, MAX_IMPORT_ROWS);
-        if (rows === 0) {
-          record(`${file.name}: no data rows found`);
-          return;
-        }
-        const patches: DocumentOp[] = [];
-        columns.forEach((column, col) => {
-          const values = parsed.columns[column.key];
-          if (!values) return;
-          for (let row = 0; row < rows; row++) {
-            const value = values[row];
-            if (value === null || value === undefined) continue;
-            patches.push({
-              op: "set",
-              addr: { sheet: ANALYTICS_SHEET_ID, row, col },
-              value: { kind: "literal", value: typeof value === "number" ? value : String(value) },
-            });
+      await runImport(
+        async () => {
+          const columns = workbook.sheets[0]?.columns ?? [];
+          const parsed = fromCsv(await file.text(), columns);
+          const rows = Math.min(parsed.rowCount, MAX_IMPORT_ROWS);
+          if (rows === 0) {
+            record(`${file.name}: no data rows found`);
+            return;
           }
-        });
-        grid.applyTransaction({ patches });
-        record(
-          `Imported ${rows.toLocaleString()} row${rows === 1 ? "" : "s"} from ${file.name} · one undoable commit`,
-        );
-      } catch (error) {
-        record(`CSV import failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
+          const patches: DocumentOp[] = [];
+          columns.forEach((column, col) => {
+            const values = parsed.columns[column.key];
+            if (!values) return;
+            for (let row = 0; row < rows; row++) {
+              const value = values[row];
+              if (value === null || value === undefined) continue;
+              patches.push({
+                op: "set",
+                addr: { sheet: ANALYTICS_SHEET_ID, row, col },
+                value: {
+                  kind: "literal",
+                  value: typeof value === "number" ? value : String(value),
+                },
+              });
+            }
+          });
+          grid.applyTransaction({ patches });
+          record(
+            `Imported ${rows.toLocaleString()} row${rows === 1 ? "" : "s"} from ${file.name} · one undoable commit`,
+          );
+        },
+        (error) => `Cannot import CSV: ${String(error)}. Check the file and try again.`,
+      );
     },
-    [readOnly, record, workbook],
+    [readOnly, record, workbook, runImport],
   );
 
   const chooseRenderer = useCallback((mode: "canvas" | "worker"): void => {
@@ -574,6 +589,12 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   }, []);
 
   return {
+    csvAction,
+    xlsxAction,
+    importAction,
+    initializationError,
+    onInitializationError: (error: unknown) =>
+      setInitializationError(`Cannot load the workbook: ${String(error)}`),
     // Grid inputs.
     gridRef,
     workbook,

@@ -17,6 +17,7 @@ import { SheetwriteGrid } from "@sheetwrite/vue";
 import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 
+import { createActionGuard, type ActionState } from "../lib/action-guard.js";
 import {
   BUSINESS_DOCUMENT_ID,
   BUSINESS_ROWS,
@@ -147,6 +148,13 @@ const App = defineComponent({
     const ready = ref(false);
     const generation = ref(0);
     const readyReason = ref("—");
+    const bootError = ref<string | null>(null);
+    const resetState = shallowRef<ActionState>({ pending: false, error: null });
+    const resetAction = createActionGuard((state) => {
+      resetState.value = state;
+    });
+    let completeReset: (() => void) | undefined;
+    let failReset: ((cause: unknown) => void) | undefined;
 
     // Inspector state for the focused cell.
     const selected = shallowRef<CellAddress | null>(null);
@@ -317,6 +325,7 @@ const App = defineComponent({
       generation.value = event.generation;
       readyReason.value = event.reason;
       ready.value = true;
+      bootError.value = null;
       window.__sheetwriteVueWorkbench = { grid };
       offRejected?.();
       offRejected = grid.on("mutation-rejected", ({ issues }) => {
@@ -338,6 +347,9 @@ const App = defineComponent({
       refreshWorkbook();
       grid.setSelection({ kind: "cell", addr: CHALLENGE_CELL });
       refreshInspector();
+      completeReset?.();
+      completeReset = undefined;
+      failReset = undefined;
       pushFeed("lifecycle", "@ready", `generation ${event.generation} (${event.reason})`);
     }
 
@@ -450,12 +462,21 @@ const App = defineComponent({
     }
 
     function resetGridInput(code: string, detail: string): void {
-      ready.value = false;
-      challengeState.value = "ready";
-      challengeIssue.value = "Protected totals require the finance-lead role.";
-      workbook.value = createWorkbenchWorkbook();
-      data.value = createBusinessData();
-      pushFeed("lifecycle", code, detail);
+      void resetAction.run(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            completeReset = resolve;
+            failReset = reject;
+            ready.value = false;
+            bootError.value = null;
+            challengeState.value = "ready";
+            challengeIssue.value = "Protected totals require the finance-lead role.";
+            workbook.value = createWorkbenchWorkbook();
+            data.value = createBusinessData();
+            pushFeed("lifecycle", code, detail);
+          }),
+        () => "Cannot rebuild the workbook. Try loading it again.",
+      );
     }
 
     function togglePolicy(): void {
@@ -634,6 +655,28 @@ const App = defineComponent({
               role.value === "reviewer" ? "Attempt 999 as reviewer" : "Commit 999 override",
             ),
           ]),
+          h(
+            "p",
+            {
+              class: "sw-action-error",
+              role: "alert",
+              "data-action-error": "",
+              hidden: bootError.value === null && resetState.value.error === null,
+            },
+            bootError.value ?? resetState.value.error ?? "",
+          ),
+          bootError.value !== null || resetState.value.pending
+            ? h(
+                "button",
+                {
+                  type: "button",
+                  disabled: resetState.value.pending,
+                  "aria-busy": resetState.value.pending || undefined,
+                  onClick: () => resetGridInput("retry", "Retrying workbook initialization"),
+                },
+                resetState.value.pending ? "Loading workbook…" : "Retry loading",
+              )
+            : null,
           h("div", { class: "sw-vuewb-workspace" }, [
             h("div", { class: "sw-demo-grid sw-vuewb-grid" }, [
               h(SheetwriteGrid, {
@@ -663,6 +706,11 @@ const App = defineComponent({
                   refreshWorkbook();
                 },
                 onInitializationError: (error: unknown) => {
+                  ready.value = false;
+                  bootError.value = "Cannot load the workbook. Try loading it again.";
+                  failReset?.(error);
+                  completeReset = undefined;
+                  failReset = undefined;
                   pushFeed("rejected", "@initialization-error", String(error));
                 },
               }),

@@ -13,6 +13,7 @@ import { FileSpreadsheet, Monitor } from "lucide-react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { ActionError, pendingProps } from "../lib/use-action.js";
 import { money, useAnalyticsWorkbench } from "./react-analytics.js";
 import { ANALYTICS_MARKETS, ANALYTICS_SEGMENTS, ANALYTICS_THEME } from "./scenarios/analytics.js";
 import { DemoButton } from "./ui/DemoButton.js";
@@ -189,6 +190,7 @@ export default function ReactWorkbench() {
 
         <div className="sw-rwb-workspace">
           <div className="sw-demo-grid" ref={gridHostRef}>
+            <ActionError error={bench.initializationError} />
             {gridHostWidth > 0 ? (
               <SheetwriteGrid
                 ref={bench.gridRef}
@@ -202,6 +204,7 @@ export default function ReactWorkbench() {
                 config={GRID_CONFIG}
                 style={{ height: "100%" }}
                 onReady={bench.onReady}
+                onInitializationError={bench.onInitializationError}
                 onGridChange={bench.onGridChange}
                 onSelectionChange={bench.onSelectionChange}
               />
@@ -379,20 +382,29 @@ export default function ReactWorkbench() {
               <h3 id="rwb-data">Data exchange</h3>
               <div className="sw-rwb-toolgroup__controls" role="toolbar" aria-label="Data workflow">
                 <fieldset className="sw-rwb-cluster" aria-label="Data exchange">
-                  <DemoButton type="button" onClick={bench.exportCsv}>
-                    Export CSV
+                  <DemoButton
+                    type="button"
+                    {...pendingProps(bench.csvAction.pending)}
+                    onClick={bench.exportCsv}
+                  >
+                    {bench.csvAction.pending ? "Exporting CSV…" : "Export CSV"}
                   </DemoButton>
-                  <DemoButton type="button" onClick={() => void bench.exportXlsx()}>
-                    Export XLSX
+                  <DemoButton
+                    type="button"
+                    {...pendingProps(bench.xlsxAction.pending)}
+                    onClick={() => void bench.exportXlsx()}
+                  >
+                    {bench.xlsxAction.pending ? "Exporting XLSX…" : "Export XLSX"}
                   </DemoButton>
                   <label className="sw-rwb-workflow__import">
-                    Import CSV
+                    {bench.importAction.pending ? "Importing CSV…" : "Import CSV"}
                     <input
                       aria-label="Import CSV file"
                       data-testid="import-csv"
                       type="file"
                       accept=".csv,text/csv"
-                      disabled={bench.readOnly}
+                      disabled={bench.readOnly || bench.importAction.pending}
+                      aria-busy={bench.importAction.pending || undefined}
                       onChange={onImportChange}
                     />
                   </label>
@@ -405,6 +417,9 @@ export default function ReactWorkbench() {
                   </Link>
                 </fieldset>
               </div>
+              <ActionError
+                error={bench.csvAction.error ?? bench.xlsxAction.error ?? bench.importAction.error}
+              />
             </section>
 
             <section

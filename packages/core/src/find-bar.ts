@@ -1,3 +1,4 @@
+import { actionFeedbackFor } from "./action-feedback.js";
 import type { Grid, SearchResult } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
@@ -111,7 +112,8 @@ export class FindBar {
     if (!readOnly) {
       const replaceRow = this.row("sheetwrite-find-replace-row");
 
-      replaceInput = document.createElement("input");
+      const replacementInput = document.createElement("input");
+      replaceInput = replacementInput;
       replaceInput.className = "sheetwrite-find-replace-input";
       replaceInput.placeholder = "Replace with";
 
@@ -121,7 +123,7 @@ export class FindBar {
         "Replace",
         "Replace",
         () => {
-          this.update(this.grid.replaceCurrent(replaceInput!.value));
+          this.update(this.grid.replaceCurrent(replacementInput.value));
         },
       );
 
@@ -131,7 +133,7 @@ export class FindBar {
         "All",
         "Replace all",
         () => {
-          this.update(this.grid.replaceAll(replaceInput!.value).result);
+          this.update(this.grid.replaceAll(replacementInput.value).result);
         },
       );
 
@@ -140,7 +142,8 @@ export class FindBar {
 
         if (e.key === "Enter") {
           e.stopPropagation();
-          this.update(this.grid.replaceCurrent(replaceInput!.value));
+          e.preventDefault();
+          replaceBtn.click();
           return;
         }
 
@@ -238,7 +241,12 @@ export class FindBar {
 
     // Keep grid focus so buttons act without observing focus oddly.
     btn.addEventListener("mousedown", (e) => e.preventDefault());
-    btn.addEventListener("click", onClick);
+    btn.addEventListener("click", () => {
+      const feedback =
+        typeClass === "sheetwrite-find-text-btn" ? actionFeedbackFor(this.grid) : undefined;
+      if (feedback) void feedback.run(`find:${className}`, onClick, btn);
+      else onClick();
+    });
 
     return btn;
   }

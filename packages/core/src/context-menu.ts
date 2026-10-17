@@ -209,17 +209,25 @@ export class ContextMenu {
       row.className = "sheetwrite-context-menu-item";
       row.setAttribute("role", "menuitem");
       if (item.id) row.dataset.contextMenuItem = item.id;
+      const action = item.action;
+      const key = action ?? item.id ?? item.label ?? "item";
+      const feedback = actionFeedbackFor(this.grid);
+      const pending = feedback?.isRunning(key) ?? false;
 
       const disabled =
-        typeof item.disabled === "function" ? item.disabled(context) : item.disabled === true;
+        pending ||
+        (typeof item.disabled === "function" ? item.disabled(context) : item.disabled === true);
       if (disabled) {
         row.classList.add("sheetwrite-context-menu-item-disabled");
         row.setAttribute("aria-disabled", "true");
       }
 
       const label = document.createElement("span");
-      const action = item.action;
       label.textContent = item.label ?? (action ? (DEFAULT_LABEL[action] ?? action) : "");
+      if (pending) {
+        row.setAttribute("aria-busy", "true");
+        label.textContent = `Running ${label.textContent}…`;
+      }
       row.appendChild(label);
 
       const binding = item.shortcut ?? (action && isKeyboardAction(action) ? action : undefined);
@@ -244,12 +252,10 @@ export class ContextMenu {
       const run = item.onClick
         ? () => item.onClick?.(this.grid, context.cell)
         : actionHandler(action, this.actions);
-      const key = item.id ?? action ?? label.textContent ?? "item";
       row.addEventListener("click", () => {
         if (disabled) return;
         // The menu closes at once; a refused clipboard or a failed export
         // still reaches the user through the grid's action status.
-        const feedback = actionFeedbackFor(this.grid);
         if (feedback) void feedback.run(key, run);
         else run();
         this.close();

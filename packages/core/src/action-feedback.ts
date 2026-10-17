@@ -54,6 +54,13 @@ class ActionFeedback {
     if (this.running.has(key)) return;
     this.running.add(key);
     const wasDisabled = button?.disabled ?? false;
+    const label = button?.getAttribute("aria-label");
+    const title = button?.title;
+    if (button) {
+      const name = label ?? button.textContent ?? key;
+      button.setAttribute("aria-label", `Running ${name}…`);
+      button.title = `Running ${name}…`;
+    }
     button?.setAttribute("aria-busy", "true");
     if (button) button.disabled = true;
     try {
@@ -67,6 +74,11 @@ class ActionFeedback {
     } finally {
       this.running.delete(key);
       button?.removeAttribute("aria-busy");
+      if (button) {
+        if (label === null || label === undefined) button.removeAttribute("aria-label");
+        else button.setAttribute("aria-label", label);
+        button.title = title ?? "";
+      }
       // Command state may have changed meanwhile; only undo our own disable.
       if (button && !wasDisabled) button.disabled = false;
     }

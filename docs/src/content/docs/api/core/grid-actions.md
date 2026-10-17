@@ -326,21 +326,24 @@ clearContents(): void;
 </details>
 
 <details class="api-member" id="grid-actions-export-csv" data-pagefind-weight="1">
-<summary><code>exportCsv</code></summary>
+<summary><code>exportCsv</code> <span class="api-member-summary">Download the active sheet as CSV.</span></summary>
 
 ```ts generated
 exportCsv(filename?: string): void;
 ```
 
+<p class="api-member-doc">Download the active sheet as CSV. Never throws; a failure emits `export-error`.</p>
 </details>
 
 <details class="api-member" id="grid-actions-export-xlsx" data-pagefind-weight="1">
-<summary><code>exportXlsx</code></summary>
+<summary><code>exportXlsx</code> <span class="api-member-summary">Download the workbook as XLSX.</span></summary>
 
 ```ts generated
-exportXlsx(filename?: string): void;
+exportXlsx(filename?: string): Promise<void>;
 ```
 
+<p class="api-member-doc">Download the workbook as XLSX. Resolves when the download starts and never
+rejects; a failure emits `export-error`.</p>
 </details>
 
 <details class="api-member" id="grid-actions-undo" data-pagefind-weight="1">
@@ -400,7 +403,7 @@ export interface GridActions {
   pasteValues(): Promise<ClipboardOutcome>;
   clearContents(): void;
   exportCsv(filename?: string): void;
-  exportXlsx(filename?: string): void;
+  exportXlsx(filename?: string): Promise<void>;
   undo(): void;
   redo(): void;
 }
