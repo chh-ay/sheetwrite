@@ -194,8 +194,8 @@ a {
 /* The global 2px ring hugging the full-width pill reads as a broken border;
    an accent border with a soft halo matches the input inside the dialog. */
 .sw-search-button:focus-visible {
-  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 15%, transparent);
+  border-color: var(--sw-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 45%, transparent);
 }
 
 .sw-search-button span {
@@ -398,10 +398,22 @@ a {
   color: var(--sw-fg-dim);
 }
 
+/* Links carry an underline at rest so they never rely on color alone; hover
+   strengthens it so the pointer target is clear. */
 .sw-prose a {
   color: var(--sw-accent-strong);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--sw-accent) 45%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18em;
+  transition:
+    text-decoration-color 140ms ease,
+    text-decoration-thickness 140ms ease;
+}
+
+.sw-prose a:hover {
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
 }
 
 .sw-prose strong {
@@ -428,6 +440,25 @@ a {
   background: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
 }
 
+/* Markdown tables sit in a scroll frame (added at build time), so short cells
+   keep values and identifiers on one line without widening the page. An edge
+   shadow shows only while more columns sit out of view on that side: the
+   covers scroll with the content, the shadows stay with the frame. */
+.sw-prose .sw-table-frame {
+  margin: 1.5rem 0 2rem;
+  overflow-x: auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  background:
+    linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--sw-shadow-edge), transparent) left / 0.8rem 100%
+      no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--sw-shadow-edge), transparent) right / 0.8rem
+      100% no-repeat scroll;
+  --sw-shadow-edge: color-mix(in srgb, var(--sw-fg-strong) 22%, transparent);
+}
+
 .sw-prose table {
   display: table;
   width: 100%;
@@ -437,6 +468,13 @@ a {
   border: 1px solid var(--sw-border);
   border-radius: 0.65rem;
   font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .sw-table-frame > table {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
 }
 
 .sw-prose th,
@@ -451,6 +489,20 @@ a {
   color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
   font-weight: 680;
+}
+
+/* A break inside a name, value or range reads as two values. */
+.sw-prose .sw-table-frame td code,
+.sw-prose .sw-table-frame .sw-cell-short {
+  white-space: nowrap;
+}
+
+.sw-prose tbody tr {
+  transition: background-color 120ms ease;
+}
+
+.sw-prose tbody tr:hover {
+  background: color-mix(in srgb, var(--sw-surface-2) 60%, transparent);
 }
 
 .sw-prose tr:last-child td {
@@ -471,6 +523,20 @@ a {
 
 .sw-prose .expressive-code .frame {
   box-shadow: none;
+}
+
+/* The copy control rests dimmed so it does not compete with the code; hover
+   and focus bring it to full strength so it reads as clickable. */
+.sw-prose .expressive-code .copy button {
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.sw-prose .expressive-code .copy button:hover,
+.sw-prose .expressive-code .copy button:focus-visible {
+  opacity: 1;
+  background-color: var(--sw-surface-2);
 }
 
 .sw-tabs {
@@ -1491,8 +1557,9 @@ body .sw-code-popover__accessible-signature {
 }
 
 @media (max-width: 48rem) {
-  /* Narrow screens scroll wide tables locally instead of stretching the page. */
-  .sw-prose table {
+  /* Narrow screens scroll wide tables locally instead of stretching the page.
+     Markdown tables already scroll inside their frame. */
+  .sw-prose table:not(.sw-table-frame > table) {
     display: block;
     overflow-x: auto;
   }
@@ -2790,6 +2857,14 @@ body .sw-code-popover__accessible-signature {
    track edges visibly misaligned them from the lines they label. */
 .bench-bar--ruler .bench-bar__track {
   overflow: visible;
+}
+
+/* On a phone the centered last tick sticks out past the page edge and makes the
+   page scroll sideways; there, it ends at its gridline instead. */
+@media (max-width: 40rem) {
+  .bench-ruler__tick:last-child {
+    transform: translateX(-100%);
+  }
 }
 
 .bench-ruled .bench-bar:not(.bench-bar--ruler) .bench-bar__track {

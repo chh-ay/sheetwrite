@@ -8,6 +8,11 @@
   background: var(--sw-surface-0);
 }
 
+/* The page behind the open phone menu must not scroll with the menu. */
+html:has(#sw-docs-navigation[open]) {
+  overflow: hidden;
+}
+
 .sw-docs-header {
   position: fixed;
   z-index: 50;
@@ -41,14 +46,18 @@
   font-size: 0.875rem;
   font-weight: 550;
   text-decoration: none;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
 }
 .sw-docs-header__links > a:hover {
   color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
 }
-.sw-docs-header__links > .sw-docs-header__home {
-  border: 1px solid var(--sw-border);
-  color: var(--sw-fg-strong);
+/* Every docs page is in the Docs section, so the header marks Docs as current. */
+.sw-docs-header__links > a[aria-current="page"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
 }
 .sw-docs .sw-search-button {
   height: 2.6rem;
@@ -84,6 +93,7 @@
   font-weight: 600;
   cursor: pointer;
   list-style: none;
+  transition: background-color 140ms ease;
 }
 .sw-nav-group > summary::-webkit-details-marker {
   display: none;
@@ -116,6 +126,9 @@
   line-height: 1.4;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
 }
 .sw-sidebar__nav a:hover {
   color: var(--sw-fg-strong);
@@ -259,6 +272,9 @@
   line-height: 1.5;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
 }
 .sw-toc a:hover,
 .sw-toc-inline a:hover {
@@ -812,7 +828,8 @@ html:has(.sw-nav-dialog[open]) {
   .sw-docs .sw-search-button kbd {
     display: none;
   }
-  .sw-docs-header__links > .sw-docs-header__showcases {
+  .sw-docs-header__links > .sw-docs-header__showcases,
+  .sw-docs-header__links > .sw-docs-header__docs {
     display: none;
   }
   .sw-docs-header__links > .sw-docs-header__home {

@@ -292,6 +292,9 @@ export function DocsShell({
             <Link className="sw-docs-header__home" to="/">
               Home
             </Link>
+            <Link aria-current="page" className="sw-docs-header__docs" to="/docs/">
+              Docs
+            </Link>
             <Link className="sw-docs-header__showcases" to="/showcases/">
               Showcases
             </Link>

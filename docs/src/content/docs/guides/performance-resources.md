@@ -1247,7 +1247,7 @@ The landing-page data comes from a separate browser benchmark. The Delivery size
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 08:11 UTC</dd></div>
 <div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
-<div><dt>Engines</dt><dd>Sheetwrite 0.5.0 release candidate · ExcelJS 4.4.0 at baseline <code>87fadb72397947ea8c6ba576682925c7879579b8</code></dd></div>
+<div><dt>Engines</dt><dd>Sheetwrite 0.5.0 release candidate · ExcelJS 4.4.0 at baseline <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code></dd></div>
 <div><dt>Fixture</dt><dd><code>bench/fixtures/xlsx-codec-corpus.xlsx</code> · 1,038,346 bytes · <code>2633e51a4a3c</code> · LibreOffice 26.2.4.2 Calc MS Excel 2007 XML</dd></div>
 <div><dt>Environment</dt><dd>Bun 1.4.3 · Node v26.3.0 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
 <div><dt>Raw artifact</dt><dd><code>bench/results/xlsx-results.json</code></dd></div>

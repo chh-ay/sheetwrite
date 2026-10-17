@@ -2383,7 +2383,7 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
     '<dl class="bench-meta" data-pagefind-ignore>',
     `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
     `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-    `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code>${html(baselineCommit ?? "")}</code></dd></div>`,
+    `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code title="${html(baselineCommit ?? "")}">${html((baselineCommit ?? "").slice(0, 12))}</code></dd></div>`,
     `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
     `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
     `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
