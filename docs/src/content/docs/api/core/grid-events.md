@@ -8,7 +8,7 @@ description: "Payload map for events emitted by a Grid."
 Payload map for events emitted by a Grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L490"><code>packages/core/src/types/grid.ts#L490</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L495"><code>packages/core/src/types/grid.ts#L495</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -154,7 +154,7 @@ search: SearchResult;
 <summary><code>export-error</code> <span class="api-member-summary">Built-in toolbar/context-menu export failed after its action was dispatched.</span></summary>
 
 ```ts generated
-"export-error": { format: "xlsx"; error: SheetwriteError };
+"export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
 ```
 
 </details>
@@ -207,7 +207,7 @@ export interface GridEvents {
     error: SheetwriteError;
   };
   "export-error": {
-    format: "xlsx";
+    format: "csv" | "xlsx";
     error: SheetwriteError;
   };
 }
