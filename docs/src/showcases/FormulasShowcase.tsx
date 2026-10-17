@@ -134,7 +134,30 @@ export default function FormulasShowcase() {
         workbook: createFormulasWorkbook(),
         data: ledger.data,
         presentation: "data-grid",
-        config: { toolbar: false },
+        config: {
+          toolbar: false,
+          contextMenu: (context) => [
+            { action: "copy", label: "Copy result" },
+            {
+              label: "Follow this formula",
+              visible:
+                context.cell !== null && Boolean(gridRef.current?.store.getFormula(context.cell)),
+              onClick(instance, cell) {
+                if (!cell) return;
+                const panel = FORMULA_PANELS.find(
+                  (candidate) =>
+                    cell.sheet === ANALYSIS_SHEET_ID &&
+                    candidate.row === cell.row &&
+                    candidate.col === cell.col,
+                );
+                if (panel) setSelected(panel.id);
+                instance.beginEdit(cell.row, cell.col);
+              },
+            },
+            { action: "separator" },
+            { action: "exportXlsx", label: "Export formula workbook" },
+          ],
+        },
       });
       gridRef.current = grid;
       window.__sheetwriteFormulasGrid = grid;

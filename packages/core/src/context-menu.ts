@@ -1,3 +1,4 @@
+import { boundShortcutLabel, formatShortcut, isKeyboardAction } from "./keymap.js";
 import type {
   ContextMenuActionName,
   ContextMenuContext,
@@ -220,10 +221,20 @@ export class ContextMenu {
       label.textContent = item.label ?? (action ? (DEFAULT_LABEL[action] ?? action) : "");
       row.appendChild(label);
 
-      if (item.shortcut) {
+      const binding = item.shortcut ?? (action && isKeyboardAction(action) ? action : undefined);
+      const shortcutLabel =
+        typeof binding === "object"
+          ? formatShortcut(binding)
+          : binding
+            ? boundShortcutLabel(
+                binding,
+                typeof this.config.keyboard === "object" ? this.config.keyboard : undefined,
+              )
+            : "";
+      if (shortcutLabel && this.config.keyboard !== false) {
         const shortcut = document.createElement("span");
         shortcut.className = "sheetwrite-context-menu-shortcut";
-        shortcut.textContent = item.shortcut;
+        shortcut.textContent = shortcutLabel;
         row.appendChild(shortcut);
       }
 

@@ -153,6 +153,52 @@ function rendererReadout(requested: string, active: string): RegExp {
   return new RegExp(`Requested:\\s*${requested}\\b[\\s\\S]*Active:\\s*${active}\\b`);
 }
 
+test("context menu shows platform shortcuts and clears temporary highlights", async ({ page }) => {
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const surface = page.locator(`${GRID} .sheetwrite-scroller`);
+  await surface.scrollIntoViewIfNeeded();
+  const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
+  const highlightColor = "rgba(217, 70, 239, 0.28)";
+  const visibleHighlightCount = () =>
+    page
+      .locator(`${GRID} .sheetwrite-overlay`)
+      .evaluate(
+        (overlay, color) =>
+          Array.from(overlay.querySelectorAll<HTMLElement>("div")).filter(
+            (rectangle) =>
+              rectangle.style.display !== "none" && rectangle.style.backgroundColor === color,
+          ).length,
+        highlightColor,
+      );
+
+  await openMenu();
+  const expectedShortcut = await page.evaluate(() =>
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent) ? "⌘C" : "Ctrl+C",
+  );
+  await expect(
+    page.locator('[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut'),
+  ).toHaveText(expectedShortcut);
+  await page.locator('[data-context-menu-item="highlight-cell"]').click();
+  await expect.poll(visibleHighlightCount).toBeGreaterThan(0);
+  await expect(page.getByText(/Temporary highlight at R\d+ C\d+/, { exact: true })).toBeVisible();
+
+  await openMenu();
+  await expect(page.locator('[data-context-menu-item="highlight-cell"]')).toHaveText(
+    "Clear highlight",
+  );
+  await page.locator('[data-context-menu-item="highlight-cell"]').click();
+  await expect.poll(visibleHighlightCount).toBe(0);
+  await expect(page.getByText("Temporary highlight cleared", { exact: true })).toBeVisible();
+
+  await openMenu();
+  await page.locator('[data-context-menu-item="highlight-cell"]').click();
+  await expect.poll(visibleHighlightCount).toBeGreaterThan(0);
+  await surface.click({ button: "right", position: { x: 160, y: 120 } });
+  await page.locator('[data-context-menu-item="clear-highlight"]').click();
+  await expect.poll(visibleHighlightCount).toBe(0);
+});
+
 test(
   "boots product-first, paints, and exposes the ownership instruments",
   {

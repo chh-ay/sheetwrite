@@ -488,7 +488,7 @@ hidden separators are normalized.
 ```ts prelude="core" partial="requires an initialized Grid host" title="Context-aware bundled menu"
 const config = {
   contextMenu: (context) => [
-    { id: "copy", action: "copy", label: "Copy value", shortcut: "Ctrl+C" },
+    { id: "copy", action: "copy", label: "Copy value", shortcut: "copy" },
     { action: "separator" },
     {
       id: "inspect",

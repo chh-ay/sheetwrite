@@ -231,7 +231,25 @@ export default function EngineShowcase() {
           }),
           datasourceStorage: ENGINE_LIVE_STORAGE,
           theme,
-          config: { toolbar: false, tabs: false },
+          config: {
+            toolbar: false,
+            tabs: false,
+            contextMenu: [
+              { action: "copy", label: "Copy engine value" },
+              {
+                label: "Return to first data row",
+                onClick(instance) {
+                  const addr = {
+                    sheet: ENGINE_LIVE_SHEET,
+                    row: 1,
+                    col: ENGINE_COLUMN_INDEX.actual,
+                  };
+                  instance.setSelection({ kind: "cell", addr });
+                  instance.scrollToCell(addr);
+                },
+              },
+            ],
+          },
           renderer,
           ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
         });

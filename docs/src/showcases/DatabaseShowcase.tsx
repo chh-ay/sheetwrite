@@ -124,6 +124,15 @@ function resolveDatabaseGridTheme(host: HTMLElement): Partial<Theme> {
 function mountDatabaseGrid(host: HTMLElement, snapshot: unknown): Grid {
   return createGridFromSnapshot(host, snapshot, {
     presentation: "data-grid",
+    config: {
+      contextMenu: [
+        { action: "copy", label: "Copy stored value" },
+        { action: "paste" },
+        { action: "clearContents" },
+        { action: "separator" },
+        { action: "exportXlsx", label: "Export database workbook" },
+      ],
+    },
     theme: resolveDatabaseGridTheme(host),
   });
 }
@@ -592,6 +601,7 @@ export default function DatabaseShowcase() {
     host.replaceChildren();
     const grid = createGridFromSnapshot(host, makeTightLimitSnapshot(), {
       presentation: "data-grid",
+      config: { contextMenu: [{ action: "copy", label: "Copy receipt value" }] },
       transactionResourceLimits: { maxEncodedBytes: TIGHT_LIMIT_BYTES },
     });
     limitGridRef.current = grid;

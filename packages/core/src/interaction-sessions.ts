@@ -5,6 +5,7 @@ import { CustomEditorController } from "./custom-editor.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import type { FindBar } from "./find-bar.js";
+import { keyboardAction } from "./keymap.js";
 import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
@@ -13,6 +14,7 @@ import { storeEngine } from "./store/engine-registry.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
+import type { KeyboardOptions } from "./types/grid.js";
 import type { CellEditor, CellEditorRect, Grid, GridConfig, GridEvents } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
@@ -81,7 +83,7 @@ interface InteractionDependencies {
    * Stock-keymap policy: `false` disables every built-in binding, a function
    * intercepts first (returning true consumes the event). See GridConfig.keyboard.
    */
-  keyboard: () => boolean | ((e: KeyboardEvent) => boolean);
+  keyboard: () => boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean);
   screenRect: (
     row: number,
     col: number,
@@ -798,34 +800,40 @@ export class InteractionSessions {
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
 
-    if (mod && key === "f") {
+    const action = keyboardAction(e, typeof keyboard === "object" ? keyboard : undefined);
+    if (action) {
       e.preventDefault();
-      this.deps.findBar()?.open();
+      switch (action) {
+        case "find":
+          this.deps.findBar()?.open();
+          break;
+        case "replace":
+          this.deps.findBar()?.open({ replace: true });
+          break;
+        case "undo":
+          this.deps.undo();
+          break;
+        case "redo":
+          this.deps.redo();
+          break;
+        case "copy":
+          void this.deps.copy();
+          break;
+        case "cut":
+          void this.deps.cut();
+          break;
+        case "paste":
+          void this.deps.paste();
+          break;
+        case "pasteValues":
+          void this.deps.pasteValues();
+          break;
+        case "clearContents":
+          this.deps.clearSelection();
+          break;
+      }
       return;
     }
-
-    if (mod && key === "h") {
-      e.preventDefault();
-      this.deps.findBar()?.open({ replace: true });
-      return;
-    }
-
-    if (mod && key === "z") {
-      e.preventDefault();
-      if (e.shiftKey) this.deps.redo();
-      else this.deps.undo();
-      return;
-    }
-
-    if (mod && key === "y") {
-      e.preventDefault();
-      this.deps.redo();
-      return;
-    }
-
-    if (mod && key === "c") return void this.deps.copy();
-    if (mod && key === "x") return void this.deps.cut();
-    if (mod && key === "v") return void (e.shiftKey ? this.deps.pasteValues() : this.deps.paste());
 
     const selection = this.deps.selection();
     const focus = selection.focusCell;
@@ -904,10 +912,6 @@ export class InteractionSessions {
       case "Enter":
       case "F2":
         if (focus) this.beginEdit(focus.row, focus.col, undefined, e.key === "F2");
-        break;
-      case "Delete":
-      case "Backspace":
-        this.deps.clearSelection();
         break;
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {

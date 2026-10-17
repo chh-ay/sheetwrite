@@ -3,6 +3,7 @@ import type {
   ChangeEvent,
   DataValidationRule,
   Grid,
+  GridConfig,
   GridEvents,
   ProtectedRange,
   ProtectionResolver,
@@ -66,7 +67,16 @@ interface FeedEntry {
 }
 
 /** Hoisted: a stable identity means the adapter never reconfigures chrome per render. */
-const GRID_CONFIG = { toolbar: true } as const;
+const GRID_CONFIG: GridConfig = {
+  toolbar: true,
+  contextMenu: [
+    { action: "copy", label: "Copy account value" },
+    { action: "paste" },
+    { action: "clearContents" },
+    { action: "separator" },
+    { action: "exportXlsx", label: "Export business workbook" },
+  ],
+};
 /** The rail log shows the newest entries the 640px rail holds without a scroll. */
 const FEED_LIMIT = 5;
 const ARCHIVE_SHEET_ID = "archive";

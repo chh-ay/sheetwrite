@@ -8,7 +8,7 @@ description: "Static rows or a context-aware factory evaluated each time the men
 Static rows or a context-aware factory evaluated each time the menu opens.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L270"><code>packages/core/src/types/grid.ts#L270</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L301"><code>packages/core/src/types/grid.ts#L301</code></a></dd></div>
 </dl>
 
 ## Declaration

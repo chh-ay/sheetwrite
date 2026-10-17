@@ -31,6 +31,7 @@ import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
+import { boundShortcutLabel } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { ReadWindowController } from "./read-window-controller.js";
@@ -83,6 +84,7 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
+import type { KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellInputSnapshot,
@@ -389,7 +391,7 @@ export class GridImpl implements Grid {
   private tabBar: HTMLDivElement | null = null;
   private sheetTabs: SheetTabs | null = null;
   private tabBarHeight = 0;
-  private keyboardPolicy: boolean | ((e: KeyboardEvent) => boolean) = true;
+  private keyboardPolicy: boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean) = true;
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
@@ -1379,6 +1381,14 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
+  getShortcutLabel(action: KeyboardAction): string {
+    if (this.keyboardPolicy === false) return "";
+    return boundShortcutLabel(
+      action,
+      typeof this.keyboardPolicy === "object" ? this.keyboardPolicy : undefined,
+    );
+  }
+
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
     this.overlayPainter.highlightCells(ranges, color);
   }
@@ -2029,6 +2039,7 @@ export class GridImpl implements Grid {
     this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
     this.applyLayout();
     this.render();
+    this.emitCommandStateChange();
   }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {

@@ -343,6 +343,25 @@ function PerformanceRoute() {
           config: {
             toolbar: false,
             tabs: false,
+            contextMenu: [
+              { action: "copy", label: "Copy loaded value" },
+              {
+                label: "Jump to last row",
+                onClick(instance) {
+                  const addr = { sheet: FEED_SHEET, row: SCALE_ROWS - 1, col: 0 };
+                  instance.setSelection({ kind: "cell", addr });
+                  instance.scrollToCell(addr);
+                },
+              },
+              {
+                label: "Return to first cell",
+                onClick(instance) {
+                  const addr = { sheet: FEED_SHEET, row: 0, col: 0 };
+                  instance.setSelection({ kind: "cell", addr });
+                  instance.scrollToCell(addr);
+                },
+              },
+            ],
             keyboard: (event, mountedGrid) => {
               if (
                 event.key !== "PageUp" ||

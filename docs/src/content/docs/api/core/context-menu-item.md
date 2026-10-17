@@ -8,7 +8,7 @@ description: "Built-in, separator, or custom callback row in the right-click men
 Built-in, separator, or custom callback row in the right-click menu.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L252"><code>packages/core/src/types/grid.ts#L252</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L277"><code>packages/core/src/types/grid.ts#L277</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -63,12 +63,17 @@ label?: string;
 </details>
 
 <details class="api-member" id="context-menu-item-shortcut" data-pagefind-weight="1">
-<summary><code>shortcut</code> <span class="api-member-summary">Optional shortcut hint rendered beside the label.</span></summary>
+<summary><code>shortcut</code> <span class="api-member-summary">A bound action or an explicit key combination, rendered for the current platform.</span></summary>
 
 ```ts generated
-shortcut?: string;
+shortcut?: KeyboardAction | KeyShortcut;
 ```
 
+<p class="api-member-doc">A bound action or an explicit key combination, rendered for the current platform.
+For example, `shortcut: &quot;copy&quot;` follows `GridConfig.keyboard.bindings.copy`;
+`shortcut: { key: &quot;c&quot;, mod: true, shift: true }` displays ⌘⇧C on macOS.
+See <a href="/docs/api/core/keyboard-options/"><code>KeyboardOptions</code></a> for bindings and
+[Interaction and editing](/docs/guides/interaction/#rebind-an-action) for examples.</p>
 </details>
 
 <details class="api-member" id="context-menu-item-visible" data-pagefind-weight="1">
@@ -102,7 +107,7 @@ export interface ContextMenuItem {
   action?: ContextMenuActionName;
   onClick?: (grid: Grid, cell: CellAddress | null) => void;
   label?: string;
-  shortcut?: string;
+  shortcut?: KeyboardAction | KeyShortcut;
   visible?: boolean | ((context: ContextMenuContext) => boolean);
   disabled?: boolean | ((context: ContextMenuContext) => boolean);
 }

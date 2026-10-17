@@ -80,6 +80,40 @@ When the grid is focused and not editing:
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 
+### Rebind an action
+
+Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions
+keep their defaults. Use `null` to remove an action's keys, or an array for multiple
+bindings. `mod` means Command on macOS and Control elsewhere. Modifiers must match
+exactly. These bindings apply when the grid has focus and is not editing.
+
+```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
+grid.setConfig({
+  keyboard: {
+    bindings: {
+      copy: { key: "c", mod: true, shift: true },
+      find: { key: "f", mod: true },
+      replace: null,
+    },
+  },
+  contextMenu: [
+    { action: "copy", label: "Copy value", shortcut: "copy" },
+  ],
+});
+```
+
+The Copy label is `⌘⇧C` on macOS and `Ctrl+Shift+C` elsewhere. Its original
+Mod+C binding no longer runs Copy. Menu actions use their bound shortcut by
+default; `shortcut: "copy"` lets a custom item use the same label.
+Built-in toolbar titles and `grid.getShortcutLabel("copy")` use the same keymap.
+An explicit key hint such as `shortcut: { key: "k", mod: true, alt: true }`
+is platform-aware but does not register a key handler. The host must bind it.
+Free-text shortcut hints are no longer accepted.
+
+Use `keyboard: false` to handle all keys in the host. The existing intercept
+function remains available: return `true` to consume a key or `false` to let the
+built-in handler continue. See [KeyboardOptions](/docs/api/core/keyboard-options/).
+
 ## Undo and redo
 
 `grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step
@@ -240,6 +274,17 @@ resolves the pointer without exposing renderer internals; the host then owns
 See [Configuration → Context-menu items](/docs/guides/configuration/#context-menu-items)
 for both models and [Styling → Widget and context-menu styling](/docs/guides/styling/#widget-and-context-menu-styling)
 for the bundled menu CSS hooks.
+
+### Temporary highlights
+
+`grid.highlightCells(ranges)` draws an overlay, not a document edit. Undo does not
+clear it. Call `grid.highlightCells(null)` to clear all temporary highlights.
+Choose a distinct overlay color so users can tell it from selection and cell
+formatting. Use `grid.styleRange` when a fill must be saved and undoable.
+
+The Vanilla workbench offers **Clear highlight** in its context menu. Right-click
+the highlighted cell to toggle it off, or right-click another cell and choose
+**Clear highlight**. Both actions write to the host event log.
 
 ## Merged cells
 

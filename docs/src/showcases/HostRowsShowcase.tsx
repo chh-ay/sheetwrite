@@ -2,6 +2,7 @@ import {
   createRowBridge,
   type DocumentOp,
   type Grid,
+  type GridConfig,
   type RowBridgeProjection,
 } from "@sheetwrite/core";
 import { createSimpleGridInput } from "@sheetwrite/core/adapter";
@@ -17,6 +18,14 @@ const LEAD_IMPORT_ROWS = 10_000;
 const HOST_PREVIEW_ROWS = 120;
 /** One Grid commit accepts at most 10,000 operations, so cells load in batches. */
 const LEAD_LOAD_BATCH_ROWS = 1_800;
+const GRID_CONFIG: GridConfig = {
+  contextMenu: [
+    { action: "copy", label: "Copy account value" },
+    { action: "paste" },
+    { action: "separator" },
+    { action: "exportCsv", label: "Export host accounts" },
+  ],
+};
 
 interface HostEntity extends Record<string, string | number | boolean | null> {
   id: string;
@@ -377,6 +386,7 @@ export default function HostRowsShowcase() {
             presentation="data-grid"
             theme={{ rowHeight: 36 }}
             rowBridge={bridge}
+            config={GRID_CONFIG}
             onReady={() => {
               applySiteTheme();
               setReady(true);

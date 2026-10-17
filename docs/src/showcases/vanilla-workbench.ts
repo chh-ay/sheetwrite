@@ -91,34 +91,63 @@ export interface Workbench {
   destroy(): void;
 }
 
-// Request-aware context menu: rows are rebuilt per opening from the live
-// context, and the callback receives the owning grid instance.
-const WORKBENCH_GRID_CONFIG: GridConfig = {
-  // The standalone shell toolbar below replaces the grid's built-in one.
-  toolbar: false,
-  contextMenu: (context) => [
-    { id: "copy", action: "copy", label: "Copy value", shortcut: "Ctrl+C" },
-    { action: "separator" },
-    {
-      id: "highlight-cell",
-      label:
-        context.cell === null
-          ? "Highlight cell"
-          : `Highlight cell R${context.cell.row + 1} C${context.cell.col + 1}`,
-      visible: context.cell !== null,
-      onClick(instance, cell) {
-        if (cell === null) return;
-        instance.highlightCells([
-          {
-            sheet: cell.sheet,
-            start: { row: cell.row, col: cell.col },
-            end: { row: cell.row, col: cell.col },
+function workbenchGridConfig(events: WorkbenchEvents): GridConfig {
+  let highlighted: { sheet: SheetId; row: number; col: number } | null = null;
+  const clearHighlight = (instance: Grid): void => {
+    instance.highlightCells(null);
+    highlighted = null;
+    events.onActivity("Temporary highlight cleared");
+  };
+
+  return {
+    toolbar: false,
+    contextMenu: (context) => {
+      const isHighlighted =
+        context.cell !== null &&
+        highlighted?.sheet === context.cell.sheet &&
+        highlighted?.row === context.cell.row &&
+        highlighted?.col === context.cell.col;
+      return [
+        { id: "copy", action: "copy", label: "Copy value", shortcut: "copy" },
+        { action: "separator" },
+        {
+          id: "highlight-cell",
+          label: isHighlighted
+            ? "Clear highlight"
+            : context.cell === null
+              ? "Highlight cell (temporary)"
+              : `Highlight cell R${context.cell.row + 1} C${context.cell.col + 1} (temporary)`,
+          visible: context.cell !== null,
+          onClick(instance, cell) {
+            if (isHighlighted) {
+              clearHighlight(instance);
+              return;
+            }
+            if (cell === null) return;
+            highlighted = cell;
+            instance.highlightCells([
+              {
+                sheet: cell.sheet,
+                start: { row: cell.row, col: cell.col },
+                end: { row: cell.row, col: cell.col },
+                color: "rgba(217, 70, 239, 0.28)",
+              },
+            ]);
+            events.onActivity(`Temporary highlight at R${cell.row + 1} C${cell.col + 1}`);
           },
-        ]);
-      },
+        },
+        {
+          id: "clear-highlight",
+          label: "Clear highlight",
+          visible: highlighted !== null && !isHighlighted,
+          onClick: clearHighlight,
+        },
+        { action: "separator" },
+        { action: "exportXlsx" },
+      ];
     },
-  ],
-};
+  };
+}
 
 /**
  * Serve the shared revenue fixture as cancellable async pages. The first
@@ -205,7 +234,7 @@ export function createWorkbench(
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
     presentation: "data-grid",
     theme: ENGINE_THEME,
-    config: WORKBENCH_GRID_CONFIG,
+    config: workbenchGridConfig(events),
     renderer: spec.renderer,
     ...(spec.renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
   };
@@ -413,10 +442,6 @@ export function addSummarySheet(grid: Grid, hostWidth: number): SheetId {
     ]),
   });
 
-  // The tab bar is sized at construction (one sheet → no bar). setConfig
-  // rebuilds built-in chrome, but early-returns on a shallow-equal config —
-  // so make the multi-sheet intent explicit, which also changes the config.
-  grid.setConfig({ ...WORKBENCH_GRID_CONFIG, tabs: true });
   grid.setActiveSheet(id);
   return id;
 }

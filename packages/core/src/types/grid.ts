@@ -248,6 +248,31 @@ export interface ContextMenuContext {
   readonly clientY: number;
 }
 
+/** A platform-neutral key combination. `mod` means Command on macOS, Control elsewhere. */
+export interface KeyShortcut {
+  key: string;
+  mod?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+}
+
+/** Built-in actions that can be rebound without replacing navigation. */
+export type KeyboardAction =
+  | "copy"
+  | "cut"
+  | "paste"
+  | "pasteValues"
+  | "undo"
+  | "redo"
+  | "find"
+  | "replace"
+  | "clearContents";
+
+/** Overrides replace all default keys for an action; null disables that action's keys. */
+export interface KeyboardOptions {
+  bindings?: Partial<Record<KeyboardAction, KeyShortcut | readonly KeyShortcut[] | null>>;
+}
+
 /** Built-in, separator, or custom callback row in the right-click menu. */
 export interface ContextMenuItem {
   /** Stable host identifier, exposed as `data-context-menu-item`. */
@@ -258,8 +283,14 @@ export interface ContextMenuItem {
   onClick?: (grid: Grid, cell: CellAddress | null) => void;
   /** Menu row text. Defaults per action. */
   label?: string;
-  /** Optional shortcut hint rendered beside the label. */
-  shortcut?: string;
+  /**
+   * A bound action or an explicit key combination, rendered for the current platform.
+   * For example, `shortcut: "copy"` follows `GridConfig.keyboard.bindings.copy`;
+   * `shortcut: { key: "c", mod: true, shift: true }` displays ⌘⇧C on macOS.
+   * See {@link KeyboardOptions} for bindings and
+   * [Interaction and editing](/docs/guides/interaction/#rebind-an-action) for examples.
+   */
+  shortcut?: KeyboardAction | KeyShortcut;
   /** Static or request-aware visibility. Hidden separators are normalized. */
   visible?: boolean | ((context: ContextMenuContext) => boolean);
   /** Static or context-aware disabled state. */
@@ -310,13 +341,14 @@ export interface GridConfig {
   tabs?: boolean;
   /**
    * Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
-   * bindings (navigation, type-to-edit, clipboard, undo/redo, find). `false`
-   * disables ALL of them — the host owns key events and drives `grid.actions`,
-   * selection, editing, and search primitives itself. A function is consulted
-   * first and consumes the event by returning `true`; returning `false` falls
-   * through to the stock bindings.
+   * bindings. An object replaces individual action bindings; omitted actions
+   * keep their defaults, and `null` disables an action's keys.
+   * For example: `{ bindings: { copy: { key: "c", mod: true, shift: true } } }`.
+   * Menu hints and toolbar titles use these same bindings. `false` disables
+   * all built-in keys. A function intercepts each keydown before the defaults;
+   * return true to consume it, false to let the built-in handler continue.
    */
-  keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
+  keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
 
 /** Workbook, data, rendering, policy, and built-in UI options used to create a Grid. */
@@ -511,6 +543,8 @@ export interface Grid {
   setSelection(sel: Selection | null): void;
   /** Resolved base theme, before zoom scaling. The returned object is a copy. */
   getTheme(): Theme;
+  /** Platform-aware label for a bound action, or an empty string when disabled. */
+  getShortcutLabel(action: KeyboardAction): string;
   /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
   /**
@@ -663,7 +697,11 @@ export interface Grid {
    * silently extends presentation padding; `undefined` restores the default.
    */
   setMinColumns(minColumns?: number): void;
-  /** Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color. */
+  /**
+   * Draw temporary highlights outside document history. Pass `null` to clear all
+   * highlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.
+   * Undo does not clear highlights; use `styleRange` for persistent cell fills.
+   */
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
   /** Replace ephemeral remote-presence overlays; null clears every collaborator. */
   setPresenceOverlays(overlays: readonly PresenceOverlay[] | null): void;
