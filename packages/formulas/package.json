@@ -50,7 +50,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis && bun ../../scripts/wasm-factory.ts .",
+    "build": "wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis && bun ../../scripts/wasm-factory.ts . && bun ../../scripts/minify-package.ts pkg",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "clean": "rm -rf pkg"
