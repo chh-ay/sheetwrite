@@ -78,35 +78,36 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.5.0</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+            <h2 id="new-in-release">New in 0.5.1</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "guides/analysis-formulas" }}>
-              <span className="sw-doc-eyebrow">Full formula engine</span>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="typed-shortcuts">
+              <span className="sw-doc-eyebrow">Keyboard bindings</span>
               <strong>
-                Analyze in the sheet <span aria-hidden="true">→</span>
+                Set your shortcuts <span aria-hidden="true">→</span>
               </strong>
               <span>
-                GROUPBY, PIVOTBY, LAMBDA, regression, finance, and regex in the optional
-                @sheetwrite/formulas engine.
+                Typed key combinations share platform-aware labels across menus and toolbars.
               </span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "guides/formulas" }} hash="spill-references">
-              <span className="sw-doc-eyebrow">Both engines</span>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="action-feedback">
+              <span className="sw-doc-eyebrow">Built-in buttons</span>
               <strong>
-                Spill references <span aria-hidden="true">→</span>
+                See command progress <span aria-hidden="true">→</span>
               </strong>
-              <span>A1# follows a spill as it grows, and array constants spill in place.</span>
+              <span>
+                Busy states and visible errors for toolbar, context-menu, and find commands.
+              </span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
               </strong>
-              <span>What a persistence server and direct @sheetwrite/wasm users must change.</span>
+              <span>Update shortcut hints, awaited exports, and export-error handlers.</span>
             </Link>
           </div>
         </section>

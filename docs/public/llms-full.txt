@@ -4,7 +4,7 @@
 
 Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from https://sheetwrite.vercel.app/llms.txt instead of being repeated here.
 
-Packages: 0.5.0. Canonical HTML: https://sheetwrite.vercel.app/docs/
+Packages: 0.5.1. Canonical HTML: https://sheetwrite.vercel.app/docs/
 
 ## Contents
 
@@ -33,6 +33,7 @@ Packages: 0.5.0. Canonical HTML: https://sheetwrite.vercel.app/docs/
 - [Error handling](#error-handling)
 - [Releases](#releases)
 - [Sheetwrite 0.5.0](#sheetwrite-0-5-0)
+- [Sheetwrite 0.5.1](#sheetwrite-0-5-1)
 - [Your first grid](#your-first-grid)
 - [Installation](#installation)
 - [Public API declarations](#public-api-declarations)
@@ -4197,6 +4198,7 @@ results, and the steps to upgrade.
 
 | Version | Highlights |
 | --- | --- |
+| [0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/) | Typed shortcuts, action feedback, restored column sum speed, and redesigned documentation. |
 | [0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/) | Full formula engine, spill references, large undo, conflict recovery without a reload, bounded string storage, faster loading and import. |
 
 Releases before 0.5.0 are listed in each package's `CHANGELOG.md` in the
@@ -4474,6 +4476,87 @@ Two operations are slower in 0.5.0. Both are tracked for a later release.
 | Check dependency licenses or lockfiles | `@sheetwrite/core` now depends on `fflate` 0.8.3. Your package manager installs it; you do not add it yourself. |
 
 The full list of changes is in each package's `CHANGELOG.md`.
+
+### Sheetwrite 0.5.1
+
+Source: https://sheetwrite.vercel.app/docs/releases/0.5.1/
+
+Sheetwrite 0.5.1 adds typed keyboard shortcuts and clear feedback for built-in
+commands. It restores column sum speed to 0.4.0 levels and redesigns the docs.
+All seven packages release as 0.5.1. Read the [upgrade checklist](#upgrade-checklist)
+for the shortcut and export API changes.
+
+## Highlights
+
+- **Custom shortcuts.** Use typed key combinations with platform-aware labels
+in context menus and toolbars.
+- **Command feedback.** Built-in buttons show busy states and visible errors.
+- **Column sums are fast again.** Literal values use a direct read path;
+calculated values keep the formula-aware path.
+- **Redesigned docs.** A task-focused home, grouped navigation, and clearer API
+pages make guides and examples easier to find.
+
+## Changes
+
+### Typed shortcuts
+
+A key combination can be a string such as `"Mod+Shift+K"` or an object such as
+`{ key: "k", mod: true, shift: true }`. `Mod` means Command on macOS and Control
+elsewhere. `Ctrl` and `Meta` always mean those specific keys.
+
+**API change:** `ContextMenuItem.shortcut` accepts a bound action name, such as
+`"copy"`, or a key combination. Replace free-text shortcut hints with one of
+these forms. Use `config.keyboard.bindings` to change or disable an action's keys.
+
+A context-menu item with a key combination and an `onClick` handler now runs
+that handler when the Grid has focus and the user presses the combination.
+Combinations with `Mod`, `Ctrl`, or `Meta` also work in the inline editor.
+Conflicting commands throw `SheetwriteError` with code `shortcut-conflict`;
+malformed combinations throw `invalid-shortcut`.
+
+### Action feedback
+
+Built-in toolbar, context-menu, and find buttons show a busy state while a
+command runs and show errors when it fails. Repeated starts of a pending
+command are ignored. Blocked clipboard access shows a recovery message.
+
+`GridActions.exportXlsx()` now returns a promise that never rejects. Built-in
+export failures show an alert and emit `export-error`, whose format can be
+`"csv"` or `"xlsx"`. Direct `Grid.exportXlsx()` calls still reject on failure.
+
+## Fixes
+
+- Restore column sum speed to 0.4.0 levels by reading literal values directly
+and skipping unused count and minimum/maximum work. Sorting also avoids
+unnecessary read overhead. Calculated values keep the formula-aware path.
+- Fix docs search and not-found pages.
+- Wait for npm validation before release publishing continues.
+
+## Documentation
+
+The docs have a task-focused home, grouped navigation, a dedicated reading
+panel, and redesigned API rows. Large API indexes have a filter; members start
+collapsed, expand for deep links, and link to their source locations.
+
+Checked API examples cover Grid setup, data, synchronization, framework
+components, engine selection, and XLSX import and export. The docs explain
+`highlightCells(null)` for clearing temporary highlights. Showcase menus and
+measurements are clearer, and the Vanilla highlight action applies an undoable
+cell fill. Generated `/llms.txt` and `/llms-full.txt` endpoints support
+AI-assisted development.
+
+## Upgrade checklist
+
+1. Update all installed `@sheetwrite/*` packages to **0.5.1** together:
+`core`, `wasm`, `formulas`, `xlsx`, `react`, `vue`, and `svelte` as applicable.
+2. Replace free-text `ContextMenuItem.shortcut` hints with an action name or a
+typed key combination. Check custom bindings for conflicts.
+3. Await `GridActions.exportXlsx()` when you need to wait for the built-in
+command to finish. It handles failures without rejecting; direct
+`Grid.exportXlsx()` still requires error handling.
+4. Update `export-error` handlers to accept both `"csv"` and `"xlsx"` formats.
+5. If you upgrade from before 0.5.0, complete the
+[0.5.0 upgrade checklist](https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist) too.
 
 ### Your first grid
 

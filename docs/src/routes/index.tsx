@@ -356,7 +356,7 @@ function Landing() {
                 <li key={note}>{note}</li>
               ))}
               <li>
-                <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+                <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
                   Read what is new and the upgrade checklist →
                 </Link>
               </li>
@@ -431,7 +431,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to="/docs/$/" params={{ _splat: "releases/0.5.0" }}>
+              <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
                 What's new
               </Link>
             </div>
