@@ -28,10 +28,15 @@ import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import compatibilityData from "../generated/compatibility.json";
+import { errorText } from "../lib/errors.js";
 import { pageMeta } from "../lib/seo.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
+  CompatibilityResultCase,
+  CompatibilityResultEvidence,
+  CompatibilityResultSource,
   CompatibilityResultStatus,
   CompatibilityResults,
 } from "../showcases/compatibility-results.js";
@@ -409,7 +414,6 @@ function InteroperabilityRoute() {
   const [probe, setProbe] = useState<IsolationProbe | null>(null);
   const [warningLog, setWarningLog] = useState<WarningLog | null>(null);
   const [roundTrip, setRoundTrip] = useState<RoundTripReport | null>(null);
-  const [working, setWorking] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [bulkReport, setBulkReport] = useState<{
     rows: number;
@@ -466,8 +470,8 @@ function InteroperabilityRoute() {
     return bytes;
   }, []);
 
-  const exportFromMenu = useEffectEvent(() => void handleDownload());
-  const compareFromMenu = useEffectEvent(() => void handleRoundTrip());
+  const exportFromMenu = useEffectEvent(() => run(handleDownload));
+  const compareFromMenu = useEffectEvent(() => run(handleRoundTrip));
 
   // Mount one grid generation per workbench source.
   useEffect(() => {
@@ -635,14 +639,7 @@ function InteroperabilityRoute() {
   // The engine resolves --sheetwrite-* custom properties at grid mount.
   // When the site theme flips, re-run that resolution (DEFAULT < CSS < options)
   // so the canvas repaints with the new palette instead of going stale.
-  useEffect(() => {
-    const observer = new MutationObserver(() => gridRef.current?.replaceTheme(CANVAS_THEME));
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(CANVAS_THEME)), []);
 
   const handleDownload = async () => {
     const grid = gridRef.current;
@@ -661,8 +658,6 @@ function InteroperabilityRoute() {
   const handleRoundTrip = async () => {
     const grid = gridRef.current;
     if (!grid) return;
-    if (working) return;
-    setWorking(true);
     setStatus("Exporting and re-importing the live document…");
     try {
       const report = await roundTripWorkbook(grid);
@@ -677,8 +672,6 @@ function InteroperabilityRoute() {
     } catch (error) {
       setStatus(`Round-trip failed — ${describeError(error)}`);
       throw new Error("Cannot compare the workbook round-trip.", { cause: error });
-    } finally {
-      setWorking(false);
     }
   };
 
@@ -702,12 +695,11 @@ function InteroperabilityRoute() {
   };
 
   const handleFile = async (file: File | null) => {
-    if (!file || working) return;
+    if (!file) return;
     if (!/\.(xlsx|csv)$/iu.test(file.name)) {
       setStatus("Choose an .xlsx or .csv file. The live workbook has not changed.");
       return;
     }
-    setWorking(true);
     setStatus(`Importing ${file.name}…`);
     const started = performance.now();
     try {
@@ -751,14 +743,10 @@ function InteroperabilityRoute() {
     } catch (error) {
       setStatus(`Import rejected — ${describeError(error)}`);
       throw new Error("Cannot import this file. Check the file and try again.", { cause: error });
-    } finally {
-      setWorking(false);
     }
   };
 
   const handleBulkImport = async () => {
-    if (working) return;
-    setWorking(true);
     setStatus("Generating a sales CSV in this browser…");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     try {
@@ -786,8 +774,6 @@ function InteroperabilityRoute() {
     } catch (error) {
       setStatus(`Generated CSV import failed — ${describeError(error)}`);
       throw new Error("Cannot import the generated CSV.", { cause: error });
-    } finally {
-      setWorking(false);
     }
   };
 
@@ -909,7 +895,7 @@ function InteroperabilityRoute() {
         data: imported.data,
       });
     } catch (error) {
-      setPasteError(error instanceof Error ? error.message : String(error));
+      setPasteError(errorText(error));
       throw new Error("Cannot import the pasted text.", { cause: error });
     }
   };
@@ -1047,13 +1033,11 @@ function InteroperabilityRoute() {
                   className="sw-si-btn sw-si-btn--primary"
                   data-testid="interop-roundtrip"
                   {...pendingProps(action.pending)}
-                  disabled={!gridReady || working || action.pending}
+                  disabled={!gridReady || action.pending}
                   onClick={() => run(handleRoundTrip)}
                   type="button"
                 >
-                  {working || action.pending
-                    ? "Comparing workbook…"
-                    : "Export, re-import & compare"}
+                  {action.pending ? "Comparing workbook…" : "Export, re-import & compare"}
                 </button>
               </header>
               <dl
@@ -1292,7 +1276,7 @@ function InteroperabilityRoute() {
                 <input
                   accept=".xlsx,.csv"
                   data-testid="interop-file-input"
-                  disabled={working || action.pending}
+                  disabled={action.pending}
                   aria-busy={action.pending || undefined}
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0] ?? null;
@@ -1306,7 +1290,7 @@ function InteroperabilityRoute() {
               <button
                 className="sw-si-btn sw-si-btn--quiet"
                 data-testid="interop-reset"
-                disabled={working || action.pending}
+                disabled={action.pending}
                 onClick={() => {
                   setFileReport(null);
                   setBulkReport(null);
@@ -1339,7 +1323,7 @@ function InteroperabilityRoute() {
               className="sw-si-btn sw-si-btn--secondary"
               data-testid="interop-bulk-import"
               aria-busy={action.pending || undefined}
-              disabled={working || action.pending}
+              disabled={action.pending}
               onClick={() => run(handleBulkImport)}
             >
               {action.pending ? "Importing rows…" : "Generate & import 200,000 rows"}
@@ -1661,299 +1645,18 @@ function InteroperabilityRoute() {
                           </span>
                           <strong>{entry.label}</strong>
                           <small className="sw-si-compat__tags">
-                            {entry.statusTags.map((tag) => (
-                              <i data-state={tag} key={tag}>
-                                {RESULT_STATUS_LABELS[tag]}
-                              </i>
-                            ))}
+                            <ResultStatusTags tags={entry.statusTags} as="i" />
                           </small>
                         </button>
                       </li>
                     ))}
                 </ul>
                 {selectedResult && selectedResultSource && selectedResultEvidence ? (
-                  <article
-                    className="sw-si-compat__detail sw-si-results__detail"
-                    data-behavior={selectedResult.behavior}
-                    data-status={selectedResult.statusTags.join(" ")}
-                    data-testid="compatibility-result-detail"
-                  >
-                    <p className="sw-si-compat__mode">
-                      {selectedResult.statusTags.map((tag) => (
-                        <span data-state={tag} key={tag}>
-                          {RESULT_STATUS_LABELS[tag]}
-                        </span>
-                      ))}
-                    </p>
-                    <p className="sw-si-results__position">
-                      Test {selectedResult.position.toLocaleString()} of{" "}
-                      {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()} ·{" "}
-                      {BEHAVIOR_LABELS[selectedResult.behavior]}
-                    </p>
-                    <h3>{selectedResult.label}</h3>
-                    <p>{selectedResultEvidence.description}</p>
-
-                    {selectedResult.unsupported && (
-                      <p className="sw-si-results__notice" data-state="unsupported">
-                        <strong>Unsupported and excluded from the pass percentage.</strong> This is
-                        a checked nonclaim, not a failed supported feature.
-                      </p>
-                    )}
-                    {selectedResult.statusTags.includes("warning") && (
-                      <p className="sw-si-results__notice" data-state="warning">
-                        <strong>Warning behavior check.</strong> This test exercises the warning
-                        path; it does not claim that an external app emitted a warning.
-                      </p>
-                    )}
-                    {selectedResult.knownDifference && (
-                      <aside className="sw-si-results__difference" data-testid="known-difference">
-                        <h4>Known difference</h4>
-                        <p>{selectedResult.knownDifference.reason}</p>
-                        <p>
-                          Recorded for{" "}
-                          {selectedResult.knownDifference.producers
-                            .filter((producer) => producer !== "excel-web")
-                            .map(
-                              (producer) =>
-                                TESTED_APPS.find((app) => app.id === producer)?.label ?? producer,
-                            )
-                            .join(", ")}
-                          .
-                        </p>
-                        <pre>
-                          {JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}
-                        </pre>
-                      </aside>
-                    )}
-
-                    <section
-                      aria-labelledby="selected-test-preview"
-                      className="sw-si-results__preview"
-                    >
-                      <h4 id="selected-test-preview">
-                        {selectedResult.kind === "formula"
-                          ? "Input and expected result"
-                          : "Workbook preview"}
-                      </h4>
-                      {selectedResult.formula && (
-                        <p>
-                          Formula <code>{selectedResult.formula}</code>
-                          {selectedResult.target ? (
-                            <>
-                              {" "}
-                              at <code>{selectedResult.target}</code>
-                            </>
-                          ) : null}
-                        </p>
-                      )}
-                      {selectedResult.inputs && selectedResult.inputs.length > 0 ? (
-                        <dl className="sw-si-results__inputs">
-                          {selectedResult.inputs.map((input) => (
-                            <div key={input.cell}>
-                              <dt>{input.cell}</dt>
-                              <dd>
-                                <code>{JSON.stringify(input.value)}</code>
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      ) : selectedResult.formula ? (
-                        <p>No input cells are required.</p>
-                      ) : null}
-                      {selectedResult.operations && (
-                        <pre data-testid="compatibility-workbook-preview">
-                          {JSON.stringify(selectedResult.operations, null, 2)}
-                        </pre>
-                      )}
-                      <dl>
-                        <div>
-                          <dt>Expected checked result</dt>
-                          <dd>
-                            <ExpectedValue result={selectedResult.expected} />
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Comparison tolerance</dt>
-                          <dd data-testid="compatibility-tolerance">
-                            {selectedResult.tolerance.kind === "exact"
-                              ? "Exact type and value"
-                              : `${selectedResult.tolerance.kind} · ${selectedResult.tolerance.value}`}
-                          </dd>
-                        </div>
-                      </dl>
-                    </section>
-
-                    <section aria-labelledby="tested-app-results" className="sw-si-results__apps">
-                      <h4 id="tested-app-results">Tested app results and differences</h4>
-                      <p>
-                        Missing results stay unavailable. A source description or expected value
-                        never substitutes for a reviewed app result.
-                      </p>
-                      <ul>
-                        {TESTED_APPS.map((app) => {
-                          const isSheetwrite = app.id === "sheetwrite";
-                          const localPassed = selectedResult.statusTags.includes("local-pass");
-                          const observation = isSheetwrite
-                            ? undefined
-                            : selectedResult.observations.find(
-                                (entry) => entry.testedApp === app.id,
-                              );
-                          const reviewed = observation?.reviewStatus === "reviewed";
-                          const state = isSheetwrite
-                            ? localPassed
-                              ? "local-pass"
-                              : selectedResult.unsupported
-                                ? "unsupported"
-                                : "unavailable"
-                            : (observation?.reviewStatus ?? "unavailable");
-                          return (
-                            <li
-                              data-state={state}
-                              data-testid={`app-result-${app.id}`}
-                              key={app.id}
-                            >
-                              <div>
-                                <strong>{app.label}</strong>
-                                <span>
-                                  {isSheetwrite
-                                    ? localPassed
-                                      ? "Local check passed"
-                                      : selectedResult.unsupported
-                                        ? "Unsupported · not claimed"
-                                        : "Local result unavailable"
-                                    : reviewed
-                                      ? "Reviewed result"
-                                      : "Result unavailable"}
-                                </span>
-                              </div>
-                              <dl>
-                                {isSheetwrite ? (
-                                  <>
-                                    <div>
-                                      <dt>Library version</dt>
-                                      <dd>{COMPATIBILITY_RESULTS.testSet.libraryVersion}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Checked evidence</dt>
-                                      <dd>
-                                        Test {selectedResult.position.toLocaleString()} in checked
-                                        set v{COMPATIBILITY_RESULTS.testSet.version}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt>Result comparison</dt>
-                                      <dd>
-                                        {localPassed
-                                          ? "The local result matched the checked expected value under the published tolerance."
-                                          : selectedResult.unsupported
-                                            ? "No supported local behavior is claimed for this checked case."
-                                            : "No local checked result is attached to this case."}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt>Test record SHA-256</dt>
-                                      <dd>{selectedResult.testChecksum}</dd>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <dt>Version</dt>
-                                      <dd>{observation?.version ?? "Unavailable"}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Captured</dt>
-                                      <dd>{observation?.capturedAt ?? "Unavailable"}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Result differences</dt>
-                                      <dd>
-                                        {!reviewed
-                                          ? "Unavailable — no reviewed result file is attached to this test."
-                                          : observation.differences.length === 0
-                                            ? "No differences after type-aware comparison."
-                                            : observation.differences.join("; ")}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt>Evidence file checksum</dt>
-                                      <dd>{observation?.evidenceFileChecksum ?? "Unavailable"}</dd>
-                                    </div>
-                                  </>
-                                )}
-                              </dl>
-                              {isSheetwrite ? (
-                                <div className="sw-si-results__local">
-                                  <strong>
-                                    {localPassed
-                                      ? "Local checked result"
-                                      : selectedResult.unsupported
-                                        ? "Checked nonclaim result"
-                                        : "Expected checked result"}
-                                  </strong>
-                                  <ExpectedValue
-                                    result={selectedResult.expected}
-                                    testId="app-result-sheetwrite-capture"
-                                  />
-                                </div>
-                              ) : (
-                                observation?.result && (
-                                  <details>
-                                    <summary>Technical captured result</summary>
-                                    <pre>{JSON.stringify(observation.result, null, 2)}</pre>
-                                  </details>
-                                )
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </section>
-
-                    <details className="sw-si-results__technical">
-                      <summary>Technical test details</summary>
-                      <dl>
-                        <div>
-                          <dt>Machine ID</dt>
-                          <dd>
-                            <code>{selectedResult.id}</code>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Test record SHA-256</dt>
-                          <dd>
-                            <code>{selectedResult.testChecksum}</code>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Exact source</dt>
-                          <dd>
-                            <a href={selectedResultSource.url}>
-                              {selectedResultSource.title}, {selectedResultSource.section}
-                            </a>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Source record SHA-256</dt>
-                          <dd>
-                            <code>{selectedResultSource.sha256}</code>
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Source rights</dt>
-                          <dd>
-                            {selectedResultSource.authorship} · {selectedResultSource.license}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Generated checked data</dt>
-                          <dd>
-                            <a href={compatibilityResultsUrl}>Open exact generated JSON</a>
-                          </dd>
-                        </div>
-                      </dl>
-                    </details>
-                  </article>
+                  <CompatibilityResultDetail
+                    selectedResult={selectedResult}
+                    selectedResultSource={selectedResultSource}
+                    selectedResultEvidence={selectedResultEvidence}
+                  />
                 ) : (
                   <p className="sw-si-empty" data-testid="compatibility-results-empty">
                     {resultStatus === "regression"
@@ -2678,4 +2381,300 @@ function InteroperabilityRoute() {
       </main>
     </div>
   );
+}
+
+function CompatibilityResultDetail({
+  selectedResult,
+  selectedResultSource,
+  selectedResultEvidence,
+}: {
+  selectedResult: CompatibilityResultCase;
+  selectedResultSource: CompatibilityResultSource;
+  selectedResultEvidence: CompatibilityResultEvidence;
+}) {
+  return (
+    <article
+      className="sw-si-compat__detail sw-si-results__detail"
+      data-behavior={selectedResult.behavior}
+      data-status={selectedResult.statusTags.join(" ")}
+      data-testid="compatibility-result-detail"
+    >
+      <p className="sw-si-compat__mode">
+        <ResultStatusTags tags={selectedResult.statusTags} as="span" />
+      </p>
+      <p className="sw-si-results__position">
+        Test {selectedResult.position.toLocaleString()} of{" "}
+        {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()} ·{" "}
+        {BEHAVIOR_LABELS[selectedResult.behavior]}
+      </p>
+      <h3>{selectedResult.label}</h3>
+      <p>{selectedResultEvidence.description}</p>
+
+      {selectedResult.unsupported && (
+        <p className="sw-si-results__notice" data-state="unsupported">
+          <strong>Unsupported and excluded from the pass percentage.</strong> This is a checked
+          nonclaim, not a failed supported feature.
+        </p>
+      )}
+      {selectedResult.statusTags.includes("warning") && (
+        <p className="sw-si-results__notice" data-state="warning">
+          <strong>Warning behavior check.</strong> This test exercises the warning path; it does not
+          claim that an external app emitted a warning.
+        </p>
+      )}
+      {selectedResult.knownDifference && (
+        <aside className="sw-si-results__difference" data-testid="known-difference">
+          <h4>Known difference</h4>
+          <p>{selectedResult.knownDifference.reason}</p>
+          <p>
+            Recorded for{" "}
+            {selectedResult.knownDifference.producers
+              .filter((producer) => producer !== "excel-web")
+              .map((producer) => TESTED_APPS.find((app) => app.id === producer)?.label ?? producer)
+              .join(", ")}
+            .
+          </p>
+          <pre>{JSON.stringify(selectedResult.knownDifference.alternate, null, 2)}</pre>
+        </aside>
+      )}
+
+      <section aria-labelledby="selected-test-preview" className="sw-si-results__preview">
+        <h4 id="selected-test-preview">
+          {selectedResult.kind === "formula" ? "Input and expected result" : "Workbook preview"}
+        </h4>
+        {selectedResult.formula && (
+          <p>
+            Formula <code>{selectedResult.formula}</code>
+            {selectedResult.target ? (
+              <>
+                {" "}
+                at <code>{selectedResult.target}</code>
+              </>
+            ) : null}
+          </p>
+        )}
+        {selectedResult.inputs && selectedResult.inputs.length > 0 ? (
+          <dl className="sw-si-results__inputs">
+            {selectedResult.inputs.map((input) => (
+              <div key={input.cell}>
+                <dt>{input.cell}</dt>
+                <dd>
+                  <code>{JSON.stringify(input.value)}</code>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : selectedResult.formula ? (
+          <p>No input cells are required.</p>
+        ) : null}
+        {selectedResult.operations && (
+          <pre data-testid="compatibility-workbook-preview">
+            {JSON.stringify(selectedResult.operations, null, 2)}
+          </pre>
+        )}
+        <dl>
+          <div>
+            <dt>Expected checked result</dt>
+            <dd>
+              <ExpectedValue result={selectedResult.expected} />
+            </dd>
+          </div>
+          <div>
+            <dt>Comparison tolerance</dt>
+            <dd data-testid="compatibility-tolerance">
+              {selectedResult.tolerance.kind === "exact"
+                ? "Exact type and value"
+                : `${selectedResult.tolerance.kind} · ${selectedResult.tolerance.value}`}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="tested-app-results" className="sw-si-results__apps">
+        <h4 id="tested-app-results">Tested app results and differences</h4>
+        <p>
+          Missing results stay unavailable. A source description or expected value never substitutes
+          for a reviewed app result.
+        </p>
+        <ul>
+          {TESTED_APPS.map((app) => (
+            <TestedAppResult app={app} selectedResult={selectedResult} key={app.id} />
+          ))}
+        </ul>
+      </section>
+
+      <details className="sw-si-results__technical">
+        <summary>Technical test details</summary>
+        <dl>
+          <div>
+            <dt>Machine ID</dt>
+            <dd>
+              <code>{selectedResult.id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Test record SHA-256</dt>
+            <dd>
+              <code>{selectedResult.testChecksum}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Exact source</dt>
+            <dd>
+              <a href={selectedResultSource.url}>
+                {selectedResultSource.title}, {selectedResultSource.section}
+              </a>
+            </dd>
+          </div>
+          <div>
+            <dt>Source record SHA-256</dt>
+            <dd>
+              <code>{selectedResultSource.sha256}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Source rights</dt>
+            <dd>
+              {selectedResultSource.authorship} · {selectedResultSource.license}
+            </dd>
+          </div>
+          <div>
+            <dt>Generated checked data</dt>
+            <dd>
+              <a href={compatibilityResultsUrl}>Open exact generated JSON</a>
+            </dd>
+          </div>
+        </dl>
+      </details>
+    </article>
+  );
+}
+
+function TestedAppResult({
+  app,
+  selectedResult,
+}: {
+  app: (typeof TESTED_APPS)[number];
+  selectedResult: CompatibilityResultCase;
+}) {
+  const isSheetwrite = app.id === "sheetwrite";
+  const localPassed = selectedResult.statusTags.includes("local-pass");
+  const observation = isSheetwrite
+    ? undefined
+    : selectedResult.observations.find((entry) => entry.testedApp === app.id);
+  const reviewed = observation?.reviewStatus === "reviewed";
+  const state = isSheetwrite
+    ? localPassed
+      ? "local-pass"
+      : selectedResult.unsupported
+        ? "unsupported"
+        : "unavailable"
+    : (observation?.reviewStatus ?? "unavailable");
+  return (
+    <li data-state={state} data-testid={`app-result-${app.id}`} key={app.id}>
+      <div>
+        <strong>{app.label}</strong>
+        <span>
+          {isSheetwrite
+            ? localPassed
+              ? "Local check passed"
+              : selectedResult.unsupported
+                ? "Unsupported · not claimed"
+                : "Local result unavailable"
+            : reviewed
+              ? "Reviewed result"
+              : "Result unavailable"}
+        </span>
+      </div>
+      <dl>
+        {isSheetwrite ? (
+          <>
+            <div>
+              <dt>Library version</dt>
+              <dd>{COMPATIBILITY_RESULTS.testSet.libraryVersion}</dd>
+            </div>
+            <div>
+              <dt>Checked evidence</dt>
+              <dd>
+                Test {selectedResult.position.toLocaleString()} in checked set v
+                {COMPATIBILITY_RESULTS.testSet.version}
+              </dd>
+            </div>
+            <div>
+              <dt>Result comparison</dt>
+              <dd>
+                {localPassed
+                  ? "The local result matched the checked expected value under the published tolerance."
+                  : selectedResult.unsupported
+                    ? "No supported local behavior is claimed for this checked case."
+                    : "No local checked result is attached to this case."}
+              </dd>
+            </div>
+            <div>
+              <dt>Test record SHA-256</dt>
+              <dd>{selectedResult.testChecksum}</dd>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <dt>Version</dt>
+              <dd>{observation?.version ?? "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Captured</dt>
+              <dd>{observation?.capturedAt ?? "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Result differences</dt>
+              <dd>
+                {!reviewed
+                  ? "Unavailable — no reviewed result file is attached to this test."
+                  : observation.differences.length === 0
+                    ? "No differences after type-aware comparison."
+                    : observation.differences.join("; ")}
+              </dd>
+            </div>
+            <div>
+              <dt>Evidence file checksum</dt>
+              <dd>{observation?.evidenceFileChecksum ?? "Unavailable"}</dd>
+            </div>
+          </>
+        )}
+      </dl>
+      {isSheetwrite ? (
+        <div className="sw-si-results__local">
+          <strong>
+            {localPassed
+              ? "Local checked result"
+              : selectedResult.unsupported
+                ? "Checked nonclaim result"
+                : "Expected checked result"}
+          </strong>
+          <ExpectedValue result={selectedResult.expected} testId="app-result-sheetwrite-capture" />
+        </div>
+      ) : (
+        observation?.result && (
+          <details>
+            <summary>Technical captured result</summary>
+            <pre>{JSON.stringify(observation.result, null, 2)}</pre>
+          </details>
+        )
+      )}
+    </li>
+  );
+}
+
+function ResultStatusTags({
+  tags,
+  as: Tag,
+}: {
+  tags: readonly CompatibilityResultStatus[];
+  as: "i" | "span";
+}) {
+  return tags.map((tag) => (
+    <Tag data-state={tag} key={tag}>
+      {RESULT_STATUS_LABELS[tag]}
+    </Tag>
+  ));
 }

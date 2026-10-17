@@ -43,7 +43,7 @@ const FRAMEWORK_PRELUDE = [
   "declare let commandStates: Readonly<Record<GridCommandName, GridCommandState>>;",
 ].join("\n");
 
-export const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
+const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
   ["core", CORE_PRELUDE],
   ["framework", FRAMEWORK_PRELUDE],
   [

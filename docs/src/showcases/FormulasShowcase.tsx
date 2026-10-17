@@ -1,9 +1,12 @@
+import { cellA1 } from "@sheetwrite/core";
 import { createGrid, type Grid, initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { functionCount } from "../generated/formula-summary.json";
+import { errorText } from "../lib/errors.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
   ANALYSIS_SHEET_ID,
@@ -46,10 +49,6 @@ interface Recalc {
   label: string;
   cells: number;
   ms: number;
-}
-
-function cellLabel(row: number, col: number): string {
-  return `${String.fromCharCode(65 + col)}${row + 1}`;
 }
 
 /**
@@ -186,7 +185,7 @@ export default function FormulasShowcase() {
     })().catch((cause: unknown) => {
       if (disposed) return;
       setState("error");
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorText(cause));
     });
 
     return () => {
@@ -200,14 +199,7 @@ export default function FormulasShowcase() {
     };
   }, []);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => gridRef.current?.replaceTheme({}));
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme({})), []);
 
   const showPanel = (panel: FormulaPanel) => {
     const grid = gridRef.current;
@@ -367,7 +359,7 @@ export default function FormulasShowcase() {
                     onClick={() => showPanel(candidate)}
                     type="button"
                   >
-                    <span>{cellLabel(candidate.row, candidate.col)}</span>
+                    <span>{cellA1(candidate.row, candidate.col)}</span>
                     {candidate.title}
                   </button>
                 </li>
@@ -387,7 +379,7 @@ export default function FormulasShowcase() {
           <div className="sw-fx-footer">
             <article className="sw-fx-detail" data-testid="formulas-detail">
               <p className="sw-fx-detail__kicker">
-                {cellLabel(panel.row, panel.col)} · {panel.families.join(" · ")} · first value{" "}
+                {cellA1(panel.row, panel.col)} · {panel.families.join(" · ")} · first value{" "}
                 <span data-testid="formulas-detail-value">{panelValue}</span>
               </p>
               <h3>{panel.title}</h3>
@@ -403,7 +395,7 @@ export default function FormulasShowcase() {
               }}
             >
               <label htmlFor="formulas-draft">
-                Try your own formula in {cellLabel(PLAYGROUND.row, PLAYGROUND.col)}
+                Try your own formula in {cellA1(PLAYGROUND.row, PLAYGROUND.col)}
               </label>
               <div>
                 <input

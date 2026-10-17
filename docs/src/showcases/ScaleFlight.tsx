@@ -1,10 +1,10 @@
 import { cellA1, type Grid } from "@sheetwrite/core";
 import { useEffect, useRef, useState } from "react";
 
+import { formatBytes } from "../lib/format.js";
 import {
   type DatasourceTile,
   FEED_SHEET,
-  formatBytes,
   pagedStatsOf,
   SCALE_COLUMNS,
   SCALE_LOGICAL_CELLS,
@@ -223,8 +223,8 @@ export function ScaleFlightDeck({
       setReport(result);
       onStatus(
         reducedMotion
-          ? `${plan.label}: jumped straight to ${finalAddress}, ${formatBytes(peakResidentBytes)} peak resident.`
-          : `${plan.label} finished at ${finalAddress}: ${result.fps.toFixed(0)} frames per second, ${formatBytes(peakResidentBytes)} peak resident.`,
+          ? `${plan.label}: jumped straight to ${finalAddress}, ${formatBytes(peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} peak resident.`
+          : `${plan.label} finished at ${finalAddress}: ${result.fps.toFixed(0)} frames per second, ${formatBytes(peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} peak resident.`,
       );
     };
 
@@ -363,7 +363,7 @@ export function ScaleFlightDeck({
           <dd>{shownCells.toLocaleString()}</dd>
           <dd className="sw-sp-flight__fine">
             {residentShare < 0.0001 && shownCells > 0 ? "<0.0001" : residentShare.toFixed(4)}% of
-            the billion · {formatBytes(shownBytes)}
+            the billion · {formatBytes(shownBytes, { kib: 1, mib: 1, gib: 2 })}
           </dd>
         </div>
         <div>
@@ -380,8 +380,8 @@ export function ScaleFlightDeck({
       <p aria-live="polite" className="sw-sp-flight__report" data-testid="scale-flight-report">
         {report && !flying
           ? report.instant
-            ? `${FLIGHTS[report.kind].label}: jumped straight to ${report.finalAddress} because reduced motion is on. Peak resident ${formatBytes(report.peakResidentBytes)} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
-            : `${FLIGHTS[report.kind].label}: ${report.frames.toLocaleString()} frames in ${(report.durationMs / 1000).toFixed(1)} s, ${report.fps.toFixed(0)} frames per second, slowest frame ${report.maxFrameMs.toFixed(0)} ms. Peak resident ${formatBytes(report.peakResidentBytes)} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
+            ? `${FLIGHTS[report.kind].label}: jumped straight to ${report.finalAddress} because reduced motion is on. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
+            : `${FLIGHTS[report.kind].label}: ${report.frames.toLocaleString()} frames in ${(report.durationMs / 1000).toFixed(1)} s, ${report.fps.toFixed(0)} frames per second, slowest frame ${report.maxFrameMs.toFixed(0)} ms. Peak resident ${formatBytes(report.peakResidentBytes, { kib: 1, mib: 1, gib: 2 })} while addressing ${SCALE_LOGICAL_CELLS.toLocaleString()} cells.`
           : ""}
       </p>
     </section>

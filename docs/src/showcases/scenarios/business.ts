@@ -21,7 +21,7 @@ import type {
   WorkbookSnapshot,
 } from "@sheetwrite/core";
 
-import { VUE_SHOWCASE_THEME } from "../revenue.js";
+import { SCENARIO_THEME } from "./presentation.js";
 
 export const BUSINESS_DOCUMENT_ID = "sheetwrite-business-orders";
 export const BUSINESS_ROWS = 500;
@@ -54,12 +54,7 @@ export const BUSINESS_COLUMNS = {
 } as const;
 
 export const BUSINESS_MAX_QTY = 5_000;
-export const BUSINESS_THEME: Partial<Theme> = {
-  font: VUE_SHOWCASE_THEME.font,
-  rowHeight: VUE_SHOWCASE_THEME.rowHeight,
-  headerHeight: VUE_SHOWCASE_THEME.headerHeight,
-  rowHeaderWidth: VUE_SHOWCASE_THEME.rowHeaderWidth,
-};
+export const BUSINESS_THEME: Partial<Theme> = { ...SCENARIO_THEME };
 
 /** Order quantities are small batches of 8..487 units. */
 export function businessQty(row: number): number {

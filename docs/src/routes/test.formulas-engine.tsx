@@ -1,9 +1,11 @@
 import { createGrid, type Grid, initSheetwrite, type Workbook } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
 
 import "@sheetwrite/core/styles.css";
-import * as formulas from "@sheetwrite/formulas";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+
+import { errorText } from "../lib/errors.js";
 
 export const Route = createFileRoute("/test/formulas-engine")({
   head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
@@ -52,7 +54,7 @@ function FormulasEngineFixture() {
         setStatus("ready");
       },
       (error: unknown) => {
-        if (!disposed) setStatus(error instanceof Error ? error.message : String(error));
+        if (!disposed) setStatus(errorText(error));
       },
     );
     return () => {

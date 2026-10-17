@@ -19,7 +19,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { errorText } from "../lib/errors.js";
+import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import { ScaleFlightDeck } from "../showcases/ScaleFlight.js";
 import {
@@ -34,7 +37,6 @@ import {
   emptyTelemetry,
   FEED_SHEET,
   type FullExportAttempt,
-  formatBytes,
   INTERACTION_EVIDENCE,
   measureBulkMutation,
   PAGE_LATENCY_MS,
@@ -171,7 +173,7 @@ function tileResidence(grid: Grid | null, tile: DatasourceTile): TileResidence {
 
 function formatByteDelta(bytes: number): string {
   if (bytes === 0) return "0 B";
-  return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes))}`;
+  return `${bytes > 0 ? "+" : "−"}${formatBytes(Math.abs(bytes), { kib: 1, mib: 1, gib: 2 })}`;
 }
 
 const BYTES_PER_MIB = 1024 * 1024;
@@ -226,15 +228,15 @@ function interactionWinList(): InteractionWin[] {
     },
     {
       label: "Inverse index",
-      value: formatBytes(current.viewIndexBytes),
+      value: formatBytes(current.viewIndexBytes, { kib: 1, mib: 1, gib: 2 }),
       delta: interactionDelta(current.viewIndexBytes, previous?.viewIndexBytes),
-      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatBytes(ceilings.inverseIndexBytes)}.`,
+      note: `Retained inverse row index for 1,000,000 rows. Ceiling ${formatBytes(ceilings.inverseIndexBytes, { kib: 1, mib: 1, gib: 2 })}.`,
     },
     {
       label: "100 distant edits",
-      value: formatBytes(current.dirty100Bytes),
+      value: formatBytes(current.dirty100Bytes, { kib: 1, mib: 1, gib: 2 }),
       delta: interactionDelta(current.dirty100Bytes, previous?.dirty100Bytes),
-      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatBytes(ceilings.dirty100Bytes)}.`,
+      note: `Retained dirty-cell memory: sparse edits stay sparse. Ceiling ${formatBytes(ceilings.dirty100Bytes, { kib: 1, mib: 1, gib: 2 })}.`,
     },
     {
       label: "Owned cold long task",
@@ -437,7 +439,7 @@ function PerformanceRoute() {
             );
           }),
           grid.on("renderer-fallback", ({ error }) => {
-            const reason = error instanceof Error ? error.message : String(error);
+            const reason = errorText(error);
             setRendererState({
               requested: "worker",
               active: gridRef.current?.rendererKind() ?? "canvas",
@@ -456,9 +458,7 @@ function PerformanceRoute() {
       .catch((error: unknown) => {
         if (disposed) return;
         setGridState("error");
-        setStatus(
-          `Grid failed to start: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        setStatus(`Grid failed to start: ${errorText(error)}`);
       });
 
     return () => {
@@ -472,14 +472,7 @@ function PerformanceRoute() {
     };
   }, [renderer, evictionStress, activeStorage]);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => gridRef.current?.replaceTheme(SCALE_THEME));
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(SCALE_THEME)), []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -753,8 +746,8 @@ function PerformanceRoute() {
                   {telemetry.aborted.toLocaleString()} aborted
                 </span>
                 <span>
-                  {formatBytes(stats.paged?.allocatedBytes ?? 0)} resident /{" "}
-                  {cacheCeilingMiB.toLocaleString()} MiB ceiling
+                  {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
+                  resident / {cacheCeilingMiB.toLocaleString()} MiB ceiling
                 </span>
               </div>
             </div>
@@ -976,7 +969,9 @@ function PerformanceRoute() {
                 </div>
                 <div>
                   <dt>Resident tile payload</dt>
-                  <dd>{formatBytes(stats.paged?.allocatedBytes ?? 0)}</dd>
+                  <dd>
+                    {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
+                  </dd>
                   <dd className="sw-sp-readout__context">
                     {cacheCeilingMiB.toLocaleString()} MiB cache ceiling ·{" "}
                     {Math.round(cachePercent)}% resident
@@ -1111,7 +1106,7 @@ function PerformanceRoute() {
                   {telemetry.requestedCells.toLocaleString()}
                 </dd>
                 <dd className="sw-sp-stat-context">
-                  {formatBytes(telemetry.requestBytes)} request JSON
+                  {formatBytes(telemetry.requestBytes, { kib: 1, mib: 1, gib: 2 })} request JSON
                 </dd>
               </div>
               <div>
@@ -1120,7 +1115,7 @@ function PerformanceRoute() {
                   {telemetry.returnedCells.toLocaleString()}
                 </dd>
                 <dd className="sw-sp-stat-context">
-                  {formatBytes(telemetry.returnedBytes)} row JSON
+                  {formatBytes(telemetry.returnedBytes, { kib: 1, mib: 1, gib: 2 })} row JSON
                 </dd>
               </div>
               <div>
@@ -1133,7 +1128,7 @@ function PerformanceRoute() {
               <div>
                 <dt>Resident tile payload</dt>
                 <dd data-testid="scale-allocated">
-                  {formatBytes(stats.paged?.allocatedBytes ?? 0)}
+                  {formatBytes(stats.paged?.allocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}
                 </dd>
                 <dd className="sw-sp-stat-context">
                   {cacheCeilingMiB.toLocaleString()} MiB cache ceiling · {Math.round(cachePercent)}%{" "}
@@ -1146,7 +1141,8 @@ function PerformanceRoute() {
                   {(stats.paged?.dirtyCells ?? 0).toLocaleString()} cells
                 </dd>
                 <dd className="sw-sp-stat-context">
-                  {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0)} outside clean budget
+                  {formatBytes(stats.paged?.dirtyAllocatedBytes ?? 0, { kib: 1, mib: 1, gib: 2 })}{" "}
+                  outside clean budget
                 </dd>
               </div>
             </dl>
@@ -1176,7 +1172,7 @@ function PerformanceRoute() {
                   rows {telemetry.lastReturn.start + 1}–{telemetry.lastReturn.end} · columns{" "}
                   {columnBandsLabel(telemetry.lastReturn.columns)} ·{" "}
                   {telemetry.lastReturn.cells.toLocaleString()} cells ·{" "}
-                  {formatBytes(telemetry.lastReturn.returnedBytes)} ·{" "}
+                  {formatBytes(telemetry.lastReturn.returnedBytes, { kib: 1, mib: 1, gib: 2 })} ·{" "}
                   {telemetry.lastReturn.latencyMs?.toFixed(1)} ms
                 </strong>
               ) : (
@@ -1256,7 +1252,7 @@ function PerformanceRoute() {
                 >
                   <span>{exportAttempt.ok ? "Complete" : "Expected typed refusal"}</span>{" "}
                   {exportAttempt.ok
-                    ? `CSV completed at ${formatBytes(exportAttempt.bytes)}.`
+                    ? `CSV completed at ${formatBytes(exportAttempt.bytes, { kib: 1, mib: 1, gib: 2 })}.`
                     : `${exportAttempt.loadedCells.toLocaleString()} of ${exportAttempt.totalCells.toLocaleString()} logical cells are loaded. IncompleteDataError prevented a partial file: ${exportAttempt.message}`}
                 </p>
               )}
@@ -1288,13 +1284,21 @@ function PerformanceRoute() {
               <div>
                 <dt>Logical live payload</dt>
                 <dd data-testid="scale-resource-logical">
-                  {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0)}
+                  {formatBytes(stats.resource?.totals.logicalLiveBytes ?? 0, {
+                    kib: 1,
+                    mib: 1,
+                    gib: 2,
+                  })}
                 </dd>
               </div>
               <div>
                 <dt>Allocated owner capacity</dt>
                 <dd data-testid="scale-resource-allocated">
-                  {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0)}
+                  {formatBytes(stats.resource?.totals.allocatedCapacityBytes ?? 0, {
+                    kib: 1,
+                    mib: 1,
+                    gib: 2,
+                  })}
                 </dd>
               </div>
               <div>
@@ -1302,7 +1306,11 @@ function PerformanceRoute() {
                 <dd data-testid="scale-resource-committed">
                   {stats.resource?.wasm.wasmCommittedBytes == null
                     ? "Unavailable"
-                    : formatBytes(stats.resource.wasm.wasmCommittedBytes)}
+                    : formatBytes(stats.resource.wasm.wasmCommittedBytes, {
+                        kib: 1,
+                        mib: 1,
+                        gib: 2,
+                      })}
                 </dd>
               </div>
             </dl>
@@ -1340,10 +1348,10 @@ function PerformanceRoute() {
                           <code>{owner.owner}</code>
                         </th>
                         <td className="sw-sp-table__num" data-label="Logical">
-                          {formatBytes(owner.logicalBytes)}
+                          {formatBytes(owner.logicalBytes, { kib: 1, mib: 1, gib: 2 })}
                         </td>
                         <td className="sw-sp-table__num" data-label="Allocated">
-                          {formatBytes(owner.allocatedBytes)}
+                          {formatBytes(owner.allocatedBytes, { kib: 1, mib: 1, gib: 2 })}
                         </td>
                         <td className="sw-sp-table__num" data-label="Entries">
                           {owner.entries.toLocaleString()}
@@ -1553,7 +1561,9 @@ function PerformanceRoute() {
                   </div>
                   <div>
                     <dt>Peak allocated</dt>
-                    <dd>{formatBytes(PAGED_EVIDENCE.peakAllocatedBytes)}</dd>
+                    <dd>
+                      {formatBytes(PAGED_EVIDENCE.peakAllocatedBytes, { kib: 1, mib: 1, gib: 2 })}
+                    </dd>
                   </div>
                 </dl>
               </section>

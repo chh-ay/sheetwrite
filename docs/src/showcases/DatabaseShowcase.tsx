@@ -10,10 +10,13 @@ import {
   type Theme,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
-
-import "@sheetwrite/core/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { errorText } from "../lib/errors.js";
+import { formatBytes } from "../lib/format.js";
+
+import "@sheetwrite/core/styles.css";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, useAction } from "../lib/use-action.js";
 import { ShowcaseLinkError, ShowcaseNetworkLink } from "./collaboration-protocol.js";
 import {
@@ -108,13 +111,6 @@ function reloadTestPassed(report: CrashReport): boolean {
 
 function createMutationId(): string {
   return `dbx-${Date.now().toString(36)}-${nextMutation++}`;
-}
-
-/** Stored bytes in the unit a reader can size up at a glance. */
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024).toLocaleString("en-US")} KiB`;
-  return `${bytes} B`;
 }
 
 function resolveDatabaseGridTheme(host: HTMLElement): Partial<Theme> {
@@ -220,10 +216,7 @@ function wireSession(
             // The coordinator wraps transport failures; keep the link message readable.
             callbacks.onLog("warn", event.error.cause.message);
           } else {
-            callbacks.onLog(
-              "error",
-              event.error instanceof Error ? event.error.message : String(event.error),
-            );
+            callbacks.onLog("error", errorText(event.error));
           }
           resumeSend();
           break;
@@ -427,7 +420,7 @@ export default function DatabaseShowcase() {
         } catch (error) {
           if (bootSignal.aborted) return;
           setStatus("error");
-          setStatusDetail(error instanceof Error ? error.message : String(error));
+          setStatusDetail(errorText(error));
         }
       });
       bootQueueRef.current = nextBoot;
@@ -448,22 +441,19 @@ export default function DatabaseShowcase() {
     };
   }, [boot]);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const session = sessionRef.current;
-      const host = hostRef.current;
-      if (session && host) session.grid.replaceTheme(resolveDatabaseGridTheme(host));
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(
+    () =>
+      observeSiteTheme(() => {
+        const session = sessionRef.current;
+        const host = hostRef.current;
+        if (session && host) session.grid.replaceTheme(resolveDatabaseGridTheme(host));
+      }),
+    [],
+  );
 
   const run = (command: () => Promise<void>) => {
     void action.run(command, (error) => {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorText(error);
       if (!(error instanceof ShowcaseLinkError)) pushLog("error", message);
       return message;
     });
@@ -527,7 +517,7 @@ export default function DatabaseShowcase() {
           if (passed) {
             pushLog(
               "commit",
-              `Undo restored 100,000 usage cells in one history step: restoreBlock committed as v${session.sync.serverVersion} (${formatBytes(decodedBytes)} decoded → ${formatBytes(wireBytes)} wire)`,
+              `Undo restored 100,000 usage cells in one history step: restoreBlock committed as v${session.sync.serverVersion} (${formatBytes(decodedBytes, { kib: 0, mib: 1, groupKib: true })} decoded → ${formatBytes(wireBytes, { kib: 0, mib: 1, groupKib: true })} wire)`,
             );
           }
         } finally {
@@ -970,7 +960,9 @@ export default function DatabaseShowcase() {
           </div>
           <div>
             <dt>Allocated</dt>
-            <dd data-testid="dbx-bytes">{stats ? formatBytes(stats.storedBytes) : "0 B"}</dd>
+            <dd data-testid="dbx-bytes">
+              {stats ? formatBytes(stats.storedBytes, { kib: 0, mib: 1, groupKib: true }) : "0 B"}
+            </dd>
           </div>
           <div>
             <dt>Session</dt>
@@ -1038,8 +1030,8 @@ export default function DatabaseShowcase() {
             <div>
               <dt>Restore block</dt>
               <dd>
-                {formatBytes(undoReport.decodedBytes)} decoded → {formatBytes(undoReport.wireBytes)}{" "}
-                wire
+                {formatBytes(undoReport.decodedBytes, { kib: 0, mib: 1, groupKib: true })} decoded →{" "}
+                {formatBytes(undoReport.wireBytes, { kib: 0, mib: 1, groupKib: true })} wire
               </dd>
             </div>
           </dl>
@@ -1230,7 +1222,8 @@ export default function DatabaseShowcase() {
             </dl>
             <p className="sw-dbx__note">
               Compaction folds the operation tail into snapshot revision after{" "}
-              {COMPACTION.maxTailRecords} tail records or {formatBytes(COMPACTION.maxTailBytes)}.
+              {COMPACTION.maxTailRecords} tail records or{" "}
+              {formatBytes(COMPACTION.maxTailBytes, { kib: 0, mib: 1, groupKib: true })}.
             </p>
           </section>
           <section aria-labelledby="dbx-architecture-title" className="sw-dbx__architecture">

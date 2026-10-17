@@ -18,6 +18,7 @@ import { FileSpreadsheet, ShieldCheck } from "lucide-vue-next";
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 
 import { createActionGuard, type ActionState } from "../lib/action-guard.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import {
   BUSINESS_DOCUMENT_ID,
   BUSINESS_ROWS,
@@ -494,19 +495,15 @@ const App = defineComponent({
       resetGridInput(":renderer", `${next} — reset-bound input, grid rebuilds`);
     }
 
-    let themeObserver: MutationObserver | null = null;
+    let stopObservingTheme: (() => void) | null = null;
     onMounted(() => {
-      themeObserver = new MutationObserver(() =>
+      stopObservingTheme = observeSiteTheme(() =>
         window.__sheetwriteVueWorkbench?.grid.replaceTheme(BUSINESS_THEME),
       );
-      themeObserver.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["data-theme"],
-      });
     });
 
     onBeforeUnmount(() => {
-      themeObserver?.disconnect();
+      stopObservingTheme?.();
       offSync?.();
       offRejected?.();
       sync?.destroy();

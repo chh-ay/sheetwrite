@@ -37,6 +37,7 @@ import {
 } from "@sheetwrite/core/shell";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
 
+import { errorText } from "../lib/errors.js";
 import {
   buildEngineData,
   createEngineWorkbook,
@@ -48,8 +49,8 @@ import {
 } from "./scenarios/engine.js";
 
 /** The fixture sheet every non-imported mount hydrates. */
-export const WORKBENCH_SHEET: SheetId = ENGINE_SHEET_ID;
-export const SUMMARY_SHEET: SheetId = "summary";
+const WORKBENCH_SHEET: SheetId = ENGINE_SHEET_ID;
+const SUMMARY_SHEET: SheetId = "summary";
 /** Fixture size, re-exported so hosts read one module for the whole scenario. */
 export const WORKBENCH_ROWS = ENGINE_ROWS;
 
@@ -305,7 +306,7 @@ export function createWorkbench(
       events.onRendererChange({
         requested: "worker",
         active: grid.rendererKind(),
-        fallback: error instanceof Error ? error.message : String(error),
+        fallback: errorText(error),
       });
       events.onActivity("Worker renderer unavailable — fell back to the main-thread canvas");
     }),
@@ -328,16 +329,12 @@ export function createWorkbench(
   );
   unsubscribes.push(
     grid.on("export-error", ({ error }) => {
-      events.onActivity(
-        `XLSX export failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      events.onActivity(`XLSX export failed: ${errorText(error)}`);
     }),
   );
   unsubscribes.push(
     grid.on("datasource-error", ({ request, error }) => {
-      events.onActivity(
-        `Page ${request.start}–${request.end} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      events.onActivity(`Page ${request.start}–${request.end} failed: ${errorText(error)}`);
     }),
   );
 
@@ -491,5 +488,5 @@ export function describeActionError(error: unknown): string {
   if (error instanceof IncompleteDataError) {
     return "Needs the full dataset — the paged store has only the visited pages loaded";
   }
-  return error instanceof Error ? error.message : String(error);
+  return errorText(error);
 }

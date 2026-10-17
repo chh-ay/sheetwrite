@@ -1,4 +1,6 @@
 <script lang="ts">
+import { errorText } from "../lib/errors.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 // Svelte 5 runes island for the offline/collaborative dispatch workbench.
 // The adapter owns canonical mount/reset/destroy of the Grid; a framework-
 // neutral session (svelte-workbench.ts) owns the durable outbox, connectivity,
@@ -184,7 +186,7 @@ $effect(() => {
       mount = value.initialMount();
     },
     (error: unknown) => {
-      if (!cancelled) bootError = error instanceof Error ? error.message : String(error);
+      if (!cancelled) bootError = errorText(error);
     },
   );
   return () => {
@@ -211,12 +213,7 @@ $effect(() => {
 $effect(() => {
   const activeGrid = grid;
   if (!activeGrid) return;
-  const observer = new MutationObserver(() => activeGrid.replaceTheme(OFFLINE_THEME));
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["data-theme"],
-  });
-  return () => observer.disconnect();
+  return observeSiteTheme(() => activeGrid.replaceTheme(OFFLINE_THEME));
 });
 
 // Shell chrome (name box, formula bar, selection status) binds to the same

@@ -1,4 +1,4 @@
-import type { PagedStoreStats, Selection, WorkbookSnapshot } from "@sheetwrite/core";
+import type { PagedStoreStats, WorkbookSnapshot } from "@sheetwrite/core";
 import { initSheetwrite } from "@sheetwrite/core";
 import { Link } from "@tanstack/react-router";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -11,6 +11,8 @@ import {
 } from "react";
 
 import { isRepeatClick } from "../lib/action-guard.js";
+import { selectionLabel } from "../lib/selection-label.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import { ENGINE_THEME } from "./scenarios/engine.js";
 import { DemoButton } from "./ui/DemoButton.js";
@@ -60,15 +62,6 @@ const WORKBENCH_SCENARIOS: ReadonlyArray<{
   { id: "paged", label: "Paged source", kicker: "Datasource ownership" },
   { id: "xlsx", label: "XLSX", kicker: "Workbook ownership" },
 ];
-
-function describeSelection(selection: Selection | null): string {
-  if (selection === null) return "No active cell";
-  if (selection.kind === "cell") return `R${selection.addr.row + 1} C${selection.addr.col + 1}`;
-  if (selection.kind === "range") {
-    return `R${selection.range.start.row + 1}:R${selection.range.end.row + 1}`;
-  }
-  return selection.kind;
-}
 
 function rendererLabel(kind: WorkbenchRenderer): string {
   return kind === "worker" ? "Web Worker" : "Main thread";
@@ -156,7 +149,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
           },
           {
             onActivity: record,
-            onSelectionChange: (next) => setSelection(describeSelection(next)),
+            onSelectionChange: (next) => setSelection(selectionLabel(next, "No active cell")),
             onRendererChange: (state) => {
               setRendererState(state);
               if (state.fallback !== null) setFallbackCount((count) => count + 1);
@@ -192,16 +185,10 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
     // reset is destroy + create of a fresh generation, not a state patch.
   }, [alive, hydrated, spec.renderer, spec.data, imported, resetCount, record]);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() =>
-      workbenchRef.current?.grid.replaceTheme(ENGINE_THEME),
-    );
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(
+    () => observeSiteTheme(() => workbenchRef.current?.grid.replaceTheme(ENGINE_THEME)),
+    [],
+  );
 
   function changeRenderer(next: WorkbenchRenderer): void {
     if (next === spec.renderer) return;

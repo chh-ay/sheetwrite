@@ -40,6 +40,7 @@ import libreofficeRichUrl from "../../../../packages/xlsx/test/fixtures/libreoff
 import fixtureManifest from "../../../../packages/xlsx/test/fixtures/manifest.json";
 import positiveUrl from "../../../../packages/xlsx/test/fixtures/sheetwrite-libreoffice-positive.xlsx?url";
 import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx?url";
+import { errorText } from "../../lib/errors.js";
 
 export const INTEROP_ORDERS_SHEET = "orders";
 export const INTEROP_INVOICE_SHEET = "invoice";
@@ -430,7 +431,7 @@ export async function probeXlsxRegistration(): Promise<{
     await probe;
     return { registered: true, error: null };
   } catch (error) {
-    return { registered: false, error: error instanceof Error ? error.message : String(error) };
+    return { registered: false, error: errorText(error) };
   }
 }
 
@@ -983,6 +984,14 @@ export interface RejectionReport {
   message: string | null;
 }
 
+function rejectionReport(error: unknown): RejectionReport {
+  return {
+    rejected: true,
+    errorName: error instanceof Error ? error.name : typeof error,
+    message: errorText(error),
+  };
+}
+
 /** Run hostile or over-limit bytes through the real import path; report the typed rejection. */
 export async function expectRejection(
   bytes: Uint8Array,
@@ -993,11 +1002,7 @@ export async function expectRejection(
     await fromXlsxWorkbook(bytes, options);
     return { rejected: false, errorName: null, message: null };
   } catch (error) {
-    return {
-      rejected: true,
-      errorName: error instanceof Error ? error.name : typeof error,
-      message: error instanceof Error ? error.message : String(error),
-    };
+    return rejectionReport(error);
   }
 }
 
@@ -1016,10 +1021,6 @@ export function delimitedCeilingDemo(): RejectionReport {
     parseCsv(big, { resourceLimits: { maxCells: 1_000 } });
     return { rejected: false, errorName: null, message: null };
   } catch (error) {
-    return {
-      rejected: true,
-      errorName: error instanceof Error ? error.name : typeof error,
-      message: error instanceof Error ? error.message : String(error),
-    };
+    return rejectionReport(error);
   }
 }

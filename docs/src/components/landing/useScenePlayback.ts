@@ -18,7 +18,7 @@ export function useScenePlayback<T extends HTMLElement>() {
   const [epoch, setEpoch] = useState(0);
 
   useEffect(() => {
-    // `epoch` only remounts the subtree; the observers attach to the same root.
+    // Replay remounts the animated subtree and recreates observers on this root.
     void epoch;
     const root = ref.current;
     if (!root) return;

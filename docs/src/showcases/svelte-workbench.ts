@@ -27,6 +27,7 @@ import {
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 
+import { errorText } from "../lib/errors.js";
 import { ShowcaseCollaborationServer, ShowcasePresenceBus } from "./collaboration-protocol.js";
 import {
   createOfflineData,
@@ -151,10 +152,6 @@ function fitSheetColumns(
     ...column,
     width: widths[index] ?? column.width,
   }));
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function describeRemoteCommit(entry: VersionedOperation): string {
@@ -348,7 +345,7 @@ export class SvelteWorkbenchSession {
         if (this.online && sync.pendingCount > 0) return sync.flush().then(() => undefined);
         return undefined;
       })
-      .catch((error: unknown) => this.feed("err", describeError(error)));
+      .catch((error: unknown) => this.feed("err", errorText(error)));
   }
 
   /** Tear down the current grid generation's coordinators. */
@@ -393,7 +390,7 @@ export class SvelteWorkbenchSession {
         await this.reconcileAfterDrain(link);
       }
     } catch (error) {
-      this.feed("err", describeError(error));
+      this.feed("err", errorText(error));
     }
   }
 
@@ -433,7 +430,7 @@ export class SvelteWorkbenchSession {
           : `${OFFLINE_COLLEAGUE_ACTOR.displayName} committed server v${version} while you're offline — reconnect to converge`,
       );
     } catch (error) {
-      this.feed("err", describeError(error));
+      this.feed("err", errorText(error));
     }
   }
 
@@ -485,7 +482,7 @@ export class SvelteWorkbenchSession {
       this.feed("info", `Reloading the document at server v${head.version ?? 0}`);
       this.callbacks.onRemount(mountFromSnapshot(head, this.hostWidth()), "conflict-reload");
     } catch (error) {
-      this.feed("err", describeError(error));
+      this.feed("err", errorText(error));
     }
   }
 
@@ -569,10 +566,10 @@ export class SvelteWorkbenchSession {
         );
         break;
       case "storage-error":
-        this.feed("err", `Outbox storage error: ${describeError(event.error)}`);
+        this.feed("err", `Outbox storage error: ${errorText(event.error)}`);
         break;
       case "error":
-        this.feed("err", describeError(event.error));
+        this.feed("err", errorText(event.error));
         break;
       case "persisting":
         break;
@@ -635,7 +632,7 @@ export class SvelteWorkbenchSession {
       if (event.type === "updated" || event.type === "expired") {
         this.callbacks.onPeers(presence.remotePresence());
       } else if (event.type === "error") {
-        this.feed("err", describeError(event.error));
+        this.feed("err", errorText(event.error));
       }
     });
 

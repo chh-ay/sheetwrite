@@ -1,3 +1,4 @@
+import { colToA1 } from "@sheetwrite/core";
 import type {
   CellValue,
   DataCell,
@@ -88,17 +89,6 @@ const TOTAL_ROW_STYLE = {
   color: "#c5eadc",
 } as const;
 
-/** A1 letters for one-based column numbers. */
-export function columnLetter(index: number): string {
-  let label = "";
-  let remaining = index;
-  do {
-    label = String.fromCharCode(65 + (remaining % 26)) + label;
-    remaining = Math.floor(remaining / 26) - 1;
-  } while (remaining >= 0);
-  return label;
-}
-
 /** Twelve monthly records followed by their formula-backed annual total. */
 export function engineAccountTotalRow(row: number): number {
   return 1 + Math.floor((row - 1) / ENGINE_ACCOUNT_ROWS) * ENGINE_ACCOUNT_ROWS + 12;
@@ -164,7 +154,7 @@ const FORECAST_COLUMNS: Workbook["sheets"][number]["columns"] = [
 ];
 
 const COLUMN_LETTER_BY_KEY: Readonly<Record<string, string>> = Object.fromEntries(
-  FORECAST_COLUMNS.map((column, index) => [column.key, columnLetter(index)]),
+  FORECAST_COLUMNS.map((column, index) => [column.key, colToA1(index)]),
 );
 
 function columnLetterOf(key: string): string {

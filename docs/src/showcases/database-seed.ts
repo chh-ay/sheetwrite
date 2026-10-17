@@ -1,3 +1,4 @@
+import { colToA1 } from "@sheetwrite/core";
 import type { WorkbookSnapshot } from "@sheetwrite/core";
 
 // Pure seed data shared by the showcase and prebuilt-site browser specs.
@@ -108,7 +109,7 @@ export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
                 colOffset: col,
                 value: {
                   kind: "formula" as const,
-                  src: `=SUM(${String.fromCharCode(65 + col)}1:${String.fromCharCode(65 + col)}${DATABASE_REVENUE_ROWS})`,
+                  src: `=SUM(${colToA1(col)}1:${colToA1(col)}${DATABASE_REVENUE_ROWS})`,
                 },
               })),
             ],
