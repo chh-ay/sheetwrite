@@ -52,6 +52,6 @@
     "@sheetwrite/core": "workspace:*",
     "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/wasm": "workspace:*",
-    "handsontable": "^18.0.0"
+    "handsontable": "18.1.2"
   }
 }

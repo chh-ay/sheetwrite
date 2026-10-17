@@ -32,7 +32,7 @@
         "@sheetwrite/core": "workspace:*",
         "@sheetwrite/formulas": "workspace:*",
         "@sheetwrite/wasm": "workspace:*",
-        "handsontable": "^18.0.0",
+        "handsontable": "18.1.2",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.14.5",
@@ -924,7 +924,7 @@
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
-    "handsontable": ["handsontable@18.0.0", "", {}, "sha512-U4H6gDrwGTfjahSyoGHhFHZvOZWB7ReQ3iBvJUIcZPdqdppdZ+FSYNovw+3MH1guJfGgRIhoLYnbSm8Gd6Ft8w=="],
+    "handsontable": ["handsontable@18.1.2", "", {}, "sha512-iL4Cia0Fsl+md1oCqUS8PJqfft3583d5ptc5M7ewfp6JTUsNsrIcpF3GPYvZy57e7P5PACX8WboGlkwgHn0h9Q=="],
 
     "happy-dom": ["happy-dom@20.14.5", "", { "dependencies": { "@types/node": ">=20.0.0", "@types/whatwg-mimetype": "^3.0.2", "@types/ws": "^8.18.1", "buffer-image-size": "^0.6.4", "entities": "^7.0.1", "whatwg-mimetype": "^3.0.0", "ws": "^8.21.0" } }, "sha512-x/RzkpWO40bTjIoT30iQtt64FLLmH/iRcUCN2X//bLx7H3ifkdfPXyqsro/OYtqzIAhiLMMA7mmiOR9C3NOKjQ=="],
 

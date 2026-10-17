@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pin the comparison grid to Handsontable 18.1.2, including its 18.1 scrolling, index translation, filtering, and cell-metadata performance improvements.
 - Add default and full formula engine measurements. Keep raw time and allocation samples, output checks, and source hashes.
 - Add analysis workloads, WASM file sizes, and fresh Node initialization samples.
 
