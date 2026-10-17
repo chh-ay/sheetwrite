@@ -95,6 +95,7 @@ jobs:
           EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
         run: bun scripts/release-publish.ts test-results/release-artifacts
       - name: Create verified package releases
+        if: steps.publish.outputs.pending != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.identity.outputs.commit }}
