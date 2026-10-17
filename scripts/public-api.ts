@@ -395,6 +395,8 @@ function jsDocCommentTexts(node: Node): string[] {
     if (block === undefined) continue;
     const comment = getTextOfJSDocComment(block.comment);
     if (comment !== undefined && comment.length > 0) comments.push(comment);
+    // Inherited framework props keep their summaries, not upstream documentation tags.
+    if (host.getSourceFile().fileName.includes("node_modules")) continue;
     for (const tag of block.tags ?? []) {
       if (!["example", "see"].includes(tag.tagName.text)) continue;
       const comment = getTextOfJSDocComment(tag.comment) ?? "";
