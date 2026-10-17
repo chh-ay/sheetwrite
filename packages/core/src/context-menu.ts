@@ -1,5 +1,5 @@
-import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
 import { actionFeedbackFor } from "./action-feedback.js";
+import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
 import type {
   ContextMenuActionName,
   ContextMenuContext,

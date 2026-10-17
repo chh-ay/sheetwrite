@@ -1,5 +1,5 @@
-import { isKeyboardAction } from "./keymap.js";
 import { actionFeedbackFor } from "./action-feedback.js";
+import { isKeyboardAction } from "./keymap.js";
 import type {
   Grid,
   GridActions,
