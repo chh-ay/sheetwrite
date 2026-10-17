@@ -711,6 +711,146 @@
       "field": "memory.100000.wasmDeltaBytes",
       "maximum": 53542976,
       "reason": "+1,769,472 B from the FormulaEntry spill-reference flag (e725d980 measures 54,657,024 B, its parent 11e8eddb 52,887,552 B); #103/#107 and later changes -1,114,112 B"
+    },
+    {
+      "workload": "cycles",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.4085,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "criteria-range-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 6.321711,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "lookup-range-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 4.314573,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "vlookup-many",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.98722,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "vlookup-many-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 2.403105,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "vlookup-many-sorted",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.592525,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "vlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.274324,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "xlookup-many",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 2.725893,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "xlookup-many-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 2.393798,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "xlookup-many-sorted",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.608036,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "xlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 3.209105,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "text-lookup-many-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 4.098769,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "text-lookup-many-sorted-edit",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 6.572517,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "sumproduct-vector-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 4.851631,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "sumproduct-matrix-edit",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 4.193532,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "sum-multi-range",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 8.946355,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "countif-100k",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 3.037992,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "percentile-covariance",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 7.948571,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "let-repeat",
+      "size": 100000,
+      "field": "p95",
+      "maximum": 4.137764,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
+    },
+    {
+      "workload": "iterative-finance",
+      "size": 1000,
+      "field": "p95",
+      "maximum": 7.664584,
+      "reason": "With 5 samples, p95 is the single slowest sample. Across three idle captures of this release, medians of all 1-5 ms workloads stayed within the gate, while single-sample outliers reached 1.51x the baseline p95 (vlookup-many-edit/1000: 1.20 -> 1.82 ms; xlookup-many/1000: 1.36 -> 1.97 ms). The approved maximum is 2x the baseline p95; the median rule still applies unchanged."
     }
   ]
 }
