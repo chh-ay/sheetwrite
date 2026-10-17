@@ -41,7 +41,8 @@ let generation = $state(1);
 let remountNote = $state("initial");
 let grid = $state<Grid>();
 let online = $state(true);
-let merging = $state(false);
+let actionKind = $state<"connection" | "merge">("connection");
+let merging = $derived(actionState.pending && actionKind === "merge");
 let syncState = $state<SyncStateSnapshot>();
 let queue = $state<readonly SyncMutationRecord[]>([]);
 let conflict = $state<WorkbenchConflict | null>(null);
@@ -244,20 +245,19 @@ function toggleConnection(event: MouseEvent): void {
   const active = session;
   const next = !online;
   void action.run(async () => {
+    actionKind = "connection";
     await active.setOnline(next);
     online = next;
   }, () => "Cannot change the connection. Try again.");
 }
 
 async function mergeConflict(): Promise<void> {
-  if (!session || merging) return;
+  if (!session) return;
   const active = session;
-  merging = true;
-  try {
-    await action.run(() => active.mergeAndResync(), () => "Cannot merge the queued edits. Try again.");
-  } finally {
-    merging = false;
-  }
+  await action.run(() => {
+    actionKind = "merge";
+    return active.mergeAndResync();
+  }, () => "Cannot merge the queued edits. Try again.");
 }
 </script>
 
