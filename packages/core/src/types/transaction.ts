@@ -23,6 +23,19 @@ export interface TransactionResourceLimits {
  *
  * Calling `Store.applyTransaction` bypasses Grid read-only checks and Grid
  * undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
+ *
+ * @example
+ * ```ts
+ * import type { Store, SheetId, Transaction } from "@sheetwrite/core";
+ *
+ * function setAmount(store: Store, sheet: SheetId) {
+ *   const transaction: Transaction = {
+ *     patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 25 } }],
+ *   };
+ *   return store.applyTransaction(transaction);
+ * }
+ * ```
+ * @see Grid.applyTransaction
  */
 export interface Transaction {
   /** Ordered document operations submitted as one store commit. */
@@ -145,7 +158,22 @@ export type PersistenceCommitResponse =
       snapshot?: WorkbookSnapshot;
     };
 
-/** Host load and commit contract for versioned workbook persistence. */
+/**
+ * Host load and commit contract for versioned workbook persistence.
+ *
+ * @example
+ * ```ts
+ * import { MemoryPersistenceAdapter, type PersistenceAdapter, type WorkbookSnapshot } from "@sheetwrite/core";
+ *
+ * async function loadLocal(snapshot: WorkbookSnapshot) {
+ *   if (!snapshot.documentId) throw new Error("A document ID is required");
+ *   const adapter: PersistenceAdapter = new MemoryPersistenceAdapter(snapshot);
+ *   return adapter.load(snapshot.documentId);
+ * }
+ * ```
+ * @see MemoryPersistenceAdapter
+ * @see SyncCoordinator
+ */
 export interface PersistenceAdapter {
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;

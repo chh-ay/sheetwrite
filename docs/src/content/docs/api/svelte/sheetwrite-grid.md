@@ -1,11 +1,30 @@
 ---
 title: "SheetwriteGrid | @sheetwrite/svelte"
-description: "Advanced framework component for workbook data or datasource input."
+description: "Advanced component for an existing workbook or datasource."
 ---
 <!-- api-export:@sheetwrite/svelte|.|SheetwriteGrid -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="variable">variable</span></div>
 
+Advanced component for an existing workbook or datasource.
 Advanced framework component for workbook data or datasource input.
+
+### Examples
+
+```ts compile
+import { mount, unmount } from "svelte";
+import { SheetwriteGrid } from "@sheetwrite/svelte";
+import type { Workbook } from "@sheetwrite/core";
+
+function mountWorkbook(target: HTMLElement, workbook: Workbook) {
+  const view = mount(SheetwriteGrid, { target, props: { workbook, height: 400 } });
+  return () => unmount(view);
+}
+```
+
+### See also
+
+- [Sheetwrite](/docs/api/svelte/sheetwrite/)
+- [/docs/frameworks/svelte/](/docs/frameworks/svelte/)
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/Grid.svelte.d.ts#L7"><code>packages/svelte/src/Grid.svelte.d.ts#L7</code></a></dd></div>

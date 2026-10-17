@@ -62,7 +62,30 @@ export interface DataSourceCapabilities {
   columns: "windowed" | "full-width";
 }
 
-/** Host callback that asynchronously loads cancellable rectangular pages. */
+/**
+ * Host callback that asynchronously loads cancellable rectangular pages.
+ *
+ * @example
+ * ```ts
+ * import type { DataSource, RowData } from "@sheetwrite/core";
+ *
+ * const rows: RowData[] = [{ amount: 12 }, { amount: 18 }];
+ * const datasource: DataSource = {
+ *   capabilities: { protocol: 2, columns: "windowed" },
+ *   async getRows(request) {
+ *     request.signal.throwIfAborted();
+ *     return {
+ *       protocol: 2, start: request.start, columns: request.columns,
+ *       rows: rows.slice(request.start, request.end).map((row) =>
+ *         Object.fromEntries(request.columns.flatMap((band) =>
+ *           band.keys.map((key) => [key, row[key] ?? null])))),
+ *     };
+ *   },
+ * };
+ * ```
+ * @see GridOptions.datasource
+ * @see DataSourceRequest
+ */
 export interface DataSource {
   readonly capabilities: DataSourceCapabilities;
   /** Loads the requested rows and columns; implementations should stop work when its signal aborts. */

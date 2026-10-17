@@ -10,8 +10,24 @@ row is treated as the header and its cell text becomes each column's key.
 Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
 
+### Examples
+
+```ts compile
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxTable } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function openTable(file: File) {
+  return fromXlsxTable(await file.arrayBuffer());
+}
+```
+
+### See also
+
+- [toXlsxTable](/docs/api/core/to-xlsx-table/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L391"><code>packages/core/src/export.ts#L391</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L418"><code>packages/core/src/export.ts#L418</code></a></dd></div>
 </dl>
 
 ## Declaration

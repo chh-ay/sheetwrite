@@ -289,6 +289,16 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
 /**
  * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
  * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite } from "@sheetwrite/core";
+ * import * as formulas from "@sheetwrite/formulas";
+ *
+ * await initSheetwrite(undefined, formulas);
+ * ```
+ * @see /docs/guides/formulas/
+ * @see createGrid
  */
 export async function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
@@ -346,7 +356,32 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
   return theme;
 }
 
-/** Creates and mounts an imperative Grid in the supplied host element. */
+/**
+ * Creates and mounts an imperative Grid in the supplied host element.
+ *
+ * @example
+ * ```ts
+ * import { createGrid, initSheetwrite } from "@sheetwrite/core";
+ *
+ * await initSheetwrite();
+ * const host = document.createElement("div");
+ * host.style.height = "400px";
+ * document.body.append(host);
+ * const grid = createGrid(host, {
+ *   workbook: {
+ *     activeSheet: "sales",
+ *     sheets: [{ id: "sales", name: "Sales", rowCount: 2,
+ *       columns: [{ key: "amount", header: "Amount", type: "number", width: 120 }] }],
+ *   },
+ *   data: { rowCount: 2, columns: { amount: [12, 18] } },
+ * });
+ * grid.scrollToCell({ sheet: "sales", row: 1, col: 0 });
+ * // Call when the host view is removed.
+ * grid.destroy();
+ * ```
+ * @see Grid
+ * @see GridOptions
+ */
 export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
   if (!isLoaded()) {
     throw new SheetwriteError(

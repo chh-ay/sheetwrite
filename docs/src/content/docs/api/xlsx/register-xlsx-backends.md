@@ -7,8 +7,24 @@ description: "Register all concrete XLSX backends with the backend-neutral core 
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
 
+### Examples
+
+```ts compile
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxWorkbook } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function open(file: File) {
+  return fromXlsxWorkbook(await file.arrayBuffer());
+}
+```
+
+### See also
+
+- [/docs/guides/xlsx-export/](/docs/guides/xlsx-export/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/registration.ts#L12"><code>packages/xlsx/src/registration.ts#L12</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/registration.ts#L26"><code>packages/xlsx/src/registration.ts#L26</code></a></dd></div>
 </dl>
 
 ## Declaration

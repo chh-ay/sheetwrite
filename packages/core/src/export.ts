@@ -344,7 +344,22 @@ function missingXlsxBackend(
   );
 }
 
-/** Exports a table model through the registered optional XLSX backend. */
+/**
+ * Exports a table model through the registered optional XLSX backend.
+ *
+ * @example
+ * ```ts
+ * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+ * import { toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
+ *
+ * registerXlsxBackends();
+ * async function download(workbook: Workbook, store: Store) {
+ *   const bytes = await toXlsxTable(workbook, store);
+ *   downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+ * }
+ * ```
+ * @see fromXlsxTable
+ */
 export async function toXlsxTable(
   workbook: Workbook,
   store: Store,
@@ -387,6 +402,18 @@ export function setXlsxTableImportBackend(next: XlsxTableImportBackend): void {
  * row is treated as the header and its cell text becomes each column's key.
  * Numbers stay numbers, date cells use the date-serial convention, strings are
  * verbatim, and empty cells become `null`.
+ *
+ * @example
+ * ```ts
+ * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+ * import { fromXlsxTable } from "@sheetwrite/core";
+ *
+ * registerXlsxBackends();
+ * async function openTable(file: File) {
+ *   return fromXlsxTable(await file.arrayBuffer());
+ * }
+ * ```
+ * @see toXlsxTable
  */
 export async function fromXlsxTable(
   data: ArrayBuffer | Uint8Array,
@@ -457,7 +484,22 @@ function workbookSnapshotOf(
   return "schemaVersion" in input ? input : input.exportSnapshot();
 }
 
-/** Formula-preserving, multi-sheet workbook export through the optional XLSX backend. */
+/**
+ * Formula-preserving, multi-sheet workbook export through the optional XLSX backend.
+ *
+ * @example
+ * ```ts
+ * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+ * import { toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
+ *
+ * registerXlsxBackends();
+ * async function download(grid: Grid) {
+ *   const bytes = await toXlsxWorkbook(grid);
+ *   downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+ * }
+ * ```
+ * @see fromXlsxWorkbook
+ */
 export async function toXlsxWorkbook(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
@@ -474,7 +516,23 @@ export async function toXlsxWorkbook(
   }
 }
 
-/** Formula-preserving, multi-sheet workbook import through the optional XLSX backend. */
+/**
+ * Formula-preserving, multi-sheet workbook import through the optional XLSX backend.
+ *
+ * @example
+ * ```ts
+ * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+ * import { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from "@sheetwrite/core";
+ *
+ * registerXlsxBackends();
+ * async function openWorkbook(host: HTMLElement, file: File) {
+ *   await initSheetwrite();
+ *   const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());
+ *   return createGridFromSnapshot(host, snapshot);
+ * }
+ * ```
+ * @see toXlsxWorkbook
+ */
 export async function fromXlsxWorkbook(
   data: ArrayBuffer | Uint8Array,
   options?: XlsxWorkbookOptions,

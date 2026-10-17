@@ -287,7 +287,23 @@ export interface KeyboardOptions {
   bindings?: Partial<Record<KeyboardAction, KeyShortcut | readonly KeyShortcut[] | null>>;
 }
 
-/** Built-in, separator, or custom callback row in the right-click menu. */
+/**
+ * Built-in, separator, or custom callback row in the right-click menu.
+ *
+ * @example
+ * ```ts
+ * import type { ContextMenuItem, GridConfig } from "@sheetwrite/core";
+ *
+ * const total: ContextMenuItem = {
+ *   id: "total",
+ *   label: "Show total",
+ *   onClick(grid) { window.alert(String(grid.aggregate(0, "sum"))); },
+ * };
+ * const config: GridConfig = { contextMenu: [total, { action: "separator" }, { action: "copy" }] };
+ * ```
+ * @see ContextMenuItems
+ * @see GridConfig.contextMenu
+ */
 export interface ContextMenuItem {
   /** Stable host identifier, exposed as `data-context-menu-item`. */
   id?: string;
@@ -320,6 +336,25 @@ export type ContextMenuItems =
 /**
  * Toolbar / feature configuration. When `config` is set the built-in toolbar is
  * shown; control flags default to `true` except the opt-in `export` flag.
+ *
+ * @example
+ * ```ts
+ * import type { GridConfig } from "@sheetwrite/core";
+ *
+ * const config: GridConfig = {
+ *   toolbar: true,
+ *   contextMenu: [{ action: "copy" }, { action: "paste" }],
+ *   keyboard(event, grid) {
+ *     if (event.altKey && event.key === "b") {
+ *       grid.actions.toggleBold();
+ *       return true;
+ *     }
+ *     return false;
+ *   },
+ * };
+ * ```
+ * @see Grid.setConfig
+ * @see ContextMenuItem
  */
 export interface GridConfig {
   /** Show the built-in toolbar (true), hide it (false), or supply a custom item list. */
@@ -366,7 +401,25 @@ export interface GridConfig {
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
 
-/** Workbook, data, rendering, policy, and built-in UI options used to create a Grid. */
+/**
+ * Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
+ *
+ * @example
+ * ```ts
+ * import type { GridOptions } from "@sheetwrite/core";
+ *
+ * const options: GridOptions = {
+ *   workbook: { activeSheet: "sheet1", sheets: [
+ *     { id: "sheet1", name: "Sheet 1", rowCount: 1,
+ *       columns: [{ key: "name", header: "Name", type: "text", width: 120 }] },
+ *   ] },
+ *   data: { rowCount: 1, columns: { name: ["Ada"] } },
+ *   config: { toolbar: true, contextMenu: true, keyboard: true },
+ * };
+ * ```
+ * @see createGrid
+ * @see GridConfig
+ */
 export interface GridOptions {
   /** Live workbook schema adopted by the store and updated by document operations. */
   workbook: Workbook;
@@ -527,7 +580,25 @@ export interface GridEvents {
   "export-error": { format: "csv" | "xlsx"; error: SheetwriteError };
 }
 
-/** Imperative grid handle for document commands, events, rendering, and teardown. */
+/**
+ * Imperative grid handle for document commands, events, rendering, and teardown.
+ *
+ * @example
+ * ```ts
+ * import type { Grid } from "@sheetwrite/core";
+ *
+ * function updateTotal(grid: Grid) {
+ *   const sheet = grid.getActiveSheet();
+ *   const result = grid.applyTransaction({
+ *     patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+ *   });
+ *   if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+ *   return grid.aggregate(0, "sum");
+ * }
+ * ```
+ * @see createGrid
+ * @see Grid.applyTransaction
+ */
 export interface Grid {
   readonly store: Store;
   /** Imperative action surface for binding custom toolbars/menus. */
@@ -584,6 +655,19 @@ export interface Grid {
    * Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
    * Use `Store.applyTransaction` only for low-level writes that intentionally
    * bypass Grid history and policy.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function setFirstCell(grid: Grid) {
+   *   return grid.applyTransaction({ patches: [
+   *     { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+   *       value: { kind: "literal", value: 42 } },
+   *   ] });
+   * }
+   * ```
+   * @see Transaction
    */
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
   /** Deterministically export the complete authoritative workbook document. */
@@ -597,13 +681,49 @@ export interface Grid {
     options?: RemoteOperationOptions,
   ): ApplyTransactionResult;
   defineCellRenderer(name: string, renderer: CellRenderer): void;
-  /** Column aggregate over the active sheet's data. */
+  /**
+   * Column aggregate over the active sheet's data.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function total(grid: Grid) {
+   *   return grid.aggregate(1, "sum");
+   * }
+   * ```
+   * @see SheetwriteStore.aggregate
+   */
   aggregate(col: number, op: AggregateOp): number;
-  /** Sort the displayed rows by a column (does not mutate stored data). */
+  /**
+   * Sort the displayed rows by a column (does not mutate stored data).
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function showLargestFirst(grid: Grid) {
+   *   grid.sortBy(1, false);
+   * }
+   * ```
+   * @see Grid.clearView
+   */
   sortBy(col: number, ascending?: boolean): void;
   /** Multi-key sort of the displayed rows (first key primary; stable). */
   sortByMulti(keys: readonly SortKey[]): void;
-  /** Filter the displayed rows to those whose column text contains `needle`. */
+  /**
+   * Filter the displayed rows to those whose column text contains `needle`.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function showOpenRows(grid: Grid) {
+   *   grid.filterBy(0, "Open");
+   * }
+   * ```
+   * @see Grid.clearView
+   */
   filterBy(col: number, needle: string): void;
   /**
    * Set or clear (null) one column's filter. All column filters AND together
@@ -645,11 +765,49 @@ export interface Grid {
    * Undo the last recorded cell edit. If the restored data is above the
    * transaction resource limits, nothing changes: the Grid emits
    * `mutation-rejected` and removes that entry, so older edits stay undoable.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function undoAndRestore(grid: Grid) {
+   *   grid.undo();
+   *   grid.redo();
+   * }
+   * ```
+   * @see Grid.redo
    */
   undo(): void;
   /** Redo the last undone cell edit. */
   redo(): void;
+  /**
+   * Download the active sheet as CSV.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function downloadCsv(grid: Grid) {
+   *   grid.exportCsv("sales.csv");
+   * }
+   * ```
+   */
   exportCsv(filename: string): void;
+  /**
+   * Download the active sheet through the registered XLSX backend.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   * import { registerXlsxBackends } from "@sheetwrite/xlsx";
+   *
+   * async function downloadXlsx(grid: Grid) {
+   *   await registerXlsxBackends();
+   *   await grid.exportXlsx("sales.xlsx");
+   * }
+   * ```
+   * @see toXlsxWorkbook
+   */
   exportXlsx(filename: string): Promise<void>;
   /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
   search(query: string, opts?: SearchOptions): SearchResult;

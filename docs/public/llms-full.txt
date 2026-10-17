@@ -5218,6 +5218,21 @@ export interface ContextMenuItem { id?: string; action?: ContextMenuActionName; 
 ```
 
 Built-in, separator, or custom callback row in the right-click menu.
+@example
+```ts
+import type { ContextMenuItem, GridConfig } from "@sheetwrite/core";
+
+const total: ContextMenuItem = {
+ id: "total",
+ label: "Show total",
+ onClick(grid) { window.alert(String(grid.aggregate(0, "sum"))); },
+};
+const config: GridConfig = { contextMenu: [total, { action: "separator" }, { action: "copy" }] };
+```
+@see
+ContextMenuItems
+@see
+GridConfig.contextMenu
 
 Members:
 - `action` — Built-in action to bind (or "separator"). Omit when supplying `onClick`.
@@ -5248,6 +5263,30 @@ Static rows or a context-aware factory evaluated each time the menu opens.
 ```
 
 Creates and mounts an imperative Grid in the supplied host element.
+@example
+```ts
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+
+await initSheetwrite();
+const host = document.createElement("div");
+host.style.height = "400px";
+document.body.append(host);
+const grid = createGrid(host, {
+ workbook: {
+ activeSheet: "sales",
+ sheets: [{ id: "sales", name: "Sales", rowCount: 2,
+ columns: [{ key: "amount", header: "Amount", type: "number", width: 120 }] }],
+ },
+ data: { rowCount: 2, columns: { amount: [12, 18] } },
+});
+grid.scrollToCell({ sheet: "sales", row: 1, col: 0 });
+// Call when the host view is removed.
+grid.destroy();
+```
+@see
+Grid
+@see
+GridOptions
 
 ##### `createGridFromSnapshot` — function
 
@@ -5265,6 +5304,20 @@ the hydrated store just like one created through `createGrid`.
 ```
 
 Create a typed bridge while preserving row and identity inference.
+@example
+```ts
+import { createRowBridge } from "@sheetwrite/core";
+
+const bridge = createRowBridge({
+ columns: [{ key: "amount" }],
+ defaultRows: [{ id: "order-1", amount: 12 }],
+ getRowId: (row) => row.id,
+});
+```
+@see
+RowBridgeOptions
+@see
+RowBridge
 
 ##### `createRuntimeResourceSnapshot` — function
 
@@ -5289,6 +5342,28 @@ export interface DataSource { readonly capabilities: DataSourceCapabilities; get
 ```
 
 Host callback that asynchronously loads cancellable rectangular pages.
+@example
+```ts
+import type { DataSource, RowData } from "@sheetwrite/core";
+
+const rows: RowData[] = [{ amount: 12 }, { amount: 18 }];
+const datasource: DataSource = {
+ capabilities: { protocol: 2, columns: "windowed" },
+ async getRows(request) {
+ request.signal.throwIfAborted();
+ return {
+ protocol: 2, start: request.start, columns: request.columns,
+ rows: rows.slice(request.start, request.end).map((row) =>
+ Object.fromEntries(request.columns.flatMap((band) =>
+ band.keys.map((key) => [key, row[key] ?? null])))),
+ };
+ },
+};
+```
+@see
+GridOptions.datasource
+@see
+DataSourceRequest
 
 Members:
 - `getRows` — Loads the requested rows and columns; implementations should stop work when its signal aborts.
@@ -5627,6 +5702,18 @@ Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed
 row is treated as the header and its cell text becomes each column's key.
 Numbers stay numbers, date cells use the date-serial convention, strings are
 verbatim, and empty cells become `null`.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxTable } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function openTable(file: File) {
+ return fromXlsxTable(await file.arrayBuffer());
+}
+```
+@see
+toXlsxTable
 
 ##### `fromXlsxWorkbook` — function
 
@@ -5635,6 +5722,20 @@ verbatim, and empty cells become `null`.
 ```
 
 Formula-preserving, multi-sheet workbook import through the optional XLSX backend.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function openWorkbook(host: HTMLElement, file: File) {
+ await initSheetwrite();
+ const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());
+ return createGridFromSnapshot(host, snapshot);
+}
+```
+@see
+toXlsxWorkbook
 
 ##### `Grid` — interface
 
@@ -5643,6 +5744,23 @@ export interface Grid { readonly store: Store; readonly actions: GridActions; ge
 ```
 
 Imperative grid handle for document commands, events, rendering, and teardown.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function updateTotal(grid: Grid) {
+ const sheet = grid.getActiveSheet();
+ const result = grid.applyTransaction({
+ patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+ });
+ if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+ return grid.aggregate(0, "sum");
+}
+```
+@see
+createGrid
+@see
+Grid.applyTransaction
 
 Members:
 - `actions` — Imperative action surface for binding custom toolbars/menus.
@@ -5650,11 +5768,34 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
 bypass Grid history and policy.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function setFirstCell(grid: Grid) {
+ return grid.applyTransaction({ patches: [
+ { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+ value: { kind: "literal", value: 42 } },
+ ] });
+}
+```
+@see
+Transaction
 - `autoFitColumns` — Explicitly resize columns from a bulk worksheet read.
 - `autoFitRows` — Explicitly resize rows to fit wrapped content; never runs during paint.
 - `beginEdit` — Open the cell editor at a view cell, optionally seeding text / selecting all.
@@ -5667,8 +5808,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -5734,6 +5907,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -5741,6 +5924,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridActions` — interface
@@ -5792,6 +5986,26 @@ export interface GridConfig { toolbar?: boolean | ToolbarItem[]; bold?: boolean;
 
 Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
+@example
+```ts
+import type { GridConfig } from "@sheetwrite/core";
+
+const config: GridConfig = {
+ toolbar: true,
+ contextMenu: [{ action: "copy" }, { action: "paste" }],
+ keyboard(event, grid) {
+ if (event.altKey && event.key === "b") {
+ grid.actions.toggleBold();
+ return true;
+ }
+ return false;
+ },
+};
+```
+@see
+Grid.setConfig
+@see
+ContextMenuItem
 
 Members:
 - `align` — Show left, center, and right alignment controls (default true).
@@ -5841,6 +6055,23 @@ export interface GridOptions { workbook: Workbook; data?: ColumnarData; datasour
 ```
 
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
+@example
+```ts
+import type { GridOptions } from "@sheetwrite/core";
+
+const options: GridOptions = {
+ workbook: { activeSheet: "sheet1", sheets: [
+ { id: "sheet1", name: "Sheet 1", rowCount: 1,
+ columns: [{ key: "name", header: "Name", type: "text", width: 120 }] },
+ ] },
+ data: { rowCount: 1, columns: { name: ["Ada"] } },
+ config: { toolbar: true, contextMenu: true, keyboard: true },
+};
+```
+@see
+createGrid
+@see
+GridConfig
 
 Members:
 - `config` — Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false.
@@ -5942,6 +6173,17 @@ Error thrown when an operation requires datasource cells that are not loaded.
 
 Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
 Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+@example
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+@see
+/docs/guides/formulas/
+@see
+createGrid
 
 ##### `isSafeExternalHyperlink` — function
 
@@ -6297,6 +6539,20 @@ export interface PersistenceAdapter { load(documentId: string, signal?: AbortSig
 ```
 
 Host load and commit contract for versioned workbook persistence.
+@example
+```ts
+import { MemoryPersistenceAdapter, type PersistenceAdapter, type WorkbookSnapshot } from "@sheetwrite/core";
+
+async function loadLocal(snapshot: WorkbookSnapshot) {
+ if (!snapshot.documentId) throw new Error("A document ID is required");
+ const adapter: PersistenceAdapter = new MemoryPersistenceAdapter(snapshot);
+ return adapter.load(snapshot.documentId);
+}
+```
+@see
+MemoryPersistenceAdapter
+@see
+SyncCoordinator
 
 Members:
 - `commitBatch` — Commit an atomic batch at versions `baseVersion + 1` through
@@ -6528,6 +6784,17 @@ Move all live stores into a fresh WASM instance. Call explicitly while idle;
 the main-thread pause scales with resident data and compact undo history.
 Preparation failures leave every live store and the selected instance unchanged.
 A larger replacement is discarded; the report then has zero migrated stores.
+@example
+```ts
+import { initSheetwrite, releaseEngineMemory } from "@sheetwrite/core";
+
+await initSheetwrite();
+// Run between user actions, not in an input or render callback.
+const report = await releaseEngineMemory();
+document.body.dataset.engineBytes = String(report.wasmBytesAfter);
+```
+@see
+EngineMemoryReleaseReport
 
 ##### `RemoteOperationOptions` — interface
 
@@ -7214,9 +7481,38 @@ class SheetwriteStore implements Store { constructor(workbook: Workbook, data?: 
 ```
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
+@example
+```ts
+import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
+
+async function total(workbook: Workbook) {
+ await initSheetwrite();
+ const store = new SheetwriteStore(workbook);
+ try {
+ return store.aggregate(workbook.activeSheet, 0, "sum");
+ } finally {
+ store.dispose();
+ }
+}
+```
+@see
+Store.aggregate
+@see
+createGrid
 
 Members:
 - `acknowledgeOperations` — Release sparse paged edits after server acknowledgement.
+- `aggregate` — Aggregate one column. Datasource-backed sheets must be fully loaded.
+@example
+```ts
+import type { SheetwriteStore, SheetId } from "@sheetwrite/core";
+
+function totals(store: SheetwriteStore, sheet: SheetId) {
+ return { total: store.aggregate(sheet, 0, "sum"), average: store.aggregate(sheet, 0, "avg") };
+}
+```
+@see
+AggregateOp
 - `applyTransaction` — Apply a low-level storage transaction.
 
 This bypasses Grid read-only checks and Grid undo/redo history. Use
@@ -7454,6 +7750,21 @@ class SyncCoordinator { constructor(grid: Grid, adapter: PersistenceAdapter, opt
 Deterministic, transport-neutral optimistic sync. Local rendering is never
 blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
+@example
+```ts
+import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
+
+async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: string, serverVersion: number) {
+ const sync = new SyncCoordinator(grid, adapter, { documentId, serverVersion });
+ await sync.ready();
+ await sync.flush();
+ return sync; // Call sync.destroy() before removing the Grid.
+}
+```
+@see
+PersistenceAdapter
+@see
+SyncCoordinator.recoverConflict
 
 Members:
 - `handleResponse` — Public for transports that deliver responses independently of send promises.
@@ -7466,6 +7777,19 @@ the pending work, so recovery applies the missed server versions and moves
 the pending queue onto the new server version. Call `flush` afterwards to
 send it. In every other case nothing changes and the result names the
 reason; the host then reloads and calls `resumeAfterReload`.
+@example
+```ts
+import type { SyncCoordinator } from "@sheetwrite/core";
+
+async function recover(sync: SyncCoordinator) {
+ const result = await sync.recoverConflict();
+ if (result.status === "recovered") await sync.flush();
+ // A reload-required result leaves the document unchanged for host recovery.
+ return result;
+}
+```
+@see
+SyncCoordinator.resumeAfterReload
 - `resumeAfterReload` — Resume only after the host remounted/reloaded document state and reapplied
 retained local operations. No lossy structural merge is attempted here.
 - `retry` — Explicit retry; the original mutation ID and durable record are retained.
@@ -7696,6 +8020,19 @@ synchronous API returns one in-memory string and fetches at most
 ```
 
 Exports a table model through the registered optional XLSX backend.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function download(workbook: Workbook, store: Store) {
+ const bytes = await toXlsxTable(workbook, store);
+ downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+```
+@see
+fromXlsxTable
 
 ##### `toXlsxWorkbook` — function
 
@@ -7704,6 +8041,19 @@ Exports a table model through the registered optional XLSX backend.
 ```
 
 Formula-preserving, multi-sheet workbook export through the optional XLSX backend.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function download(grid: Grid) {
+ const bytes = await toXlsxWorkbook(grid);
+ downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+```
+@see
+fromXlsxWorkbook
 
 ##### `Transaction` — interface
 
@@ -7716,6 +8066,19 @@ concurrency at the storage boundary.
 
 Calling `Store.applyTransaction` bypasses Grid read-only checks and Grid
 undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
+@example
+```ts
+import type { Store, SheetId, Transaction } from "@sheetwrite/core";
+
+function setAmount(store: Store, sheet: SheetId) {
+ const transaction: Transaction = {
+ patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 25 } }],
+ };
+ return store.applyTransaction(transaction);
+}
+```
+@see
+Grid.applyTransaction
 
 Members:
 - `epoch` — Expected current store epoch; a mismatch returns a conflict without applying patches.
@@ -8168,6 +8531,20 @@ expose callbacks from work that never commits.
 ```
 
 Create a typed bridge while preserving row and identity inference.
+@example
+```ts
+import { createRowBridge } from "@sheetwrite/core";
+
+const bridge = createRowBridge({
+ columns: [{ key: "amount" }],
+ defaultRows: [{ id: "order-1", amount: 12 }],
+ getRowId: (row) => row.id,
+});
+```
+@see
+RowBridgeOptions
+@see
+RowBridge
 
 ##### `createSimpleGridInput` — function
 
@@ -9220,6 +9597,15 @@ same-source callers share one in-flight init; a concurrent different-source
 call rejects; a different-source call after success warns and no-ops; a
 rejected init is retryable. When `source` is omitted the loader picks the
 right strategy for the runtime.
+@example
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+@see
+/docs/guides/formulas/
 
 ##### `RangeSnapshot` — class
 
@@ -9327,6 +9713,23 @@ export interface Grid { readonly store: Store; readonly actions: GridActions; ge
 ```
 
 Imperative grid handle for document commands, events, rendering, and teardown.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function updateTotal(grid: Grid) {
+ const sheet = grid.getActiveSheet();
+ const result = grid.applyTransaction({
+ patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+ });
+ if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+ return grid.aggregate(0, "sum");
+}
+```
+@see
+createGrid
+@see
+Grid.applyTransaction
 
 Members:
 - `actions` — Imperative action surface for binding custom toolbars/menus.
@@ -9334,11 +9737,34 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
 bypass Grid history and policy.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function setFirstCell(grid: Grid) {
+ return grid.applyTransaction({ patches: [
+ { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+ value: { kind: "literal", value: 42 } },
+ ] });
+}
+```
+@see
+Transaction
 - `autoFitColumns` — Explicitly resize columns from a bulk worksheet read.
 - `autoFitRows` — Explicitly resize rows to fit wrapped content; never runs during paint.
 - `beginEdit` — Open the cell editor at a view cell, optionally seeding text / selecting all.
@@ -9351,8 +9777,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -9418,6 +9876,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -9425,6 +9893,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type
@@ -9515,6 +9994,22 @@ Convenience component for local object rows. It derives a single-sheet workbook 
 `columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`
 through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
 use `SheetwriteGrid` when the host already owns a workbook or datasource.
+@example
+```tsx
+import { Sheetwrite } from "@sheetwrite/react";
+
+export function Sales() {
+ return <Sheetwrite
+ columns={[{ key: "amount", title: "Amount", type: "number" }]}
+ defaultRows={[{ amount: 12 }, { amount: 18 }]}
+ height={400}
+ />;
+}
+```
+@see
+SheetwriteGrid
+@see
+/docs/frameworks/react/
 
 ##### `SheetwriteGrid` — variable
 
@@ -9523,6 +10018,19 @@ use `SheetwriteGrid` when the host already owns a workbook or datasource.
 ```
 
 Advanced framework component with inferred row-bridge identity.
+@example
+```tsx
+import { SheetwriteGrid } from "@sheetwrite/react";
+import type { Workbook } from "@sheetwrite/core";
+
+export function WorkbookView({ workbook }: { workbook: Workbook }) {
+ return <SheetwriteGrid workbook={workbook} height={400} />;
+}
+```
+@see
+Sheetwrite
+@see
+/docs/frameworks/react/
 
 ##### `SheetwriteGridProps` — interface
 
@@ -9736,6 +10244,23 @@ export interface Grid { readonly store: Store; readonly actions: GridActions; ge
 ```
 
 Imperative grid handle for document commands, events, rendering, and teardown.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function updateTotal(grid: Grid) {
+ const sheet = grid.getActiveSheet();
+ const result = grid.applyTransaction({
+ patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+ });
+ if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+ return grid.aggregate(0, "sum");
+}
+```
+@see
+createGrid
+@see
+Grid.applyTransaction
 
 Members:
 - `actions` — Imperative action surface for binding custom toolbars/menus.
@@ -9743,11 +10268,34 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
 bypass Grid history and policy.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function setFirstCell(grid: Grid) {
+ return grid.applyTransaction({ patches: [
+ { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+ value: { kind: "literal", value: 42 } },
+ ] });
+}
+```
+@see
+Transaction
 - `autoFitColumns` — Explicitly resize columns from a bulk worksheet read.
 - `autoFitRows` — Explicitly resize rows to fit wrapped content; never runs during paint.
 - `beginEdit` — Open the cell editor at a view cell, optionally seeding text / selecting all.
@@ -9760,8 +10308,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -9827,6 +10407,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -9834,6 +10424,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type
@@ -9921,8 +10522,24 @@ Result of projection or reconciliation.
 ```
 
 Convenience component for local object rows. Bind `grid` to access the live `Grid`.
-
 Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.
+@example
+```ts
+import { mount, unmount } from "svelte";
+import { Sheetwrite } from "@sheetwrite/svelte";
+
+const view = mount(Sheetwrite, { target: document.body, props: {
+ columns: [{ key: "amount", title: "Amount", type: "number" }],
+ defaultRows: [{ amount: 12 }, { amount: 18 }],
+ height: 400,
+} });
+// Call when the host view is removed.
+await unmount(view);
+```
+@see
+SheetwriteGrid
+@see
+/docs/frameworks/svelte/
 
 ##### `SheetwriteGrid` — variable
 
@@ -9930,7 +10547,23 @@ Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperativ
 (this: void, internals: ComponentInternals, props: SheetwriteGridProps<RowBridgeId>): { $on?(type: string, callback: (e: any) => void): () => void; $set?(props: Partial<SheetwriteGridProps<RowBridgeId>>): void; }
 ```
 
+Advanced component for an existing workbook or datasource.
 Advanced framework component for workbook data or datasource input.
+@example
+```ts
+import { mount, unmount } from "svelte";
+import { SheetwriteGrid } from "@sheetwrite/svelte";
+import type { Workbook } from "@sheetwrite/core";
+
+function mountWorkbook(target: HTMLElement, workbook: Workbook) {
+ const view = mount(SheetwriteGrid, { target, props: { workbook, height: 400 } });
+ return () => unmount(view);
+}
+```
+@see
+Sheetwrite
+@see
+/docs/frameworks/svelte/
 
 ##### `SheetwriteGridProps` — interface
 
@@ -10125,6 +10758,23 @@ export interface Grid { readonly store: Store; readonly actions: GridActions; ge
 ```
 
 Imperative grid handle for document commands, events, rendering, and teardown.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function updateTotal(grid: Grid) {
+ const sheet = grid.getActiveSheet();
+ const result = grid.applyTransaction({
+ patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+ });
+ if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+ return grid.aggregate(0, "sum");
+}
+```
+@see
+createGrid
+@see
+Grid.applyTransaction
 
 Members:
 - `actions` — Imperative action surface for binding custom toolbars/menus.
@@ -10132,11 +10782,34 @@ Members:
 opened by Sheetwrite; internal navigation occurs only under the explicit policy.
 - `addSheet` — Add a sheet with a stable ID and return its actionable transaction outcome.
 - `aggregate` — Column aggregate over the active sheet's data.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+ return grid.aggregate(1, "sum");
+}
+```
+@see
+SheetwriteStore.aggregate
 - `applyRemoteOperations` — Apply host-supplied operations without undo history or outgoing dirty state.
 The resulting change event has `source: "remote"`.
 - `applyTransaction` — Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
 bypass Grid history and policy.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function setFirstCell(grid: Grid) {
+ return grid.applyTransaction({ patches: [
+ { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+ value: { kind: "literal", value: 42 } },
+ ] });
+}
+```
+@see
+Transaction
 - `autoFitColumns` — Explicitly resize columns from a bulk worksheet read.
 - `autoFitRows` — Explicitly resize rows to fit wrapped content; never runs during paint.
 - `beginEdit` — Open the cell editor at a view cell, optionally seeding text / selecting all.
@@ -10149,8 +10822,40 @@ position and vertical moves return view positions. For hosts building
 their own keymaps (`config.keyboard`).
 - `distinctValues` — Distinct resolved values of a column in first-seen order. Defaults to
 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.
+- `exportCsv` — Download the active sheet as CSV.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+ grid.exportCsv("sales.csv");
+}
+```
 - `exportSnapshot` — Deterministically export the complete authoritative workbook document.
+- `exportXlsx` — Download the active sheet through the registered XLSX backend.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+ await registerXlsxBackends();
+ await grid.exportXlsx("sales.xlsx");
+}
+```
+@see
+toXlsxWorkbook
 - `filterBy` — Filter the displayed rows to those whose column text contains `needle`.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+ grid.filterBy(0, "Open");
+}
+```
+@see
+Grid.clearView
 - `findNext` — Move the active match to the next match and scroll it into view.
 - `findPrev` — Move the active match to the previous match and scroll it into view.
 - `getActiveSheet` — Id of the currently visible sheet.
@@ -10216,6 +10921,16 @@ each edge); `undefined` restores the default of 6.
 - `showColumns` — Show columns through one bulk-safe metadata transaction.
 - `showRows` — Show the given data rows again, or every hidden row when omitted.
 - `sortBy` — Sort the displayed rows by a column (does not mutate stored data).
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+ grid.sortBy(1, false);
+}
+```
+@see
+Grid.clearView
 - `sortByMulti` — Multi-key sort of the displayed rows (first key primary; stable).
 - `styleRange` — Merge `style` into every cell of `range` (null clears cell styles) as one
 undoable transaction. Styles land in the store and paint in the canvas —
@@ -10223,6 +10938,17 @@ unlike {@link highlightCells}, which draws a translucent overlay above it.
 - `undo` — Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
 `mutation-rejected` and removes that entry, so older edits stay undoable.
+@example
+```ts
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+ grid.undo();
+ grid.redo();
+}
+```
+@see
+Grid.redo
 - `ungroupRows` — Remove a row group (rows become visible if the group was collapsed).
 
 ##### `GridCommandName` — type
@@ -10310,6 +11036,23 @@ SheetwriteComponentConstructor<SheetwriteProps<Record<string, CellScalar>, RowBr
 ```
 
 Convenience component for local object rows with live option updates.
+@example
+```ts
+import { createApp, h } from "vue";
+import { Sheetwrite } from "@sheetwrite/vue";
+
+const app = createApp({ render: () => h(Sheetwrite, {
+ columns: [{ key: "amount", title: "Amount", type: "number" }],
+ defaultRows: [{ amount: 12 }, { amount: 18 }],
+ height: 400,
+}) });
+app.mount(document.body);
+// Call app.unmount() before removing the host view.
+```
+@see
+SheetwriteGrid
+@see
+/docs/frameworks/vue/
 
 ##### `SheetwriteComponentConstructor` — type
 
@@ -10328,6 +11071,22 @@ SheetwriteComponentConstructor<SheetwriteGridProps<RowBridgeId>, SheetwriteGridE
 ```
 
 Advanced framework component for workbook data or datasource input.
+@example
+```ts
+import { createApp, h } from "vue";
+import { SheetwriteGrid } from "@sheetwrite/vue";
+import type { Workbook } from "@sheetwrite/core";
+
+function mountWorkbook(host: HTMLElement, workbook: Workbook) {
+ const app = createApp({ render: () => h(SheetwriteGrid, { workbook, height: 400 }) });
+ app.mount(host);
+ return () => app.unmount();
+}
+```
+@see
+Sheetwrite
+@see
+/docs/frameworks/vue/
 
 ##### `SheetwriteGridEmits` — interface
 
@@ -10723,6 +11482,14 @@ same-source callers share one in-flight init; a concurrent different-source
 call rejects; a different-source call after success warns and no-ops; a
 rejected init is retryable. When `source` is omitted the loader picks the
 right strategy for the runtime.
+@example
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+
+await initSheetwrite();
+```
+@see
+/docs/start/installation/
 
 ##### `RangeSnapshot` — class
 
@@ -10798,6 +11565,18 @@ Build the active-sheet table model used by the bounded OOXML writer.
 ```
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxWorkbook } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function open(file: File) {
+ return fromXlsxWorkbook(await file.arrayBuffer());
+}
+```
+@see
+/docs/guides/xlsx-export/
 
 ##### `sheetwriteTableExportBackend` — variable
 
@@ -10852,3 +11631,15 @@ Page: https://sheetwrite.vercel.app/docs/api/xlsx-register/
 ```
 
 Register all concrete XLSX backends with the backend-neutral core contracts.
+@example
+```ts
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxWorkbook } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function open(file: File) {
+ return fromXlsxWorkbook(await file.arrayBuffer());
+}
+```
+@see
+/docs/guides/xlsx-export/

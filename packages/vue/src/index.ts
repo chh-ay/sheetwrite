@@ -364,7 +364,24 @@ const SheetwriteGridComponent = defineComponent({
   },
 });
 
-/** Advanced framework component for workbook data or datasource input. */
+/**
+ * Advanced framework component for workbook data or datasource input.
+ *
+ * @example
+ * ```ts
+ * import { createApp, h } from "vue";
+ * import { SheetwriteGrid } from "@sheetwrite/vue";
+ * import type { Workbook } from "@sheetwrite/core";
+ *
+ * function mountWorkbook(host: HTMLElement, workbook: Workbook) {
+ *   const app = createApp({ render: () => h(SheetwriteGrid, { workbook, height: 400 }) });
+ *   app.mount(host);
+ *   return () => app.unmount();
+ * }
+ * ```
+ * @see Sheetwrite
+ * @see /docs/frameworks/vue/
+ */
 export const SheetwriteGrid = SheetwriteGridComponent as unknown as SheetwriteComponentConstructor<
   SheetwriteGridProps,
   SheetwriteGridEmits,
@@ -452,7 +469,25 @@ const SheetwriteSimpleComponent = defineComponent({
   },
 });
 
-/** Convenience component for local object rows with live option updates. */
+/**
+ * Convenience component for local object rows with live option updates.
+ *
+ * @example
+ * ```ts
+ * import { createApp, h } from "vue";
+ * import { Sheetwrite } from "@sheetwrite/vue";
+ *
+ * const app = createApp({ render: () => h(Sheetwrite, {
+ *   columns: [{ key: "amount", title: "Amount", type: "number" }],
+ *   defaultRows: [{ amount: 12 }, { amount: 18 }],
+ *   height: 400,
+ * }) });
+ * app.mount(document.body);
+ * // Call app.unmount() before removing the host view.
+ * ```
+ * @see SheetwriteGrid
+ * @see /docs/frameworks/vue/
+ */
 export const Sheetwrite = SheetwriteSimpleComponent as unknown as SheetwriteComponentConstructor<
   SheetwriteProps,
   SheetwriteGridEmits

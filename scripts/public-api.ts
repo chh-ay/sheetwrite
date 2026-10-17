@@ -22,6 +22,7 @@ import {
   isImportTypeNode,
   isInterfaceDeclaration,
   isJSDoc,
+  isJSDocSeeTag,
   isLiteralTypeNode,
   isNamedExports,
   isNamespaceImport,
@@ -394,13 +395,36 @@ function jsDocCommentTexts(node: Node): string[] {
     if (block === undefined) continue;
     const comment = getTextOfJSDocComment(block.comment);
     if (comment !== undefined && comment.length > 0) comments.push(comment);
+    // Inherited framework props keep their summaries, not upstream documentation tags.
+    if (host.getSourceFile().fileName.includes("node_modules")) continue;
+    for (const tag of block.tags ?? []) {
+      if (!["example", "see"].includes(tag.tagName.text)) continue;
+      const comment = getTextOfJSDocComment(tag.comment) ?? "";
+      const reference = isJSDocSeeTag(tag) ? tag.nameExpression?.getText() : undefined;
+      const text = [reference, comment].filter(Boolean).join(" ");
+      comments.push(`@${tag.tagName.text}\n${text}`);
+    }
   }
   return comments;
 }
 
 /** JSDoc comment text of a node, as `getJSDocCommentsAndTags` joined it. */
 function jsDocCommentText(node: Node): string {
-  return jsDocCommentTexts(node).join(" ").trim();
+  return jsDocCommentTexts(node).join("\n").trim();
+}
+
+function mergeDocumentation(sources: readonly string[]): string {
+  const summaries: string[] = [];
+  const tags: string[] = [];
+  for (const source of sources) {
+    for (const block of source.split(/(?=^@(?:example|see)\b)/m)) {
+      const text = block.trim();
+      if (text.length === 0) continue;
+      (text.startsWith("@") ? tags : summaries).push(text);
+    }
+  }
+  // Re-export prose must precede tags, or it becomes part of the last tag's body.
+  return [...new Set(summaries), ...new Set(tags)].join("\n");
 }
 
 /**
@@ -423,7 +447,7 @@ async function symbolDocumentation(
       if (!comments.includes(comment)) comments.push(comment);
     }
   }
-  if (comments.length > 0) return comments.join("\n");
+  if (comments.length > 0) return mergeDocumentation(comments);
   if (visited.has(symbol)) return "";
   visited.add(symbol);
   for (const declaration of declarations) {
@@ -934,7 +958,7 @@ async function analyzeEntry(
       owners: [...owners].sort(),
       source,
       jsDocTags: [...tags].sort(),
-      documentation: documentation.join("\n\n"),
+      documentation: mergeDocumentation(documentation),
       memberDocs:
         kind === "interface" || kind === "class" ? await memberDocumentation(target, project) : [],
     });

@@ -30,7 +30,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L35",
+              "source": "src/types/transaction.ts#L48",
               "jsDocTags": [],
               "documentation": "Outcome of applying a document transaction, including conflict, rejection, and no-op states.",
               "memberDocs": []
@@ -179,7 +179,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L185",
+              "source": "src/types/transaction.ts#L213",
               "jsDocTags": [],
               "documentation": "One committed cell edit, carrying enough to roll back.",
               "memberDocs": []
@@ -288,7 +288,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L475",
+              "source": "src/types/grid.ts#L528",
               "jsDocTags": [],
               "documentation": "View-aware editable snapshot of one cell, for hosts building a detached\nformula bar or cell inspector. `address` is the translated *data* address —\nthe correct target for `Grid.applyTransaction` even under an active\nsort/filter view — while the `(row, col)` inputs of\n{@link Grid.getCellInput} are active-sheet view coordinates.",
               "memberDocs": [
@@ -463,7 +463,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L194",
+              "source": "src/types/transaction.ts#L222",
               "jsDocTags": [],
               "documentation": "Payload of the `change` event; flows OUT for API submission/reconcile.",
               "memberDocs": [
@@ -811,9 +811,12 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L291",
-              "jsDocTags": [],
-              "documentation": "Built-in, separator, or custom callback row in the right-click menu.",
+              "source": "src/types/grid.ts#L307",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Built-in, separator, or custom callback row in the right-click menu.\n@example\n```ts\nimport type { ContextMenuItem, GridConfig } from \"@sheetwrite/core\";\n\nconst total: ContextMenuItem = {\n  id: \"total\",\n  label: \"Show total\",\n  onClick(grid) { window.alert(String(grid.aggregate(0, \"sum\"))); },\n};\nconst config: GridConfig = { contextMenu: [total, { action: \"separator\" }, { action: \"copy\" }] };\n```\n@see\nContextMenuItems\n@see\nGridConfig.contextMenu",
               "memberDocs": [
                 {
                   "name": "action",
@@ -852,7 +855,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L316",
+              "source": "src/types/grid.ts#L332",
               "jsDocTags": [],
               "documentation": "Static rows or a context-aware factory evaluated each time the menu opens.",
               "memberDocs": []
@@ -864,9 +867,12 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L350",
-              "jsDocTags": [],
-              "documentation": "Creates and mounts an imperative Grid in the supplied host element.",
+              "source": "src/grid.ts#L385",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Creates and mounts an imperative Grid in the supplied host element.\n@example\n```ts\nimport { createGrid, initSheetwrite } from \"@sheetwrite/core\";\n\nawait initSheetwrite();\nconst host = document.createElement(\"div\");\nhost.style.height = \"400px\";\ndocument.body.append(host);\nconst grid = createGrid(host, {\n  workbook: {\n    activeSheet: \"sales\",\n    sheets: [{ id: \"sales\", name: \"Sales\", rowCount: 2,\n      columns: [{ key: \"amount\", header: \"Amount\", type: \"number\", width: 120 }] }],\n  },\n  data: { rowCount: 2, columns: { amount: [12, 18] } },\n});\ngrid.scrollToCell({ sheet: \"sales\", row: 1, col: 0 });\n// Call when the host view is removed.\ngrid.destroy();\n```\n@see\nGrid\n@see\nGridOptions",
               "memberDocs": []
             },
             {
@@ -888,9 +894,12 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L961",
-              "jsDocTags": [],
-              "documentation": "Create a typed bridge while preserving row and identity inference.",
+              "source": "src/row-bridge.ts#L976",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Create a typed bridge while preserving row and identity inference.\n@example\n```ts\nimport { createRowBridge } from \"@sheetwrite/core\";\n\nconst bridge = createRowBridge({\n  columns: [{ key: \"amount\" }],\n  defaultRows: [{ id: \"order-1\", amount: 12 }],\n  getRowId: (row) => row.id,\n});\n```\n@see\nRowBridgeOptions\n@see\nRowBridge",
               "memberDocs": []
             },
             {
@@ -924,9 +933,12 @@
               "owners": [
                 "src/types/data.ts"
               ],
-              "source": "src/types/data.ts#L66",
-              "jsDocTags": [],
-              "documentation": "Host callback that asynchronously loads cancellable rectangular pages.",
+              "source": "src/types/data.ts#L89",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Host callback that asynchronously loads cancellable rectangular pages.\n@example\n```ts\nimport type { DataSource, RowData } from \"@sheetwrite/core\";\n\nconst rows: RowData[] = [{ amount: 12 }, { amount: 18 }];\nconst datasource: DataSource = {\n  capabilities: { protocol: 2, columns: \"windowed\" },\n  async getRows(request) {\n    request.signal.throwIfAborted();\n    return {\n      protocol: 2, start: request.start, columns: request.columns,\n      rows: rows.slice(request.start, request.end).map((row) =>\n        Object.fromEntries(request.columns.flatMap((band) =>\n          band.keys.map((key) => [key, row[key] ?? null])))),\n    };\n  },\n};\n```\n@see\nGridOptions.datasource\n@see\nDataSourceRequest",
               "memberDocs": [
                 {
                   "name": "getRows",
@@ -1032,7 +1044,7 @@
               "owners": [
                 "src/types/data.ts"
               ],
-              "source": "src/types/data.ts#L73",
+              "source": "src/types/data.ts#L96",
               "jsDocTags": [],
               "documentation": "Dense or allocation-lazy paged storage policy for datasource cells.",
               "memberDocs": [
@@ -1448,9 +1460,12 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L391",
-              "jsDocTags": [],
-              "documentation": "Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed\nrow is treated as the header and its cell text becomes each column's key.\nNumbers stay numbers, date cells use the date-serial convention, strings are\nverbatim, and empty cells become `null`.",
+              "source": "src/export.ts#L418",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Parse the first sheet of `.xlsx` bytes into `ColumnarData`. The first parsed\nrow is treated as the header and its cell text becomes each column's key.\nNumbers stay numbers, date cells use the date-serial convention, strings are\nverbatim, and empty cells become `null`.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxTable } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function openTable(file: File) {\n  return fromXlsxTable(await file.arrayBuffer());\n}\n```\n@see\ntoXlsxTable",
               "memberDocs": []
             },
             {
@@ -1460,9 +1475,12 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L478",
-              "jsDocTags": [],
-              "documentation": "Formula-preserving, multi-sheet workbook import through the optional XLSX backend.",
+              "source": "src/export.ts#L536",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Formula-preserving, multi-sheet workbook import through the optional XLSX backend.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function openWorkbook(host: HTMLElement, file: File) {\n  await initSheetwrite();\n  const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());\n  return createGridFromSnapshot(host, snapshot);\n}\n```\n@see\ntoXlsxWorkbook",
               "memberDocs": []
             },
             {
@@ -1472,9 +1490,12 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L531",
-              "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
+              "source": "src/types/grid.ts#L602",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
               "memberDocs": [
                 {
                   "name": "actions",
@@ -1490,7 +1511,7 @@
                 },
                 {
                   "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
                 },
                 {
                   "name": "applyRemoteOperations",
@@ -1498,7 +1519,7 @@
                 },
                 {
                   "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
                 },
                 {
                   "name": "autoFitColumns",
@@ -1529,12 +1550,20 @@
                   "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
                   "name": "exportSnapshot",
                   "documentation": "Deterministically export the complete authoritative workbook document."
                 },
                 {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
                   "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "findNext",
@@ -1702,7 +1731,7 @@
                 },
                 {
                   "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
+                  "documentation": "Sort the displayed rows by a column (does not mutate stored data).\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "sortByMulti",
@@ -1714,7 +1743,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
                 },
                 {
                   "name": "ungroupRows",
@@ -1802,9 +1831,12 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L324",
-              "jsDocTags": [],
-              "documentation": "Toolbar / feature configuration. When `config` is set the built-in toolbar is\nshown; control flags default to `true` except the opt-in `export` flag.",
+              "source": "src/types/grid.ts#L359",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Toolbar / feature configuration. When `config` is set the built-in toolbar is\nshown; control flags default to `true` except the opt-in `export` flag.\n@example\n```ts\nimport type { GridConfig } from \"@sheetwrite/core\";\n\nconst config: GridConfig = {\n  toolbar: true,\n  contextMenu: [{ action: \"copy\" }, { action: \"paste\" }],\n  keyboard(event, grid) {\n    if (event.altKey && event.key === \"b\") {\n      grid.actions.toggleBold();\n      return true;\n    }\n    return false;\n  },\n};\n```\n@see\nGrid.setConfig\n@see\nContextMenuItem",
               "memberDocs": [
                 {
                   "name": "align",
@@ -1883,7 +1915,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L495",
+              "source": "src/types/grid.ts#L548",
               "jsDocTags": [],
               "documentation": "Payload map for events emitted by a Grid.",
               "memberDocs": [
@@ -1916,9 +1948,12 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L370",
-              "jsDocTags": [],
-              "documentation": "Workbook, data, rendering, policy, and built-in UI options used to create a Grid.",
+              "source": "src/types/grid.ts#L423",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Workbook, data, rendering, policy, and built-in UI options used to create a Grid.\n@example\n```ts\nimport type { GridOptions } from \"@sheetwrite/core\";\n\nconst options: GridOptions = {\n  workbook: { activeSheet: \"sheet1\", sheets: [\n    { id: \"sheet1\", name: \"Sheet 1\", rowCount: 1,\n      columns: [{ key: \"name\", header: \"Name\", type: \"text\", width: 120 }] },\n  ] },\n  data: { rowCount: 1, columns: { name: [\"Ada\"] } },\n  config: { toolbar: true, contextMenu: true, keyboard: true },\n};\n```\n@see\ncreateGrid\n@see\nGridConfig",
               "memberDocs": [
                 {
                   "name": "config",
@@ -2013,7 +2048,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L180",
+              "source": "src/types/transaction.ts#L208",
               "jsDocTags": [],
               "documentation": "An undoable transaction submitted through a Grid.\n\nGrid transactions deliberately have no epoch: optimistic reconciliation is\na low-level Store concern, while Grid commits are normal host-driven edits\nthat participate in read-only policy and undo/redo history.",
               "memberDocs": []
@@ -2078,9 +2113,12 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L293",
-              "jsDocTags": [],
-              "documentation": "Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.\nPass the `@sheetwrite/formulas` module as the second argument to select the full engine.",
+              "source": "src/grid.ts#L303",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.\nPass the `@sheetwrite/formulas` module as the second argument to select the full engine.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/guides/formulas/\n@see\ncreateGrid",
               "memberDocs": []
             },
             {
@@ -2114,7 +2152,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L305",
+              "source": "src/grid.ts#L315",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -2388,7 +2426,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L56",
+              "source": "src/types/transaction.ts#L69",
               "jsDocTags": [],
               "documentation": "Whether a committed change originated locally or from remote host input.",
               "memberDocs": []
@@ -2489,7 +2527,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L76",
+              "source": "src/types/transaction.ts#L89",
               "jsDocTags": [],
               "documentation": "Immutable local operation batch awaiting a host acknowledgement.",
               "memberDocs": [
@@ -2548,9 +2586,12 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L149",
-              "jsDocTags": [],
-              "documentation": "Host load and commit contract for versioned workbook persistence.",
+              "source": "src/types/transaction.ts#L177",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Host load and commit contract for versioned workbook persistence.\n@example\n```ts\nimport { MemoryPersistenceAdapter, type PersistenceAdapter, type WorkbookSnapshot } from \"@sheetwrite/core\";\n\nasync function loadLocal(snapshot: WorkbookSnapshot) {\n  if (!snapshot.documentId) throw new Error(\"A document ID is required\");\n  const adapter: PersistenceAdapter = new MemoryPersistenceAdapter(snapshot);\n  return adapter.load(snapshot.documentId);\n}\n```\n@see\nMemoryPersistenceAdapter\n@see\nSyncCoordinator",
               "memberDocs": [
                 {
                   "name": "commitBatch",
@@ -2565,7 +2606,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L130",
+              "source": "src/types/transaction.ts#L143",
               "jsDocTags": [],
               "documentation": "Cancellable commit of one atomic batch that spans several server versions.",
               "memberDocs": [
@@ -2582,7 +2623,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L125",
+              "source": "src/types/transaction.ts#L138",
               "jsDocTags": [],
               "documentation": "Cancellable pending commit submitted to a persistence adapter.",
               "memberDocs": [
@@ -2599,7 +2640,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L138",
+              "source": "src/types/transaction.ts#L151",
               "jsDocTags": [],
               "documentation": "Applied, duplicate, or conflict acknowledgement from persistence. `applied`\nconfirms the submitted operations unchanged; normalization must conflict.",
               "memberDocs": []
@@ -2868,9 +2909,12 @@
               "owners": [
                 "src/engine-memory.ts"
               ],
-              "source": "src/engine-memory.ts#L28",
-              "jsDocTags": [],
-              "documentation": "Move all live stores into a fresh WASM instance. Call explicitly while idle;\nthe main-thread pause scales with resident data and compact undo history.\nPreparation failures leave every live store and the selected instance unchanged.\nA larger replacement is discarded; the report then has zero migrated stores.",
+              "source": "src/engine-memory.ts#L39",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Move all live stores into a fresh WASM instance. Call explicitly while idle;\nthe main-thread pause scales with resident data and compact undo history.\nPreparation failures leave every live store and the selected instance unchanged.\nA larger replacement is discarded; the report then has zero migrated stores.\n@example\n```ts\nimport { initSheetwrite, releaseEngineMemory } from \"@sheetwrite/core\";\n\nawait initSheetwrite();\n// Run between user actions, not in an input or render callback.\nconst report = await releaseEngineMemory();\ndocument.body.dataset.engineBytes = String(report.wasmBytesAfter);\n```\n@see\nEngineMemoryReleaseReport",
               "memberDocs": []
             },
             {
@@ -2880,7 +2924,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L69",
+              "source": "src/types/transaction.ts#L82",
               "jsDocTags": [],
               "documentation": "Classification metadata for host-supplied remote operations.",
               "memberDocs": [
@@ -2897,7 +2941,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L166",
+              "source": "src/types/transaction.ts#L194",
               "jsDocTags": [],
               "documentation": "Host subscription contract for ordered versioned operations. Sources that\ncan pause intake should await the listener promise to preserve backpressure.",
               "memberDocs": []
@@ -2909,7 +2953,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L461",
+              "source": "src/types/grid.ts#L514",
               "jsDocTags": [],
               "documentation": "Replacement count and refreshed search state returned by replace-all.",
               "memberDocs": [
@@ -2966,7 +3010,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L310",
+              "source": "src/grid.ts#L320",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -3367,7 +3411,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L969",
+              "source": "src/row-bridge.ts#L984",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -3523,7 +3567,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L439",
+              "source": "src/types/grid.ts#L492",
               "jsDocTags": [],
               "documentation": "Case, whole-cell, sheet, and column constraints for grid search.",
               "memberDocs": [
@@ -3552,7 +3596,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L451",
+              "source": "src/types/grid.ts#L504",
               "jsDocTags": [],
               "documentation": "Ordered matches and active index produced by a grid search.",
               "memberDocs": [
@@ -3613,7 +3657,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L381",
+              "source": "src/export.ts#L396",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -3625,7 +3669,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L450",
+              "source": "src/export.ts#L477",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -3750,7 +3794,7 @@
               "owners": [
                 "src/types/grid.ts"
               ],
-              "source": "src/types/grid.ts#L485",
+              "source": "src/types/grid.ts#L538",
               "jsDocTags": [],
               "documentation": "Actionable transaction outcome for a stable sheet lifecycle target.",
               "memberDocs": []
@@ -3973,13 +4017,20 @@
               "owners": [
                 "src/store.ts"
               ],
-              "source": "src/store.ts#L107",
-              "jsDocTags": [],
-              "documentation": "Stable public facade and the sole transaction, epoch, policy, and event barrier.",
+              "source": "src/store.ts#L126",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Stable public facade and the sole transaction, epoch, policy, and event barrier.\n@example\n```ts\nimport { initSheetwrite, SheetwriteStore, type Workbook } from \"@sheetwrite/core\";\n\nasync function total(workbook: Workbook) {\n  await initSheetwrite();\n  const store = new SheetwriteStore(workbook);\n  try {\n    return store.aggregate(workbook.activeSheet, 0, \"sum\");\n  } finally {\n    store.dispose();\n  }\n}\n```\n@see\nStore.aggregate\n@see\ncreateGrid",
               "memberDocs": [
                 {
                   "name": "acknowledgeOperations",
                   "documentation": "Release sparse paged edits after server acknowledgement."
+                },
+                {
+                  "name": "aggregate",
+                  "documentation": "Aggregate one column. Datasource-backed sheets must be fully loaded.\n@example\n```ts\nimport type { SheetwriteStore, SheetId } from \"@sheetwrite/core\";\n\nfunction totals(store: SheetwriteStore, sheet: SheetId) {\n  return { total: store.aggregate(sheet, 0, \"sum\"), average: store.aggregate(sheet, 0, \"avg\") };\n}\n```\n@see\nAggregateOp"
                 },
                 {
                   "name": "applyTransaction",
@@ -4415,9 +4466,12 @@
               "owners": [
                 "src/sync.ts"
               ],
-              "source": "src/sync.ts#L311",
-              "jsDocTags": [],
-              "documentation": "Deterministic, transport-neutral optimistic sync. Local rendering is never\nblocked: changes queue immediately, while hosts explicitly call `sendNext`\nor `retry` to perform network work.",
+              "source": "src/sync.ts#L325",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Deterministic, transport-neutral optimistic sync. Local rendering is never\nblocked: changes queue immediately, while hosts explicitly call `sendNext`\nor `retry` to perform network work.\n@example\n```ts\nimport { SyncCoordinator, type Grid, type PersistenceAdapter } from \"@sheetwrite/core\";\n\nasync function connect(grid: Grid, adapter: PersistenceAdapter, documentId: string, serverVersion: number) {\n  const sync = new SyncCoordinator(grid, adapter, { documentId, serverVersion });\n  await sync.ready();\n  await sync.flush();\n  return sync; // Call sync.destroy() before removing the Grid.\n}\n```\n@see\nPersistenceAdapter\n@see\nSyncCoordinator.recoverConflict",
               "memberDocs": [
                 {
                   "name": "handleResponse",
@@ -4429,7 +4483,7 @@
                 },
                 {
                   "name": "recoverConflict",
-                  "documentation": "Recover from the outstanding base-version conflict without reloading the\ndocument. This succeeds when the pending work and every server version it\ndid not see change different cells, and neither inserts, deletes, or moves\nrows or columns: the local Grid then already shows the server result plus\nthe pending work, so recovery applies the missed server versions and moves\nthe pending queue onto the new server version. Call `flush` afterwards to\nsend it. In every other case nothing changes and the result names the\nreason; the host then reloads and calls `resumeAfterReload`."
+                  "documentation": "Recover from the outstanding base-version conflict without reloading the\ndocument. This succeeds when the pending work and every server version it\ndid not see change different cells, and neither inserts, deletes, or moves\nrows or columns: the local Grid then already shows the server result plus\nthe pending work, so recovery applies the missed server versions and moves\nthe pending queue onto the new server version. Call `flush` afterwards to\nsend it. In every other case nothing changes and the result names the\nreason; the host then reloads and calls `resumeAfterReload`.\n@example\n```ts\nimport type { SyncCoordinator } from \"@sheetwrite/core\";\n\nasync function recover(sync: SyncCoordinator) {\n  const result = await sync.recoverConflict();\n  if (result.status === \"recovered\") await sync.flush();\n  // A reload-required result leaves the document unchanged for host recovery.\n  return result;\n}\n```\n@see\nSyncCoordinator.resumeAfterReload"
                 },
                 {
                   "name": "resumeAfterReload",
@@ -4550,7 +4604,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L99",
+              "source": "src/types/transaction.ts#L112",
               "jsDocTags": [],
               "documentation": "Pending commit paired with its current synchronization status.",
               "memberDocs": [
@@ -4567,7 +4621,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L91",
+              "source": "src/types/transaction.ts#L104",
               "jsDocTags": [],
               "documentation": "Lifecycle state of one local mutation in the synchronization queue.",
               "memberDocs": []
@@ -4849,9 +4903,12 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L348",
-              "jsDocTags": [],
-              "documentation": "Exports a table model through the registered optional XLSX backend.",
+              "source": "src/export.ts#L363",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Exports a table model through the registered optional XLSX backend.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { toXlsxTable, downloadBytes, type Workbook, type Store } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function download(workbook: Workbook, store: Store) {\n  const bytes = await toXlsxTable(workbook, store);\n  downloadBytes(bytes, \"table.xlsx\", \"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\");\n}\n```\n@see\nfromXlsxTable",
               "memberDocs": []
             },
             {
@@ -4861,9 +4918,12 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L461",
-              "jsDocTags": [],
-              "documentation": "Formula-preserving, multi-sheet workbook export through the optional XLSX backend.",
+              "source": "src/export.ts#L503",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Formula-preserving, multi-sheet workbook export through the optional XLSX backend.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { toXlsxWorkbook, downloadBytes, type Grid } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function download(grid: Grid) {\n  const bytes = await toXlsxWorkbook(grid);\n  downloadBytes(bytes, \"workbook.xlsx\", \"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\");\n}\n```\n@see\nfromXlsxWorkbook",
               "memberDocs": []
             },
             {
@@ -4873,9 +4933,12 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L27",
-              "jsDocTags": [],
-              "documentation": "Low-level Store transaction. `epoch` provides optional optimistic\nconcurrency at the storage boundary.\n\nCalling `Store.applyTransaction` bypasses Grid read-only checks and Grid\nundo/redo history. Host-driven edits should use `Grid.applyTransaction`.",
+              "source": "src/types/transaction.ts#L40",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Low-level Store transaction. `epoch` provides optional optimistic\nconcurrency at the storage boundary.\n\nCalling `Store.applyTransaction` bypasses Grid read-only checks and Grid\nundo/redo history. Host-driven edits should use `Grid.applyTransaction`.\n@example\n```ts\nimport type { Store, SheetId, Transaction } from \"@sheetwrite/core\";\n\nfunction setAmount(store: Store, sheet: SheetId) {\n  const transaction: Transaction = {\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 25 } }],\n  };\n  return store.applyTransaction(transaction);\n}\n```\n@see\nGrid.applyTransaction",
               "memberDocs": [
                 {
                   "name": "epoch",
@@ -4894,7 +4957,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L59",
+              "source": "src/types/transaction.ts#L72",
               "jsDocTags": [],
               "documentation": "Source and commit classification used when applying a transaction.",
               "memberDocs": [
@@ -5036,7 +5099,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L104",
+              "source": "src/types/transaction.ts#L117",
               "jsDocTags": [],
               "documentation": "Position of one server version inside an atomic multi-version batch.",
               "memberDocs": [
@@ -5069,7 +5132,7 @@
               "owners": [
                 "src/types/transaction.ts"
               ],
-              "source": "src/types/transaction.ts#L112",
+              "source": "src/types/transaction.ts#L125",
               "jsDocTags": [],
               "documentation": "Remote document operations paired with a contiguous server version.",
               "memberDocs": [
@@ -5499,7 +5562,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L370",
+              "source": "src/export.ts#L385",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -5511,7 +5574,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L438",
+              "source": "src/export.ts#L465",
               "jsDocTags": [],
               "documentation": "Optional backend contract for complete workbook XLSX interchange.",
               "memberDocs": []
@@ -5523,7 +5586,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L427",
+              "source": "src/export.ts#L454",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -5548,7 +5611,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L408",
+              "source": "src/export.ts#L435",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
@@ -5636,9 +5699,12 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L961",
-              "jsDocTags": [],
-              "documentation": "Create a typed bridge while preserving row and identity inference.",
+              "source": "src/row-bridge.ts#L976",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Create a typed bridge while preserving row and identity inference.\n@example\n```ts\nimport { createRowBridge } from \"@sheetwrite/core\";\n\nconst bridge = createRowBridge({\n  columns: [{ key: \"amount\" }],\n  defaultRows: [{ id: \"order-1\", amount: 12 }],\n  getRowId: (row) => row.id,\n});\n```\n@see\nRowBridgeOptions\n@see\nRowBridge",
               "memberDocs": []
             },
             {
@@ -6284,7 +6350,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L969",
+              "source": "src/row-bridge.ts#L984",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -7178,7 +7244,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L41",
+              "source": "loader.d.ts#L50",
               "jsDocTags": [],
               "documentation": "Initialize a fresh engine; a compiled module can be reused without retaining its memory.",
               "memberDocs": []
@@ -7215,7 +7281,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L29",
+              "source": "loader.d.ts#L38",
               "jsDocTags": [],
               "documentation": "Engine objects and caches owned by one independently collectible WASM instance.",
               "memberDocs": []
@@ -7278,7 +7344,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L26",
+              "source": "loader.d.ts#L35",
               "jsDocTags": [],
               "documentation": "Whether the WASM module has finished initializing.",
               "memberDocs": []
@@ -7290,9 +7356,12 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L21",
-              "jsDocTags": [],
-              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.",
+              "source": "loader.d.ts#L30",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\nimport * as formulas from \"@sheetwrite/formulas\";\n\nawait initSheetwrite(undefined, formulas);\n```\n@see\n/docs/guides/formulas/",
               "memberDocs": []
             },
             {
@@ -7445,9 +7514,12 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L416",
-              "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
+              "source": "../core/dist/types/grid.d.ts#L487",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
               "memberDocs": [
                 {
                   "name": "actions",
@@ -7463,7 +7535,7 @@
                 },
                 {
                   "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
                 },
                 {
                   "name": "applyRemoteOperations",
@@ -7471,7 +7543,7 @@
                 },
                 {
                   "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
                 },
                 {
                   "name": "autoFitColumns",
@@ -7502,12 +7574,20 @@
                   "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
                   "name": "exportSnapshot",
                   "documentation": "Deterministically export the complete authoritative workbook document."
                 },
                 {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
                   "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "findNext",
@@ -7675,7 +7755,7 @@
                 },
                 {
                   "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
+                  "documentation": "Sort the displayed rows by a column (does not mutate stored data).\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "sortByMulti",
@@ -7687,7 +7767,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
                 },
                 {
                   "name": "ungroupRows",
@@ -7828,9 +7908,12 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L330",
-              "jsDocTags": [],
-              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource.",
+              "source": "src/index.tsx#L359",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Convenience component for local object rows. It derives a single-sheet workbook from\n`columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`\nthrough prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;\nuse `SheetwriteGrid` when the host already owns a workbook or datasource.\n@example\n```tsx\nimport { Sheetwrite } from \"@sheetwrite/react\";\n\nexport function Sales() {\n  return <Sheetwrite\n    columns={[{ key: \"amount\", title: \"Amount\", type: \"number\" }]}\n    defaultRows={[{ amount: 12 }, { amount: 18 }]}\n    height={400}\n  />;\n}\n```\n@see\nSheetwriteGrid\n@see\n/docs/frameworks/react/",
               "memberDocs": []
             },
             {
@@ -7840,9 +7923,12 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L275",
-              "jsDocTags": [],
-              "documentation": "Advanced framework component with inferred row-bridge identity.",
+              "source": "src/index.tsx#L289",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Advanced framework component with inferred row-bridge identity.\n@example\n```tsx\nimport { SheetwriteGrid } from \"@sheetwrite/react\";\nimport type { Workbook } from \"@sheetwrite/core\";\n\nexport function WorkbookView({ workbook }: { workbook: Workbook }) {\n  return <SheetwriteGrid workbook={workbook} height={400} />;\n}\n```\n@see\nSheetwrite\n@see\n/docs/frameworks/react/",
               "memberDocs": []
             },
             {
@@ -8241,7 +8327,7 @@
               "owners": [
                 "src/index.tsx"
               ],
-              "source": "src/index.tsx#L280",
+              "source": "src/index.tsx#L294",
               "jsDocTags": [],
               "documentation": "Simple framework adapter props for columns and default row objects.",
               "memberDocs": []
@@ -8383,9 +8469,12 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L416",
-              "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
+              "source": "../core/dist/types/grid.d.ts#L487",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
               "memberDocs": [
                 {
                   "name": "actions",
@@ -8401,7 +8490,7 @@
                 },
                 {
                   "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
                 },
                 {
                   "name": "applyRemoteOperations",
@@ -8409,7 +8498,7 @@
                 },
                 {
                   "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
                 },
                 {
                   "name": "autoFitColumns",
@@ -8440,12 +8529,20 @@
                   "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
                   "name": "exportSnapshot",
                   "documentation": "Deterministically export the complete authoritative workbook document."
                 },
                 {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
                   "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "findNext",
@@ -8613,7 +8710,7 @@
                 },
                 {
                   "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
+                  "documentation": "Sort the displayed rows by a column (does not mutate stored data).\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "sortByMulti",
@@ -8625,7 +8722,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
                 },
                 {
                   "name": "ungroupRows",
@@ -8768,7 +8865,7 @@
               ],
               "source": "src/Sheetwrite.svelte.d.ts#L7",
               "jsDocTags": [],
-              "documentation": "Convenience component for local object rows. Bind `grid` to access the live `Grid`.\n\nOwns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.",
+              "documentation": "Convenience component for local object rows. Bind `grid` to access the live `Grid`.\nOwns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.\n@example\n```ts\nimport { mount, unmount } from \"svelte\";\nimport { Sheetwrite } from \"@sheetwrite/svelte\";\n\nconst view = mount(Sheetwrite, { target: document.body, props: {\n  columns: [{ key: \"amount\", title: \"Amount\", type: \"number\" }],\n  defaultRows: [{ amount: 12 }, { amount: 18 }],\n  height: 400,\n} });\n// Call when the host view is removed.\nawait unmount(view);\n```\n@see\nSheetwriteGrid\n@see\n/docs/frameworks/svelte/",
               "memberDocs": []
             },
             {
@@ -8780,7 +8877,7 @@
               ],
               "source": "src/Grid.svelte.d.ts#L7",
               "jsDocTags": [],
-              "documentation": "Advanced framework component for workbook data or datasource input.",
+              "documentation": "Advanced component for an existing workbook or datasource.\nAdvanced framework component for workbook data or datasource input.\n@example\n```ts\nimport { mount, unmount } from \"svelte\";\nimport { SheetwriteGrid } from \"@sheetwrite/svelte\";\nimport type { Workbook } from \"@sheetwrite/core\";\n\nfunction mountWorkbook(target: HTMLElement, workbook: Workbook) {\n  const view = mount(SheetwriteGrid, { target, props: { workbook, height: 400 } });\n  return () => unmount(view);\n}\n```\n@see\nSheetwrite\n@see\n/docs/frameworks/svelte/",
               "memberDocs": []
             },
             {
@@ -9313,9 +9410,12 @@
               "owners": [
                 "../core/dist/types/grid.d.ts"
               ],
-              "source": "../core/dist/types/grid.d.ts#L416",
-              "jsDocTags": [],
-              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.",
+              "source": "../core/dist/types/grid.d.ts#L487",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Imperative grid handle for document commands, events, rendering, and teardown.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction updateTotal(grid: Grid) {\n  const sheet = grid.getActiveSheet();\n  const result = grid.applyTransaction({\n    patches: [{ op: \"set\", addr: { sheet, row: 0, col: 0 }, value: { kind: \"literal\", value: 42 } }],\n  });\n  if (result.status === \"applied\") grid.scrollToCell({ sheet, row: 0, col: 0 });\n  return grid.aggregate(0, \"sum\");\n}\n```\n@see\ncreateGrid\n@see\nGrid.applyTransaction",
               "memberDocs": [
                 {
                   "name": "actions",
@@ -9331,7 +9431,7 @@
                 },
                 {
                   "name": "aggregate",
-                  "documentation": "Column aggregate over the active sheet's data."
+                  "documentation": "Column aggregate over the active sheet's data.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction total(grid: Grid) {\n  return grid.aggregate(1, \"sum\");\n}\n```\n@see\nSheetwriteStore.aggregate"
                 },
                 {
                   "name": "applyRemoteOperations",
@@ -9339,7 +9439,7 @@
                 },
                 {
                   "name": "applyTransaction",
-                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy."
+                  "documentation": "Apply arbitrary patches as one undoable Grid commit. No-op when read-only.\nUse `Store.applyTransaction` only for low-level writes that intentionally\nbypass Grid history and policy.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction setFirstCell(grid: Grid) {\n  return grid.applyTransaction({ patches: [\n    { op: \"set\", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },\n      value: { kind: \"literal\", value: 42 } },\n  ] });\n}\n```\n@see\nTransaction"
                 },
                 {
                   "name": "autoFitColumns",
@@ -9370,12 +9470,20 @@
                   "documentation": "Distinct resolved values of a column in first-seen order. Defaults to\n1,000 values for bounded filter menus; pass 0 to request an uncapped scan."
                 },
                 {
+                  "name": "exportCsv",
+                  "documentation": "Download the active sheet as CSV.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction downloadCsv(grid: Grid) {\n  grid.exportCsv(\"sales.csv\");\n}\n```"
+                },
+                {
                   "name": "exportSnapshot",
                   "documentation": "Deterministically export the complete authoritative workbook document."
                 },
                 {
+                  "name": "exportXlsx",
+                  "documentation": "Download the active sheet through the registered XLSX backend.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\n\nasync function downloadXlsx(grid: Grid) {\n  await registerXlsxBackends();\n  await grid.exportXlsx(\"sales.xlsx\");\n}\n```\n@see\ntoXlsxWorkbook"
+                },
+                {
                   "name": "filterBy",
-                  "documentation": "Filter the displayed rows to those whose column text contains `needle`."
+                  "documentation": "Filter the displayed rows to those whose column text contains `needle`.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showOpenRows(grid: Grid) {\n  grid.filterBy(0, \"Open\");\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "findNext",
@@ -9543,7 +9651,7 @@
                 },
                 {
                   "name": "sortBy",
-                  "documentation": "Sort the displayed rows by a column (does not mutate stored data)."
+                  "documentation": "Sort the displayed rows by a column (does not mutate stored data).\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction showLargestFirst(grid: Grid) {\n  grid.sortBy(1, false);\n}\n```\n@see\nGrid.clearView"
                 },
                 {
                   "name": "sortByMulti",
@@ -9555,7 +9663,7 @@
                 },
                 {
                   "name": "undo",
-                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable."
+                  "documentation": "Undo the last recorded cell edit. If the restored data is above the\ntransaction resource limits, nothing changes: the Grid emits\n`mutation-rejected` and removes that entry, so older edits stay undoable.\n@example\n```ts\nimport type { Grid } from \"@sheetwrite/core\";\n\nfunction undoAndRestore(grid: Grid) {\n  grid.undo();\n  grid.redo();\n}\n```\n@see\nGrid.redo"
                 },
                 {
                   "name": "ungroupRows",
@@ -9696,9 +9804,12 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L456",
-              "jsDocTags": [],
-              "documentation": "Convenience component for local object rows with live option updates.",
+              "source": "src/index.ts#L491",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Convenience component for local object rows with live option updates.\n@example\n```ts\nimport { createApp, h } from \"vue\";\nimport { Sheetwrite } from \"@sheetwrite/vue\";\n\nconst app = createApp({ render: () => h(Sheetwrite, {\n  columns: [{ key: \"amount\", title: \"Amount\", type: \"number\" }],\n  defaultRows: [{ amount: 12 }, { amount: 18 }],\n  height: 400,\n}) });\napp.mount(document.body);\n// Call app.unmount() before removing the host view.\n```\n@see\nSheetwriteGrid\n@see\n/docs/frameworks/vue/",
               "memberDocs": []
             },
             {
@@ -9720,9 +9831,12 @@
               "owners": [
                 "src/index.ts"
               ],
-              "source": "src/index.ts#L368",
-              "jsDocTags": [],
-              "documentation": "Advanced framework component for workbook data or datasource input.",
+              "source": "src/index.ts#L385",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Advanced framework component for workbook data or datasource input.\n@example\n```ts\nimport { createApp, h } from \"vue\";\nimport { SheetwriteGrid } from \"@sheetwrite/vue\";\nimport type { Workbook } from \"@sheetwrite/core\";\n\nfunction mountWorkbook(host: HTMLElement, workbook: Workbook) {\n  const app = createApp({ render: () => h(SheetwriteGrid, { workbook, height: 400 }) });\n  app.mount(host);\n  return () => app.unmount();\n}\n```\n@see\nSheetwrite\n@see\n/docs/frameworks/vue/",
               "memberDocs": []
             },
             {
@@ -10360,7 +10474,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L41",
+              "source": "loader.d.ts#L49",
               "jsDocTags": [],
               "documentation": "Initialize a fresh engine; a compiled module can be reused without retaining its memory.",
               "memberDocs": []
@@ -10397,7 +10511,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L29",
+              "source": "loader.d.ts#L37",
               "jsDocTags": [],
               "documentation": "Engine objects and caches owned by one independently collectible WASM instance.",
               "memberDocs": []
@@ -10448,7 +10562,7 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L26",
+              "source": "loader.d.ts#L34",
               "jsDocTags": [],
               "documentation": "Whether the WASM module has finished initializing.",
               "memberDocs": []
@@ -10460,9 +10574,12 @@
               "owners": [
                 "loader.d.ts"
               ],
-              "source": "loader.d.ts#L21",
-              "jsDocTags": [],
-              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.",
+              "source": "loader.d.ts#L29",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Initialize the WASM module. Idempotent and re-entrant: concurrent\nsame-source callers share one in-flight init; a concurrent different-source\ncall rejects; a different-source call after success warns and no-ops; a\nrejected init is retryable. When `source` is omitted the loader picks the\nright strategy for the runtime.\n@example\n```ts\nimport { initSheetwrite } from \"@sheetwrite/core\";\n\nawait initSheetwrite();\n```\n@see\n/docs/start/installation/",
               "memberDocs": []
             },
             {
@@ -10567,9 +10684,12 @@
               "owners": [
                 "src/registration.ts"
               ],
-              "source": "src/registration.ts#L12",
-              "jsDocTags": [],
-              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.",
+              "source": "src/registration.ts#L26",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/guides/xlsx-export/",
               "memberDocs": []
             },
             {
@@ -10648,9 +10768,12 @@
               "owners": [
                 "src/registration.ts"
               ],
-              "source": "src/registration.ts#L12",
-              "jsDocTags": [],
-              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.",
+              "source": "src/registration.ts#L26",
+              "jsDocTags": [
+                "example",
+                "see"
+              ],
+              "documentation": "Register all concrete XLSX backends with the backend-neutral core contracts.\n@example\n```ts\nimport { registerXlsxBackends } from \"@sheetwrite/xlsx\";\nimport { fromXlsxWorkbook } from \"@sheetwrite/core\";\n\nregisterXlsxBackends();\nasync function open(file: File) {\n  return fromXlsxWorkbook(await file.arrayBuffer());\n}\n```\n@see\n/docs/guides/xlsx-export/",
               "memberDocs": []
             }
           ]

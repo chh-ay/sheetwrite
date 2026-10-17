@@ -7,8 +7,28 @@ description: "Workbook, data, rendering, policy, and built-in UI options used to
 
 Workbook, data, rendering, policy, and built-in UI options used to create a Grid.
 
+### Examples
+
+```ts compile
+import type { GridOptions } from "@sheetwrite/core";
+
+const options: GridOptions = {
+  workbook: { activeSheet: "sheet1", sheets: [
+    { id: "sheet1", name: "Sheet 1", rowCount: 1,
+      columns: [{ key: "name", header: "Name", type: "text", width: 120 }] },
+  ] },
+  data: { rowCount: 1, columns: { name: ["Ada"] } },
+  config: { toolbar: true, contextMenu: true, keyboard: true },
+};
+```
+
+### See also
+
+- [createGrid](/docs/api/core/create-grid/)
+- [GridConfig](/docs/api/core/grid-config/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L370"><code>packages/core/src/types/grid.ts#L370</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L423"><code>packages/core/src/types/grid.ts#L423</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

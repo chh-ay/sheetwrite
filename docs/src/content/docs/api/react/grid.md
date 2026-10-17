@@ -7,8 +7,28 @@ description: "Imperative grid handle for document commands, events, rendering, a
 
 Imperative grid handle for document commands, events, rendering, and teardown.
 
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function updateTotal(grid: Grid) {
+  const sheet = grid.getActiveSheet();
+  const result = grid.applyTransaction({
+    patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 42 } }],
+  });
+  if (result.status === "applied") grid.scrollToCell({ sheet, row: 0, col: 0 });
+  return grid.aggregate(0, "sum");
+}
+```
+
+### See also
+
+- [createGrid](/docs/api/core/create-grid/)
+- [Grid.applyTransaction](/docs/api/react/grid/#grid-apply-transaction)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L416"><code>packages/core/dist/types/grid.d.ts#L416</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L487"><code>packages/core/dist/types/grid.d.ts#L487</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -290,9 +310,27 @@ accepted here.</p>
 applyTransaction(transaction: GridTransaction): ApplyTransactionResult;
 ```
 
-<p class="api-member-doc">Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
+Apply arbitrary patches as one undoable Grid commit. No-op when read-only.
 Use `Store.applyTransaction` only for low-level writes that intentionally
-bypass Grid history and policy.</p>
+bypass Grid history and policy.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function setFirstCell(grid: Grid) {
+  return grid.applyTransaction({ patches: [
+    { op: "set", addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+      value: { kind: "literal", value: 42 } },
+  ] });
+}
+```
+
+### See also
+
+- [Transaction](/docs/api/core/transaction/)
+
 </details>
 
 <details class="api-member" id="grid-export-snapshot" data-pagefind-weight="1">
@@ -331,6 +369,22 @@ defineCellRenderer(name: string, renderer: CellRenderer): void;
 aggregate(col: number, op: AggregateOp): number;
 ```
 
+Column aggregate over the active sheet's data.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function total(grid: Grid) {
+  return grid.aggregate(1, "sum");
+}
+```
+
+### See also
+
+- [SheetwriteStore.aggregate](/docs/api/core/sheetwrite-store/#sheetwrite-store-aggregate)
+
 </details>
 
 <details class="api-member" id="grid-sort-by" data-pagefind-weight="1">
@@ -339,6 +393,22 @@ aggregate(col: number, op: AggregateOp): number;
 ```ts generated
 sortBy(col: number, ascending?: boolean): void;
 ```
+
+Sort the displayed rows by a column (does not mutate stored data).
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function showLargestFirst(grid: Grid) {
+  grid.sortBy(1, false);
+}
+```
+
+### See also
+
+- [Grid.clearView](/docs/api/react/grid/#grid-clear-view)
 
 </details>
 
@@ -357,6 +427,22 @@ sortByMulti(keys: readonly SortKey[]): void;
 ```ts generated
 filterBy(col: number, needle: string): void;
 ```
+
+Filter the displayed rows to those whose column text contains `needle`.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function showOpenRows(grid: Grid) {
+  grid.filterBy(0, "Open");
+}
+```
+
+### See also
+
+- [Grid.clearView](/docs/api/react/grid/#grid-clear-view)
 
 </details>
 
@@ -506,9 +592,25 @@ clearView(): void;
 undo(): void;
 ```
 
-<p class="api-member-doc">Undo the last recorded cell edit. If the restored data is above the
+Undo the last recorded cell edit. If the restored data is above the
 transaction resource limits, nothing changes: the Grid emits
-`mutation-rejected` and removes that entry, so older edits stay undoable.</p>
+`mutation-rejected` and removes that entry, so older edits stay undoable.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function undoAndRestore(grid: Grid) {
+  grid.undo();
+  grid.redo();
+}
+```
+
+### See also
+
+- [Grid.redo](/docs/api/react/grid/#grid-redo)
+
 </details>
 
 <details class="api-member" id="grid-redo" data-pagefind-weight="1">
@@ -521,20 +623,50 @@ redo(): void;
 </details>
 
 <details class="api-member" id="grid-export-csv" data-pagefind-weight="1">
-<summary><code>exportCsv</code></summary>
+<summary><code>exportCsv</code> <span class="api-member-summary">Download the active sheet as CSV.</span></summary>
 
 ```ts generated
 exportCsv(filename: string): void;
 ```
 
+Download the active sheet as CSV.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+function downloadCsv(grid: Grid) {
+  grid.exportCsv("sales.csv");
+}
+```
+
 </details>
 
 <details class="api-member" id="grid-export-xlsx" data-pagefind-weight="1">
-<summary><code>exportXlsx</code></summary>
+<summary><code>exportXlsx</code> <span class="api-member-summary">Download the active sheet through the registered XLSX backend.</span></summary>
 
 ```ts generated
 exportXlsx(filename: string): Promise<void>;
 ```
+
+Download the active sheet through the registered XLSX backend.
+
+### Examples
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+
+async function downloadXlsx(grid: Grid) {
+  await registerXlsxBackends();
+  await grid.exportXlsx("sales.xlsx");
+}
+```
+
+### See also
+
+- [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
 
 </details>
 

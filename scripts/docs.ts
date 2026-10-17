@@ -460,6 +460,7 @@ function documentationLinkRoute(
   target: string,
   routes: DocumentationLinkRoutes,
 ): string | undefined {
+  if (/^(?:https?:\/\/|\/docs\/)/.test(target)) return target;
   const targetParts = target.split(".");
   if (targetParts.length > 2) return undefined;
   const [ownerName, memberName] = targetParts;
@@ -512,15 +513,45 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
   return issues;
 }
 
+function documentationSections(
+  documentation: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  const sections = documentation.split(/(?:^|\n)@(example|see)\b\s*\n?/);
+  const body = [sections[0]?.trim() ?? ""];
+  const examples: string[] = [];
+  const related: string[] = [];
+  for (let index = 1; index < sections.length; index += 2) {
+    const tag = sections[index];
+    const value = sections[index + 1]?.trim() ?? "";
+    if (tag === "example") {
+      examples.push(value.replace(/^```(ts|tsx)(?:\s+compile)?\s*$/gm, "```$1 compile"));
+    } else if (tag === "see") {
+      const link = /^\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}$/.exec(value);
+      const target = link?.[1] ?? value;
+      const label = link?.[2]?.trim() || target;
+      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
+    }
+  }
+  if (examples.length > 0) body.push("### Examples", ...examples);
+  if (related.length > 0) body.push("### See also", related.join("\n"));
+  return body.join("\n\n");
+}
+
 function documentationMarkdown(
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
+  source = item.documentation,
 ): string {
   const documentation =
-    item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return documentation.replace(
+    source.trim() || "Source summary unavailable; docs:check rejects this omission.";
+  return documentationSections(documentation, pkg, entry, item, routes).replace(
     /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
     (_match, target: string, label: string | undefined) => {
       const text = label?.trim() || target;
@@ -1041,7 +1072,8 @@ function renderMembers(
     // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
-    const summary = documentation === undefined ? "" : compactSummary(documentation);
+    const summary =
+      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "");
     const summaryDoc =
       documentation === undefined
         ? ""
@@ -1073,7 +1105,9 @@ function renderMembers(
       documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
         ? []
         : [
-            `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
+            /(?:^|\n)@(example|see)\b/.test(documentation)
+              ? `${documentationMarkdown(pkg, entry, item, routes, documentation)}\n`
+              : `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
           ]),
       "</details>",
     ].join("\n");
@@ -3852,8 +3886,68 @@ export async function generateDocs(): Promise<void> {
   );
 }
 
+// Keep this starter surface explicit: removing a symbol must not silently remove its docs gate.
+const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
+  "@sheetwrite/core": [
+    "initSheetwrite",
+    "createGrid",
+    "Grid",
+    "Grid.applyTransaction",
+    "Grid.aggregate",
+    "Grid.sortBy",
+    "Grid.filterBy",
+    "Grid.undo",
+    "Grid.exportCsv",
+    "Grid.exportXlsx",
+    "GridOptions",
+    "GridConfig",
+    "ContextMenuItem",
+    "SheetwriteStore",
+    "SheetwriteStore.aggregate",
+    "Transaction",
+    "DataSource",
+    "createRowBridge",
+    "SyncCoordinator",
+    "SyncCoordinator.recoverConflict",
+    "PersistenceAdapter",
+    "releaseEngineMemory",
+    "fromXlsxTable",
+    "toXlsxTable",
+    "fromXlsxWorkbook",
+    "toXlsxWorkbook",
+  ],
+  "@sheetwrite/react": ["Sheetwrite", "SheetwriteGrid"],
+  "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
+  "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
+  "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/wasm": ["load"],
+  "@sheetwrite/formulas": ["load"],
+};
+
+function requireApiExamples(manifest: PublicApiManifest): void {
+  const failures: string[] = [];
+  for (const [packageName, names] of Object.entries(REQUIRED_API_EXAMPLES)) {
+    const entry = manifest.packages
+      .find((pkg) => pkg.name === packageName)
+      ?.entryPoints.find((candidate) => candidate.subpath === ".");
+    for (const name of names) {
+      const [symbolName, memberName] = name.split(".");
+      const apiExport = entry?.exports.find((candidate) => candidate.name === symbolName);
+      const documentation =
+        memberName === undefined
+          ? apiExport?.documentation
+          : apiExport?.memberDocs.find((member) => member.name === memberName)?.documentation;
+      if (!/(?:^|\n)@example\s*\n[\s\S]*?```(?:ts|tsx)\s*\n[\s\S]+?```/.test(documentation ?? "")) {
+        failures.push(`${packageName} ${name} requires an @example with a TypeScript code block`);
+      }
+    }
+  }
+  if (failures.length > 0) throw new Error(failures.join("\n"));
+}
+
 export async function verifyDocs(): Promise<void> {
   const analysis = await analyzePublicApi(repositoryRoot);
+  requireApiExamples(analysis.manifest);
   const expected = await expectedGeneratedFiles(analysis.manifest);
   const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
 

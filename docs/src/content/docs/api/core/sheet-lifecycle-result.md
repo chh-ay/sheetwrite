@@ -8,7 +8,7 @@ description: "Actionable transaction outcome for a stable sheet lifecycle target
 Actionable transaction outcome for a stable sheet lifecycle target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L485"><code>packages/core/src/types/grid.ts#L485</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L538"><code>packages/core/src/types/grid.ts#L538</code></a></dd></div>
 </dl>
 
 ## Declaration

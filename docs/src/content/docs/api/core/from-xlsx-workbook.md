@@ -7,8 +7,26 @@ description: "Formula-preserving, multi-sheet workbook import through the option
 
 Formula-preserving, multi-sheet workbook import through the optional XLSX backend.
 
+### Examples
+
+```ts compile
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { fromXlsxWorkbook, createGridFromSnapshot, initSheetwrite } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function openWorkbook(host: HTMLElement, file: File) {
+  await initSheetwrite();
+  const snapshot = await fromXlsxWorkbook(await file.arrayBuffer());
+  return createGridFromSnapshot(host, snapshot);
+}
+```
+
+### See also
+
+- [toXlsxWorkbook](/docs/api/core/to-xlsx-workbook/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L478"><code>packages/core/src/export.ts#L478</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L536"><code>packages/core/src/export.ts#L536</code></a></dd></div>
 </dl>
 
 ## Declaration

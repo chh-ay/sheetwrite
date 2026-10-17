@@ -7,8 +7,25 @@ description: "Host load and commit contract for versioned workbook persistence."
 
 Host load and commit contract for versioned workbook persistence.
 
+### Examples
+
+```ts compile
+import { MemoryPersistenceAdapter, type PersistenceAdapter, type WorkbookSnapshot } from "@sheetwrite/core";
+
+async function loadLocal(snapshot: WorkbookSnapshot) {
+  if (!snapshot.documentId) throw new Error("A document ID is required");
+  const adapter: PersistenceAdapter = new MemoryPersistenceAdapter(snapshot);
+  return adapter.load(snapshot.documentId);
+}
+```
+
+### See also
+
+- [MemoryPersistenceAdapter](/docs/api/core/memory-persistence-adapter/)
+- [SyncCoordinator](/docs/api/core/sync-coordinator/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L149"><code>packages/core/src/types/transaction.ts#L149</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L177"><code>packages/core/src/types/transaction.ts#L177</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

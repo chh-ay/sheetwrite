@@ -7,8 +7,25 @@ description: "Create a typed bridge while preserving row and identity inference.
 
 Create a typed bridge while preserving row and identity inference.
 
+### Examples
+
+```ts compile
+import { createRowBridge } from "@sheetwrite/core";
+
+const bridge = createRowBridge({
+  columns: [{ key: "amount" }],
+  defaultRows: [{ id: "order-1", amount: 12 }],
+  getRowId: (row) => row.id,
+});
+```
+
+### See also
+
+- [RowBridgeOptions](/docs/api/core-adapter/row-bridge-options/)
+- [RowBridge](/docs/api/core-adapter/row-bridge/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L961"><code>packages/core/src/row-bridge.ts#L961</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L976"><code>packages/core/src/row-bridge.ts#L976</code></a></dd></div>
 </dl>
 
 ## Declaration

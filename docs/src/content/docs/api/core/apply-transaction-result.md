@@ -8,7 +8,7 @@ description: "Outcome of applying a document transaction, including conflict, re
 Outcome of applying a document transaction, including conflict, rejection, and no-op states.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L35"><code>packages/core/src/types/transaction.ts#L35</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L48"><code>packages/core/src/types/transaction.ts#L48</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>4</span>

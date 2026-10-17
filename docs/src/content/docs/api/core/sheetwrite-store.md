@@ -7,8 +7,29 @@ description: "Stable public facade and the sole transaction, epoch, policy, and 
 
 Stable public facade and the sole transaction, epoch, policy, and event barrier.
 
+### Examples
+
+```ts compile
+import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
+
+async function total(workbook: Workbook) {
+  await initSheetwrite();
+  const store = new SheetwriteStore(workbook);
+  try {
+    return store.aggregate(workbook.activeSheet, 0, "sum");
+  } finally {
+    store.dispose();
+  }
+}
+```
+
+### See also
+
+- Store.aggregate
+- [createGrid](/docs/api/core/create-grid/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L107"><code>packages/core/src/store.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/store.ts#L126"><code>packages/core/src/store.ts#L126</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -96,11 +117,27 @@ acknowledgeOperations: (operations: readonly DocumentOp[], storageRevision?: big
 </details>
 
 <details class="api-member" id="sheetwrite-store-aggregate" data-pagefind-weight="1">
-<summary><code>aggregate</code></summary>
+<summary><code>aggregate</code> <span class="api-member-summary">Aggregate one column. Datasource-backed sheets must be fully loaded.</span></summary>
 
 ```ts generated
 aggregate: (sheet: SheetId, col: number, op: AggregateOp) => number;
 ```
+
+Aggregate one column. Datasource-backed sheets must be fully loaded.
+
+### Examples
+
+```ts compile
+import type { SheetwriteStore, SheetId } from "@sheetwrite/core";
+
+function totals(store: SheetwriteStore, sheet: SheetId) {
+  return { total: store.aggregate(sheet, 0, "sum"), average: store.aggregate(sheet, 0, "avg") };
+}
+```
+
+### See also
+
+- [AggregateOp](/docs/api/core/aggregate-op/)
 
 </details>
 

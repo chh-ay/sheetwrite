@@ -271,7 +271,21 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
   },
 );
 
-/** Advanced framework component with inferred row-bridge identity. */
+/**
+ * Advanced framework component with inferred row-bridge identity.
+ *
+ * @example
+ * ```tsx
+ * import { SheetwriteGrid } from "@sheetwrite/react";
+ * import type { Workbook } from "@sheetwrite/core";
+ *
+ * export function WorkbookView({ workbook }: { workbook: Workbook }) {
+ *   return <SheetwriteGrid workbook={workbook} height={400} />;
+ * }
+ * ```
+ * @see Sheetwrite
+ * @see /docs/frameworks/react/
+ */
 export const SheetwriteGrid = SheetwriteGridComponent as <Id extends RowBridgeId = RowBridgeId>(
   props: SheetwriteGridProps<Id> & { ref?: ForwardedRef<Grid> },
 ) => ReactElement;
@@ -326,6 +340,21 @@ const SheetwriteComponent = forwardRef<
  * `columns`, `defaultRows`, and `sheetName`, initializes Sheetwrite, and owns the `Grid`
  * through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
  * use `SheetwriteGrid` when the host already owns a workbook or datasource.
+ *
+ * @example
+ * ```tsx
+ * import { Sheetwrite } from "@sheetwrite/react";
+ *
+ * export function Sales() {
+ *   return <Sheetwrite
+ *     columns={[{ key: "amount", title: "Amount", type: "number" }]}
+ *     defaultRows={[{ amount: 12 }, { amount: 18 }]}
+ *     height={400}
+ *   />;
+ * }
+ * ```
+ * @see SheetwriteGrid
+ * @see /docs/frameworks/react/
  */
 export const Sheetwrite = SheetwriteComponent as <
   Row extends Record<string, CellScalar>,

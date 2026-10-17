@@ -114,10 +114,25 @@ afterEach(async () => {
 describe("re-export documentation", () => {
   it("keeps interface kind, signature, and member docs through re-exports", async () => {
     const root = await fixture(
-      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\n`,
+      `${canonicalDeclarations}\nexport * from "./generated.js";\n/** Instantiated module exports. */\nexport type { GeneratedOutput } from "./generated.js";\nexport type { ExternalService } from "framework";\n`,
       {
         "generated.d.ts":
           "export interface GeneratedOutput {\n  /** Shared linear memory. */\n  readonly memory: object;\n}\n",
+        "node_modules/framework/package.json": JSON.stringify({
+          name: "framework",
+          types: "./index.d.ts",
+        }),
+        "node_modules/framework/index.d.ts": [
+          "/** Upstream service.",
+          " * @see https://example.com/upstream",
+          " */",
+          "export interface ExternalService {",
+          "  /** Upstream property.",
+          "   * @see https://example.com/property",
+          "   */",
+          "  value: string;",
+          "}",
+        ].join("\n"),
       },
     );
     const { manifest } = await analyzePublicApi(root);
@@ -129,6 +144,48 @@ describe("re-export documentation", () => {
     expect(generated?.memberDocs).toEqual([
       { name: "memory", documentation: "Shared linear memory." },
     ]);
+    const external = entry?.exports.find((candidate) => candidate.name === "ExternalService");
+    expect(external?.documentation).toBe("Upstream service.");
+    expect(external?.memberDocs).toEqual([{ name: "value", documentation: "Upstream property." }]);
+  });
+
+  it("preserves example and see tags for symbols and their members", async () => {
+    const tagged = [
+      "/** A documented service.",
+      " * @example",
+      " * ```ts",
+      " * const service = new Service();",
+      " * ```",
+      " * @see {@link DataSource | Load data}",
+      " * @see DataSource",
+      " */",
+      "export declare class Service {",
+      "  /** Run the service.",
+      "   * @example",
+      "   * ```ts",
+      "   * service.run();",
+      "   * ```",
+      "   * @see https://example.com/run",
+      "   */",
+      "  run(): void;",
+      "}",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const service = manifest.packages[0]?.entryPoints[0]?.exports.find(
+      (candidate) => candidate.name === "Service",
+    );
+    expect(service?.documentation).toContain(
+      "@example\n```ts\nconst service = new Service();\n```",
+    );
+    expect(service?.documentation).toContain("@see\n{@link DataSource | Load data}");
+    expect(service?.documentation).toContain("@see\nDataSource");
+    expect(service?.memberDocs).toContainEqual({
+      name: "run",
+      documentation:
+        "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
+    });
   });
 });
 describe("interface heritage flattening", () => {
