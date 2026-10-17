@@ -65,7 +65,8 @@ import {
   validateRawStat,
 } from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
-import { protocolCaptureMeta } from "./protocol-meta.js";
+import { validateEngineVersions } from "./engine-versions.js";
+import { packageVersion, protocolCaptureMeta } from "./protocol-meta.js";
 import { collect, forceGc, type MeasureOptions, mib, ms, type Stat, summarize } from "./stats.js";
 
 /** Sheetwrite is measured across the full range; its store scales to 1M. */
@@ -329,6 +330,7 @@ export interface EngineResult extends TimedEngineResult {
 
 export interface DataBenchmarkResult extends GateIdentity {
   readonly meta: {
+    readonly engineVersions: Readonly<Record<EngineId, string>>;
     readonly bun: string;
     readonly platform: string;
     readonly arch: string;
@@ -423,6 +425,7 @@ export function validateDataBenchmark(
   expectedMode: BenchmarkMode = result.mode,
 ): void {
   assertGateIdentity("data", expectedMode, result);
+  validateEngineVersions(result.meta.engineVersions, ["sheetwrite", "handsontable"]);
   for (const field of ["bun", "platform", "arch"] as const) {
     if (typeof result.meta[field] !== "string" || result.meta[field].length === 0) {
       throw new Error(`data metadata.${field} must be a non-empty string`);
@@ -1547,6 +1550,10 @@ function dataResult(
       platform: process.platform,
       arch: process.arch,
       ...protocolCaptureMeta(),
+      engineVersions: {
+        sheetwrite: packageVersion("packages/core/package.json"),
+        handsontable: packageVersion("bench/node_modules/handsontable/package.json"),
+      },
       sheetwriteRows: [...sheetwrite.keys()],
       handsontableRows: [...handsontable.keys()],
       queryFixtures: QUERY_FIXTURES,

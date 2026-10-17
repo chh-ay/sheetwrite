@@ -64,6 +64,7 @@ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
     mode: "smoke",
     matrixId: MATRIX_IDS.data.smoke,
     meta: {
+      engineVersions: { sheetwrite: "0.4.0", handsontable: "18.1.2" },
       bun: "test",
       platform: "linux",
       arch: "x64",
@@ -79,6 +80,25 @@ function smokeFixture(options: FixtureOptions = {}): DataBenchmarkResult {
 }
 
 describe("data benchmark exact matrix", () => {
+  test("requires semantic versions for both measured engines", () => {
+    const valid = smokeFixture();
+    expect(() => validateDataBenchmark(valid)).not.toThrow();
+    for (const engine of ["sheetwrite", "handsontable"] as const) {
+      for (const version of [undefined, "", "18", "^18.1.2", "01.2.3"]) {
+        const invalid = {
+          ...valid,
+          meta: {
+            ...valid.meta,
+            engineVersions: { ...valid.meta.engineVersions, [engine]: version },
+          },
+        };
+        expect(() => validateDataBenchmark(invalid as DataBenchmarkResult)).toThrow(
+          `engineVersions.${engine}`,
+        );
+      }
+    }
+  });
+
   test("rejects missing, duplicate, unexpected, and non-finite cells with canonical keys", () => {
     expect(() => validateDataBenchmark(smokeFixture({ omitWorkload: "ingest" }), "smoke")).toThrow(
       "missing engine=sheetwrite;rows=1000;metric=ingest",

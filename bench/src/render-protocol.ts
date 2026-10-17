@@ -1,3 +1,4 @@
+import { validateEngineVersions } from "./engine-versions.js";
 import type { AggregateSample } from "./stats.js";
 import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 
@@ -753,6 +754,7 @@ function parseLaunchAttempt(value: unknown, path: string): BrowserLaunchAttempt 
 function parseMetadata(value: unknown, path: string): RenderRunMetadata {
   const input = record(value, path);
   const engineVersions = record(input.engineVersions, `${path}.engineVersions`);
+  validateEngineVersions(engineVersions, ENGINE_IDS);
   const hashes = record(input.datasetHashes, `${path}.datasetHashes`);
   const viewport = record(input.viewport, `${path}.viewport`);
   const engineOrder = array(input.engineOrder, `${path}.engineOrder`).map((entry, round) =>

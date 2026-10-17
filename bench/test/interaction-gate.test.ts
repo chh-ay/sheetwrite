@@ -92,6 +92,7 @@ function fixture(edits: FixtureEdits = {}): unknown {
       commit: edits.metadata?.commit ?? TEST_COMMIT,
       dirty: edits.metadata?.dirty ?? false,
       timestamp: TEST_TIMESTAMP,
+      engineVersions: { sheetwrite: "0.4.0" },
     },
     runner: TEST_RUNNER,
     method: TEST_METHOD,
@@ -147,6 +148,18 @@ describe("interaction performance artifact", () => {
     expect(() =>
       validateInteractionArtifact(fixture({ mode: "smoke", samples: SMOKE_SAMPLES, rows: 1_000 })),
     ).toThrow("workload changed");
+  });
+
+  test("requires the measured Sheetwrite semantic version", () => {
+    const valid = fixture();
+    for (const version of [undefined, "", "0.4", "^0.4.0"]) {
+      expect(() =>
+        validateInteractionArtifact({
+          ...valid,
+          metadata: { ...valid.metadata, engineVersions: { sheetwrite: version } },
+        }),
+      ).toThrow("engineVersions.sheetwrite");
+    }
   });
 
   test("rejects incomplete or dirty capture provenance", () => {

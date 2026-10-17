@@ -1,5 +1,6 @@
 import type { BenchmarkMode } from "./gate-protocol.js";
 import { validateRawStat, validateStat } from "./gate-protocol.js";
+import { validateEngineVersions } from "./engine-versions.js";
 import type { ProtocolCaptureMeta } from "./protocol-meta.js";
 import type { Stat } from "./stats.js";
 
@@ -109,7 +110,9 @@ export interface InteractionPerformanceArtifact {
   readonly protocolVersion: typeof INTERACTION_PROTOCOL_VERSION;
   readonly matrixId: typeof INTERACTION_MATRIX_ID;
   readonly mode: BenchmarkMode;
-  readonly metadata: ProtocolCaptureMeta;
+  readonly metadata: ProtocolCaptureMeta & {
+    readonly engineVersions: Readonly<Record<"sheetwrite", string>>;
+  };
   readonly runner: InteractionRunner;
   readonly method: InteractionMethod;
   readonly rows: typeof INTERACTION_ROWS;
@@ -247,12 +250,14 @@ function ceilingsOf(value: unknown): Readonly<Record<InteractionCeilingMetric, n
   };
 }
 
-function metaOf(value: unknown): ProtocolCaptureMeta {
+function metaOf(value: unknown): InteractionPerformanceArtifact["metadata"] {
   const input = record(value, "interaction artifact.metadata");
+  validateEngineVersions(input.engineVersions, ["sheetwrite"]);
   return {
     commit: text(input.commit, "interaction artifact.metadata.commit"),
     dirty: bool(input.dirty, "interaction artifact.metadata.dirty"),
     timestamp: timestampOf(input.timestamp, "interaction artifact.metadata.timestamp"),
+    engineVersions: { sheetwrite: input.engineVersions.sheetwrite },
   };
 }
 

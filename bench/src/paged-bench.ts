@@ -19,7 +19,8 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
-import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
+import { validateEngineVersions } from "./engine-versions.js";
+import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { type Stat, summarize } from "./stats.js";
 
 export const PAGED_FULL_ROWS = 1_000_000;
@@ -116,7 +117,9 @@ export interface PagedTimingResult {
 }
 
 export interface PagedBenchmarkResult extends GateIdentity {
-  readonly meta: ProtocolCaptureMeta;
+  readonly meta: ProtocolCaptureMeta & {
+    readonly engineVersions: Readonly<Record<"sheetwrite", string>>;
+  };
   readonly rows: number;
   readonly columns: number;
   readonly runs: number;
@@ -156,6 +159,7 @@ export function validatePagedBenchmark(
   expectedMode: BenchmarkMode = result.mode,
 ): void {
   assertGateIdentity("paged", expectedMode, result);
+  validateEngineVersions(result.meta.engineVersions, ["sheetwrite"]);
   const expectedRows = expectedMode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
   const expectedRuns = expectedMode === "smoke" ? SMOKE_RUNS : FULL_RUNS;
   if (
@@ -744,7 +748,10 @@ async function runBenchmark(
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
     matrixId: MATRIX_IDS.paged[mode],
-    meta: protocolCaptureMeta(),
+    meta: {
+      ...protocolCaptureMeta(),
+      engineVersions: { sheetwrite: packageVersion("packages/core/package.json") },
+    },
     rows: rowCount,
     columns: COLUMNS,
     runs,

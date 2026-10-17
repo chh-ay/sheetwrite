@@ -1,7 +1,9 @@
+import { createRequire } from "node:module";
 import { cpus } from "node:os";
 import { relative, resolve } from "node:path";
 
-import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
+import { validateEngineVersions } from "./engine-versions.js";
+import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 
 const BENCH_ROOT = resolve(import.meta.dir, "..");
@@ -98,7 +100,12 @@ export interface XlsxComparison {
 export interface XlsxBenchmarkArtifact {
   readonly protocol: typeof PROTOCOL;
   readonly mode: XlsxBenchmarkMode;
-  readonly metadata: ProtocolCaptureMeta;
+  readonly metadata: ProtocolCaptureMeta & {
+    readonly engineVersions: {
+      readonly sheetwrite: string;
+      readonly exceljs?: string;
+    };
+  };
   readonly rounds: number;
   readonly maxBaselineRatio: number;
   readonly fixture: {
@@ -287,6 +294,10 @@ export function validateXlsxBenchmarkArtifact(value: unknown): XlsxBenchmarkArti
   if (artifact.mode === "full" && artifact.toolchain.baselineCommit !== BASELINE_COMMIT) {
     throw new Error(`full XLSX benchmark requires baseline ${BASELINE_COMMIT}`);
   }
+  validateEngineVersions(
+    artifact.metadata?.engineVersions,
+    artifact.toolchain.baselineCommit === undefined ? ["sheetwrite"] : ["sheetwrite", "exceljs"],
+  );
   if (
     artifact.fixture.sha256 !== FIXTURE_SHA256 ||
     artifact.fixture.generatorSha256 !== GENERATOR_SHA256
@@ -454,7 +465,21 @@ export async function runXlsxBenchmark(options: RunOptions): Promise<XlsxBenchma
   return validateXlsxBenchmarkArtifact({
     protocol: PROTOCOL,
     mode: options.mode,
-    metadata: protocolCaptureMeta(),
+    metadata: {
+      ...protocolCaptureMeta(),
+      engineVersions: {
+        sheetwrite: packageVersion("packages/core/package.json"),
+        ...(options.baselineRoot
+          ? {
+              exceljs: packageVersion(
+                createRequire(resolve(options.baselineRoot, "packages/xlsx/package.json")).resolve(
+                  "exceljs/package.json",
+                ),
+              ),
+            }
+          : {}),
+      },
+    },
     rounds: options.rounds,
     maxBaselineRatio: MAX_BASELINE_RATIO,
     fixture: {

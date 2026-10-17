@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { validateEngineVersions } from "./engine-versions.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
 /**
@@ -17,6 +20,12 @@ export interface ProtocolCaptureMeta {
   readonly commit: string;
   readonly dirty: boolean;
   readonly timestamp: string;
+}
+
+export function packageVersion(path: string): string {
+  const manifest: unknown = JSON.parse(readFileSync(resolve(REPOSITORY_ROOT, path), "utf8"));
+  validateEngineVersions(manifest, ["version"]);
+  return manifest.version;
 }
 
 function gitOutput(args: readonly string[]): string {

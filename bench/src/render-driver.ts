@@ -6,7 +6,7 @@ import { type Browser, chromium, type Page } from "@playwright/test";
 
 import { DEFAULT_SEED, datasetChecksum, makeColumnar } from "./dataset.js";
 import type { BenchmarkMode } from "./gate-protocol.js";
-import { sourceTreeDirty } from "./protocol-meta.js";
+import { packageVersion, sourceTreeDirty } from "./protocol-meta.js";
 import benchmarkPage from "./render-bench.html";
 import { validateRenderGateArtifact } from "./render-gate.js";
 import {
@@ -580,18 +580,6 @@ function gitOutput(args: readonly string[]): string {
   return processResult.stdout.toString().trim();
 }
 
-async function packageVersion(relativePath: string): Promise<string> {
-  const value: unknown = await Bun.file(resolve(REPOSITORY_ROOT, relativePath)).json();
-  if (value === null || typeof value !== "object" || !("version" in value)) {
-    throw new TypeError(`${relativePath} has no version`);
-  }
-  const version = value.version;
-  if (typeof version !== "string" || version.length === 0) {
-    throw new TypeError(`${relativePath} has an invalid version`);
-  }
-  return version;
-}
-
 function stableJson(value: RenderBenchmarkArtifact): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
@@ -733,8 +721,8 @@ async function runDriver(args: readonly string[]): Promise<void> {
       arch: process.arch,
       cpu: cpus()[0]?.model ?? "unknown",
       engineVersions: {
-        sheetwrite: await packageVersion("packages/core/package.json"),
-        handsontable: await packageVersion("bench/node_modules/handsontable/package.json"),
+        sheetwrite: packageVersion("packages/core/package.json"),
+        handsontable: packageVersion("bench/node_modules/handsontable/package.json"),
       },
       datasetSeed: DEFAULT_SEED,
       datasetHashes,

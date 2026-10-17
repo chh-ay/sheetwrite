@@ -20,7 +20,7 @@ import {
   type InteractionValues,
   validateInteractionArtifact,
 } from "./interaction-gate.js";
-import { protocolCaptureMeta } from "./protocol-meta.js";
+import { packageVersion, protocolCaptureMeta } from "./protocol-meta.js";
 import { summarize } from "./stats.js";
 
 /** Fields of the showcase page this capture drives; installed by the route. */
@@ -541,7 +541,10 @@ async function main(): Promise<void> {
     protocolVersion: INTERACTION_PROTOCOL_VERSION,
     matrixId: INTERACTION_MATRIX_ID,
     mode,
-    metadata: protocolCaptureMeta(),
+    metadata: {
+      ...protocolCaptureMeta(),
+      engineVersions: { sheetwrite: packageVersion("packages/core/package.json") },
+    },
     runner: {
       runtime: `Bun ${Bun.version} on ${process.platform} ${process.arch}`,
       browser: `Chromium ${browser.version()}`,

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Pin the comparison grid to Handsontable 18.1.2, including its 18.1 scrolling, index translation, filtering, and cell-metadata performance improvements.
+- Record installed engine versions in data, interaction, paged, and XLSX captures, and require semantic versions in their artifact contracts and the render parser. XLSX comparisons identify ExcelJS from the measured baseline checkout alongside its commit.
 - Add default and full formula engine measurements. Keep raw time and allocation samples, output checks, and source hashes.
 - Add analysis workloads, WASM file sizes, and fresh Node initialization samples.
 
