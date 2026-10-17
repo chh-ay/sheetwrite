@@ -1,5 +1,12 @@
 # @sheetwrite/wasm
 
+## 0.5.1
+
+### Patch Changes
+
+- 7d9b52a: Add checked API examples and links for grid setup, data, synchronization, framework components, engine selection, and XLSX import and export.
+- c8db125: Read literal cell values directly to restore column sum performance and reduce sort overhead. Skip unused count and minimum/maximum work when computing a column sum. Keep calculated values on the formula-aware read path.
+
 ## 0.5.0
 
 ### Minor Changes

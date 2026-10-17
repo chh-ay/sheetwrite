@@ -1,5 +1,15 @@
 # @sheetwrite/vue
 
+## 0.5.1
+
+### Patch Changes
+
+- 7d9b52a: Add checked API examples and links for grid setup, data, synchronization, framework components, engine selection, and XLSX import and export.
+- Updated dependencies [1f50d09]
+- Updated dependencies [7d9b52a]
+- Updated dependencies [edb091d]
+  - @sheetwrite/core@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

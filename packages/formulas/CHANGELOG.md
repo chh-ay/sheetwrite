@@ -1,5 +1,11 @@
 # @sheetwrite/formulas
 
+## 0.5.1
+
+### Patch Changes
+
+- 7d9b52a: Add checked API examples and links for grid setup, data, synchronization, framework components, engine selection, and XLSX import and export.
+
 ## 0.5.0
 
 ### Minor Changes
