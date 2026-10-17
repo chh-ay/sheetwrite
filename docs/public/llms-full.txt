@@ -4482,7 +4482,7 @@ The full list of changes is in each package's `CHANGELOG.md`.
 Source: https://sheetwrite.vercel.app/docs/releases/0.5.1/
 
 Sheetwrite 0.5.1 adds typed keyboard shortcuts and clear feedback for built-in
-commands. It restores column sum speed to 0.4.0 levels and redesigns the docs.
+commands. It makes column sums about twice as fast as in 0.5.0 and redesigns the docs.
 All seven packages release as 0.5.1. Read the [upgrade checklist](#upgrade-checklist)
 for the shortcut and export API changes.
 
@@ -4491,8 +4491,8 @@ for the shortcut and export API changes.
 - **Custom shortcuts.** Use typed key combinations with platform-aware labels
 in context menus and toolbars.
 - **Command feedback.** Built-in buttons show busy states and visible errors.
-- **Column sums are fast again.** Literal values use a direct read path;
-calculated values keep the formula-aware path.
+- **Faster column sums.** About twice as fast as 0.5.0. Literal values use a
+direct read path; calculated values keep the formula-aware path.
 - **Redesigned docs.** A task-focused home, grouped navigation, and clearer API
 pages make guides and examples easier to find.
 
@@ -4501,8 +4501,8 @@ pages make guides and examples easier to find.
 ### Typed shortcuts
 
 A key combination can be a string such as `"Mod+Shift+K"` or an object such as
-`{ key: "k", mod: true, shift: true }`. `Mod` means Command on macOS and Control
-elsewhere. `Ctrl` and `Meta` always mean those specific keys.
+`{ key: "k", mod: true, shift: true }`. `Mod` shows as Command on macOS and as Control
+elsewhere, and accepts either key. `Ctrl` and `Meta` always mean those specific keys.
 
 **API change:** `ContextMenuItem.shortcut` accepts a bound action name, such as
 `"copy"`, or a key combination. Replace free-text shortcut hints with one of
@@ -4526,24 +4526,25 @@ export failures show an alert and emit `export-error`, whose format can be
 
 ## Fixes
 
-- Restore column sum speed to 0.4.0 levels by reading literal values directly
-and skipping unused count and minimum/maximum work. Sorting also avoids
+- Column sums are about twice as fast as in 0.5.0: literal values are read
+directly, and unused count and minimum/maximum work is skipped. In paired
+runs against 0.4.0, sums are faster at 1,000, 10,000, 500,000 and 1,000,000
+rows and 22.7% slower at 100,000 rows. Sorting also avoids
 unnecessary read overhead. Calculated values keep the formula-aware path.
 - Fix docs search and not-found pages.
 - Wait for npm validation before release publishing continues.
 
 ## Documentation
 
-The docs have a task-focused home, grouped navigation, a dedicated reading
-panel, and redesigned API rows. Large API indexes have a filter; members start
-collapsed, expand for deep links, and link to their source locations.
-
-Checked API examples cover Grid setup, data, synchronization, framework
-components, engine selection, and XLSX import and export. The docs explain
-`highlightCells(null)` for clearing temporary highlights. Showcase menus and
-measurements are clearer, and the Vanilla highlight action applies an undoable
-cell fill. Generated `/llms.txt` and `/llms-full.txt` endpoints support
-AI-assisted development.
+- Docs pages use an open reading layout. Tables scroll inside a frame and keep
+short values on one line. Links are underlined.
+- A version tag next to the logo opens the latest release notes, and a Releases
+section in the sidebar lists every version with its date.
+- The Grid methods in the configuration guide are grouped by area and link to
+the API reference.
+- Each benchmark on the performance page shows its result first. Full tables
+are in a closed "All measurements" section.
+- API pages show checked examples and related links.
 
 ## Upgrade checklist
 
