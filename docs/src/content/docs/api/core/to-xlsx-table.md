@@ -8,7 +8,7 @@ description: "Exports a table model through the registered optional XLSX backend
 Exports a table model through the registered optional XLSX backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L324"><code>packages/core/src/export.ts#L324</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L348"><code>packages/core/src/export.ts#L348</code></a></dd></div>
 </dl>
 
 ## Declaration

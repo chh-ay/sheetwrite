@@ -9,7 +9,7 @@ Distinct-value scan result for one column: parallel kind/number/text
 arrays whose buffers are surrendered once through the `take*` accessors.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L308"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L308</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L412"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L412</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>
@@ -83,6 +83,7 @@ class DistinctColumn {
 <p class="api-consumers-label">Public exports naming <code>DistinctColumn</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

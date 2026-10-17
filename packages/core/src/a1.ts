@@ -47,7 +47,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
   if (dRow === 0 && dCol === 0) return src;
 
   return src.replace(
-    /(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
     (
       match: string,
       ca: string,
@@ -57,6 +57,7 @@ export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
       offset: number,
       full: string,
     ): string => {
+      if (match.startsWith('"') || match.startsWith("'")) return match;
       const prev = offset > 0 ? full.charAt(offset - 1) : "";
       if (prev === "_" || /[A-Za-z0-9]/.test(prev)) return match;
 
@@ -83,25 +84,28 @@ export function remapFormulaA1Refs(
   remap: (index: number) => number | null,
 ): string {
   return source.replace(
-    /(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)/g,
+    /"(?:[^"]|"")*"|'(?:[^']|'')*'|(\$?)([A-Za-z]{1,3})(\$?)([0-9]+)(#?)/g,
     (
       match: string,
       colAbsolute: string,
       letters: string,
       rowAbsolute: string,
       digits: string,
+      spill: string,
       offset: number,
       full: string,
     ): string => {
+      if (match.startsWith('"') || match.startsWith("'")) return match;
       const previous = offset > 0 ? full.charAt(offset - 1) : "";
       if (previous === "!" || previous === "_" || /[A-Za-z0-9]/.test(previous)) return match;
       const col = labelToCol(letters.toUpperCase());
       const row = Number(digits) - 1;
       const mapped = remap(axis === "row" ? row : col);
+      // A deleted anchor also ends its spill reference: `A1#` becomes `#REF!`.
       if (mapped === null) return "#REF!";
       return axis === "row"
-        ? `${colAbsolute}${colToA1(col)}${rowAbsolute}${mapped + 1}`
-        : `${colAbsolute}${colToA1(mapped)}${rowAbsolute}${row + 1}`;
+        ? `${colAbsolute}${colToA1(col)}${rowAbsolute}${mapped + 1}${spill}`
+        : `${colAbsolute}${colToA1(mapped)}${rowAbsolute}${row + 1}${spill}`;
     },
   );
 }

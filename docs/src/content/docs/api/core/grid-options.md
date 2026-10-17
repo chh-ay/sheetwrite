@@ -201,12 +201,15 @@ Defaults to 6; use 0 to disable the buffer.</p>
 </details>
 
 <details class="api-member" id="grid-options-min-columns" data-pagefind-weight="1">
-<summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns (empty padding columns past the data, like a spreadsheet).</span></summary>
+<summary><code>minColumns</code> <span class="api-member-summary">Render at least this many columns, adding empty columns past the data.</span></summary>
 
 ```ts generated
 minColumns?: number;
 ```
 
+<p class="api-member-doc">Render at least this many columns, adding empty columns past the data. A
+spreadsheet also adds empty columns to fill the host width; a data grid
+adds them only through this option.</p>
 </details>
 
 <details class="api-member" id="grid-options-config" data-pagefind-weight="1">
@@ -268,6 +271,7 @@ export interface GridOptions {
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/create-grid/"><code>createGrid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/snapshot-grid-options/"><code>SnapshotGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-adapter/adapter-grid-input/"><code>AdapterGridInput</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/apply-changed-live-grid-options/"><code>applyChangedLiveGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/create-grid-controller/"><code>createGridController</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/extract-grid-options/"><code>extractGridOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>

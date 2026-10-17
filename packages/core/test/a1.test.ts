@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { cellA1, colToA1, rangeA1, remapFormulaA1Refs, shiftA1Refs } from "../src/a1.js";
 
 describe("A1 column labels", () => {
@@ -31,6 +32,16 @@ describe("shiftA1Refs", () => {
     expect(shiftA1Refs("=A1", -5, 0)).toBe("=A1");
     expect(shiftA1Refs("=B2", 0, -10)).toBe("=A2");
   });
+
+  it("preserves array constants and text while shifting adjacent references", () => {
+    expect(shiftA1Refs('=SUM({1,2;3,4})+A1&{"A1","a""B2"}', 2, 1)).toBe(
+      '=SUM({1,2;3,4})+B3&{"A1","a""B2"}',
+    );
+  });
+
+  it("keeps the spill suffix of a filled reference", () => {
+    expect(shiftA1Refs("=SUM(A1#)+$B$2#", 1, 1)).toBe("=SUM(B2#)+$B$2#");
+  });
 });
 
 describe("remapFormulaA1Refs", () => {
@@ -38,5 +49,17 @@ describe("remapFormulaA1Refs", () => {
     const removeColumn = (column: number) =>
       column === 1 ? null : column > 1 ? column - 1 : column;
     expect(remapFormulaA1Refs("=A1+B1+C1", "column", removeColumn)).toBe("=A1+#REF!+B1");
+  });
+
+  it("moves spill references with their anchor and drops the suffix when it is deleted", () => {
+    const removeRow = (row: number) => (row === 1 ? null : row > 1 ? row - 1 : row);
+    expect(remapFormulaA1Refs("=SUM(A3#)", "row", removeRow)).toBe("=SUM(A2#)");
+    expect(remapFormulaA1Refs("=SUM(A2#)", "row", removeRow)).toBe("=SUM(#REF!)");
+  });
+
+  it("preserves array text while remapping adjacent references", () => {
+    expect(remapFormulaA1Refs('=A1&{"A1","B2";"C3","D4"}', "row", (row) => row + 1)).toBe(
+      '=A2&{"A1","B2";"C3","D4"}',
+    );
   });
 });

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
+
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   BUN_VERSION,
@@ -19,7 +20,6 @@ export const RELEASE_ARTIFACT_MANIFEST = "release-artifacts.json";
 export const RELEASE_BUILD_COMMAND = "bun run build:packages";
 
 export function assertPublishedFilePolicy(packageName: string, files: readonly string[]): void {
-  if (packageName !== "@sheetwrite/core") return;
   const sourceMap = files.find((path) => path.toLowerCase().endsWith(".map"));
   if (sourceMap !== undefined) {
     throw new Error(`${packageName} published files must exclude source maps; found ${sourceMap}`);
@@ -377,6 +377,19 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "pkg/sheetwrite_wasm_bg.wasm",
     "pkg/sheetwrite_wasm_bg.wasm.d.ts",
   ],
+  "@sheetwrite/formulas": [
+    "README.md",
+    "LICENSE",
+    "loader.d.ts",
+    "loader.mjs",
+    "loader-browser.mjs",
+    "loader-node.mjs",
+    "loader-state.mjs",
+    "pkg/sheetwrite_wasm.d.ts",
+    "pkg/sheetwrite_wasm.js",
+    "pkg/sheetwrite_wasm_bg.wasm",
+    "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+  ],
   "@sheetwrite/core": [
     "README.md",
     "LICENSE",
@@ -387,13 +400,7 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "styles.css",
     "shell.css",
   ],
-  "@sheetwrite/xlsx": [
-    "README.md",
-    "LICENSE",
-    "dist/index.d.ts",
-    "dist/index.js",
-    "dist/index.js.map",
-  ],
+  "@sheetwrite/xlsx": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
   "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],

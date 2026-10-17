@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import {
   assertReviewedActionPins,
   parseWorkflowContract,
@@ -57,6 +58,19 @@ describe("CI and release workflow contracts", () => {
     expect(() =>
       assertReviewedActionPins([{ name: "unknown fixture", workflow: unknownAction }], {}),
     ).toThrow("action is not reviewed");
+
+    const unreviewedCommit = parseWorkflowContract(
+      `jobs:\n  check:\n    steps:\n      - uses: actions/checkout@${"1".repeat(40)}`,
+      "unreviewed commit fixture",
+    );
+    expect(() =>
+      assertReviewedActionPins(
+        [{ name: "unreviewed commit fixture", workflow: unreviewedCommit }],
+        {
+          "actions/checkout": "0".repeat(40),
+        },
+      ),
+    ).toThrow();
   });
 
   it("deploys only successful develop pushes after Required CI and docs", () => {

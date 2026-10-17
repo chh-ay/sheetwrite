@@ -26,6 +26,7 @@ export function Sheet({ columns, rows, save, onReady }: SheetProps) {
     <Sheetwrite
       columns={columns}
       defaultRows={rows}
+      height={420}
       onGridChange={(event) => save(event.transaction)}
       onReady={onReady}
     />

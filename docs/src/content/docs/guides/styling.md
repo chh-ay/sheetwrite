@@ -88,6 +88,20 @@ Two runtime methods with different semantics:
   merged values behind.
 - `grid.getEffectiveTheme()` returns the effective (post-zoom) theme currently
   painting.
+- `grid.getTheme()` returns a copy of the base theme, before zoom scaling.
+
+After `setTheme` or `replaceTheme` changes the base theme, the Grid emits
+`theme-change` with a copy of the new theme. Use it to keep host controls in
+step with the canvas. The built-in toolbar uses it: its text and fill colour
+swatches show the theme's `fg` and `bg` until the user picks a colour.
+
+```ts prelude="theming" partial="requires surrounding host state" title="Follow theme changes"
+const swatch = document.querySelector<HTMLElement>("#fill-swatch")!;
+swatch.style.background = grid.getTheme().bg;
+grid.on("theme-change", ({ theme }) => {
+  swatch.style.background = theme.bg;
+});
+```
 
 Tailwind works through the same seam: set `--sheetwrite-*` custom properties on
 the host with arbitrary-property utilities (e.g.

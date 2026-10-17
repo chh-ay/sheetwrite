@@ -1,5 +1,3 @@
-// ── Name box + formula bar ───────────────────────────────────────────────────
-//
 // Independent input factories for the two Sheets-style formula-row controls.
 // Both subscribe only to public grid events, keep a focused-draft guard so
 // asynchronous refreshes never clobber in-progress typing, and return focus to

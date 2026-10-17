@@ -20,7 +20,7 @@ Anything else (bare numbers, free text) returns `null` so callers can fall back
 to a text literal.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/date-serial.ts#L95"><code>packages/core/src/date-serial.ts#L95</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/date-serial.ts#L93"><code>packages/core/src/date-serial.ts#L93</code></a></dd></div>
 </dl>
 
 ## Declaration

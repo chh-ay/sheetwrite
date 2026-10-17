@@ -1,6 +1,16 @@
 import {
+  atomicBatchLimits,
+  isAtomicBatch,
+  markAtomicBatch,
+  splitOversizedBlocks,
+} from "./atomic-batch.js";
+import {
+  type AdmittedTransactionResources,
+  admitTransactionResources,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
+  resolveTransactionResourceValidation,
   validateTransactionResources,
+  withAdmittedTransactionResources,
 } from "./document-protocol.js";
 import {
   type HistoryAction,
@@ -10,8 +20,11 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
+import { encodeRestoreBlock, estimateRestoreBlockBytes } from "./restore-block.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { GridTransactionAdmissionDecision } from "./transaction-admission.js";
+import { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellValue, Column } from "./types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "./types/coordinates.js";
 import type {
@@ -41,6 +54,8 @@ export interface DocumentControllerOptions {
   onHistoryApplied: () => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
+  /** Only engine-owned callbacks may preserve payload measurements by identity. */
+  trustedResourceCallbacks?: true;
 }
 
 /**
@@ -66,10 +81,12 @@ export class DocumentController {
     operations: readonly DocumentOp[],
     options: RemoteOperationOptions = {},
   ): ApplyTransactionResult {
-    const resourceValidation = validateTransactionResources(
-      operations,
-      this.transactionResourceLimits,
-    );
+    const atomic = isAtomicBatch(operations);
+    const limits = atomic
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
+    const resourceValidation = validateTransactionResources(operations, limits);
+
     if (!resourceValidation.ok) {
       return {
         status: "rejected",
@@ -77,45 +94,68 @@ export class DocumentController {
         issues: [resourceValidation.issue],
       };
     }
-    return this.options.store.applyTransaction(
-      { patches: operations.slice() },
+
+    // The store receives a private copy of the caller's operations; the copy is
+    // verified to hold the measured operations before its record is handed over.
+    const patches = operations.slice();
+    if (atomic) markAtomicBatch(patches);
+    const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
+
+    const outcome = this.options.store.applyTransaction(
+      withAdmittedTransactionResources({ patches }, admitted),
       {
         source: "remote",
         commitReason: options.commitReason ?? "api",
         localReplay: options.localReplay,
       },
     );
+
+    // Undo entries hold addresses from before this change: a remote row or
+    // column insert or delete moves them exactly as a local one does.
+    if (outcome.status === "applied") {
+      for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
+    }
+
+    return outcome;
   }
 
-  commit(input: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
-    const inputResources = validateTransactionResources(input, this.transactionResourceLimits);
-    if (!inputResources.ok) {
-      return {
-        status: "rejected",
-        epoch: this.options.epoch(),
-        issues: [inputResources.issue],
-      };
-    }
+  commit(
+    input: DocumentOp[],
+    reason: CommitReason,
+    admitted?: AdmittedTransactionResources,
+  ): ApplyTransactionResult {
+    const atomic = isAtomicBatch(input);
+    const limits = atomic
+      ? atomicBatchLimits(this.transactionResourceLimits)
+      : this.transactionResourceLimits;
+    const inputResources = resolveTransactionResourceValidation(input, limits, admitted);
+    if (!inputResources.result.ok) return this.rejectResources(inputResources.result.issue);
+
     if (this.options.readOnly()) {
       return { status: "noop", epoch: this.options.epoch(), reason: "read-only" };
     }
+
     if (input.length === 0) {
       return { status: "noop", epoch: this.options.epoch(), reason: "empty" };
     }
+
+    // Custom callbacks may mutate nested operations while retaining identity.
+    // Grid's engine-owned materializer only returns the input when unchanged.
+    let admittedPatches = this.options.trustedResourceCallbacks
+      ? inputResources.admitted
+      : undefined;
     const patches = this.options.materializeVirtualColumns(input);
+
     if (patches !== input) {
-      const materializedResources = validateTransactionResources(
-        patches,
-        this.transactionResourceLimits,
-      );
-      if (!materializedResources.ok) {
-        return {
-          status: "rejected",
-          epoch: this.options.epoch(),
-          issues: [materializedResources.issue],
-        };
+      if (atomic) markAtomicBatch(patches);
+      const materializedResources = resolveTransactionResourceValidation(patches, limits);
+      if (!materializedResources.result.ok) {
+        return this.rejectResources(materializedResources.result.issue);
       }
+
+      admittedPatches = materializedResources.admitted;
     }
+
     if (patches.some((patch) => this.options.loadable?.canApplyLocally(patch) === false)) {
       return { status: "noop", epoch: this.options.epoch(), reason: "incomplete-data" };
     }
@@ -129,63 +169,119 @@ export class DocumentController {
         issues: [admission.issue],
       };
     }
+
+    if (admission && (!this.options.trustedResourceCallbacks || admission.inspectedOperations)) {
+      admittedPatches = undefined;
+    }
+
     const reservation = admission?.reservation;
 
     if (this.applyingHistory) {
       let outcome: ApplyTransactionResult;
+
       try {
-        outcome = this.storeApply(patches, reason);
+        outcome = this.storeApply(patches, reason, admittedPatches);
       } catch (error) {
         reservation?.cancel();
         throw error;
       }
+
       reservation?.finish(outcome);
       if (outcome.status === "rejected") this.options.onMutationRejected(outcome.issues);
+
       return outcome;
     }
 
     const inverseByPatch = new Map<DocumentOp, Array<DocumentOp | HistoryPart>>();
     let outcome: ApplyTransactionResult;
+
     try {
-      for (const patch of patches) inverseByPatch.set(patch, this.inversePatch(patch));
-      outcome = this.storeApply(patches, reason);
+      // One edit avoids the coordinate/grouping allocation of a batch snapshot.
+      if (patches.length > 1) {
+        const setsBySheet = new Map<SheetId, Array<Extract<DocumentOp, { op: "set" }>>>();
+        for (const patch of patches) {
+          if (patch.op !== "set") continue;
+          const sets = setsBySheet.get(patch.addr.sheet) ?? [];
+          sets.push(patch);
+          setsBySheet.set(patch.addr.sheet, sets);
+        }
+
+        const engine = storeEngine(this.options.store);
+        if (engine) {
+          for (const [sheet, sets] of setsBySheet) {
+            const captured = this.snapshotSetBatch(sheet, sets);
+
+            for (const [index, patch] of sets.entries()) {
+              const cell = captured[index];
+              if (!cell) throw new Error("Missing captured inverse cell");
+
+              inverseByPatch.set(patch, [cell]);
+            }
+          }
+        }
+      }
+
+      // Custom stores without an engine retain their scalar snapshot contract.
+      for (const patch of patches) {
+        if (!inverseByPatch.has(patch)) inverseByPatch.set(patch, this.inversePatch(patch));
+      }
+
+      outcome = this.storeApply(patches, reason, admittedPatches);
     } catch (error) {
       reservation?.cancel();
+
       for (const inverse of inverseByPatch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
       }
+
       throw error;
     }
+
     reservation?.finish(outcome);
+
     if (outcome.status !== "applied") {
       for (const inverse of inverseByPatch.values()) {
         for (const item of inverse) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
       }
+
       if (outcome.status === "rejected") this.options.onMutationRejected(outcome.issues);
+
       return outcome;
     }
+
     if (outcome.rejections?.length) this.options.onMutationRejected(outcome.rejections);
 
     const applied = outcome.transaction.patches;
     const appliedSet = new Set(applied);
     const inverse: HistoryAction = [];
-    for (const [patch, items] of inverseByPatch) {
+
+    // Bulk capture groups by sheet; history still follows input order and
+    // captures a reused operation object only once.
+    for (const patch of patches) {
+      const items = inverseByPatch.get(patch);
+      if (!items) continue;
+      inverseByPatch.delete(patch);
+
       if (!appliedSet.has(patch)) {
         for (const item of items) {
           if ("kind" in item && item.kind === "rangeSnapshot") item.dispose();
         }
+
         continue;
       }
+
       for (const item of items) {
         inverse.push("kind" in item ? item : { kind: "patches", patches: [item] });
       }
     }
+
     for (const patch of applied) this.rebaseHistoryFor(patch);
     this.history.push(inverse, applied);
+
     return outcome;
   }
 
@@ -200,19 +296,36 @@ export class DocumentController {
   undo(): void {
     const action = this.history.undo();
     if (!action) return;
+
+    let outcome: ApplyTransactionResult | null;
+
     try {
-      if (!this.applyHistoryPatches(action, "undo")) this.history.restoreUndo();
+      outcome = this.applyHistoryPatches(action, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
+    }
+
+    if (outcome?.status === "applied") return;
+
+    // The restore payload and the transaction limits never change, so these
+    // rejections repeat on every retry; keeping the entry would block every
+    // older undo behind it. Other rejections, such as a full sync queue, can
+    // pass later, so those entries stay.
+    if (outcome?.status === "rejected" && outcome.issues.some(exceedsTransactionLimit)) {
+      this.history.discardUndone();
+    } else {
+      this.history.restoreUndo();
     }
   }
 
   redo(): void {
     const action = this.history.redo();
     if (!action) return;
+
     try {
-      if (!this.applyHistoryPatches(action, "redo")) this.history.restoreRedo();
+      if (this.applyHistoryPatches(action, "redo")?.status !== "applied")
+        this.history.restoreRedo();
     } catch (error) {
       this.history.restoreRedo();
       throw error;
@@ -227,16 +340,76 @@ export class DocumentController {
     this.history.clear();
   }
 
-  private storeApply(patches: DocumentOp[], reason: CommitReason): ApplyTransactionResult {
-    return this.options.store.applyTransaction({ patches }, { commitReason: reason });
+  private storeApply(
+    patches: DocumentOp[],
+    reason: CommitReason,
+    admitted: AdmittedTransactionResources | undefined,
+  ): ApplyTransactionResult {
+    return this.options.store.applyTransaction(
+      withAdmittedTransactionResources({ patches }, admitted),
+      { commitReason: reason },
+    );
   }
 
   private inversePatch(patch: DocumentOp): Array<DocumentOp | HistoryPart> {
     switch (patch.op) {
       case "set":
-        return [this.inverseSetPatch(patch)];
-      case "setRange":
+        return [this.snapshotCell(patch.addr)];
+      case "setRange": {
+        const engine = storeEngine(this.options.store);
+        const width = Math.abs(patch.range.end.col - patch.range.start.col) + 1;
+        const height = Math.abs(patch.range.end.row - patch.range.start.row) + 1;
+
+        if (
+          engine &&
+          (patch.cells.length !== width * height ||
+            patch.cells.some((cell) => cell.rowOffset >= height || cell.colOffset >= width))
+        ) {
+          const rowStart = Math.min(patch.range.start.row, patch.range.end.row);
+          const colStart = Math.min(patch.range.start.col, patch.range.end.col);
+          const captured = engine.captureCells(
+            patch.range.sheet,
+            patch.cells.map((cell) => ({
+              row: rowStart + cell.rowOffset,
+              col: colStart + cell.colOffset,
+            })),
+          );
+
+          return [
+            {
+              op: "setRange",
+              range: patch.range,
+              cells: patch.cells.map((cell, index) => {
+                const previous = captured[index];
+                if (!previous) throw new Error("Missing captured sparse inverse cell");
+
+                return {
+                  rowOffset: cell.rowOffset,
+                  colOffset: cell.colOffset,
+                  value: previous.value,
+                  style: previous.style,
+                };
+              }),
+            },
+          ];
+        }
+
+        const captured = this.snapshotRangeCells(patch.range);
+        return [
+          {
+            op: "setRange",
+            range: patch.range,
+            cells: patch.cells.map((cell) => {
+              const previous = captured[cell.rowOffset * width + cell.colOffset];
+              if (!previous) throw new Error("Missing captured dense inverse cell");
+
+              return { ...cell, value: previous.value, style: previous.style };
+            }),
+          },
+        ];
+      }
       case "setBlock":
+      case "restoreBlock":
       case "setRangeStyle":
       case "clearRange": {
         const compact = this.compactHistoryPart(patch.range);
@@ -589,25 +762,6 @@ export class DocumentController {
     };
   }
 
-  private inverseSetPatch(patch: Extract<DocumentOp, { op: "set" }>): DocumentOp {
-    const formula =
-      this.options.loadable?.getFormula(patch.addr) ?? this.options.store.getFormula(patch.addr);
-    const refTarget = this.options.store.getRefTarget(patch.addr);
-    const cell = this.options.store.getCell(patch.addr);
-    const value: CellValue = formula
-      ? { kind: "formula", src: formula }
-      : refTarget
-        ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
-
-    return {
-      op: "set",
-      addr: patch.addr,
-      value,
-      style: cell.style,
-    };
-  }
-
   private snapshotRows(sheetId: SheetId, at: number, count: number): DocumentOp[] {
     const sheet = this.sheetById(sheetId);
     if (!sheet) return [];
@@ -642,19 +796,116 @@ export class DocumentController {
     return patches;
   }
 
+  private snapshotSetBatch(
+    sheet: SheetId,
+    sets: readonly Extract<DocumentOp, { op: "set" }>[],
+  ): Array<Extract<DocumentOp, { op: "set" }>> {
+    const engine = storeEngine(this.options.store);
+    // Custom stores without an engine retain their scalar snapshot contract.
+    if (!engine) return sets.map((patch) => this.snapshotCell(patch.addr));
+
+    const first = sets[0];
+    if (!first) return [];
+
+    let rowStart = first.addr.row;
+    let rowEnd = rowStart;
+    let colStart = first.addr.col;
+    let colEnd = colStart;
+    for (const { addr } of sets) {
+      rowStart = Math.min(rowStart, addr.row);
+      rowEnd = Math.max(rowEnd, addr.row);
+      colStart = Math.min(colStart, addr.col);
+      colEnd = Math.max(colEnd, addr.col);
+    }
+
+    const width = colEnd - colStart + 1;
+    const dense =
+      sets.length === (rowEnd - rowStart + 1) * width &&
+      sets.every(
+        ({ addr }, index) =>
+          addr.row === rowStart + Math.floor(index / width) &&
+          addr.col === colStart + (index % width),
+      );
+    const range = {
+      sheet,
+      start: { row: rowStart, col: colStart },
+      end: { row: rowEnd, col: colEnd },
+    };
+    const capturedRange = dense ? this.captureRangeCells(range) : null;
+
+    // Per-operation inverses retain only applied cells when a batch partially
+    // succeeds; the range resource itself cannot represent that subset.
+    if (capturedRange) {
+      return sets.map((patch, offset) => {
+        const cell = capturedRange[offset];
+        if (!cell) throw new Error("Missing captured dense inverse cell");
+
+        return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
+      });
+    }
+
+    const captured = engine.captureCells(
+      sheet,
+      sets.map((patch) => patch.addr),
+    );
+    return sets.map((patch, index) => {
+      const cell = captured[index];
+      if (!cell) throw new Error("Missing captured inverse cell");
+
+      return { op: "set", addr: patch.addr, value: cell.value, style: cell.style };
+    });
+  }
+
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
-    const formula = this.options.store.getFormula(addr);
+    const formula = this.options.loadable?.getFormula(addr) ?? this.options.store.getFormula(addr);
     const refTarget = this.options.store.getRefTarget(addr);
     const cell = this.options.store.getCell(addr);
+    const owner = this.options.store.getSpillAnchor(addr);
+    const isSpillChild = owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
     const value: CellValue = formula
       ? { kind: "formula", src: formula }
       : refTarget
         ? { kind: "ref", target: refTarget }
-        : { kind: "literal", value: cell.resolved };
+        : { kind: "literal", value: isSpillChild ? null : cell.resolved };
     return { op: "set", addr, value, style: cell.style };
   }
 
+  private captureRangeCells(range: Range): SnapshotCell[] | null {
+    const snapshot = storeEngine(this.options.store)?.captureRangeHistory(range);
+    if (!snapshot) return null;
+
+    let block: Extract<DocumentOp, { op: "setBlock" }>["block"];
+    try {
+      block = snapshot.toDocumentOp(range).block;
+    } finally {
+      snapshot.dispose();
+    }
+
+    const formulas = new Map(block.formulas);
+    const references = new Map(block.refs);
+    return block.values.map((value, offset) => {
+      const formula = formulas.get(offset);
+      const reference = references.get(offset);
+      const styleId = block.styleIds?.[offset];
+
+      return {
+        rowOffset: Math.floor(offset / block.colCount),
+        colOffset: offset % block.colCount,
+        value: formula
+          ? { kind: "formula", src: formula }
+          : reference
+            ? { kind: "ref", target: reference }
+            : { kind: "literal", value },
+        style: styleId === undefined ? undefined : block.styleTable?.[styleId],
+      };
+    });
+  }
+
   private snapshotRangeCells(range: Range): SnapshotCell[] {
+    const captured = this.captureRangeCells(range);
+    if (captured) return captured;
+
+    // Custom stores and unavailable range captures retain their scalar snapshot contract.
     const r0 = Math.min(range.start.row, range.end.row);
     const r1 = Math.max(range.start.row, range.end.row);
     const c0 = Math.min(range.start.col, range.end.col);
@@ -671,35 +922,48 @@ export class DocumentController {
         });
       }
     }
+
     return cells;
   }
 
   private snapshotCellsInMerge(sheet: SheetId, merge: MergeRange): DocumentOp[] {
-    const patches: DocumentOp[] = [];
+    const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
     const r0 = Math.min(merge.r0, merge.r1);
     const r1 = Math.max(merge.r0, merge.r1);
     const c0 = Math.min(merge.c0, merge.c1);
     const c1 = Math.max(merge.c0, merge.c1);
+
     for (let row = r0; row <= r1; row++) {
       for (let col = c0; col <= c1; col++) {
-        patches.push(this.snapshotCell({ sheet, row, col }));
+        patches.push({
+          op: "set",
+          addr: { sheet, row, col },
+          value: { kind: "literal", value: null },
+        });
       }
     }
-    return patches;
+
+    return this.snapshotSetBatch(sheet, patches);
   }
 
   private snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
-    const cells: SnapshotCell[] = [];
-    for (let row = 0; row < sheet.rowCount; row++) {
-      for (let col = 0; col < sheet.columns.length; col++) {
-        const patch = this.snapshotCell({ sheet: id, row, col });
-        const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
-        if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
-        cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
+
+    const engine = storeEngine(this.options.store);
+    const cells: SnapshotCell[] = engine?.captureSheetCells(id) ?? [];
+    // Custom stores without an engine retain their scalar snapshot contract.
+    if (!engine) {
+      for (let row = 0; row < sheet.rowCount; row++) {
+        for (let col = 0; col < sheet.columns.length; col++) {
+          const patch = this.snapshotCell({ sheet: id, row, col });
+          const literalEmpty = patch.value.kind === "literal" && patch.value.value === null;
+          if (literalEmpty && Object.keys(patch.style ?? {}).length === 0) continue;
+          cells.push({ rowOffset: row, colOffset: col, value: patch.value, style: patch.style });
+        }
       }
     }
+
     const rowMeta: Array<[number, { height?: number; hidden?: boolean }]> = [];
     const rows = new Set([
       ...(sheet.rowHeights?.keys() ?? []),
@@ -753,14 +1017,39 @@ export class DocumentController {
     const patches: DocumentOp[] = [];
     for (const sheet of this.options.store.getWorkbook().sheets) {
       if (sheet.id === removedSheet) continue;
-      for (let row = 0; row < sheet.rowCount; row++) {
-        for (let col = 0; col < sheet.columns.length; col++) {
-          const addr = { sheet: sheet.id, row, col };
-          if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
-            patches.push(this.snapshotCell(addr));
+      const engine = storeEngine(this.options.store);
+      if (engine) {
+        const sources = engine.captureSheetSources(sheet.id);
+        const offsets = new Set([
+          ...(sources?.formulaOffsets ?? []),
+          ...(sources?.referenceOffsets ?? []),
+        ]);
+        const addresses = [...offsets]
+          .sort((left, right) => left - right)
+          .map((offset) => ({
+            sheet: sheet.id,
+            row: Math.floor(offset / sheet.columns.length),
+            col: offset % sheet.columns.length,
+          }));
+        const captured = engine.captureCells(sheet.id, addresses);
+        for (const [index, addr] of addresses.entries()) {
+          const cell = captured[index];
+          if (!cell) throw new Error("Missing external source snapshot");
+
+          patches.push({ op: "set", addr, value: cell.value, style: cell.style });
+        }
+      } else {
+        // Custom stores without an engine retain their scalar source discovery contract.
+        for (let row = 0; row < sheet.rowCount; row++) {
+          for (let col = 0; col < sheet.columns.length; col++) {
+            const addr = { sheet: sheet.id, row, col };
+            if (this.options.store.getFormula(addr) || this.options.store.getRefTarget(addr)) {
+              patches.push(this.snapshotCell(addr));
+            }
           }
         }
       }
+
       for (const hyperlink of sheet.hyperlinks ?? []) {
         if (hyperlink.target.kind === "internal" && hyperlink.target.range.sheet === removedSheet) {
           patches.push({
@@ -771,6 +1060,7 @@ export class DocumentController {
         }
       }
     }
+
     return patches;
   }
 
@@ -791,26 +1081,128 @@ export class DocumentController {
     }
   }
 
-  private applyHistoryPatches(action: HistoryAction, reason: "undo" | "redo"): boolean {
+  private applyHistoryPatches(
+    action: HistoryAction,
+    reason: "undo" | "redo",
+  ): ApplyTransactionResult | null {
     const patches = materializeHistoryAction(action);
-    if (patches.length === 0) return false;
+    if (patches.length === 0) return null;
 
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
+    const preparation = new TransactionPreparation();
     try {
-      outcome = this.commit(patches, reason);
+      const fitted = this.fitHistoryPatches(patches, preparation);
+      outcome = this.commit(fitted.patches, reason, fitted.admitted);
     } finally {
+      preparation.dispose();
       this.applyingHistory = false;
     }
-    if (outcome.status !== "applied") return false;
+    if (outcome.status !== "applied") return outcome;
     for (const patch of outcome.transaction.patches) this.rebaseHistoryFor(patch);
     this.options.onHistoryApplied();
-    return true;
+    return outcome;
+  }
+
+  /**
+   * Undo and redo restore old state, which can be much larger than the edit.
+   * A restore above the transaction limits first becomes compact
+   * `restoreBlock` operations, which keeps it one transaction and one server
+   * version. If it is still too large, its blocks are split into pieces that
+   * each fit one version, and the pieces become one atomic batch: one store
+   * commit, one history step, one `change` event, and an all-or-nothing
+   * multi-version commit in sync. The returned measurement lets the commit
+   * skip a second walk of the payload.
+   */
+  private fitHistoryPatches(
+    patches: DocumentOp[],
+    preparation: TransactionPreparation,
+  ): {
+    patches: DocumentOp[];
+    admitted?: AdmittedTransactionResources;
+  } {
+    const limits = this.transactionResourceLimits;
+    const resources = validateTransactionResources(patches, limits);
+    if (resources.ok) {
+      return { patches, admitted: admitTransactionResources(patches, limits, resources) };
+    }
+    if (resources.issue.kind !== "resource-limit") return { patches };
+    if (resources.issue.resource === "encoded-bytes" && this.compactRestoreMayFit(patches)) {
+      const compact = patches.map((patch) => {
+        if (patch.op !== "setBlock") return patch;
+        try {
+          const operation = encodeRestoreBlock(patch.range, patch.block);
+          preparation.seed(operation, patch.block);
+          return operation;
+        } catch (error) {
+          // Above the restore block caps the block stays a candidate for splitting.
+          if (!(error instanceof RangeError)) throw error;
+          return patch;
+        }
+      });
+      const compactResources = validateTransactionResources(compact, limits);
+      if (compactResources.ok) {
+        return {
+          patches: compact,
+          admitted: admitTransactionResources(compact, limits, compactResources),
+        };
+      }
+    }
+    const split = splitOversizedBlocks(patches, limits);
+    if (!split) return { patches };
+    const batch = markAtomicBatch(split.operations);
+    const batchLimits = atomicBatchLimits(limits);
+    const fitsBatch =
+      batch.length <= batchLimits.maxOperations &&
+      split.encodedBytes <= batchLimits.maxEncodedBytes;
+    return {
+      patches: batch,
+      ...(fitsBatch
+        ? {
+            admitted: admitTransactionResources(batch, batchLimits, {
+              operationCount: batch.length,
+              encodedBytes: split.encodedBytes,
+            }),
+          }
+        : {}),
+    };
+  }
+
+  /** Whether the combined block compression estimate fits one transaction. */
+  private compactRestoreMayFit(patches: readonly DocumentOp[]): boolean {
+    let estimate = 0;
+    for (const patch of patches) {
+      if (patch.op === "setBlock") estimate += estimateRestoreBlockBytes(patch.block);
+    }
+    return estimate <= this.transactionResourceLimits.maxEncodedBytes;
+  }
+
+  /**
+   * A host transaction returns this rejection to its caller. Undo and redo have
+   * no caller to read it, so they report it through `mutation-rejected`, as the
+   * admission and store rejections already do.
+   */
+  private rejectResources(issue: MutationIssue): ApplyTransactionResult {
+    if (this.applyingHistory) this.options.onMutationRejected([issue]);
+    return { status: "rejected", epoch: this.options.epoch(), issues: [issue] };
   }
 
   private sheetById(id: SheetId): Sheet | null {
     return this.options.store.getWorkbook().sheets.find((sheet) => sheet.id === id) ?? null;
   }
+}
+
+/**
+ * Rejections by the fixed transaction and server-version limits, which no
+ * retry can pass.
+ */
+function exceedsTransactionLimit(issue: MutationIssue): boolean {
+  return (
+    issue.kind === "resource-limit" &&
+    (issue.resource === "operations" ||
+      issue.resource === "encoded-bytes" ||
+      issue.resource === "batch-versions")
+  );
 }
 
 function previousColumnPatch(column: Column, changed: Partial<Column>): Partial<Column> {

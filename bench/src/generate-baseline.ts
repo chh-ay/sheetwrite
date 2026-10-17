@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
+
 import { CONTROLLED_SAMPLING_FINGERPRINT } from "./check.js";
 import {
   buildControlledBaseline,
@@ -12,6 +13,7 @@ import {
   computeHarnessFingerprint,
   MATRIX_IDS,
 } from "./gate-protocol.js";
+import { sourceTreeDirty } from "./protocol-meta.js";
 import type { RenderBenchmarkArtifact } from "./render-protocol.js";
 import { parseRenderArtifact } from "./render-protocol.js";
 
@@ -79,7 +81,7 @@ export async function generateBaseline(args: readonly string[]): Promise<string>
   if (diagnostic && writeBaseline) {
     throw new Error("--diagnostic can produce review candidates only, not an approved baseline");
   }
-  const dirty = gitOutput(["status", "--porcelain"]).length > 0;
+  const dirty = sourceTreeDirty(true);
   if (dirty && !diagnostic) {
     throw new Error(
       "baseline generation refuses a dirty tree; use --diagnostic for a non-approved candidate",

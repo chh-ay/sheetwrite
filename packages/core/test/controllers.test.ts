@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { AriaMirror } from "../src/aria-mirror.js";
 import { DatasourceController } from "../src/datasource-controller.js";
 import { DocumentController } from "../src/document-controller.js";
@@ -6,7 +7,7 @@ import type { DomMergeAnchorRequest, DomOverlay } from "../src/dom-overlay.js";
 import { GeometryLayoutController } from "../src/geometry-layout-controller.js";
 import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
-import { RenderCoordinator } from "../src/render-coordinator.js";
+import { ReadWindowController } from "../src/read-window-controller.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Renderer, Store, Viewport, VisibleWindowView } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
@@ -16,9 +17,8 @@ beforeAll(async () => {
 });
 
 describe("DocumentController", () => {
-  it("owns commit history and applies undo/redo through the store", () => {
+  it("keeps an out-of-range sparse write a no-op without adding history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
-    let historyApplications = 0;
     const controller = new DocumentController({
       store,
       loadable: store,
@@ -26,27 +26,137 @@ describe("DocumentController", () => {
       epoch: () => 0,
       materializeVirtualColumns: (patches) => patches,
       onMutationRejected: () => {},
-      onHistoryApplied: () => {
-        historyApplications += 1;
-      },
+      onHistoryApplied: () => {},
     });
-    const address = { sheet: "s1", row: 1, col: 0 };
 
     expect(
-      controller.applyTransaction({
-        patches: [{ op: "set", addr: address, value: { kind: "literal", value: "Ada" } }],
-      }).status,
-    ).toBe("applied");
-    expect(store.getCell(address).resolved).toBe("Ada");
-
-    controller.undo();
-    expect(store.getCell(address).resolved).toBeNull();
-    controller.redo();
-    expect(store.getCell(address).resolved).toBe("Ada");
-    expect(historyApplications).toBe(2);
-
+      controller.commit(
+        [
+          {
+            op: "setRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+            cells: [{ rowOffset: 1, colOffset: 0, value: { kind: "literal", value: "outside" } }],
+          },
+        ],
+        "api",
+      ).status,
+    ).toBe("noop");
+    expect(controller.canUndo).toBe(false);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBeNull();
     controller.destroy();
     store.dispose();
+  });
+
+  it.each(["dense", "sparse"])(
+    "restores %s batched formulas, references, styles and spill children through undo/redo",
+    (layout) => {
+      const store = new SheetwriteStore(makeWorkbook(6));
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 5, col: 2 } };
+      const formula = { sheet: "s1", row: 0, col: 0 };
+      const reference =
+        layout === "dense" ? { sheet: "s1", row: 3, col: 0 } : { sheet: "s1", row: 5, col: 2 };
+      store.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: formula,
+            value: { kind: "formula", src: "=SEQUENCE(3)" },
+            style: { bold: true },
+          },
+          {
+            op: "set",
+            addr: reference,
+            value: { kind: "ref", target: formula },
+            style: { italic: true },
+          },
+        ],
+      });
+      const controller = new DocumentController({
+        store,
+        loadable: store,
+        readOnly: () => false,
+        epoch: () => 0,
+        materializeVirtualColumns: (patches) => patches,
+        onMutationRejected: () => {},
+        onHistoryApplied: () => {},
+      });
+
+      expect(
+        controller.commit(
+          [
+            { op: "clearRange", range },
+            { op: "set", addr: formula, value: { kind: "literal", value: "changed" } },
+            { op: "set", addr: { ...formula, row: 1 }, value: { kind: "literal", value: "child" } },
+            {
+              op: "set",
+              addr: { ...formula, row: 2 },
+              value: { kind: "literal", value: "child-two" },
+            },
+            { op: "set", addr: reference, value: { kind: "literal", value: "replaced" } },
+          ],
+          "api",
+        ).status,
+      ).toBe("applied");
+      controller.undo();
+
+      expect(store.getFormula(formula)).toBe("=SEQUENCE(3)");
+      expect(store.getRefTarget(reference)).toEqual(formula);
+      expect(store.getCell(formula).style).toEqual({ bold: true });
+      expect(store.getCell(reference).style).toEqual({ italic: true });
+      expect(store.getCell({ ...formula, row: 2 }).resolved).toBe(3);
+      expect(store.getSpillAnchor({ ...formula, row: 1 })).toEqual(formula);
+
+      controller.redo();
+      expect(store.getCell({ ...formula, row: 1 }).resolved).toBe("child");
+      expect(store.getCell(reference).resolved).toBe("replaced");
+      controller.destroy();
+      store.dispose();
+    },
+  );
+
+  it("rejects nested payload growth from callbacks that retain operation identity", () => {
+    const maxEncodedBytes = 256;
+    const oversizedValue = "x".repeat(maxEncodedBytes * 2);
+    for (const mutationBoundary of ["materialization", "admission"] as const) {
+      const transactionResourceLimits = { maxEncodedBytes, maxOperations: 1 };
+      const store = new SheetwriteStore(makeWorkbook(4), undefined, { transactionResourceLimits });
+      const mutatePayload = (patches: readonly import("../src/types.js").DocumentOp[]) => {
+        const patch = patches[0];
+        if (patch?.op === "set" && patch.value.kind === "literal") {
+          patch.value.value = oversizedValue;
+        }
+      };
+      const controller = new DocumentController({
+        store,
+        loadable: store,
+        transactionResourceLimits,
+        readOnly: () => false,
+        epoch: () => 0,
+        materializeVirtualColumns: (patches) => {
+          if (mutationBoundary === "materialization") mutatePayload(patches);
+          return patches;
+        },
+        admitTransaction: (patches) => {
+          if (mutationBoundary === "admission") mutatePayload(patches);
+          return { ok: true, reservation: { cancel() {}, finish() {} } };
+        },
+        onMutationRejected: () => {},
+        onHistoryApplied: () => {},
+      });
+      const addr = { sheet: "s1", row: 0, col: 0 };
+      try {
+        expect(
+          controller.commit(
+            [{ op: "set", addr, value: { kind: "literal", value: "small" } }],
+            "api",
+          ).status,
+        ).toBe("rejected");
+        expect(store.getCell(addr).resolved).toBeNull();
+      } finally {
+        controller.destroy();
+        store.dispose();
+      }
+    }
   });
   it("captures structural and range inverses for Store implementations without compact history", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
@@ -129,6 +239,29 @@ describe("DocumentController", () => {
     controller.undo();
     expect(store.getWorkbook().namedRanges).toEqual([namedRange]);
 
+    const spillRange = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } };
+    store.applyTransaction({
+      patches: [
+        { op: "clearRange", range: spillRange },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "formula", src: "=SEQUENCE(3)" },
+        },
+      ],
+    });
+    expect(controller.commit([{ op: "clearRange", range: spillRange }], "api").status).toBe(
+      "applied",
+    );
+    controller.undo();
+    expect(store.getFormula({ sheet: "s1", row: 0, col: 1 })).toBe("=SEQUENCE(3)");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(1);
+    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(3);
+    expect(store.getSpillAnchor({ sheet: "s1", row: 2, col: 1 })).toEqual({
+      sheet: "s1",
+      row: 0,
+      col: 1,
+    });
     controller.destroy();
     store.dispose();
   });
@@ -136,8 +269,10 @@ describe("DocumentController", () => {
 
 describe("GeometryLayoutController", () => {
   it("owns zoomed indexes, frozen bands, windows, and cell rectangles", () => {
+    const zoom = 2;
     const workbook = makeWorkbook(10);
     const sheet = workbook.sheets[0]!;
+    const [first = 0, second = 0] = sheet.columns.map((column) => column.width ?? 0);
     sheet.frozenRows = 2;
     sheet.frozenCols = 1;
     sheet.rowHeights = new Map([[1, 40]]);
@@ -146,20 +281,22 @@ describe("GeometryLayoutController", () => {
         sheet: () => sheet,
         activeSheet: () => "s1",
         loadable: null,
-        theme: () => DEFAULT_THEME,
-        zoom: () => 1,
+        // The grid passes a theme already scaled by zoom.
+        theme: () => ({ ...DEFAULT_THEME, rowHeight: DEFAULT_THEME.rowHeight * zoom }),
+        zoom: () => zoom,
         maxElementHeight: () => 33_000_000,
       },
-      160,
+      400,
     );
+    const frozenHeight = (DEFAULT_THEME.rowHeight + 40) * zoom;
 
-    expect(controller.rowHeight(1)).toBe(40);
-    expect(controller.frozenHeight()).toBe(DEFAULT_THEME.rowHeight + 40);
-    expect(controller.frozenWidth()).toBe(160);
-    expect(controller.paintWindow(0, 0, 132, 360, 0)).toMatchObject({
+    expect(controller.rowHeight(1)).toBe(40 * zoom);
+    expect(controller.frozenHeight()).toBe(frozenHeight);
+    expect(controller.frozenWidth()).toBe(first * zoom);
+    expect(controller.paintWindow(0, 0, 400, 900, 0)).toMatchObject({
       frozenRows: 2,
       frozenColumns: 1,
-      frozenWidth: 160,
+      frozenWidth: first * zoom,
     });
     expect(
       controller.rangeRect(
@@ -171,16 +308,11 @@ describe("GeometryLayoutController", () => {
         0,
         0,
       ),
-    ).toEqual({
-      x: DEFAULT_THEME.rowHeaderWidth,
-      y: DEFAULT_THEME.headerHeight,
-      w: 280,
-      h: DEFAULT_THEME.rowHeight + 40,
-    });
+    ).toMatchObject({ w: (first + second) * zoom, h: frozenHeight });
   });
 });
 
-describe("RenderCoordinator", () => {
+describe("ReadWindowController", () => {
   it("separates pixel repaints from logical data-window invalidation", () => {
     const store = new SheetwriteStore(makeWorkbook(8));
     let windowReads = 0;
@@ -190,6 +322,7 @@ describe("RenderCoordinator", () => {
     let zoom = 1;
     let anchorRequests: readonly DomMergeAnchorRequest[] = [];
     const countedStore = {
+      getWorkbook: () => store.getWorkbook(),
       getVisibleWindow: (...args: Parameters<Store["getVisibleWindow"]>) => {
         windowReads += 1;
         return store.getVisibleWindow(...args);
@@ -266,7 +399,7 @@ describe("RenderCoordinator", () => {
     }) as typeof requestAnimationFrame;
     globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
 
-    const coordinator = new RenderCoordinator({
+    const coordinator = new ReadWindowController({
       renderer: () => renderer,
       domOverlay,
       overlayPainter: overlay,
@@ -287,6 +420,13 @@ describe("RenderCoordinator", () => {
       emitScroll: () => {},
     });
 
+    const readsWindow = (change: () => void): boolean => {
+      const before = windowReads;
+      change();
+      coordinator.renderNow();
+      return windowReads > before;
+    };
+
     try {
       coordinator.schedule();
       coordinator.schedule();
@@ -296,75 +436,45 @@ describe("RenderCoordinator", () => {
       expect(viewports).toHaveLength(1);
       expect(overlayPaints).toBe(1);
       expect(ariaUpdates).toBe(1);
-      expect(windowReads).toBe(1);
+      expect(windowReads).toBeGreaterThan(0);
+
+      const readsBefore = windowReads;
       coordinator.renderNow();
       expect(paints).toHaveLength(1);
-      expect(windowReads).toBe(1);
+      expect(windowReads).toBe(readsBefore);
 
-      coordinator.invalidate();
-      coordinator.renderNow();
+      const revision = viewports.at(-1)?.contentRevision;
+      expect(readsWindow(() => coordinator.invalidate())).toBe(false);
       expect(paints).toHaveLength(2);
-      expect(viewports.at(-1)?.contentRevision).toBe(1);
-      expect(windowReads).toBe(1);
-
-      scrollTop = 1;
-      coordinator.renderNow();
-      scrollLeft = 1;
-      coordinator.renderNow();
+      expect(viewports.at(-1)?.contentRevision).not.toBe(revision);
+      expect(readsWindow(() => (scrollTop = 1))).toBe(false);
+      expect(readsWindow(() => (scrollLeft = 1))).toBe(false);
       expect(paints).toHaveLength(4);
-      expect(windowReads).toBe(1);
 
-      scrollTop = DEFAULT_THEME.rowHeight + 1;
-      coordinator.renderNow();
-      expect(windowReads).toBe(2);
-
-      scrollLeft = 170;
-      coordinator.renderNow();
-      expect(windowReads).toBe(3);
-
-      storeEpoch += 1;
-      coordinator.renderNow();
-      expect(windowReads).toBe(4);
-
-      coordinator.invalidateData();
-      coordinator.renderNow();
-      expect(windowReads).toBe(5);
+      expect(readsWindow(() => (scrollTop = DEFAULT_THEME.rowHeight + 1))).toBe(true);
+      expect(readsWindow(() => (scrollLeft = 170))).toBe(true);
+      expect(readsWindow(() => (storeEpoch += 1))).toBe(true);
+      expect(readsWindow(() => coordinator.invalidateData())).toBe(true);
 
       const paintsBeforeZoom = paints.length;
-      zoom = 1.25;
-      coordinator.renderNow();
-      expect(windowReads).toBe(5);
+      expect(readsWindow(() => (zoom = 1.25))).toBe(false);
       expect(paints).toHaveLength(paintsBeforeZoom + 1);
 
+      const invalidate = () => coordinator.invalidate();
       anchorRequests = [{ sheet: "s1", row: 0, cols: [0] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(6);
+      expect(readsWindow(invalidate)).toBe(true);
       expect(domAnchorViewCounts.at(-1)).toBe(1);
-
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(6);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [0] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(7);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [1] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(8);
-
-      anchorRequests = [{ sheet: "s1", row: 1, cols: [1, 2] }];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(9);
-
+      expect(readsWindow(invalidate)).toBe(false);
+      for (const request of [
+        { sheet: "s1", row: 1, cols: [0] },
+        { sheet: "s1", row: 1, cols: [1] },
+        { sheet: "s1", row: 1, cols: [1, 2] },
+      ]) {
+        anchorRequests = [request];
+        expect(readsWindow(invalidate)).toBe(true);
+      }
       anchorRequests = [];
-      coordinator.invalidate();
-      coordinator.renderNow();
-      expect(windowReads).toBe(9);
+      expect(readsWindow(invalidate)).toBe(false);
       expect(domAnchorViewCounts.at(-1)).toBe(0);
 
       const paintsBeforeDestroy = paints.length;

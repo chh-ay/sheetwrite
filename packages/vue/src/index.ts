@@ -1,29 +1,28 @@
-import {
-  type CellRenderer,
-  type CellScalar,
-  type ChangeEvent,
-  type ColumnarData,
-  type DataSource,
-  type DataSourceStorageOptions,
-  type Grid,
-  type GridEvents,
-  type GridOptions,
-  initSheetwrite,
-  isSheetwriteReady,
-  type Selection,
-  type SheetwriteError,
-  type Theme,
-  type Workbook,
+import type {
+  CellRenderer,
+  CellScalar,
+  ChangeEvent,
+  ColumnarData,
+  DataSource,
+  DataSourceStorageOptions,
+  Grid,
+  GridEvents,
+  GridOptions,
+  Selection,
+  SheetwriteError,
+  Theme,
+  Workbook,
 } from "@sheetwrite/core";
 import {
-  createGridController,
+  type AdapterGridInput,
+  createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
-  type GridController,
+  extractGridOptions,
+  type GridAdapterEventHandlers,
   type GridControllerHandlers,
+  type GridPublicationAdapter,
   type GridReadyEvent,
-  type GridReadyReason,
-  getGridResetReason,
   gridSizeStyle,
   type RowBridge,
   type RowBridgeHandler,
@@ -36,6 +35,7 @@ import {
   type AllowedComponentProps,
   type ComponentPublicInstance,
   defineComponent,
+  getCurrentInstance,
   h,
   nextTick,
   onBeforeUnmount,
@@ -261,13 +261,15 @@ const SheetwriteGridComponent = defineComponent({
   setup(props, { attrs, emit, expose, slots }) {
     const host = ref<HTMLDivElement | null>(null);
     const exposedGrid = shallowRef<Grid | null>(null);
-    let controller: GridController | null = null;
-    let generation = 0;
-    let previousOptions: GridOptions | null = null;
-    let mounted = false;
-    let initializationToken = 0;
 
-    const handlers: GridControllerHandlers = {
+    const instance = getCurrentInstance();
+    let readyOnceDelivered = false;
+    const forwardCommandStateChange: NonNullable<GridControllerHandlers["onCommandStateChange"]> = (
+      event,
+    ) => {
+      emit("command-state-change", event);
+    };
+    const handlers: GridAdapterEventHandlers = {
       onGridChange: (event) => emit("grid-change", event),
       onRowDelta: (projection) => emit("row-delta", projection),
       onSelectionChange: (selection) => emit("selection-change", selection),
@@ -275,134 +277,75 @@ const SheetwriteGridComponent = defineComponent({
       onEditBegin: (event) => emit("edit-begin", event),
       onEditCommit: (event) => emit("edit-commit", event),
       onSearch: (result) => emit("search", result),
-      onCommandStateChange: (event) => emit("command-state-change", event),
+      // The controller only subscribes to command state while this is defined.
+      // Vue removes declared emit listeners from `attrs`, so presence is read
+      // from the vnode props under the same keys `emit` itself looks up. An
+      // unreadable listener table keeps the subscription instead of risking a
+      // dropped event.
+      get onCommandStateChange() {
+        const listenerProps = instance?.vnode.props;
+        if (!listenerProps) return forwardCommandStateChange;
+        return listenerProps.onCommandStateChange === undefined &&
+          listenerProps["onCommand-state-change"] === undefined
+          ? undefined
+          : forwardCommandStateChange;
+      },
       onActiveSheetChange: (event) => emit("active-sheet-change", event),
       onMutationRejected: (event) => emit("mutation-rejected", event),
       onRendererFallback: (event) => emit("renderer-fallback", event),
       onDatasourceError: (event) => emit("datasource-error", event),
       onExportError: (event) => emit("export-error", event),
+      onReady(event) {
+        // Vue's emit catches listener exceptions before the lifetime can retire
+        // the Grid. Readiness is a publication transaction, so deliver it here.
+        const listeners = instance?.vnode.props;
+        const readyListeners: unknown = listeners?.onReady;
+
+        for (const listener of Array.isArray(readyListeners) ? readyListeners : [readyListeners]) {
+          if (typeof listener === "function") listener(event);
+        }
+
+        if (!readyOnceDelivered) {
+          readyOnceDelivered = true;
+          const onceListeners: unknown = listeners?.onReadyOnce;
+
+          for (const listener of Array.isArray(onceListeners) ? onceListeners : [onceListeners]) {
+            if (typeof listener === "function") listener(event);
+          }
+        }
+      },
+      onInitializationError: (error) => emit("initialization-error", error),
     };
 
-    function currentOptions(): GridOptions {
-      return {
-        workbook: props.workbook!,
-        data: props.data,
-        datasource: props.datasource,
-        datasourceStorage: props.datasourceStorage,
-        renderer: props.renderer,
-        workerUrl: props.workerUrl,
-        presentation: props.presentation,
-        theme: props.theme,
-        readOnly: props.readOnly,
-        protectionResolver: props.protectionResolver,
-        mutationPolicy: props.mutationPolicy,
-        transactionResourceLimits: props.transactionResourceLimits,
-        hyperlinkActivation: props.hyperlinkActivation,
-        renderers: props.renderers,
-        editors: props.editors,
-        overscan: props.overscan,
-        minColumns: props.minColumns,
-        config: props.config,
-      };
-    }
-
-    function teardownGrid(): void {
-      exposedGrid.value = null;
-      controller?.destroy();
-      controller = null;
-    }
-
-    async function createCurrentGrid(): Promise<void> {
-      if (!mounted || !host.value) return;
-      const options = currentOptions();
-      const reason: GridReadyReason =
-        generation === 0
-          ? "initial"
-          : ((previousOptions && getGridResetReason(previousOptions, options)) ?? "input-reset");
-      teardownGrid();
-      const created = createGridController(host.value, options, handlers, props.rowBridge);
-      controller = created;
-      generation += 1;
-      previousOptions = options;
-      exposedGrid.value = created.grid;
-      await nextTick();
-      if (controller !== created) return;
-      emit("ready", { grid: created.grid, generation, reason });
-    }
-
-    async function initialize(): Promise<void> {
-      const token = ++initializationToken;
-      const alreadyReady = isSheetwriteReady();
-      try {
-        const initialization = initSheetwrite(props.wasmSource);
-        if (alreadyReady && mounted && !controller) await createCurrentGrid();
-        await initialization;
-        if (!alreadyReady && mounted && isSheetwriteReady() && !controller) {
-          await createCurrentGrid();
-        }
-      } catch (error) {
-        if (mounted && token === initializationToken) {
-          emit("initialization-error", error as SheetwriteError);
-        }
-      }
-    }
-
+    const lifetime = createAdapterGridController(handlers, {
+      publish(grid) {
+        exposedGrid.value = grid;
+        if (grid) return nextTick();
+      },
+      setInitializationState() {
+        // Fallback follows exposed Grid availability in Vue.
+      },
+      reportConsumerFailure(thrown) {
+        reportError(thrown);
+      },
+    } satisfies GridPublicationAdapter);
     onMounted(() => {
-      mounted = true;
-      void initialize();
+      if (host.value) {
+        lifetime.mount(host.value, {
+          options: extractGridOptions({ ...props }),
+          rowBridge: props.rowBridge,
+          wasmSource: props.wasmSource,
+        });
+      }
     });
-    onBeforeUnmount(() => {
-      mounted = false;
-      initializationToken += 1;
-      teardownGrid();
-    });
-
+    onBeforeUnmount(() => lifetime.unmount());
     watch(
-      () => props.wasmSource,
-      () => {
-        void initialize();
-      },
-    );
-    watch(
-      () => [
-        props.workbook,
-        props.data,
-        props.datasource,
-        props.datasourceStorage,
-        props.rowBridge,
-        props.renderer,
-        props.workerUrl,
-        props.presentation,
-        props.protectionResolver,
-        props.mutationPolicy,
-        props.transactionResourceLimits,
-        props.hyperlinkActivation,
-        props.renderers,
-        props.editors,
-      ],
-      () => {
-        if (isSheetwriteReady()) void createCurrentGrid();
-      },
-    );
-    watch(
-      () => props.readOnly,
-      (value) => controller?.setReadOnly(value ?? false),
-    );
-    watch(
-      () => props.config,
-      (value) => controller?.setConfig(value),
-    );
-    watch(
-      () => props.theme,
-      (value) => controller?.setTheme(value),
-    );
-    watch(
-      () => props.overscan,
-      (value) => controller?.setOverscan(value),
-    );
-    watch(
-      () => props.minColumns,
-      (value) => controller?.setMinColumns(value),
+      (): AdapterGridInput => ({
+        options: extractGridOptions({ ...props }),
+        rowBridge: props.rowBridge,
+        wasmSource: props.wasmSource,
+      }),
+      (input) => lifetime.update(input),
     );
 
     expose({ grid: exposedGrid });

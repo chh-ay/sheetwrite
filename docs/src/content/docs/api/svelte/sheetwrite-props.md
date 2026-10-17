@@ -8,7 +8,7 @@ description: "Simple framework adapter props for columns and default row objects
 Simple framework adapter props for columns and default row objects.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/props.ts#L68"><code>packages/svelte/src/props.ts#L68</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/props.ts#L69"><code>packages/svelte/src/props.ts#L69</code></a></dd></div>
 </dl>
 
 ## Declaration

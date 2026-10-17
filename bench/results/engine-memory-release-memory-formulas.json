@@ -1,0 +1,111 @@
+{
+  "engine": "formulas",
+  "root": "/home/vvin/learn/sheetwrite-wt/formula-spill",
+  "jsHeapMeasurement": "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
+  "observations": [
+    {
+      "scenario": "empty-dense",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5960832,
+        "jscExternalBytes": 83390282,
+        "rssBytes": 115179520
+      },
+      "after": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5967984,
+        "jscExternalBytes": 83405289,
+        "rssBytes": 115101696
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 40304640,
+        "wasmBytesAfter": 40304640,
+        "pauseMs": 45.377703
+      },
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 40304640,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
+    },
+    {
+      "scenario": "dense-clear",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 105971712,
+        "jsHeapBytes": 5984208,
+        "jscExternalBytes": 108862577,
+        "rssBytes": 187457536
+      },
+      "after": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 5995104,
+        "jscExternalBytes": 83509189,
+        "rssBytes": 122040320
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 105971712,
+        "wasmBytesAfter": 40304640,
+        "pauseMs": 42.98413599999992
+      },
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 40304640,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
+    },
+    {
+      "scenario": "paged-dirty",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 40304640,
+        "jsHeapBytes": 6001600,
+        "jscExternalBytes": 83567774,
+        "rssBytes": 141471744
+      },
+      "after": {
+        "wasmBytes": 1245184,
+        "jsHeapBytes": 6012672,
+        "jscExternalBytes": 5459997,
+        "rssBytes": 85864448
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 40304640,
+        "wasmBytesAfter": 1245184,
+        "pauseMs": 3.2185349999999744
+      },
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 1245184,
+      "compactHistoryBytes": 0,
+      "bytesAboveFreshFloor": 0
+    },
+    {
+      "scenario": "large-clear-history",
+      "rows": 1000000,
+      "before": {
+        "wasmBytes": 106037248,
+        "jsHeapBytes": 8271824,
+        "jscExternalBytes": 216881138,
+        "rssBytes": 206925824
+      },
+      "after": {
+        "wasmBytes": 79429632,
+        "jsHeapBytes": 8285904,
+        "jscExternalBytes": 163807040,
+        "rssBytes": 170598400
+      },
+      "report": {
+        "stores": 1,
+        "wasmBytesBefore": 106037248,
+        "wasmBytesAfter": 79429632,
+        "pauseMs": 251.62361299999998
+      },
+      "oldMemoryCollected": true,
+      "freshWasmBytesFloor": 79429632,
+      "compactHistoryBytes": 39000582,
+      "bytesAboveFreshFloor": 0
+    }
+  ]
+}

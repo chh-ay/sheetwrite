@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/core",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
   "license": "MIT",
@@ -72,6 +72,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@sheetwrite/wasm": "workspace:*"
+    "@sheetwrite/wasm": "workspace:*",
+    "fflate": "0.8.3"
   }
 }

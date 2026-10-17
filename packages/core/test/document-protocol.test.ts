@@ -1,4 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
+import { deflateSync } from "fflate";
+
 import {
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
@@ -7,52 +10,20 @@ import {
   documentOpTarget,
   getLastMergeValidationStatsForTest,
   resolveTransactionResourceLimits,
+  validateDocumentOperationShape,
   validateTransactionResources,
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
+import {
+  decodeRestoreBlock,
+  encodeRestoreBlock,
+  MAX_RESTORE_BLOCK_DECODED_BYTES,
+} from "../src/restore-block.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { DataValidationCondition, DocumentOp, WorkbookSnapshot } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
-
-type OperationTargetSource = "address" | "range" | "sheet" | "new-sheet" | "named-range";
-
-const OPERATION_TARGET_SOURCE = {
-  set: "address",
-  setRange: "range",
-  setBlock: "range",
-  setRangeStyle: "range",
-  clearRange: "range",
-  addRows: "sheet",
-  removeRows: "sheet",
-  moveRows: "sheet",
-  addColumns: "sheet",
-  removeColumns: "sheet",
-  moveColumns: "sheet",
-  setColumn: "sheet",
-  setRowMeta: "sheet",
-  addMerge: "sheet",
-  removeMerge: "sheet",
-  addSheet: "new-sheet",
-  removeSheet: "sheet",
-  renameSheet: "sheet",
-  moveSheet: "sheet",
-  setSheetVisibility: "sheet",
-  setSheetMeta: "sheet",
-  addTable: "sheet",
-  updateTable: "sheet",
-  removeTable: "sheet",
-  setHyperlink: "sheet",
-  removeHyperlink: "sheet",
-  setValidationRule: "sheet",
-  removeValidationRule: "sheet",
-  setProtectedRange: "sheet",
-  removeProtectedRange: "sheet",
-  setNote: "address",
-  setNamedRange: "named-range",
-  removeNamedRange: "named-range",
-} satisfies Record<DocumentOp["op"], OperationTargetSource>;
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -498,7 +469,7 @@ describe("workbook document protocol", () => {
     );
   });
 
-  it("bounds structural merge-index work for 1K, 4K, and 16K valid corpora", () => {
+  it("validates large disjoint merge sets in bounded work and keeps every merge", () => {
     for (const count of [1_000, 4_000, 16_000]) {
       const columns = 128;
       const merges = Array.from({ length: count }, (_, index) => ({
@@ -511,9 +482,14 @@ describe("workbook document protocol", () => {
         mergeSnapshot(merges, Math.ceil(count / columns), columns),
       );
       expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error("disjoint merges unexpectedly rejected");
+      expect(result.value.sheets[0]?.merges).toHaveLength(merges.length);
+      expect(
+        new Set(result.value.sheets[0]?.merges?.map((merge) => JSON.stringify(merge))),
+      ).toEqual(new Set(merges.map((merge) => JSON.stringify(merge))));
+      // Untrusted snapshots must validate merges in O(n log n), not pairwise.
       const stats = getLastMergeValidationStatsForTest();
       expect(stats.normalized).toBe(count);
-      expect(stats.errors).toBe(0);
       expect(stats.nodeVisits).toBeLessThan(count * (Math.ceil(Math.log2(count)) + 1) * 12);
     }
   });
@@ -741,7 +717,7 @@ describe("workbook document protocol", () => {
     );
   });
 
-  it("keeps operation targeting exhaustive and emitted operations JSON-only", () => {
+  it("targets emitted operations and keeps their payloads JSON-only", () => {
     const store = new SheetwriteStore(makeWorkbook(3));
     const emitted: DocumentOp[] = [];
     store.on("change", (event) => emitted.push(...event.transaction.patches));
@@ -772,11 +748,6 @@ describe("workbook document protocol", () => {
 
     expect(result.status).toBe("applied");
     expect(emitted.map(documentOpTarget)).toEqual(["s1", "s1", "s1"]);
-    expect(emitted.map((operation) => OPERATION_TARGET_SOURCE[operation.op])).toEqual([
-      "address",
-      "address",
-      "sheet",
-    ]);
     expect(JSON.parse(JSON.stringify(emitted))).toEqual(emitted);
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("saved");
     expect(store.getWorkbook().sheets[0]!.notes).toEqual([
@@ -827,7 +798,7 @@ describe("transaction resource protocol", () => {
     expect(result.operationCount).toBe(DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations);
 
     const rejected = validateTransactionResources([...accepted, operation]);
-    expect(rejected).toEqual({
+    expect(rejected).toMatchObject({
       ok: false,
       issue: {
         kind: "resource-limit",
@@ -835,7 +806,6 @@ describe("transaction resource protocol", () => {
         resource: "operations",
         actual: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations + 1,
         max: DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations,
-        message: `Transaction operation count ${DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations + 1} exceeds maximum ${DEFAULT_TRANSACTION_RESOURCE_LIMITS.maxOperations}`,
       },
     });
   });
@@ -894,5 +864,165 @@ describe("transaction resource protocol", () => {
       actual: maxEncodedBytes + 1,
       max: maxEncodedBytes,
     });
+  });
+});
+
+describe("compressed restore operation admission", () => {
+  const restoreRange = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
+  const restoredBlock = {
+    rowCount: 2,
+    colCount: 2,
+    values: ["résumé", null, 42, true],
+    formulas: [[1, "=A1"]] as [number, string][],
+    refs: [[2, { sheet: "s1", row: 0, col: 0 }]] as [
+      number,
+      { sheet: string; row: number; col: number },
+    ][],
+    styleTable: [{ bold: true }],
+    styleIds: [0, 0, 0, 0],
+  };
+
+  function rawRestore(
+    bytes: Uint8Array,
+    decodedBytes = bytes.length,
+  ): Extract<DocumentOp, { op: "restoreBlock" }> {
+    const compressed = deflateSync(bytes);
+    let binary = "";
+    for (const byte of compressed) binary += String.fromCharCode(byte);
+    return {
+      op: "restoreBlock",
+      range: restoreRange,
+      encoding: "deflate-json-v1",
+      decodedBytes,
+      data: btoa(binary),
+    };
+  }
+
+  it("admits one compact operation and preserves every packed cell field", () => {
+    const operation = encodeRestoreBlock(restoreRange, restoredBlock);
+    expect(validateDocumentOperationShape(operation)).toEqual([]);
+    expect(decodeRestoreBlock(JSON.parse(JSON.stringify(operation)))).toEqual(restoredBlock);
+    expect(documentOpTarget(operation)).toBe("s1");
+    expect(validateTransactionResources([operation])).toMatchObject({
+      ok: true,
+      operationCount: 1,
+    });
+  });
+
+  it("rejects malformed encoding, byte claims, UTF-8 and decoded block fields", () => {
+    const valid = encodeRestoreBlock(restoreRange, restoredBlock);
+    const invalidOperations = [
+      { ...valid, encoding: "unknown" },
+      { ...valid, decodedBytes: valid.decodedBytes - 1 },
+      { ...valid, decodedBytes: valid.decodedBytes + 1 },
+      { ...valid, decodedBytes: MAX_RESTORE_BLOCK_DECODED_BYTES + 1 },
+      { ...valid, data: `${valid.data}\\n` },
+      { ...valid, data: "AA==" },
+      { ...valid, data: btoa(atob(valid.data).slice(0, -1)) },
+      { ...valid, data: btoa(`${atob(valid.data)}\\0`) },
+      rawRestore(new Uint8Array([255])),
+      rawRestore(new TextEncoder().encode(JSON.stringify({ ...restoredBlock, values: [1] }))),
+      rawRestore(
+        new TextEncoder().encode(
+          JSON.stringify({ ...restoredBlock, refs: [[4, { sheet: "s1", row: 0, col: 0 }]] }),
+        ),
+      ),
+      rawRestore(
+        new TextEncoder().encode(
+          JSON.stringify({
+            ...restoredBlock,
+            formulas: [
+              [1, "=A1"],
+              [1, "=A2"],
+            ],
+          }),
+        ),
+      ),
+      rawRestore(
+        new TextEncoder().encode(
+          JSON.stringify({
+            ...restoredBlock,
+            refs: [
+              [2, { sheet: "s1", row: 0, col: 0 }],
+              [2, { sheet: "s1", row: 1, col: 0 }],
+            ],
+          }),
+        ),
+      ),
+      rawRestore(
+        new TextEncoder().encode(
+          JSON.stringify({ ...restoredBlock, refs: [[1, { sheet: "s1", row: 0, col: 0 }]] }),
+        ),
+      ),
+      rawRestore(
+        new TextEncoder().encode(JSON.stringify({ rowCount: 4_000_001, colCount: 1, values: [] })),
+      ),
+    ];
+    for (const operation of invalidOperations) {
+      expect(validateDocumentOperationShape(operation).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("rejects restore envelope accessors without executing untrusted code", () => {
+    const valid = encodeRestoreBlock(restoreRange, restoredBlock);
+    for (const field of ["encoding", "decodedBytes", "data"] as const) {
+      let reads = 0;
+      const operation = Object.defineProperty({ ...valid }, field, {
+        enumerable: true,
+        get() {
+          reads++;
+          return valid[field];
+        },
+      });
+      expect(validateDocumentOperationShape(operation).length).toBeGreaterThan(0);
+      expect(reads).toBe(0);
+    }
+  });
+
+  it("rejects actual expansion over the decoded boundary even when the byte claim is allowed", () => {
+    const bomb = rawRestore(
+      new Uint8Array(MAX_RESTORE_BLOCK_DECODED_BYTES + 1),
+      MAX_RESTORE_BLOCK_DECODED_BYTES,
+    );
+    expect(validateDocumentOperationShape(bomb).length).toBeGreaterThan(0);
+    const tinyClaim = rawRestore(new Uint8Array(1024 * 1024), 1);
+    expect(validateDocumentOperationShape(tinyClaim).length).toBeGreaterThan(0);
+  });
+});
+
+describe("restore protocol store boundary", () => {
+  it("applies packed contents atomically and emits the compact operation rather than decoded payloads", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    const emitted: DocumentOp[] = [];
+    store.on("change", (event) => emitted.push(...event.transaction.patches));
+    const operation = encodeRestoreBlock(
+      { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+      {
+        rowCount: 2,
+        colCount: 1,
+        values: ["restored", 42],
+        styleTable: [{ bold: true }],
+        styleIds: [0, 0],
+      },
+    );
+    expect(store.applyTransaction({ patches: [operation] }).status).toBe("applied");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("restored");
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(42);
+    expect(store.getCell({ sheet: "s1", row: 1, col: 0 }).style).toMatchObject({ bold: true });
+    expect(emitted).toEqual([operation]);
+
+    const rejected = store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "must not apply" },
+        },
+        { ...operation, decodedBytes: operation.decodedBytes - 1 },
+      ],
+    });
+    expect(rejected.status).not.toBe("applied");
+    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("restored");
+    expect(emitted).toEqual([operation]);
   });
 });

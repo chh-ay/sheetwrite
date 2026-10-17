@@ -48,6 +48,18 @@ Row and full-column selections are part of the model. Column selection is wired 
 the top header; **row selection is programmatic only** — there is no row-header
 click gesture, so set it via `setSelection({ kind: "row", sheet, row })`.
 
+Only the pointer that began a drag can change it. Switching sheets, changing
+sheet structure or the sorted/filtered view, or losing pointer capture ends the
+gesture; a later pointer release cannot apply it to a different sheet or view.
+
+## Resizing
+
+Drag a column-header boundary or a row-header boundary to preview its size.
+The preview changes geometry only: the document and undo history remain intact
+until release. Release submits one undoable size change. Cancellation, capture
+loss, or a rejected change restores the document's size. Turning read-only on
+ends an active resize without committing.
+
 ## Keyboard navigation
 
 When the grid is focused and not editing:
@@ -67,6 +79,34 @@ When the grid is focused and not editing:
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
+
+## Undo and redo
+
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step
+through the last 200 recorded transactions. Remote operations from a
+`SyncCoordinator` do not create undo entries.
+
+Undo of a large clear restores every old cell. When the restore is larger than
+one transaction allows, the Grid sends one compressed `restoreBlock` operation.
+If that still needs more than one server version, it uses an atomic batch,
+which needs `PersistenceAdapter.commitBatch`. See
+[Large undo and atomic batches](/docs/guides/collaboration/#large-undo-and-atomic-batches).
+
+If the restore is above the batch ceilings, cannot be split, or needs a
+`commitBatch` that the adapter does not have, `grid.undo()` changes nothing. The
+Grid emits `mutation-rejected` with a `resource-limit` issue and removes that
+entry from the history, so older edits can still be undone. Show the reason to
+the user:
+
+```ts prelude="core" partial="requires surrounding host state" title="Report an undo that is too large"
+grid.on("mutation-rejected", ({ issues }) => {
+  for (const issue of issues) {
+    if (issue.kind === "resource-limit") {
+      console.warn(`Not undone: ${issue.resource} ${issue.actual} is above ${issue.max}.`);
+    }
+  }
+});
+```
 
 ## Inline editing
 
@@ -88,6 +128,19 @@ Commit and navigation keys:
 
 While the IME is composing, keystrokes belong to the composition and are not
 treated as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+`beginEdit` closes the previous editor, selects the requested cell, and emits
+`selection` when that changes the selection, then emits `edit-begin` before
+opening the editor. A synchronous handler can replace or cancel the request
+without the old editor reopening.
+Successful completion emits `change`, then `edit-commit`, then the navigation's
+`selection` event; rejected completion does not emit `edit-commit` or navigate.
+Event addresses remain view coordinates.
+
+Stock, validation, and custom editors retain the underlying document cell while
+sorting or filtering changes its visible position. Completion writes that same
+cell, not whichever row now occupies the old position. If the cell leaves the
+view, or sheet structure changes, the editor is cancelled.
 
 ## Clipboard interoperability
 

@@ -1,6 +1,7 @@
 ## Headless data-layer results
 
-Bun 1.3.14 · linux/x64 · seeded dataset (id/date/customer/city/amount) · median (p95) over warmed-up iterations · lower is better.
+Bun 1.4.3 · linux/x64 · seeded dataset (id/date/customer/city/amount) · median (p95) over warmed-up iterations · lower is better.
+Measured engines: Sheetwrite 0.4.0; Handsontable 18.1.2.
 
 ### Head-to-head (both engines, headless)
 
@@ -10,64 +11,64 @@ Both grids run identical workloads at 1k/10k — the sizes Handsontable complete
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.308 (0.413) | 480 (547) | **1556.9× faster** |
-| 10,000 | 2.37 (2.61) | 4056 (4553) | **1709.6× faster** |
+| 1,000 | 0.563 (0.616) | 248 (268) | **440.5× faster** |
+| 10,000 | 4.87 (6.03) | 2330 (4260) | **478.6× faster** |
 
 #### Read 50×5 window
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.006 (0.011) | 0.080 (0.133) | **13.6× faster** |
-| 10,000 | 0.006 (0.007) | 0.117 (0.148) | **20.2× faster** |
+| 1,000 | 0.006 (0.011) | 0.106 (0.116) | **17.8× faster** |
+| 10,000 | 0.007 (0.010) | 0.118 (0.127) | **16.2× faster** |
 
 #### 1000 single-cell edits
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 1.65 (2.34) | 174 (242) | **105.4× faster** |
-| 10,000 | 0.705 (1.47) | 466 (548) | **662.0× faster** |
+| 1,000 | 4.46 (5.83) | 146 (217) | **32.8× faster** |
+| 10,000 | 3.57 (4.84) | 535 (1181) | **150.1× faster** |
 
 #### Sort by amount (numeric)
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.109 (0.231) | 193 (238) | **1762.9× faster** |
-| 10,000 | 0.182 (0.198) | 1815 (2714) | **9977.5× faster** |
+| 1,000 | 0.156 (0.205) | 114 (129) | **728.5× faster** |
+| 10,000 | 0.218 (0.251) | 2485 (2572) | **11379.1× faster** |
 
 #### Filter city contains "Tokyo"
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.021 (0.033) | 98.09 (108) | **4708.7× faster** |
-| 10,000 | 0.045 (0.049) | 913 (2027) | **20304.6× faster** |
+| 1,000 | 0.020 (0.047) | 45.35 (50.76) | **2258.1× faster** |
+| 10,000 | 0.036 (0.038) | 908 (1477) | **25557.3× faster** |
 
 #### Compose city and customer contains filters
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.193 (0.269) | 174 (211) | **903.8× faster** |
-| 10,000 | 0.412 (0.453) | 1716 (2137) | **4160.9× faster** |
+| 1,000 | 0.095 (0.108) | 91.32 (95.39) | **957.7× faster** |
+| 10,000 | 0.385 (0.433) | 2299 (2400) | **5971.9× faster** |
 
 #### Distinct low-cardinality city values
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.078 (0.122) | 0.226 (0.346) | **2.9× faster** |
-| 10,000 | 0.379 (0.418) | 1.42 (2.63) | **3.7× faster** |
+| 1,000 | 0.015 (0.024) | 0.085 (0.106) | **5.6× faster** |
+| 10,000 | 0.062 (0.066) | 0.848 (1.66) | **13.7× faster** |
 
 #### Distinct high-cardinality customer values
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.462 (0.508) | 0.295 (0.338) | 1.6× slower |
-| 10,000 | 2.02 (2.29) | 1.81 (2.59) | 1.1× slower |
+| 1,000 | 0.172 (0.199) | 0.096 (0.113) | 1.8× slower |
+| 10,000 | 1.31 (2.01) | 1.19 (1.24) | 1.1× slower |
 
 #### Sum amount (aggregate)
 
 | rows | Sheetwrite median (p95) ms | Handsontable median (p95) ms | Sheetwrite |
 |---:|---:|---:|:--|
-| 1,000 | 0.003 (0.005) | 0.194 (0.336) | **57.7× faster** |
-| 10,000 | 0.019 (0.020) | 1.38 (2.01) | **72.0× faster** |
+| 1,000 | 0.005 (0.005) | 0.088 (0.107) | **17.1× faster** |
+| 10,000 | 0.038 (0.039) | 0.770 (0.874) | **20.3× faster** |
 
 ### Sheetwrite data-engine scaling (1k → 1M) — median (p95) ms
 
@@ -75,11 +76,25 @@ Handsontable is omitted at 100k–1M (headless render-all infeasible); the at-sc
 
 | rows | Ingest N rows | Read 50×5 window | 1000 single-cell edits | Sort by amount (numeric) | Filter city contains "Tokyo" | Compose city and customer contains filters | Distinct low-cardinality city values | Distinct high-cardinality customer values | Sum amount (aggregate) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 0.308 (0.413) | 0.006 (0.011) | 1.65 (2.34) | 0.109 (0.231) | 0.021 (0.033) | 0.193 (0.269) | 0.078 (0.122) | 0.462 (0.508) | 0.003 (0.005) |
-| 10,000 | 2.37 (2.61) | 0.006 (0.007) | 0.705 (1.47) | 0.182 (0.198) | 0.045 (0.049) | 0.412 (0.453) | 0.379 (0.418) | 2.02 (2.29) | 0.019 (0.020) |
-| 100,000 | 25.60 (27.60) | 0.008 (0.012) | 1.25 (2.36) | 1.82 (1.92) | 0.325 (0.356) | 3.49 (3.64) | 3.67 (3.76) | 21.50 (26.14) | 0.189 (0.257) |
-| 500,000 | 143 (144) | 0.009 (0.014) | 0.674 (0.854) | 9.97 (10.50) | 1.61 (1.75) | 18.24 (20.60) | 22.17 (22.85) | 115 (125) | 1.06 (1.48) |
-| 1,000,000 | 314 (320) | 0.011 (0.013) | 0.744 (0.805) | 24.61 (27.43) | 3.65 (4.27) | 35.93 (44.20) | 38.86 (40.30) | 257 (267) | 2.08 (2.31) |
+| 1,000 | 0.563 (0.616) | 0.006 (0.011) | 4.46 (5.83) | 0.156 (0.205) | 0.020 (0.047) | 0.095 (0.108) | 0.015 (0.024) | 0.172 (0.199) | 0.005 (0.005) |
+| 10,000 | 4.87 (6.03) | 0.007 (0.010) | 3.57 (4.84) | 0.218 (0.251) | 0.036 (0.038) | 0.385 (0.433) | 0.062 (0.066) | 1.31 (2.01) | 0.038 (0.039) |
+| 100,000 | 53.64 (54.48) | 0.008 (0.010) | 4.19 (5.02) | 2.59 (2.83) | 0.398 (0.418) | 4.46 (4.62) | 0.711 (0.726) | 14.70 (17.16) | 0.425 (0.450) |
+| 500,000 | 284 (285) | 0.010 (0.011) | 3.84 (4.18) | 12.60 (13.07) | 1.88 (1.92) | 18.93 (19.72) | 3.05 (4.69) | 78.03 (84.63) | 1.90 (1.97) |
+| 1,000,000 | 565 (568) | 0.011 (0.012) | 3.94 (4.34) | 26.85 (26.90) | 3.59 (3.72) | 46.86 (47.38) | 5.82 (7.01) | 163 (166) | 4.28 (4.39) |
+
+### Sheetwrite query scenarios — median (p95) ms
+
+Measured on the Sheetwrite engine only: multi-key sorts, value-set filters and an all-numeric ingest exercise its Rust query engine and its columnar ingest, which no other engine here implements. A pick count larger than the sheet saturates at the row count. The 50,000-pick filter is measured at 100,000 rows only: it compares every row with every picked value today, so a larger sheet would need minutes for a single sample.
+
+| rows | Sort by 3 keys (text, number, date) | Sort amount over "Tokyo" city candidates | Filter customer by 10 picked values | Filter customer by 1,000 picked values | Filter customer by 50,000 picked values | Ingest N rows (5 numeric columns) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1,000 | 0.125 (0.151) | 0.024 (0.037) | 0.048 (0.059) | 0.510 (0.555) | — | 0.178 (0.181) |
+| 10,000 | 2.74 (3.46) | 0.173 (0.180) | 0.369 (0.377) | 0.909 (0.930) | — | 1.74 (1.75) |
+| 100,000 | 31.63 (32.03) | 2.15 (2.33) | 3.57 (3.67) | 4.21 (4.28) | 41.41 (42.19) | 15.09 (15.54) |
+| 500,000 | 232 (235) | 12.49 (14.48) | 16.20 (16.61) | 16.45 (16.94) | — | 75.26 (75.58) |
+| 1,000,000 | 506 (515) | 28.76 (30.57) | 31.09 (33.20) | 36.71 (39.01) | — | 148 (149) |
+
+Fixtures: sort-multi-key — grouped-customer-v2 (97 repeated customers, 8 amount buckets, dates reversed against row order); sort-with-candidates — seeded-dataset-v1; filter-value-set-10 — seeded-dataset-v1; filter-value-set-1000 — seeded-dataset-v1; filter-value-set-50000 — seeded-dataset-v1; ingest-numeric-only — numeric-five-column-v1.
 
 ### Memory
 
@@ -87,11 +102,11 @@ Sheetwrite's exact data footprint — the WASM linear-memory growth for a single
 
 | rows | Sheetwrite data (WASM columnar store) | bytes/row |
 |---:|---:|---:|
-| 1,000 | 0.25 MiB | 262 B |
-| 10,000 | 2.06 MiB | 216 B |
-| 100,000 | 17.94 MiB | 188 B |
-| 500,000 | 104.00 MiB | 218 B |
-| 1,000,000 | 207.13 MiB | 217 B |
+| 1,000 | 0.38 MiB | 393 B |
+| 10,000 | 3.00 MiB | 315 B |
+| 100,000 | 27.63 MiB | 290 B |
+| 500,000 | 162.25 MiB | 340 B |
+| 1,000,000 | 306.75 MiB | 322 B |
 
 **Notes**
 - Handsontable edit: edits wrapped in suspendRender/resumeRender to isolate the data path

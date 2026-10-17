@@ -1,0 +1,146 @@
+/* Local to the four framework workbenches, not the other showcase routes. */
+.sw-showcase-page[data-framework="vanilla"] {
+  --sw-workbench-accent: var(--sw-demo-accent);
+}
+.sw-showcase-page[data-framework="react"] {
+  --sw-workbench-accent: var(--sw-demo-react-accent);
+}
+.sw-showcase-page[data-framework="vue"] {
+  --sw-workbench-accent: var(--sw-demo-vue-accent);
+}
+.sw-showcase-page[data-framework="svelte"] {
+  --sw-workbench-accent: var(--sw-demo-svelte-accent);
+}
+.sw-workbench-stage {
+  --sw-stage-bg: var(--sw-surface-1);
+  --sw-stage-raised: var(--sw-surface-2);
+  --sw-stage-fg: var(--sw-fg-strong);
+  --sw-stage-muted: var(--sw-fg-muted);
+  --sw-stage-border: var(--sw-border);
+  border-radius: var(--sw-window-radius);
+}
+.sw-workbench-stage
+  :is(.sw-vw-gridstage__header, .sw-rwb-commandbar, .sw-vuewb-controlbar, .sw-svw-chrome) {
+  --sw-demo-surface: var(--sw-stage-bg);
+  --sw-demo-raised: var(--sw-stage-raised);
+  --sw-demo-deep: var(--sw-stage-bg);
+  --sw-demo-panel: var(--sw-stage-raised);
+  --sw-demo-fg: var(--sw-stage-fg);
+  --sw-demo-fg-strong: var(--sw-stage-fg);
+  --sw-demo-fg-soft: var(--sw-stage-muted);
+  --sw-demo-muted: var(--sw-stage-muted);
+  --sw-demo-border: var(--sw-stage-border);
+  --sw-demo-border-strong: var(--sw-stage-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  min-height: 4.5rem;
+  background:
+    radial-gradient(
+      30rem 12rem at 90% -30%,
+      color-mix(in srgb, var(--sw-workbench-accent) 18%, transparent),
+      transparent
+    ),
+    var(--sw-stage-bg);
+  color: var(--sw-stage-fg);
+}
+.sw-workbench-stage
+  :is(.sw-vw-gridstage__header, .sw-rwb-commandbar, .sw-vuewb-controlbar, .sw-svw-chrome)
+  h2 {
+  color: var(--sw-stage-fg);
+  /* Workbench chrome, not a page hero: the grid keeps the visual weight. */
+  font: 650 clamp(1.05rem, 1.5vw, 1.25rem) / 1.2 var(--sw-font-display);
+}
+/* The query cluster keeps its place beside the identity and absorbs the free
+   width, so the primary action and status never land on a half-empty row. It
+   wraps inside itself when the strip runs out of room. */
+.sw-workbench-stage :is(.sw-rwb-commandbar, .sw-vuewb-controlbar) .sw-demo-controlbar__controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+.sw-workbench-stage .sw-workbench-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--sw-workbench-accent);
+  border-radius: var(--sw-demo-radius-2);
+  background: var(--sw-workbench-accent);
+  color: var(--sw-demo-ink);
+  font: 650 var(--sw-type-sm) var(--sw-font-body);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sw-workbench-stage .sw-workbench-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sw-workbench-stage .sw-workbench-primary:focus-visible {
+  outline: 2px solid var(--sw-workbench-accent);
+  outline-offset: 3px;
+}
+.sw-workbench-readout {
+  display: grid;
+  gap: 0.2rem;
+  margin-left: auto;
+  text-align: right;
+  font-size: var(--sw-type-xs);
+  color: var(--sw-stage-muted);
+}
+.sw-workbench-readout strong {
+  font: 600 var(--sw-type-sm) / 1.3 var(--sw-font-mono);
+  color: var(--sw-stage-fg);
+}
+.sw-workbench-stage .sw-demo-button {
+  min-height: 2rem;
+  height: 2rem;
+}
+.sw-workbench-release {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  border-block: 1px solid var(--sw-border);
+  font-size: var(--sw-type-xs);
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+}
+.sw-workbench-release strong {
+  color: var(--sw-accent-strong);
+}
+@media (max-width: 42rem) {
+  .sw-workbench-stage
+    :is(.sw-vw-gridstage__header, .sw-rwb-commandbar, .sw-vuewb-controlbar, .sw-svw-chrome) {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+  .sw-workbench-readout {
+    width: auto;
+    margin: 0;
+    text-align: left;
+  }
+  .sw-workbench-stage .sw-demo-controlbar__controls {
+    flex-wrap: wrap;
+    min-width: 0;
+    width: 100%;
+  }
+  .sw-workbench-stage .sw-demo-controlbar__identity {
+    min-width: 0;
+  }
+  .sw-showcase-page__footer .sw-install-command {
+    max-width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-workbench-stage *,
+  .host-row-stage * {
+    scroll-behavior: auto;
+    animation-duration: 0s;
+    transition-duration: 0s;
+  }
+}

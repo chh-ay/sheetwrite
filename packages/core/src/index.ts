@@ -1,11 +1,14 @@
 export { cellA1, colToA1, labelToCol, rangeA1, shiftA1Refs } from "./a1.js";
+
 export {
   cellScalarToText,
   parseCellInput,
   parseCellLiteralInput,
   parseCurrencyInput,
 } from "./cell-input.js";
+
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
+
 export {
   type CommentAdapter,
   type CommentAnchor,
@@ -35,11 +38,14 @@ export {
   type RevisionSummary,
   type VersionedCommentEvent,
 } from "./collaboration.js";
+
 export {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
+
 export { dateToSerial, parseDateInput, serialToDate } from "./date-serial.js";
+
 export {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
   type DelimitedTextOperation,
@@ -48,6 +54,7 @@ export {
   DelimitedTextResourceError,
   type DelimitedTextResourceLimits,
 } from "./delimited-text.js";
+
 export {
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   DEFAULT_TRANSACTION_RESOURCE_LIMITS,
@@ -65,6 +72,11 @@ export {
   validateWorkbookSnapshot,
   WORKBOOK_SCHEMA_VERSION,
 } from "./document-protocol.js";
+
+export type { SheetwriteEngine } from "./engine.js";
+
+export { type EngineMemoryReleaseReport, releaseEngineMemory } from "./engine-memory.js";
+
 export {
   isSheetwriteError,
   SHEETWRITE_ERROR_CODES,
@@ -77,6 +89,7 @@ export {
   type SheetwriteErrorOperation,
   type SheetwriteErrorOptions,
 } from "./errors.js";
+
 export {
   DEFAULT_XLSX_RESOURCE_LIMITS,
   downloadBytes,
@@ -99,6 +112,7 @@ export {
   type XlsxWorkbookOptions,
   type XlsxWorkbookWarning,
 } from "./export.js";
+
 export {
   createGrid,
   DEFAULT_THEME,
@@ -106,6 +120,7 @@ export {
   isSheetwriteReady,
   resolveThemeFromCss,
 } from "./grid.js";
+
 export {
   hyperlinkAt,
   isSafeExternalHyperlink,
@@ -120,12 +135,15 @@ export {
   sanitizeCellHyperlink,
   sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
+
 export {
   type LegacyRowLoader,
   type LegacyRowPage,
   legacyFullWidthDataSource,
 } from "./legacy-full-width-datasource.js";
+
 export { formatNumber } from "./number-format.js";
+
 export {
   createGridFromSnapshot,
   MemoryPersistenceAdapter,
@@ -133,13 +151,16 @@ export {
   type PersistenceErrorCode,
   type SnapshotGridOptions,
 } from "./persistence.js";
+
 export {
   type DocumentRebaseResult,
   type RebaseConflict,
   type RebaseConflictCode,
   rebaseDocumentOperations,
 } from "./rebase.js";
+
 export { REF_CYCLE } from "./reference.js";
+
 export {
   assertRuntimeResourceSnapshot,
   type BoundaryDirection,
@@ -163,6 +184,7 @@ export {
   WASM_MEMORY_OWNERS,
   type WasmMemoryOwner,
 } from "./resource-accounting.js";
+
 export {
   createRowBridge,
   RowBridge,
@@ -187,18 +209,23 @@ export {
   type RowBridgeUnprojectableDelta,
   rowBridgeTransactionId,
 } from "./row-bridge.js";
+
 export {
   type SheetNameIssueCode,
   type SheetNameValidationResult,
   sheetNameKey,
   validateSheetName,
 } from "./sheet-name.js";
+
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
+
 export {
   DEFAULT_SYNC_COORDINATOR_LIMITS,
   type PendingCommitLoadOptions,
   type PendingCommitStorage,
   type SyncActivityState,
+  type SyncConflictRecovery,
+  type SyncConflictReloadReason,
   type SyncConnectionState,
   SyncCoordinator,
   type SyncCoordinatorEvent,
@@ -212,6 +239,7 @@ export {
   type SyncStateSnapshot,
   type SyncVersionGapRequest,
 } from "./sync.js";
+
 export type {
   AggregateOp,
   ApplyTransactionResult,
@@ -279,6 +307,7 @@ export type {
   PagedStoreStats,
   PendingCommit,
   PersistenceAdapter,
+  PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   PresenceOverlay,
@@ -317,6 +346,7 @@ export type {
   TransactionApplicationOptions,
   TransactionResourceLimits,
   ValidationPolicy,
+  VersionBatchMember,
   VersionedOperation,
   VisibleWindowView,
   Workbook,
@@ -328,6 +358,7 @@ export type {
   WorkbookTableStyle,
   WorkbookTableUnsupportedFeature,
 } from "./types.js";
+
 export {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,

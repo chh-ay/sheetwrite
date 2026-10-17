@@ -8,7 +8,7 @@ description: "The workbook-wide store: every sheet, one string pool."
 The workbook-wide store: every sheet, one string pool.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L20"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L20</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L41"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L41</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -16,6 +16,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-add-paged-sheet"><code>addPagedSheet</code></a>
 <a href="#cell-store-add-rows"><code>addRows</code></a>
 <a href="#cell-store-add-sheet"><code>addSheet</code></a>
+<a href="#cell-store-admit-source-range"><code>admitSourceRange</code></a>
 <a href="#cell-store-aggregate"><code>aggregate</code></a>
 <a href="#cell-store-begin-mutation"><code>beginMutation</code></a>
 <a href="#cell-store-begin-page-load"><code>beginPageLoad</code></a>
@@ -24,21 +25,23 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-capture-references"><code>captureReferences</code></a>
 <a href="#cell-store-capture-sources"><code>captureSources</code></a>
 <a href="#cell-store-capture-sources-for-rows"><code>captureSourcesForRows</code></a>
+<a href="#cell-store-cell-snapshots"><code>cellSnapshots</code></a>
 <a href="#cell-store-cell-state"><code>cellState</code></a>
 <a href="#cell-store-clear-cell"><code>clearCell</code></a>
 <a href="#cell-store-clear-range"><code>clearRange</code></a>
 <a href="#cell-store-col-count"><code>colCount</code></a>
 <a href="#cell-store-columns-fully-loaded"><code>columnsFullyLoaded</code></a>
+<a href="#cell-store-commit-sources"><code>commitSources</code></a>
 <a href="#cell-store-compact-string-storage"><code>compactStringStorage</code></a>
 <a href="#cell-store-data-edge"><code>dataEdge</code></a>
 <a href="#cell-store-data-edge-ordered"><code>dataEdgeOrdered</code></a>
 <a href="#cell-store-dirty-revision"><code>dirtyRevision</code></a>
 <a href="#cell-store-distinct-values"><code>distinctValues</code></a>
-<a href="#cell-store-end-mutation"><code>endMutation</code></a>
-<a href="#cell-store-end-page-load"><code>endPageLoad</code></a>
+<a href="#cell-store-export-memory-state"><code>exportMemoryState</code></a>
 <a href="#cell-store-filter-rows"><code>filterRows</code></a>
 <a href="#cell-store-filter-rows-multi"><code>filterRowsMulti</code></a>
 <a href="#cell-store-formula-matrix-resource-stats"><code>formulaMatrixResourceStats</code></a>
+<a href="#cell-store-formula-read-bands"><code>formulaReadBands</code></a>
 <a href="#cell-store-formula-source"><code>formulaSource</code></a>
 <a href="#cell-store-free"><code>free</code></a>
 <a href="#cell-store-get-cell"><code>getCell</code></a>
@@ -46,10 +49,12 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-get-window-rows"><code>getWindowRows</code></a>
 <a href="#cell-store-hydrate-page-numbers"><code>hydratePageNumbers</code></a>
 <a href="#cell-store-hydrate-page-strings-packed"><code>hydratePageStringsPacked</code></a>
+<a href="#cell-store-import-range-memory-state"><code>importRangeMemoryState</code></a>
 <a href="#cell-store-insert-cols"><code>insertCols</code></a>
 <a href="#cell-store-is-fully-loaded"><code>isFullyLoaded</code></a>
 <a href="#cell-store-is-paged"><code>isPaged</code></a>
 <a href="#cell-store-is-sheet-alive"><code>isSheetAlive</code></a>
+<a href="#cell-store-loaded-spans"><code>loadedSpans</code></a>
 <a href="#cell-store-mark-cell-clean-revision"><code>markCellCleanRevision</code></a>
 <a href="#cell-store-mark-range-clean"><code>markRangeClean</code></a>
 <a href="#cell-store-memory-stats"><code>memoryStats</code></a>
@@ -57,12 +62,13 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-paged-stats"><code>pagedStats</code></a>
 <a href="#cell-store-persisted-cell-data"><code>persistedCellData</code></a>
 <a href="#cell-store-pin-range"><code>pinRange</code></a>
+<a href="#cell-store-pin-read-window"><code>pinReadWindow</code></a>
+<a href="#cell-store-pin-viewport-bands"><code>pinViewportBands</code></a>
 <a href="#cell-store-pool-strings"><code>poolStrings</code></a>
 <a href="#cell-store-query-resource-stats"><code>queryResourceStats</code></a>
 <a href="#cell-store-range-fully-loaded"><code>rangeFullyLoaded</code></a>
 <a href="#cell-store-range-style-ids"><code>rangeStyleIds</code></a>
 <a href="#cell-store-recompute"><code>recompute</code></a>
-<a href="#cell-store-recompute-changed"><code>recomputeChanged</code></a>
 <a href="#cell-store-recompute-volatile"><code>recomputeVolatile</code></a>
 <a href="#cell-store-reference-target"><code>referenceTarget</code></a>
 <a href="#cell-store-references-targeting"><code>referencesTargeting</code></a>
@@ -78,8 +84,9 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-restore-range"><code>restoreRange</code></a>
 <a href="#cell-store-row-count"><code>rowCount</code></a>
 <a href="#cell-store-search"><code>search</code></a>
-<a href="#cell-store-set-block"><code>setBlock</code></a>
+<a href="#cell-store-set-block-packed"><code>setBlockPacked</code></a>
 <a href="#cell-store-set-bool"><code>setBool</code></a>
+<a href="#cell-store-set-column-block-packed"><code>setColumnBlockPacked</code></a>
 <a href="#cell-store-set-column-numbers"><code>setColumnNumbers</code></a>
 <a href="#cell-store-set-column-strings"><code>setColumnStrings</code></a>
 <a href="#cell-store-set-column-strings-packed"><code>setColumnStringsPacked</code></a>
@@ -100,11 +107,13 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-spill-anchor-row"><code>spillAnchorRow</code></a>
 <a href="#cell-store-spill-derived-mask"><code>spillDerivedMask</code></a>
 <a href="#cell-store-spill-owner-coordinates"><code>spillOwnerCoordinates</code></a>
+<a href="#cell-store-string-pool-epoch"><code>stringPoolEpoch</code></a>
 <a href="#cell-store-style-id-at"><code>styleIdAt</code></a>
 <a href="#cell-store-wasm-committed-bytes"><code>wasmCommittedBytes</code></a>
+<a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>90</span>
+## Members <span class="api-count" data-pagefind-ignore>99</span>
 
 <div class="api-member-list">
 
@@ -142,6 +151,17 @@ addRows: (sheet: number, at: number, count: number) => void;
 addSheet: (n_cols: number, row_count: number) => number;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-admit-source-range" data-pagefind-weight="1">
+<summary><code>admitSourceRange</code> <span class="api-member-summary">Whether a source rectangle can replace its spill cells without cutting an installed spill away from its anchor.</span></summary>
+
+```ts generated
+admitSourceRange: (sheet: number, r0: number, c0: number, r1: number, c1: number) => boolean;
+```
+
+<p class="api-member-doc">Whether a source rectangle can replace its spill cells without cutting
+an installed spill away from its anchor. No owner window crosses WASM.</p>
 </details>
 
 <details class="api-member" id="cell-store-aggregate" data-pagefind-weight="1">
@@ -224,6 +244,21 @@ for arbitrary row/column coordinates in one boundary crossing. Offsets
 follow the caller's row-major coordinate order.</p>
 </details>
 
+<details class="api-member" id="cell-store-cell-snapshots" data-pagefind-weight="1">
+<summary><code>cellSnapshots</code> <span class="api-member-summary">Resolved values of a sparse coordinate list in one batched read.</span></summary>
+
+```ts generated
+cellSnapshots: (sheet: number, rows: Uint32Array, cols: Uint32Array) => CellSnapshot | undefined;
+```
+
+<p class="api-member-doc">Resolved values of a sparse coordinate list in one batched read.
+
+`rows` and `cols` are absolute coordinates and must have the same length;
+otherwise the result carries no cells. Every entry reads exactly like
+[`Self::get_cell`], so a batched capture reports the values a per-cell
+read would.</p>
+</details>
+
 <details class="api-member" id="cell-store-cell-state" data-pagefind-weight="1">
 <summary><code>cellState</code> <span class="api-member-summary">0 unloaded, 1 loaded-empty, 2 loaded-value, 3 dirty local edit.</span></summary>
 
@@ -269,13 +304,27 @@ columnsFullyLoaded: (sheet: number, start_row: number, end_row: number, cols: Ui
 
 </details>
 
+<details class="api-member" id="cell-store-commit-sources" data-pagefind-weight="1">
+<summary><code>commitSources</code> <span class="api-member-summary">Commit staged user or host sources.</span></summary>
+
+```ts generated
+commitSources: () => void;
+```
+
+<p class="api-member-doc">Commit staged user or host sources. Admission metadata must be staged
+before this barrier; derived values and string roots are complete on return.
+Beginning a page load suppresses local dirty tracking until this commit.</p>
+</details>
+
 <details class="api-member" id="cell-store-compact-string-storage" data-pagefind-weight="1">
-<summary><code>compactStringStorage</code> <span class="api-member-summary">Release geometric growth slack after a bounded bulk ingest.</span></summary>
+<summary><code>compactStringStorage</code> <span class="api-member-summary">Reclaim unreachable text and release growth slack at a transaction barrier.</span></summary>
 
 ```ts generated
 compactStringStorage: () => void;
 ```
 
+<p class="api-member-doc">Reclaim unreachable text and release growth slack at a transaction barrier.
+Raw pool IDs must be discarded when `stringPoolEpoch` changes.</p>
 </details>
 
 <details class="api-member" id="cell-store-data-edge" data-pagefind-weight="1">
@@ -322,20 +371,11 @@ distinctValues: (sheet: number, col: number, limit: number) => DistinctColumn;
 
 </details>
 
-<details class="api-member" id="cell-store-end-mutation" data-pagefind-weight="1">
-<summary><code>endMutation</code></summary>
+<details class="api-member" id="cell-store-export-memory-state" data-pagefind-weight="1">
+<summary><code>exportMemoryState</code> <span class="api-member-summary">Export only live state, not allocator slack or a dependency-index cache.</span></summary>
 
 ```ts generated
-endMutation: () => void;
-```
-
-</details>
-
-<details class="api-member" id="cell-store-end-page-load" data-pagefind-weight="1">
-<summary><code>endPageLoad</code></summary>
-
-```ts generated
-endPageLoad: () => void;
+exportMemoryState: () => Uint8Array;
 ```
 
 </details>
@@ -365,6 +405,26 @@ filterRowsMulti: (sheet: number, cols: Uint32Array, kinds: Uint8Array, flags: Ui
 formulaMatrixResourceStats: () => Float64Array;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-formula-read-bands" data-pagefind-weight="1">
+<summary><code>formulaReadBands</code> <span class="api-member-summary">Same-sheet calculation prerequisites for startrow..endrow × cols, as flat [rowstart, rowend, colstart, colend) rectangles.</span></summary>
+
+```ts generated
+formulaReadBands: (sheet: number, start_row: number, end_row: number, cols: Uint32Array, max_cells: number) => Uint32Array;
+```
+
+<p class="api-member-doc">Same-sheet calculation prerequisites for `start_row..end_row` × `cols`,
+as flat `[row_start, row_end, col_start, col_end)` rectangles.
+
+The walk follows each read into the formula cells it reaches, so for
+`H = F - G` and `F = D - E` it reports `D`, `E`, `F`, and `G`.
+Spill children follow their anchor; attempted spill destinations are also
+prerequisites because admission must establish that source cells are empty.
+Reads of other sheets are skipped. `max_cells` bounds the walk: a read larger than
+the remaining budget is skipped, so one whole-column range cannot make a
+window demand the full column. Rectangles are disjoint and ascend by
+column, then by row.</p>
 </details>
 
 <details class="api-member" id="cell-store-formula-source" data-pagefind-weight="1">
@@ -402,9 +462,8 @@ getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array
 ```
 
 <p class="api-member-doc">One bulk read of a rectangular window for the renderer. Returns
-contiguous packed cell data (row-major over `rows x cols`) plus the
-unique strings referenced by the window, so the host paints without
-crossing the boundary per cell.</p>
+contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+and window-local formula-error strings, avoiding per-cell boundary reads.</p>
 </details>
 
 <details class="api-member" id="cell-store-get-window-rows" data-pagefind-weight="1">
@@ -438,6 +497,15 @@ hydratePageStringsPacked: (sheet: number, col: number, start_row: number, buf: s
 ```
 
 <p class="api-member-doc">Packed-string counterpart to [`CellStore::hydrate_page_numbers`].</p>
+</details>
+
+<details class="api-member" id="cell-store-import-range-memory-state" data-pagefind-weight="1">
+<summary><code>importRangeMemoryState</code></summary>
+
+```ts generated
+importRangeMemoryState: (bytes: Uint8Array, sheet: number, row_start: number, col_start: number) => RangeSnapshot;
+```
+
 </details>
 
 <details class="api-member" id="cell-store-insert-cols" data-pagefind-weight="1">
@@ -474,6 +542,22 @@ isPaged: (sheet: number) => boolean;
 isSheetAlive: (sheet: number) => boolean;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-loaded-spans" data-pagefind-weight="1">
+<summary><code>loadedSpans</code> <span class="api-member-summary">Loaded row runs of one column inside startrow..endrow, as flat [start, end) pairs in ascending, disjoint order.</span></summary>
+
+```ts generated
+loadedSpans: (sheet: number, start_row: number, end_row: number, col: number) => Uint32Array;
+```
+
+<p class="api-member-doc">Loaded row runs of one column inside `start_row..end_row`, as flat
+`[start, end)` pairs in ascending, disjoint order.
+
+A row belongs to a run only when [`Self::columns_fully_loaded`] would
+report it loaded, so a caller can reconcile a whole column with one call
+instead of probing the band row by row. Rows outside the sheet and empty
+requests produce no pairs.</p>
 </details>
 
 <details class="api-member" id="cell-store-mark-cell-clean-revision" data-pagefind-weight="1">
@@ -536,10 +620,30 @@ cells and source bytes, never the logical sheet rectangle.</p>
 </details>
 
 <details class="api-member" id="cell-store-pin-range" data-pagefind-weight="1">
-<summary><code>pinRange</code></summary>
+<summary><code>pinRange</code> <span class="api-member-summary">Replaces caller-owned persistent pins; empty row ranges leave them unchanged.</span></summary>
 
 ```ts generated
 pinRange: (sheet: number, start_row: number, end_row: number, cols: Uint32Array) => void;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-pin-read-window" data-pagefind-weight="1">
+<summary><code>pinReadWindow</code> <span class="api-member-summary">Replaces transient read protection without changing explicit or viewport pins.</span></summary>
+
+```ts generated
+pinReadWindow: (sheet: number, start_row: number, end_row: number, rows: Uint32Array, cols: Uint32Array) => void;
+```
+
+<p class="api-member-doc">Replaces transient read protection without changing explicit or viewport pins.
+Nonempty `rows` are backing row IDs; otherwise `[start_row, end_row)` is used.</p>
+</details>
+
+<details class="api-member" id="cell-store-pin-viewport-bands" data-pagefind-weight="1">
+<summary><code>pinViewportBands</code> <span class="api-member-summary">Replaces viewport-owned protection independently of transient read pins.</span></summary>
+
+```ts generated
+pinViewportBands: (sheet: number, bands: Uint32Array) => void;
 ```
 
 </details>
@@ -591,17 +695,7 @@ recompute: (sheet: number) => void;
 
 The pass first grows the dirty cell set through formula read-sets to find
 all dependent formulas. It then evaluates only those formulas, using a
-per-pass memo table so each formula cell is evaluated at most once even
-when many downstream formulas reference it.</p>
-</details>
-
-<details class="api-member" id="cell-store-recompute-changed" data-pagefind-weight="1">
-<summary><code>recomputeChanged</code> <span class="api-member-summary">Recompute the union of every dirty sheet once at the host transaction barrier, including cross-sheet formula and plain-reference dependents.</span></summary>
-
-```ts generated
-recomputeChanged: () => void;
-```
-
+per-pass memo table to reuse formula results across dependent reads.</p>
 </details>
 
 <details class="api-member" id="cell-store-recompute-volatile" data-pagefind-weight="1">
@@ -746,16 +840,22 @@ list. Scans the requested columns column-major (cache-local), then sorts
 row-major so search navigation runs top-to-bottom, left-to-right.</p>
 </details>
 
-<details class="api-member" id="cell-store-set-block" data-pagefind-weight="1">
-<summary><code>setBlock</code> <span class="api-member-summary">Atomically write one row-major mixed literal/formula/reference block.</span></summary>
+<details class="api-member" id="cell-store-set-block-packed" data-pagefind-weight="1">
+<summary><code>setBlockPacked</code> <span class="api-member-summary">Atomically write one row-major mixed literal/formula/reference block whose text payload arrives packed instead of once per cell.</span></summary>
 
 ```ts generated
-setBlock: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, texts: string[], styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number;
+setBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number;
 ```
 
-<p class="api-member-doc">Atomically write one row-major mixed literal/formula/reference block.
-Formula/reference offsets are sparse row-major exceptions. Reference
-targets are packed `[sheet_handle, row, col]` triples. The compact
+<p class="api-member-doc">Atomically write one row-major mixed literal/formula/reference block
+whose text payload arrives packed instead of once per cell.
+
+`text_buf` holds the UTF-8 bytes of every `KIND_STRING` cell of `kinds`
+in cell-offset order. `text_offsets` carries their byte boundaries: the
+n-th string cell owns `text_offsets[n]..text_offsets[n + 1]`, and the
+last entry equals the buffer length, so a block without strings passes an
+empty buffer and `&amp;[0]`. Literal strings are interned in cell-offset order;
+source-owned text slots are consumed without interning. The compact
 status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
 source metadata, and `3` paged dirty-capacity rejection.</p>
 </details>
@@ -767,6 +867,23 @@ source metadata, and `3` paged dirty-capacity rejection.</p>
 setBool: (sheet: number, row: number, col: number, value: boolean, style: number) => void;
 ```
 
+</details>
+
+<details class="api-member" id="cell-store-set-column-block-packed" data-pagefind-weight="1">
+<summary><code>setColumnBlockPacked</code> <span class="api-member-summary">Atomically write one column-major mixed literal/formula/reference block whose text payload arrives packed.</span></summary>
+
+```ts generated
+setColumnBlockPacked: (sheet: number, start_row: number, start_col: number, rows: number, cols: number, kinds: Uint8Array, numbers: Float64Array, text_buf: Uint8Array, text_offsets: Uint32Array, styles: Uint32Array, formula_offsets: Uint32Array, formula_sources: string[], reference_offsets: Uint32Array, reference_targets: Uint32Array) => number;
+```
+
+<p class="api-member-doc">Atomically write one column-major mixed literal/formula/reference block
+whose text payload arrives packed.
+
+This is [`Self::set_block_packed`] with the flat input arrays in the
+store's own column-major order: cell `(row, col)` sits at
+`col * rows + row`, so a columnar import can fill them column by column.
+Text packing, source metadata and every status code behave exactly as in
+[`Self::set_block_packed`].</p>
 </details>
 
 <details class="api-member" id="cell-store-set-column-numbers" data-pagefind-weight="1">
@@ -818,19 +935,24 @@ Formula strings are parsed once here, never once per visible cell.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-formula" data-pagefind-weight="1">
-<summary><code>setFormula</code> <span class="api-member-summary">Parse and store an arithmetic formula at (row, col).</span></summary>
+<summary><code>setFormula</code> <span class="api-member-summary">Parse and store a formula at (row, col).</span></summary>
 
 ```ts generated
 setFormula: (sheet: number, row: number, col: number, src: string, style: number) => number;
 ```
 
-<p class="api-member-doc">Parse and store an arithmetic formula at `(row, col)`.
+<p class="api-member-doc">Parse and store a formula at `(row, col)`.
 
 Setters only mark cells dirty; they do not recompute formulas. The host
 calls `recompute(sheet)` once at the transaction barrier so a multi-cell
 edit performs one dependency-scoped pass instead of one full-sheet pass
-per setter. The returned value is the previous cached value until that
-barrier recompute runs, and the store facade ignores it for batched edits.</p>
+per setter. A successful parse returns the pre-write cached scalar; a
+parse rejection returns `0.0`, and a rejected write returns `NaN`.
+
+The dependency index is invalidated only when the rewrite changes what
+the formula reads or whether it produces an array. A constant-only edit
+keeps the cached index, so its next recompute visits just the edited
+formula and its dependents instead of every formula in the workbook.</p>
 </details>
 
 <details class="api-member" id="cell-store-set-named-range" data-pagefind-weight="1">
@@ -976,6 +1098,15 @@ spillOwnerCoordinates: (sheet: number, row_start: number, row_end: number, cols:
 <p class="api-member-doc">Packed row-major `[anchor_row, anchor_col, ...]` owner coordinates.</p>
 </details>
 
+<details class="api-member" id="cell-store-string-pool-epoch" data-pagefind-weight="1">
+<summary><code>stringPoolEpoch</code> <span class="api-member-summary">Raw string IDs are valid only within this epoch, including window IDs.</span></summary>
+
+```ts generated
+stringPoolEpoch: () => number;
+```
+
+</details>
+
 <details class="api-member" id="cell-store-style-id-at" data-pagefind-weight="1">
 <summary><code>styleIdAt</code> <span class="api-member-summary">Current style-dictionary id at a cell; 0 when out of bounds.</span></summary>
 
@@ -992,7 +1123,16 @@ the cell's style.</p>
 <summary><code>wasmCommittedBytes</code></summary>
 
 ```ts generated
-wasmCommittedBytes: () => number
+wasmCommittedBytes: () => number;
+```
+
+</details>
+
+<details class="api-member" id="cell-store-import-memory-state" data-pagefind-weight="1">
+<summary><code>importMemoryState</code> <span class="api-member-summary">Import into a fresh instance; failure never mutates the source store.</span></summary>
+
+```ts generated
+static importMemoryState: (bytes: Uint8Array) => CellStore
 ```
 
 </details>
@@ -1015,6 +1155,13 @@ class CellStore {
   ) => number;
   addRows: (sheet: number, at: number, count: number) => void;
   addSheet: (n_cols: number, row_count: number) => number;
+  admitSourceRange: (
+    sheet: number,
+    r0: number,
+    c0: number,
+    r1: number,
+    c1: number,
+  ) => boolean;
   aggregate: (sheet: number, col: number, op: number) => number;
   beginMutation: () => bigint;
   beginPageLoad: () => void;
@@ -1042,6 +1189,11 @@ class CellStore {
     rows: Uint32Array,
     cols: Uint32Array,
   ) => SourceSnapshot | undefined;
+  cellSnapshots: (
+    sheet: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => CellSnapshot | undefined;
   cellState: (sheet: number, row: number, col: number) => number;
   clearCell: (sheet: number, row: number, col: number, style: number) => void;
   clearRange: (
@@ -1060,6 +1212,7 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => boolean;
+  commitSources: () => void;
   compactStringStorage: () => void;
   dataEdge: (
     sheet: number,
@@ -1082,8 +1235,7 @@ class CellStore {
     col: number,
     limit: number,
   ) => DistinctColumn;
-  endMutation: () => void;
-  endPageLoad: () => void;
+  exportMemoryState: () => Uint8Array;
   filterRows: (sheet: number, col: number, needle: string) => Uint32Array;
   filterRowsMulti: (
     sheet: number,
@@ -1097,6 +1249,13 @@ class CellStore {
     value_texts: string[],
   ) => Uint32Array;
   formulaMatrixResourceStats: () => Float64Array;
+  formulaReadBands: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    cols: Uint32Array,
+    max_cells: number,
+  ) => Uint32Array;
   formulaSource: (
     sheet: number,
     row: number,
@@ -1132,10 +1291,22 @@ class CellStore {
     style: number,
     protected_offsets: Uint32Array,
   ) => void;
+  importRangeMemoryState: (
+    bytes: Uint8Array,
+    sheet: number,
+    row_start: number,
+    col_start: number,
+  ) => RangeSnapshot;
   insertCols: (sheet: number, at: number, count: number) => void;
   isFullyLoaded: (sheet: number) => boolean;
   isPaged: (sheet: number) => boolean;
   isSheetAlive: (sheet: number) => boolean;
+  loadedSpans: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    col: number,
+  ) => Uint32Array;
   markCellCleanRevision: (
     sheet: number,
     row: number,
@@ -1159,6 +1330,14 @@ class CellStore {
     end_row: number,
     cols: Uint32Array,
   ) => void;
+  pinReadWindow: (
+    sheet: number,
+    start_row: number,
+    end_row: number,
+    rows: Uint32Array,
+    cols: Uint32Array,
+  ) => void;
+  pinViewportBands: (sheet: number, bands: Uint32Array) => void;
   poolStrings: (ids: Uint32Array) => string[];
   queryResourceStats: () => Float64Array;
   rangeFullyLoaded: (
@@ -1176,7 +1355,6 @@ class CellStore {
     c1: number,
   ) => Uint32Array;
   recompute: (sheet: number) => void;
-  recomputeChanged: () => void;
   recomputeVolatile: (serial: number) => boolean;
   referenceTarget: (
     sheet: number,
@@ -1218,7 +1396,7 @@ class CellStore {
     case_insensitive: boolean,
     whole_cell: boolean,
   ) => Uint32Array;
-  setBlock: (
+  setBlockPacked: (
     sheet: number,
     start_row: number,
     start_col: number,
@@ -1226,7 +1404,8 @@ class CellStore {
     cols: number,
     kinds: Uint8Array,
     numbers: Float64Array,
-    texts: string[],
+    text_buf: Uint8Array,
+    text_offsets: Uint32Array,
     styles: Uint32Array,
     formula_offsets: Uint32Array,
     formula_sources: string[],
@@ -1240,6 +1419,22 @@ class CellStore {
     value: boolean,
     style: number,
   ) => void;
+  setColumnBlockPacked: (
+    sheet: number,
+    start_row: number,
+    start_col: number,
+    rows: number,
+    cols: number,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    text_buf: Uint8Array,
+    text_offsets: Uint32Array,
+    styles: Uint32Array,
+    formula_offsets: Uint32Array,
+    formula_sources: string[],
+    reference_offsets: Uint32Array,
+    reference_targets: Uint32Array,
+  ) => number;
   setColumnNumbers: (
     sheet: number,
     col: number,
@@ -1354,8 +1549,10 @@ class CellStore {
     row_end: number,
     cols: Uint32Array,
   ) => Uint32Array;
+  stringPoolEpoch: () => number;
   styleIdAt: (sheet: number, row: number, col: number) => number;
   wasmCommittedBytes: () => number;
+  static importMemoryState: (bytes: Uint8Array) => CellStore;
 }
 ```
 
@@ -1375,6 +1572,6 @@ class CellStore {
 <p class="api-consumers-label">Public exports naming <code>CellStore</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

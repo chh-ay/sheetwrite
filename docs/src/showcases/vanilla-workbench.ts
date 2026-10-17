@@ -34,6 +34,7 @@ import {
   type ShellPiece,
 } from "@sheetwrite/core/shell";
 import workerRendererUrl from "@sheetwrite/core/worker?worker&url";
+
 import {
   buildEngineData,
   createEngineWorkbook,
@@ -180,7 +181,6 @@ export function createWorkbench(
   spec: WorkbenchSpec,
   events: WorkbenchEvents,
 ): Workbench {
-  // 1. Static chrome skeleton, styled by @sheetwrite/core/shell.css.
   const root = document.createElement("div");
   root.className = "sheetwrite-shell";
 
@@ -200,14 +200,33 @@ export function createWorkbench(
   root.append(toolbarRow, formulaRow, gridHost, bottomRow);
   host.appendChild(root);
 
-  // 2. Construction-bound options are decided here and only here. Changing
-  //    any of them means destroying this generation and creating a new one.
+  // Construction-bound options are decided here and only here. Changing
+  // any of them means destroying this generation and creating a new one.
   const base: Omit<GridOptions, "workbook" | "data" | "datasource" | "datasourceStorage"> = {
+    presentation: "data-grid",
     theme: ENGINE_THEME,
     config: WORKBENCH_GRID_CONFIG,
     renderer: spec.renderer,
     ...(spec.renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
   };
+
+  const workbook = createEngineWorkbook();
+  const MIN_ROW_GUTTER_WIDTH = 48;
+  const ROW_LABEL_FONT_SIZE = 13;
+  const ROW_LABEL_DIGIT_WIDTH = 0.6;
+  const ROW_LABEL_PADDING = 12;
+  for (const sheet of workbook.sheets) {
+    const rowGutterWidth = Math.max(
+      ENGINE_THEME.rowHeaderWidth ?? MIN_ROW_GUTTER_WIDTH,
+      Math.ceil(
+        String(sheet.rowCount).length * ROW_LABEL_FONT_SIZE * ROW_LABEL_DIGIT_WIDTH +
+          ROW_LABEL_PADDING,
+      ),
+    );
+    const dataWidth = sheet.columns.reduce((total, column) => total + column.width, 0);
+    const columnScale = Math.max(1, (gridHost.clientWidth - rowGutterWidth) / dataWidth);
+    for (const column of sheet.columns) column.width = Math.ceil(column.width * columnScale);
+  }
 
   let grid: Grid;
   try {
@@ -215,7 +234,7 @@ export function createWorkbench(
       grid = createGridFromSnapshot(gridHost, spec.snapshot, base);
     } else if (spec.data === "paged") {
       grid = createGrid(gridHost, {
-        workbook: createEngineWorkbook(),
+        workbook,
         datasource: createRevenuePageSource((start, end) =>
           events.onActivity(
             `Rows ${(start + 1).toLocaleString()}–${end.toLocaleString()} served by the host page source`,
@@ -227,7 +246,7 @@ export function createWorkbench(
       grid.setFrozen(0, 1);
     } else {
       grid = createGrid(gridHost, {
-        workbook: createEngineWorkbook(),
+        workbook,
         data: ENGINE_DATA,
         ...base,
       });
@@ -238,9 +257,9 @@ export function createWorkbench(
     throw error;
   }
 
-  // 3. Renderer truth. `rendererKind()` reports what actually constructed;
-  //    a worker that fails to boot emits `renderer-fallback` asynchronously,
-  //    so subscribe before yielding to the event loop.
+  // `rendererKind()` reports what actually constructed;
+  // a worker that fails to boot emits `renderer-fallback` asynchronously,
+  // so subscribe before yielding to the event loop.
   const unsubscribes: Array<() => void> = [];
   events.onRendererChange({
     requested: spec.renderer,
@@ -258,7 +277,6 @@ export function createWorkbench(
     }),
   );
 
-  // 4. Every activity line below is fed by a public grid event.
   unsubscribes.push(grid.on("selection", ({ selection }) => events.onSelectionChange(selection)));
   unsubscribes.push(
     grid.on("change", ({ transaction, source }) => {
@@ -289,8 +307,8 @@ export function createWorkbench(
     }),
   );
 
-  // 5. Paged allocation is observable: pages land asynchronously after
-  //    scrolls, so poll the cheap WASM stats read while this generation lives.
+  // Paged allocation is observable: pages land asynchronously after
+  // scrolls, so poll the cheap WASM stats read while this generation lives.
   let statsTimer: ReturnType<typeof setInterval> | null = null;
   if (spec.snapshot === undefined && spec.data === "paged") {
     const report = (): void => events.onPagedStats(pagedStatsOf(grid, WORKBENCH_SHEET));
@@ -301,7 +319,6 @@ export function createWorkbench(
     events.onPagedStats(null);
   }
 
-  // 6. Compose the chrome pieces around the live grid handle.
   const focusGrid = (): void => gridHost.focus();
   const pieces: ShellPiece[] = [];
   pieces.push(createToolbar(toolbarRow, grid));
@@ -320,7 +337,6 @@ export function createWorkbench(
   pieces.push(formulaBar);
   pieces.push(createSelectionStatus(bottomRow, grid));
 
-  // 7. Teardown mirrors construction in reverse; nothing survives it.
   let destroyed = false;
   return {
     grid,
@@ -345,20 +361,28 @@ export function createWorkbench(
  * live cross-sheet formulas over the fixture data, then rebuild the built-in
  * chrome so the sheet-tab bar reflects the now-multi-sheet workbook.
  */
-export function addSummarySheet(grid: Grid): SheetId {
+export function addSummarySheet(grid: Grid, hostWidth: number): SheetId {
   const existing = grid.store.getWorkbook().sheets.find((sheet) => sheet.id === SUMMARY_SHEET);
   if (existing !== undefined) {
     grid.setActiveSheet(SUMMARY_SHEET);
     return SUMMARY_SHEET;
   }
 
+  const width = Math.max(600, hostWidth - 64);
   const result = grid.addSheet({
     id: SUMMARY_SHEET,
     name: "Summary",
     rowCount: 4,
     columns: [
-      { key: "metric", header: "Metric", width: 220, type: "text" },
-      { key: "value", header: "Value", width: 170, type: "currency", numberFormat: "$#,##0.00" },
+      { key: "metric", header: "Metric", width: Math.ceil(width * 0.4), type: "text" },
+      { key: "count", header: "Accounts", width: Math.ceil(width * 0.25), type: "number" },
+      {
+        key: "value",
+        header: "ARR (USD)",
+        width: Math.ceil(width * 0.35),
+        type: "currency",
+        numberFormat: "$#,##0.00",
+      },
     ],
   });
   if (result.status !== "applied") {
@@ -381,7 +405,11 @@ export function addSummarySheet(grid: Grid): SheetId {
         addr: { sheet: id, row, col: 0 },
         value: { kind: "literal", value: label },
       },
-      { op: "set", addr: { sheet: id, row, col: 1 }, value: { kind: "formula", src } },
+      {
+        op: "set",
+        addr: { sheet: id, row, col: row === 0 ? 1 : 2 },
+        value: { kind: "formula", src },
+      },
     ]),
   });
 

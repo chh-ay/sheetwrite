@@ -1,4 +1,4 @@
-//! Formula parser for the optional calc tier.
+//! Formula parser and reference rewriting for the formula engine.
 //!
 //! Grammar (A1 references with optional sheet qualifiers):
 //!   expr       := concat (comparison concat)?
@@ -8,8 +8,13 @@
 //!   power      := postfix ('^' postfix)*
 //!   postfix    := unary ('%')*
 //!   unary      := ('+' | '-') unary | primary
-//!   primary    := number | '(' expr ')' | func '(' args ')' | range | cell
-//!   range  := cell ':' cell
+//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | structured_ref
+//!   range      := cell ':' cell
+//!   array      := '{' row (';' row)* '}'
+//!   row        := constant (',' constant)*
+//!   constant   := ('+' | '-')? number | string | TRUE | FALSE | error
+//!
+//! Every row of an array constant must have the same number of columns.
 //!
 //! Cell references accept optional absolute markers (`$A$1`, `A$1`, `$A1`).
 //! Sheet-qualified references keep the sheet name until `CellStore` resolves it
@@ -19,6 +24,7 @@
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
 use crate::memory::MemoryOwnerStats;
+use crate::types::{FormulaError, Value};
 use std::{borrow::Cow, cmp::Ordering};
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
@@ -192,6 +198,11 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+    /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
+    /// reference makes it; the name is not in the function table.
+    AnchorArray,
+    #[cfg(feature = "analysis")]
+    Analysis(u16),
 }
 
 const fn ascii_upper(byte: u8) -> u8 {
@@ -204,16 +215,19 @@ const fn ascii_upper(byte: u8) -> u8 {
 
 fn registered_name_cmp(registered: &str, input: &str) -> Ordering {
     let length_order = registered.len().cmp(&input.len());
+
     if length_order != Ordering::Equal {
         return length_order;
     }
 
     for (&expected, &actual) in registered.as_bytes().iter().zip(input.as_bytes()) {
         let byte_order = expected.cmp(&ascii_upper(actual));
+
         if byte_order != Ordering::Equal {
             return byte_order;
         }
     }
+
     Ordering::Equal
 }
 
@@ -236,6 +250,12 @@ macro_rules! define_function_registry {
             {
                 return Some(FUNCTION_NAMES[index].1);
             }
+
+            #[cfg(feature = "analysis")]
+            if let Some(id) = crate::eval::analysis::lookup(name) {
+                return Some(Func::Analysis(id));
+            }
+
             FUNCTION_ALIASES
                 .binary_search_by(|(registered, _)| registered_name_cmp(registered, name))
                 .ok()
@@ -245,9 +265,27 @@ macro_rules! define_function_registry {
         fn func_name(func: Func) -> &'static str {
             match func {
                 $(Func::$variant => $canonical,)+
+                Func::AnchorArray => "ANCHORARRAY",
+                #[cfg(feature = "analysis")]
+                Func::Analysis(id) => crate::eval::analysis::name(id),
             }
         }
     };
+}
+
+#[cfg(feature = "analysis")]
+pub(crate) fn function_names() -> Vec<String> {
+    let mut names: Vec<String> = FUNCTION_NAMES
+        .iter()
+        .chain(FUNCTION_ALIASES.iter())
+        .map(|(name, _)| (*name).to_owned())
+        .chain(crate::eval::analysis::names().map(str::to_owned))
+        .collect();
+
+    names.sort_unstable();
+    names.dedup();
+
+    names
 }
 
 define_function_registry! {
@@ -493,6 +531,14 @@ pub enum Ast {
     Str(String),
     Bool(bool),
     Missing,
+    /// A helper parameter value. It exists only during full-engine evaluation.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
+    BoundMatrix {
+        rows: usize,
+        cols: usize,
+        values: std::rc::Rc<Vec<crate::types::Value>>,
+    },
     Name(String),
     NamedRange(NamedRangeRef),
     UnresolvedStructured(UnresolvedStructuredRef),
@@ -511,12 +557,31 @@ pub enum Ast {
     Neg(Box<Ast>),
     Pos(Box<Ast>),
     Percent(Box<Ast>),
+    /// One use of a LET binding in an expanded tree. `slot` identifies the
+    /// binding for the evaluation in progress, so its expression is evaluated
+    /// at most once however many uses the expansion has; `expression` stays
+    /// in the tree so dependency, volatility and array analysis of the
+    /// expansion still see the reads and the arrays.
+    LetSlot {
+        slot: u32,
+        expression: Box<Ast>,
+    },
+    /// An array constant such as `{1,2;3,4}`: row-major values with `cols`
+    /// values in each row.
+    Array {
+        cols: u32,
+        values: Vec<Value>,
+    },
 }
 impl Ast {
     /// Heap payload owned below an inline AST root. The root itself is already
     /// included in its formula hash-table bucket.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { values, .. } => {
+                out.add_vec::<crate::types::Value>(values.len(), values.capacity());
+            }
             Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
             Ast::NamedRange(value) => add_string_memory(&value.name, out),
             Ast::UnresolvedStructured(value) => {
@@ -550,6 +615,19 @@ impl Ast {
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 add_boxed_ast_memory(inner, out);
+            }
+            Ast::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
+            Ast::Array { values, .. } => {
+                let bytes = std::mem::size_of::<Value>();
+                out.add_payload(
+                    values.len().saturating_mul(bytes),
+                    values.capacity().saturating_mul(bytes),
+                );
+                for value in values {
+                    if let Value::Text(text) = value {
+                        out.add_payload(text.len(), text.len());
+                    }
+                }
             }
             Ast::Num(_)
             | Ast::Bool(_)
@@ -587,14 +665,17 @@ fn parse_col(letters: &str) -> Option<u32> {
     }
 
     let mut col: u32 = 0;
+
     for ch in letters.chars() {
         if !ch.is_ascii_alphabetic() {
             return None;
         }
+
         col = col
             .checked_mul(26)?
             .checked_add((ch.to_ascii_uppercase() as u32) - ('A' as u32) + 1)?;
     }
+
     Some(col - 1)
 }
 
@@ -604,10 +685,12 @@ fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let token = token.strip_prefix('$').unwrap_or(token);
 
     let mut letters_end = 0;
+
     for (idx, ch) in token.char_indices() {
         if !ch.is_ascii_alphabetic() {
             break;
         }
+
         letters_end = idx + ch.len_utf8();
     }
 
@@ -626,9 +709,11 @@ fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
 
     let col = parse_col(letters)?;
     let row: u32 = digits.parse().ok()?;
+
     if row == 0 {
         return None;
     }
+
     Some((row - 1, col, RefFlags { row_abs, col_abs }))
 }
 
@@ -652,6 +737,7 @@ fn normalize_range(
             end_flags.col_abs
         },
     };
+
     let normalized_end_flags = RefFlags {
         row_abs: if row <= end_row {
             end_flags.row_abs
@@ -664,6 +750,7 @@ fn normalize_range(
             flags.col_abs
         },
     };
+
     (
         row.min(end_row),
         col.min(end_col),
@@ -686,11 +773,30 @@ enum Tok<'a> {
     LParen,
     RParen,
     Comma,
+    Semicolon,
+    LBrace,
+    RBrace,
     Colon,
     Bang,
     Cmp(CmpOp),
-    InvalidRef,
+    Error(FormulaError),
+    /// The `#` after a cell reference: the whole spill of that anchor.
+    Hash,
 }
+
+/// Error constants a formula can contain. `#REF!` parses as an invalid
+/// reference; the others are accepted only inside array constants.
+const ERROR_LITERALS: [(&str, FormulaError); 9] = [
+    ("#DIV/0!", FormulaError::DivZero),
+    ("#NULL!", FormulaError::Null),
+    ("#SPILL!", FormulaError::Spill),
+    ("#CALC!", FormulaError::Calc),
+    ("#VALUE!", FormulaError::Value),
+    ("#REF!", FormulaError::Ref),
+    ("#NAME?", FormulaError::Name),
+    ("#NUM!", FormulaError::Num),
+    ("#N/A", FormulaError::Na),
+];
 
 fn quoted_token(
     src: &str,
@@ -765,9 +871,13 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
                 Cow::Owned(quoted_token(src, &mut i, b'\'', "unterminated sheet name")?),
                 true,
             ));
-        } else if bytes[i..].starts_with(b"#REF!") {
-            toks.push(Tok::InvalidRef);
-            i += 5;
+        } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
+            bytes[i..]
+                .get(..literal.len())
+                .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+        }) {
+            toks.push(Tok::Error(*error));
+            i += literal.len();
         } else if c == b'[' {
             let start = i;
             let mut depth = 0usize;
@@ -840,8 +950,24 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
                     toks.push(Tok::Comma);
                     i += 1;
                 }
+                b';' => {
+                    toks.push(Tok::Semicolon);
+                    i += 1;
+                }
+                b'{' => {
+                    toks.push(Tok::LBrace);
+                    i += 1;
+                }
+                b'}' => {
+                    toks.push(Tok::RBrace);
+                    i += 1;
+                }
                 b':' => {
                     toks.push(Tok::Colon);
+                    i += 1;
+                }
+                b'#' => {
+                    toks.push(Tok::Hash);
                     i += 1;
                 }
                 _ if !c.is_ascii() => {
@@ -987,6 +1113,28 @@ impl<'a> Parser<'a> {
         Self::guard_depth(depth)?;
 
         let mut value = self.unary_at(depth)?;
+        #[cfg(feature = "analysis")]
+        while self.peek() == Some(&Tok::LParen) {
+            let _ = self.next();
+            let mut args = vec![value];
+            if self.peek() != Some(&Tok::RParen) {
+                loop {
+                    args.push(if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                        Ast::Missing
+                    } else {
+                        self.expr_at(depth + 1)?
+                    });
+                    if self.peek() != Some(&Tok::Comma) {
+                        break;
+                    }
+                    let _ = self.next();
+                }
+            }
+            if self.next() != Some(Tok::RParen) {
+                return Err("expected )".into());
+            }
+            value = Ast::UnknownFunc("$LAMBDA_CALL".into(), args);
+        }
         while self.peek() == Some(&Tok::Op('%')) {
             let _ = self.next();
             value = Ast::Percent(Box::new(value));
@@ -1025,13 +1173,65 @@ impl<'a> Parser<'a> {
             }
             Some(Tok::Ident(name, quoted)) => self.ident_at(name, quoted, depth),
             Some(Tok::Structured(raw)) => parse_structured_ref(raw, None),
-            Some(Tok::InvalidRef) => Ok(Ast::InvalidRef),
+            Some(Tok::Error(FormulaError::Ref)) => Ok(Ast::InvalidRef),
+            Some(Tok::LBrace) => self.array_constant(),
             other => Err(if other.is_some() {
                 "unexpected token".into()
             } else {
                 "unexpected end".into()
             }),
         }
+    }
+
+    fn array_constant(&mut self) -> Result<Ast, String> {
+        let mut values = Vec::new();
+        let mut cols = 0usize;
+        let mut row_len = 0usize;
+        loop {
+            values.push(self.array_element()?);
+            row_len += 1;
+            match self.next() {
+                Some(Tok::Comma) => continue,
+                Some(separator @ (Tok::Semicolon | Tok::RBrace)) => {
+                    if cols == 0 {
+                        cols = row_len;
+                    } else if row_len != cols {
+                        return Err("array constant rows must have the same length".into());
+                    }
+                    if separator == Tok::RBrace {
+                        break;
+                    }
+                    row_len = 0;
+                }
+                _ => return Err("expected , ; or } in array constant".into()),
+            }
+        }
+        let cols = u32::try_from(cols).map_err(|_| "array constant is too wide".to_string())?;
+        Ok(Ast::Array { cols, values })
+    }
+
+    /// One array-constant element: a number with an optional sign, text, a
+    /// logical value, or an error. References and expressions are rejected.
+    fn array_element(&mut self) -> Result<Value, String> {
+        let value = match self.next() {
+            Some(Tok::Num(number)) => Value::number(number),
+            Some(Tok::Op(sign @ ('+' | '-'))) => match self.next() {
+                Some(Tok::Num(number)) => Value::number(if sign == '-' { -number } else { number }),
+                _ => return Err("expected number after sign in array constant".into()),
+            },
+            Some(Tok::Str(text)) => Value::text(text),
+            Some(Tok::Ident(name, false)) if name.eq_ignore_ascii_case("TRUE") => Value::Bool(true),
+            Some(Tok::Ident(name, false)) if name.eq_ignore_ascii_case("FALSE") => {
+                Value::Bool(false)
+            }
+            Some(Tok::Error(error)) => Value::Error(error),
+            _ => {
+                return Err(
+                    "array constants accept only numbers, text, logical values and errors".into(),
+                )
+            }
+        };
+        Ok(value)
     }
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
@@ -1098,7 +1298,7 @@ impl<'a> Parser<'a> {
                     _ => Err("expected cell after :".into()),
                 }
             } else {
-                Ok(Ast::Cell(row, col, flags))
+                Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
             }
         }
     }
@@ -1123,7 +1323,18 @@ impl<'a> Parser<'a> {
             return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
         }
 
-        Ok(Ast::SheetCell(qualifier, row, col, flags))
+        Ok(self.spill_suffix(Ast::SheetCell(qualifier, row, col, flags)))
+    }
+
+    /// `A1#` refers to the whole spill of the formula in A1. It is stored as
+    /// `ANCHORARRAY(A1)`, the form that XLSX files use.
+    fn spill_suffix(&mut self, anchor: Ast) -> Ast {
+        if self.peek() == Some(&Tok::Hash) {
+            let _ = self.next();
+            Ast::Func(Func::AnchorArray, vec![anchor])
+        } else {
+            anchor
+        }
     }
 
     fn sheet_range_end(
@@ -1282,6 +1493,27 @@ where
                 }
             }
             Ast::Func(Func::Let, resolved)
+        }
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), mut args)
+            if !args.is_empty() =>
+        {
+            let body = args.pop().expect("nonempty arguments");
+            let mut scoped = locals.to_vec();
+            scoped.extend(args.iter().filter_map(|parameter| {
+                if let Ast::Name(name) = parameter {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            }));
+            args.push(resolve_named_ranges_inner(
+                body,
+                formula_sheet,
+                resolve,
+                &scoped,
+            ));
+            Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args)
         }
         Ast::Func(func, args) => Ast::Func(
             func,
@@ -1497,6 +1729,9 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
             }
             true
         }
+        Ast::LetSlot { expression, .. } => {
+            translate_relative_refs_inner(expression, row_delta, col_delta)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             if !translate_relative_refs_inner(left, row_delta, col_delta) {
                 **left = Ast::InvalidRef;
@@ -1520,7 +1755,10 @@ fn translate_relative_refs_inner(ast: &mut Ast, row_delta: i64, col_delta: i64) 
         | Ast::NamedRange(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
-        | Ast::InvalidRef => true,
+        | Ast::InvalidRef
+        | Ast::Array { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => true,
     }
 }
 
@@ -1829,11 +2067,7 @@ fn write_structured_ref(
 fn write_ast(ast: &Ast, out: &mut String) {
     match ast {
         Ast::Num(value) => out.push_str(&value.to_string()),
-        Ast::Str(value) => {
-            out.push('"');
-            out.push_str(&value.replace('"', "\"\""));
-            out.push('"');
-        }
+        Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
@@ -1880,7 +2114,37 @@ fn write_ast(ast: &Ast, out: &mut String) {
             write_a1(*r1, *c1, flags.end, out);
         }
         Ast::Missing => {}
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
         Ast::InvalidRef => out.push_str("#REF!"),
+        Ast::Array { cols, values } => {
+            out.push('{');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    out.push(if index % *cols as usize == 0 {
+                        ';'
+                    } else {
+                        ','
+                    });
+                }
+                match value {
+                    Value::Number(number) => out.push_str(&number.to_string()),
+                    Value::Text(text) => write_text(text, out),
+                    Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+                    Value::Error(error) => out.push_str(error.sentinel()),
+                    Value::Blank => {}
+                }
+            }
+            out.push('}');
+        }
+        Ast::LetSlot { expression, .. } => write_ast(expression, out),
+        Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
+            write_ast(&args[0], out);
+            // A deleted anchor writes as #REF!, which has no spill suffix.
+            if !matches!(args[0], Ast::InvalidRef) {
+                out.push('#');
+            }
+        }
         Ast::Func(func, args) => {
             out.push_str(func_name(*func));
             out.push('(');
@@ -1889,6 +2153,20 @@ fn write_ast(ast: &Ast, out: &mut String) {
                     out.push(',');
                 }
                 write_ast(arg, out);
+            }
+            out.push(')');
+        }
+        #[cfg(feature = "analysis")]
+        Ast::UnknownFunc(name, args) if name == crate::eval::analysis::lambda::CALL => {
+            if let Some(callee) = args.first() {
+                write_ast(callee, out);
+            }
+            out.push('(');
+            for (index, argument) in args.iter().skip(1).enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_ast(argument, out);
             }
             out.push(')');
         }
@@ -1949,6 +2227,12 @@ fn write_ast(ast: &Ast, out: &mut String) {
     }
 }
 
+fn write_text(value: &str, out: &mut String) {
+    out.push('"');
+    out.push_str(&value.replace('"', "\"\""));
+    out.push('"');
+}
+
 fn write_sheet_name(name: &str, quoted: bool, out: &mut String) {
     if quoted {
         out.push('\'');
@@ -1987,6 +2271,32 @@ fn write_col(mut col: u32, out: &mut String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spill_references_parse_and_serialize_with_a_hash_suffix() {
+        for (source, expected) in [
+            ("=A1#", "=A1#"),
+            ("=sum($b$2#)", "=SUM($B$2#)"),
+            ("=ROWS('My Sheet'!C3#)", "=ROWS('My Sheet'!C3#)"),
+        ] {
+            assert_eq!(serialize(&parse(source).unwrap()), expected, "{source}");
+        }
+        assert_eq!(
+            parse("=A1#").unwrap(),
+            Ast::Func(
+                Func::AnchorArray,
+                vec![Ast::Cell(0, 0, RefFlags::default())]
+            )
+        );
+        // `#` only follows a cell, and the function name cannot be typed.
+        for source in ["=A1:B2#", "=#", "=1#"] {
+            assert!(parse(source).is_err(), "{source}");
+        }
+        assert!(matches!(
+            parse("=ANCHORARRAY(A1)"),
+            Ok(Ast::UnknownFunc(..))
+        ));
+    }
 
     #[test]
     fn parse_a1_accepts_absolute_markers() {
@@ -2050,6 +2360,73 @@ mod tests {
         assert!(parse("=%2").is_err());
         assert!(parse("=2^").is_err());
         assert!(parse("=2&&3").is_err());
+    }
+
+    #[test]
+    fn array_constants_parse_rows_and_columns_and_round_trip() {
+        let shapes = [
+            ("={1,2,3}", 3, 3, "={1,2,3}"),
+            ("={1;2;3}", 1, 3, "={1;2;3}"),
+            ("={1,2;3,4}", 2, 4, "={1,2;3,4}"),
+            ("={ -1.5 , +2 }", 2, 2, "={-1.5,2}"),
+            (
+                "={\"a\"\"b\",true,False;#n/a,#DIV/0!,#REF!}",
+                3,
+                6,
+                "={\"a\"\"b\",TRUE,FALSE;#N/A,#DIV/0!,#REF!}",
+            ),
+        ];
+        for (source, expected_cols, expected_len, expected_text) in shapes {
+            let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+            let Ast::Array { cols, values } = &ast else {
+                panic!("{source} did not parse as an array constant");
+            };
+            assert_eq!(
+                (*cols, values.len()),
+                (expected_cols, expected_len),
+                "{source}"
+            );
+            assert_eq!(serialize(&ast), expected_text, "{source}");
+            assert_eq!(parse(&serialize(&ast)).as_ref(), Ok(&ast), "{source}");
+        }
+
+        assert_eq!(
+            parse("={\"x\",FALSE,#NAME?}"),
+            Ok(Ast::Array {
+                cols: 3,
+                values: vec![
+                    Value::text("x"),
+                    Value::Bool(false),
+                    Value::Error(FormulaError::Name),
+                ],
+            })
+        );
+        assert_eq!(
+            serialize(&parse("=SUM({1,2},A1)").unwrap()),
+            "=SUM({1,2},A1)"
+        );
+    }
+
+    #[test]
+    fn array_constants_reject_ragged_rows_references_and_expressions() {
+        for source in [
+            "={1,2;3}",
+            "={1;2,3}",
+            "={}",
+            "={1,}",
+            "={1;}",
+            "={1,,2}",
+            "={A1,2}",
+            "={1+1}",
+            "={(1)}",
+            "={SUM(1)}",
+            "={-\"a\"}",
+            "={1,{2}}",
+            "={1,2",
+            "=1;2",
+        ] {
+            assert!(parse(source).is_err(), "{source} should not parse");
+        }
     }
 
     #[test]
@@ -2285,5 +2662,32 @@ mod tests {
         }
         assert_eq!(parse_col(""), None);
         assert_eq!(parse_col("A1"), None);
+    }
+
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn analysis_names_resolve_to_their_family_without_shadowing_built_ins() {
+        let names: Vec<&str> = crate::eval::analysis::names().collect();
+        for name in &names {
+            assert!(
+                name.bytes().all(|byte| !byte.is_ascii_lowercase()),
+                "{name} must be uppercase"
+            );
+            // A built-in or alias with the same spelling would win the lookup.
+            let id = crate::eval::analysis::lookup(name).expect("registered analysis name");
+            assert_eq!(lookup_func(name), Some(Func::Analysis(id)), "{name}");
+            assert_eq!(
+                lookup_func(&name.to_ascii_lowercase()),
+                Some(Func::Analysis(id))
+            );
+            assert_eq!(func_name(Func::Analysis(id)), *name);
+        }
+        let listed = function_names();
+        assert_eq!(
+            listed.len(),
+            FUNCTION_NAMES.len() + FUNCTION_ALIASES.len() + names.len(),
+            "every spelling is listed once"
+        );
+        assert!(listed.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

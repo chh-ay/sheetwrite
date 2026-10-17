@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export const BUN_VERSION = "1.4.2";
-export const RUST_VERSION = "1.98.1";
+export const BUN_VERSION = "1.4.3";
+export const RUST_VERSION = "1.99.0";
 export const NODE_VERSION = "26.9.0";
 export const NPM_VERSION = "11.19.1";
 export const WASM_TARGET = "wasm32-unknown-unknown";
@@ -11,6 +11,7 @@ export const CARGO_LLVM_COV_VERSION = "0.8.7";
 
 export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/wasm",
+  "@sheetwrite/formulas",
   "@sheetwrite/core",
   "@sheetwrite/xlsx",
   "@sheetwrite/react",
@@ -20,6 +21,7 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
 
 export const PACKAGE_TYPECHECK_ORDER = [
   "@sheetwrite/wasm",
+  "@sheetwrite/formulas",
   "@sheetwrite/core",
   "@sheetwrite/xlsx",
   "@sheetwrite/react",
@@ -138,6 +140,11 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     cwd: "packages/wasm",
   },
   {
+    id: "test:rust:analysis",
+    command: ["cargo", "test", "--features", "analysis"],
+    cwd: "packages/wasm",
+  },
+  {
     id: "audit:rust",
     command: ["cargo", "audit"],
     cwd: "packages/wasm",
@@ -162,7 +169,15 @@ const POST_BUILD_QUALITY_NODES: readonly CommandNode[] = [
       "packages",
       "test/browser/canvas-assertions.test.ts",
       "scripts/public-api.test.ts",
+      "scripts/conformance.test.ts",
+      "scripts/conformance-google.test.ts",
+      "scripts/conformance-workbook-roundtrip.test.ts",
+      "scripts/formula-contract.test.ts",
+      "scripts/ci-paths.test.ts",
+      "scripts/indexnow.test.ts",
+      "scripts/release-github.test.ts",
       "bench/test",
+      "docs/test",
     ],
   },
   ...EXAMPLE_BUILD_NODES,

@@ -35,3 +35,11 @@ Named re-exports preserve documentation from both the export statement and the d
 `bun run api:check` hashes the normalized manifest. A changed digest must be reviewed with the declaration diff and accepted explicitly; rebuilding alone cannot rewrite the baseline. This catches additions, removals, signature drift, duplicate declaration merges, missing documentation, and dependency types that leak into the public surface.
 
 The API manifest describes type compatibility. Runtime behavior remains protected by package tests, adapter lifecycle contracts, browser scenarios, canonical tarball checks, and delivery-size budgets.
+
+## Deprecations and removals
+
+`supported` entry points get a deprecation period, marked with `@deprecated`, before removal. `internal` entry points, such as the WASM engine, may change in a minor release with a changelog entry.
+
+| Package | Removed or deprecated | Replacement | Release |
+| --- | --- | --- | --- |
+| `@sheetwrite/wasm` | Removed `CellStore.setBlock` | `CellStore.setBlockPacked` | Next minor release |

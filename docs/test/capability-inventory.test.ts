@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   CAPABILITY_INVENTORY,
   CAPABILITY_OWNERS,
@@ -34,6 +35,10 @@ const REQUIRED_CAPABILITY_IDS = [
   "workbook.host-operations",
   "formulas.entry-recalc",
   "formulas.references-names",
+  "formulas.full-engine",
+  "formulas.dynamic-arrays",
+  "formulas.lambda",
+  "formulas.spill-references",
   "data.aggregation",
   "data.sort-filter",
   "data.validation-rules",
@@ -77,6 +82,7 @@ const REQUIRED_CAPABILITY_IDS = [
   "collab.conflicts",
   "collab.recovery",
   "lifecycle.engine-events",
+  "workflow.host-owned-rows",
   "lifecycle.vanilla",
   "lifecycle.react",
   "lifecycle.vue",

@@ -588,6 +588,7 @@ export class DomOverlay {
 
     if (entry.renderer.update) {
       entry.renderer.update(entry.node, context);
+      this.syncSemantics(entry);
     } else if (needsLegacyRefresh) {
       const next = entry.renderer.dom!(context);
       if (!(next instanceof HTMLElement)) {
@@ -618,8 +619,10 @@ export class DomOverlay {
         }
       }
       if (failed) throw failure;
+      this.syncSemantics(entry);
     }
-    this.syncSemantics(entry);
+    // A legacy renderer whose node was not rebuilt keeps the semantics the last
+    // rebuild or creation installed: only the position moved.
   }
 
   private positionEntry(

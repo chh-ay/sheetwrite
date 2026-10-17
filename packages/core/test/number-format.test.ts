@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
 import {
   formatNumber,
@@ -7,15 +8,15 @@ import {
 } from "../src/number-format.js";
 
 describe("formatNumber", () => {
-  it("applies percent scaling and suffix", () => {
-    expect(formatNumber(0.5, "0%")).toBe("50%");
-    expect(formatNumber(0.123, "0.0%")).toBe("12.3%");
-  });
-
-  it("resolves the locale currency placeholder", () => {
-    resetNumberFormatResourcesForTest();
-    expect(formatNumber(1234.5, "¤#,##0.00")).toBe("$1,234.50");
-    expect(formatNumber(1, "¤0.00")).toBe("$1.00");
+  it.each([
+    [-246, "$#,##0", "-$246"],
+    [-1234.5, "$#,##0.00", "-$1,234.50"],
+    [-246, '"€"#,##0', "-€246"],
+    [-246, "[$€-2] #,##0", "-€ 246"],
+    [-246, "$#,##0;($#,##0)", "($246)"],
+  ] as const)("formats %s with %s as %s", (value, code, expected) => {
+    expect(formatNumber(value, code)).toBe(expected);
+    expect(formatNumber(value, code)).toBe(expected);
   });
 
   it("matches Intl rounding for grouped formats without using toFixed semantics", () => {
@@ -119,13 +120,74 @@ describe("formatNumber", () => {
     expect(formatNumber(-12.5, '0.0;"loss "0.0')).toBe("loss 12.5");
   });
 
-  it("uses the configured locale rather than the browser default", () => {
-    expect(formatNumber(1234.5, "#,##0.00", "de-DE")).toBe("1.234,50");
-  });
-
   it("distinguishes month and minute tokens and renders names and AM/PM", () => {
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4, 15, 6, 7)));
     expect(formatNumber(serial, "mmm d, yyyy h:mm:ss AM/PM")).toBe("Jul 4, 2024 3:06:07 PM");
     expect(formatNumber(serial, "mmmm dd")).toBe("July 04");
+  });
+
+  it("returns exact text for fixed values on repeated calls", () => {
+    resetNumberFormatResourcesForTest();
+    const cases: ReadonlyArray<[number, string | undefined, string | undefined, string]> = [
+      [1234.5, "¤#,##0.00", "en-US", "$1,234.50"],
+      [1, "¤0.00", "en-US", "$1.00"],
+      [1234.5, "¤#,##0.00", "de-DE", "$1.234,50"],
+      [1234.5, "#,##0.00", "de-DE", "1.234,50"],
+      [1234.5, "#,##0.00", "en-US", "1,234.50"],
+      [1234.5, "#,##0.0", "en-US", "1,234.5"],
+      [-1234.5, "#,##0.00", "en-US", "-1,234.50"],
+      [-0.4, "$#,##0", "en-US", "-$0"],
+      [-0.05, "0.0%", "en-US", "-5.0%"],
+      [-246, '0" USD"', "en-US", "-246 USD"],
+      [-5, "0", "en-US", "-5"],
+      [-0, "$0.00", "en-US", "$-0.00"],
+      [0, "$0.00", "en-US", "$0.00"],
+      [-1, "yyyy-mm-dd", "en-US", "1899-12-30"],
+      [-0, undefined, undefined, "-0"],
+      [0, undefined, undefined, "0"],
+      [-0, "0.00", undefined, "-0.00"],
+      [0, "0.00", undefined, "0.00"],
+      [Number.NaN, "#,##0", undefined, ""],
+      [Number.NaN, undefined, undefined, ""],
+      [Number.POSITIVE_INFINITY, "#,##0.00", undefined, ""],
+      [Number.NEGATIVE_INFINITY, undefined, undefined, ""],
+      [1e21, "#,##0.00", undefined, "1,000,000,000,000,000,000,000.00"],
+      [1e-7, "0.00000000", undefined, "0.00000010"],
+      [45_351, "yyyy-mm-dd", undefined, "2024-02-29"],
+      [45_351, "mmm d, yyyy", undefined, "Feb 29, 2024"],
+      [-2.5, "#,##0.00;(#,##0.00)", undefined, "(2.50)"],
+      [0.5, "0%", undefined, "50%"],
+      [0.123, "0.0%", undefined, "12.3%"],
+      [12_345.6789, "0.00E+00", undefined, "1.23E+04"],
+    ];
+
+    for (const [value, code, locale, expected] of cases) {
+      expect(formatNumber(value, code, locale), `cold ${value}`).toBe(expected);
+      // The second call serves the entry the first call stored.
+      expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
+    }
+  });
+
+  it("recomputes text evicted by the value and format-group bounds", () => {
+    resetNumberFormatResourcesForTest();
+    const code = "#,##0.000000";
+    // More distinct values than one format/locale group keeps, so the first
+    // entry is evicted before it is read again.
+    for (let index = 0; index < 600; index++) formatNumber(index + 0.5, code);
+    expect(formatNumber(0.5, code)).toBe("0.500000");
+    expect(formatNumber(599.5, code)).toBe("599.500000");
+    expect(formatNumber(100.5, code)).toBe("100.500000");
+
+    // More (format, locale) groups than the group limit keeps, so the oldest
+    // groups are dropped. Ten locale spellings of one format are ten groups.
+    for (let index = 0; index < 10; index++) {
+      expect(formatNumber(7.4, "#,##0.0", `en-US-x-${index}`)).toBe("7.4");
+    }
+    expect(formatNumber(7.4, "#,##0.0", "en-US-x-0")).toBe("7.4");
+    for (let index = 0; index < 10; index++) {
+      expect(formatNumber(7.4, `0.${"0".repeat(index + 1)}`)).toBe(`7.4${"0".repeat(index)}`);
+    }
+    expect(formatNumber(7.4, "0.0")).toBe("7.4");
+    expect(formatNumber(0.5, code)).toBe("0.500000");
   });
 });

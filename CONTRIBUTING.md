@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Use Bun 1.4.2, Rust 1.98.1 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
+Use Bun 1.4.3, Rust 1.99.0 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
 
 ```sh
 rustup toolchain install
@@ -21,6 +21,8 @@ bun run verify:ci
 
 Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm`.
 
+A change to the engine (the Rust source in `packages/wasm`, which also builds `@sheetwrite/formulas`) or to its TypeScript callers must also pass two benchmark checks before it merges, not only at the release capture. Run the formula gate, `bun run src/formula-bench.ts` from `bench/`, which compares a fresh capture with the committed baseline. Run the engine memory probe described in [`bench/README.md`](bench/README.md#engine-memory-release-gate). Retained bytes are deterministic, so any growth must be fixed or approved in the same change, with a measured reason in `bench/results/formula-baseline-approvals.json` (see [the formula-engine protocol](bench/README.md#formula-engine-protocol)).
+
 `verify:ci` is the broadest local pre-submit gate, though not a complete mirror of the pipeline — CI additionally runs the full browser matrix, coverage, and the production docs build. Matched timing comparisons run deliberately through the local protocol in `bench/README.md`, not as a required CI job. `verify:ci` prints `::workspace-node::<id>` before each step; `bun scripts/workspace-tooling.ts verify-ci --dry-run` lists every id with the exact command it runs, so you can re-run just the step that failed. [`scripts/README.md`](scripts/README.md) explains how the repository's scripts are organised and which handful you actually need.
 
 Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are owned by `bun run docs:generate`. Do not hand-edit generated files. `bun run docs:check` rejects stale output, including the AI-readable endpoints. Build output, benchmark evidence, and release artifacts remain uncommitted.
@@ -28,6 +30,35 @@ Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are own
 After the initial 0.1.0 release, user-visible package changes require a Changeset created with `bunx changeset`. Private workspaces are excluded.
 
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
+
+## Code style
+
+oxfmt and rustfmt own formatting. Three rules they cannot check:
+
+- **Keep explanations, not narration.** Keep comments that explain design, data
+  layout, invariants, safety arguments, non-obvious trade-offs, or why an
+  approach was chosen, at whatever length they need. Delete only history or
+  change narration ("before…", "now…", "exactly as before", issue/plan labels),
+  comments that restate the next line or a name, and commented-out code.
+  When code changes, update its comments in the same commit; a comment that
+  no longer matches the code is worse than none.
+  Doc comments (`/** */`, `///`, `//!`) stay doc comments; never downgrade
+  them to `//`.
+- **Separate the steps.** Put one blank line between the logical steps of a
+  function (setup, the main work, the result), after a block that closes in the
+  middle of a function, and between declarations and members. A function body
+  that needs no blank line is usually short enough to read at a glance; one
+  that needs many is usually several functions.
+- **Keep TypeScript in step with the engine.** When you add or change a
+  Rust/WASM export, update its TypeScript callers in the same change. Check
+  `packages/core/src/store/wasm-contract.ts` and every call site of the
+  capability, not only the one you were working on. Where a bulk or packed
+  export exists, use it instead of calling a per-cell or per-row export in a
+  loop, and move callers of a superseded export to its replacement. Keep a
+  scalar loop only where the bulk call would change behaviour (validation,
+  ordering, partial failure) or measures slower, and say why in a comment.
+  A faster engine path that TypeScript does not call does not make the
+  product faster.
 
 ## Documentation deployment
 

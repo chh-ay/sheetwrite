@@ -14,6 +14,8 @@ description: "Compiler-backed classification of every publishable Sheetwrite pac
 | `@sheetwrite/core/styles.css` | `./styles.css` | asset | [Reference](/docs/api/core-styles-css/) |
 | `@sheetwrite/core/testing` | `./dist/testing.d.ts` | test-only | [Reference](/docs/api/core-testing/) |
 | `@sheetwrite/core/worker` | `./dist/worker.d.ts` | supported | [Reference](/docs/api/core-worker/) |
+| `@sheetwrite/formulas` | `./loader.d.ts` | internal | [Reference](/docs/api/formulas/) |
+| `@sheetwrite/formulas/wasm` | `./pkg/sheetwrite_wasm_bg.wasm` | asset | [Reference](/docs/api/formulas-wasm/) |
 | `@sheetwrite/react` | `./dist/index.d.ts` | supported | [Reference](/docs/api/react/) |
 | `@sheetwrite/react/styles.css` | `./styles.css` | asset | [Reference](/docs/api/react-styles-css/) |
 | `@sheetwrite/svelte` | `./src/index.ts` | supported | [Reference](/docs/api/svelte/) |

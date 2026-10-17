@@ -11,7 +11,7 @@ Immutable local operation batch awaiting a host acknowledgement.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L76"><code>packages/core/src/types/transaction.ts#L76</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Members <span class="api-count" data-pagefind-ignore>5</span>
 
 <div class="api-member-list">
 
@@ -50,6 +50,19 @@ readonly operations: readonly DocumentOp[];
 ```
 
 </details>
+
+<details class="api-member" id="pending-commit-version-operation-counts" data-pagefind-weight="1">
+<summary><code>versionOperationCounts</code> <span class="api-member-summary">Present only when the operations are too large for one server version.</span></summary>
+
+```ts generated
+readonly versionOperationCounts?: readonly number[];
+```
+
+<p class="api-member-doc">Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.</p>
+</details>
 </div>
 
 ## Declaration
@@ -63,6 +76,7 @@ export interface PendingCommit {
   baseVersion: number;
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
+  readonly versionOperationCounts?: readonly number[];
 }
 ```
 

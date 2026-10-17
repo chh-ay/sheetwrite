@@ -9,7 +9,7 @@ Host subscription contract for ordered versioned operations. Sources that
 can pause intake should await the listener promise to preserve backpressure.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L132"><code>packages/core/src/types/transaction.ts#L132</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L166"><code>packages/core/src/types/transaction.ts#L166</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

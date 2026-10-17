@@ -58,11 +58,13 @@ export interface VisibleWindowView {
   valueKinds?: Uint8Array;
   /** Raw numeric payloads for worker transfer; internal fast path. */
   numberValues?: Float64Array;
-  /** Raw global string-pool ids for worker transfer; `0xffffffff` means none. */
+  /** Store-wide u32 epoch issuing the raw IDs; clear ID caches whenever it changes. */
+  stringPoolEpoch: number;
+  /** Raw string-pool ids valid only in `stringPoolEpoch`; `0xffffffff` means none. */
   stringPoolIds?: Uint32Array;
   /** Raw local-string indices for formula errors; `-1` means none. */
   stringLocalIds?: Int32Array;
-  /** String-pool ids resolved by this window and safe for worker cache updates. */
+  /** IDs resolved in `stringPoolEpoch`, safe for cache updates after epoch invalidation. */
   stringPoolUpdateIds?: Uint32Array;
   /** String values parallel to `stringPoolUpdateIds`. */
   stringPoolUpdateValues?: readonly string[];

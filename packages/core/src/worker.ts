@@ -1,4 +1,4 @@
-// OffscreenCanvas paint worker (M5). Receives the transferred canvas + frames
+// Receives the transferred canvas and frames
 // from the main thread and paints off-thread via the shared `paintFrame`, so a
 // busy main thread can't stall scrolling. Custom (function) cell renderers do
 // not cross the worker boundary, so the registry here is always empty.
@@ -17,6 +17,7 @@ interface PackedPaintData {
   styleIds: Uint32Array;
   valueKinds: Uint8Array;
   numberValues: Float64Array;
+  stringPoolEpoch: number;
   stringPoolIds: Uint32Array;
   stringLocalIds: Int32Array;
   stringPoolUpdateIds?: Uint32Array;
@@ -50,6 +51,7 @@ interface SharedPackedMessage {
   rows: { start: number; end: number };
   cols: readonly number[];
   styles: VisibleWindowView["styles"];
+  stringPoolEpoch: number;
   stringPoolUpdateValues?: readonly string[];
   localStrings?: readonly string[];
   shared: {
@@ -99,6 +101,7 @@ const STRING_CACHE_CAP = 65_536;
 
 interface WorkerRuntimeState {
   stringCache: Map<number, string>;
+  stringPoolEpoch: number | undefined;
   valuesScratch: CellScalar[];
   canvas: OffscreenCanvas | null;
   ctx: OffscreenCanvasRenderingContext2D | null;
@@ -114,6 +117,10 @@ function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): Visi
   const updateIds = msg.stringPoolUpdateIds;
   const updateValues = msg.stringPoolUpdateValues;
 
+  if (state.stringPoolEpoch !== msg.stringPoolEpoch) {
+    state.stringCache.clear();
+    state.stringPoolEpoch = msg.stringPoolEpoch;
+  }
   // Cap the pool-id→string cache before this frame's updates are folded in; the
   // just-swept window re-warms from the update payload below.
   if (state.stringCache.size >= STRING_CACHE_CAP) state.stringCache.clear();
@@ -145,6 +152,7 @@ function unpackPackedView(msg: PackedPaintData, state: WorkerRuntimeState): Visi
 
   return {
     sheet: msg.sheet,
+    stringPoolEpoch: msg.stringPoolEpoch,
     rows: msg.rows,
     cols: msg.cols,
     values: state.valuesScratch,
@@ -161,6 +169,7 @@ function unpackSharedPackedView(
   const packed: PackedPaintMessage = {
     type: "paintPacked",
     sheet: msg.sheet,
+    stringPoolEpoch: msg.stringPoolEpoch,
     rows: msg.rows,
     cols: msg.cols,
     styles: msg.styles,
@@ -261,6 +270,7 @@ export function createWorkerMessageHandler(
 ): (message: unknown) => void {
   const state: WorkerRuntimeState = {
     stringCache: new Map(),
+    stringPoolEpoch: undefined,
     valuesScratch: [],
     canvas: null,
     ctx: null,

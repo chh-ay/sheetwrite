@@ -53,6 +53,12 @@ unmount. Reset-bound inputs are `workbook`, `data`, `datasource`,
 `renderers`; `theme`, `readOnly`, `config`, `overscan`, and `minColumns` update
 live.
 
+Readiness observes the latest committed live options, including changes while
+WASM initialization is pending. A throwing ready callback retires the new Grid;
+consumer errors are not initialization failures. Omitted `renderer` and
+`"canvas"` are equivalent. Changing an explicit `wasmSource` after readiness
+preserves the Grid and retains the loader's first-source warning.
+
 Grid callbacks are `onGridChange`, `onViewportChange`, `onSelectionChange`, `onEditBegin`, `onEditCommit`, `onSearch`, `onCommandStateChange`, `onActiveSheetChange`, `onMutationRejected`, `onRendererFallback`, `onDatasourceError`, and `onExportError`.
 
 For vanilla/preload control, use `initSheetwrite()` and `createGrid()` from `@sheetwrite/core`. See [installation](https://sheetwrite.vercel.app/docs/start/installation/), [Svelte integration](https://sheetwrite.vercel.app/docs/frameworks/svelte/), and [collaboration](https://sheetwrite.vercel.app/docs/guides/collaboration/).

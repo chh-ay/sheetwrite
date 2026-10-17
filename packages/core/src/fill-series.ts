@@ -6,8 +6,6 @@
 
 import type { CellScalar } from "./types/cell.js";
 
-// ── Inputs & outputs ─────────────────────────────────────────────────────────
-
 /** One source cell in fill order (top→bottom for a vertical fill). */
 export interface FillSourceCell {
   /** Resolved scalar value of the source cell. */
@@ -32,8 +30,6 @@ export interface FillSeries {
    */
   stepAt(p: number): FillStep;
 }
-
-// ── Detection ────────────────────────────────────────────────────────────────
 
 /** Relative+absolute slack so float deltas (0.1, 0.2, 0.3, …) read as constant. */
 const DELTA_EPSILON = 1e-9;

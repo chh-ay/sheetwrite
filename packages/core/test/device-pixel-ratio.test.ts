@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+
 import { GridImpl } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, Store, Workbook } from "../src/types.js";
@@ -44,7 +45,15 @@ function makeStore(workbook: Workbook): Store {
     getVisibleWindow: (sheet, rows, cols) => {
       const size = Math.max(0, (rows.end - rows.start) * cols.length);
       const values: CellScalar[] = new Array(size).fill(null);
-      return { sheet, rows, cols, values, styleIds: new Uint32Array(size), styles: [{}] };
+      return {
+        sheet,
+        stringPoolEpoch: 0,
+        rows,
+        cols,
+        values,
+        styleIds: new Uint32Array(size),
+        styles: [{}],
+      };
     },
     ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),

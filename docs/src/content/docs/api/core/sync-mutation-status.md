@@ -8,7 +8,7 @@ description: "Lifecycle state of one local mutation in the synchronization queue
 Lifecycle state of one local mutation in the synchronization queue.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L84"><code>packages/core/src/types/transaction.ts#L84</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L91"><code>packages/core/src/types/transaction.ts#L91</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -1,11 +1,12 @@
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { replaceInText } from "./search-replace.js";
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
-import type { DocumentOp, Sheet } from "./types/document.js";
+import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { ReplaceResult, SearchOptions, SearchResult } from "./types/grid.js";
-import type { Store } from "./types/store.js";
+import type { ResolvedCell, Store } from "./types/store.js";
 
 export interface SearchControllerDeps {
   store: Store;
@@ -180,11 +181,63 @@ export class SearchController {
     }
 
     const patches: DocumentOp[] = [];
-    for (let i = 0; i < this.searchMatches.length; i++) {
-      const match = this.searchMatches.at(i);
+    let replaced = 0;
+    const bySheet = new Map<SheetId, CellAddress[]>();
+    for (let index = 0; index < this.searchMatches.length; index++) {
+      const match = this.searchMatches.at(index);
       if (!match) continue;
-      const patch = this.replacementPatch(match, replacement);
-      if (patch) patches.push(patch);
+      const matches = bySheet.get(match.sheet) ?? [];
+      matches.push(match);
+      bySheet.set(match.sheet, matches);
+    }
+
+    const engine = storeEngine(this.deps.store);
+    for (const [sheet, matches] of bySheet) {
+      const captured = engine?.captureCells(sheet, matches);
+      const metadata = this.deps.sheet(sheet);
+      // Per-cell operations preserve policy issue indices and partial spill rejection.
+      const scalarWrites =
+        !engine ||
+        Boolean(
+          metadata.validationRules?.length ||
+          metadata.protectedRanges?.length ||
+          captured?.some((cell) => cell.isSpillChild),
+        );
+      const cells: SnapshotCell[] = [];
+      let endRow = 0;
+      let endCol = 0;
+      for (const [index, addr] of matches.entries()) {
+        const cell = captured?.[index];
+        // Custom stores without an engine retain their scalar read contract.
+        const patch = cell
+          ? cell.value.kind === "formula"
+            ? null
+            : this.replacementFromCell(addr, replacement, cell)
+          : this.replacementPatch(addr, replacement);
+        if (!patch) continue;
+        if (scalarWrites) {
+          patches.push(patch);
+          replaced++;
+          continue;
+        }
+
+        cells.push({
+          rowOffset: addr.row,
+          colOffset: addr.col,
+          value: patch.value,
+          style: patch.style,
+        });
+        endRow = Math.max(endRow, addr.row);
+        endCol = Math.max(endCol, addr.col);
+      }
+
+      if (cells.length === 0) continue;
+      replaced += cells.length;
+      patches.push({
+        op: "setRange",
+        range: { sheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
+        cells,
+      });
     }
 
     if (patches.length > 0) {
@@ -195,7 +248,7 @@ export class SearchController {
       this.revealActiveMatch();
       this.deps.scheduleRender();
     }
-    return { replaced: patches.length, result: this.emitSearch() };
+    return { replaced, result: this.emitSearch() };
   }
 
   /**
@@ -204,12 +257,21 @@ export class SearchController {
    * Preserves the cell's existing style and re-parses through `parseCellInput`
    * so numbers stay numbers.
    */
-  private replacementPatch(addr: CellAddress, replacement: string): DocumentOp | null {
-    // Formula cells carry source text we must never rewrite; ref cells are
-    // WASM-cleared and never surface in matches, but guard anyway.
+  private replacementPatch(
+    addr: CellAddress,
+    replacement: string,
+  ): Extract<DocumentOp, { op: "set" }> | null {
+    // Formula source text must never be rewritten by a resolved-value search.
     if (this.deps.store.getFormula(addr) !== null) return null;
 
-    const cell = this.deps.store.getCell(addr);
+    return this.replacementFromCell(addr, replacement, this.deps.store.getCell(addr));
+  }
+
+  private replacementFromCell(
+    addr: CellAddress,
+    replacement: string,
+    cell: Pick<ResolvedCell, "resolved" | "style">,
+  ): Extract<DocumentOp, { op: "set" }> | null {
     const text = cellScalarToText(cell.resolved);
     const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;

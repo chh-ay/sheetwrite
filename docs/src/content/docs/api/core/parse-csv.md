@@ -12,7 +12,7 @@ and returns an in-memory grid; it does not claim streaming. Scanning enforces
 resource ceilings before materializing the next oversized field or record.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L139"><code>packages/core/src/export.ts#L139</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L140"><code>packages/core/src/export.ts#L140</code></a></dd></div>
 </dl>
 
 ## Declaration

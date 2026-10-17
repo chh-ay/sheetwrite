@@ -5,10 +5,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
 };
-
-use super::array::ast_produces_array;
 
 pub(crate) struct DepIndex {
     exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,
@@ -93,6 +91,26 @@ impl DepIndex {
         }
         (nodes, edges)
     }
+
+    /// Whether rewriting one formula entry leaves every field
+    /// [`build_dep_index`] reads unchanged.
+    ///
+    /// When this holds, the cached index still describes the rewritten
+    /// formula, so source replacement keeps the current formula epoch and the next
+    /// recompute skips the whole-workbook rebuild. The formula cell itself is
+    /// still marked dirty, so it is always re-evaluated.
+    ///
+    /// An entry with a parse or resolution error carries no reads and no AST,
+    /// so both sides must be error-free for the comparison to be meaningful; a
+    /// cell that gains its first formula changes the formula-cell set, so the
+    /// caller only compares entries when one already existed.
+    pub(crate) fn dependency_graph_unchanged(previous: &FormulaEntry, next: &FormulaEntry) -> bool {
+        previous.error.is_none()
+            && next.error.is_none()
+            && previous.reads.cells == next.reads.cells
+            && previous.reads.ranges == next.reads.ranges
+            && previous.produces_array == next.produces_array
+    }
 }
 
 struct RangeGroup {
@@ -132,6 +150,14 @@ impl RangeInterval {
     }
 }
 
+/// Build the whole-workbook dependency index for `epoch`.
+///
+/// The fields this function reads from each formula entry -- the read cells,
+/// the read ranges and whether the AST produces an array -- are also compared
+/// by [`DepIndex::dependency_graph_unchanged`], which lets a formula rewrite
+/// keep the cached index when none of them changed. A new dependency-relevant
+/// field must be added to that comparison too, or the epoch will not advance
+/// when it changes.
 pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
     let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
@@ -149,7 +175,7 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (&formula_cell, entry) in &sheet.formulas {
-            has_dynamic_arrays |= entry.ast.as_ref().is_some_and(ast_produces_array);
+            has_dynamic_arrays |= entry.produces_array;
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
@@ -322,6 +348,37 @@ pub(super) fn collect_affected_formulas(
     }
 
     affected
+}
+
+/// Formulas that read any of `cells` directly, by cell or by range. Unlike
+/// [`collect_affected_formulas`], this does not follow dependents further.
+pub(super) fn direct_readers(
+    index: &DepIndex,
+    sheet: usize,
+    cells: &[(u32, u32)],
+) -> HashSet<AbsCellKey> {
+    let mut readers = HashSet::new();
+    let mut range_matches: Vec<usize> = Vec::new();
+    let mut row_matches: Vec<usize> = Vec::new();
+    let mut range_marks = vec![0; index.range_groups.len()];
+    let mut range_stamp = 1;
+    for &cell in cells {
+        let cell = AbsCellKey::from_local(sheet, cell);
+        if let Some(dependents) = index.exact_dependents.get(&cell) {
+            readers.extend(dependents.iter().copied());
+        }
+        index.collect_matching_range_groups(
+            cell,
+            &mut range_matches,
+            &mut row_matches,
+            &mut range_marks,
+            &mut range_stamp,
+        );
+        for &group in &range_matches {
+            readers.extend(index.range_groups[group].dependents.iter().copied());
+        }
+    }
+    readers
 }
 
 fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {

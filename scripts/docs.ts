@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, relative, resolve, sep } from "node:path";
+
 import {
   isCallSignatureDeclaration,
   isClassDeclaration,
@@ -17,6 +18,8 @@ import {
   type SourceFile,
 } from "typescript/unstable/ast";
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
+
+import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -30,12 +33,6 @@ import {
   collectMissingCapabilityFiles,
 } from "../docs/src/showcases/capability-validation.js";
 import {
-  COMPATIBILITY_FIXTURES,
-  COMPATIBILITY_INVENTORY,
-  type CompatibilityFixture,
-  type CompatibilityRecord,
-} from "../docs/src/showcases/compatibility.js";
-import {
   buildCompatibilityResults,
   type CompatibilityResults,
 } from "../docs/src/showcases/compatibility-results.js";
@@ -43,12 +40,23 @@ import {
   collectCompatibilityIssues,
   collectMissingCompatibilityFiles,
 } from "../docs/src/showcases/compatibility-validation.js";
+import {
+  COMPATIBILITY_FIXTURES,
+  COMPATIBILITY_INVENTORY,
+  type CompatibilityFixture,
+  type CompatibilityRecord,
+} from "../docs/src/showcases/compatibility.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
 import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
+import {
+  renderFullEngineEvidence,
+  validateFullEngineArtifact,
+  validateMatchedEngineArtifact,
+} from "./full-engine-docs.js";
 import {
   type ApiEntryPoint,
   type ApiExport,
@@ -86,6 +94,7 @@ export const MIGRATION_ROUTES = {
 
 const PACKAGE_DIRECTORIES: Readonly<Record<string, string>> = {
   "@sheetwrite/core": "packages/core",
+  "@sheetwrite/formulas": "packages/formulas",
   "@sheetwrite/react": "packages/react",
   "@sheetwrite/svelte": "packages/svelte",
   "@sheetwrite/vue": "packages/vue",
@@ -120,11 +129,12 @@ const FORBIDDEN_NAMES = [
   "toXlsx(",
   "fromXlsx(",
 ] as const;
+
 /**
  * Sheetwrite-owned adapter surface every framework package must document.
  * `inputs` mirrors `GRID_OPTION_POLICY` plus explicit WASM initialization, and
- * `vueEvents` mirrors `handlerEvents` in template casing; `docs.test.ts` locks
- * both mirrors against `@sheetwrite/core/adapter`.
+ * `vueEvents` mirrors `handlerEvents` in template casing; `docs.test.ts` checks
+ * that casing and input-contract drift against `GridOptions`.
  */
 export const ADAPTER_DOC_CONTRACT = {
   packages: ["@sheetwrite/react", "@sheetwrite/svelte", "@sheetwrite/vue"],
@@ -657,7 +667,6 @@ async function readDeclarationShape(
   };
 }
 
-/** Named members carry their name; signature-only members fall back to a positional label. */
 function declarationMemberName(member: Node, index: number, sourceFile: SourceFile): string {
   const named = member as Node & { name?: Node };
   if (named.name !== undefined) {
@@ -713,8 +722,8 @@ interface MemberTypeParts {
 }
 
 /**
- * The declared type of a member row. Call signatures, constructors, and index
- * signatures keep every colon inside their brackets and have no type of their own.
+ * The declared type of a member row. Only a colon outside brackets and string
+ * literals separates the member prefix from its type.
  */
 function memberTypeParts(signature: string): MemberTypeParts | undefined {
   const parts = splitTopLevel(signature, ":");
@@ -733,7 +742,6 @@ function literalUnionKey(literals: readonly string[]): string {
   return [...new Set(literals)].sort().join("\u0000");
 }
 
-/** A union of string literals prints every value inline; its alias prints one name. */
 function stringLiteralUnionVariants(type: string): string[] | undefined {
   const variants = splitTopLevel(type, "|").map((variant) => variant.trim());
   if (variants.length < 2) return undefined;
@@ -748,7 +756,7 @@ interface UnionAlias {
 
 /**
  * The checker expands an aliased union at every use site, so `code: SheetwriteErrorCode`
- * prints as its 47 literals. This index maps that expansion back to the alias that names
+ * prints as its literals. This index maps that expansion back to the alias that names
  * it: an alias qualifies when its declaration is a string-literal union, or the
  * `(typeof SOME_EXPORTED_ARRAY)[number]` form whose array holds the same literals.
  */
@@ -784,7 +792,6 @@ async function unionAliasIndex(
               candidate.packageName,
               candidate.entry,
             );
-      // The referenced array is an export of its own; its literals are the expansion.
       literals =
         source === undefined
           ? undefined
@@ -841,7 +848,6 @@ const DEPENDENCY_KINDS: ReadonlyArray<
   ["dev", "devDependencies"],
 ];
 
-/** Every workspace package manifest the repository declares, in workspace order. */
 async function workspaceManifests(): Promise<WorkspaceManifest[]> {
   const root = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8")) as {
     workspaces?: string[];
@@ -922,10 +928,6 @@ async function consumerIndex(manifest: PublicApiManifest): Promise<ConsumerIndex
   return { dependents, references };
 }
 
-/**
- * Who consumes the symbol: the workspaces that depend on its package, and the
- * documented exports that name it. Each entry names the consumer and its relationship.
- */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
   const dependents = consumers.dependents.get(pkg.name) ?? [];
   const references = (consumers.references.get(item.name) ?? []).filter(
@@ -1028,8 +1030,7 @@ function renderMembers(
       ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
       : "";
     // Overload rows repeat a member name; the merged documentation renders once,
-    // on the first row. Distinct per-overload docs need AST-ordinal extraction and
-    // wait until the public surface actually contains such a case.
+    // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
     const summary = documentation === undefined ? "" : compactSummary(documentation);
@@ -1124,6 +1125,7 @@ export async function renderSymbolPage(
     if (members.index.length > 0) body.push(members.index, "");
     body.push(members.list, "");
   }
+
   // A variants section earns its space only for structured unions; scalar
   // unions read best inline in the (expanded) declaration, where identifiers
   // are highlighted, hoverable, and linked.
@@ -1142,6 +1144,7 @@ export async function renderSymbolPage(
     }
     body.push("</div>", "");
   }
+
   // One consistent model: the code section is always "Declaration", always
   // pretty-printed. It collapses only when Members/Variants already tell the
   // story above it; otherwise it is the page's primary content and expands.
@@ -1304,6 +1307,10 @@ interface RenderEvidenceResult {
   madMs: number;
   memory: { beforeBytes: number; afterBytes: number; deltaBytes: number };
   validation: Array<{ passed: boolean }>;
+  /** Recorded only on failures: where the scenario stopped and what it reported. */
+  stage?: string;
+  errorClass?: string;
+  message?: string;
 }
 
 interface ValidatedRenderEvidence {
@@ -1318,6 +1325,7 @@ interface ValidatedRenderEvidence {
     os: string;
     arch: string;
     cpu: string;
+    engineVersions: Readonly<Record<"sheetwrite" | "handsontable", string>>;
     rounds: number;
     launchAttempts: Array<{ success: boolean }>;
   };
@@ -1349,7 +1357,7 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
 
 /**
  * Landing-page benchmark summary. Each engine is aggregated across rounds
- * exactly like the evidence page, then ratios pair per scenario - never a
+ * like the evidence page, then ratios pair per scenario - never a
  * ratio of cross-scenario medians. Real numbers only: when the artifact is
  * missing or invalid the landing renders a "run the protocol" placeholder.
  */
@@ -1384,6 +1392,7 @@ export function landingBenchPayload(
         result.scenarioId === scenario &&
         result.status === "success",
     );
+
   // Sizes with zero full-round pairs are omitted rather than emitted as NaN
   // (JSON.stringify silently turns NaN into null and the landing would render
   // it as a number).
@@ -1435,6 +1444,7 @@ export function landingBenchPayload(
     heroStats.millionRowMedianMs,
     heroStats.millionRowHeapMb,
   ];
+
   // Never publish a payload whose displayed values are not all finite: a
   // structurally valid artifact with no comparable pairs must fall back to
   // the "run the protocol" placeholder, not render null.
@@ -1484,8 +1494,14 @@ async function loadEvidence<T>(
       return { available: false, reason: evidence, source, reproduction };
     }
     return { evidence, source };
-  } catch {
-    return { available: false, reason: "artifact is not valid JSON", source, reproduction };
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    return {
+      available: false,
+      reason: `artifact could not be validated: ${error.message}`,
+      source,
+      reproduction,
+    };
   }
 }
 
@@ -1509,8 +1525,9 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   ) {
     return "artifact does not match controlled render protocol version 1";
   }
-  // Failed cells are allowed - the page reports them as crashes - but every
-  // present result must be internally valid.
+  validateEngineVersions(metadata.engineVersions, ["sheetwrite", "handsontable"]);
+
+  // Failed cells are allowed - the page reports them as crashes.
   // Failed cells legitimately carry null samples; only successes must be finite.
   const valid = results.every(
     (result) =>
@@ -1524,10 +1541,133 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   return artifact as ValidatedRenderEvidence;
 }
 
+interface CorePathsEvidence {
+  schemaVersion: number;
+  protocol: string;
+  mode: string;
+  metadata: CaptureMeta;
+  toolchain: { bun: string; nodeCompat: string; cpu: string };
+  methodology: { timing: string; scope: string };
+  scale: Record<string, number>;
+  scenarios: Array<{
+    id: string;
+    unit: string;
+    samplesMs: number[];
+    timing: { median: number; p95: number; iters: number };
+    counters: Record<string, number>;
+    observations?: Record<string, string>;
+    variants?: Array<{
+      id: string;
+      samplesMs: number[];
+      timing: { median: number; p95: number; iters: number };
+    }>;
+    validation: string;
+  }>;
+}
+
+/**
+ * Full-mode core-path capture. The artifact is written by `bench:core-paths`;
+ * each reported scenario needs finite timings and a written validation
+ * checkpoint to be publishable.
+ */
+function validateCorePathsArtifact(value: Record<string, unknown>): CorePathsEvidence | string {
+  const artifact = value as unknown as Partial<CorePathsEvidence>;
+  if (
+    artifact.schemaVersion !== 1 ||
+    artifact.protocol !== "sheetwrite-core-paths-v1" ||
+    artifact.mode !== "full"
+  ) {
+    return "artifact is not a full-mode core-path capture";
+  }
+  if (!Array.isArray(artifact.scenarios) || artifact.scenarios.length === 0) {
+    return "artifact carries no core-path scenarios";
+  }
+  for (const scenario of artifact.scenarios) {
+    const timings = [scenario.timing, ...(scenario.variants ?? []).map((entry) => entry.timing)];
+    if (
+      typeof scenario.unit !== "string" ||
+      scenario.unit.length === 0 ||
+      typeof scenario.validation !== "string" ||
+      scenario.validation.length === 0 ||
+      timings.some(
+        (timing) =>
+          !Number.isFinite(timing?.median) ||
+          !Number.isFinite(timing?.p95) ||
+          !Number.isInteger(timing?.iters) ||
+          timing.iters < 1,
+      )
+    ) {
+      return "core-path scenarios carry an unvalidated or non-finite timing";
+    }
+  }
+  return artifact as CorePathsEvidence;
+}
+
+interface XlsxEvidence {
+  protocol: string;
+  mode: string;
+  metadata: CaptureMeta & {
+    engineVersions: Readonly<Record<"sheetwrite" | "exceljs", string>>;
+  };
+  rounds: number;
+  maxBaselineRatio: number;
+  fixture: { path: string; bytes: number; sha256: string; producer: string };
+  toolchain: { bun: string; node: string; cpu: string; baselineCommit?: string };
+  summaries: Array<{
+    engine: string;
+    operation: string;
+    scenario: string;
+    durationMs: { median: number; p95: number; iters: number };
+    maxRssBytes: { median: number; p95: number; max: number };
+  }>;
+  comparisons: Array<{
+    operation: string;
+    scenario: string;
+    medianWallRatio: number;
+    peakRssRatio: number;
+  }>;
+}
+
+function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | string {
+  const artifact = value as unknown as Partial<XlsxEvidence>;
+  if (artifact.protocol !== "sheetwrite-xlsx-codec-v1" || artifact.mode !== "full") {
+    return "artifact is not a full-mode XLSX codec capture";
+  }
+  validateEngineVersions(artifact.metadata?.engineVersions, ["sheetwrite", "exceljs"]);
+  if (!/^[0-9a-f]{40}$/u.test(artifact.toolchain?.baselineCommit ?? "")) {
+    return "XLSX comparison is missing its measured baseline commit";
+  }
+  const rounds = artifact.rounds;
+  if (
+    typeof rounds !== "number" ||
+    !Number.isInteger(rounds) ||
+    rounds < 1 ||
+    !Array.isArray(artifact.summaries) ||
+    artifact.summaries.length === 0 ||
+    !Array.isArray(artifact.comparisons)
+  ) {
+    return "XLSX capture is missing its rounds, summaries, or comparisons";
+  }
+  if (
+    artifact.summaries.some(
+      (summary) =>
+        !Number.isFinite(summary?.durationMs?.median) ||
+        !Number.isFinite(summary?.durationMs?.p95) ||
+        !Number.isFinite(summary?.maxRssBytes?.max),
+    )
+  ) {
+    return "XLSX summaries carry non-finite samples";
+  }
+  return artifact as XlsxEvidence;
+}
+
 interface DataEvidence {
   protocolVersion: number;
   mode: string;
-  meta: CaptureMeta & { bun: string };
+  meta: CaptureMeta & {
+    bun: string;
+    engineVersions: Readonly<Record<"sheetwrite" | "handsontable", string>>;
+  };
   sheetwrite: Record<
     string,
     { rows: number; stats: Record<string, { median: number; p95: number }> }
@@ -1543,6 +1683,7 @@ function validateDataArtifact(value: Record<string, unknown>): DataEvidence | st
   if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
     return "artifact is not a full-mode data protocol capture";
   }
+  validateEngineVersions(artifact.meta?.engineVersions, ["sheetwrite", "handsontable"]);
   for (const engine of ["sheetwrite", "handsontable"] as const) {
     const block = artifact[engine];
     if (block === undefined || typeof block !== "object") return `artifact lacks ${engine} results`;
@@ -1607,7 +1748,6 @@ interface BenchPairStat {
   faded: number;
 }
 
-/** One widget row: label, ratio chip, and a bar per engine (or a crash card). */
 function benchPairRow(
   label: string,
   ours: BenchPairStat | undefined,
@@ -1706,8 +1846,8 @@ function benchRuler(ticks: string[]): string {
 /**
  * Shared per-panel log scale: every bar maps through the same decade domain,
  * so lengths compare across rows, and the ruler labels each 10x tick. The
- * domain is the observed values' decade envelope (capped at five decades so
- * sub-microsecond noise cannot flatten the axis).
+ * domain rounds outward to decades, ignoring values below maxValue / 100_000
+ * when choosing its lower bound so tiny noise cannot flatten the axis.
  */
 function benchLogScale(values: number[], fmt: (value: number) => string): BenchScale {
   const positive = values.filter((value) => value > 0);
@@ -1732,7 +1872,6 @@ function benchLogScale(values: number[], fmt: (value: number) => string): BenchS
   return { pct, ruler: benchRuler(ticks), segments };
 }
 
-/** Shared linear scale (memory panels: footprints live within one decade). */
 function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
   const maxValue = Math.max(...values.filter((value) => value > 0), 1);
   const pct = (value: number): string =>
@@ -1746,7 +1885,6 @@ function benchLinearScale(values: number[], fmt: (value: number) => string): Ben
   return { pct, ruler: benchRuler(ticks), segments: 4 };
 }
 
-/** Collapsible methodology block: protocol prose plus per-scenario meanings. */
 function benchMethod(
   summary: string,
   paragraphs: string[],
@@ -1769,7 +1907,8 @@ const RENDER_METHOD = benchMethod(
   "Methodology - what each scenario does",
   [
     "Live grid in controlled headless Chromium. Ten counterbalanced rounds; all fourteen scenarios run warm per mount, and the fixture is rebuilt after any failure so crashes cannot leak state. Every scenario must prove its effect (scroll really moved, editor really opened, rows really changed) or it fails.",
-    "Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing.",
+    "Each measured sample repeats one logical action until it covers at least 100 ms of measured time, so timer resolution and scheduler jitter cannot decide a sample. Every raw sample is retained in the artifact.",
+    "Bright = median round, faded = p95 round. <strong>Did not complete</strong> = recorded crash, timeout, or failed checkpoint - never a timing. The failure table names the stage and the recorded error behind every missing cell.",
   ],
   [
     [
@@ -1902,7 +2041,6 @@ function benchScaleFigure(
   return lines;
 }
 
-/** The two-axis (size x metric) CSS-only tab widget for the render benchmark. */
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -2002,8 +2140,7 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
 
 /**
  * Run-completion arithmetic for the evidence headline. `results` already
- * contains failed entries - failedKeys must never be added on top (that
- * double-count published 1120/1140 for a 1120-cell matrix).
+ * contains failed entries - failedKeys must never be added on top.
  */
 export function runCompletionSummary(results: ReadonlyArray<{ status: string }>): {
   successes: number;
@@ -2012,6 +2149,283 @@ export function runCompletionSummary(results: ReadonlyArray<{ status: string }>)
 } {
   const successes = results.filter((result) => result.status === "success").length;
   return { successes, total: results.length, failures: results.length - successes };
+}
+
+interface EvidenceCapture {
+  readonly label: string;
+  readonly source: string;
+  readonly meta: CaptureMeta;
+}
+
+/** Every loaded artifact states its capture stamp as either `meta` or `metadata`. */
+type CapturedEvidence =
+  | { evidence: { meta?: CaptureMeta; metadata?: CaptureMeta }; source: string }
+  | EvidenceState;
+
+function formatCaptureTime(timestamp: string): string {
+  return timestamp.slice(0, 16).replace("T", " ");
+}
+
+/**
+ * Release captures run before the version bump, so they record the previous
+ * release's package version. Each entry maps such a capture commit to the
+ * release it measured.
+ */
+const RELEASE_CANDIDATE_CAPTURES: Readonly<Record<string, string>> = {
+  "49e05e298c3f39a8cede038fe8d0062343abc21f": "0.5.0",
+};
+
+function sheetwriteLabel(recordedVersion: string, commit: string): string {
+  const release = RELEASE_CANDIDATE_CAPTURES[commit];
+  return html(
+    release === undefined
+      ? `Sheetwrite ${recordedVersion}`
+      : `Sheetwrite ${release} release candidate`,
+  );
+}
+
+/**
+ * One capture header for the whole page. A page assembled from artifacts of one
+ * commit states that single point-in-time capture; a page assembled from
+ * different commits lists every vintage instead of letting each section's own
+ * commit line hide the mismatch.
+ */
+function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
+  const first = captures[0];
+  if (first === undefined) return [];
+  const commits = new Set(captures.map((capture) => capture.meta.commit));
+  const timestamps = captures.map((capture) => capture.meta.timestamp).sort();
+  const earliest = timestamps[0];
+  const latest = timestamps.at(-1);
+  if (earliest === undefined || latest === undefined) return [];
+  const window =
+    formatCaptureTime(earliest) === formatCaptureTime(latest)
+      ? formatCaptureTime(earliest)
+      : `${formatCaptureTime(earliest)} → ${formatCaptureTime(latest)}`;
+  if (commits.size === 1) {
+    return [
+      "## Capture",
+      "",
+      '<dl class="bench-meta" data-pagefind-ignore>',
+      `<div><dt>Captured</dt><dd>${window} UTC</dd></div>`,
+      `<div><dt>Commit</dt><dd><code>${first.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Artifacts</dt><dd>${captures.length} validated captures from that one commit; each section states its own environment (browser or runtime) and protocol</dd></div>`,
+      "</dl>",
+      "",
+    ];
+  }
+  const vintages = [...captures].sort(
+    (left, right) =>
+      left.meta.timestamp.localeCompare(right.meta.timestamp) ||
+      left.label.localeCompare(right.label),
+  );
+  return [
+    "## Capture",
+    "",
+    '<div class="evidence-mixed" data-pagefind-ignore><strong>Mixed capture vintages.</strong> The sections below were captured at different commits. Each section is internally consistent and each one names its own commit; the page as a whole is not a single point-in-time measurement.</div>',
+    "",
+    "| Section | Artifact | Commit | Captured |",
+    "| --- | --- | --- | --- |",
+    ...vintages.map(
+      (capture) =>
+        `| ${capture.label} | \`${capture.source}\` | <code>${capture.meta.commit.slice(0, 12)}</code> | ${formatCaptureTime(capture.meta.timestamp)} UTC |`,
+    ),
+    "",
+  ];
+}
+
+/**
+ * Failures grouped by the cell that produced them. A run that did not finish is
+ * never converted into a timing, so the failure list is part of the evidence:
+ * it names the stage and the recorded error behind every missing cell.
+ */
+function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
+  const failures = evidence.results.filter((result) => result.status !== "success");
+  if (failures.length === 0) return [];
+  const groups = new Map<
+    string,
+    { engine: string; rows: number; scenario: string; stage: string; error: string; cells: number }
+  >();
+  for (const failure of failures) {
+    const stage = failure.stage ?? "unrecorded";
+    const error = [failure.errorClass, failure.message]
+      .filter((part): part is string => typeof part === "string" && part.length > 0)
+      .join(": ")
+      .replaceAll("|", "\\|");
+    const key = [failure.engine, failure.rows, failure.scenarioId, stage, error].join("\u0000");
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, {
+        engine: failure.engine,
+        rows: failure.rows,
+        scenario: failure.scenarioId,
+        stage,
+        error: error.length > 0 ? error : "not recorded",
+        cells: 1,
+      });
+    } else {
+      group.cells += 1;
+    }
+  }
+  const ordered = [...groups.values()].sort(
+    (left, right) =>
+      left.engine.localeCompare(right.engine) ||
+      left.rows - right.rows ||
+      left.scenario.localeCompare(right.scenario) ||
+      left.stage.localeCompare(right.stage),
+  );
+  return [
+    "",
+    "Every expected cell carries either a timing or its recorded failure. These cells did not finish and have no timing:",
+    "",
+    "| Engine | Size | Scenario | Stage | Recorded error | Cells |",
+    "| --- | ---: | --- | --- | --- | ---: |",
+    ...ordered.map(
+      (group) =>
+        `| ${group.engine} | ${fmtRows(group.rows)} | ${group.scenario} | ${group.stage} | ${group.error} | ${group.cells} |`,
+    ),
+    "",
+  ];
+}
+
+/** Markdown table cells cannot carry a raw pipe. */
+const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
+
+/**
+ * Core write-path evidence: packed block writes, CSV import, large restore,
+ * and paged residency work. Every scenario carries the checkpoint it proved,
+ * so a timing is never published alone.
+ */
+function renderCorePathsSection(evidence: CorePathsEvidence, source: string): string[] {
+  const counters = evidence.scenarios.filter(
+    (scenario) => Object.keys(scenario.counters).length > 0,
+  );
+  return [
+    "## Core write path",
+    "",
+    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes; every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
+    "",
+    '<dl class="bench-meta" data-pagefind-ignore>',
+    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
+    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node compatibility ${evidence.toolchain.nodeCompat} · ${html(evidence.toolchain.cpu)}</dd></div>`,
+    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+    "</dl>",
+    "",
+    `Scale: ${Object.entries(evidence.scale)
+      .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
+      .join(", ")}.`,
+    "",
+    "| Scenario | One timed iteration | Median | p95 | Samples |",
+    "| --- | --- | ---: | ---: | ---: |",
+    ...evidence.scenarios.flatMap((scenario) => [
+      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${fmtMs(scenario.timing.median)} | ${fmtMs(scenario.timing.p95)} | ${scenario.timing.iters} |`,
+      ...(scenario.variants ?? []).map(
+        (variant) =>
+          `| \`${scenario.id}:${variant.id}\` | variant measured in the same run | ${fmtMs(variant.timing.median)} | ${fmtMs(variant.timing.p95)} | ${variant.timing.iters} |`,
+      ),
+    ]),
+    "",
+    ...(counters.length === 0
+      ? []
+      : [
+          "Counters recorded by the same runs (non-time evidence):",
+          "",
+          ...counters.map(
+            (scenario) =>
+              `- \`${scenario.id}\` — ${Object.entries(scenario.counters)
+                .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
+                .join(", ")}`,
+          ),
+          "",
+        ]),
+    "<details><summary>Per-scenario correctness checkpoint</summary>",
+    "",
+    ...evidence.scenarios.map(
+      (scenario) => `- \`${scenario.id}\` — ${markdownCell(scenario.validation)}`,
+    ),
+    "",
+    "</details>",
+    "",
+    "Reproduce with:",
+    "",
+    '```sh verify title="Core write-path evidence"',
+    "bun run --filter @sheetwrite/bench bench:core-paths",
+    "```",
+    "",
+  ];
+}
+
+/**
+ * XLSX codec evidence: when a baseline commit is recorded, compare the current
+ * tree against that codec using the same checked fixture. A ratio below 1 means
+ * the current codec is faster; peak RSS is the largest raw process peak.
+ */
+function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
+  const summaryFor = (
+    engine: string,
+    operation: string,
+    scenario: string,
+  ): XlsxEvidence["summaries"][number] | undefined =>
+    evidence.summaries.find(
+      (summary) =>
+        summary.engine === engine &&
+        summary.operation === operation &&
+        summary.scenario === scenario,
+    );
+  const baselineCommit = evidence.toolchain.baselineCommit;
+  return [
+    "## XLSX codec benchmark",
+    "",
+    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
+    "",
+    '<dl class="bench-meta" data-pagefind-ignore>',
+    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
+    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+    `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code>${html(baselineCommit ?? "")}</code></dd></div>`,
+    `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
+    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
+    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
+    "</dl>",
+    "",
+    ...(baselineCommit === undefined
+      ? [
+          "This capture ran the current tree only, so no codec comparison is published.",
+          "",
+          "| Operation | Scenario | Median | p95 | Peak RSS |",
+          "| --- | --- | ---: | ---: | ---: |",
+          ...evidence.summaries
+            .filter((summary) => summary.engine === "current")
+            .map(
+              (summary) =>
+                `| ${summary.operation} | ${summary.scenario} | ${fmtMs(summary.durationMs.median)} | ${fmtMs(summary.durationMs.p95)} | ${fmtMb(summary.maxRssBytes.max)} |`,
+            ),
+          "",
+        ]
+      : [
+          `The baseline codec is the same operation at commit <code>${baselineCommit.slice(0, 12)}</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster.`,
+          "",
+          "| Operation | Scenario | Current median | Baseline median | Ratio | Current peak RSS | Baseline peak RSS | RSS ratio |",
+          "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+          ...evidence.comparisons.flatMap((comparison) => {
+            const current = summaryFor("current", comparison.operation, comparison.scenario);
+            const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
+            if (current === undefined || baseline === undefined) return [];
+            return [
+              `| ${comparison.operation} | ${comparison.scenario} | ${fmtMs(current.durationMs.median)} | ${fmtMs(baseline.durationMs.median)} | ${comparison.medianWallRatio.toFixed(2)}× | ${fmtMb(current.maxRssBytes.max)} | ${fmtMb(baseline.maxRssBytes.max)} | ${comparison.peakRssRatio.toFixed(2)}× |`,
+            ];
+          }),
+          "",
+        ]),
+    "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
+    "",
+    '```sh verify title="XLSX codec evidence"',
+    `git worktree add ../sheetwrite-xlsx-baseline ${baselineCommit ?? "<baseline commit>"}`,
+    "cd ../sheetwrite-xlsx-baseline && bun install --frozen-lockfile && bun run build:packages",
+    "cd - && bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root ../sheetwrite-xlsx-baseline",
+    "```",
+    "",
+  ];
 }
 
 export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Promise<string> {
@@ -2030,6 +2444,42 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "bun run --filter @sheetwrite/bench bench:formula",
     validateFormulaArtifact,
   );
+  const fullEngine = await loadEvidence(
+    "bench/results/full-engine-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:engines",
+    validateFullEngineArtifact,
+  );
+  const matchedEngine = await loadEvidence(
+    "bench/results/full-engine-matched-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:matched",
+    validateMatchedEngineArtifact,
+  );
+  const corePaths = await loadEvidence(
+    "bench/results/core-paths-results.json",
+    "bun run --filter @sheetwrite/bench bench:core-paths",
+    validateCorePathsArtifact,
+  );
+  const xlsx = await loadEvidence(
+    "bench/results/xlsx-results.json",
+    "bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>",
+    validateXlsxArtifact,
+  );
+  const captures = (
+    [
+      { label: "Render benchmark", loaded: scale },
+      { label: "Data engine benchmark", loaded: data },
+      { label: "Core write path", loaded: corePaths },
+      { label: "Formula engine benchmark", loaded: formula },
+      { label: "Formula engines (analysis capture)", loaded: fullEngine },
+      { label: "Formula engines (matched capture)", loaded: matchedEngine },
+      { label: "XLSX codec benchmark", loaded: xlsx },
+    ] satisfies Array<{ label: string; loaded: CapturedEvidence }>
+  ).flatMap(({ label, loaded }) => {
+    if (!("evidence" in loaded)) return [];
+    const evidence = loaded.evidence;
+    const captured = "meta" in evidence ? evidence.meta : evidence.metadata;
+    return [{ label, source: loaded.source, meta: captured }];
+  });
   const sizeHistory =
     sizeHistoryOverride ??
     validateSizeHistory(
@@ -2043,6 +2493,27 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     ).trimEnd(),
     "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
     "",
+    "## Release retained engine memory",
+    "",
+    "WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.",
+    "",
+    '```ts prelude="core" partial="requires an initialized application at an idle point" title="Explicit idle memory release"',
+    'import { releaseEngineMemory } from "@sheetwrite/core";',
+    "",
+    "const report = await releaseEngineMemory();",
+    "```",
+    "",
+    "The call waits for synchronous transactions and active datasource page loads, then moves all live stores together into a fresh instance of the selected engine. Cell sources, styles, cached formula results (including volatile results), resident datasource pages, unsaved dirty edits, and compact undo/redo history survive. Unloaded clean pages remain unloaded and can be fetched again from the datasource. Worker renderers rebuild their frames without document-change events.",
+    "",
+    "The main-thread pause scales with resident cells and compact history, so do not invoke it on an interaction-critical path. Migration temporarily needs both instances and packed transfer buffers; it can increase peak memory before garbage collection reclaims the retired instance. If preparation fails, every live store stays on the original instance. Concurrent calls share the same release.",
+    "",
+    "`report.wasmBytesBefore` and `report.wasmBytesAfter` are committed linear-memory bytes, not live-cell bytes or process memory. `report.pauseMs` measures migration, excluding the idle wait. A release is not guaranteed to reduce committed bytes: surviving data, compact history, and migration scratch can still require substantial memory. Actual process-memory reclamation depends on garbage collection.",
+    "",
+    ...renderCaptureHeader(captures),
+    "`bench:release` captures render-scale, the performance showcase's paged storage at `bench/results/paged-results.json`, the interaction evidence at `bench/results/interaction-results.json`, data, core paths, formula, formula engines, matched engines, and XLSX, then re-records the render regression baseline last. Its smoke rehearsal writes only to `bench/results/smoke/`.",
+    "",
+    "The interaction capture (`bench:interaction`, schema `interaction-current-v2`) measures the current build, not a comparison: packed inverse-index lookup latency in nanoseconds, inverse-index backing bytes, retained bytes after 100 distant edits, and the cold-route long task owned by Sheetwrite. It records the raw samples, the summary derived from them, the runner, and the method, and it holds those four metrics to absolute release ceilings. Version 1 recorded a one-off before/after pair whose baseline build cannot be re-measured at a later release, so no old sample is carried forward into the current capture.",
+    "",
     "## Matched local regression check",
     "",
     "Timing comparisons run deliberately on a controlled local machine, not as a required CI job. Capture ten fresh matched rounds, retain every raw sample, and compare the fresh artifact with the committed baseline. Any unapproved slowdown fails the local command.",
@@ -2055,6 +2526,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "```",
     "",
     "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
+    "",
+    "The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
     "",
     "## Render benchmark",
     "",
@@ -2071,11 +2544,13 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${metadata.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Environment</dt><dd>Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
+      `<div><dt>Engines</dt><dd>${sheetwriteLabel(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Environment</dt><dd>Bun ${html(metadata.bunVersion)} · Node compatibility ${html(metadata.nodeVersion)} · Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
       `<div><dt>Protocol</dt><dd>${metadata.rounds} rounds · raw artifact <code>${source}</code></dd></div>`,
       "</dl>",
       "",
       renderBenchWidget(evidence),
+      ...renderFailureTable(evidence),
       "",
       RENDER_METHOD,
       "",
@@ -2097,6 +2572,10 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "",
     "The UI and this reference share [`RUNTIME_RESOURCE_SCHEMA_VERSION`](/docs/api/core/runtime-resource-schema-version/). Detailed peak phases remain in the validated benchmark artifact rather than being presented as measurements from the visitor's browser.",
     "",
+    "String collection reclaims obsolete pool text and densely remaps surviving IDs. Automatic collection runs only at committed edit transaction barriers, never during painting or page loading, when dead arena/span storage exceeds 256 KiB and the surviving arena/span storage. Growth-based backoff avoids repeatedly scanning unchanged live data. Bulk clears and sheet removal request a new threshold check at the next commit.",
+    "",
+    "`compactStringStorage()` explicitly collects unreachable text and trims growth slack outside an active mutation/page load. Raw IDs are valid only within `stringPoolEpoch()`; retain the epoch with projections and invalidate caches on a change, as described in the [worker rendering guide](/docs/guides/worker-rendering/#raw-string-ids-and-epochs). History snapshots own captured text. Persist resolved values, not pool IDs. Reclaimed Rust ownership does not imply that WebAssembly committed linear memory shrinks.",
+    "",
     "Reproduce and validate the full owner/operation matrix with:",
     "",
     '```sh verify title="Runtime resource evidence"',
@@ -2114,6 +2593,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Environment</dt><dd>Bun ${html(evidence.meta.bun)}</dd></div>`,
       `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
       "</dl>",
       "",
@@ -2200,6 +2681,11 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(data);
   }
+  if ("evidence" in corePaths) {
+    lines.push(...renderCorePathsSection(corePaths.evidence, corePaths.source));
+  } else {
+    pending.push(corePaths);
+  }
   lines.push("## Formula engine benchmark", "");
   if ("evidence" in formula) {
     const { evidence, source } = formula;
@@ -2213,6 +2699,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "</dl>",
       "",
     );
+
     // The scalar-edit-affects-N workloads are one scaling series (recompute
     // cost tracks affected dependents, not sheet size); published as separate
     // one-row groups their near-zero baselines read like broken benchmarks.
@@ -2273,6 +2760,23 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     );
   } else {
     pending.push(formula);
+  }
+  if ("evidence" in fullEngine) {
+    lines.push(
+      renderFullEngineEvidence(
+        fullEngine.evidence,
+        "evidence" in matchedEngine ? matchedEngine.evidence : undefined,
+      ),
+    );
+    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+  } else {
+    pending.push(fullEngine);
+    if (!("evidence" in matchedEngine)) pending.push(matchedEngine);
+  }
+  if ("evidence" in xlsx) {
+    lines.push(...renderXlsxSection(xlsx.evidence, xlsx.source));
+  } else {
+    pending.push(xlsx);
   }
   lines.push("## Delivery size", "");
   const latestRelease = sizeHistory.releases.at(-1);
@@ -2510,6 +3014,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     loadFormulaContractInventory(repositoryRoot),
     compatibilityResults(),
   ]);
+
   // Link resolution and entry pages read declaration shapes synchronously, so every
   // manifest declaration is parsed up front, in one batch.
   await prepareDeclarationShapes(
@@ -2519,6 +3024,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   );
   const documentationLinkIssues = unresolvedDocumentationLinks(manifest);
   if (documentationLinkIssues.length > 0) throw new Error(documentationLinkIssues.join("\n"));
+
   const linkRoutes = documentationLinkRoutes(manifest);
   // "Referenced by" reads repository manifests and the whole API surface, so it is
   // indexed once here rather than per symbol page.
@@ -2613,7 +3119,6 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
     {
-      // Sidebar navigation source: one entry per package's primary entry point.
       path: join(generatedDataRoot, "api-nav.json"),
       content: stableJson(
         manifest.packages.map((pkg) => ({
@@ -2823,8 +3328,8 @@ function validateImports(
 }
 
 /**
- * Compiler options for the compiled snippets. TypeScript 7 removed `baseUrl`, so the
- * `paths` targets are relative to the scratch tsconfig beside the snippets.
+ * Compiler options for the compiled snippets. TypeScript 7 does not support `baseUrl`,
+ * so the `paths` targets are relative to the scratch tsconfig beside the snippets.
  */
 const SNIPPET_COMPILER_OPTIONS = {
   jsx: "react-jsx",
@@ -2845,12 +3350,10 @@ const SNIPPET_COMPILER_OPTIONS = {
   target: "es2022",
 } as const;
 
-/** Flattens a diagnostic and its message chain the way `flattenDiagnosticMessageText` did. */
 function diagnosticText(diagnostic: Diagnostic): string {
   return [diagnostic.text, ...(diagnostic.messageChain ?? []).map(diagnosticText)].join("\n");
 }
 
-/** The TypeScript 7 equivalent of `getPreEmitDiagnostics`: config, syntax, options, global, semantic. */
 async function preEmitDiagnostics(project: Project): Promise<readonly Diagnostic[]> {
   const diagnostics = [...(await project.program.getConfigFileParsingDiagnostics())];
   const configFileCount = diagnostics.length;
@@ -3241,6 +3744,7 @@ export async function verifyDocs(): Promise<void> {
   const analysis = await analyzePublicApi(repositoryRoot);
   const expected = await expectedGeneratedFiles(analysis.manifest);
   const failures = await checkDocs(analysis.manifest, expected, analysis.issues);
+
   // The showcase capability contract gates the docs build: a capability
   // without an owner, route, browser contract, or shared binding must not ship.
   failures.push(

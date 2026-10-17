@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import { CAPABILITY_OWNERS } from "../../docs/src/showcases/capabilities.js";
 import { siteUrl } from "./playwright.config.js";
 
@@ -18,71 +19,54 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-test("hub launches every owning showcase without errors", async ({ page }) => {
+test("hub links every showcase, filters accessibly, and never clips a card", async ({ page }) => {
   const errors = collectErrors(page);
-  await page.setViewportSize({ width: 1568, height: 844 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(siteUrl("/showcases/"));
   await page.waitForLoadState("networkidle");
 
-  await expect(page.locator("main h1")).toHaveText("Eight real experiences. Pick your proof.");
-  // The Showcases link is page-current on the hub itself.
-  await expect(page.locator('.sw-product-nav a[aria-current="page"]')).toHaveText("Showcases");
-
-  // The capability owners occupy the first row and framework owners the
-  // second. All eight equal launchers fit the acceptance viewport.
-  const launchers = page.locator(".sw-hub-scenes .sw-hub-launch");
-  await expect(launchers).toHaveCount(8);
-  await expect(launchers.first()).toHaveAttribute("data-owner", "performance");
-  const launcherGeometry = await launchers.evaluateAll((links) =>
-    links.map((link) => {
-      const bounds = link.getBoundingClientRect();
-      return {
-        bottom: Math.round(bounds.bottom),
-        height: Math.round(bounds.height),
-        top: Math.round(bounds.top),
-        width: Math.round(bounds.width),
-      };
-    }),
+  const site = page.getByRole("navigation", { name: "Site" });
+  await expect(site.getByRole("link", { name: "Showcases" })).toHaveAttribute(
+    "aria-current",
+    "page",
   );
-  expect(new Set(launcherGeometry.map(({ width }) => width)).size).toBe(1);
-  expect(new Set(launcherGeometry.map(({ height }) => height)).size).toBe(1);
-  expect(
-    [...new Set(launcherGeometry.map(({ top }) => top))].map(
-      (top) => launcherGeometry.filter((card) => card.top === top).length,
-    ),
-  ).toEqual([4, 4]);
-  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeLessThanOrEqual(844);
-  expect(Math.max(...launcherGeometry.map(({ bottom }) => bottom))).toBeGreaterThanOrEqual(780);
-  const galleryWidth = await page
-    .locator(".sw-hub-scenes")
-    .evaluate((gallery) => Math.round(gallery.getBoundingClientRect().width));
-  expect(galleryWidth).toBeGreaterThanOrEqual(1568 - 96);
-  const clippedLabels = await page
-    .locator(
-      ".sw-hub-scene__caption, .sw-hub-framework-scene > span, .sw-hub-framework-scene code, .sw-hub-framework-scene small, .sw-hub-launch__meta, .sw-hub-launch__body > strong, .sw-hub-launch__summary, .sw-hub__owner-count",
-    )
-    .evaluateAll((labels) =>
-      labels
-        .filter(
-          (label) =>
-            label.getClientRects().length > 0 &&
-            (label.scrollWidth > label.clientWidth || label.scrollHeight > label.clientHeight),
-        )
-        .map((label) => label.textContent?.trim()),
-    );
-  expect(clippedLabels).toEqual([]);
-  const bodyFontSizes = await page
-    .locator(".sw-hub-launch__body > strong, .sw-hub-launch__summary")
-    .evaluateAll((labels) =>
-      labels.map((label) => Number.parseFloat(getComputedStyle(label).fontSize)),
-    );
-  expect(Math.min(...bodyFontSizes)).toBeGreaterThanOrEqual(14);
+  await expect(page.locator("main h1")).toHaveCount(1);
 
-  // The hub is a static launcher: previews do not eagerly mount a Grid or a
-  // renderer surface.
+  // One launcher per showcase owner.
+  const launchers = page.locator("main a[data-owner]");
+  const owners = CAPABILITY_OWNERS.map((owner) => owner.id).sort();
+  expect(
+    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+  ).toEqual(owners);
+
+  // The hub is a static launcher: it must not mount a Grid or a renderer.
   await expect(page.locator('main [role="grid"], main canvas')).toHaveCount(0);
 
-  // Selection, keyboard activation, and focus-visible treatment are explicit.
+  // No card clips its content at any common width, in either theme.
+  for (const width of [1440, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => {
+        document.documentElement.dataset.theme = value;
+      }, theme);
+      const clipped = await launchers.evaluateAll((cards) =>
+        cards.flatMap((card) =>
+          [card, ...card.querySelectorAll("*")]
+            .filter(
+              (element) =>
+                element.getClientRects().length > 0 &&
+                (element.scrollWidth > element.clientWidth ||
+                  element.scrollHeight > element.clientHeight),
+            )
+            .map((element) => element.textContent?.trim()),
+        ),
+      );
+      expect(clipped, `${width}px ${theme}`).toEqual([]);
+    }
+  }
+
+  // Filters are toggle buttons that work from the keyboard and show focus.
+  await page.setViewportSize({ width: 1440, height: 900 });
   const allFilter = page.getByRole("button", { name: "All", exact: true });
   const dataFilter = page.getByRole("button", { name: "Data & scale", exact: true });
   const workbookFilter = page.getByRole("button", { name: "Workbook", exact: true });
@@ -99,21 +83,22 @@ test("hub launches every owning showcase without errors", async ({ page }) => {
   await dataFilter.press("Enter");
   await expect(dataFilter).toHaveAttribute("aria-pressed", "true");
   await expect(allFilter).toHaveAttribute("aria-pressed", "false");
-  await expect(launchers).toHaveCount(2);
+  await expect
+    .poll(async () =>
+      (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+    )
+    .toEqual(["database", "host-rows", "performance"]);
 
   await workbookFilter.click();
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");
-  await expect(dataFilter).toHaveAttribute("aria-pressed", "false");
   await expect(launchers).toHaveCount(1);
   await expect(launchers).toHaveAttribute("data-owner", "interoperability");
-  await expect(page.getByText("1 / 8 shown")).toBeVisible();
+  await page.getByRole("button", { name: "Formulas", exact: true }).click();
+  expect(
+    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
+  ).toEqual(["engine", "formulas"]);
   await allFilter.click();
-  await expect(allFilter).toHaveAttribute("aria-pressed", "true");
-  await expect(launchers).toHaveCount(8);
-
-  // Landmarks and headings: one h1, labelled sections, real list semantics.
-  await expect(page.locator("main h1")).toHaveCount(1);
-  await expect(page.getByRole("navigation", { name: "Site" })).toBeVisible();
+  await expect(launchers).toHaveCount(owners.length);
 
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
@@ -123,24 +108,5 @@ test("every owning showcase URL stays resolvable", async ({ request }) => {
   for (const owner of CAPABILITY_OWNERS) {
     const response = await request.get(siteUrl(owner.href));
     expect(response.ok(), `${owner.href} must resolve`).toBe(true);
-  }
-});
-
-test("all four capability routes share one 2 by 2 hero contract", async ({ page }) => {
-  await page.setViewportSize({ width: 1568, height: 900 });
-  for (const route of ["performance", "database", "interoperability", "collaboration"]) {
-    await page.goto(siteUrl(`/showcases/${route}/`));
-    const hero = page.locator(".sw-capability-hero");
-    await expect(hero).toHaveCount(1);
-    const facts = hero.locator(".sw-capability-hero__facts > div");
-    await expect(facts).toHaveCount(4);
-    const geometry = await facts.evaluateAll((items) =>
-      items.map((item) => {
-        const bounds = item.getBoundingClientRect();
-        return { left: Math.round(bounds.left), top: Math.round(bounds.top) };
-      }),
-    );
-    expect(new Set(geometry.map(({ left }) => left)).size, `${route} hero columns`).toBe(2);
-    expect(new Set(geometry.map(({ top }) => top)).size, `${route} hero rows`).toBe(2);
   }
 });

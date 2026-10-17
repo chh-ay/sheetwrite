@@ -1,0 +1,40 @@
+{
+  "changedImplementation": "9915236",
+  "runnerSlot": 4,
+  "runtime": "Bun 1.4.3",
+  "command": "bun --cpu-prof --cpu-prof-interval 100 --cpu-prof-dir <directory> --cpu-prof-name <side>-steady-read.cpuprofile bench/src/engine-memory-release-bench.ts --metric read --root <worktree>",
+  "warmups": 40,
+  "samples": 21,
+  "windowsPerSample": 2048,
+  "baseline": {
+    "commit": "5a16a55",
+    "medianMsPerWindow": 0.010230052246093746,
+    "totalProfileSamples": 1384,
+    "readPinnedStackSamples": 608,
+    "getEngineStackSamples": 0,
+    "hotLeafSamples": {
+      "wasm-function[59]": 122,
+      "wasm-function[48]": 92,
+      "slice": 62,
+      "stringPoolEpoch": 55,
+      "readPinned": 46,
+      "cellstore_getWindow": 42
+    }
+  },
+  "changed": {
+    "commit": "9915236",
+    "medianMsPerWindow": 0.01073473779296874,
+    "totalProfileSamples": 2121,
+    "readPinnedStackSamples": 600,
+    "getEngineStackSamples": 0,
+    "hotLeafSamples": {
+      "wasm-function[59]": 141,
+      "wasm-function[48]": 92,
+      "stringPoolEpoch": 58,
+      "slice": 51,
+      "readPinned": 49,
+      "cellstore_getWindow": 21
+    }
+  },
+  "interpretation": "Both read loops use direct StoreWindowReader.wasm references, rebound synchronously by replaceEngine only at migration. No per-read engine lookup or rebinding predicate exists. Profiles show the same dominant WASM/window-copy work, not a new lookup stack. The original 3-warmup/128-window batches mixed JSC tier-up and short allocation/GC bursts; the gate now warms 40 batches and measures 2048-window batches. Profiled timings are diagnostic only; verdicts use the separate unprofiled A/A plus five ABBA/BAAB comparison."
+}

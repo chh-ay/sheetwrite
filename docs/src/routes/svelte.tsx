@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { pageMeta } from "../lib/seo.js";
 import { SvelteShowcaseIsland } from "../showcases/AdapterIslands.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
+
 import svelteWorkbenchStylesheet from "../styles/svelte-workbench.css?url";
 
 const description =
-  "Take a live dispatch board through signal loss: edit real tickets offline, keep every change in IndexedDB, then reconnect and watch the authoritative queue drain.";
+  "Edit dispatch tickets offline. IndexedDB stores each pending change. Reconnect to send the queue, or review a version conflict and merge the field update.";
 
 export const Route = createFileRoute("/svelte")({
   head: () => ({
@@ -34,16 +36,16 @@ function SvelteShowcaseRoute() {
         },
         {
           title: "Causal collaboration",
-          detail: "Presence, remote commits, queue state, and server versions stay live.",
+          detail: "Presence stays on the board. Queue state and server versions appear beside it.",
         },
         {
           title: "Explicit recovery",
           detail: "Version conflicts and remount restoration remain inspectable on demand.",
         },
       ]}
-      prompt="Switch Offline → edit a ticket → see it enter the durable outbox → reconnect and watch dispatch acknowledge it."
+      prompt="Go offline, edit the next ticket, then review the outbox beside the board. Reconnect to send the queued edit."
       sourcePath="docs/src/showcases/SvelteShowcase.svelte"
-      title="Dispatch keeps moving without signal."
+      title="Keep dispatch work safe offline."
     >
       <SvelteShowcaseIsland />
     </ShowcasePage>

@@ -8,7 +8,7 @@ description: "Converts simple columns and row objects into canonical workbook an
 Converts simple columns and row objects into canonical workbook and columnar input.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L281"><code>packages/core/src/adapter.ts#L281</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/adapter.ts#L459"><code>packages/core/src/adapter.ts#L459</code></a></dd></div>
 </dl>
 
 ## Declaration

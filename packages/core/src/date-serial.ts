@@ -1,23 +1,21 @@
-// Excel/Sheets-style date serials: a date is a plain number — whole days since
-// the 1899-12-30 epoch, with the fractional part carrying the time of day. Dates
-// therefore live in ordinary number cells, so sorting, filtering, and aggregation
-// keep working unchanged; only rendering (a date `numberFormat`) and input parsing
-// need to know a column is a date.
+// Excel/Sheets-style date serials: a date is a plain number — whole days with
+// the fractional part carrying the time of day. Dates therefore live in
+// ordinary number cells, so sorting, filtering, and aggregation work on their
+// numeric values; rendering (a date `numberFormat`) and input parsing interpret
+// those values as dates.
 //
-// ── Excel's leap-year compatibility and UTC ──────────────────────────────────
 // Excel's 1900 date system treats serial 60 as the non-existent 1900-02-29.
 // Real JavaScript Dates before 1900-03-01 use days since 1899-12-31; dates on or
-// after that cutoff receive one extra serial day. Serial 60 maps to the only
-// representable fallback (1900-02-28) when converted to a Date, while numeric
-// formula/XLSX paths can preserve the serial itself.
+// after that cutoff receive one extra serial day. Serial 60 maps to
+// 1900-02-28 when converted to a Date, while numeric formula/XLSX paths can
+// preserve the serial itself.
 //
-// All conversions use UTC (`Date.UTC` / `getUTC*`) so host timezone offsets never
-// shift calendar dates.
+// Calendar construction and access use UTC (`Date.UTC` / `getUTC*`) so host
+// timezone offsets never shift calendar dates.
 
 /** Real-date base used before Excel's synthetic leap day. */
 const EPOCH_MS = Date.UTC(1899, 11, 31);
 const LEAP_BUG_CUTOFF_MS = Date.UTC(1900, 2, 1);
-/** Milliseconds in one day; the serial ↔ ms scale factor. */
 const MS_PER_DAY = 86_400_000;
 
 /**

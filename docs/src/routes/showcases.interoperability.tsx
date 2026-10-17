@@ -7,9 +7,11 @@ import type {
   XlsxWorkbookWarning,
 } from "@sheetwrite/core";
 import {
+  cellA1,
   createGrid,
   createGridFromSnapshot,
   downloadBytes,
+  fromCsv,
   initSheetwrite,
 } from "@sheetwrite/core";
 import {
@@ -18,12 +20,13 @@ import {
   createSelectionStatus,
   type ShellPiece,
 } from "@sheetwrite/core/shell";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
-import compatibilityData from "../generated/compatibility.json";
 import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
+import compatibilityData from "../generated/compatibility.json";
 import { pageMeta } from "../lib/seo.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
@@ -33,6 +36,9 @@ import type {
 import {
   ADVERSARIAL_FIXTURES,
   abortedImport,
+  BULK_SALES_ROWS,
+  createBulkSalesCsv,
+  createInjectionSnapshot,
   createInteropSnapshot,
   csvOfActiveSheet,
   delimitedCeilingDemo,
@@ -41,7 +47,6 @@ import {
   fetchFixtureBytes,
   INTEROP_ANALYSIS_SHEET,
   INTEROP_ASSUMPTIONS_SHEET,
-  INTEROP_EXPECTED,
   INTEROP_INJECTION_TEXT,
   type InteropFixture,
   importDelimitedText,
@@ -55,6 +60,7 @@ import {
   sha256Hex,
   tsvOfSelection,
 } from "../showcases/scenarios/interoperability.js";
+
 import stylesheet from "../styles/showcase-interoperability.css?url";
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
@@ -73,16 +79,15 @@ export const Route = createFileRoute("/showcases/interoperability")({
     meta: pageMeta("Spreadsheet interoperability — Sheetwrite showcases", description),
     links: [{ rel: "stylesheet", href: stylesheet }],
   }),
+  // `?compatibility=<record id>` opens one compatibility record.
+  validateSearch: (search: Record<string, unknown>): { compatibility?: string } =>
+    typeof search.compatibility === "string" ? { compatibility: search.compatibility } : {},
   component: InteroperabilityRoute,
 });
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-/**
- * Canvas metrics only. Every color comes from the route stylesheet's
- * --sheetwrite-* seeds (adaptive --sw-* tokens), so the workbench canvas
- * follows the site light/dark theme instead of a hardcoded dark palette.
- */
+/** Canvas colors come from the dark stage's shared demo tokens. */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 36 };
 const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
 
@@ -143,6 +148,19 @@ function compatibilityStatusSummary(record: CompatibilityRecord): string {
 }
 
 const COMPATIBILITY_AREAS = [...new Set(compatibilityData.records.map((record) => record.area))];
+/** Reader-facing names for feature areas; unknown areas fall back to their id. */
+const AREA_NAMES: Readonly<Record<string, string>> = {
+  formula: "Formulas",
+  reference: "References",
+  worksheet: "Worksheets",
+  view: "Views",
+  style: "Styles",
+  validation: "Validation",
+  clipboard: "Clipboard",
+  "xlsx-import": "XLSX import",
+  "xlsx-export": "XLSX export",
+};
+const areaName = (area: string): string => AREA_NAMES[area] ?? area.replaceAll("-", " ");
 const COMPATIBILITY_DIALECTS = [
   ...new Set(compatibilityData.records.map((record) => record.dialect)),
 ];
@@ -284,6 +302,37 @@ function formatSerialDate(value: number | null): string {
     .slice(0, 10);
 }
 
+interface CheckedValue {
+  readonly type: string;
+  readonly value?: unknown;
+  readonly error?: string;
+}
+
+/** A checked result as a reader sees it in a cell; structured results keep their JSON. */
+function ExpectedValue({ result, testId }: { result: CheckedValue; testId?: string }) {
+  const scalar =
+    result.type === "number" || result.type === "string" || result.type === "boolean"
+      ? result.type === "boolean"
+        ? String(result.value).toUpperCase()
+        : result.type === "string"
+          ? `"${String(result.value)}"`
+          : String(result.value)
+      : result.type === "error"
+        ? (result.error ?? String(result.value))
+        : result.type === "blank"
+          ? "Blank cell"
+          : null;
+  if (scalar !== null) {
+    return (
+      <p className="sw-si-value" data-testid={testId} data-type={result.type}>
+        <code>{scalar}</code>
+        <span>{result.type}</span>
+      </p>
+    );
+  }
+  return <pre data-testid={testId}>{JSON.stringify(result, null, 2)}</pre>;
+}
+
 interface ChoiceOption {
   value: string;
   label: string;
@@ -343,7 +392,7 @@ function InteroperabilityRoute() {
 
   const [source, setSource] = useState<WorkbenchSource>(() => ({
     kind: "snapshot",
-    label: "Canonical invoice workbook",
+    label: "Q1 2026 · workplace equipment sales",
     snapshot: createInteropSnapshot(),
   }));
   const [gridReady, setGridReady] = useState(false);
@@ -351,6 +400,23 @@ function InteroperabilityRoute() {
   const [probe, setProbe] = useState<IsolationProbe | null>(null);
   const [warningLog, setWarningLog] = useState<WarningLog | null>(null);
   const [roundTrip, setRoundTrip] = useState<RoundTripReport | null>(null);
+  const [working, setWorking] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [bulkReport, setBulkReport] = useState<{
+    rows: number;
+    columns: number;
+    ms: number;
+    bytes: number;
+  } | null>(null);
+  const [fileReport, setFileReport] = useState<{
+    name: string;
+    bytes: number;
+    ms: number;
+    sheets: number;
+    cells: number;
+    formulas: number;
+    warnings: number;
+  } | null>(null);
   const [digests, setDigests] = useState<Record<string, DigestState>>({});
   const [rejections, setRejections] = useState<Record<string, RejectionReport>>({});
   const [abortReport, setAbortReport] = useState<RejectionReport | null>(null);
@@ -373,13 +439,13 @@ function InteroperabilityRoute() {
   const [compatibilityDialect, setCompatibilityDialect] = useState("all");
   const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
 
+  const { compatibility: requestedCompatibility } = Route.useSearch();
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("compatibility");
-    if (compatibilityData.records.some((record) => record.id === requested)) {
-      setSelectedCompatibilityId(requested);
+    if (compatibilityData.records.some((record) => record.id === requestedCompatibility)) {
+      setSelectedCompatibilityId(requestedCompatibility ?? null);
       document.getElementById("contract")?.scrollIntoView();
     }
-  }, []);
+  }, [requestedCompatibility]);
 
   const fixtureBytes = useCallback(async (fixture: InteropFixture): Promise<Uint8Array> => {
     const cached = bytesCache.current.get(fixture.file);
@@ -402,62 +468,75 @@ function InteroperabilityRoute() {
     let unsubscribeChange: (() => void) | null = null;
     let previousModel: AnalyticalReadout | null = null;
 
-    void initSheetwrite().then(async () => {
-      if (disposed) return;
-      // The registration probe must observe the page BEFORE this route ever
-      // touches the optional XLSX package, so it runs exactly once, here.
-      if (!probedRef.current) {
-        probedRef.current = true;
-        setProbe(await probeXlsxRegistration());
+    void initSheetwrite()
+      .then(async () => {
         if (disposed) return;
-      }
-      const base = { theme: CANVAS_THEME, config: { toolbar: false } };
-      grid =
-        source.kind === "snapshot"
-          ? createGridFromSnapshot(host, source.snapshot, base)
-          : createGrid(host, {
-              workbook: {
-                activeSheet: "imported",
-                sheets: [
-                  {
-                    id: "imported",
-                    name: "Imported",
-                    rowCount: source.data.rowCount,
-                    columns: source.columns,
-                  },
-                ],
-              },
-              data: source.data,
-              ...base,
-            });
-      pieces.push(
-        createNameBox(formulaRow, grid, { focusGrid: () => host.focus() }),
-        createFormulaBar(formulaRow, grid, { focusGrid: () => host.focus() }),
-        createSelectionStatus(statusRow, grid),
-      );
-      gridRef.current = grid;
-      window.__sheetwriteInteropGrid = grid;
-      previousModel = readAnalyticalModel(grid);
-      setModelReadout(previousModel);
-      setModelChange(null);
-      unsubscribeChange = grid.on("change", (event) => {
-        if (!grid) return;
-        const nextModel = readAnalyticalModel(grid);
-        setModelReadout(nextModel);
-        if (previousModel && nextModel) {
-          setModelChange({
-            address: event.changes
-              .map(({ addr }) => `${String(addr.sheet)}!R${addr.row + 1}C${addr.col + 1}`)
-              .join(", "),
-            committedCells: event.changes.length,
-            changedResults: changedAnalyticalResults(previousModel, nextModel),
-          });
+        // The registration probe must observe the page BEFORE this route ever
+        // touches the optional XLSX package, so it runs exactly once, here.
+        if (!probedRef.current) {
+          probedRef.current = true;
+          setProbe(await probeXlsxRegistration());
+          if (disposed) return;
         }
-        previousModel = nextModel;
+        const base = { theme: CANVAS_THEME, config: { toolbar: false } };
+        grid =
+          source.kind === "snapshot"
+            ? createGridFromSnapshot(host, source.snapshot, base)
+            : createGrid(host, {
+                workbook: {
+                  activeSheet: "imported",
+                  sheets: [
+                    {
+                      id: "imported",
+                      name: "Imported",
+                      rowCount: source.data.rowCount,
+                      columns: source.columns,
+                    },
+                  ],
+                },
+                data: source.data,
+                ...base,
+              });
+        grid.setSelection({
+          kind: "cell",
+          addr: { sheet: grid.getActiveSheet(), row: 0, col: 0 },
+        });
+        pieces.push(
+          createNameBox(formulaRow, grid, { focusGrid: () => host.focus() }),
+          createFormulaBar(formulaRow, grid, { focusGrid: () => host.focus() }),
+          createSelectionStatus(statusRow, grid),
+        );
+        gridRef.current = grid;
+        window.__sheetwriteInteropGrid = grid;
+        previousModel = readAnalyticalModel(grid);
+        setModelReadout(previousModel);
+        setModelChange(null);
+        unsubscribeChange = grid.on("change", (event) => {
+          if (!grid) return;
+          const nextModel = readAnalyticalModel(grid);
+          setModelReadout(nextModel);
+          if (previousModel && nextModel) {
+            setModelChange({
+              address: event.changes
+                .map(({ addr }) => `${String(addr.sheet)}!R${addr.row + 1}C${addr.col + 1}`)
+                .join(", "),
+              committedCells: event.changes.length,
+              changedResults: changedAnalyticalResults(previousModel, nextModel),
+            });
+          }
+          previousModel = nextModel;
+        });
+        setGridReady(true);
+        setStatus(
+          `Loaded: ${source.label}. Edit any cell, then export, re-import, and compare it cell by cell.`,
+        );
+      })
+      .catch((error: unknown) => {
+        if (!disposed) {
+          setGridReady(false);
+          setStatus(`Workbook could not load — ${describeError(error)}`);
+        }
       });
-      setGridReady(true);
-      setStatus(`Loaded: ${source.label}. Edit any cell, then export below.`);
-    });
 
     return () => {
       unsubscribeChange?.();
@@ -527,8 +606,8 @@ function InteroperabilityRoute() {
     return () => observer.disconnect();
   }, []);
 
-  // The engine resolves --sheetwrite-* custom properties once per grid mount.
-  // When the site theme flips, re-run that resolution (DEFAULT < CSS < metrics)
+  // The engine resolves --sheetwrite-* custom properties at grid mount.
+  // When the site theme flips, re-run that resolution (DEFAULT < CSS < options)
   // so the canvas repaints with the new palette instead of going stale.
   useEffect(() => {
     const observer = new MutationObserver(() => gridRef.current?.replaceTheme(CANVAS_THEME));
@@ -555,6 +634,8 @@ function InteroperabilityRoute() {
   const handleRoundTrip = async () => {
     const grid = gridRef.current;
     if (!grid) return;
+    if (working) return;
+    setWorking(true);
     setStatus("Exporting and re-importing the live document…");
     try {
       const report = await roundTripWorkbook(grid);
@@ -563,9 +644,13 @@ function InteroperabilityRoute() {
         operation: "XLSX export → re-import round-trip",
         warnings: [...report.exportWarnings, ...report.importWarnings],
       });
-      setStatus("Round-trip complete. Every claim below was just measured.");
+      setStatus(
+        `Compared ${report.cellsCompared.toLocaleString()} stored cells. ${report.cellsMatched.toLocaleString()} matched; ${report.formulasPreserved}/${report.formulasBefore} formula sources preserved.`,
+      );
     } catch (error) {
       setStatus(`Round-trip failed — ${describeError(error)}`);
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -589,16 +674,90 @@ function InteroperabilityRoute() {
   };
 
   const handleFile = async (file: File | null) => {
-    if (!file) return;
+    if (!file || working) return;
+    if (!/\.(xlsx|csv)$/iu.test(file.name)) {
+      setStatus("Choose an .xlsx or .csv file. The live workbook has not changed.");
+      return;
+    }
+    setWorking(true);
     setStatus(`Importing ${file.name}…`);
+    const started = performance.now();
     try {
-      const outcome = await importWorkbook(await file.arrayBuffer());
-      setWarningLog({ operation: `Import of ${file.name}`, warnings: outcome.warnings });
+      if (/\.csv$/iu.test(file.name)) {
+        const imported = importDelimitedText(await file.text());
+        setWarningLog({ operation: `CSV import of ${file.name}`, warnings: [] });
+        setSource({
+          kind: "columnar",
+          label: file.name,
+          columns: imported.columns,
+          data: imported.data,
+        });
+        setFileReport({
+          name: file.name,
+          bytes: file.size,
+          ms: performance.now() - started,
+          sheets: 1,
+          cells: imported.data.rowCount * imported.columns.length,
+          formulas: 0,
+          warnings: 0,
+        });
+      } else {
+        const outcome = await importWorkbook(await file.arrayBuffer());
+        setWarningLog({ operation: `Import of ${file.name}`, warnings: outcome.warnings });
+        const cells = outcome.snapshot.sheets.flatMap((sheet) =>
+          sheet.cells.flatMap((block) => block.cells),
+        );
+        setFileReport({
+          name: file.name,
+          bytes: file.size,
+          ms: performance.now() - started,
+          sheets: outcome.snapshot.sheets.length,
+          cells: cells.length,
+          formulas: cells.filter((cell) => cell.value.kind === "formula").length,
+          warnings: outcome.warnings.length,
+        });
+        setSource({ kind: "snapshot", label: file.name, snapshot: outcome.snapshot });
+      }
       setRoundTrip(null);
       setFixtureLoad(null);
-      setSource({ kind: "snapshot", label: file.name, snapshot: outcome.snapshot });
     } catch (error) {
       setStatus(`Import rejected — ${describeError(error)}`);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    if (working) return;
+    setWorking(true);
+    setStatus("Generating a sales CSV in this browser…");
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    try {
+      const generated = createBulkSalesCsv();
+      const bytes = new TextEncoder().encode(generated.text).byteLength;
+      const started = performance.now();
+      const data = fromCsv(generated.text, generated.columns, {
+        resourceLimits: { maxCells: (BULK_SALES_ROWS + 1) * generated.columns.length },
+      });
+      setBulkReport({
+        rows: data.rowCount,
+        columns: generated.columns.length,
+        ms: performance.now() - started,
+        bytes,
+      });
+      setRoundTrip(null);
+      setFileReport(null);
+      setWarningLog(null);
+      setSource({
+        kind: "columnar",
+        label: "Generated sales ledger · 200,000 orders",
+        columns: generated.columns,
+        data,
+      });
+    } catch (error) {
+      setStatus(`Generated CSV import failed — ${describeError(error)}`);
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -720,7 +879,7 @@ function InteroperabilityRoute() {
     }
   };
 
-  const injectionCsvLine = csvPreview?.split(/\r?\n/).find((line) => line.includes("OP-1045"));
+  const injectionCsvLine = csvPreview?.split(/\r?\n/).find((line) => line.includes("'=HYPERLINK("));
   const visibleResults = COMPATIBILITY_RESULTS.cases.filter(
     (entry) =>
       (resultStatus === "all" || entry.statusTags.includes(resultStatus)) &&
@@ -749,6 +908,11 @@ function InteroperabilityRoute() {
     0,
     SECTIONS.findIndex((section) => section.id === activeSection),
   );
+  const spillExamples = roundTrip?.formulaExamples ?? [];
+  const spillExamplesStored = spillExamples.filter((example) => example.exported !== null).length;
+  const spillExamplesEncoded = spillExamples.filter((example) =>
+    example.exported?.includes("_xlfn.ANCHORARRAY("),
+  ).length;
 
   return (
     <div className="sw-si-frame">
@@ -759,7 +923,9 @@ function InteroperabilityRoute() {
             <>
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
-              <a href="/docs/guides/xlsx-export/">XLSX interchange guide →</a>
+              <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+                XLSX interchange guide →
+              </Link>
             </>
           }
           eyebrow="CAPABILITY / SPREADSHEET INTEROPERABILITY"
@@ -788,12 +954,25 @@ function InteroperabilityRoute() {
           ))}
         </nav>
 
-        <p aria-live="polite" className="sw-si-status" data-testid="interop-status" role="status">
-          {status}
-        </p>
-
         <section aria-label="Workbook exchange workbench" className="sw-si-section" id="xlsx">
-          <div className="sw-si-workbench" data-ready={gridReady || undefined}>
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path. */}
+          <section
+            className="sw-si-workbench"
+            aria-label="Live workbook and spreadsheet drop target"
+            data-testid="interop-drop-stage"
+            data-ready={gridReady || undefined}
+            data-dragging={dragActive || undefined}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragActive(false);
+              void handleFile(event.dataTransfer.files[0] ?? null);
+            }}
+          >
             <p className="sw-si-workbench__label" data-testid="interop-source">
               <span>Source workbook</span>
               <strong>{source.label}</strong>
@@ -802,78 +981,81 @@ function InteroperabilityRoute() {
               </span>
             </p>
             <aside
-              aria-labelledby="fidelity-ledger-title"
               className="sw-si-ledger"
               data-testid="interop-fidelity-ledger"
+              aria-label="Live exchange results"
             >
-              <header>
-                <p>One exchange path</p>
-                <h3 id="fidelity-ledger-title">Load → edit → compare</h3>
+              <header className="sw-si-flight-head">
+                <div>
+                  <p>
+                    LIVE XLSX EXCHANGE
+                    <span
+                      className="sw-si-hud-state"
+                      data-state={roundTrip ? "complete" : "ready"}
+                      data-testid="interop-run-state"
+                    >
+                      {roundTrip ? "Exchange complete" : "Not run yet"}
+                    </span>
+                  </p>
+                  <h2>Take the workbook out. Bring the proof back.</h2>
+                </div>
+                <button
+                  className="sw-si-btn sw-si-btn--primary"
+                  data-testid="interop-roundtrip"
+                  disabled={!gridReady || working}
+                  onClick={handleRoundTrip}
+                  type="button"
+                >
+                  {working ? "Working…" : "Export, re-import & compare"}
+                </button>
               </header>
-              <ol className="sw-si-journey">
-                <li data-state="complete">
-                  <strong>Source loaded</strong>
-                  <span>{source.label}</span>
-                </li>
-                <li data-state={modelChange ? "complete" : "active"}>
-                  <strong>Edit the live Grid</strong>
-                  <span>
-                    {modelChange
-                      ? `${modelChange.committedCells} cell change recorded`
-                      : "Try B2 or a model input"}
-                  </span>
-                </li>
-                <li data-state={roundTrip ? "complete" : "pending"}>
-                  <strong>Export, re-import, diff</strong>
-                  <span>{roundTrip ? "Comparison complete" : "Run the primary action below"}</span>
-                </li>
-              </ol>
-              <button
-                className="sw-si-btn sw-si-btn--primary sw-si-ledger__action"
-                data-testid="interop-roundtrip"
-                onClick={handleRoundTrip}
-                type="button"
+              <dl
+                className="sw-si-hud"
+                data-state={roundTrip ? "complete" : "ready"}
+                aria-live="polite"
               >
-                Export, re-import &amp; compare
-              </button>
-              <dl aria-label="Current fidelity ledger" className="sw-si-ledger__states">
-                <div data-state="evaluated">
-                  <dt>Evaluated</dt>
-                  <dd>{INTEROP_EXPECTED.formulaCount} formula sources live in Grid</dd>
-                </div>
-                <div data-state="preserved">
-                  <dt>Preserved</dt>
-                  <dd>
-                    {roundTrip
-                      ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore} formulas · ${
-                          roundTrip.sheetsPreserved &&
-                          roundTrip.mergePreserved &&
-                          roundTrip.frozenRowsPreserved
-                            ? "sheet structure matched"
-                            : "differences found"
-                        }`
-                      : "Measured after export and re-import"}
+                <div>
+                  <dt>Cells compared</dt>
+                  <dd data-testid="interop-cells-compared">
+                    {roundTrip ? roundTrip.cellsCompared.toLocaleString() : "—"}
                   </dd>
                 </div>
-                <div data-state="warning">
+                <div>
+                  <dt>Formulas preserved</dt>
+                  <dd>
+                    {roundTrip ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}` : "—"}
+                  </dd>
+                </div>
+                <div>
                   <dt>Warnings</dt>
-                  <dd>
-                    {warningLog
-                      ? `${warningLog.warnings.length} reported by ${warningLog.operation}`
-                      : "Structured and never hidden"}
-                  </dd>
+                  <dd>{warningLog ? warningLog.warnings.length : "—"}</dd>
                 </div>
-                <div data-state="unsupported">
-                  <dt>Unsupported boundary</dt>
-                  <dd>No unreviewed Excel or Google Sheets result is claimed</dd>
+                <div>
+                  <dt>XLSX bytes</dt>
+                  <dd>{roundTrip ? roundTrip.exportedBytes.toLocaleString() : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Exchange time</dt>
+                  <dd>{roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : "—"}</dd>
                 </div>
               </dl>
+              {/* One status line for the whole page: actions in the labs below
+                  report here too, next to the workbook they change. */}
+              <p
+                aria-live="polite"
+                className="sw-si-after-action"
+                data-testid="interop-status"
+                role="status"
+              >
+                {status}
+              </p>
             </aside>
-            <section aria-labelledby="analytical-model-title" className="sw-si-model">
+            <details className="sw-si-model" data-testid="interop-model-disclosure">
+              <summary>Inspect the equipment lease and cash-flow model</summary>
               <div className="sw-si-model__heading">
                 <div>
                   <p className="sw-si-model__eyebrow">LIVE FORMULA MODEL</p>
-                  <h3 id="analytical-model-title">Portable analytical workbench</h3>
+                  <h3 id="analytical-model-title">Equipment lease &amp; cash-flow model</h3>
                 </div>
                 <p className="sw-si-model__evidence" data-testid="interop-model-evidence">
                   Local engine: evaluated now. No new Excel or Google Sheets result is added; the
@@ -1012,7 +1194,7 @@ function InteroperabilityRoute() {
                     }.`
                   : "Public change event: awaiting an analytical input edit."}
               </p>
-            </section>
+            </details>
             {/* shell.css sizes .sheetwrite-shell at height:100% (unlayered),
                 so the definite height lives on this owned wrapper. */}
             <div className="sw-si-stage">
@@ -1021,7 +1203,7 @@ function InteroperabilityRoute() {
                   className="sheetwrite-shell-row sheetwrite-shell-formula-row"
                   ref={formulaRowRef}
                 />
-                {/* biome-ignore lint/a11y/useSemanticElements: Sheetwrite upgrades this canvas host into a virtualized ARIA grid; a table cannot host the runtime. */}
+                {/* Sheetwrite upgrades this host into a virtualized ARIA grid; a table cannot host the runtime. */}
                 <div
                   aria-label="Interoperability workbench grid"
                   role="grid"
@@ -1044,10 +1226,11 @@ function InteroperabilityRoute() {
                 Download .xlsx
               </button>
               <label className="sw-si-btn sw-si-btn--secondary sw-si-file">
-                Import your .xlsx
+                Drop your own .xlsx / .csv
                 <input
-                  accept=".xlsx"
+                  accept=".xlsx,.csv"
                   data-testid="interop-file-input"
+                  disabled={working}
                   onChange={(event) => void handleFile(event.currentTarget.files?.[0] ?? null)}
                   type="file"
                 />
@@ -1057,12 +1240,14 @@ function InteroperabilityRoute() {
                 className="sw-si-btn sw-si-btn--quiet"
                 data-testid="interop-reset"
                 onClick={() => {
+                  setFileReport(null);
+                  setBulkReport(null);
                   setRoundTrip(null);
                   setWarningLog(null);
                   setFixtureLoad(null);
                   setSource({
                     kind: "snapshot",
-                    label: "Canonical invoice workbook",
+                    label: "Q1 2026 · workplace equipment sales",
                     snapshot: createInteropSnapshot(),
                   });
                 }}
@@ -1071,7 +1256,46 @@ function InteroperabilityRoute() {
                 Reset workbench
               </button>
             </div>
+          </section>
+          <div className="sw-si-release-lab">
+            <div>
+              <p className="sw-si-release-label">NEW IN 0.5.0 · STREAMED IMPORT</p>
+              <h3>Put 200,000 sales records through the CSV importer.</h3>
+              <p>
+                Records go straight into typed columns. XLSX imports also stream rows and shared
+                strings. This demo measures CSV parse time, not peak memory.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="sw-si-btn sw-si-btn--secondary"
+              data-testid="interop-bulk-import"
+              disabled={working}
+              onClick={handleBulkImport}
+            >
+              Generate &amp; import 200,000 rows
+            </button>
+            {bulkReport && (
+              <p className="sw-si-bulk-report" data-testid="interop-bulk-report" role="status">
+                <strong>
+                  {bulkReport.rows.toLocaleString()} rows × {bulkReport.columns} columns
+                </strong>
+                <span>
+                  {bulkReport.ms.toFixed(0)} ms CSV parse · {bulkReport.bytes.toLocaleString()}{" "}
+                  bytes · {gridReady ? "Live Grid ready" : "Loading the live Grid"}
+                </span>
+              </p>
+            )}
           </div>
+          {fileReport && (
+            <p className="sw-si-import-report" data-testid="interop-file-report" role="status">
+              <strong>{fileReport.name}</strong> loaded into the live Grid: {fileReport.sheets}{" "}
+              {fileReport.sheets === 1 ? "sheet" : "sheets"} · {fileReport.cells.toLocaleString()}{" "}
+              stored cells · {fileReport.formulas} formula sources · {fileReport.warnings} import
+              warnings · {fileReport.bytes.toLocaleString()} bytes · {fileReport.ms.toFixed(0)} ms.
+              Run the exchange to compare its exported copy.
+            </p>
+          )}
           {roundTrip && (
             <dl
               className="sw-si-report"
@@ -1079,12 +1303,19 @@ function InteroperabilityRoute() {
                 roundTrip.formulasPreserved === roundTrip.formulasBefore &&
                 roundTrip.sheetsPreserved &&
                 roundTrip.mergePreserved &&
-                roundTrip.frozenRowsPreserved
+                roundTrip.frozenRowsPreserved &&
+                roundTrip.cellsMatched === roundTrip.cellsCompared
                   ? "pass"
                   : "partial"
               }
               data-testid="interop-roundtrip-report"
             >
+              <div>
+                <dt>Cells matched</dt>
+                <dd data-testid="interop-roundtrip-cells">
+                  {roundTrip.cellsMatched}/{roundTrip.cellsCompared}
+                </dd>
+              </div>
               <div>
                 <dt>Exported bytes</dt>
                 <dd>{roundTrip.exportedBytes.toLocaleString()}</dd>
@@ -1113,6 +1344,60 @@ function InteroperabilityRoute() {
               </div>
             </dl>
           )}
+          {roundTrip && roundTrip.formulaExamples.length > 0 && (
+            <details className="sw-si-source-proof" open data-testid="interop-spill-proof">
+              <summary>
+                New in 0.5.0: array constants and spill references survived the exchange
+              </summary>
+              <p>
+                Excel stores <code>A1#</code> as <code>_xlfn.ANCHORARRAY(A1)</code>. Each row shows
+                the same formula as a grid source, as the text inside the exported .xlsx file, and
+                after the file is imported again.
+              </p>
+              <div className="sw-si-tablewrap">
+                <table className="sw-si-matrix">
+                  <thead>
+                    <tr>
+                      <th>Cell</th>
+                      <th>Before export</th>
+                      <th>In the exported .xlsx</th>
+                      <th>After import</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roundTrip.formulaExamples.map((example) => (
+                      <tr
+                        key={`${example.sheet}:${example.row}:${example.col}`}
+                        data-exported={example.exported === null ? "missing" : "found"}
+                        data-matched={example.before === example.after}
+                        data-spill-encoding={
+                          example.exported?.includes("_xlfn.ANCHORARRAY(") ? "anchorarray" : "plain"
+                        }
+                      >
+                        <th>
+                          {example.sheet} · {cellA1(example.row, example.col)}
+                        </th>
+                        <td>
+                          <code>{example.before}</code>
+                        </td>
+                        <td>
+                          <code>{example.exported ?? "Not found in the exported file"}</code>
+                        </td>
+                        <td>
+                          <code>{example.after ?? "Not preserved"}</code>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="sw-si-note" data-testid="interop-spill-file-check">
+                Exported-file check: {spillExamplesStored} of {roundTrip.formulaExamples.length}{" "}
+                example formulas found in the bytes this page just wrote; {spillExamplesEncoded}{" "}
+                stored as <code>_xlfn.ANCHORARRAY(...)</code>.
+              </p>
+            </details>
+          )}
         </section>
 
         <section aria-labelledby="contract-summary" className="sw-si-section" id="contract">
@@ -1132,9 +1417,9 @@ function InteroperabilityRoute() {
                 This page publishes a fixed, checked test set and the product&apos;s declared
                 feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
                 OpenFormula compatibility.{" "}
-                <a href="/docs/reference/compatibility-results/">
+                <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
                   Read the detailed checked results →
-                </a>
+                </Link>
               </p>
 
               <section
@@ -1285,8 +1570,12 @@ function InteroperabilityRoute() {
                           {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
                         </span>
                         <strong>{entry.label}</strong>
-                        <small>
-                          {entry.statusTags.map((tag) => RESULT_STATUS_LABELS[tag]).join(" · ")}
+                        <small className="sw-si-compat__tags">
+                          {entry.statusTags.map((tag) => (
+                            <i data-state={tag} key={tag}>
+                              {RESULT_STATUS_LABELS[tag]}
+                            </i>
+                          ))}
                         </small>
                       </button>
                     </li>
@@ -1390,7 +1679,7 @@ function InteroperabilityRoute() {
                         <div>
                           <dt>Expected checked result</dt>
                           <dd>
-                            <pre>{JSON.stringify(selectedResult.expected, null, 2)}</pre>
+                            <ExpectedValue result={selectedResult.expected} />
                           </dd>
                         </div>
                         <div>
@@ -1512,9 +1801,10 @@ function InteroperabilityRoute() {
                                         ? "Checked nonclaim result"
                                         : "Expected checked result"}
                                   </strong>
-                                  <pre data-testid="app-result-sheetwrite-capture">
-                                    {JSON.stringify(selectedResult.expected, null, 2)}
-                                  </pre>
+                                  <ExpectedValue
+                                    result={selectedResult.expected}
+                                    testId="app-result-sheetwrite-capture"
+                                  />
                                 </div>
                               ) : (
                                 observation?.result && (
@@ -1612,7 +1902,7 @@ function InteroperabilityRoute() {
                     { value: "all", label: "All feature areas" },
                     ...COMPATIBILITY_AREAS.map((area) => ({
                       value: area,
-                      label: area.replaceAll("-", " "),
+                      label: areaName(area),
                     })),
                   ]}
                   testId="inventory-area-filter"
@@ -1643,7 +1933,7 @@ function InteroperabilityRoute() {
                   {visibleCompatibility.map((record) => (
                     <li key={record.id}>
                       <button
-                        aria-label={`${record.label}; ${record.area.replaceAll("-", " ")}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
+                        aria-label={`${record.label}; ${areaName(record.area)}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
                         aria-pressed={selectedCompatibility?.id === record.id}
                         data-result={record.resultMode}
                         data-status={record.status}
@@ -1652,7 +1942,7 @@ function InteroperabilityRoute() {
                         type="button"
                       >
                         <span>
-                          {record.area.replaceAll("-", " ")} / {BEHAVIOR_LABELS[record.dialect]}
+                          {areaName(record.area)} · {BEHAVIOR_LABELS[record.dialect]}
                         </span>
                         <strong>{record.label}</strong>
                         <small className="sw-si-compat__record-status">
@@ -1847,7 +2137,9 @@ function InteroperabilityRoute() {
               <p>
                 Every import and export reports what it could not preserve as structured{" "}
                 <code>XlsxWorkbookWarning</code> records — coded, per sheet, per cell.{" "}
-                <a href="/docs/api/core/xlsx-workbook-warning/">Warning codes →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-workbook-warning" }}>
+                  Warning codes →
+                </Link>
               </p>
               <div className="sw-si-panel sw-si-warnings" data-testid="interop-warnings">
                 {warningLog === null ? (
@@ -1900,7 +2192,7 @@ function InteroperabilityRoute() {
               <strong>CSV / TSV export, injection proof, and paste import</strong>
               <small>Lossy interchange is explicit and isolated from the workbook path</small>
             </summary>
-            <div className="sw-si-disclosure__body">
+            <div className="sw-si-disclosure__body sw-si-lab">
               <h2 id="delimited-title">CSV and TSV, hardened</h2>
               <p>
                 Delimited exports neutralize formula-injection payloads before a cell ever reaches a
@@ -1909,10 +2201,7 @@ function InteroperabilityRoute() {
               <div className="sw-si-panel">
                 <div className="sw-si-panel__head">
                   <h3>Export the live document</h3>
-                  <p>
-                    Row OP-1045 stores <code>{INTEROP_INJECTION_TEXT}</code> as text — export the
-                    sheet and inspect what the CSV emits.
-                  </p>
+                  <p>Export the active sheet, or select a range to inspect its clipboard TSV.</p>
                 </div>
                 <div aria-label="Delimited text actions" className="sw-si-actions" role="toolbar">
                   <button
@@ -1941,22 +2230,15 @@ function InteroperabilityRoute() {
                   </button>
                 </div>
                 {csvPreview !== null && (
-                  <>
-                    {injectionCsvLine && (
-                      <p className="sw-si-injection" data-testid="interop-injection-proof">
-                        Injection cell as exported: <code>{injectionCsvLine}</code>
-                      </p>
-                    )}
-                    <label className="sw-si-preview">
-                      CSV output (first 2,000 characters)
-                      <textarea
-                        data-testid="interop-csv-output"
-                        readOnly
-                        rows={7}
-                        value={csvPreview.slice(0, 2000)}
-                      />
-                    </label>
-                  </>
+                  <label className="sw-si-preview">
+                    CSV output (first 2,000 characters)
+                    <textarea
+                      data-testid="interop-csv-output"
+                      readOnly
+                      rows={7}
+                      value={csvPreview.slice(0, 2000)}
+                    />
+                  </label>
                 )}
                 {tsvPreview !== null && (
                   <label className="sw-si-preview">
@@ -2015,13 +2297,55 @@ function InteroperabilityRoute() {
               <strong>Hostile packages, aborts, and resource ceilings</strong>
               <small>Five hand-authored attack packages with typed rejection evidence</small>
             </summary>
-            <div className="sw-si-disclosure__body">
+            <div className="sw-si-disclosure__body sw-si-lab">
               <h2 id="limits-title">Resource limits and hostile input</h2>
               <p>
                 Ceilings are enforced before anything allocates, and hand-authored hostile
                 OPC/SpreadsheetML packages are rejected with typed errors.{" "}
-                <a href="/docs/api/core/xlsx-resource-limits/">Resource limits →</a>
+                <Link to="/docs/$/" params={{ _splat: "api/core/xlsx-resource-limits" }}>
+                  Resource limits →
+                </Link>
               </p>
+              <div className="sw-si-panel">
+                <h3>Formula-injection probe</h3>
+                <p>
+                  <code>{INTEROP_INJECTION_TEXT}</code> is stored as literal text. It is not an
+                  active link or a formula. Load it only in this lab, then inspect the hardened CSV.
+                </p>
+                <div className="sw-si-actions">
+                  <button
+                    type="button"
+                    className="sw-si-btn sw-si-btn--secondary"
+                    data-testid="interop-injection-load"
+                    onClick={() => {
+                      setRoundTrip(null);
+                      setFileReport(null);
+                      setBulkReport(null);
+                      setCsvPreview(null);
+                      setSource({
+                        kind: "snapshot",
+                        label: "Security lab · literal injection probe",
+                        snapshot: createInjectionSnapshot(),
+                      });
+                    }}
+                  >
+                    Load the literal probe
+                  </button>
+                  <button
+                    type="button"
+                    className="sw-si-btn sw-si-btn--secondary"
+                    data-testid="interop-injection-export"
+                    onClick={handleCsvExport}
+                  >
+                    Export probe CSV
+                  </button>
+                </div>
+                {injectionCsvLine && (
+                  <p className="sw-si-injection" data-testid="interop-injection-proof">
+                    Injection cell as exported: <code>{injectionCsvLine}</code>
+                  </p>
+                )}
+              </div>
               <ul aria-label="Enforced import ceilings" className="sw-si-facts">
                 <li>byte ceiling</li>
                 <li>entry ceiling</li>

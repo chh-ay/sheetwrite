@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+
+import { getEngine } from "../../packages/core/src/engine.js";
 import {
   type DataSourceColumnBand,
   type DocumentOp,
@@ -6,8 +8,8 @@ import {
   type RowData,
   SheetwriteStore,
   type Workbook,
-} from "@sheetwrite/core";
-import { initSync } from "@sheetwrite/wasm";
+} from "../../packages/core/src/index.js";
+import { validateEngineVersions } from "./engine-versions.js";
 import {
   assertFiniteNonNegative,
   assertGateIdentity,
@@ -18,6 +20,7 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
+import { packageVersion, type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { type Stat, summarize } from "./stats.js";
 
 export const PAGED_FULL_ROWS = 1_000_000;
@@ -114,6 +117,9 @@ export interface PagedTimingResult {
 }
 
 export interface PagedBenchmarkResult extends GateIdentity {
+  readonly meta: ProtocolCaptureMeta & {
+    readonly engineVersions: Readonly<Record<"sheetwrite", string>>;
+  };
   readonly rows: number;
   readonly columns: number;
   readonly runs: number;
@@ -153,6 +159,7 @@ export function validatePagedBenchmark(
   expectedMode: BenchmarkMode = result.mode,
 ): void {
   assertGateIdentity("paged", expectedMode, result);
+  validateEngineVersions(result.meta.engineVersions, ["sheetwrite"]);
   const expectedRows = expectedMode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
   const expectedRuns = expectedMode === "smoke" ? SMOKE_RUNS : FULL_RUNS;
   if (
@@ -169,6 +176,15 @@ export function validatePagedBenchmark(
     result.cacheChurnRetainedChunks !== CACHE_CHURN_RETAINED_CHUNKS
   ) {
     throw new Error(`paged ${expectedMode} configuration does not match its declared protocol`);
+  }
+  if (
+    result.meta.commit.length === 0 ||
+    typeof result.meta.dirty !== "boolean" ||
+    !Number.isFinite(Date.parse(result.meta.timestamp))
+  ) {
+    throw new Error(
+      "paged capture provenance is incomplete: commit, dirty, and timestamp required",
+    );
   }
 
   const observed = [
@@ -523,9 +539,11 @@ async function runProbe(
 ): Promise<ProbeResult> {
   const bytes = readFileSync(WASM_PATH);
   await initSheetwrite(bytes);
-  const wasm = initSync({ module: bytes });
+  const memory = getEngine().getMemory();
+
   Bun.gc(true);
-  const wasmBefore = wasm.memory.buffer.byteLength;
+  const wasmBefore = memory.buffer.byteLength;
+
   const store = new SheetwriteStore(workbook(rowCount), undefined, {
     storage: "paged",
     chunkRows,
@@ -560,16 +578,19 @@ async function runProbe(
       : 0;
   const result = {
     scenario,
-    wasmDeltaBytes: wasm.memory.buffer.byteLength - wasmBefore,
+    wasmDeltaBytes: memory.buffer.byteLength - wasmBefore,
     ...stats,
     dirtyAllocatedBytes,
     retainedBytes: stats.allocatedBytes + dirtyAllocatedBytes,
   };
+
   if (store.getWorkbook().sheets.length !== 1) {
     throw new Error("benchmark store was optimized away");
   }
   if (!admissionOnly && patches.length > 0) verifyDirtySemantics(store, rowCount, patches);
+
   store.dispose();
+
   return result;
 }
 
@@ -651,6 +672,7 @@ async function runBenchmark(
   mode: BenchmarkMode,
   chunkRows: number,
   prototype: boolean,
+  outputPath?: string,
 ): Promise<void> {
   await initSheetwrite();
   const rowCount = mode === "smoke" ? PAGED_SMOKE_ROWS : PAGED_FULL_ROWS;
@@ -726,6 +748,10 @@ async function runBenchmark(
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,
     matrixId: MATRIX_IDS.paged[mode],
+    meta: {
+      ...protocolCaptureMeta(),
+      engineVersions: { sheetwrite: packageVersion("packages/core/package.json") },
+    },
     rows: rowCount,
     columns: COLUMNS,
     runs,
@@ -770,9 +796,9 @@ async function runBenchmark(
       `| ${probe.scenario} | ${(probe.wasmDeltaBytes / 1024 / 1024).toFixed(2)} | ${(probe.allocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.dirtyAllocatedBytes / 1024 / 1024).toFixed(2)} | ${(probe.retainedBytes / 1024 / 1024).toFixed(2)} | ${probe.chunks} | ${probe.loadedCells} | ${probe.dirtyCells} |`,
     );
   }
-  if (mode === "full" && !prototype) {
+  if (outputPath !== undefined || (mode === "full" && !prototype)) {
     await Bun.write(
-      new URL("../results/paged-results.json", import.meta.url),
+      outputPath ?? new URL("../results/paged-results.json", import.meta.url),
       `${JSON.stringify(result, null, 2)}\n`,
     );
   }
@@ -783,6 +809,11 @@ if (import.meta.main) {
   const probeIndex = process.argv.indexOf("--probe");
   const rowsIndex = process.argv.indexOf("--rows");
   const chunkRowsIndex = process.argv.indexOf("--chunk-rows");
+  const outputIndex = process.argv.indexOf("--output");
+  const outputPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : undefined;
+  if (outputIndex >= 0 && (outputPath === undefined || outputPath.startsWith("--"))) {
+    throw new Error("paged benchmark requires a path after --output");
+  }
   const scenario = probeIndex >= 0 ? process.argv[probeIndex + 1] : undefined;
   const rowCount = rowsIndex >= 0 ? Number(process.argv[rowsIndex + 1]) : Number.NaN;
   const chunkRows = chunkRowsIndex >= 0 ? Number(process.argv[chunkRowsIndex + 1]) : CHUNK_ROWS;
@@ -803,6 +834,7 @@ if (import.meta.main) {
       process.argv.includes("--smoke") ? "smoke" : "full",
       chunkRows,
       process.argv.includes("--prototype"),
+      outputPath,
     );
   }
 }

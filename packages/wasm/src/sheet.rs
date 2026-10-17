@@ -4,12 +4,15 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::calc::Ast;
+use crate::derived::DerivedOverlay;
 use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
     SHEET_INDEXES_METADATA, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES,
 };
-use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, NO_STRING};
+use crate::types::{CellKey, FormulaEntry, FormulaError, KIND_EMPTY, KIND_FORMULA, NO_STRING};
+
+mod transfer;
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
 /// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
@@ -44,16 +47,13 @@ pub(crate) struct CondRule {
     pub(crate) stop_if_true: bool,
 }
 
-// ── NaN-boxed cell payload ───────────────────────────────────────────────────
-//
-// One u64 per cell replaces the old pair of vectors (`num: Vec<f64>` +
-// `str_id: Vec<u32>`): 8 bytes instead of 12 per cell, and one cache stream
-// fewer on every scan. `kind` stays the discriminator; the payload holds
-// canonical f64 bits for numbers and `STR_TAG | id` for string-pool ids.
+// One u64 per cell keeps the numeric bits and string-pool id in one cache
+// stream. `kind` stays the discriminator; the payload holds canonical f64 bits
+// for numbers and `STR_TAG | id` for string-pool ids.
 // Numeric writes canonicalize NaN, so the tag surface (a negative signaling
 // NaN pattern) can never be produced by a number.
 
-const STR_TAG_HI: u64 = 0xFFFC_0000;
+pub(crate) const STR_TAG_HI: u64 = 0xFFFC_0000;
 const STR_TAG: u64 = STR_TAG_HI << 32;
 const CANON_NAN: u64 = 0x7FF8_0000_0000_0000;
 
@@ -80,8 +80,7 @@ pub(crate) fn payload_is_str(bits: u64) -> bool {
     (bits >> 32) == STR_TAG_HI
 }
 
-/// Numeric view of a payload; string-tagged payloads read as `0.0`, matching
-/// the old always-present `num` vector (writers zeroed `num` on string sets).
+/// Numeric view of a payload; string-tagged payloads read as `0.0`.
 #[inline]
 pub(crate) fn payload_num(bits: u64) -> f64 {
     if payload_is_str(bits) {
@@ -132,6 +131,7 @@ impl CellChunk {
     fn set_bit(bits: &mut [u64], offset: usize, value: bool) {
         let mask = 1 << (offset % BITS_PER_WORD);
         let word = &mut bits[offset / BITS_PER_WORD];
+
         if value {
             *word |= mask;
         } else {
@@ -167,6 +167,11 @@ struct StorageEntry {
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 
+enum PinOwner {
+    Explicit,
+    Read,
+}
+
 pub(crate) struct PagedStorage {
     chunk_rows: usize,
     byte_budget: usize,
@@ -175,6 +180,10 @@ pub(crate) struct PagedStorage {
     dirty: HashMap<(usize, usize), DirtyCell>,
     dirty_by_revision: HashMap<u64, Vec<(usize, usize)>>,
     pinned: HashSet<(usize, usize)>,
+    read_pinned: HashSet<(usize, usize)>,
+    pin_scratch: HashSet<(usize, usize)>,
+    viewport_pinned: HashSet<(usize, usize)>,
+    viewport_pin_scratch: HashSet<(usize, usize)>,
     evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
@@ -191,6 +200,10 @@ impl PagedStorage {
             dirty: HashMap::new(),
             dirty_by_revision: HashMap::new(),
             pinned: HashSet::new(),
+            read_pinned: HashSet::new(),
+            pin_scratch: HashSet::new(),
+            viewport_pinned: HashSet::new(),
+            viewport_pin_scratch: HashSet::new(),
             evictable: RefCell::new(BTreeSet::new()),
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
@@ -219,14 +232,20 @@ impl PagedStorage {
         let Some(chunk) = self.chunks.get(&key) else {
             return;
         };
-        let eligible = !self.pinned.contains(&key);
+
+        let eligible = !self.read_pinned.contains(&key)
+            && !self.viewport_pinned.contains(&key)
+            && !self.pinned.contains(&key);
         let previous = chunk.last_access.get();
         let mut evictable = self.evictable.borrow_mut();
+
         if eligible {
             evictable.remove(&(previous, key.0, key.1));
         }
+
         let access = self.next_access();
         chunk.last_access.set(access);
+
         if eligible {
             evictable.insert((access, key.0, key.1));
         }
@@ -236,12 +255,15 @@ impl PagedStorage {
         if self.byte_budget == 0 {
             return;
         }
+
         let chunk_bytes = self.chunk_bytes();
+
         while (self.chunks.len() + 1) * chunk_bytes > self.byte_budget {
             let candidate = self.evictable.get_mut().pop_first();
             let Some((_, col, chunk_index)) = candidate else {
                 break;
             };
+
             self.eviction_candidate_checks = self.eviction_candidate_checks.saturating_add(1);
             self.chunks.remove(&(col, chunk_index));
             self.evictions = self.evictions.saturating_add(1);
@@ -251,15 +273,21 @@ impl PagedStorage {
     fn ensure_chunk(&mut self, key: (usize, usize)) -> &mut CellChunk {
         if !self.chunks.contains_key(&key) {
             self.evict_for_chunk();
+
             let access = self.next_access();
             self.chunks
                 .insert(key, CellChunk::new(self.chunk_rows, access));
-            if !self.pinned.contains(&key) {
+
+            if !self.read_pinned.contains(&key)
+                && !self.viewport_pinned.contains(&key)
+                && !self.pinned.contains(&key)
+            {
                 self.evictable.get_mut().insert((access, key.0, key.1));
             }
         } else {
             self.touch(key);
         }
+
         self.chunks.get_mut(&key).expect("inserted paged chunk")
     }
 
@@ -274,14 +302,18 @@ impl PagedStorage {
         if let Some(cell) = self.dirty.get(&(row, col)) {
             return (cell.kind, cell.payload, cell.style, true, true);
         }
+
         let (key, offset) = self.key_offset(row, col);
         let Some(chunk) = self.chunks.get(&key) else {
             return (KIND_EMPTY, 0, 0, false, false);
         };
+
         self.touch(key);
+
         if !CellChunk::bit(&chunk.loaded, offset) {
             return (KIND_EMPTY, 0, 0, false, false);
         }
+
         (
             chunk.kind[offset],
             chunk.payload[offset],
@@ -306,16 +338,19 @@ impl PagedStorage {
 
     fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
         let mut additional = 0usize;
+
         for col in c0..c0 + cols {
             for row in r0..r0 + rows {
                 if !self.dirty.contains_key(&(row, col)) {
                     additional += 1;
+
                     if self.dirty.len() + additional > self.max_dirty_cells {
                         return false;
                     }
                 }
             }
         }
+
         true
     }
 
@@ -331,16 +366,19 @@ impl PagedStorage {
             .flat_map(|col| (r0..r0 + rows).map(move |row| (row, col)))
             .filter(|key| !self.dirty.contains_key(key))
             .count();
+
         if self.dirty.len().saturating_add(additional) > self.max_dirty_cells
             || self.dirty.try_reserve(additional).is_err()
         {
             return false;
         }
+
         if !self.dirty_by_revision.contains_key(&revision)
             && self.dirty_by_revision.try_reserve(1).is_err()
         {
             return false;
         }
+
         self.dirty_by_revision
             .entry(revision)
             .or_default()
@@ -540,30 +578,102 @@ impl PagedStorage {
     }
 
     fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
-        let mut next = HashSet::new();
-        for &col in cols {
-            for chunk in r0 / self.chunk_rows..=r1 / self.chunk_rows {
-                next.insert((col as usize, chunk));
+        let mut next = std::mem::take(&mut self.pin_scratch);
+        if r0 < r1 {
+            for &col in cols {
+                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
+                    next.insert((col as usize, chunk));
+                }
             }
         }
+        self.replace_pins(next, PinOwner::Explicit);
+    }
 
-        for key in self.pinned.difference(&next) {
+    fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
+        let mut next = std::mem::take(&mut self.pin_scratch);
+        for &col in cols {
+            if rows.is_empty() {
+                if start < end {
+                    for chunk in start / self.chunk_rows..=(end - 1) / self.chunk_rows {
+                        next.insert((col as usize, chunk));
+                    }
+                }
+            } else {
+                for &row in rows {
+                    next.insert((col as usize, row as usize / self.chunk_rows));
+                }
+            }
+        }
+        self.replace_pins(next, PinOwner::Read);
+    }
+
+    fn pin_viewport_bands(&mut self, bands: &[u32]) {
+        let mut next = std::mem::take(&mut self.viewport_pin_scratch);
+        for band in bands.chunks_exact(4) {
+            let [r0, r1, c0, c1] = [
+                band[0] as usize,
+                band[1] as usize,
+                band[2] as usize,
+                band[3] as usize,
+            ];
+            if r0 >= r1 {
+                continue;
+            }
+            for col in c0..c1 {
+                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
+                    next.insert((col, chunk));
+                }
+            }
+        }
+        for key in self.viewport_pinned.difference(&next) {
+            if self.pinned.contains(key) || self.read_pinned.contains(key) {
+                continue;
+            }
             if let Some(chunk) = self.chunks.get(key) {
                 self.evictable
                     .get_mut()
                     .insert((chunk.last_access.get(), key.0, key.1));
             }
         }
-        for key in next.difference(&self.pinned) {
+        for key in next.difference(&self.viewport_pinned) {
             if let Some(chunk) = self.chunks.get(key) {
                 self.evictable
                     .get_mut()
                     .remove(&(chunk.last_access.get(), key.0, key.1));
             }
         }
-        self.pinned = next;
+        let mut previous = std::mem::replace(&mut self.viewport_pinned, next);
+        previous.clear();
+        self.viewport_pin_scratch = previous;
+    }
+
+    fn replace_pins(&mut self, next: HashSet<(usize, usize)>, owner: PinOwner) {
         let access = self.next_access();
-        for &key in &self.pinned {
+        let (current, other) = match owner {
+            PinOwner::Explicit => (&mut self.pinned, &self.read_pinned),
+            PinOwner::Read => (&mut self.read_pinned, &self.pinned),
+        };
+        for key in current.difference(&next) {
+            if self.viewport_pinned.contains(key) || other.contains(key) {
+                continue;
+            }
+            if let Some(chunk) = self.chunks.get(key) {
+                self.evictable
+                    .get_mut()
+                    .insert((chunk.last_access.get(), key.0, key.1));
+            }
+        }
+        for key in next.difference(current) {
+            if let Some(chunk) = self.chunks.get(key) {
+                self.evictable
+                    .get_mut()
+                    .remove(&(chunk.last_access.get(), key.0, key.1));
+            }
+        }
+        let mut previous = std::mem::replace(current, next);
+        previous.clear();
+        self.pin_scratch = previous;
+        for &key in current.iter() {
             if let Some(chunk) = self.chunks.get(&key) {
                 chunk.last_access.set(access);
             }
@@ -685,6 +795,22 @@ impl PagedStorage {
         indexes
             .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.read_pinned.len(),
+            self.read_pinned.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.pin_scratch.len(),
+            self.pin_scratch.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.viewport_pinned.len(),
+            self.viewport_pinned.capacity(),
+        );
+        indexes.add_hash_table::<(usize, usize), ()>(
+            self.viewport_pin_scratch.len(),
+            self.viewport_pin_scratch.capacity(),
+        );
         // `std::collections::BTreeSet` exposes no node capacity. Report its
         // eviction entries without inventing allocator bytes from `size_of_val`.
         indexes.entries = indexes
@@ -721,18 +847,13 @@ impl PagedStorage {
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 pub(crate) const MAX_SPILL_OWNER_CELLS: usize = 1_000_000;
 pub(crate) const MAX_SPILL_OWNER_BYTES: usize = 64 * 1024 * 1024;
-const SPILL_OWNER_ENTRY_BYTES: usize = 32;
-const SPILL_ERROR_ENTRY_BYTES: usize = 16;
+// Includes installed-owner metadata and its source-independent scalar overlay.
+const SPILL_OWNER_ENTRY_BYTES: usize = 64;
 
-pub(crate) fn spill_ownership_within_budget(owner_cells: usize, error_cells: usize) -> bool {
+pub(crate) fn spill_ownership_within_budget(owner_cells: usize) -> bool {
     owner_cells <= MAX_SPILL_OWNER_CELLS
         && owner_cells
             .checked_mul(SPILL_OWNER_ENTRY_BYTES)
-            .and_then(|bytes| {
-                error_cells
-                    .checked_mul(SPILL_ERROR_ENTRY_BYTES)
-                    .and_then(|errors| bytes.checked_add(errors))
-            })
             .is_some_and(|bytes| bytes <= MAX_SPILL_OWNER_BYTES)
 }
 
@@ -791,20 +912,20 @@ pub(crate) struct SheetData {
     pub(crate) row_count: usize,
     /// `kind[col * row_count + row]`
     pub(crate) kind: Vec<u8>,
-    /// NaN-boxed value payload (see module header); `0` when empty.
+    /// NaN-boxed value payload; `0` when empty.
     pub(crate) payload: Vec<u64>,
     /// Host style-dictionary id; `0` means "no explicit style".
     pub(crate) style: Vec<u32>,
     paged: Option<PagedStorage>,
-    /// Arithmetic formulas keyed by (row, col); successful results cache in the payload.
+    /// Calculated scalars and spill output; never persisted or hydrated.
+    derived: DerivedOverlay,
+    /// Formula source and dependency metadata, independent of calculated payloads.
     pub(crate) formulas: HashMap<CellKey, FormulaEntry>,
     /// Attempted spill bounds remain registered even while obstructed so clearing
     /// a blocker invalidates the owning anchor.
     pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
     /// Every currently materialized spill cell (including its anchor) to its owner.
     pub(crate) spill_owners: HashMap<CellKey, CellKey>,
-    /// Errors projected into derived spill cells; anchors keep errors in FormulaEntry.
-    pub(crate) spill_errors: HashMap<CellKey, FormulaError>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
@@ -818,6 +939,53 @@ pub(crate) struct SheetData {
 }
 
 impl SheetData {
+    /// Physical roots include shadowed clean pages: acknowledgement can expose them.
+    pub(crate) fn visit_string_ids(&self, mut visit: impl FnMut(u32)) {
+        let mut visit_payload = |payload: u64| {
+            let id = payload_str_id(payload);
+            if id != NO_STRING {
+                visit(id);
+            }
+        };
+        for &payload in &self.payload {
+            visit_payload(payload);
+        }
+        self.derived.visit_payloads(&mut visit_payload);
+        if let Some(paged) = &self.paged {
+            for chunk in paged.chunks.values() {
+                for &payload in &chunk.payload {
+                    visit_payload(payload);
+                }
+            }
+            for dirty in paged.dirty.values() {
+                visit_payload(dirty.payload);
+            }
+        }
+    }
+
+    pub(crate) fn remap_string_ids(&mut self, remap: &[u32]) {
+        let remap_payload = |payload: &mut u64| {
+            let id = payload_str_id(*payload);
+            if id != NO_STRING {
+                *payload = encode_str_id(remap[id as usize]);
+            }
+        };
+        for payload in &mut self.payload {
+            remap_payload(payload);
+        }
+        self.derived.remap_payloads(&remap_payload);
+        if let Some(paged) = &mut self.paged {
+            for chunk in paged.chunks.values_mut() {
+                for payload in &mut chunk.payload {
+                    remap_payload(payload);
+                }
+            }
+            for dirty in paged.dirty.values_mut() {
+                remap_payload(&mut dirty.payload);
+            }
+        }
+    }
+
     pub(crate) fn new(n_cols: usize, row_count: usize) -> Self {
         Self::try_new(n_cols, row_count).expect("trusted dense sheet dimensions")
     }
@@ -850,10 +1018,10 @@ impl SheetData {
             payload,
             style,
             paged: None,
+            derived: DerivedOverlay::dense(),
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            spill_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -875,10 +1043,10 @@ impl SheetData {
             payload: Vec::new(),
             style: Vec::new(),
             paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
+            derived: DerivedOverlay::paged(),
             formulas: HashMap::new(),
             spill_ranges: HashMap::new(),
             spill_owners: HashMap::new(),
-            spill_errors: HashMap::new(),
             spill_blockers: Vec::new(),
             dirty_cells: HashSet::new(),
             all_dirty: false,
@@ -911,16 +1079,33 @@ impl SheetData {
         coordinates.extend(self.formulas.keys().copied());
         coordinates.sort_unstable();
         coordinates.dedup();
-        coordinates.retain(|&(row, col)| {
-            self.spill_owner((row, col)).is_none_or(|anchor| {
-                anchor == (row, col) || self.style_at(self.idx(row as usize, col as usize)) != 0
-            })
-        });
+        // Derived output has no source coordinate. Explicit child styles remain.
         coordinates
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn kind_at(&self, index: usize) -> u8 {
+        let source = if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, _, _, loaded, _) = paged.read(row, col);
+            if !loaded {
+                return kind;
+            }
+
+            kind
+        } else {
+            self.kind[index]
+        };
+
+        if source == KIND_EMPTY && !self.derived.is_empty() {
+            self.derived.get(index).map_or(source, |value| value.0)
+        } else {
+            source
+        }
+    }
+
+    #[inline]
+    pub(crate) fn source_kind_at(&self, index: usize) -> u8 {
         if let Some(paged) = &self.paged {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).0
@@ -930,24 +1115,118 @@ impl SheetData {
     }
 
     #[inline]
+    pub(crate) fn source_payload_at(&self, index: usize) -> u64 {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            paged.read(row, col).1
+        } else {
+            self.payload[index]
+        }
+    }
+
+    #[inline]
+    fn resolved_payload_at(&self, index: usize) -> u64 {
+        if self.derived.is_empty() {
+            return self.source_payload_at(index);
+        }
+
+        let (kind, payload) = if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, loaded, _) = paged.read(row, col);
+            if !loaded {
+                return payload;
+            }
+
+            (kind, payload)
+        } else {
+            (self.kind[index], self.payload[index])
+        };
+
+        if kind == KIND_EMPTY || kind == KIND_FORMULA {
+            self.derived.get(index).map_or(payload, |cell| cell.1)
+        } else {
+            payload
+        }
+    }
+
+    /// The source-first projection for a resident cell. Every source replacement
+    /// removes its calculated slot, and admission installs only over empty or
+    /// formula sources. Thus a present slot certifies that no literal source
+    /// wins; bulk reads need not fetch the source discriminator again.
+    #[inline(always)]
+    pub(crate) fn resolved_cell_at(&self, index: usize) -> (u8, u64) {
+        if let Some(cell) = self.derived.get(index) {
+            return cell;
+        }
+
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, _, _) = paged.read(row, col);
+            return (kind, payload);
+        }
+
+        (self.kind[index], self.payload[index])
+    }
+
+    #[inline]
+    pub(crate) fn calculated_cell_at(&self, index: usize) -> Option<(u8, u64)> {
+        self.derived.get(index)
+    }
+
+    #[inline]
+    pub(crate) fn calculated_chunk_at(&self, index: usize) -> Option<&[u64]> {
+        self.derived.chunk_at(index)
+    }
+
+    #[inline]
+    pub(crate) fn calculated_error_at(&self, index: usize) -> Option<FormulaError> {
+        self.derived.error_at(index)
+    }
+
+    pub(crate) fn set_derived(&mut self, index: usize, kind: u8, payload: u64) -> bool {
+        if self.derived.is_empty() && !self.reserve_derived(1) {
+            return false;
+        }
+
+        self.derived.set(index, kind, payload);
+        true
+    }
+
+    pub(crate) fn reserve_derived(&mut self, additional: usize) -> bool {
+        self.derived.reserve(additional, self.kind.len())
+    }
+
+    pub(crate) fn formula_value_kind(&self, index: usize) -> crate::types::FormulaValueKind {
+        use crate::types::{FormulaValueKind, KIND_BOOL, KIND_STRING};
+
+        match self.derived.get(index).map(|cell| cell.0) {
+            Some(KIND_STRING) => FormulaValueKind::Text,
+            Some(KIND_BOOL) => FormulaValueKind::Bool,
+            Some(KIND_EMPTY) => FormulaValueKind::Blank,
+            _ => FormulaValueKind::Number,
+        }
+    }
+
+    pub(crate) fn invalidate_derived(&mut self) {
+        self.derived.clear();
+    }
+
+    pub(crate) fn invalidate_calculations(&mut self) {
+        // Whole-sheet recalculation makes per-output teardown unnecessary.
+        self.spill_ranges.clear();
+        self.spill_owners = HashMap::new();
+        self.invalidate_derived();
+        self.clear_dirty();
+        self.all_dirty = true;
+    }
+
+    #[inline]
     pub(crate) fn style_at(&self, index: usize) -> u32 {
         if let Some(paged) = &self.paged {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).2
         } else {
             self.style[index]
-        }
-    }
-
-    pub(crate) fn set_kind(&mut self, index: usize, kind: u8) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(index);
-            let (_, payload, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, payload, style, None);
-            }
-        } else {
-            self.kind[index] = kind;
         }
     }
 
@@ -982,6 +1261,7 @@ impl SheetData {
             .is_none_or(|paged| paged.prepare_dirty_cells(cells, revision))
     }
 
+    #[inline]
     pub(crate) fn write_cell(
         &mut self,
         row: usize,
@@ -996,12 +1276,17 @@ impl SheetData {
                 return false;
             }
         }
-        if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
-            self.prepare_cell_write((row, col));
+
+        if !self.derived.is_empty() || !self.spill_ranges.is_empty() {
+            if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
+                self.prepare_cell_write((row, col));
+            }
         }
+
         if let Some(paged) = &mut self.paged {
             return paged.write(row, col, kind, payload, style, dirty_revision);
         }
+
         let index = self.idx(row, col);
         self.kind[index] = kind;
         self.payload[index] = payload;
@@ -1009,17 +1294,24 @@ impl SheetData {
         true
     }
 
-    pub(crate) fn mark_cell_loaded(&mut self, row: usize, col: usize, dirty: bool) {
+    /// A style edit changes source formatting, not calculated cell identity.
+    pub(crate) fn write_style(
+        &mut self,
+        row: usize,
+        col: usize,
+        style: u32,
+        revision: Option<u64>,
+    ) -> bool {
+        let index = self.idx(row, col);
+        let kind = self.source_kind_at(index);
+        let payload = self.source_payload_at(index);
+
         if let Some(paged) = &mut self.paged {
-            let (kind, payload, style, _, was_dirty) = paged.read(row, col);
-            let revision = if dirty {
-                Some(paged.dirty_revision(row, col).unwrap_or(1))
-            } else {
-                None
-            };
-            let _ = paged.write(row, col, kind, payload, style, revision);
-            debug_assert!(!was_dirty || paged.dirty_revision(row, col).is_some());
+            return paged.write(row, col, kind, payload, style, revision);
         }
+
+        self.style[index] = style;
+        true
     }
 
     pub(crate) fn hydrate_cell(
@@ -1031,12 +1323,17 @@ impl SheetData {
         style: u32,
     ) -> bool {
         if let Some(paged) = &mut self.paged {
-            return paged.hydrate(row, col, kind, payload, style);
+            if !paged.hydrate(row, col, kind, payload, style) {
+                return false;
+            }
+        } else {
+            let index = self.idx(row, col);
+            self.kind[index] = kind;
+            self.payload[index] = payload;
+            self.style[index] = style;
         }
-        let index = self.idx(row, col);
-        self.kind[index] = kind;
-        self.payload[index] = payload;
-        self.style[index] = style;
+
+        self.prepare_cell_write((row as u32, col as u32));
         true
     }
 
@@ -1099,8 +1396,20 @@ impl SheetData {
     pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
         if let Some(paged) = &mut self.paged {
             if start_row < end_row {
-                paged.pin_range(start_row, end_row - 1, cols);
+                paged.pin_range(start_row, end_row, cols);
             }
+        }
+    }
+
+    pub(crate) fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
+        if let Some(paged) = &mut self.paged {
+            paged.pin_read_window(start, end, rows, cols);
+        }
+    }
+
+    pub(crate) fn pin_viewport_bands(&mut self, bands: &[u32]) {
+        if let Some(paged) = &mut self.paged {
+            paged.pin_viewport_bands(bands);
         }
     }
 
@@ -1130,72 +1439,21 @@ impl SheetData {
             .is_none_or(|paged| (c0..=c1).all(|col| (r0..=r1).all(|row| paged.read(row, col).3)))
     }
 
-    // ── Payload accessors ────────────────────────────────────────────────────
-
     #[inline]
     pub(crate) fn num_at(&self, i: usize) -> f64 {
-        if let Some(paged) = &self.paged {
-            let (row, col) = self.coordinates(i);
-            payload_num(paged.read(row, col).1)
-        } else {
-            payload_num(self.payload[i])
-        }
+        payload_num(self.resolved_payload_at(i))
     }
 
     #[inline]
     pub(crate) fn str_id_at(&self, i: usize) -> u32 {
-        if let Some(paged) = &self.paged {
-            let (row, col) = self.coordinates(i);
-            payload_str_id(paged.read(row, col).1)
-        } else {
-            payload_str_id(self.payload[i])
-        }
+        payload_str_id(self.resolved_payload_at(i))
     }
 
     /// # Safety
     /// `i` must be in-bounds for the cell vectors.
     #[inline]
     pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        unsafe { *self.payload.get_unchecked(i) }
-    }
-
-    #[inline]
-    pub(crate) fn set_num(&mut self, i: usize, value: f64) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, encode_num(value), style, None);
-            }
-        } else {
-            self.payload[i] = encode_num(value);
-        }
-    }
-
-    #[inline]
-    pub(crate) fn set_str(&mut self, i: usize, id: u32) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, encode_str_id(id), style, None);
-            }
-        } else {
-            self.payload[i] = encode_str_id(id);
-        }
-    }
-
-    #[inline]
-    pub(crate) fn clear_payload(&mut self, i: usize) {
-        if let Some(paged) = self.paged.as_ref() {
-            let (row, col) = self.coordinates(i);
-            let (kind, _, style, _, _) = paged.read(row, col);
-            if let Some(paged) = self.paged.as_mut() {
-                let _ = paged.write(row, col, kind, 0, style, None);
-            }
-        } else {
-            self.payload[i] = 0;
-        }
+        self.resolved_payload_at(i)
     }
 
     #[inline]
@@ -1212,8 +1470,15 @@ impl SheetData {
         self.spill_owners.get(&cell).copied()
     }
 
-    /// Remove only cells still owned by `anchor`; a user-written obstruction that
-    /// detached from the spill remains untouched.
+    /// The range that `anchor` spills into. `spill_ranges` also keeps
+    /// blocked attempts; only an installed spill owns its anchor cell.
+    pub(crate) fn installed_spill(&self, anchor: CellKey) -> Option<SpillRange> {
+        if self.spill_owner(anchor) != Some(anchor) {
+            return None;
+        }
+        self.spill_ranges.get(&anchor).copied()
+    }
+
     pub(crate) fn compact_spill_metadata(&mut self) {
         if self.spill_owners.is_empty() {
             self.spill_owners = HashMap::new();
@@ -1226,19 +1491,11 @@ impl SheetData {
         {
             self.spill_owners.shrink_to_fit();
         }
-        if self.spill_errors.is_empty() {
-            self.spill_errors = HashMap::new();
-        } else if self.spill_errors.capacity() > self.spill_errors.len().saturating_mul(2)
-            && self
-                .spill_errors
-                .capacity()
-                .saturating_sub(self.spill_errors.len())
-                > 4096
-        {
-            self.spill_errors.shrink_to_fit();
-        }
+        self.derived.compact();
     }
 
+    /// Remove only cells still owned by `anchor`; a user-written obstruction that
+    /// detached from the spill remains untouched.
     pub(crate) fn clear_spill(&mut self, anchor: CellKey) -> Vec<CellKey> {
         if self.spill_owner(anchor) != Some(anchor) {
             return Vec::new();
@@ -1254,16 +1511,11 @@ impl SheetData {
                     continue;
                 }
                 self.spill_owners.remove(&cell);
-                self.spill_errors.remove(&cell);
                 if cell == anchor || !self.contains_cell(row as usize, col as usize) {
                     continue;
                 }
-                if !self.is_loaded(row as usize, col as usize) {
-                    continue;
-                }
                 let index = self.idx(row as usize, col as usize);
-                self.set_kind(index, KIND_EMPTY);
-                self.clear_payload(index);
+                self.derived.remove(index);
                 changed.push(cell);
             }
         }
@@ -1281,22 +1533,45 @@ impl SheetData {
         changed
     }
 
+    /// Remove a cell's formula without hashing when the sheet has none.
+    #[inline]
+    pub(crate) fn remove_formula(&mut self, key: CellKey) -> bool {
+        !self.formulas.is_empty() && self.formulas.remove(&key).is_some()
+    }
+
     /// Detach a direct write from any spill and invalidate every attempted spill
     /// whose destination includes this cell.
+    #[inline]
     pub(crate) fn prepare_cell_write(&mut self, cell: CellKey) {
+        if !self.derived.is_empty() && self.contains_cell(cell.0 as usize, cell.1 as usize) {
+            self.derived
+                .remove(self.idx(cell.0 as usize, cell.1 as usize));
+        }
+
+        // No spill metadata means nothing to detach, invalidate or enqueue; the
+        // hash probes below would only pay for empty-map lookups on every write.
+        if self.spill_ranges.is_empty() && self.spill_owners.is_empty() {
+            return;
+        }
+
+        self.detach_spill_source(cell);
+    }
+
+    fn detach_spill_source(&mut self, cell: CellKey) {
         let affected: Vec<CellKey> = self
             .spill_ranges
             .iter()
             .filter_map(|(&anchor, &range)| range.contains(cell).then_some(anchor))
             .collect();
+
         if self.spill_ranges.contains_key(&cell) {
             let changed = self.clear_spill(cell);
             self.dirty_cells.extend(changed);
             self.spill_ranges.remove(&cell);
         } else {
             self.spill_owners.remove(&cell);
-            self.spill_errors.remove(&cell);
         }
+
         self.compact_spill_metadata();
         self.dirty_cells.extend(affected);
     }
@@ -1313,6 +1588,14 @@ impl SheetData {
         }
     }
 
+    pub(crate) fn finish_recompute(&mut self) {
+        if self.formulas.is_empty() {
+            self.invalidate_derived();
+        }
+
+        self.clear_dirty();
+    }
+
     fn remap_paged<F>(&mut self, new_rows: usize, new_cols: usize, mut remap: F)
     where
         F: FnMut(usize, usize) -> Option<(usize, usize)>,
@@ -1320,12 +1603,14 @@ impl SheetData {
         let Some(current) = self.paged.take() else {
             return;
         };
+
         let entries = current.entries();
         let mut next = PagedStorage::new(
             current.chunk_rows,
             current.byte_budget,
             current.max_dirty_cells,
         );
+
         for entry in entries {
             if let Some((new_row, new_col)) = remap(entry.row, entry.col) {
                 if new_row < new_rows && new_col < new_cols {
@@ -1351,6 +1636,7 @@ impl SheetData {
                 }
             }
         }
+
         self.row_count = new_rows;
         self.n_cols = new_cols;
         self.paged = Some(next);
@@ -1362,15 +1648,19 @@ impl SheetData {
         if new_row_count == self.row_count {
             return;
         }
+
         if self.is_paged() {
             self.remap_paged(new_row_count, self.n_cols, |row, col| {
                 (row < new_row_count).then_some((row, col))
             });
+
             self.formulas.retain(|&(row, col), _| {
                 (row as usize) < new_row_count && (col as usize) < self.n_cols
             });
+
             self.clear_dirty();
             self.all_dirty = true;
+
             return;
         }
 
@@ -1402,6 +1692,7 @@ impl SheetData {
         self.formulas.retain(|&(row, col), _| {
             (row as usize) < new_row_count && (col as usize) < self.n_cols
         });
+
         self.clear_dirty();
         self.all_dirty = true;
     }
@@ -1422,21 +1713,27 @@ impl SheetData {
             self.remap_paged(new_count, self.n_cols, |row, col| {
                 Some((if row >= at { row + count } else { row }, col))
             });
+
             if !self.formulas.is_empty() {
                 let (at_u, count_u) = (at as u32, count as u32);
                 let moved = std::mem::take(&mut self.formulas);
+
                 for ((row, col), mut entry) in moved {
                     entry.shift_rows(at_u, i64::from(count_u), sheet, sheet);
+
                     let new_row = if row >= at_u {
                         row.saturating_add(count_u)
                     } else {
                         row
                     };
+
                     self.formulas.insert((new_row, col), entry);
                 }
             }
+
             self.clear_dirty();
             self.all_dirty = true;
+
             return;
         }
 
@@ -1463,13 +1760,16 @@ impl SheetData {
         if !self.formulas.is_empty() {
             let (at_u, count_u) = (at as u32, count as u32);
             let moved = std::mem::take(&mut self.formulas);
+
             for ((row, col), mut entry) in moved {
                 entry.shift_rows(at_u, i64::from(count_u), sheet, sheet);
+
                 let new_row = if row >= at_u {
                     row.saturating_add(count_u)
                 } else {
                     row
                 };
+
                 self.formulas.insert((new_row, col), entry);
             }
         }
@@ -1739,6 +2039,7 @@ impl SheetData {
         for entry in self.formulas.values() {
             entry.heap_memory_stats(formulas);
         }
+        self.derived.add_memory_stats(formulas);
 
         stats
             .owner_mut(SPILL_RANGES)
@@ -1777,10 +2078,11 @@ pub(crate) fn formula_error_with_entry(
     key: CellKey,
     entry: Option<&FormulaEntry>,
 ) -> Option<FormulaError> {
+    let (row, col) = (key.0 as usize, key.1 as usize);
     sheet
-        .spill_errors
-        .get(&key)
-        .copied()
+        .contains_cell(row, col)
+        .then(|| sheet.calculated_error_at(sheet.idx(row, col)))
+        .flatten()
         .or_else(|| entry.and_then(|entry| entry.error))
 }
 

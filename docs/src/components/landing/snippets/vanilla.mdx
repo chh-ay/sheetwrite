@@ -1,0 +1,30 @@
+```ts
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import "@sheetwrite/core/styles.css";
+
+await initSheetwrite();
+
+const grid = createGrid(host, {
+  workbook: {
+    activeSheet: "sales",
+    sheets: [
+      {
+        id: "sales",
+        name: "Sales",
+        rowCount: 3,
+        columns: [
+          { key: "product", header: "Product", width: 180, type: "text" },
+          { key: "amount", header: "Amount", width: 100, type: "number" },
+        ],
+      },
+    ],
+  },
+  data: {
+    rowCount: 3,
+    columns: {
+      product: ["Notebook", "Pen", "Folder"],
+      amount: new Float64Array([12, 4, 9]),
+    },
+  },
+});
+```

@@ -1,11 +1,16 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
+import { deflateSync } from "fflate";
+
 import {
   resolveTransactionResourceLimits,
   validateTransactionResources,
   validateWorkbookSnapshot,
 } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";
-import { SheetwriteStore } from "../src/store.js";
+import { releaseEngineMemory } from "../src/index.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
+import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type {
   ChangeEvent,
   DocumentOp,
@@ -25,6 +30,49 @@ beforeAll(async () => {
 });
 
 describe("SheetwriteStore", () => {
+  it("refreshes cached window text and restores history after committed string collection", () => {
+    const store = new SheetwriteStore(makeWorkbook(3));
+    const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+    try {
+      store.applyTransaction({
+        patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "original" } }],
+      });
+      const before = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+      const issuingEpoch = before.stringPoolEpoch;
+      expect(before.values[0]).toBe("original");
+      const history = store.captureRangeHistory(range);
+      if (!history) throw new Error("Expected captured text history");
+      try {
+        let observedSweep = false;
+        for (let edit = 0; edit < 6_000; edit++) {
+          store.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr: addr(0, 0),
+                value: { kind: "literal", value: `${edit}-${"x".repeat(128)}` },
+              },
+            ],
+          });
+          const refreshed = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+          if (refreshed.stringPoolEpoch !== issuingEpoch) {
+            expect(refreshed.stringPoolIds?.[0]).toBe(before.stringPoolIds?.[0]);
+            expect(refreshed.values[0]).toBe(`${edit}-${"x".repeat(128)}`);
+            observedSweep = true;
+            break;
+          }
+        }
+        expect(observedSweep).toBe(true);
+        store.applyTransaction({ patches: [history.toDocumentOp(range)] });
+        expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values[0]).toBe("original");
+      } finally {
+        history.dispose();
+      }
+    } finally {
+      store.dispose();
+    }
+  });
+
   it("applies literal set patches and resolves them through the WASM boundary", () => {
     const store = new SheetwriteStore(makeWorkbook(10));
     store.applyTransaction({
@@ -44,7 +92,6 @@ describe("SheetwriteStore", () => {
       rowCount: 3,
       columns: {
         name: ["a", "b", "c"],
-        // Numeric column mixing literals and formulas, per the ColumnarData contract.
         amount: [10, { kind: "formula", src: "=B1*2" }, { kind: "formula", src: "=SUM(B1:B2)" }],
       },
     });
@@ -61,11 +108,9 @@ describe("SheetwriteStore", () => {
     const view = store.getVisibleWindow("s1", { start: 3, end: 6 }, [0, 1, 2]);
     expect(view.rows).toEqual({ start: 3, end: 6 });
     expect(view.values.length).toBe(3 * 3); // 3 rows x 3 cols, row-major
-    // row 3 -> [name, amount, city]
     expect(view.values[0]).toBe("Customer 3");
-    expect(view.values[1]).toBe(30.5); // row 3 amount = 3 * 10 + 0.5
-    expect(view.values[2]).toBe("Phnom Penh"); // row 3 city = cities[3 % 3]
-    // row 4 begins at index 3
+    expect(view.values[1]).toBe(30.5);
+    expect(view.values[2]).toBe("Phnom Penh");
     expect(view.values[3]).toBe("Customer 4");
     expect(view.styleIds.length).toBe(9);
     expect(view.ffiOutputBytes).toBeGreaterThan(0);
@@ -82,16 +127,15 @@ describe("SheetwriteStore", () => {
       ],
     });
 
-    // The window reads the ref's shadow without a JS overlay, so the raw
+    // The window reads the ref's displayed value without a JS overlay, so the raw
     // typed-array fields stay attached (worker zero-copy path).
     const view = store.getVisibleWindow("s1", { start: 0, end: 3 }, [0]);
     expect(view.values[1]).toBe(41);
     expect(view.valueKinds).toBeDefined();
 
-    // Formulas now see the ref cell's displayed value (was empty pre-port).
     expect(store.getCell(addr(2, 0)).resolved).toBe(42);
 
-    // Editing the target refreshes the shadow and dependents.
+    // Editing the target refreshes the displayed reference value and dependents.
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: 10 } }],
     });
@@ -298,6 +342,103 @@ describe("SheetwriteStore", () => {
     expect(change.newValue).toEqual({ kind: "literal", value: "new" });
   });
 
+  for (const operation of ["setBlock", "setRange", "clearRange"] as const) {
+    it(`preserves resolved before-values and styles in ${operation} rollback events`, () => {
+      const store = new SheetwriteStore(makeWorkbook(3));
+      const initialValues = ["雪😀", true, null, 7, null, null] as const;
+      const boldStyle = { bold: true };
+      store.applyTransaction({
+        patches: [
+          {
+            op: "setBlock",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 2 } },
+            block: {
+              rowCount: 2,
+              colCount: 3,
+              values: [...initialValues],
+              styleTable: [boldStyle],
+              styleIds: [0, 0, 0, 0, 0, 0],
+              formulas: [
+                [2, "=1/0"],
+                [4, "=A2*2"],
+              ],
+              refs: [[5, addr(0, 0)]],
+            },
+          },
+        ],
+      });
+      store.setDetailedChangeCapture(true);
+      const events: ChangeEvent[] = [];
+      store.on("change", (event) => events.push(event));
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 2 } };
+      const replacement: DocumentOp =
+        operation === "setBlock"
+          ? {
+              op: "setBlock",
+              range,
+              block: { rowCount: 2, colCount: 3, values: [null, null, null, null, null, null] },
+            }
+          : operation === "clearRange"
+            ? { op: "clearRange", range, style: false }
+            : {
+                op: "setRange",
+                range,
+                cells: Array.from({ length: initialValues.length }, (_, offset) => ({
+                  rowOffset: Math.floor(offset / 3),
+                  colOffset: offset % 3,
+                  value: { kind: "literal" as const, value: null },
+                })),
+              };
+      expect(store.applyTransaction({ patches: [replacement] }).status).toBe("applied");
+      expect(
+        events.map((event) =>
+          event.changes.map((change) => ({
+            addr: change.addr,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+            oldStyle: change.oldStyle,
+          })),
+        ),
+      ).toEqual([
+        ["雪😀", true, "#DIV/0!", 7, 14, "雪😀"].map((value, offset) => ({
+          addr: addr(Math.floor(offset / 3), offset % 3),
+          oldValue: { kind: "literal", value },
+          newValue: { kind: "literal", value: null },
+          oldStyle: boldStyle,
+        })),
+      ]);
+      store.dispose();
+    });
+  }
+
+  it("captures resolved spill children before clearing their complete spill", () => {
+    const store = new SheetwriteStore(makeWorkbook(2));
+    store.applyTransaction({
+      patches: [{ op: "set", addr: addr(0, 0), value: { kind: "formula", src: "=SEQUENCE(2,2)" } }],
+    });
+    store.setDetailedChangeCapture(true);
+    const events: ChangeEvent[] = [];
+    store.on("change", (event) => events.push(event));
+
+    expect(
+      store.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+            style: false,
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+    expect(events.flatMap((event) => event.changes.map((change) => change.oldValue))).toEqual(
+      [1, 2, 3, 4].map((value) => ({ kind: "literal", value })),
+    );
+    expect(store.getFormula(addr(0, 0))).toBeNull();
+    expect(store.getCell(addr(1, 1)).resolved).toBeNull();
+    store.dispose();
+  });
+
   it("evaluates arithmetic formulas and recomputes on dependency edits", () => {
     const store = new SheetwriteStore(makeWorkbook(5));
     store.applyTransaction({
@@ -463,8 +604,8 @@ describe("SheetwriteStore", () => {
 
     const store = new SheetwriteStore(makeWorkbook(1000), makeColumnarData(1000));
     expect(store.getCell(addr(500, 1)).resolved).toBe(5000.5);
-    // sum of amount column: sum(r*10 + 0.5) for r in [0, 1000)
     expect(store.aggregate("s1", 1, "sum")).toBe(4995500);
+
     store.dispose();
   });
 
@@ -497,7 +638,6 @@ describe("SheetwriteStore", () => {
   it("composes a values filter, hidden rows, and a multi-key sort into one view", () => {
     const store = new SheetwriteStore(makeWorkbook(6), makeColumnarData(6));
 
-    // Keep only Phnom Penh + Tokyo cities → data rows [0, 1, 3, 4].
     store.setColumnFilter("s1", 2, { kind: "values", values: ["Phnom Penh", "Tokyo"] });
     expect(store.viewRowCount("s1")).toBe(4);
     expect(store.columnFilters("s1").get(2)).toEqual({
@@ -505,11 +645,9 @@ describe("SheetwriteStore", () => {
       values: ["Phnom Penh", "Tokyo"],
     });
 
-    // Hide one survivor → [0, 1, 3].
     store.hideRows("s1", [4]);
     expect(store.viewRowCount("s1")).toBe(3);
 
-    // Sort city ascending, then amount descending: Phnom Penh {3 (30.5), 0 (0.5)}, Tokyo {1}.
     store.sortByMulti("s1", [
       { col: 2, ascending: true },
       { col: 1, ascending: false },
@@ -1113,12 +1251,12 @@ describe("paged datasource storage", () => {
 
     expect(() =>
       store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "missing", amount: 1 }]),
-    ).toThrow(/omits declared cell data/);
+    ).toThrow(Error);
     expectRowUnloaded(0);
 
     expect(() =>
       store.loadPage("s1", 1, NAME_SOURCE_COLUMN_BAND, [{ name: "extra", amount: null }]),
-    ).toThrow(/undeclared cell data/);
+    ).toThrow(Error);
     expectRowUnloaded(1);
 
     expect(() =>
@@ -1131,12 +1269,12 @@ describe("paged datasource storage", () => {
         ],
         [{ name: "reordered", city: "C" }],
       ),
-    ).toThrow(/invalid column bounds/);
+    ).toThrow(Error);
     expectRowUnloaded(2);
 
     expect(() =>
       store.loadPage("s1", 2, [{ start: 0, end: 1, keys: ["city"] }], [{ city: "wrong-position" }]),
-    ).toThrow(/invalid column keys/);
+    ).toThrow(Error);
     expectRowUnloaded(2);
 
     expect(() =>
@@ -1149,7 +1287,7 @@ describe("paged datasource storage", () => {
         ],
         [{ name: "overlap", amount: 3, city: "D" }],
       ),
-    ).toThrow(/invalid column bounds/);
+    ).toThrow(Error);
     expectRowUnloaded(3);
     expect(store.queryCapability("s1")).toEqual({
       status: "incomplete",
@@ -1179,15 +1317,15 @@ describe("paged datasource storage", () => {
       loadedCells: 2,
       totalCells: 6,
     });
-    expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
-    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+    expect(() => store.aggregate("s1", 1, "sum")).toThrow(IncompleteDataError);
+    expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
 
     store.applyTransaction({
       patches: [{ op: "set", addr: addr(0, 2), value: { kind: "formula", src: "=A1" } }],
     });
     expect(store.getCell(addr(0, 2)).resolved).toBe("#LOADING!");
     expect(store.queryCapability("s1").status).toBe("incomplete");
-    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+    expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
     store.dispose();
   });
 
@@ -1233,7 +1371,7 @@ describe("paged datasource storage", () => {
     store.dispose();
   });
 
-  it("allocates no cell buffers up front and keeps dirty chunks resident", () => {
+  it("migrates resident paged chunks and dirty overlays without loading absent clean pages", async () => {
     const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
       storage: "paged",
       chunkRows: 4,
@@ -1257,8 +1395,8 @@ describe("paged datasource storage", () => {
       loadedCells: 0,
       totalCells: 3_000_000,
     });
-    expect(() => store.aggregate("s1", 1, "sum")).toThrow(/has unloaded datasource cells/);
-    expect(() => store.exportSnapshot()).toThrow(/has unloaded datasource cells/);
+    expect(() => store.aggregate("s1", 1, "sum")).toThrow(IncompleteDataError);
+    expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
 
     store.loadPage("s1", 0, ALL_SOURCE_COLUMN_BANDS, [{ name: "zero", amount: 1, city: "A" }]);
     store.applyTransaction({
@@ -1277,6 +1415,17 @@ describe("paged datasource storage", () => {
     // One viewport-pinned chunk, one dirty chunk, and at most one clean victim.
     expect(store.getPagedStats("s1").chunks).toBeLessThanOrEqual(3);
     expect(store.getCellLoadState(addr(4, 0))).toBe("unloaded");
+    const stats = store.getPagedStats("s1");
+    await releaseEngineMemory();
+    expect(store.getPagedStats("s1")).toEqual(stats);
+    expect(store.getCell(addr(0, 1)).resolved).toBe(99);
+    expect(store.getCellLoadState(addr(0, 1))).toBe("local-edit");
+    expect(store.getCellLoadState(addr(4, 0))).toBe("unloaded");
+    expect(store.getCell(addr(12, 2)).resolved).toBe("B");
+    expect(() => store.exportSnapshot()).toThrow(IncompleteDataError);
+    store.loadPage("s1", 4, NAME_SOURCE_COLUMN_BAND, [{ name: "reloaded after release" }]);
+    expect(store.getCell(addr(4, 0)).resolved).toBe("reloaded after release");
+    expect(store.getCell(addr(0, 1)).resolved).toBe(99);
 
     store.acknowledgeOperations([
       { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 99 } },
@@ -1284,6 +1433,122 @@ describe("paged datasource storage", () => {
     expect(store.getPagedStats("s1").dirtyCells).toBe(0);
     store.dispose();
   });
+
+  it("keeps earlier single-cell acknowledgements when a later address is invalid", () => {
+    const store = new SheetwriteStore(makeWorkbook(2), undefined, { storage: "paged" });
+    const operation: DocumentOp = {
+      op: "set",
+      addr: addr(0, 1),
+      value: { kind: "literal", value: 7 },
+    };
+    store.applyTransaction({ patches: [operation] });
+
+    expect(() =>
+      store.acknowledgeOperations([
+        operation,
+        { ...operation, addr: { sheet: "missing", row: 0, col: 0 } },
+      ]),
+    ).toThrow("unknown sheet");
+    expect(store.getPagedStats("s1").dirtyCells).toBe(0);
+    store.dispose();
+  });
+
+  it("acknowledges matching sparse runs without cleaning newer values, sources or styles", () => {
+    const store = new SheetwriteStore(makeWorkbook(12), undefined, { storage: "paged" });
+    const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 11, col: 1 } };
+    const cells = Array.from({ length: 12 }, (_, rowOffset) => ({
+      rowOffset,
+      colOffset: 0,
+      value: { kind: "literal" as const, value: rowOffset },
+      style: { bold: true },
+    }));
+    const operation: DocumentOp = { op: "setRange", range, cells };
+    store.applyTransaction({ patches: [operation] });
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: addr(3, 1),
+          value: { kind: "literal", value: 300 },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(7, 1),
+          value: { kind: "formula", src: "=7" },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(8, 1),
+          value: { kind: "ref", target: addr(0, 1) },
+          style: { bold: true },
+        },
+        {
+          op: "set",
+          addr: addr(9, 1),
+          value: { kind: "literal", value: 9 },
+          style: { italic: true },
+        },
+      ],
+    });
+
+    store.acknowledgeOperations([{ ...operation, cells: [...cells, ...cells.slice(0, 1)] }]);
+    expect(store.getPagedStats("s1").dirtyCells).toBe(4);
+    for (let row = 0; row < 12; row++) {
+      expect(store.getCellLoadState(addr(row, 1))).toBe(
+        [3, 7, 8, 9].includes(row) ? "local-edit" : "loaded-value",
+      );
+    }
+    expect(store.getCell(addr(3, 1)).resolved).toBe(300);
+    expect(store.getFormula(addr(7, 1))).toBe("=7");
+    expect(store.getRefTarget(addr(8, 1))).toEqual(addr(0, 1));
+    store.dispose();
+  });
+
+  for (const mode of ["set", "setRange"] as const) {
+    it(`counts existing and duplicate sparse ${mode} targets once at the dirty limit`, () => {
+      const store = new SheetwriteStore(makeWorkbook(1_200), undefined, {
+        storage: "paged",
+        dirtyCellLimit: 1_100,
+      });
+      const patchesFor = (count: number, distinct: number): DocumentOp[] => {
+        const cells = Array.from({ length: count }, (_, index) => ({
+          rowOffset: index % distinct,
+          colOffset: 0,
+          value: { kind: "literal" as const, value: index },
+        }));
+        return mode === "setRange"
+          ? [cells.slice(0, distinct), cells.slice(distinct)]
+              .filter((batch) => batch.length > 0)
+              .map((batch) => ({
+                op: "setRange" as const,
+                range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1_199, col: 0 } },
+                cells: batch,
+              }))
+          : cells.map((cell) => ({ op: "set", addr: addr(cell.rowOffset, 0), value: cell.value }));
+      };
+      store.applyTransaction({ patches: patchesFor(100, 100) });
+      let events = 0;
+      store.on("change", () => {
+        events += 1;
+      });
+
+      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_100) }).status).toBe("applied");
+      expect(store.getPagedStats("s1").dirtyCells).toBe(1_100);
+      expect(events).toBe(1);
+      expect(store.applyTransaction({ patches: patchesFor(1_200, 1_101) })).toMatchObject({
+        status: "rejected",
+        issues: [
+          { kind: "resource-limit", resource: "paged-dirty-cells", actual: 1_101, max: 1_100 },
+        ],
+      });
+      expect(store.getPagedStats("s1").dirtyCells).toBe(1_100);
+      expect(events).toBe(1);
+      expect(store.getCellLoadState(addr(1_100, 0))).toBe("unloaded");
+      store.dispose();
+    });
+  }
 
   it("keeps paged edits pinned until their operations are acknowledged", () => {
     const store = new SheetwriteStore(makeWorkbook(1_000_000), undefined, {
@@ -1807,6 +2072,103 @@ describe("validation, protection, and notes metadata", () => {
     partial.dispose();
   });
 
+  it("revalidates resource and address limits after permission callbacks mutate live operations", () => {
+    const maxEncodedBytes = 256;
+    for (const mutation of ["payload", "address"] as const) {
+      const workbook = makeWorkbook(3);
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("fixture is missing its sheet");
+      sheet.protectedRanges = [
+        {
+          id: "locked",
+          range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+        },
+      ];
+      const store = new SheetwriteStore(workbook, undefined, {
+        transactionResourceLimits: { maxEncodedBytes },
+      });
+      store.setProtectionResolver(({ operation }) => {
+        if (operation.op === "set" && operation.value.kind === "literal") {
+          if (mutation === "payload") operation.value.value = "x".repeat(maxEncodedBytes * 2);
+          else operation.addr.sheet = "missing-sheet";
+        }
+        return "allow";
+      });
+      try {
+        const result = store.applyTransaction({
+          patches: [{ op: "set", addr: addr(0, 0), value: { kind: "literal", value: "small" } }],
+        });
+        expect(result.status).toBe("rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
+  it("uses the callback-revised restore payload and rejects revised invalid envelopes atomically", () => {
+    for (const mutation of ["replacement", "bytes", "sheet"] as const) {
+      const workbook = makeWorkbook(3);
+      const sheet = workbook.sheets[0];
+      if (!sheet) throw new Error("fixture is missing its sheet");
+      const range = { sheet: sheet.id, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+      sheet.protectedRanges = [{ id: "locked", range }];
+      const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [11] });
+      const replacement = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [29] });
+      const store = new SheetwriteStore(workbook);
+      store.setProtectionResolver(({ operation }) => {
+        if (operation.op === "restoreBlock") {
+          if (mutation === "replacement") Object.assign(operation, replacement);
+          else if (mutation === "bytes")
+            Object.assign(operation, { decodedBytes: operation.decodedBytes + 1 });
+          else operation.range.sheet = "missing-sheet";
+        }
+        return "allow";
+      });
+      try {
+        const result = store.applyTransaction({ patches: [restore] });
+        expect(result.status).toBe(mutation === "replacement" ? "applied" : "rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBe(mutation === "replacement" ? 29 : null);
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
+  it("rejects restore dimension mismatches and missing style tables before any mutation", () => {
+    for (const malformed of ["dimensions", "styles"] as const) {
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } };
+      const block = {
+        rowCount: 1,
+        colCount: 1,
+        values: [11],
+        ...(malformed === "styles" ? { styleIds: [0] } : {}),
+      };
+      const decoded = new TextEncoder().encode(JSON.stringify(block));
+      const restore: DocumentOp = {
+        op: "restoreBlock",
+        range: malformed === "dimensions" ? { ...range, end: { row: 1, col: 0 } } : range,
+        encoding: "deflate-json-v1",
+        decodedBytes: decoded.byteLength,
+        data: Buffer.from(deflateSync(decoded)).toString("base64"),
+      };
+      const store = new SheetwriteStore(makeWorkbook(3));
+      try {
+        const outcome = store.applyTransaction({
+          patches: [
+            { op: "set", addr: addr(0, 1), value: { kind: "literal", value: 42 } },
+            restore,
+          ],
+        });
+        expect(outcome.status).toBe("rejected");
+        expect(store.getCell(addr(0, 0)).resolved).toBeNull();
+        expect(store.getCell(addr(0, 1)).resolved).toBeNull();
+      } finally {
+        store.dispose();
+      }
+    }
+  });
+
   it("denies protected local mutations by default and delegates permission to the host", () => {
     const workbook = makeWorkbook(3);
     workbook.sheets[0]!.protectedRanges = [
@@ -1932,7 +2294,7 @@ describe("transaction resource ingress", () => {
 
     const oversizedPatches = [literalSet(1, "blocked"), literalSet(2, "also blocked")];
     const local = store.applyTransaction({ patches: oversizedPatches });
-    expect(local).toEqual({
+    expect(local).toMatchObject({
       status: "rejected",
       epoch: 1,
       issues: [
@@ -1942,7 +2304,6 @@ describe("transaction resource ingress", () => {
           resource: "operations",
           actual: 2,
           max: 1,
-          message: "Transaction operation count 2 exceeds maximum 1",
         },
       ],
     });

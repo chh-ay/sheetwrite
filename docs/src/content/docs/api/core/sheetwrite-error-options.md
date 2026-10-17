@@ -8,7 +8,7 @@ description: "Optional cause, diagnostic context, and boundary-known retryabilit
 Optional cause, diagnostic context, and boundary-known retryability.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L107"><code>packages/core/src/errors.ts#L107</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L109"><code>packages/core/src/errors.ts#L109</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

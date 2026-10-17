@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import {
   LIFECYCLE_CELL,
   LIFECYCLE_RESET_CELL,
@@ -46,58 +47,62 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
 }
 
 for (const framework of ["react", "vue", "svelte"] as const) {
-  test(`framework lifecycle: ${framework} mounts, resets, destroys, and recovers errors`, {
-    tag: "@portability",
-  }, async ({ page }) => {
-    const errors = collectErrors(page);
-    await page.goto(siteUrl(`/test/framework-lifecycle/${framework}/`));
+  test(
+    `framework lifecycle: ${framework} mounts, resets, destroys, and recovers errors`,
+    {
+      tag: "@portability",
+    },
+    async ({ page }) => {
+      const errors = collectErrors(page);
+      await page.goto(siteUrl(`/test/framework-lifecycle/${framework}/`));
 
-    const fallback = page.locator("[data-lifecycle-fallback]");
-    const status = page.locator("[data-lifecycle-status]");
-    const errorCount = page.locator("[data-lifecycle-errors]");
-    await expect(fallback).toBeVisible();
-    await expect(status).toHaveText("error", { timeout: 15_000 });
-    await expect(errorCount).toHaveText("1");
+      const fallback = page.locator("[data-lifecycle-fallback]");
+      const status = page.locator("[data-lifecycle-status]");
+      const errorCount = page.locator("[data-lifecycle-errors]");
+      await expect(fallback).toBeVisible();
+      await expect(status).toHaveText("error", { timeout: 15_000 });
+      await expect(errorCount).toHaveText("1");
 
-    await page.locator("[data-lifecycle-retry]").click();
-    await expect(status).toHaveText("ready", { timeout: 15_000 });
-    await expect(page.locator("[data-lifecycle-ready]")).toHaveText("1:initial");
-    await expect(errorCount).toHaveText("1");
-    await expect(fallback).toHaveCount(0);
-    await expect
-      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
-        timeout: 15_000,
-        message: `${framework} lifecycle fixture did not expose its known cell`,
-      })
-      .toContain(LIFECYCLE_CELL);
-    await expect
-      .poll(() => canvasBodyPainted(page), {
-        timeout: 15_000,
-        message: `${framework} lifecycle fixture did not paint a body cell`,
-      })
-      .toBe(true);
+      await page.locator("[data-lifecycle-retry]").click();
+      await expect(status).toHaveText("ready", { timeout: 15_000 });
+      await expect(page.locator("[data-lifecycle-ready]")).toHaveText("1:initial");
+      await expect(errorCount).toHaveText("1");
+      await expect(fallback).toHaveCount(0);
+      await expect
+        .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
+          timeout: 15_000,
+          message: `${framework} lifecycle fixture did not expose its known cell`,
+        })
+        .toContain(LIFECYCLE_CELL);
+      await expect
+        .poll(() => canvasBodyPainted(page), {
+          timeout: 15_000,
+          message: `${framework} lifecycle fixture did not paint a body cell`,
+        })
+        .toBe(true);
 
-    await page.locator("[data-lifecycle-reset]").click();
-    await expect(page.locator("[data-lifecycle-ready]")).toHaveText("2:input-reset");
-    await expect
-      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
-        timeout: 15_000,
-        message: `${framework} lifecycle fixture did not expose its reset cell`,
-      })
-      .toContain(LIFECYCLE_RESET_CELL);
-    await expect
-      .poll(() => canvasBodyPainted(page), {
-        timeout: 15_000,
-        message: `${framework} lifecycle fixture did not repaint after reset`,
-      })
-      .toBe(true);
+      await page.locator("[data-lifecycle-reset]").click();
+      await expect(page.locator("[data-lifecycle-ready]")).toHaveText("2:input-reset");
+      await expect
+        .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
+          timeout: 15_000,
+          message: `${framework} lifecycle fixture did not expose its reset cell`,
+        })
+        .toContain(LIFECYCLE_RESET_CELL);
+      await expect
+        .poll(() => canvasBodyPainted(page), {
+          timeout: 15_000,
+          message: `${framework} lifecycle fixture did not repaint after reset`,
+        })
+        .toBe(true);
 
-    await page.locator("[data-lifecycle-unmount]").click();
-    await expect(page.locator(".sheetwrite")).toHaveCount(0);
-    await expect(page.locator(".sheetwrite canvas")).toHaveCount(0);
+      await page.locator("[data-lifecycle-unmount]").click();
+      await expect(page.locator(".sheetwrite")).toHaveCount(0);
+      await expect(page.locator(".sheetwrite canvas")).toHaveCount(0);
 
-    await page.waitForTimeout(50);
-    expect(errors.page).toEqual([]);
-    expect(errors.console).toEqual([]);
-  });
+      await page.waitForTimeout(50);
+      expect(errors.page).toEqual([]);
+      expect(errors.console).toEqual([]);
+    },
+  );
 }

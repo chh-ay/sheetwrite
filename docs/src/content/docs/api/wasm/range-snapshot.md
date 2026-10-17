@@ -8,15 +8,16 @@ description: "Opaque, store-local history payload for one dense rectangular cell
 Opaque, store-local history payload for one dense rectangular cell block.
 
 The host may retain this object in undo history, but it is deliberately not
-part of the serialized document protocol. String payloads remain interned in
-the owning `CellStore`, so snapshots must only be restored into that store.
+part of the serialized document protocol. A deduplicated local dictionary
+owns captured text independently of the store's pool epoch.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L334"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L334</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L438"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L438</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
 <a href="#range-snapshot-byte-length"><code>byteLength</code></a>
+<a href="#range-snapshot-export-memory-state"><code>exportMemoryState</code></a>
 <a href="#range-snapshot-formula-offsets"><code>formulaOffsets</code></a>
 <a href="#range-snapshot-formula-sources"><code>formulaSources</code></a>
 <a href="#range-snapshot-free"><code>free</code></a>
@@ -26,7 +27,7 @@ the owning `CellStore`, so snapshots must only be restored into that store.
 <a href="#range-snapshot-style-ids"><code>styleIds</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>8</span>
+## Members <span class="api-count" data-pagefind-ignore>9</span>
 
 <div class="api-member-list">
 
@@ -35,6 +36,15 @@ the owning `CellStore`, so snapshots must only be restored into that store.
 
 ```ts generated
 byteLength: () => number;
+```
+
+</details>
+
+<details class="api-member" id="range-snapshot-export-memory-state" data-pagefind-weight="1">
+<summary><code>exportMemoryState</code> <span class="api-member-summary">Transfer packed scalars and the local dictionary, never JS cell patches.</span></summary>
+
+```ts generated
+exportMemoryState: (sheet: number) => Uint8Array;
 ```
 
 </details>
@@ -111,6 +121,7 @@ styleIds: () => Uint32Array
 ```ts generated
 class RangeSnapshot {
   byteLength: () => number;
+  exportMemoryState: (sheet: number) => Uint8Array;
   formulaOffsets: () => Uint32Array;
   formulaSources: () => string[];
   free: () => void;
@@ -137,6 +148,7 @@ class RangeSnapshot {
 <p class="api-consumers-label">Public exports naming <code>RangeSnapshot</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/formulas/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
 <li><a href="/docs/api/wasm/cell-store/"><code>CellStore</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

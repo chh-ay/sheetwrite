@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import {
   assertWorkbookTables,
   type Column,
   type DocumentOp,
   initSheetwrite,
   rebaseDocumentOperations,
+  SheetwriteError,
   SheetwriteStore,
   validateWorkbookSnapshot,
   type Workbook,
@@ -132,7 +134,7 @@ describe("canonical workbook tables", () => {
         maxStyleNameLength: 128,
         maxUnsupportedFeaturesPerTable: 16,
       }),
-    ).toThrow(/workbook table limit is 0/);
+    ).toThrow(SheetwriteError);
   });
 
   it("preserves stable identities across row and column structure changes", () => {

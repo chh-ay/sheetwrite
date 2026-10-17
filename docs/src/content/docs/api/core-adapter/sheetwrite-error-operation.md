@@ -8,7 +8,7 @@ description: "Exhaustive stable operation discriminator for consumer-visible fai
 Exhaustive stable operation discriminator for consumer-visible failures.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L82"><code>packages/core/src/errors.ts#L82</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L84"><code>packages/core/src/errors.ts#L84</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -1,5 +1,52 @@
 # @sheetwrite/xlsx
 
+## 0.5.0
+
+### Minor Changes
+
+- 4e5b8e2: Align the framework adapters and XLSX integration with the coordinated Sheetwrite 0.5.0 release.
+
+### Patch Changes
+
+- fb505d4: Faster XLSX import with lower peak memory. Worksheet rows and shared strings are read as they are parsed instead of being kept in a full XML tree, start tags and attributes are scanned without regular expressions or temporary arrays, the ZIP checksum loop no longer goes through the iterator protocol, and each cell style is copied once instead of twice. On the 1 MB benchmark workbook, a same-process A/B measured a 38% median improvement (1,675 ms to 1,039 ms) and peak memory fell from 476 MiB to 312 MiB. The imported snapshot is unchanged.
+- cb78a4b: Exclude source maps from published library packages to reduce download and install size. Keep maps in local builds for development and size analysis.
+  
+  Declare only CSS files as side effects in the React, Vue, and Svelte adapters. Bundlers can remove unused JavaScript and keep imported stylesheets.
+- e725d98: Support spill references such as `A1#`. A spill reference refers to the current spill of its anchor cell and follows it when the spill changes size. It returns `#REF!` when the anchor holds no spill. Row and column edits move the reference with its anchor. XLSX import and export convert it to and from `_xlfn.ANCHORARRAY`.
+- Updated dependencies [a490186]
+- Updated dependencies [b2379eb]
+- Updated dependencies [fca4622]
+- Updated dependencies [be6b618]
+- Updated dependencies [ed66b6d]
+- Updated dependencies [a9a3c5f]
+- Updated dependencies [9915236]
+- Updated dependencies [11e9336]
+- Updated dependencies [b8dbb50]
+- Updated dependencies [a767c8b]
+- Updated dependencies [26a3552]
+- Updated dependencies [0f4b9da]
+- Updated dependencies [d1d34b9]
+- Updated dependencies [cf1a10c]
+- Updated dependencies [48be92d]
+- Updated dependencies [ef2b0f5]
+- Updated dependencies [2c03528]
+- Updated dependencies [2b5f1eb]
+- Updated dependencies [cb12daa]
+- Updated dependencies [73cb52a]
+- Updated dependencies [4d4b204]
+- Updated dependencies [be093cd]
+- Updated dependencies [43b0e9c]
+- Updated dependencies [7221484]
+- Updated dependencies [b54b29a]
+- Updated dependencies [e6b6dbb]
+- Updated dependencies [e725d98]
+- Updated dependencies [eb1c786]
+- Updated dependencies [bc7bc53]
+- Updated dependencies [59e8d1a]
+- Updated dependencies [fdc14ce]
+- Updated dependencies [99435f8]
+  - @sheetwrite/core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

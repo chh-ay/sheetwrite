@@ -1,8 +1,7 @@
 import { labelToCol } from "./a1.js";
+import { engineFunctionNames } from "./engine.js";
 import type { HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
-
-// ── Function catalog ─────────────────────────────────────────────────────────
 
 /**
  * Every function name the calc engine accepts, mirrored from the parser's match
@@ -11,7 +10,7 @@ import type { Theme } from "./types/render.js";
  * drops a function. Every alias is listed (AVG/AVERAGE, CONCAT/CONCATENATE) so
  * autocomplete only ever offers spellings the parser will actually accept.
  */
-export const FORMULA_FUNCTIONS: readonly string[] = [
+const FORMULA_FUNCTIONS: readonly string[] = [
   "ABS",
   "ADDRESS",
   "AND",
@@ -176,7 +175,7 @@ export const FORMULA_FUNCTIONS: readonly string[] = [
  * underlying cell content stays legible; passed through as per-range
  * {@link HighlightRange.color}.
  */
-export const REF_PALETTE: readonly string[] = [
+const REF_PALETTE: readonly string[] = [
   "#4285f455",
   "#ea433555",
   "#f9ab0055",
@@ -185,15 +184,13 @@ export const REF_PALETTE: readonly string[] = [
   "#00acc155",
 ];
 
-// ── Formula parsing helpers ──────────────────────────────────────────────────
-
 /**
  * The trailing run of letters ending at `caret` — the function name being typed.
  * Returns `null` when the caret does not sit right after a letter (e.g. after a
  * digit, operator, or paren), which is exactly when no function suggestion is
  * wanted.
  */
-export function functionTokenAt(text: string, caret: number): string | null {
+function functionTokenAt(text: string, caret: number): string | null {
   const match = /([A-Za-z][A-Za-z0-9.]*)$/.exec(text.slice(0, caret));
   return match?.[1] ?? null;
 }
@@ -218,7 +215,7 @@ function parseCell(ref: string): { row: number; col: number } | null {
  * `shiftA1Refs` in a1.ts, including the "skip tokens glued to an alphanumeric"
  * rule that stops function names (and identifiers) from matching.
  */
-export function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
+function parseFormulaRefs(text: string, sheet: SheetId): HighlightRange[] {
   const re = /(\$?[A-Za-z]{1,3}\$?\d+)(?::(\$?[A-Za-z]{1,3}\$?\d+))?/g;
   const out: HighlightRange[] = [];
 
@@ -246,8 +243,6 @@ function parsePx(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ── Assist dependencies ──────────────────────────────────────────────────────
-
 /**
  * Host-provided hooks the formula assist needs from the grid. Deliberately tiny
  * so the built-in editor stays a thin, replaceable default over public grid
@@ -262,8 +257,6 @@ export interface AssistDeps {
   /** Sheet id the formula's A1 references resolve against (the active sheet). */
   sheet: () => SheetId;
 }
-
-// ── Formula assist ───────────────────────────────────────────────────────────
 
 /**
  * A styleable layer over the active formula editor: an autocomplete popup for
@@ -286,8 +279,6 @@ export class FormulaAssist {
     this.deps = deps;
   }
 
-  // ── lifecycle ──────────────────────────────────────────────────────────────
-
   /** Bind to a freshly opened editor textarea and paint any initial state. */
   attach(textarea: HTMLTextAreaElement, theme: Theme): void {
     this.textarea = textarea;
@@ -306,8 +297,6 @@ export class FormulaAssist {
   get isOpen(): boolean {
     return this.popup !== null;
   }
-
-  // ── model updates ────────────────────────────────────────────────────────--
 
   /**
    * Recompute ref highlights and the autocomplete popup from the live text and
@@ -336,11 +325,14 @@ export class FormulaAssist {
     }
 
     const upper = token.toUpperCase();
-    const matches = FORMULA_FUNCTIONS.filter((fn) => fn.startsWith(upper)).sort((left, right) => {
-      const lengthOrder = left.length - right.length;
-      if (lengthOrder !== 0) return lengthOrder;
-      return left < right ? -1 : left > right ? 1 : 0;
-    });
+    const functions = engineFunctionNames ?? FORMULA_FUNCTIONS;
+    const matches = functions
+      .filter((fn) => fn.startsWith(upper))
+      .sort((left, right) => {
+        const lengthOrder = left.length - right.length;
+        if (lengthOrder !== 0) return lengthOrder;
+        return left < right ? -1 : left > right ? 1 : 0;
+      });
     if (matches.length === 0) {
       this.close();
       return;
@@ -379,8 +371,6 @@ export class FormulaAssist {
         return false;
     }
   }
-
-  // ── rendering ────────────────────────────────────────────────────────────--
 
   /** Re-anchor the popup under the editor; called by the editor on scroll. */
   reposition(): void {

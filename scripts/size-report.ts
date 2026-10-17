@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
+
 import {
   assertPublishedFilePolicy,
   readReleaseManifestDigest,
@@ -212,11 +213,11 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 const bundlerEvidenceRoot = join(repositoryRoot, "test-results/bundlers");
 const reportPath = join(import.meta.dir, "size-report.json");
 const historyPath = join(import.meta.dir, "size-history.json");
-const xlsxCodecPackages: Record<string, true> = {
-  fflate: true,
-};
+/** The optional package that core and the framework adapters must not install. */
+const XLSX_PACKAGE = "@sheetwrite/xlsx";
 const packageDirectories = [
   "packages/wasm",
+  "packages/formulas",
   "packages/core",
   "packages/xlsx",
   "packages/react",
@@ -973,12 +974,8 @@ async function measureClosure(
   }
   packageNames.sort();
   if (name !== "core-xlsx") {
-    const leaked = packageNames.filter((identity) => {
-      const packageName = identity.split("@").slice(0, -1).join("@");
-      return xlsxCodecPackages[packageName] === true;
-    });
-    if (leaked.length > 0)
-      throw new Error(`${name} runtime closure contains XLSX codec packages: ${leaked.join(", ")}`);
+    const leaked = packageNames.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`));
+    if (leaked.length > 0) throw new Error(`${name} runtime closure contains ${leaked.join(", ")}`);
   }
   return { name, packageCount: packageNames.length, logicalBytes, packages: packageNames };
 }
@@ -1180,15 +1177,11 @@ async function buildSizeReport(
         "install-closure",
         closure.name,
       );
-      const codecPackageCount = closure.packages.filter((identity) => {
-        const packageName = identity.split("@").slice(0, -1).join("@");
-        return xlsxCodecPackages[packageName] === true;
-      }).length;
       if (closure.name !== "core-xlsx") {
         addMetric(
           metrics,
-          `${prefix}.xlsxCodecPackageCount`,
-          codecPackageCount,
+          `${prefix}.xlsxPackageCount`,
+          closure.packages.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`)).length,
           "count",
           "optional-dependency-isolation",
           closure.name,
@@ -1491,13 +1484,13 @@ async function recordRelease(history: SizeHistory, release: SizeReleaseSnapshot)
     releases: [...history.releases, release],
   };
   await writeFile(historyPath, `${JSON.stringify(updated, null, 2)}\n`);
-  await runCommand(["bunx", "biome", "format", "--write", historyPath]);
+  await runCommand(["bunx", "oxfmt", historyPath]);
 }
 
 async function writeReport(report: SizeReport): Promise<void> {
   await rm(join(import.meta.dir, "size-report-failure.json"), { force: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  await runCommand(["bunx", "biome", "format", "--write", reportPath]);
+  await runCommand(["bunx", "oxfmt", reportPath]);
 }
 
 async function writeFailure(error: unknown): Promise<void> {

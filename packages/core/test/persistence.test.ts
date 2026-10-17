@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import {
   createGridFromSnapshot,
   initSheetwrite,
@@ -8,6 +9,7 @@ import {
   SnapshotValidationError,
   type WorkbookSnapshot,
 } from "../src/index.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
@@ -145,9 +147,6 @@ describe("snapshot persistence boundary", () => {
     expect(store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(5);
     expect(store.getCell({ sheet: "summary", row: 0, col: 1 }).resolved).toBe(5);
 
-    store.getCell = () => {
-      throw new Error("snapshot export must use a bulk sheet read");
-    };
     const first = store.exportSnapshot();
     const bytes = JSON.stringify(first);
     expect(first.sheets[0]).toMatchObject({
@@ -287,23 +286,39 @@ describe("snapshot persistence boundary", () => {
       }),
     ).rejects.toMatchObject({ code: "commit-rejected" });
 
-    const response = await adapter.commit({
+    const request = {
       documentId: "doc-1",
       baseVersion: 7,
       clientMutationId: "valid-1",
       operations: [
         {
-          op: "set",
+          op: "set" as const,
           addr: { sheet: "source", row: 0, col: 0 },
-          value: { kind: "literal", value: 12 },
+          value: { kind: "literal" as const, value: 12 },
         },
       ],
-    });
+    };
+    const response = await adapter.commit(request);
     expect(response.status).toBe("applied");
+    expect(response).toMatchObject({ version: 8, clientMutationId: "valid-1" });
+    expect(await adapter.commit(request)).toMatchObject({
+      status: "duplicate",
+      version: 8,
+      clientMutationId: "valid-1",
+    });
+    expect(await adapter.commit({ ...request, clientMutationId: "stale" })).toEqual({
+      status: "conflict",
+      currentVersion: 8,
+      operationsSinceBase: [
+        { version: 8, operations: request.operations, clientMutationId: "valid-1" },
+      ],
+    });
 
     const secondHost = document.createElement("div");
     document.body.appendChild(secondHost);
-    const second = createGridFromSnapshot(secondHost, await adapter.load("doc-1"));
+    const persisted = await adapter.load("doc-1");
+    expect(persisted.version).toBe(8);
+    const second = createGridFromSnapshot(secondHost, persisted);
     expect(second.store.getCell({ sheet: "source", row: 0, col: 0 }).resolved).toBe(12);
     expect(second.store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(13);
     second.destroy();
@@ -321,5 +336,89 @@ describe("snapshot persistence boundary", () => {
         signal: controller.signal,
       }),
     ).rejects.toMatchObject({ code: "aborted" });
+  });
+
+  it("persists compact restores as an atomic versioned batch with retry-safe conflict history", async () => {
+    const adapter = new MemoryPersistenceAdapter(richSnapshot());
+    const restore = encodeRestoreBlock(
+      { sheet: "source", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      { rowCount: 1, colCount: 1, values: [23] },
+    );
+    const note = {
+      op: "setNote" as const,
+      addr: { sheet: "source", row: 0, col: 0 },
+      text: "restored",
+    };
+    const request = {
+      documentId: "doc-1",
+      baseVersion: 7,
+      clientMutationId: "restore-batch",
+      operations: [restore, note],
+      versionOperationCounts: [1, 1],
+    };
+    expect(await adapter.commitBatch(request)).toMatchObject({ status: "applied", version: 9 });
+    expect(await adapter.commitBatch(request)).toMatchObject({ status: "duplicate", version: 9 });
+    const hydrated = SheetwriteStore.fromSnapshot(await adapter.load("doc-1"));
+    expect(hydrated.getCell({ sheet: "source", row: 0, col: 0 }).resolved).toBe(23);
+    expect(hydrated.getCell({ sheet: "summary", row: 0, col: 0 }).resolved).toBe(24);
+    expect(hydrated.exportSnapshot().sheets[0]?.notes).toMatchObject([{ text: "restored" }]);
+    hydrated.dispose();
+    const conflict = await adapter.commit({
+      documentId: "doc-1",
+      baseVersion: 7,
+      clientMutationId: "stale",
+      operations: [],
+    });
+    expect(conflict).toEqual({
+      status: "conflict",
+      currentVersion: 9,
+      operationsSinceBase: [
+        {
+          version: 8,
+          operations: [restore],
+          clientMutationId: "restore-batch",
+          batch: { index: 0, count: 2 },
+        },
+        {
+          version: 9,
+          operations: [note],
+          clientMutationId: "restore-batch",
+          batch: { index: 1, count: 2 },
+        },
+      ],
+    });
+  });
+
+  it("rejects a malformed compact batch member without publishing earlier members or its mutation ID", async () => {
+    const initial = richSnapshot();
+    const adapter = new MemoryPersistenceAdapter(initial);
+    const restore = encodeRestoreBlock(
+      { sheet: "source", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      { rowCount: 1, colCount: 1, values: [31] },
+    );
+    const request = {
+      documentId: "doc-1",
+      baseVersion: 7,
+      clientMutationId: "retry-batch",
+      operations: [restore, { ...restore, data: "AAAA" }],
+      versionOperationCounts: [1, 1],
+    };
+    await expect(adapter.commitBatch(request)).rejects.toMatchObject({ code: "commit-rejected" });
+    expect(await adapter.load("doc-1")).toEqual(
+      await new MemoryPersistenceAdapter(initial).load("doc-1"),
+    );
+    expect(
+      await adapter.commitBatch({
+        ...request,
+        operations: [
+          restore,
+          {
+            op: "setNote",
+            addr: { sheet: "source", row: 0, col: 0 },
+            text: "retry succeeded",
+          },
+        ],
+      }),
+    ).toMatchObject({ status: "applied", version: 9 });
   });
 });

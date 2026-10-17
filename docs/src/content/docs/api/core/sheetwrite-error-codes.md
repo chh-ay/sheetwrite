@@ -55,6 +55,8 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "pending-byte-limit",
   "late-echo",
   "remote-operations-rejected",
+  "invalid-batch",
+  "batch-limit",
   "pending-capacity",
   "presence-failed",
   "revision-failed",

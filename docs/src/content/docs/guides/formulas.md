@@ -31,9 +31,43 @@ grid.store.applyTransaction({
 
 ## Supported formulas
 
-The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference publishes all **100 required-supported target functions plus every incumbent function**, grouped by family, with aliases, exact signature and semantic profiles, implementation/evidence paths, source links, and behavior status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
+The checked, versioned `sheetwrite.formula-capabilities` contract is the source of truth for function registration. Its generated reference lists every function in both engines, grouped by family, with aliases, exact signature and semantic profiles, implementation and evidence paths, source links, and behavior status. Do not infer support from an Excel, Google Sheets, or OpenFormula function with a similar name.
 
 [Browse the generated formula function contract →](/docs/reference/formula-functions/)
+
+## Full formula engine
+
+Sheetwrite has two engine builds with the same API. `@sheetwrite/wasm` is the default engine: it has the standard function set and the smallest download. `@sheetwrite/formulas` is the full engine: the same engine with the analysis families below. An app selects one engine, one time, before it creates a Grid or a store:
+
+```ts prelude="core" partial="requires surrounding host state" title="Select the full engine"
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+| Family | Examples |
+| --- | --- |
+| Distributions | `NORM.DIST`, `T.INV.2T`, `CHISQ.DIST.RT`, `BINOM.DIST`, `GAMMA.INV`, `CONFIDENCE.T` |
+| Descriptive statistics | `TRIMMEAN`, `PERCENTILE.EXC`, `RANK.AVG`, `SKEW`, `KURT`, `FORECAST.LINEAR` |
+| Regression | `LINEST`, `LOGEST`, `TREND`, `GROWTH`, `FREQUENCY`, `MODE.MULT` |
+| Finance | `XIRR`, `XNPV`, `MIRR`, `NPER`, `CUMIPMT`, `DDB` |
+| Dates | `NETWORKDAYS.INTL`, `WORKDAY.INTL`, `DATEDIF`, `ISOWEEKNUM` |
+| Text and regex | `TEXTSPLIT`, `TEXTBEFORE`, `TEXTAFTER`, `REGEXEXTRACT`, `REGEXREPLACE`, `ARRAYTOTEXT` |
+| Database | `DSUM`, `DAVERAGE`, `DCOUNT`, `DGET`, `DMAX`, `DSTDEV` |
+| Math and matrices | `AGGREGATE`, `MMULT`, `MINVERSE`, `MDETERM`, `SUMSQ`, `COMBIN` |
+| Reshaping | `SORTBY`, `HSTACK`, `VSTACK`, `TOCOL`, `WRAPROWS`, `EXPAND` |
+| LAMBDA | `LAMBDA`, `MAP`, `REDUCE`, `SCAN`, `BYROW`, `BYCOL`, `MAKEARRAY`, `ISOMITTED` |
+| Grouping | `GROUPBY`, `PIVOTBY`, `PERCENTOF` |
+
+The default engine returns `#NAME?` for these functions, and formula assist does not suggest them. The [formula analysis showcase](/showcases/formulas/) runs thirteen panels of them live over 20,000 orders, and the [analysis formulas guide](/docs/guides/analysis-formulas/) shows each family with examples.
+
+Limits of the full engine:
+
+- `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls are limited to a depth of 64 and 2,000,000 work units per outer helper; more returns `#NUM!`.
+- `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
+- Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
+- `AGGREGATE` options that skip hidden rows have no effect, because formulas do not see hidden-row state.
 
 Function names are case-insensitive. Commas are the only documented argument separator. Interior omitted optional arguments are preserved (`XLOOKUP(key, keys, results,, 0)`). Locale-specific separators are not accepted.
 
@@ -70,7 +104,7 @@ Coercion follows these documented rules:
 
 Bindings are lazy. Only names reachable from `calculation` are expanded and evaluated, so an unused cell read, error, or `NOW()` does not become a dependency, error, or volatile marker. A used binding preserves ordinary formula dependency, spill, copy/fill, and structural-reference behavior. `LET(x,1/0,7)` therefore returns `7`, while `LET(x,A1,x+1)` tracks `A1`.
 
-One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes across reachable bindings. Invalid name/arity/binding structure returns `#VALUE!`; expansion beyond the node ceiling returns `#NUM!`. `LET` does not create callable functions: `LAMBDA` and higher-order execution remain unsupported.
+One `LET` admits at most 126 bindings. Expansion admits at most 16,384 AST nodes across reachable bindings. Invalid name/arity/binding structure returns `#VALUE!`; expansion beyond the node ceiling returns `#NUM!`. In the full engine, a `LET` value can be a `LAMBDA`; see [Full formula engine](#full-formula-engine).
 
 ## References, ranges, and named ranges
 
@@ -110,11 +144,37 @@ store.applyTransaction({
 
 A formula on `summary` resolves the sheet-scoped `Revenue`; formulas on other sheets resolve the workbook definition. Names are case-insensitive, must be formula-safe identifiers, and cannot look like A1 cells or boolean literals. Row/column insertions, removals, and moves rebase their rectangles. Deleting the complete target or its scope removes the definition; formulas then fall back to a workbook definition or evaluate to `#NAME?`.
 
+## Array constants
+
+Both engines accept array constants in braces. Commas separate columns and semicolons separate rows: `={1,2;3,4}` spills into two rows and two columns. `={1,2,3}` is one row; `={1;2;3}` is one column. Normal spill limits and collision rules apply.
+
+Elements can be numbers with an optional sign, quoted text, `TRUE`, `FALSE`, or error constants such as `#N/A`. Every row must have the same length. Empty arrays, references, and expressions inside braces are invalid and return `#VALUE!`.
+
+Functions that accept arrays can use these values directly, for example `=SUM({1,2,3})` returns `6` and `=INDEX({1,2;3,4},2,1)` returns `3`. Copy and structural edits preserve constants and their text elements. XLSX import and export preserve the formula source.
+
+## Spill references
+
+Put `#` after a cell reference to refer to the whole spill of the formula in that cell. If `A1` contains `=SEQUENCE(D1)`, then `=SUM(A1#)` adds all the values in the spill, and `=SORT(A1#,1,-1)` spills them in reverse order. When the spill changes size, formulas that use `A1#` use the new range. A sheet name is permitted: `='Report'!B2#`.
+
+`A1#` returns `#REF!` when the cell does not hold a spill: for example, the cell contains a value, or a collision blocks the spill (`#SPILL!`). If you delete the row or column of the anchor cell, the reference becomes `#REF!`. Both engines support spill references. XLSX files store `A1#` as `_xlfn.ANCHORARRAY(A1)`; import and export convert between the two forms.
+
+Arithmetic on a whole spill applies to each element. For example, `=A1#*10` multiplies each value in the spill by 10 and spills the result.
+
+## Array arithmetic
+
+Operators apply to each element of a range, array constant, spill reference, or dynamic-array result. This includes arithmetic (`+`, `-`, `*`, `/`, `^`), text concatenation (`&`), comparisons, unary `+` and `-`, and `%`.
+
+For example, `=A1:A3*10` spills three results. `=FILTER(A1:A5,B1:B5>2)` uses a comparison array to select rows. `=SUMPRODUCT((A1:A5>2)*B1:B5)` multiplies the comparison results by the values in column B.
+
+A scalar applies to every element. Rows and columns expand separately. A size of one expands to match the other operand. For example, `={1,2,3}+{10;20}` returns `{11,12,13;21,22,23}`. If two sizes differ and neither is one, the result uses the larger size. Positions outside the smaller operand return `#N/A`.
+
+Each element uses the scalar rules for values and errors. An error affects its element, not the whole array. Functions that accept arrays use the results directly. For example, `=SUM(A1:A3*B1:B3)` returns one sum. A top-level array result spills into adjacent cells. A blocked spill returns `#SPILL!`. Array size and memory limits still apply.
+
 ## Operators
 
 | Precedence, high to low | Operators | Associativity |
 | --- | --- | --- |
-| Reference | `:` | — |
+| Reference | `:`, postfix `#` (spill) | — |
 | Unary sign | unary `+`, unary `-` | right |
 | Percentage | postfix `%` | left |
 | Exponentiation | `^` | left |
@@ -193,7 +253,7 @@ Lookup errors in the scanned range propagate. Approximate modes validate orderin
 `FILTER`, `SORT`, `UNIQUE`, `TRANSPOSE`, `SEQUENCE`, `TAKE`, `DROP`, `CHOOSECOLS`, and `CHOOSEROWS` return rectangular values. A direct range formula such as `=A1:B4` also spills:
 
 - `FILTER(array, include, [if_empty])` accepts a one-column include range matching the array's rows or a one-row include range matching its columns. Shape mismatches are `#VALUE!`. No selected values returns `if_empty`, or `#CALC!` when omitted.
-- `SORT(array, [sort_index], [sort_order], [by_col])` defaults to the first column, ascending. `sort_index` selects the row/column key; `sort_order` is `1` or `-1`; `by_col=TRUE` sorts columns instead of rows. Multi-key sorting is unsupported.
+- `SORT(array, [sort_index], [sort_order], [by_col])` defaults to the first column, ascending. `sort_index` selects the row/column key; `sort_order` is `1` or `-1`; `by_col=TRUE` sorts columns instead of rows. For several keys, use `SORTBY` in the full engine.
 - `UNIQUE(array, [by_col], [exactly_once])` preserves first-seen order. `by_col=TRUE` compares columns; `exactly_once=TRUE` keeps only items occurring once. An empty result is `#CALC!`.
 - `TRANSPOSE(array)` swaps rows and columns.
 - `SEQUENCE(rows, [columns], [start], [step])` requires positive integer dimensions and defaults to one column, start `1`, step `1`; values fill row-major.
@@ -232,13 +292,13 @@ The admission check happens before materialization when the shape is statically 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. Automatic volatile functions beyond the explicit `TODAY`/`NOW` host-clock barrier, network functions, external/live-data providers, arbitrary external workbook references, database functions, cube/OLAP functions, and `LAMBDA` or higher-order array execution are unsupported. Examples include `RAND`, `RANDBETWEEN`, `INDIRECT`, `OFFSET`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, `DSUM`, `CUBEVALUE`, `LAMBDA`, `MAP`, `REDUCE`, and `SCAN`.
+Formula evaluation performs no network request and runs no custom JavaScript. Automatic volatile functions beyond the explicit `TODAY`/`NOW` host-clock barrier, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `RAND`, `RANDBETWEEN`, `INDIRECT`, `OFFSET`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
 
 ## Performance evidence
 
-No formula throughput or latency number is published from this guide because no checked final formula-performance evidence file is present. Follow the [performance evidence guide](/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
+The [default and full formula engine results](/docs/guides/performance-resources/#default-and-full-formula-engines) compare both engines on the formula benchmark and time the analysis families. Follow the [performance evidence guide](/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
 
 ## Point mode and reference rewriting
 

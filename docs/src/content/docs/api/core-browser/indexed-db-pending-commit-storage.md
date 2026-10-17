@@ -9,7 +9,7 @@ Browser-only durable pending queue. Import it from `@sheetwrite/core/browser`;
 the package's root entrypoint never evaluates IndexedDB globals.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/indexeddb.ts#L62"><code>packages/core/src/indexeddb.ts#L62</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/indexeddb.ts#L99"><code>packages/core/src/indexeddb.ts#L99</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

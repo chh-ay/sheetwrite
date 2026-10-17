@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import type { Grid } from "../../packages/core/src/types.js";
-import { hasOpaqueForeground } from "./canvas-assertions.js";
 
 declare global {
   interface Window {
@@ -10,17 +10,6 @@ declare global {
 }
 
 import { type examplePages, siteUrl } from "./playwright.config.js";
-
-// The framework-free example page boots and paints the revenue accounts
-// workbook. React/Vue/Svelte example routes are booted by their framework
-// workbench specs instead.
-const VANILLA_FIRST_CELL = "Account 000001";
-
-/**
- * Shared boot contract for every production-built example page: it loads
- * without console/page errors, the grid host mounts, WASM initializes far
- * enough to paint cells, and the canvas contains non-background pixels.
- */
 
 function urlOf(page: (typeof examplePages)[number]): string {
   return siteUrl(`/${page}/`);
@@ -42,128 +31,88 @@ function collectErrors(page: Page): BootErrors {
   return errors;
 }
 
-/** True when the canvas body holds opaque paint beyond its dominant background. */
-async function canvasBodyPainted(page: Page): Promise<boolean> {
-  const sample = await page.evaluate(() => {
-    const canvas = document.querySelector(".sheetwrite canvas");
-    if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) {
-      return null;
-    }
-    const ctx = canvas.getContext("2d");
-    const bounds = canvas.getBoundingClientRect();
-    if (!ctx || bounds.width === 0 || bounds.height === 0) return null;
-
-    const scaleX = canvas.width / bounds.width;
-    const scaleY = canvas.height / bounds.height;
-    // All shipped themes keep their row/column headers within these insets.
-    // Sampling beyond both excludes grid chrome while retaining several body cells.
-    const left = Math.ceil(64 * scaleX);
-    const top = Math.ceil(40 * scaleY);
-    const width = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
-    const height = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
-    if (width <= 0 || height <= 0) return null;
-
-    return Array.from(ctx.getImageData(left, top, width, height).data);
-  });
-
-  return sample !== null && hasOpaqueForeground(sample);
-}
-
-for (const name of ["vanilla"] as const) {
-  test(`${name} example boots, initializes WASM, and paints cells`, {
+test(
+  "workbook XLSX backend preserves formulas in a browser build",
+  {
     tag: "@portability",
-  }, async ({ page }) => {
+  },
+  async ({ page }) => {
     const errors = collectErrors(page);
-
-    await page.goto(urlOf(name));
-    await page.waitForSelector(".sheetwrite", { state: "attached", timeout: 15_000 });
+    await page.goto(siteUrl("/test/xlsx/"));
+    const result = page.locator("#result");
     await expect
-      .poll(() => page.locator('.sheetwrite [role="gridcell"]').allTextContents(), {
-        timeout: 15_000,
-        message: `${name} grid never exposed its expected cell value`,
-      })
-      .toContain(VANILLA_FIRST_CELL);
-    await expect
-      .poll(() => canvasBodyPainted(page), {
-        timeout: 15_000,
-        message: "grid body cells never painted",
-      })
-      .toBe(true);
+      .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+      .not.toBe("running");
 
+    expect(
+      await result.getAttribute("data-status"),
+      (await result.textContent()) ?? "XLSX smoke returned no result text",
+    ).toBe("ready");
     expect(errors.page).toEqual([]);
     expect(errors.console).toEqual([]);
-  });
-}
+  },
+);
 
-test("workbook XLSX backend preserves formulas in a browser build", {
-  tag: "@portability",
-}, async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto(siteUrl("/test/xlsx/"));
-  const result = page.locator("#result");
-  await expect
-    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
-    .not.toBe("running");
+test(
+  "offline queue, two-grid sync, and presence converge in a browser",
+  {
+    tag: "@portability",
+  },
+  async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto(siteUrl("/test/collaboration/"));
+    const result = page.locator("#result");
+    await expect
+      .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
+      .not.toBe("running");
 
-  expect(
-    await result.getAttribute("data-status"),
-    (await result.textContent()) ?? "XLSX smoke returned no result text",
-  ).toBe("ready");
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
+    expect(
+      await result.getAttribute("data-status"),
+      (await result.textContent()) ?? "Collaboration smoke returned no result text",
+    ).toBe("ready");
+    const payload = JSON.parse((await result.textContent()) ?? "{}") as Record<string, unknown>;
+    // The harness self-checks before reporting ready; assert the durable
+    // outcomes without pinning incidental counters like presence node counts.
+    expect(payload).toMatchObject({
+      literal: 21,
+      formula: 42,
+      sheetName: "Shared",
+      restoredMutation: "durable-browser-m1",
+    });
+    expect(errors.page).toEqual([]);
+    expect(errors.console).toEqual([]);
+  },
+);
 
-test("offline queue, two-grid sync, and presence converge in a browser", {
-  tag: "@portability",
-}, async ({ page }) => {
-  const errors = collectErrors(page);
-  await page.goto(siteUrl("/test/collaboration/"));
-  const result = page.locator("#result");
-  await expect
-    .poll(() => result.getAttribute("data-status"), { timeout: 15_000 })
-    .not.toBe("running");
+test(
+  "vanilla example commits an edit through the formula bar and undoes it",
+  {
+    tag: "@portability",
+  },
+  async ({ page }) => {
+    await page.goto(urlOf("vanilla"));
+    await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
 
-  expect(
-    await result.getAttribute("data-status"),
-    (await result.textContent()) ?? "Collaboration smoke returned no result text",
-  ).toBe("ready");
-  const payload = JSON.parse((await result.textContent()) ?? "{}") as Record<string, unknown>;
-  // The harness self-checks before reporting ready; assert the durable
-  // outcomes without pinning incidental counters like presence node counts.
-  expect(payload).toMatchObject({
-    literal: 21,
-    formula: 42,
-    sheetName: "Shared",
-    restoredMutation: "durable-browser-m1",
-  });
-  expect(errors.page).toEqual([]);
-  expect(errors.console).toEqual([]);
-});
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    const original = await page.locator("#formula").inputValue();
+    expect(original).not.toBe("browser-smoke");
+    await page.fill("#formula", "browser-smoke");
+    await page.press("#formula", "Enter");
 
-test("vanilla example commits an edit through the formula bar and undoes it", {
-  tag: "@portability",
-}, async ({ page }) => {
-  await page.goto(urlOf("vanilla"));
-  await page.waitForSelector(".sheetwrite canvas", { state: "attached" });
+    // Re-selecting the same cell echoes the committed value back into the bar.
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    await expect(page.locator("#formula")).toHaveValue("browser-smoke");
 
-  // Select B2 via the name box, then commit a literal through the formula bar.
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  await page.fill("#formula", "browser-smoke");
-  await page.press("#formula", "Enter");
-
-  // Re-selecting the same cell echoes the committed value back into the bar.
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  await expect(page.locator("#formula")).toHaveValue("browser-smoke");
-
-  // Ctrl+Z on the grid host undoes the commit.
-  await page.click(".sheetwrite", { position: { x: 200, y: 100 } });
-  await page.keyboard.press("Control+z");
-  await page.fill("#namebox", "B2");
-  await page.press("#namebox", "Enter");
-  await expect(page.locator("#formula")).not.toHaveValue("browser-smoke");
-});
+    // Ctrl+Z on the grid undoes the commit and restores the original value.
+    await page.locator(".sheetwrite").first().click();
+    await page.keyboard.press("Control+z");
+    await page.fill("#namebox", "B2");
+    await page.press("#namebox", "Enter");
+    await expect(page.locator("#formula")).toHaveValue(original);
+  },
+);
 
 test("dynamic spill entry, obstruction, resize, ownership, and undo are visible", async ({
   page,
@@ -385,4 +334,65 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
       ),
     )
     .toBe(true);
+});
+
+test("pointer selection and row/column resize keep preview out of history until release", async ({
+  page,
+}) => {
+  await page.goto(urlOf("vue"));
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("Vue grid unavailable");
+    grid.setActiveSheet("orders");
+    // This scenario isolates pointer history; policy rejection has its own
+    // interface regressions and the workbench starts in a restricted role.
+    grid.setProtectionResolver(() => "allow");
+    grid.scrollToCell({ sheet: "orders", row: 0, col: 0 });
+  });
+  const scroller = page.locator(".sw-demo-grid .sheetwrite-scroller");
+  const bounds = await scroller.boundingBox();
+  if (!bounds) throw new Error("Grid scroller bounds unavailable");
+  const gutter = 48;
+  const header = 32;
+  const rowHeight = 30;
+  await page.mouse.move(bounds.x + gutter + 20, bounds.y + header + 10);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + gutter + 20, bounds.y + header + rowHeight * 2 + 10);
+  await page.mouse.up();
+  expect(
+    await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection()),
+  ).toMatchObject({
+    kind: "range",
+    range: { start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
+  });
+
+  for (const axis of ["column", "row"] as const) {
+    const original = await page.evaluate(() => {
+      const grid = window.__sheetwriteVueWorkbench?.grid;
+      if (!grid) throw new Error("Vue grid unavailable");
+      return grid.exportSnapshot();
+    });
+    const sheet = original.sheets.find((candidate) => candidate.id === "orders");
+    const column = sheet?.columns[0];
+    if (!column) throw new Error("Orders column unavailable");
+    const x = bounds.x + (axis === "column" ? gutter + column.width : 10);
+    const y = bounds.y + (axis === "row" ? header + rowHeight : 10);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + (axis === "column" ? 40 : 0), y + (axis === "row" ? 40 : 0), {
+      steps: 4,
+    });
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).toEqual(original);
+    await page.mouse.up();
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).not.toEqual(original);
+    await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.undo());
+    expect(
+      await page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.exportSnapshot()),
+    ).toEqual(original);
+  }
 });

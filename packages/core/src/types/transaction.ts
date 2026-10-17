@@ -78,6 +78,13 @@ export interface PendingCommit {
   baseVersion: number;
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
+  /**
+   * Present only when the operations are too large for one server version.
+   * Each entry is the operation count of one consecutive version of an atomic
+   * batch, in order; the counts add up to `operations.length`. A server
+   * applies and publishes all of these versions, or none of them.
+   */
+  readonly versionOperationCounts?: readonly number[];
 }
 
 /** Lifecycle state of one local mutation in the synchronization queue. */
@@ -93,16 +100,35 @@ export interface SyncMutationRecord extends PendingCommit {
   status: SyncMutationStatus;
 }
 
+/** Position of one server version inside an atomic multi-version batch. */
+export interface VersionBatchMember {
+  /** Zero-based position of this version in the batch. */
+  index: number;
+  /** Number of consecutive versions in the batch; at least 2. */
+  count: number;
+}
+
 /** Remote document operations paired with a contiguous server version. */
 export interface VersionedOperation {
   version: number;
   readonly operations: readonly DocumentOp[];
   clientMutationId?: string;
+  /**
+   * Present when this version is one member of an atomic batch. Every member
+   * carries the same `clientMutationId` and `count`. Receivers apply the batch
+   * only after its last member arrives.
+   */
+  batch?: VersionBatchMember;
 }
 
 /** Cancellable pending commit submitted to a persistence adapter. */
 export interface PersistenceCommitRequest extends PendingCommit {
   signal?: AbortSignal;
+}
+
+/** Cancellable commit of one atomic batch that spans several server versions. */
+export interface PersistenceBatchCommitRequest extends PersistenceCommitRequest {
+  readonly versionOperationCounts: readonly number[];
 }
 
 /**
@@ -123,6 +149,14 @@ export type PersistenceCommitResponse =
 export interface PersistenceAdapter {
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
+  /**
+   * Commit an atomic batch at versions `baseVersion + 1` through
+   * `baseVersion + versionOperationCounts.length`. Apply every member or none,
+   * publish every member with its `batch` position, and acknowledge with the
+   * last version. `SyncCoordinator` rejects a local transaction that needs more
+   * than one version when the adapter does not implement this method.
+   */
+  commitBatch?(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse>;
 }
 
 /**

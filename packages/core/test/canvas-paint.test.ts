@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   blitVerticalScroll,
   fontFor,
@@ -27,6 +28,8 @@ interface FillTextCall {
   fillStyle: string;
   font: string;
   maxWidth?: number;
+  /** Clip rectangles in effect when the text was drawn (all apply at once). */
+  clips: ClipRectCall[];
 }
 
 interface MoveToCall {
@@ -79,8 +82,19 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.fillRect = (x: number, y: number, w: number, h: number) => {
     ctx.fillRects.push({ x, y, w, h, fillStyle: ctx.fillStyle });
   };
+  // Track the clip stack across save/restore so each draw knows its clips.
+  let activeClips: ClipRectCall[] = [];
+  const savedClips: ClipRectCall[][] = [];
   ctx.fillText = (text: string, x: number, y: number, maxWidth?: number) => {
-    ctx.fillTexts.push({ text, x, y, maxWidth, fillStyle: ctx.fillStyle, font: ctx.font });
+    ctx.fillTexts.push({
+      text,
+      x,
+      y,
+      maxWidth,
+      fillStyle: ctx.fillStyle,
+      font: ctx.font,
+      clips: [...activeClips],
+    });
   };
   let segmentStart: MoveToCall | undefined;
   ctx.moveTo = (x: number, y: number) => {
@@ -101,10 +115,19 @@ function makeRecordingCtx(): RecordingCtx {
     pendingRect = { x, y, w, h };
   };
   ctx.clip = () => {
-    if (pendingRect) ctx.clipRects.push(pendingRect);
+    if (pendingRect) {
+      ctx.clipRects.push(pendingRect);
+      activeClips = [...activeClips, pendingRect];
+    }
+  };
+  ctx.save = () => {
+    savedClips.push(activeClips);
+  };
+  ctx.restore = () => {
+    activeClips = savedClips.pop() ?? [];
   };
 
-  for (const op of ["setTransform", "beginPath", "save", "restore", "stroke", "setLineDash"]) {
+  for (const op of ["setTransform", "beginPath", "stroke", "setLineDash"]) {
     ctx[op] = () => {};
   }
 
@@ -153,7 +176,7 @@ function makeView(
   const rows = { start: 0, end: 3 };
   const cellCount = (rows.end - rows.start) * cols.length;
   const values = new Array<string>(cellCount).fill("x");
-  return { sheet: "s1", rows, cols, values, styleIds, styles };
+  return { sheet: "s1", stringPoolEpoch: 0, rows, cols, values, styleIds, styles };
 }
 
 /** Paint `view` against a fresh recording context and return it for inspection. */
@@ -195,6 +218,28 @@ describe("fontFor", () => {
     expect(fontFor(theme, { italic: true })).toBe('italic 450 13px "Inter Variable", sans-serif');
     expect(fontFor(theme, { bold: true, italic: true })).toBe(
       'italic bold 13px "Inter Variable", sans-serif',
+    );
+  });
+});
+
+describe("paintFrame number formats", () => {
+  it("paints the automatic minus before a currency prefix", () => {
+    const layout = makeLayout([
+      { key: "amount", header: "Amount", width: 150, type: "currency", numberFormat: "$#,##0" },
+    ]);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: 1 },
+      cols: [0],
+      values: [-246],
+      styleIds: new Uint32Array(1),
+      styles: [{}],
+    };
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
+      ["-$246"],
     );
   });
 });
@@ -407,10 +452,45 @@ describe("paintFrame typography and wrapping", () => {
     };
 
     const ctx = render(view, layout, viewport);
-    const painted = ctx.fillTexts
-      .filter((call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48 && call.x === 6)
-      .map((call) => call.text);
-    expect(painted).toEqual(["ab", "cd", "ef"]);
+    const painted = ctx.fillTexts.filter(
+      (call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48,
+    );
+    expect(painted.map((call) => call.text).join("")).toBe("abcdef");
+    expect(painted.length).toBeGreaterThan(1);
+    expect(painted.every((call) => call.x >= 0 && call.x < 26)).toBe(true);
+  });
+
+  it("draws only the wrapped lines that fit, in the top-anchored positions", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 26, type: "text" }]);
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const styles = [{}, { wrap: true }];
+    const text = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const view = makeView(styleIds, styles, [0]);
+    (view.values as string[])[0] = text;
+    // Empty neighbours keep the recorded run free of unrelated body text.
+    (view.values as string[])[1] = "";
+    (view.values as string[])[2] = "";
+    const viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 48, 72]),
+      rowHeights: Float64Array.from([48, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+    const painted = ctx.fillTexts.filter((call) => call.y >= HEADER_HEIGHT);
+    const visibleText = painted.map((call) => call.text).join("");
+    expect(painted.length).toBeGreaterThan(1);
+    expect(text.startsWith(visibleText)).toBe(true);
+    expect(visibleText.length).toBeLessThan(text.length);
+    const firstLine = painted[0];
+    if (!firstLine) throw new Error("Expected the first wrapped line");
+    expect(firstLine.y).toBeGreaterThan(HEADER_HEIGHT);
+    expect(firstLine.y).toBeLessThan(HEADER_HEIGHT + ROW_HEIGHT / 2);
+    for (const [index, line] of painted.entries()) {
+      expect(line.clips.some((clip) => clip.y === HEADER_HEIGHT && clip.h === 48)).toBe(true);
+      const previous = painted[index - 1];
+      if (previous) expect(line.y).toBeGreaterThan(previous.y);
+    }
   });
 });
 
@@ -436,12 +516,14 @@ describe("paintFrame text decorations", () => {
 
     const lines = decorationLines(ctx);
     expect(lines).toHaveLength(1);
-    const underline = lines[0]!;
+    const underline = lines[0];
+    if (!underline) throw new Error("Expected an underline");
     // Below the "middle" baseline origin, still inside the row (20..44).
     expect(underline.y).toBeGreaterThan(ROW_CY);
     expect(underline.y).toBeLessThan(HEADER_HEIGHT + ROW_HEIGHT);
-    // Left-aligned run starts at x + CELL_PAD (0 + 6) and spans the measured "x".
-    expect(underline.x).toBe(6);
+    const text = ctx.fillTexts.find((call) => call.text === "x" && call.y === ROW_CY);
+    if (!text) throw new Error("Expected the underlined text run");
+    expect(underline.x).toBe(text.x);
     expect(underline.w).toBe(7);
   });
 
@@ -460,6 +542,7 @@ describe("paintFrame compiled number formats", () => {
     const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
     const view: VisibleWindowView = {
       sheet: "s1",
+      stringPoolEpoch: 0,
       rows: { start: 0, end: 3 },
       cols: [0, 1],
       values: [1234.5, serial, 1234.5, serial, 1234.5, serial],
@@ -543,5 +626,18 @@ describe("scroll blit and damage-band integrity", () => {
     const label = ctx.fillTexts.find((call) => call.text === "2");
     expect(label).toBeDefined();
     expect(label?.y).toBe(56);
+  });
+
+  it("never paints a row number into the column header band", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(new Uint32Array(3), [{}], [0]);
+    const theme = makeTheme({ rowHeaderWidth: 40 });
+    // Row 1 is scrolled 16px under the header: its band is y in [4, 28) and
+    // its number is centred at y=16, inside the header band [0, 20).
+    const ctx = render(view, layout, { ...UNIFORM_VIEWPORT, scrollTop: 16 }, theme);
+    const label = ctx.fillTexts.find((call) => call.text === "1");
+    expect(label).toBeDefined();
+    const clipTop = Math.max(...label!.clips.map((clip) => clip.y));
+    expect(clipTop).toBeGreaterThanOrEqual(HEADER_HEIGHT);
   });
 });

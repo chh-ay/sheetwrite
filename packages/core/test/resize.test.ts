@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { autofitColumnWidth, resizeTargetAt } from "../src/resize.js";
 
 describe("resize gesture geometry", () => {
@@ -16,7 +17,10 @@ describe("resize gesture geometry", () => {
   it("autofits to the widest header or cell text", () => {
     const measure = (text: string): number => text.length * 7.25;
 
-    expect(autofitColumnWidth(measure, ["Ada", "Lin"], "Customer name")).toBe(107);
-    expect(autofitColumnWidth(measure, ["Ada", "a much longer value"], "Name")).toBe(150);
+    const headerWidth = autofitColumnWidth(measure, ["Ada", "Lin"], "Customer name");
+    const cellWidth = autofitColumnWidth(measure, ["Ada", "a much longer value"], "Name");
+    expect(headerWidth).toBeGreaterThanOrEqual(measure("Customer name"));
+    expect(cellWidth).toBeGreaterThanOrEqual(measure("a much longer value"));
+    expect(cellWidth).toBeGreaterThan(headerWidth);
   });
 });

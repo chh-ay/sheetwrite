@@ -1,4 +1,3 @@
-import { isLoaded, load } from "@sheetwrite/wasm";
 import { colToA1 } from "./a1.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
@@ -9,28 +8,32 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellScalarToText } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
-import { ContextMenu } from "./context-menu.js";
-import { CustomEditorController } from "./custom-editor.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
 import {
+  admitTransactionResources,
   assertWorkbookAllocationLimits,
   resolveTransactionResourceLimits,
   validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
-import { EditController, type EditNavigate } from "./editor.js";
+import {
+  ENGINE_LOAD_HINT,
+  isEngineLoaded as isLoaded,
+  loadEngine,
+  type SheetwriteEngine,
+} from "./engine.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { downloadBytes, toCsv, toXlsxTable } from "./export.js";
 import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
-import { InputController } from "./input-controller.js";
+import { InteractionSessions } from "./interaction-sessions.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
-import { RenderCoordinator } from "./render-coordinator.js";
+import { ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -42,8 +45,9 @@ import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
-import { visibleSheetNeighbor } from "./store/ranges.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
+import { visibleSheetNeighbor } from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
@@ -67,7 +71,6 @@ import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
   ColumnFilter,
-  CommitReason,
   DataValidationRule,
   DocumentOp,
   MutationPolicyMode,
@@ -82,7 +85,6 @@ import type {
 } from "./types/document.js";
 import type {
   CellEditor,
-  CellEditorRect,
   CellInputSnapshot,
   Grid,
   GridActions,
@@ -105,7 +107,7 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
-import { ValidationEditor } from "./validation-editor.js";
+import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
 /** Platform fallback used when no reliable browser scroll clamp can be measured. */
@@ -281,12 +283,16 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
-/** Load the WASM data engine once. Must be awaited before `createGrid`. */
+/**
+ * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
+ * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ */
 export async function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
+  engine?: SheetwriteEngine,
 ): Promise<void> {
   try {
-    await load(source);
+    await loadEngine(source, engine);
   } catch (error) {
     throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
   }
@@ -343,7 +349,7 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
     throw new SheetwriteError(
       "initialization-required",
       "create-grid",
-      "Sheetwrite: await initSheetwrite() before createGrid()",
+      `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
   return new GridImpl(host, opts);
@@ -364,10 +370,7 @@ export class GridImpl implements Grid {
   private readonly scroller: HTMLDivElement;
   private readonly sizer: HTMLDivElement;
   private renderer: Renderer;
-  private readonly editor: EditController;
-  private readonly validationEditor: ValidationEditor;
-  private readonly customEditor: CustomEditorController;
-  private readonly input: InputController;
+  private readonly interactions: InteractionSessions;
   private readonly ariaMirror: AriaMirror;
   private readonly searchController: SearchController;
   private readonly clipboard: ClipboardController;
@@ -377,7 +380,7 @@ export class GridImpl implements Grid {
   private readonly geometry: GeometryLayoutController;
   private readonly overlayPainter: OverlayPainter;
   private readonly domOverlay: DomOverlay;
-  private readonly renderCoordinator: RenderCoordinator;
+  private readonly readWindows: ReadWindowController;
   private overscan: number;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
@@ -390,30 +393,12 @@ export class GridImpl implements Grid {
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
-  private contextMenu: ContextMenu | null = null;
   private findBar: FindBar | null = null;
   private config: GridConfig | undefined;
   private readonly presentation: GridPresentation;
   private readonly hyperlinkActivation: "event-only" | "internal-navigation" | "disabled";
   private toolbarHeight = 0;
   private readonly viewportEl: HTMLDivElement;
-  private readonly onContextMenu = (e: MouseEvent): void => {
-    if (!this.contextMenu) return;
-    e.preventDefault();
-
-    const addr = this.getCellAtPoint(e.clientX, e.clientY);
-    if (addr && !this.selection.contains(addr.row, addr.col)) {
-      this.selection.selectCell(addr.row, addr.col);
-      this.emitSelection();
-      this.scheduleRender();
-    }
-
-    this.contextMenu.open({
-      cell: addr,
-      clientX: e.clientX,
-      clientY: e.clientY,
-    });
-  };
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly customEditors = new Map<string, CellEditor>();
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
@@ -430,6 +415,7 @@ export class GridImpl implements Grid {
     "datasource-error": new Set(),
     "mutation-rejected": new Set(),
     "export-error": new Set(),
+    "theme-change": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -465,7 +451,7 @@ export class GridImpl implements Grid {
     if (this.destroyed) return;
     this.armResolutionListener();
     this.syncSizer();
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   };
   private readonly onScroll = () => this.scheduleRender();
@@ -510,7 +496,7 @@ export class GridImpl implements Grid {
     this.loadable = this.store instanceof SheetwriteStore ? this.store : null;
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
-    const virtualTarget = padTarget(host, opts.minColumns);
+    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
     for (const sheet of workbook.sheets) {
       this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
     }
@@ -548,6 +534,7 @@ export class GridImpl implements Grid {
       },
       transactionResourceLimits: this.transactionResourceLimits,
       admitTransaction: (operations) => beginGridTransactionAdmission(this, operations),
+      trustedResourceCallbacks: true,
     });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
@@ -680,10 +667,6 @@ export class GridImpl implements Grid {
       this.toolbarHeight = Toolbar.height;
     }
 
-    if (config?.contextMenu !== false) {
-      this.contextMenu = new ContextMenu(host, config ?? {}, this.theme, this.actions, this);
-    }
-
     if (config?.find !== false) {
       this.findBar = new FindBar(host, this.theme, this, this.readOnly);
     }
@@ -704,19 +687,16 @@ export class GridImpl implements Grid {
     this.renderer = this.createRenderer(opts, this.viewportEl);
     this.renderer.setRenderers(this.customRenderers);
 
-    this.editor = new EditController(this.viewportEl, {
-      highlightCells: (ranges) => this.highlightCells(ranges),
-      sheet: () => this.activeSheet,
-    });
-    this.validationEditor = new ValidationEditor(this.viewportEl);
-    this.customEditor = new CustomEditorController(this.viewportEl);
-    this.input = new InputController({
+    this.interactions = new InteractionSessions({
       host,
       scroller: this.scroller,
       viewportEl: this.viewportEl,
-      editor: this.editor,
-      isEditing: () =>
-        this.editor.isEditing || this.validationEditor.isEditing || this.customEditor.isEditing,
+      grid: this,
+      customEditors: this.customEditors,
+      highlightCells: (ranges) => this.highlightCells(ranges),
+      columnHeader: (col) => this.columnHeader(col),
+      toViewRow: (row) => this.toViewRow(row),
+      editListeners: this.listeners,
       findBar: () => this.findBar,
       store: this.store,
       loadable: this.loadable,
@@ -728,6 +708,7 @@ export class GridImpl implements Grid {
       firstCol: () => this.firstCol(),
       lastCol: () => this.lastCol(),
       nextVisibleCol: (col, dir) => this.nextVisibleCol(col, dir),
+      previousVisibleColumn: (col) => this.geometry.previousVisibleColumn(col),
       colAtX: (contentX) => this.colAtX(contentX),
       rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
       rowCount: () => this.geometry.rowCount,
@@ -736,21 +717,23 @@ export class GridImpl implements Grid {
       colLeftOf: (col) => this.colLeftOf(col),
       rowTop: (row) => this.geometry.rowOffset(row),
       rowHeight: (row) => this.geometry.rowHeight(row),
-      visibleRowWindow: () =>
-        this.geometry.visibleRowWindow(
-          this.geometry.toContent(this.scroller.scrollTop),
-          this.viewportH(),
-          this.overscan,
-        ),
+      visibleRowWindow: () => this.readWindows.sampleRows(),
       previewColumnWidth: (col, width) => {
-        const column = this.sheet().columns[col];
-        if (!column) return;
-        column.width = width;
-        this.rebuildColumnIndex();
+        this.geometry.previewColumnWidth(col, width);
         this.applyLayout();
         this.scheduleRender();
       },
-      setRowHeight: (row, height) => this.setRowHeight(row, height / this.zoom),
+      previewRowHeight: (row, height) => {
+        this.geometry.previewRowHeight(row, height);
+        this.syncSizer();
+        this.readWindows.invalidate();
+        this.scheduleRender();
+      },
+      clearResizePreview: () => {
+        this.geometry.clearResizePreview();
+        this.applyLayout();
+        this.scheduleRender();
+      },
       dataEdge: (row, col, dRow, dCol) => this.dataEdge(row, col, dRow, dCol),
       keyboard: () => this.keyboardPolicy,
       contentXAt: (viewportX) => this.contentXAt(viewportX),
@@ -760,7 +743,6 @@ export class GridImpl implements Grid {
         this.screenRect(row, col, contentTop, scrollLeft),
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
-      beginEdit: (row, col, initial, selectAll) => this.beginEdit(row, col, initial, selectAll),
       clearSelection: () => this.clearSelection(),
       emitSelection: () => this.emitSelection(),
       scrollToCell: (addr) => this.scrollToCell(addr),
@@ -781,6 +763,7 @@ export class GridImpl implements Grid {
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
     });
+    this.interactions.configureMenu(config, this.theme);
 
     this.overlayPainter = new OverlayPainter(this.viewportEl, {
       theme: () => this.theme,
@@ -799,15 +782,14 @@ export class GridImpl implements Grid {
       screenRect: (row, col, contentTop, scrollLeft) =>
         this.screenRect(row, col, contentTop, scrollLeft),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
-      isEditing: () =>
-        this.editor.isEditing || this.validationEditor.isEditing || this.customEditor.isEditing,
-      fillTarget: () => this.input.fillPreview,
+      isEditing: () => this.interactions.isEditing,
+      fillTarget: () => this.interactions.fillPreview,
       fillHandleScreen: (contentTop, scrollLeft) =>
-        this.input.fillHandleScreen(contentTop, scrollLeft),
+        this.interactions.fillHandleScreen(contentTop, scrollLeft),
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
-      geometryVersion: () => this.renderCoordinator.geometryVersion,
+      geometryVersion: () => this.readWindows.geometryVersion,
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -834,13 +816,14 @@ export class GridImpl implements Grid {
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
-    this.renderCoordinator = new RenderCoordinator({
+    this.readWindows = new ReadWindowController({
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,
       ariaMirror: this.ariaMirror,
       geometry: this.geometry,
       datasource: this.datasourceController,
+      datasourceEnabled: Boolean(datasource),
       store: this.store,
       activeSheet: () => this.activeSheet,
       theme: () => this.theme,
@@ -957,12 +940,17 @@ export class GridImpl implements Grid {
         this.datasourceController.reset(this.sheet().rowCount);
         this.mutationRevisions.clear();
       }
+      this.interactions.reconcile(
+        shouldResetDatasource
+          ? "structure"
+          : shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
+            ? "view"
+            : "value",
+      );
       if (shouldRebuildRows) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
       if (sheetsChanged) this.renderTabs();
-      if (shouldResetDatasource) this.customEditor.cancel();
-      else this.refreshCustomEditor();
       this.ariaMirror.bumpVersion();
       this.scheduleRender();
       for (const fn of this.listeners.change) fn(event);
@@ -971,7 +959,6 @@ export class GridImpl implements Grid {
 
     this.applyLayout();
     this.scroller.addEventListener("scroll", this.onScroll, { passive: true });
-    this.scroller.addEventListener("contextmenu", this.onContextMenu);
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => this.onResize());
       this.resizeObserver.observe(host);
@@ -1031,8 +1018,6 @@ export class GridImpl implements Grid {
   rendererKind(): "canvas" | "worker" {
     return this.activeRendererKind;
   }
-
-  // ── sheet / layout geometry ────────────────────────────────────────────────
 
   private sheet(id: SheetId = this.activeSheet): Sheet {
     if (id === this.activeSheet && this.activeSheetCache) return this.activeSheetCache;
@@ -1193,29 +1178,15 @@ export class GridImpl implements Grid {
     );
   }
 
-  private editorLabel(row: number, col: number): string {
-    return `Edit ${this.columnHeader(col)}, row ${row + 1}`;
-  }
-
-  private editorRect(
-    row: number,
-    col: number,
-    contentTop: number,
-    scrollLeft: number,
-  ): CellEditorRect {
-    const rect = this.screenRect(row, col, contentTop, scrollLeft);
-    return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
-  }
-
   private applyLayout(): void {
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     const sheet = this.sheet();
     const columns = sheet.columns.map((column, c) => ({
       ...column,
       header: column.visible === false ? "" : this.columnHeader(c),
       // Paint geometry is zoomed to match the column index; base widths stay
       // untouched on the workbook.
-      width: column.visible === false ? 0 : column.width * this.zoom,
+      width: column.visible === false ? 0 : this.geometry.columnWidth(c) * this.zoom,
     }));
     const domRendererColumns = new Uint8Array(columns.length);
     for (let col = 0; col < columns.length; col++) {
@@ -1238,25 +1209,6 @@ export class GridImpl implements Grid {
     this.domOverlay.setLayout(layout);
     this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
-  }
-  private refreshCustomEditor(): void {
-    const address = this.customEditor.editingAddress;
-    if (!address || address.sheet !== this.activeSheet) return;
-    const viewRow = this.toViewRow(address.row);
-    const column = this.sheet().columns[address.col];
-    if (viewRow === null || !column) {
-      this.customEditor.cancel();
-      return;
-    }
-    const value = this.store.getCell(address).resolved;
-    const formula = this.loadable?.getFormula(address) ?? this.store.getFormula(address);
-    this.customEditor.update({
-      viewAddress: { sheet: this.activeSheet, row: viewRow, col: address.col },
-      column,
-      value,
-      text: formula ?? cellScalarToText(value),
-      label: this.editorLabel(viewRow, address.col),
-    });
   }
 
   private syncSizer(): void {
@@ -1292,7 +1244,7 @@ export class GridImpl implements Grid {
 
   private rebuildColumnIndex(): void {
     this.geometry.rebuildColumns();
-    this.renderCoordinator.invalidateColumns();
+    this.readWindows.invalidateColumns();
     this.ariaMirror?.setColumnCount(this.geometry.columnIndices.length);
   }
 
@@ -1319,197 +1271,19 @@ export class GridImpl implements Grid {
   }
 
   private scheduleRender(): void {
-    this.renderCoordinator.schedule();
+    this.readWindows.schedule();
   }
 
   private render(): void {
-    this.renderCoordinator.renderNow();
+    this.readWindows.renderNow();
   }
 
   private repositionEditor(contentTop: number, scrollLeft: number): void {
-    const editorCell = this.editor.editingCell;
-    if (editorCell) {
-      this.editor.position(this.screenRect(editorCell.row, editorCell.col, contentTop, scrollLeft));
-    }
-    const validationCell = this.validationEditor.editingCell;
-    if (validationCell) {
-      this.validationEditor.position(
-        this.screenRect(validationCell.row, validationCell.col, contentTop, scrollLeft),
-      );
-    }
-    const customCell = this.customEditor.editingCell;
-    if (customCell) {
-      this.customEditor.position(
-        this.editorRect(customCell.row, customCell.col, contentTop, scrollLeft),
-      );
-    }
+    this.interactions.reposition(contentTop, scrollLeft);
   }
-
-  // ── editing ──────────────────────────────────────────────────────────────--
 
   beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
-    if (this.readOnly) return;
-
-    const editCell = this.anchorCell(row, col);
-    const sheet = this.sheet();
-    const column = sheet.columns[editCell.col];
-    if (!column) return;
-
-    const dataAddr = {
-      sheet: this.activeSheet,
-      row: this.toDataRow(editCell.row),
-      col: editCell.col,
-    };
-    const formula = this.loadable?.getFormula(dataAddr) ?? null;
-    const current = this.store.getCell(dataAddr).resolved;
-    const text = initial ?? formula ?? (current === null ? "" : String(current));
-    const contentTop = this.geometry.toContent(this.scroller.scrollTop);
-
-    this.selection.selectCell(editCell.row, editCell.col);
-    this.scheduleRender();
-
-    for (const fn of this.listeners["edit-begin"]) {
-      fn({ addr: { sheet: this.activeSheet, row: editCell.row, col: editCell.col } });
-    }
-
-    const validationRule = sheet.validationRules?.find(
-      (rule) =>
-        rule.range.sheet === dataAddr.sheet &&
-        dataAddr.row >= Math.min(rule.range.start.row, rule.range.end.row) &&
-        dataAddr.row <= Math.max(rule.range.start.row, rule.range.end.row) &&
-        dataAddr.col >= Math.min(rule.range.start.col, rule.range.end.col) &&
-        dataAddr.col <= Math.max(rule.range.start.col, rule.range.end.col) &&
-        (rule.condition.kind === "list" || rule.condition.kind === "checkbox"),
-    );
-    const custom = column.editor ? this.customEditors.get(column.editor) : undefined;
-    if (custom) {
-      this.editor.cancel();
-      this.validationEditor.cancel(false);
-      this.customEditor.begin({
-        editor: custom,
-        grid: this,
-        address: dataAddr,
-        viewAddress: { sheet: this.activeSheet, row: editCell.row, col: editCell.col },
-        column,
-        value: current,
-        text,
-        initialInput: initial,
-        selectAll: selectAll || initial === undefined,
-        label: this.editorLabel(editCell.row, editCell.col),
-        rect: this.editorRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
-        onCommit: (value, navigate) => this.commitDataEdit(dataAddr, value, navigate),
-        onCancel: () => {
-          this.host.focus();
-          this.scheduleRender();
-        },
-      });
-      return;
-    }
-    this.customEditor.cancel(false);
-    if (initial === undefined && validationRule) {
-      this.editor.cancel();
-      this.validationEditor.begin({
-        row: editCell.row,
-        col: editCell.col,
-        rule: validationRule,
-        current,
-        rect: this.screenRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
-        theme: this.theme,
-        onCommit: (value, navigate) =>
-          this.commitCellEdit(editCell.row, editCell.col, { kind: "literal", value }, navigate),
-        onCancel: () => {
-          this.host.focus();
-          this.scheduleRender();
-        },
-      });
-      return;
-    }
-    this.validationEditor.cancel(false);
-    this.editor.begin({
-      row: editCell.row,
-      col: editCell.col,
-      type: column.type,
-      initial: text,
-      selectAll: selectAll || initial === undefined,
-      rect: this.screenRect(editCell.row, editCell.col, contentTop, this.scroller.scrollLeft),
-      label: this.editorLabel(editCell.row, editCell.col),
-      theme: this.theme,
-      onCommit: (value, navigate) => this.commitEdit(editCell.row, editCell.col, value, navigate),
-      onCancel: () => {
-        this.host.focus();
-        this.scheduleRender();
-      },
-    });
-  }
-
-  private commitEdit(row: number, col: number, raw: string, navigate: EditNavigate): void {
-    const column = this.sheet().columns[col];
-    this.commitCellEdit(row, col, parseCellInput(raw, column?.type ?? "text"), navigate);
-  }
-
-  private commitDataEdit(
-    address: Readonly<CellAddress>,
-    raw: string,
-    navigate: EditNavigate,
-  ): void {
-    if (address.sheet !== this.activeSheet) return;
-    const viewRow = this.toViewRow(address.row);
-    if (viewRow === null) {
-      this.host.focus();
-      this.scheduleRender();
-      return;
-    }
-    const column = this.sheet().columns[address.col];
-    this.commitCellEditAt(address, viewRow, parseCellInput(raw, column?.type ?? "text"), navigate);
-  }
-
-  private commitCellEdit(row: number, col: number, value: CellValue, navigate: EditNavigate): void {
-    this.commitCellEditAt(
-      { sheet: this.activeSheet, row: this.toDataRow(row), col },
-      row,
-      value,
-      navigate,
-    );
-  }
-
-  private commitCellEditAt(
-    address: Readonly<CellAddress>,
-    viewRow: number,
-    value: CellValue,
-    navigate: EditNavigate,
-  ): void {
-    const reason: CommitReason =
-      navigate === "down" ? "edit-enter" : navigate === "none" ? "edit-blur" : "edit-tab";
-    const outcome = this.document.commit(
-      [
-        {
-          op: "set",
-          addr: { ...address },
-          value,
-        },
-      ],
-      reason,
-    );
-
-    if (outcome.status === "applied") {
-      for (const fn of this.listeners["edit-commit"]) {
-        fn({ addr: { sheet: address.sheet, row: viewRow, col: address.col }, value });
-      }
-      this.moveAfterCommit(viewRow, address.col, navigate);
-    }
-    this.host.focus();
-    this.scheduleRender();
-  }
-
-  private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
-    const sheet = this.sheet();
-    if (navigate === "down") this.selection.selectCell(Math.min(sheet.rowCount - 1, row + 1), col);
-    else if (navigate === "right") this.selection.selectCell(row, this.nextVisibleCol(col, 1));
-    else if (navigate === "left") this.selection.selectCell(row, this.nextVisibleCol(col, -1));
-    else this.selection.selectCell(row, col);
-    this.emitSelection();
-    const f = this.selection.focusCell;
-    if (f) this.scrollToCell({ sheet: this.activeSheet, row: f.row, col: f.col });
+    this.interactions.beginEdit(row, col, initial, selectAll);
   }
 
   private clearSelection(): void {
@@ -1574,8 +1348,10 @@ export class GridImpl implements Grid {
 
   private emitSelection(): void {
     this.ariaMirror.bumpVersion();
-    const sel = this.getSelection();
-    for (const fn of this.listeners.selection) fn({ selection: sel });
+    if (this.listeners.selection.size > 0) {
+      const selection = this.getSelection();
+      for (const listener of this.listeners.selection) listener({ selection });
+    }
     this.emitCommandStateChange();
   }
 
@@ -1983,7 +1759,10 @@ export class GridImpl implements Grid {
   setMinColumns(minColumns?: number): void {
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
     if (!stored) return;
-    const target = Math.max(stored.columns.length, padTarget(this.host, minColumns));
+    const target = Math.max(
+      stored.columns.length,
+      padTarget(this.host, minColumns, this.presentation),
+    );
     if (target === this.virtualColumnTargets.get(this.activeSheet)) return;
     this.virtualColumnTargets.set(this.activeSheet, target);
     this.activeSheetCache = null;
@@ -1996,11 +1775,9 @@ export class GridImpl implements Grid {
     if (next === this.overscan) return;
     this.overscan = next;
     // Read per frame by the window calculations; a repaint picks it up.
-    this.renderCoordinator.invalidate();
+    this.readWindows.invalidate();
     this.scheduleRender();
   }
-
-  // ── public API ─────────────────────────────────────────────────────────────
 
   /** Internal structural counters used by allocation regression tests and range benchmarks. */
   getMutationRevisionStats(): MutationRevisionStats {
@@ -2043,9 +1820,7 @@ export class GridImpl implements Grid {
     if (!target || (target.visibility ?? "visible") !== "visible" || id === this.activeSheet)
       return;
 
-    this.editor.cancel();
-    this.validationEditor.cancel();
-    this.customEditor.cancel();
+    this.interactions.reconcile("sheet");
     this.cancelAutoFit();
     this.domOverlay.reset();
     this.mutationRevisions.clear();
@@ -2072,7 +1847,7 @@ export class GridImpl implements Grid {
   }
 
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
-    const cell = this.input.cellAtPointer(clientX, clientY);
+    const cell = this.interactions.cellAtPointer(clientX, clientY);
     return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
   }
 
@@ -2152,9 +1927,15 @@ export class GridImpl implements Grid {
     this.scheduleRender();
   }
 
+  getTheme(): Theme {
+    return { ...this.baseTheme };
+  }
+
   setTheme(theme: Partial<Theme>): void {
     this.baseTheme = { ...this.baseTheme, ...theme };
     this.applyZoomedTheme();
+    this.reseedWidgetTheme();
+    this.emitThemeChange();
   }
 
   replaceTheme(theme: Partial<Theme> | undefined): void {
@@ -2162,6 +1943,25 @@ export class GridImpl implements Grid {
     // then host CSS custom properties, then the new option value.
     this.baseTheme = { ...DEFAULT_THEME, ...resolveThemeFromCss(this.host), ...(theme ?? {}) };
     this.applyZoomedTheme();
+    this.reseedWidgetTheme();
+    this.emitThemeChange();
+  }
+
+  /**
+   * The built-in toolbar, find bar, and context menu read their palette from
+   * custom properties seeded on the grid root when they are created. Seed them
+   * again from the new base theme so a theme switch (for example to dark)
+   * repaints the widgets too, not only the canvas.
+   */
+  private reseedWidgetTheme(): void {
+    if (!this.toolbar && !this.findBar && this.config?.contextMenu === false) return;
+    seedWidgetTheme(this.host, this.baseTheme);
+  }
+
+  private emitThemeChange(): void {
+    const listeners = this.listeners["theme-change"];
+    if (listeners.size === 0) return;
+    for (const fn of listeners) fn({ theme: { ...this.baseTheme } });
   }
 
   getEffectiveTheme(): Theme {
@@ -2175,9 +1975,7 @@ export class GridImpl implements Grid {
     this.sheetTabs?.setReadOnly(readOnly);
     if (readOnly) {
       this.cancelAutoFit();
-      this.editor.cancel();
-      this.validationEditor.cancel();
-      this.customEditor.cancel();
+      this.interactions.reconcile("read-only");
     }
     if (readOnly) this.host.setAttribute("aria-readonly", "true");
     else this.host.removeAttribute("aria-readonly");
@@ -2214,11 +2012,7 @@ export class GridImpl implements Grid {
       this.toolbarHeight = Toolbar.height;
     }
 
-    this.contextMenu?.destroy();
-    this.contextMenu =
-      config?.contextMenu === false
-        ? null
-        : new ContextMenu(this.host, config ?? {}, this.baseTheme, this.actions, this);
+    this.interactions.configureMenu(config, this.baseTheme);
 
     this.findBar?.destroy();
     this.findBar =
@@ -2249,7 +2043,17 @@ export class GridImpl implements Grid {
         issues: [resourceValidation.issue],
       };
     }
-    return this.document.commit(transaction.patches.slice(), "api");
+    // The controller receives a private copy of the caller's operations. The
+    // copy is verified against the measured payload, so the controller and the
+    // store reuse this measurement instead of walking it again.
+    const patches = transaction.patches.slice();
+    const admitted = admitTransactionResources(
+      patches,
+      this.transactionResourceLimits,
+      resourceValidation,
+      transaction.patches,
+    );
+    return this.document.commit(patches, "api", admitted);
   }
 
   exportSnapshot(): WorkbookSnapshot {
@@ -2583,6 +2387,7 @@ export class GridImpl implements Grid {
       } else if (
         patch.op === "setRange" ||
         patch.op === "setBlock" ||
+        patch.op === "restoreBlock" ||
         patch.op === "setRangeStyle" ||
         patch.op === "clearRange"
       ) {
@@ -2618,8 +2423,6 @@ export class GridImpl implements Grid {
     }
     return additions.length > 0 ? [...additions, ...patches] : patches;
   }
-
-  // ── toolbar actions (operate on the current selection) ──────────────────────
 
   private buildActions(): GridActions {
     return {
@@ -2744,33 +2547,53 @@ export class GridImpl implements Grid {
   private formattingSummary(): Readonly<Partial<Record<GridCommandName, number>>> {
     const summary: Partial<Record<GridCommandName, number>> = {};
     for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 0;
+
     if (this.selection.isEmpty) return summary;
 
-    let visited = 0;
+    const coordinates: Array<{ row: number; col: number }> = [];
     let complete = true;
     this.selection.forEachRect((rect) => {
       if (!complete) return;
+
       for (let row = rect.r0; row <= rect.r1; row++) {
         const dataRow = this.toDataRow(row);
         for (let col = rect.c0; col <= rect.c1; col++) {
-          if (visited >= COMMAND_STATE_CELL_LIMIT) {
+          if (coordinates.length >= COMMAND_STATE_CELL_LIMIT) {
             complete = false;
             return;
           }
+
           const column = this.sheet().columns[col];
           if (!column) continue;
-          visited += 1;
-          const cell = this.store.getCell({ sheet: this.activeSheet, row: dataRow, col });
-          for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
-            const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
-            summary[command] = (summary[command] ?? 0) | bit;
-          }
+          coordinates.push({ row: dataRow, col });
         }
       }
     });
+
     if (!complete) {
       for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) summary[command] = 3;
+      return summary;
     }
+
+    const engine = storeEngine(this.store);
+    // Custom stores without an engine retain their single-cell read contract.
+    const cells = engine
+      ? engine.captureResolvedCells(this.activeSheet, coordinates)
+      : coordinates.map(({ row, col }) =>
+          this.store.getCell({ sheet: this.activeSheet, row, col }),
+        );
+
+    for (const [index, coordinate] of coordinates.entries()) {
+      const cell = cells[index];
+      const column = this.sheet().columns[coordinate.col];
+      if (!cell || !column) continue;
+
+      for (const command of COMMAND_STATE_ACTIVITY_COMMANDS) {
+        const bit = formattingCommandActive(command, cell.style, column.cellStyle) ? 1 : 2;
+        summary[command] = (summary[command] ?? 0) | bit;
+      }
+    }
+
     return summary;
   }
 
@@ -3052,8 +2875,8 @@ export class GridImpl implements Grid {
     const count = this.loadable
       ? this.loadable.viewRowCount(this.activeSheet)
       : this.sheet().rowCount;
+    this.interactions.reconcile("view");
     this.geometry.rebuildRows(count);
-    this.refreshCustomEditor();
     this.selection.clear();
     this.selection.setBounds(count, this.firstCol(), this.lastCol());
     this.emitSelection();
@@ -3061,7 +2884,7 @@ export class GridImpl implements Grid {
     // The view permutation lives outside the store, so it must invalidate the
     // data signature itself — a view change with an identical window/scroll
     // (e.g. sorting while already at the top) would otherwise reuse stale rows.
-    this.renderCoordinator.invalidateData();
+    this.readWindows.invalidateData();
     this.syncSizer();
     this.render();
   }
@@ -3092,13 +2915,9 @@ export class GridImpl implements Grid {
     this.cancelAutoFit();
     this.datasourceController.destroy();
     this.mutationRevisions.clear();
-    this.renderCoordinator.destroy();
-    this.editor.destroy();
-    this.validationEditor.destroy();
-    this.customEditor.destroy();
-    this.input.destroy();
+    this.readWindows.destroy();
+    this.interactions.destroy();
     this.scroller.removeEventListener("scroll", this.onScroll);
-    this.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver?.disconnect();
     this.resolutionMediaQuery?.removeEventListener("change", this.onResolutionChange);
     this.resolutionMediaQuery = null;
@@ -3126,7 +2945,6 @@ export class GridImpl implements Grid {
     cleanup(() => this.sheetTabs?.destroy());
     cleanup(() => this.tabBar?.remove());
     cleanup(() => this.toolbar?.destroy());
-    cleanup(() => this.contextMenu?.destroy());
     cleanup(() => this.findBar?.destroy());
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
@@ -3144,8 +2962,17 @@ function appendPadColumns(columns: Column[], target: number): void {
   }
 }
 
-/** Columns needed to satisfy `minColumns` and fill the host width. */
-function padTarget(host: HTMLElement, minColumns: number | undefined): number {
+/**
+ * Columns needed to satisfy `minColumns` and, for a spreadsheet, to fill the
+ * host width. A data grid's columns come from the data, so it adds empty
+ * columns only when the host asks for them with `minColumns`.
+ */
+function padTarget(
+  host: HTMLElement,
+  minColumns: number | undefined,
+  presentation: GridPresentation,
+): number {
+  if (presentation === "data-grid") return minColumns ?? 0;
   const fillWidth = host.clientWidth - DEFAULT_THEME.rowHeaderWidth;
   const fillCols = fillWidth > 0 ? Math.ceil(fillWidth / DEFAULT_COL_WIDTH) + 1 : 0;
   return Math.max(minColumns ?? 0, fillCols);

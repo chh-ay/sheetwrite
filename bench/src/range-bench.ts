@@ -1,5 +1,7 @@
 import "./dom-setup.js";
 import { readFileSync } from "node:fs";
+
+import { getEngine } from "../../packages/core/src/engine.js";
 import {
   createGrid,
   type DataSourcePage,
@@ -10,9 +12,8 @@ import {
   type Range,
   SheetwriteStore,
   type Workbook,
-} from "@sheetwrite/core";
-import { installCanvasTestStubs } from "@sheetwrite/core/testing";
-import { initSync } from "@sheetwrite/wasm";
+} from "../../packages/core/src/index.js";
+import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
 import { COLUMNS, makeColumnar, toSheetwriteColumnar } from "./dataset.js";
 import {
   type BenchmarkMode,
@@ -379,7 +380,7 @@ async function autoFitWorkload(
 
 const bytes = readFileSync(WASM_PATH);
 await initSheetwrite(bytes);
-const wasm = initSync({ module: bytes });
+const memory = getEngine().getMemory();
 const restoreCanvas = installCanvasTestStubs();
 const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
 const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
@@ -392,9 +393,9 @@ globalThis.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
 const results: RangeStructuralResult[] = [];
 try {
   for (const rows of ROW_COUNTS) {
-    results.push(...(await storeWorkloads(rows, wasm.memory)));
-    results.push(await datasourceRevisionWorkload(rows, wasm.memory));
-    results.push(await autoFitWorkload(rows, wasm.memory));
+    results.push(...(await storeWorkloads(rows, memory)));
+    results.push(await datasourceRevisionWorkload(rows, memory));
+    results.push(await autoFitWorkload(rows, memory));
   }
 } finally {
   globalThis.requestAnimationFrame = originalRequestAnimationFrame;

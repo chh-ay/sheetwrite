@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "a5059754ef1dbc7b663fc5097128ec1ecbc96d76a752f073e986e1f1bf78070b",
+  "sha256": "9793ce9eff0bb66bd1b38c1fc83b9efd35547880d9a4299f03acbfa7fa2fc8e2",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -82,6 +82,7 @@
         "DocumentRebaseResult",
         "DocumentValidationError",
         "DocumentValidationResult",
+        "EngineMemoryReleaseReport",
         "Grid",
         "GridActions",
         "GridCommandName",
@@ -115,6 +116,7 @@
         "PendingCommitLoadOptions",
         "PendingCommitStorage",
         "PersistenceAdapter",
+        "PersistenceBatchCommitRequest",
         "PersistenceCommitRequest",
         "PersistenceCommitResponse",
         "PersistenceError",
@@ -193,6 +195,7 @@
         "SheetNameValidationResult",
         "SheetSnapshot",
         "SheetVisibility",
+        "SheetwriteEngine",
         "SheetwriteError",
         "SheetwriteErrorCode",
         "SheetwriteErrorContext",
@@ -213,6 +216,8 @@
         "Store",
         "StoreMemoryBreakdown",
         "SyncActivityState",
+        "SyncConflictRecovery",
+        "SyncConflictReloadReason",
         "SyncConnectionState",
         "SyncCoordinator",
         "SyncCoordinatorEvent",
@@ -237,6 +242,7 @@
         "TransactionResourceValidationResult",
         "TransientResourcePeak",
         "ValidationPolicy",
+        "VersionBatchMember",
         "VersionedCommentEvent",
         "VersionedOperation",
         "VisibleWindowView",
@@ -297,6 +303,7 @@
         "parseDateInput",
         "rangeA1",
         "rebaseDocumentOperations",
+        "releaseEngineMemory",
         "resolveHyperlinkTarget",
         "resolveThemeFromCss",
         "resolveTransactionResourceLimits",
@@ -423,6 +430,27 @@
       "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
     },
     {
+      "package": "@sheetwrite/formulas",
+      "entryPoint": ".",
+      "exports": [
+        "CellOut",
+        "CellSnapshot",
+        "CellStore",
+        "DistinctColumn",
+        "EngineInstance",
+        "InitInput",
+        "InitOutput",
+        "RangeSnapshot",
+        "SourceSnapshot",
+        "SyncInitInput",
+        "WindowView",
+        "createEngine",
+        "initSync",
+        "isLoaded",
+        "load"
+      ]
+    },
+    {
       "package": "@sheetwrite/react",
       "entryPoint": ".",
       "exports": [
@@ -507,12 +535,14 @@
         "CellOut",
         "CellStore",
         "DistinctColumn",
+        "EngineInstance",
         "InitInput",
         "InitOutput",
         "RangeSnapshot",
         "SourceSnapshot",
         "SyncInitInput",
         "WindowView",
+        "createEngine",
         "initSync",
         "isLoaded",
         "load"

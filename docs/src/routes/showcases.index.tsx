@@ -1,19 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
+import { opensFreshDocument } from "../lib/navigation.js";
 import { pageMeta } from "../lib/seo.js";
-import {
-  CAPABILITY_INVENTORY,
-  CAPABILITY_OWNERS,
-  type CapabilityOwnerId,
-} from "../showcases/capabilities.js";
-import { assertCapabilityInventory } from "../showcases/capability-validation.js";
-import hubStylesheet from "../styles/showcase-hub.css?url";
+import { CAPABILITY_OWNERS, type CapabilityOwnerId } from "../showcases/hub-inventory.js";
 
-// Fail closed at module scope: a broken capability contract must never
-// prerender, so an invalid inventory fails the docs build here.
-assertCapabilityInventory(CAPABILITY_INVENTORY, CAPABILITY_OWNERS);
+import hubStylesheet from "../styles/showcase-hub.css?url";
 
 export const Route = createFileRoute("/showcases/")({
   head: () => ({
@@ -28,30 +22,51 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/** The eight-showcase gallery contains four capability owners plus four adapters. */
+/**
+ * Seven capability owners: three featured cards on the first desktop row, four
+ * on the second, then the four adapters.
+ */
 const SCENE_ORDER = [
   "performance",
-  "database",
-  "interoperability",
+  "formulas",
   "collaboration",
+  "database",
+  "host-rows",
+  "interoperability",
+  "engine",
 ] as const satisfies readonly CapabilityOwnerId[];
 
 type SceneOwnerId = (typeof SCENE_ORDER)[number];
 
 /** Concise launch copy, distilled from each checked owner's responsibility. */
 const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
-  performance: "Million-row paging with measured Worker and main-thread results.",
+  performance: "Fly the live Grid through a billion cells and watch what stays resident.",
+  formulas: "GROUPBY, PIVOTBY, LAMBDA and regex over 20,000 orders, recalculated on every edit.",
   database: "IndexedDB snapshots, commits, compaction, and reload recovery.",
+  "host-rows": "Your store owns the rows. Sort, filter and edit; every delta names the record.",
   interoperability: "XLSX and delimited exchange with fixture-backed fidelity warnings.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
+  engine: "A 50,000-row forecast with every public engine event traced beside it.",
 };
 
-/** Accurate mount and runtime cues per first-party adapter. */
-const FRAMEWORK_MOUNTS: Readonly<Record<string, { mount: string; pkg: string }>> = {
-  vanilla: { mount: "createGrid(host, …)", pkg: "@sheetwrite/core" },
-  react: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/react" },
-  vue: { mount: "<SheetwriteGrid />", pkg: "@sheetwrite/vue" },
-  svelte: { mount: "<SheetwriteGrid bind:grid />", pkg: "@sheetwrite/svelte" },
+/** Real import and mount line per first-party adapter. */
+const FRAMEWORK_MOUNTS: Readonly<Record<string, { name: string; mount: string; pkg: string }>> = {
+  vanilla: { name: "createGrid", mount: "createGrid(host, { workbook })", pkg: "@sheetwrite/core" },
+  react: {
+    name: "SheetwriteGrid",
+    mount: "<SheetwriteGrid workbook={book} />",
+    pkg: "@sheetwrite/react",
+  },
+  vue: {
+    name: "SheetwriteGrid",
+    mount: '<SheetwriteGrid :workbook="book" />',
+    pkg: "@sheetwrite/vue",
+  },
+  svelte: {
+    name: "SheetwriteGrid",
+    mount: "<SheetwriteGrid {workbook} bind:grid />",
+    pkg: "@sheetwrite/svelte",
+  },
 };
 
 const FRAMEWORK_SUMMARY: Readonly<Record<string, string>> = {
@@ -61,11 +76,12 @@ const FRAMEWORK_SUMMARY: Readonly<Record<string, string>> = {
   svelte: "Durable offline edits, reconnect drain, and activity state.",
 };
 
-type HubGroup = "all" | "data" | "workbook" | "collaboration" | "framework";
+type HubGroup = "all" | "data" | "formulas" | "workbook" | "collaboration" | "framework";
 
 const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
   { id: "all", label: "All" },
   { id: "data", label: "Data & scale" },
+  { id: "formulas", label: "Formulas" },
   { id: "workbook", label: "Workbook" },
   { id: "collaboration", label: "Collaboration" },
   { id: "framework", label: "Framework integration" },
@@ -73,6 +89,7 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
+  if (owner.id === "formulas" || owner.id === "engine") return "formulas";
   if (owner.id === "interoperability") return "workbook";
   if (owner.id === "collaboration") return "collaboration";
   return "data";
@@ -211,48 +228,203 @@ function CollaborationScene() {
   );
 }
 
+/** A formula spilling into a live result block. */
+function FormulasScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--formulas">
+      <code className="sw-hub-spill__formula">
+        =GROUPBY(<em>region</em>, <em>revenue</em>, SUM)
+      </code>
+      <span className="sw-hub-spill">
+        {[
+          ["Americas", "10.9M"],
+          ["EMEA", "9.5M"],
+          ["APAC", "7.6M"],
+          ["LATAM", "3.8M"],
+        ].map(([label, value]) => (
+          <span key={label}>
+            <i>{label}</i>
+            <b>{value}</b>
+          </span>
+        ))}
+      </span>
+      <span className="sw-hub-scene__caption">299 functions · LAMBDA · spill references</span>
+    </span>
+  );
+}
+
+/** Engine events streaming beside a Grid. */
+function EngineScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
+      <span className="sw-hub-trace">
+        <code>
+          <i>datasource</i> rows 31–45 · 0.1 ms
+        </code>
+        <code>
+          <i>formula</i> C2 810 → 900
+        </code>
+        <code>
+          <i>drawing</i> canvas · 270 cells
+        </code>
+        <code>
+          <i>host-save</i> acknowledged
+        </code>
+      </span>
+      <span className="sw-hub-scene__caption">public events · paged forecast</span>
+    </span>
+  );
+}
+
+/** Host-owned rows: the view moves, the record IDs stay. */
+function HostRowsScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--host-rows">
+      <span className="sw-hub-trace">
+        <code>
+          <i>sort</i> ARR desc · IDs kept
+        </code>
+        <code>
+          <i>edit</i> account-003 ARR → 225,000
+        </code>
+        <code>
+          <i>delta</i> 1 record · host store
+        </code>
+        <code>
+          <i>import</i> 10,000 leads · unique IDs
+        </code>
+      </span>
+      <span className="sw-hub-scene__caption">stable row IDs · host write policy</span>
+    </span>
+  );
+}
+
 function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
   switch (id) {
     case "performance":
       return <PerformanceScene medianMs={medianMs} />;
+    case "formulas":
+      return <FormulasScene />;
     case "database":
       return <DatabaseScene />;
+    case "host-rows":
+      return <HostRowsScene />;
     case "interoperability":
       return <InteroperabilityScene />;
     case "collaboration":
       return <CollaborationScene />;
+    case "engine":
+      return <EngineScene />;
   }
+}
+
+type HubOwner = (typeof CAPABILITY_OWNERS)[number];
+
+function HubCard({ owner, medianMs }: Readonly<{ owner: HubOwner; medianMs?: number }>) {
+  const cue = FRAMEWORK_MOUNTS[owner.id];
+  const isFramework = owner.kind === "framework";
+  return (
+    <li data-kind={owner.kind} data-owner={owner.id}>
+      <Link
+        className={`sw-hub-launch${isFramework ? " sw-hub-launch--framework" : ""}`}
+        data-owner={owner.id}
+        reloadDocument={opensFreshDocument(owner.href)}
+        to={owner.href}
+      >
+        {isFramework ? (
+          <span aria-hidden="true" className="sw-hub-framework-scene">
+            <code className="sw-hub-framework-scene__import">
+              <span>
+                <i>import</i> {"{ "}
+                {cue?.name}
+                {" }"}
+              </span>{" "}
+              <span>
+                <i>from</i> <em>"{cue?.pkg}"</em>
+              </span>
+            </code>
+            <code className="sw-hub-framework-scene__mount">{cue?.mount}</code>
+          </span>
+        ) : (
+          <CapabilityScene id={owner.id as SceneOwnerId} medianMs={medianMs} />
+        )}
+        <span className="sw-hub-launch__body">
+          <span className="sw-hub-launch__meta">
+            {HUB_GROUPS.find((item) => item.id === ownerGroup(owner))?.label}
+          </span>
+          <strong>{owner.label}</strong>
+          <span className="sw-hub-launch__summary">
+            {isFramework ? FRAMEWORK_SUMMARY[owner.id] : SCENE_SUMMARY[owner.id as SceneOwnerId]}
+          </span>
+          <span className="sw-hub__owner-count">Open live example →</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function HubSection({
+  id,
+  title,
+  note,
+  owners,
+  group,
+  medianMs,
+}: Readonly<{
+  id: string;
+  title: string;
+  note: string;
+  owners: readonly HubOwner[];
+  group: HubGroup;
+  medianMs?: number;
+}>) {
+  if (owners.length === 0) return null;
+  return (
+    <section aria-labelledby={id} className="sw-hub__group">
+      <div className="sw-hub__group-head">
+        <h3 id={id}>{title}</h3>
+        <p>{note}</p>
+      </div>
+      <ol className="sw-hub-scenes" data-group={group}>
+        {owners.map((owner) => (
+          <HubCard key={owner.id} medianMs={medianMs} owner={owner} />
+        ))}
+      </ol>
+    </section>
+  );
 }
 
 function ShowcaseHub() {
   const bench = landingBench as HubBenchData;
   const heroStats = bench.available ? bench.heroStats : undefined;
+  const medianMs = heroStats?.millionRowMedianMs;
   const [group, setGroup] = useState<HubGroup>("all");
-  const orderedOwners = [
-    ...SCENE_ORDER.map((id) => OWNER_BY_ID.get(id)).filter(
-      (owner): owner is NonNullable<typeof owner> => owner !== undefined,
-    ),
-    ...CAPABILITY_OWNERS.filter((owner) => owner.kind === "framework"),
-  ];
-  const visibleOwners =
-    group === "all" ? orderedOwners : orderedOwners.filter((owner) => ownerGroup(owner) === group);
+  const capabilityOwners = SCENE_ORDER.map((id) => OWNER_BY_ID.get(id)).filter(
+    (owner): owner is NonNullable<typeof owner> => owner !== undefined,
+  );
+  const frameworkOwners = CAPABILITY_OWNERS.filter((owner) => owner.kind === "framework");
+  const shows = (owner: HubOwner) => group === "all" || ownerGroup(owner) === group;
+  const visibleCapabilities = capabilityOwners.filter(shows);
+  const visibleFrameworks = frameworkOwners.filter(shows);
+  const total = capabilityOwners.length + frameworkOwners.length;
 
   return (
     <div className="sw-hub-frame">
       <SiteTopbar active="showcases" />
       <main className="sw-hub" id="main-content">
         <header className="sw-hub__hero">
-          <h1>Eight real experiences. Pick your proof.</h1>
+          <p className="sw-hub__eyebrow">Showcases</p>
+          <h1>See Sheetwrite at work.</h1>
+          <p className="sw-hub__lede">
+            Each example opens a live spreadsheet with real controls. Start with a capability, or
+            pick the framework you build with.
+          </p>
         </header>
 
         <section aria-labelledby="hub-scenes" className="sw-hub__scenes">
-          <div className="sw-hub__section-heading">
-            <div>
-              <p className="sw-hub__section-index">01 / Product experiences</p>
-              <h2 id="hub-scenes">Pick the proof that matches your work</h2>
-            </div>
-            <p>Preview the interaction, then open the owning route to use it.</p>
-          </div>
+          <h2 className="sw-hub__visually-hidden" id="hub-scenes">
+            Live examples
+          </h2>
           <div className="sw-hub__toolbar">
             <fieldset className="sw-hub__filters">
               <legend>Filter product examples</legend>
@@ -268,49 +440,24 @@ function ShowcaseHub() {
               ))}
             </fieldset>
             <p aria-live="polite" className="sw-hub__filter-status">
-              {visibleOwners.length} / {orderedOwners.length} shown
+              {visibleCapabilities.length + visibleFrameworks.length} / {total} shown
             </p>
           </div>
-          <ol className="sw-hub-scenes" data-group={group}>
-            {visibleOwners.map((owner) => {
-              const cue = FRAMEWORK_MOUNTS[owner.id];
-              const isFramework = owner.kind === "framework";
-              return (
-                <li data-owner={owner.id} key={owner.id}>
-                  <Link
-                    className={`sw-hub-launch${isFramework ? " sw-hub-launch--framework" : ""}`}
-                    data-owner={owner.id}
-                    to={owner.href}
-                  >
-                    {isFramework ? (
-                      <span aria-hidden="true" className="sw-hub-framework-scene">
-                        <span>{owner.label.replace(" workbench", "")}</span>
-                        <code>{cue?.mount}</code>
-                        <small>{cue?.pkg}</small>
-                      </span>
-                    ) : (
-                      <CapabilityScene
-                        id={owner.id as SceneOwnerId}
-                        medianMs={heroStats?.millionRowMedianMs}
-                      />
-                    )}
-                    <span className="sw-hub-launch__body">
-                      <span className="sw-hub-launch__meta">
-                        {HUB_GROUPS.find((item) => item.id === ownerGroup(owner))?.label}
-                      </span>
-                      <strong>{owner.label}</strong>
-                      <span className="sw-hub-launch__summary">
-                        {isFramework
-                          ? FRAMEWORK_SUMMARY[owner.id]
-                          : SCENE_SUMMARY[owner.id as SceneOwnerId]}
-                      </span>
-                      <span className="sw-hub__owner-count">Open live experience →</span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ol>
+          <HubSection
+            group={group}
+            id="hub-capabilities"
+            medianMs={medianMs}
+            note="Each opens on the feature it proves, with live data and controls."
+            owners={visibleCapabilities}
+            title="Capabilities"
+          />
+          <HubSection
+            group={group}
+            id="hub-frameworks"
+            note="The same engine, mounted through each first-party adapter."
+            owners={visibleFrameworks}
+            title="Framework adapters"
+          />
         </section>
       </main>
     </div>

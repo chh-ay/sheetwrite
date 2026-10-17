@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   ALLOCATION_METHOD,
   CORRECTNESS_METHOD,
@@ -10,6 +11,9 @@ import {
   FORMULA_GATE_TOLERANCE,
   FORMULA_PROTOCOL,
   FORMULA_SOURCE_FILES,
+  type FormulaBaselineApprovals,
+  type FormulaGateApproval,
+  formulaRegressionBaselineIdentity,
   formulaSourceDigest,
   TIMING_METHOD,
   validateFormulaBenchmark,
@@ -188,7 +192,7 @@ describe("formula benchmark schema", () => {
 });
 
 describe("formula regression gate", () => {
-  it("gates every workload's median and p95 from raw samples", () => {
+  it("gates median and p95 from raw samples", () => {
     const baseline = formulaFixture("full");
 
     const median = formulaFixture("full");
@@ -200,6 +204,37 @@ describe("formula regression gate", () => {
     p95.workloads[0]!.samplesMs = [1, 1, 1, 1, 1.4];
     p95.workloads[0]!.stat = summarize(p95.workloads[0]!.samplesMs);
     expect(() => validateFormulaRegression(p95, baseline)).toThrow(".p95 regression");
+  });
+
+  it("gives sub-millisecond workloads a 0.3 ms median floor and no p95 check", () => {
+    const withSamples = (samples: number[]) => {
+      const result = formulaFixture("full");
+      result.workloads[0]!.samplesMs = samples;
+      result.workloads[0]!.stat = summarize(samples);
+      return result;
+    };
+    const subMillisecond = withSamples([0.5, 0.5, 0.5, 0.5, 0.5]);
+    const millisecond = withSamples([1, 1, 1, 1, 1]);
+
+    expect(() =>
+      validateFormulaRegression(withSamples([0.5, 0.5, 0.5, 0.5, 3]), subMillisecond),
+    ).not.toThrow();
+    expect(() =>
+      validateFormulaRegression(withSamples([0.75, 0.75, 0.75, 0.75, 0.75]), subMillisecond),
+    ).not.toThrow();
+    expect(() =>
+      validateFormulaRegression(withSamples([0.85, 0.85, 0.85, 0.85, 0.85]), subMillisecond),
+    ).toThrow(".median regression: baseline 0.5, candidate 0.85, limit 0.8");
+
+    expect(() =>
+      validateFormulaRegression(withSamples([1.24, 1.24, 1.24, 1.24, 1.24]), millisecond),
+    ).not.toThrow();
+    expect(() =>
+      validateFormulaRegression(withSamples([1.3, 1.3, 1.3, 1.3, 1.3]), millisecond),
+    ).toThrow(".median regression: baseline 1, candidate 1.3, limit 1.25");
+    expect(() => validateFormulaRegression(withSamples([1, 1, 1, 1, 1.4]), millisecond)).toThrow(
+      ".p95 regression",
+    );
   });
 
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {
@@ -252,5 +287,203 @@ describe("formula regression gate", () => {
     const candidate = formulaFixture("smoke");
 
     expect(() => validateFormulaRegression(candidate, baseline)).not.toThrow();
+  });
+});
+
+describe("formula baseline approvals", () => {
+  const REASON = "8 bytes per calculated cell, derived-value storage (#103/#107)";
+
+  function approvalsFor(
+    baseline: CompleteFormulaBenchmarkResult,
+    approvals: unknown[],
+  ): FormulaBaselineApprovals {
+    const identity = formulaRegressionBaselineIdentity(baseline);
+    return {
+      baselineCommit: identity.commit,
+      baselineSourceDigest: identity.sourceDigest,
+      approvals: approvals as FormulaGateApproval[],
+    };
+  }
+
+  /** A full candidate whose first workload is 30% slower and retains 8 more bytes per sample. */
+  function regressedCandidate(): CompleteFormulaBenchmarkResult {
+    const candidate = formulaFixture("full");
+    const workload = candidate.workloads[0]!;
+    workload.samplesMs = [1.3, 1.3, 1.3, 1.3, 1.3];
+    workload.stat = summarize(workload.samplesMs);
+    for (const sample of workload.allocationSamples) sample.retainedBytes += 8;
+    workload.allocationStat.retainedBytes = summarize(
+      workload.allocationSamples.map((sample) => sample.retainedBytes),
+    );
+    candidate.memory[0]!.wasmDeltaBytes += 4096;
+    return candidate;
+  }
+
+  function approvedRows(timingMaximum: number, bytesMaximum: number): unknown[] {
+    const { id, size } = formulaFixture("full").workloads[0]!;
+    return [
+      { workload: id, size, field: "median", maximum: timingMaximum, reason: "A/A spread" },
+      { workload: id, size, field: "p95", maximum: timingMaximum, reason: "A/A spread" },
+      {
+        workload: id,
+        size,
+        field: "allocation.retainedBytes.median",
+        maximum: bytesMaximum,
+        reason: REASON,
+      },
+      {
+        workload: id,
+        size,
+        field: "allocation.retainedBytes.p95",
+        maximum: bytesMaximum,
+        reason: REASON,
+      },
+      { field: "memory.1000.wasmDeltaBytes", maximum: 5120, reason: "one 4 KiB chunk minimum" },
+    ];
+  }
+
+  it("passes approved rows at or below their approved maximum", () => {
+    const baseline = formulaFixture("full");
+    const candidate = regressedCandidate();
+    expect(() => validateFormulaRegression(candidate, baseline)).toThrow(".median regression");
+
+    const approvals = approvalsFor(baseline, approvedRows(1.3, 1032));
+    expect(() => validateFormulaRegression(candidate, baseline, approvals)).not.toThrow();
+    expect(() => validateFormulaCapture(candidate, baseline, approvals)).not.toThrow();
+  });
+
+  it("fails an approved row above its approved maximum", () => {
+    const baseline = formulaFixture("full");
+    const candidate = regressedCandidate();
+
+    expect(() =>
+      validateFormulaRegression(
+        candidate,
+        baseline,
+        approvalsFor(baseline, approvedRows(1.29, 1032)),
+      ),
+    ).toThrow(".median regression: baseline 1, candidate 1.3, approved maximum 1.29");
+    expect(() =>
+      validateFormulaRegression(
+        candidate,
+        baseline,
+        approvalsFor(baseline, approvedRows(1.3, 1031)),
+      ),
+    ).toThrow(".allocation.retainedBytes.median regression");
+  });
+
+  it("keeps the baseline rule for every row the file does not list", () => {
+    const baseline = formulaFixture("full");
+    const candidate = regressedCandidate();
+    const unlisted = candidate.workloads[1]!;
+    unlisted.samplesMs = [1.3, 1.3, 1.3, 1.3, 1.3];
+    unlisted.stat = summarize(unlisted.samplesMs);
+    const approvals = approvalsFor(baseline, approvedRows(1.3, 1032));
+
+    expect(() => validateFormulaRegression(candidate, baseline, approvals)).toThrow(
+      `workload=${unlisted.id};size=${unlisted.size}.median regression: baseline 1, candidate 1.3, limit 1.25`,
+    );
+
+    const transient = regressedCandidate();
+    const workload = transient.workloads[0]!;
+    for (const sample of workload.allocationSamples) sample.peakTransientBytes += 1;
+    workload.allocationStat.peakTransientBytes = summarize(
+      workload.allocationSamples.map((sample) => sample.peakTransientBytes),
+    );
+    expect(() => validateFormulaRegression(transient, baseline, approvals)).toThrow(
+      ".allocation.peakTransientBytes.median regression",
+    );
+  });
+
+  it("rejects approvals bound to another baseline as stale", () => {
+    const baseline = formulaFixture("full");
+    const candidate = regressedCandidate();
+
+    const otherDigest = approvalsFor(baseline, approvedRows(1.3, 1032));
+    otherDigest.baselineSourceDigest = "b".repeat(64);
+    expect(() => validateFormulaRegression(candidate, baseline, otherDigest)).toThrow(
+      "formula baseline approvals are stale",
+    );
+
+    const otherCommit = approvalsFor(baseline, approvedRows(1.3, 1032));
+    otherCommit.baselineCommit = "1".repeat(40);
+    expect(() => validateFormulaRegression(candidate, baseline, otherCommit)).toThrow(
+      "formula baseline approvals are stale",
+    );
+  });
+
+  it("rejects fields a review may not approve", () => {
+    const baseline = formulaFixture("full");
+    const { id, size } = baseline.workloads[0]!;
+    const fields = {
+      "allocation.peakTransientBytes.median": "may not be approved",
+      "allocation.peakTransientBytes.p95": "may not be approved",
+      "allocation.transientAllocations.median": "may not be approved",
+      "allocation.transientAllocations.p95": "may not be approved",
+      mean: "is not an approvable gate field",
+      "allocation.retainedBytes.max": "is not an approvable gate field",
+    };
+    for (const [field, message] of Object.entries(fields)) {
+      const approvals = approvalsFor(baseline, [
+        { workload: id, size, field, maximum: 2048, reason: REASON },
+      ]);
+      expect(() => validateFormulaRegression(formulaFixture("full"), baseline, approvals)).toThrow(
+        message,
+      );
+    }
+
+    const subMillisecond = formulaFixture("full");
+    subMillisecond.workloads[0]!.samplesMs = [0.5, 0.5, 0.5, 0.5, 0.5];
+    subMillisecond.workloads[0]!.stat = summarize(subMillisecond.workloads[0]!.samplesMs);
+    const ungatedP95 = approvalsFor(subMillisecond, [
+      { workload: id, size, field: "p95", maximum: 2, reason: "A/A spread" },
+    ]);
+    expect(() =>
+      validateFormulaRegression(formulaFixture("full"), subMillisecond, ungatedP95),
+    ).toThrow("which the gate does not check");
+  });
+
+  it("rejects malformed approval files", () => {
+    const baseline = formulaFixture("full");
+    const { id, size } = baseline.workloads[0]!;
+    const row = { workload: id, size, field: "median", maximum: 1.3, reason: "A/A spread" };
+    const cases: [unknown[], string][] = [
+      [[], "at least one approval"],
+      [[{ ...row, note: "x" }], "must contain exactly"],
+      [[{ workload: id, size, field: "median", maximum: 1.3 }], "must contain exactly"],
+      [[{ ...row, reason: "  " }], "reason must state the measured reason"],
+      [[{ ...row, maximum: "1.3" }], "maximum must be a positive finite number"],
+      [[{ ...row, maximum: 0 }], "maximum must be a positive finite number"],
+      [
+        [{ ...row, field: "allocation.retainedBytes.p95", maximum: 1032.5 }],
+        "maximum must be a whole number of bytes",
+      ],
+      [[{ ...row, size: 1.5 }], "size must be an integer"],
+      [[row, { ...row, maximum: 1.4 }], "duplicates the approval"],
+      [[{ ...row, workload: "no-such-workload" }], "which the baseline lacks"],
+      [
+        [{ field: "memory.7.wasmDeltaBytes", maximum: 2048, reason: "x" }],
+        "which the baseline lacks",
+      ],
+      [
+        [{ workload: id, size, field: "memory.1000.wasmDeltaBytes", maximum: 2048, reason: "x" }],
+        "must contain exactly",
+      ],
+      [["median"], "must be an object"],
+    ];
+    for (const [approvals, message] of cases) {
+      expect(() =>
+        validateFormulaRegression(
+          formulaFixture("full"),
+          baseline,
+          approvalsFor(baseline, approvals),
+        ),
+      ).toThrow(message);
+    }
+
+    const extraKey = { ...approvalsFor(baseline, [row]), reviewer: "someone" };
+    expect(() => validateFormulaRegression(formulaFixture("full"), baseline, extraKey)).toThrow(
+      "must contain exactly",
+    );
   });
 });

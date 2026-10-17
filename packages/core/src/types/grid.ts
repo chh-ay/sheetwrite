@@ -378,7 +378,11 @@ export interface GridOptions {
    * Defaults to 6; use 0 to disable the buffer.
    */
   overscan?: number;
-  /** Render at least this many columns (empty padding columns past the data, like a spreadsheet). */
+  /**
+   * Render at least this many columns, adding empty columns past the data. A
+   * spreadsheet also adds empty columns to fill the host width; a data grid
+   * adds them only through this option.
+   */
   minColumns?: number;
   /** Built-in UI controls; providing an object enables the toolbar unless `toolbar` is false. */
   config?: GridConfig;
@@ -461,6 +465,8 @@ export interface GridEvents {
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
   "hyperlink-activate": HyperlinkActivationEvent;
+  /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
+  "theme-change": { theme: Theme };
   /**
    * Emitted once when the worker renderer could not be constructed and the
    * grid fell back to the main-thread canvas renderer.
@@ -503,6 +509,8 @@ export interface Grid {
   getCellInput(row: number, col: number): CellInputSnapshot | null;
   getSelection(): Selection | null;
   setSelection(sel: Selection | null): void;
+  /** Resolved base theme, before zoom scaling. The returned object is a copy. */
+  getTheme(): Theme;
   /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
   /**
@@ -584,7 +592,11 @@ export interface Grid {
   rowGroups(): readonly RowGroup[];
   /** Clear any active sort/filter view. */
   clearView(): void;
-  /** Undo the last recorded cell edit. */
+  /**
+   * Undo the last recorded cell edit. If the restored data is above the
+   * transaction resource limits, nothing changes: the Grid emits
+   * `mutation-rejected` and removes that entry, so older edits stay undoable.
+   */
   undo(): void;
   /** Redo the last undone cell edit. */
   redo(): void;

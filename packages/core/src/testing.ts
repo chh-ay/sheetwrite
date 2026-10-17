@@ -1,6 +1,6 @@
 export { installDatasourceClockForTest } from "./datasource-controller.js";
 
-// ── Test-environment helper (never import from production code) ─────────────
+// Test-environment helper (never import from production code).
 
 /**
  * The stub 2D context the canvas test stubs install: every method is a no-op

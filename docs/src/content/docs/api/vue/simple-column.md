@@ -8,7 +8,7 @@ description: "Column definition accepted by the adapters’ simple row-object AP
 Column definition accepted by the adapters’ simple row-object API.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/adapter.d.ts#L110"><code>packages/core/dist/adapter.d.ts#L110</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/adapter.d.ts#L137"><code>packages/core/dist/adapter.d.ts#L137</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>

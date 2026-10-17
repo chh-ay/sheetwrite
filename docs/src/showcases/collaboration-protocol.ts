@@ -2,6 +2,7 @@ import {
   type DocumentOp,
   MemoryPersistenceAdapter,
   type PersistenceAdapter,
+  type PersistenceBatchCommitRequest,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
   type PresenceMessage,
@@ -59,11 +60,43 @@ export class ShowcaseCollaborationServer implements PersistenceAdapter, RemoteOp
     for (const listener of this.commitListeners) listener(record);
     return response;
   }
+  async commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    const response = await this.adapter.commitBatch(request);
+    if (response.status === "applied") {
+      this.versions.set(request.documentId, response.version);
+      let offset = 0;
+      request.versionOperationCounts.forEach((count, index) => {
+        this.broadcast({
+          version: request.baseVersion + index + 1,
+          clientMutationId: request.clientMutationId,
+          operations: request.operations.slice(offset, offset + count),
+          batch: { index, count: request.versionOperationCounts.length },
+        });
+        offset += count;
+      });
+    }
+    const record: ShowcaseCommitRecord = {
+      documentId: request.documentId,
+      clientMutationId: request.clientMutationId,
+      baseVersion: request.baseVersion,
+      status: response.status,
+      version: response.status === "conflict" ? response.currentVersion : response.version,
+      operationCount: request.operations.length,
+      batchVersions: request.versionOperationCounts.length,
+    };
+    for (const listener of this.commitListeners) listener(record);
+    return response;
+  }
 
   /** Observes every sequencing decision: applied, duplicate, and conflict acks. */
   observeCommits(listener: (record: ShowcaseCommitRecord) => void): () => void {
     this.commitListeners.add(listener);
     return () => this.commitListeners.delete(listener);
+  }
+
+  /** Latest version the server has sequenced for a document. */
+  headVersion(documentId: string): number {
+    return this.versions.get(documentId) ?? 0;
   }
 
   subscribe(listener: (operation: VersionedOperation) => void): () => void {
@@ -117,9 +150,6 @@ export class ShowcasePresenceBus {
   }
 }
 
-/** Document every collaboration proof client loads and commits against. */
-export const COLLABORATION_DOCUMENT_ID = "showcase-collaboration";
-
 /** Stable identity each collaboration proof client publishes over presence. */
 export interface ShowcaseActor {
   id: string;
@@ -133,80 +163,6 @@ export const COLLABORATION_ACTORS: readonly [ShowcaseActor, ShowcaseActor] = [
   { id: "actor-bram", displayName: "Bram", color: "#0ea5e9" },
 ];
 
-/**
- * Canonical sprint-planning workbook for the collaboration proof. The Committed
- * row is a live `=SUM` formula, so remote commits visibly recalculate on every
- * client that receives them.
- */
-export function makeCollaborationSnapshot(): WorkbookSnapshot {
-  const tasks: ReadonlyArray<readonly [task: string, owner: string, points: number]> = [
-    ["Import pipeline", "Ana", 8],
-    ["Conflict review UI", "Bram", 5],
-    ["Presence roster", "Ana", 3],
-    ["Offline drain QA", "Bram", 5],
-    ["Release notes", "Ana", 2],
-  ];
-  return {
-    schemaVersion: 1,
-    documentId: COLLABORATION_DOCUMENT_ID,
-    version: 0,
-    workbook: { activeSheet: "plan" },
-    sheets: [
-      {
-        id: "plan",
-        name: "Sprint plan",
-        order: 0,
-        rowCount: 8,
-        columns: [
-          { key: "task", header: "Task", width: 180, type: "text" },
-          { key: "owner", header: "Owner", width: 110, type: "text" },
-          { key: "points", header: "Points", width: 100, type: "number" },
-        ],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: 7,
-            colCount: 3,
-            cells: [
-              ...tasks.flatMap((entry, row) => [
-                {
-                  rowOffset: row,
-                  colOffset: 0,
-                  value: { kind: "literal" as const, value: entry[0] },
-                },
-                {
-                  rowOffset: row,
-                  colOffset: 1,
-                  value: { kind: "literal" as const, value: entry[1] },
-                },
-                {
-                  rowOffset: row,
-                  colOffset: 2,
-                  value: { kind: "literal" as const, value: entry[2] },
-                },
-              ]),
-              {
-                rowOffset: 6,
-                colOffset: 0,
-                value: { kind: "literal" as const, value: "Committed" },
-              },
-              {
-                rowOffset: 6,
-                colOffset: 2,
-                value: { kind: "formula" as const, src: "=SUM(C1:C5)" },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-/** Sheet cell holding the live `=SUM` total of the collaboration workbook. */
-export const COLLABORATION_TOTAL_CELL = { sheet: "plan", row: 6, col: 2 } as const;
-
 /** One sequenced commit acknowledgement observed at the demo server. */
 export interface ShowcaseCommitRecord {
   documentId: string;
@@ -216,6 +172,7 @@ export interface ShowcaseCommitRecord {
   /** Head version after the request: assigned, previously assigned, or current. */
   version: number;
   operationCount: number;
+  batchVersions?: number;
 }
 
 /** Transit fault raised by {@link ShowcaseNetworkLink} fault injection. */
@@ -251,14 +208,34 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
   private disposeUpstream?: () => void;
   private readonly queued: VersionedOperation[] = [];
   private readonly held: VersionedOperation[] = [];
+  /** Broadcasts that arrived while no coordinator was subscribed (boot, remount). */
+  private readonly unclaimed: VersionedOperation[] = [];
+  /** Versions at or below this are already in the snapshot the next coordinator mounts. */
+  private snapshotVersion = -1;
   private readonly suppressedEchoes = new Set<string>();
   private readonly stateListeners = new Set<(state: ShowcaseLinkState) => void>();
   private connectedState = true;
   private dropNextAck = false;
   private holdNext = false;
 
-  /** Broadcast-less adapters (e.g. the database proof) are valid servers too. */
-  constructor(private readonly server: PersistenceAdapter & Partial<RemoteOperationSource>) {}
+  /**
+   * Broadcast-less adapters (e.g. the database proof) are valid servers too.
+   * The link listens from construction, so a commit sequenced between a
+   * snapshot load and the coordinator subscribing is kept, not lost.
+   */
+  constructor(private readonly server: PersistenceAdapter & Partial<RemoteOperationSource>) {
+    this.disposeUpstream = this.server.subscribe?.((operation) => this.receive(operation));
+  }
+
+  /**
+   * The next coordinator mounts a snapshot at `version`: drop broadcasts it
+   * already contains, keep newer ones for delivery on subscribe.
+   */
+  startFrom(version: number): void {
+    this.snapshotVersion = version;
+    const newer = this.unclaimed.filter((operation) => operation.version > version);
+    this.unclaimed.splice(0, this.unclaimed.length, ...newer);
+  }
 
   get connected(): boolean {
     return this.connectedState;
@@ -285,7 +262,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     if (connected) {
       while (this.connectedState && this.queued.length > 0) {
         const operation = this.queued.shift();
-        if (operation) this.listener?.(operation);
+        if (operation) this.deliver(operation);
       }
     }
     this.publishState();
@@ -303,10 +280,11 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     this.publishState();
   }
 
-  /** Delivers every held broadcast in version order, closing the gap. */
+  /** Delivers every held broadcast in version order and cancels a pending hold, closing the gap. */
   releaseHeldBroadcasts(): void {
+    this.holdNext = false;
     const releasing = this.held.splice(0).sort((a, b) => a.version - b.version);
-    for (const operation of releasing) this.listener?.(operation);
+    for (const operation of releasing) this.deliver(operation);
     this.publishState();
   }
 
@@ -322,7 +300,21 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     return this.server.load(documentId, signal);
   }
 
-  async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+  commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.send(request, () => this.server.commit(request));
+  }
+
+  commitBatch(request: PersistenceBatchCommitRequest): Promise<PersistenceCommitResponse> {
+    return this.send(request, () => {
+      if (!this.server.commitBatch) throw new Error("This adapter cannot commit an atomic batch.");
+      return this.server.commitBatch(request);
+    });
+  }
+
+  private async send(
+    request: PersistenceCommitRequest,
+    commit: () => Promise<PersistenceCommitResponse>,
+  ): Promise<PersistenceCommitResponse> {
     if (!this.connectedState) {
       throw new ShowcaseLinkError("offline", "The client link is offline; the commit never left");
     }
@@ -334,7 +326,7 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
       this.suppressedEchoes.add(request.clientMutationId);
       this.publishState();
     }
-    const response = await this.server.commit(request);
+    const response = await commit();
     if (dropAck) {
       if (response.status === "applied") {
         throw new ShowcaseLinkError(
@@ -349,7 +341,8 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
 
   subscribe(listener: (operation: VersionedOperation) => void): () => void {
     this.listener = listener;
-    this.disposeUpstream ??= this.server.subscribe?.((operation) => this.receive(operation));
+    const unclaimed = this.unclaimed.splice(0).sort((a, b) => a.version - b.version);
+    for (const operation of unclaimed) this.listener?.(operation);
     return () => {
       if (this.listener === listener) this.listener = undefined;
     };
@@ -360,16 +353,21 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
     this.disposeUpstream = undefined;
     this.listener = undefined;
     this.queued.length = 0;
+    this.unclaimed.length = 0;
     this.held.length = 0;
     this.suppressedEchoes.clear();
     this.stateListeners.clear();
   }
 
   private receive(operation: VersionedOperation): void {
+    if (operation.version <= this.snapshotVersion) return;
     if (
       operation.clientMutationId !== undefined &&
-      this.suppressedEchoes.delete(operation.clientMutationId)
+      this.suppressedEchoes.has(operation.clientMutationId)
     ) {
+      if (!operation.batch || operation.batch.index === operation.batch.count - 1) {
+        this.suppressedEchoes.delete(operation.clientMutationId);
+      }
       this.publishState();
       return;
     }
@@ -384,7 +382,17 @@ export class ShowcaseNetworkLink implements PersistenceAdapter, RemoteOperationS
       this.publishState();
       return;
     }
-    this.listener?.(operation);
+    this.deliver(operation);
+  }
+
+  /**
+   * Hands a broadcast to the subscribed coordinator, or keeps it for the next
+   * one while a client remounts. Versions its snapshot already holds are dropped.
+   */
+  private deliver(operation: VersionedOperation): void {
+    if (operation.version <= this.snapshotVersion) return;
+    if (this.listener) this.listener(operation);
+    else this.unclaimed.push(operation);
   }
 
   private publishState(): void {

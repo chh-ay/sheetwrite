@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import type { WorkbookSnapshot, XlsxWorkbookBackend } from "@sheetwrite/core";
+
 import { createXlsxCorpus, type XlsxCorpusMode, type XlsxCorpusScenario } from "./xlsx-corpus.js";
 
 interface WorkerResult {
@@ -174,7 +176,8 @@ async function main(): Promise<WorkerResult> {
     operation,
     scenario,
     durationMs,
-    maxRssBytes: maximumRssBytes(),
+    // Linux updates VmHWM lazily, so the observed final RSS can already exceed it.
+    maxRssBytes: Math.max(maximumRssBytes(), after.rss),
     rssBeforeBytes: before.rss,
     rssAfterBytes: after.rss,
     heapBeforeBytes: before.heapUsed,

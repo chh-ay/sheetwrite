@@ -12,7 +12,7 @@ the shell handle; `destroy` tears down every piece, the grid, and the shell
 DOM, and is safe to call twice.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L60"><code>packages/core/src/shell/spreadsheet-shell.ts#L60</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/spreadsheet-shell.ts#L58"><code>packages/core/src/shell/spreadsheet-shell.ts#L58</code></a></dd></div>
 </dl>
 
 ## Declaration

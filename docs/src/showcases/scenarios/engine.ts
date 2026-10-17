@@ -8,6 +8,7 @@
  */
 
 import type { ColumnarData, Theme, Workbook } from "@sheetwrite/core";
+
 import {
   createRevenueWorkbook,
   REVENUE_AMOUNT_COLUMN,

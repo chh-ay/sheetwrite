@@ -62,9 +62,12 @@ pub(crate) enum FormulaError {
     Spill,
     Calc,
     Loading,
+    Null,
 }
 
 impl FormulaError {
+    pub(crate) const COUNT: usize = 11;
+
     pub(crate) fn sentinel(self) -> &'static str {
         match self {
             FormulaError::Cycle => "#CYCLE!",
@@ -77,6 +80,7 @@ impl FormulaError {
             FormulaError::Spill => "#SPILL!",
             FormulaError::Calc => "#CALC!",
             FormulaError::Loading => "#LOADING!",
+            FormulaError::Null => "#NULL!",
         }
     }
 
@@ -93,6 +97,24 @@ impl FormulaError {
             FormulaError::Spill => 7,
             FormulaError::Calc => 8,
             FormulaError::Loading => 9,
+            FormulaError::Null => 10,
+        }
+    }
+
+    pub(crate) fn from_slot(slot: u64) -> Option<Self> {
+        match slot {
+            0 => Some(Self::Cycle),
+            1 => Some(Self::DivZero),
+            2 => Some(Self::Ref),
+            3 => Some(Self::Num),
+            4 => Some(Self::Value),
+            5 => Some(Self::Name),
+            6 => Some(Self::Na),
+            7 => Some(Self::Spill),
+            8 => Some(Self::Calc),
+            9 => Some(Self::Loading),
+            10 => Some(Self::Null),
+            _ => None,
         }
     }
 }
@@ -175,6 +197,7 @@ impl ReadSet {
 
     pub(crate) fn collect(&mut self, ast: &Ast, formula_sheet: u32) {
         match ast {
+            Ast::LetSlot { expression, .. } => self.collect(expression, formula_sheet),
             Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
                 sheet: formula_sheet,
                 row: *row,
@@ -225,7 +248,10 @@ impl ReadSet {
             | Ast::Missing
             | Ast::Name(_)
             | Ast::UnresolvedStructured(_)
-            | Ast::Num(_) => {}
+            | Ast::Num(_)
+            | Ast::Array { .. } => {}
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } => {}
         }
     }
 
@@ -258,6 +284,7 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             ast_is_volatile(left) || ast_is_volatile(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_is_volatile(inner),
+        Ast::LetSlot { expression, .. } => ast_is_volatile(expression),
         _ => false,
     }
 }
@@ -270,6 +297,20 @@ fn ast_contains_let(ast: &Ast) -> bool {
             ast_contains_let(left) || ast_contains_let(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_let(inner),
+        Ast::LetSlot { expression, .. } => ast_contains_let(expression),
+        _ => false,
+    }
+}
+
+fn ast_contains_spill_ref(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::AnchorArray, _) => true,
+        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_spill_ref),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_contains_spill_ref(left) || ast_contains_spill_ref(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_spill_ref(inner),
+        Ast::LetSlot { expression, .. } => ast_contains_spill_ref(expression),
         _ => false,
     }
 }
@@ -300,26 +341,26 @@ pub(crate) struct FormulaEntry {
     pub(crate) ast: Option<Ast>,
     pub(crate) source: String,
     pub(crate) reads: ReadSet,
+    /// Source parse rejection; recalculation never mutates this field.
     pub(crate) error: Option<FormulaError>,
-    pub(crate) value_kind: FormulaValueKind,
     pub(crate) volatile: bool,
+    /// The formula contains `A1#`. Each evaluation replaces those with the
+    /// current spill ranges; other formulas skip that step.
+    pub(crate) has_spill_refs: bool,
+    pub(crate) produces_array: bool,
     pub(crate) source_kind: PersistedSourceKind,
 }
 
 impl FormulaEntry {
-    #[cfg(test)]
-    pub(crate) fn parsed(ast: Ast, sheet: u32, source: &str) -> Self {
-        Self::parsed_source(ast, sheet, source.to_string())
-    }
-
     pub(crate) fn parsed_source(ast: Ast, sheet: u32, source: String) -> Self {
         let (reads, volatile) = formula_metadata(&ast, sheet);
         Self {
+            has_spill_refs: ast_contains_spill_ref(&ast),
+            produces_array: crate::eval::ast_produces_array(&ast),
             ast: Some(ast),
             source: source.to_string(),
             reads,
             error: None,
-            value_kind: FormulaValueKind::Number,
             volatile,
             source_kind: PersistedSourceKind::Formula,
         }
@@ -341,8 +382,9 @@ impl FormulaEntry {
             ast: Some(ast),
             source: String::new(),
             error: None,
-            value_kind: FormulaValueKind::Blank,
             volatile: false,
+            has_spill_refs: false,
+            produces_array: false,
             source_kind: PersistedSourceKind::Reference,
         }
     }
@@ -384,8 +426,9 @@ impl FormulaEntry {
             source: source.to_string(),
             reads: ReadSet::default(),
             error: Some(error),
-            value_kind: FormulaValueKind::Number,
             volatile: false,
+            has_spill_refs: false,
+            produces_array: false,
             source_kind: PersistedSourceKind::Formula,
         }
     }
@@ -506,18 +549,54 @@ pub(crate) fn cell_key(row: usize, col: usize) -> Option<CellKey> {
     Some((u32::try_from(row).ok()?, u32::try_from(col).ok()?))
 }
 
-// ── String pool ──────────────────────────────────────────────────────────────
+pub(crate) enum InternSlot {
+    One(u32),
+    Many(Vec<u32>),
+}
+
+/// The intern map's keys are already 64-bit string hashes; re-hashing them
+/// through SipHash on every probe is unnecessary. This hasher passes the key
+/// through untouched.
+#[derive(Default)]
+pub(crate) struct IdentityHasher(u64);
+
+impl Hasher for IdentityHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("IdentityHasher is only used with u64 keys");
+    }
+
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+}
+fn string_hash(s: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    s.hash(&mut hasher);
+    hasher.finish()
+}
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 
 /// Dictionary-encoded string pool backed by one contiguous UTF-8 arena.
 ///
 /// `Vec<String>` costs a 12-byte header plus a separate heap allocation per
 /// entry on wasm32; at a million distinct strings that is tens of megabytes of
 /// headers and allocator slack. The arena stores every string back to back in
-/// one buffer with an 8-byte `(offset, len)` span per id, keeps pool text
-/// cache-contiguous for filter/search scans, and frees in two deallocations.
-pub(crate) struct StringPool {
+/// one buffer with an 8-byte `(offset, len)` span per id, keeping pool text
+/// cache-contiguous for filter/search scans.
+pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    lookup:
+        std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
+    pub(crate) epoch: u32,
+    pub(crate) next_collection_bytes: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -526,11 +605,14 @@ struct PoolSpan {
     len: u32,
 }
 
-impl StringPool {
+impl StringStorage {
     pub(crate) fn new() -> Self {
         Self {
             bytes: Vec::new(),
             spans: Vec::new(),
+            lookup: Default::default(),
+            epoch: 0,
+            next_collection_bytes: STRING_COLLECTION_FLOOR_BYTES,
         }
     }
 
@@ -544,26 +626,126 @@ impl StringPool {
         Some(unsafe { std::str::from_utf8_unchecked(bytes) })
     }
 
-    /// Append a string and return its id. Dedup is the interner's job; the
-    /// pool itself is append-only.
-    pub(crate) fn push(&mut self, s: &str) -> u32 {
+    fn push(&mut self, text: &str) -> u32 {
         let id = self.spans.len() as u32;
         let offset = self.bytes.len() as u32;
-        self.bytes.extend_from_slice(s.as_bytes());
+        self.bytes.extend_from_slice(text.as_bytes());
         self.spans.push(PoolSpan {
             offset,
-            len: s.len() as u32,
+            len: text.len() as u32,
         });
         id
     }
 
-    pub(crate) fn shrink_to_fit(&mut self) {
-        self.bytes.shrink_to_fit();
-        self.spans.shrink_to_fit();
+    pub(crate) fn intern(&mut self, text: &str) -> u32 {
+        let hash = string_hash(text);
+
+        if let Some(slot) = self.lookup.get(&hash) {
+            match slot {
+                InternSlot::One(id) if self.get(*id) == Some(text) => return *id,
+                InternSlot::Many(ids) => {
+                    for &id in ids {
+                        if self.get(id) == Some(text) {
+                            return id;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let id = self.push(text);
+
+        match self.lookup.get_mut(&hash) {
+            None => {
+                self.lookup.insert(hash, InternSlot::One(id));
+            }
+            Some(slot) => match slot {
+                InternSlot::One(previous) => *slot = InternSlot::Many(vec![*previous, id]),
+                InternSlot::Many(ids) => ids.push(id),
+            },
+        }
+
+        id
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.spans.len()
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.bytes.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
+    }
+
+    /// Build before remapping roots: reservation failure leaves the old epoch intact.
+    pub(crate) fn collection(&self, marks: &[bool], force: bool) -> Option<(Self, Vec<u32>)> {
+        let live_count = marks.iter().filter(|&&marked| marked).count();
+        let live_utf8 = self
+            .spans
+            .iter()
+            .zip(marks)
+            .filter(|(_, marked)| **marked)
+            .map(|(span, _)| span.len as usize)
+            .sum::<usize>();
+        let live_bytes = live_utf8 + live_count * std::mem::size_of::<PoolSpan>();
+
+        if !force
+            && (self.retained_bytes() <= live_bytes.saturating_mul(2)
+                || self.retained_bytes() - live_bytes < STRING_COLLECTION_FLOOR_BYTES)
+        {
+            return None;
+        }
+
+        let mut replacement = Self::new();
+        replacement.bytes.try_reserve_exact(live_utf8).ok()?;
+        replacement.spans.try_reserve_exact(live_count).ok()?;
+        replacement.lookup.try_reserve(live_count).ok()?;
+
+        let mut remap = Vec::new();
+        remap.try_reserve_exact(self.len()).ok()?;
+        remap.resize(self.len(), NO_STRING);
+
+        for (id, &marked) in marks.iter().enumerate() {
+            if marked {
+                remap[id] = replacement.intern(self.get(id as u32)?);
+            }
+        }
+
+        replacement.epoch = self.epoch.wrapping_add(1);
+        replacement.next_collection_bytes = live_bytes
+            .saturating_mul(2)
+            .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
+
+        Some((replacement, remap))
+    }
+
+    pub(crate) fn postpone_collection(&mut self) {
+        self.next_collection_bytes = self
+            .retained_bytes()
+            .saturating_mul(2)
+            .saturating_add(STRING_COLLECTION_FLOOR_BYTES);
+    }
+
+    pub(crate) fn index_memory_stats(&self) -> MemoryOwnerStats {
+        let mut stats = MemoryOwnerStats::default();
+        stats.add_hash_table::<u64, InternSlot>(self.lookup.len(), self.lookup.capacity());
+
+        for slot in self.lookup.values() {
+            if let InternSlot::Many(ids) = slot {
+                stats.add_vec::<u32>(ids.len(), ids.capacity());
+            }
+        }
+
+        stats
+    }
+
+    /// Destructive bulk changes may leave no subsequent unique-string growth.
+    pub(crate) fn request_collection(&mut self) {
+        self.next_collection_bytes = STRING_COLLECTION_FLOOR_BYTES;
     }
 }
 
-impl StringPool {
+impl StringStorage {
     pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
         let mut utf8 = MemoryOwnerStats::default();
         utf8.add_vec::<u8>(self.bytes.len(), self.bytes.capacity());
@@ -573,11 +755,11 @@ impl StringPool {
     }
 }
 
-pub(crate) fn string_from_pool(strings: &StringPool, pool_id: u32) -> Option<String> {
+pub(crate) fn string_from_pool(strings: &StringStorage, pool_id: u32) -> Option<String> {
     string_from_pool_ref(strings, pool_id).map(str::to_owned)
 }
 
-pub(crate) fn string_from_pool_ref(strings: &StringPool, pool_id: u32) -> Option<&str> {
+pub(crate) fn string_from_pool_ref(strings: &StringStorage, pool_id: u32) -> Option<&str> {
     if pool_id == NO_STRING {
         return None;
     }

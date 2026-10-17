@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
+
 import type { WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import { strFromU8, unzipSync } from "fflate";
+
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
 import { rawXlsx, TRANSITIONAL_MAIN, TRANSITIONAL_REL, worksheet } from "./raw-opc.js";
 
@@ -84,8 +86,8 @@ describe("native XLSX workbook tables", () => {
 
     expect(imported.sheets[0]!.tables).toBeUndefined();
     expect(imported.workbook.namedRanges?.[0]?.name).toBe("Sales");
-    expect(warnings.at(-1)?.message).toBe(
-      "Excel table sales was dropped because its name conflicts case-insensitively with workbook defined name Sales; the defined name was retained to keep formula resolution unambiguous",
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ code: "invalid-metadata", sheet: "Raw" }),
     );
   });
 });

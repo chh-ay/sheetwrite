@@ -8,7 +8,7 @@ description: "A stable host identity for one data-space row."
 A stable host identity for one data-space row.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L7"><code>packages/core/src/row-bridge.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L8"><code>packages/core/src/row-bridge.ts#L8</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -50,6 +50,6 @@ export type RowBridgeId = string | number;
 <li><a href="/docs/api/core/row-bridge-options/"><code>RowBridgeOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-paste-delta/"><code>RowBridgePasteDelta</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge-projection/"><code>RowBridgeProjection</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 49 more</li>
+<li class="api-consumer-more">and 52 more</li>
 </ul>
 </div>

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
+
 import { AriaMirror } from "../src/aria-mirror.js";
 import type { VisibleWindowView } from "../src/types.js";
 
 function view(cols: readonly number[], rowStart = 3): VisibleWindowView {
   return {
     sheet: "s1",
+    stringPoolEpoch: 0,
     rows: { start: rowStart, end: rowStart + 1 },
     cols,
     values: cols.map((col) => `r${rowStart}c${col}`),

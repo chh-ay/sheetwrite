@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { normalizeSitemap } from "./normalize-sitemap.js";
 
 const wrap = (urls: string[]): string =>
@@ -16,6 +17,7 @@ describe("sitemap normalization contract", () => {
         "https://sheetwrite.vercel.app/docs/api/core/grid/#grid-set-zoom",
         "https://sheetwrite.vercel.app/test/xlsx",
         "https://sheetwrite.vercel.app/docs/proof/",
+        "https://sheetwrite.vercel.app/404",
         "https://sheetwrite.vercel.app/docs/start/installation/",
       ]),
     );
@@ -26,6 +28,6 @@ describe("sitemap normalization contract", () => {
       "https://sheetwrite.vercel.app/docs/start/installation/",
     ]);
     expect(kept).toBe(3);
-    expect(dropped).toBe(4);
+    expect(dropped).toBe(5);
   });
 });

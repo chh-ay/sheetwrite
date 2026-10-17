@@ -6,7 +6,12 @@
 // Modes:
 //   lifecycle — pre-init guards, concurrent init semantics, post-success calls
 //   retry     — a failing first source rejects, then a corrected init succeeds
-import { initSheetwrite, isSheetwriteReady, SheetwriteStore } from "../src/index.js";
+import {
+  initSheetwrite,
+  isSheetwriteReady,
+  SheetwriteError,
+  SheetwriteStore,
+} from "../src/index.js";
 import type { Workbook } from "../src/types.js";
 
 const workbook: Workbook = {
@@ -21,8 +26,13 @@ const workbook: Workbook = {
   ],
 };
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function rejectedInitialization(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) throw new TypeError("Initialization must reject with an Error");
+  return {
+    status: "rejected",
+    name: error.name,
+    ...(error instanceof SheetwriteError ? { code: error.code, operation: error.operation } : {}),
+  };
 }
 
 async function lifecycle(): Promise<Record<string, unknown>> {
@@ -33,7 +43,7 @@ async function lifecycle(): Promise<Record<string, unknown>> {
     new SheetwriteStore(workbook);
     result.preInitStore = "constructed";
   } catch (error) {
-    result.preInitStore = errorMessage(error);
+    result.preInitStore = rejectedInitialization(error);
   }
 
   // Fire everything before awaiting: while the first call's initialization is
@@ -43,7 +53,7 @@ async function lifecycle(): Promise<Record<string, unknown>> {
   const sameSourceWhileInFlight = initSheetwrite();
   const second = initSheetwrite("https://example.invalid/x.wasm").then(
     () => "fulfilled",
-    (error: unknown) => errorMessage(error),
+    (error: unknown) => rejectedInitialization(error),
   );
   await Promise.all([first, sameSourceWhileInFlight]);
   result.concurrentSameSource = "fulfilled";
@@ -68,7 +78,7 @@ async function retry(): Promise<Record<string, unknown>> {
 
   result.firstFailure = await initSheetwrite("https://example.invalid/broken.wasm").then(
     () => "fulfilled",
-    (error: unknown) => `rejected: ${errorMessage(error)}`,
+    (error: unknown) => rejectedInitialization(error),
   );
   result.readyAfterFailure = isSheetwriteReady();
 

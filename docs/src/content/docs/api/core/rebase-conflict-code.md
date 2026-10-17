@@ -8,7 +8,7 @@ description: "Stable conservative-rebase conflict category."
 Stable conservative-rebase conflict category.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L7"><code>packages/core/src/rebase.ts#L7</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L8"><code>packages/core/src/rebase.ts#L8</code></a></dd></div>
 </dl>
 
 ## Declaration

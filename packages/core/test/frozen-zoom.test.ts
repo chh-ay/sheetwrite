@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -404,7 +405,7 @@ describe("row heights under views", () => {
     grid.clearView();
 
     // Cleared view is identity, so data row 3 sits at view position 3. The
-    // override must paint there; pre-fix it landed on row 1.
+    // override must paint there.
     const rowHeights = recorder.paints.at(-1)?.rowHeights;
     expect(rowHeights?.[dataRow]).toBe(60);
     expect(rowHeights?.[1]).not.toBe(60);

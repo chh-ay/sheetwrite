@@ -5,7 +5,7 @@ use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, RangeFlags, SheetRef};
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
@@ -15,6 +15,7 @@ use super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
 };
 use super::value::{bool_from_value, compare_values, number_from_value};
+use super::with_let_slots;
 
 fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
@@ -29,9 +30,32 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     }
 }
 
-pub(super) fn ast_produces_array(ast: &Ast) -> bool {
+pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => true,
+        Ast::Func(Func::AnchorArray, _) => true,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            super::analysis::lambda::produces_array(name, args)
+        }
+        Ast::Range(..)
+        | Ast::AbsRange(..)
+        | Ast::NamedRange(..)
+        | Ast::Structured(..)
+        | Ast::Array { .. } => true,
+        Ast::LetSlot { expression, .. } => ast_produces_array(expression),
+        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            ast_produces_array(left) || ast_produces_array(right)
+        }
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_produces_array(inner),
+        #[cfg(feature = "analysis")]
+        Ast::Func(Func::Analysis(id), args) => {
+            let name = super::analysis::name(*id);
+            super::analysis::family(name)
+                .and_then(|family| family.array.as_ref())
+                .is_some_and(|hooks| (hooks.produces_array)(name, args))
+        }
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -86,18 +110,122 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
 }
 
 impl CellStore {
+    /// The range that the anchor of `A1#` spills into now, or `#REF!` when
+    /// the anchor holds no spill.
+    fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
+        let (sheet, row, col) = match args {
+            [Ast::Cell(row, col, _)] => (formula_sheet, *row, *col),
+            [Ast::AbsCell(sheet, row, col, _)] => (sheet.handle as usize, *row, *col),
+            _ => return Ast::InvalidRef,
+        };
+        let Some(range) = self
+            .sheets
+            .get(sheet)
+            .and_then(|data| data.installed_spill((row, col)))
+        else {
+            return Ast::InvalidRef;
+        };
+        let sheet = SheetRef {
+            handle: sheet as u32,
+            name: String::new(),
+            quoted: false,
+        };
+        Ast::AbsRange(
+            sheet,
+            row,
+            col,
+            range.row_end,
+            range.col_end,
+            RangeFlags::default(),
+        )
+    }
+
+    /// A copy of `ast` in which every `A1#` is the range that its anchor
+    /// spills into now. Range functions such as SUMIF, INDEX and ROWS then
+    /// accept spill references without special handling.
+    pub(super) fn resolve_spill_refs(&self, ast: &Ast, sheet: usize) -> Ast {
+        let mut resolved = ast.clone();
+        self.replace_spill_refs(&mut resolved, sheet);
+        resolved
+    }
+
+    fn replace_spill_refs(&self, ast: &mut Ast, sheet: usize) {
+        match ast {
+            Ast::Func(Func::AnchorArray, args) => *ast = self.spill_reference(args, sheet),
+            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+                for arg in args {
+                    self.replace_spill_refs(arg, sheet);
+                }
+            }
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                self.replace_spill_refs(left, sheet);
+                self.replace_spill_refs(right, sheet);
+            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                self.replace_spill_refs(inner, sheet);
+            }
+            Ast::LetSlot { expression, .. } => self.replace_spill_refs(expression, sheet),
+            _ => {}
+        }
+    }
+
     pub(super) fn dynamic_array_bound(
         &self,
         ast: &Ast,
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => Some(
+            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+                if ast_produces_array(ast) =>
+            {
+                Some(
+                    self.matrix_shape(ast, formula_sheet)
+                        .map(|shape| shape.2)
+                        .or_else(|error| {
+                            if error == FormulaError::Value {
+                                Ok(SPILL_MAX_CELLS)
+                            } else {
+                                Err(error)
+                            }
+                        }),
+                )
+            }
+            Ast::Func(Func::AnchorArray, args) => {
+                let range = self.spill_reference(args, formula_sheet);
+                Some(
+                    self.matrix_shape(&range, formula_sheet)
+                        .map(|(_, _, cells)| cells),
+                )
+            }
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => {
+                Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                ast_produces_array(ast)
+                    .then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                Some((hooks.bound)(self, name, args, formula_sheet))
+            }
+            Ast::Range(..)
+            | Ast::AbsRange(..)
+            | Ast::NamedRange(..)
+            | Ast::Structured(..)
+            | Ast::Array { .. } => Some(
                 self.matrix_shape(ast, formula_sheet)
                     .map(|(_, _, cells)| cells),
             ),
+            Ast::LetSlot { expression, .. } => self.dynamic_array_bound(expression, formula_sheet),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
-                Ok(expanded) => self.dynamic_array_bound(&expanded, formula_sheet),
+                Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet),
                 Err(_) => None,
             },
             Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
@@ -181,22 +309,62 @@ impl CellStore {
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
-                self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
+            Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
+                if ast_produces_array(ast) =>
+            {
+                self.eval_operator_array(ast, sheet, affected, memo, visiting, depth + 1)
             }
-            Ast::Func(Func::Let, args) => {
-                let expanded = match expand_let_ast(args) {
-                    Ok(expanded) => expanded,
-                    Err(error) => return Some(Err(error)),
-                };
-                return self.eval_dynamic_array(
-                    &expanded,
+            Ast::Func(Func::AnchorArray, args) => {
+                let range = self.spill_reference(args, sheet);
+                return self.eval_dynamic_array(&range, sheet, affected, memo, visiting, depth);
+            }
+            Ast::InvalidRef => Err(FormulaError::Ref),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, values } => {
+                Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                if !ast_produces_array(ast) {
+                    return None;
+                }
+                super::analysis::lambda::evaluate_matrix(
+                    self,
+                    name,
+                    args,
                     sheet,
                     affected,
                     memo,
                     visiting,
                     depth + 1,
-                );
+                )
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
+                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                if !(hooks.produces_array)(name, args) {
+                    return None;
+                }
+                (hooks.evaluate)(self, name, args, sheet, affected, memo, visiting, depth + 1)
+            }
+            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
+                self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
+            }
+            Ast::Array { values, .. } => self
+                .matrix_shape(ast, sheet)
+                .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
+            Ast::LetSlot { expression, .. } => {
+                return self.eval_dynamic_array(expression, sheet, affected, memo, visiting, depth)
+            }
+            Ast::Func(Func::Let, args) => {
+                let (expanded, slots) = match expand_let_ast(args) {
+                    Ok(expanded) => expanded,
+                    Err(error) => return Some(Err(error)),
+                };
+                return with_let_slots(slots, || {
+                    self.eval_dynamic_array(&expanded, sheet, affected, memo, visiting, depth + 1)
+                });
             }
             Ast::Func(Func::Filter, args) => {
                 self.eval_filter(args, sheet, affected, memo, visiting, depth + 1)
@@ -259,11 +427,71 @@ impl CellStore {
         formula_sheet: usize,
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
+            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+                let (left_rows, left_cols, _) = if ast_produces_array(left) {
+                    self.matrix_shape(left, formula_sheet)?
+                } else {
+                    (1, 1, 1)
+                };
+                let (right_rows, right_cols, _) = if ast_produces_array(right) {
+                    self.matrix_shape(right, formula_sheet)?
+                } else {
+                    (1, 1, 1)
+                };
+                let rows = left_rows.max(right_rows);
+                let cols = left_cols.max(right_cols);
+                return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
+            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+                return self.matrix_shape(inner, formula_sheet);
+            }
+            Ast::Func(Func::AnchorArray, args) => {
+                return self
+                    .matrix_shape(&self.spill_reference(args, formula_sheet), formula_sheet);
+            }
+            Ast::InvalidRef => return Err(FormulaError::Ref),
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { rows, cols, .. } => {
+                return Ok((
+                    *rows,
+                    *cols,
+                    EvalMatrix::validate_shape(*rows, *cols, 1, 0)?,
+                ));
+            }
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+                return super::analysis::lambda::shape(self, name, args, formula_sheet);
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Func(Func::Analysis(id), args) => {
+                let name = super::analysis::name(*id);
+                let hooks = super::analysis::family(name)
+                    .and_then(|family| family.array.as_ref())
+                    .ok_or(FormulaError::Value)?;
+                if !(hooks.produces_array)(name, args) {
+                    return Err(FormulaError::Value);
+                }
+                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet)?;
+                let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+                if cells != validated {
+                    return Err(FormulaError::Value);
+                }
+                return Ok((rows, cols, cells));
+            }
             Ast::Func(Func::Let, args) => {
-                return self.matrix_shape(&expand_let_ast(args)?, formula_sheet);
+                let (expanded, _) = expand_let_ast(args)?;
+                return self.matrix_shape(&expanded, formula_sheet);
             }
             Ast::Func(Func::Filter | Func::Sort | Func::Unique, args) => {
                 return self.matrix_shape(args.first().ok_or(FormulaError::Value)?, formula_sheet);
+            }
+            Ast::LetSlot { expression, .. } => {
+                return self.matrix_shape(expression, formula_sheet);
+            }
+            Ast::Array { cols, values } => {
+                let cols = *cols as usize;
+                let rows = values.len() / cols;
+                return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
             Ast::Func(Func::Transpose, args) => {
                 let (rows, cols, cells) =
@@ -389,7 +617,8 @@ impl CellStore {
         let include =
             self.eval_array_matrix_arg(&args[1], sheet, affected, memo, visiting, depth + 1)?;
         array.validate_copies(2)?;
-        debug_assert_eq!(array.values.len(), array_cells);
+        // Value-dependent arrays can shrink from their static shape bound.
+        debug_assert!(array.values.len() <= array_cells);
 
         let filter_rows = include.rows == array.rows && include.cols == 1;
         let filter_cols = include.rows == 1 && include.cols == array.cols;
@@ -601,41 +830,44 @@ impl CellStore {
         )?;
         debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
 
-        let mut buckets: HashMap<u64, Vec<(usize, usize)>> = HashMap::new();
-        let mut order = Vec::with_capacity(item_count);
+        // Store collision chains in insertion order, without an allocation per hash.
+        let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
+        let mut representatives: Vec<(usize, usize, Option<usize>)> =
+            Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
         for item in 0..item_count {
             let hash = matrix_item_hash(&array, item, by_col);
-            let bucket = buckets.entry(hash).or_default();
+            let mut position = buckets.get(&hash).map(|&(first, _)| first);
             let mut found = None;
-            for (position, (representative, _)) in bucket.iter().enumerate() {
+            while let Some(index) = position {
+                let (representative, _, next) = representatives[index];
                 comparisons = comparisons.checked_add(1).ok_or(FormulaError::Num)?;
                 if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
                     return Err(FormulaError::Num);
                 }
-                if matrix_items_equal(&array, *representative, item, by_col)? {
-                    found = Some(position);
+                if matrix_items_equal(&array, representative, item, by_col)? {
+                    found = Some(index);
                     break;
                 }
+                position = next;
             }
             if let Some(position) = found {
-                bucket[position].1 += 1;
+                representatives[position].1 += 1;
             } else {
-                bucket.push((item, 1));
-                order.push((hash, item));
+                let next = representatives.len();
+                if let Some((_, last)) = buckets.get_mut(&hash) {
+                    representatives[*last].2 = Some(next);
+                    *last = next;
+                } else {
+                    buckets.insert(hash, (next, next));
+                }
+                representatives.push((item, 1, None));
             }
         }
 
-        let retained: Vec<usize> = order
+        let retained: Vec<usize> = representatives
             .into_iter()
-            .filter_map(|(hash, item)| {
-                let count = buckets
-                    .get(&hash)?
-                    .iter()
-                    .find(|(representative, _)| *representative == item)?
-                    .1;
-                (!exactly_once || count == 1).then_some(item)
-            })
+            .filter_map(|(item, count, _)| (!exactly_once || count == 1).then_some(item))
             .collect();
         if retained.is_empty() {
             return Err(FormulaError::Calc);
@@ -1085,6 +1317,23 @@ mod tests {
         );
         assert_close(number(&store, sheet, 1, 5), 20.0);
         assert_close(number(&store, sheet, 0, 7), 21.0);
+    }
+
+    #[test]
+    fn filter_uses_evaluated_unique_shape() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 6);
+        for (row, value) in [1.0, 1.0, 2.0].into_iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_number(sheet, 0, 1, 1.0, 0);
+        store.set_number(sheet, 1, 1, 1.0, 0);
+        store.set_formula(sheet, 0, 3, "=FILTER(UNIQUE(A1:A3),B1:B2)", 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 3), 1.0);
+        assert_close(number(&store, sheet, 1, 3), 2.0);
+        assert_eq!(store.spill_anchor_row(sheet, 1, 3), 0);
+        assert_eq!(store.get_cell(sheet, 2, 3).kind(), KIND_EMPTY);
     }
 
     #[test]

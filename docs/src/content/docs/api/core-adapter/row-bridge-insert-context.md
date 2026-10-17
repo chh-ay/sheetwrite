@@ -8,7 +8,7 @@ description: "Context supplied when a canonical row insertion needs a host ident
 Context supplied when a canonical row insertion needs a host identity.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L15"><code>packages/core/src/row-bridge.ts#L15</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/row-bridge.ts#L16"><code>packages/core/src/row-bridge.ts#L16</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

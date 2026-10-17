@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { validateRenderGateArtifact } from "../src/render-gate.js";
 import {
   type FailedScenario,

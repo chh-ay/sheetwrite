@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { parseTsv, toTsv } from "../src/clipboard.js";
+
 import { ClipboardController, SHEETWRITE_CLIPBOARD_MIME } from "../src/clipboard-controller.js";
+import { parseTsv, toTsv } from "../src/clipboard.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SelectionModel } from "../src/selection.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -41,8 +42,6 @@ describe("clipboard TSV", () => {
     expect(parseTsv(toTsv([[null], [null], [null]]))).toEqual([[""], [""], [""]]);
   });
 });
-
-// ── Rich clipboard (copy/cut/paste/pasteValues) ──────────────────────────────
 
 /**
  * In-memory {@link Store} stand-in exercising exactly the reads the controller

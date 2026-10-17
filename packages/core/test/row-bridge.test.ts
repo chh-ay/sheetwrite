@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { initSheetwrite } from "../src/grid.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellValue } from "../src/types/cell.js";
@@ -43,6 +45,49 @@ beforeAll(async () => {
 });
 
 describe("RowBridge", () => {
+  it("projects revised restores during nested callbacks and after the event lifetime", () => {
+    const workbook: Workbook = {
+      activeSheet: "sheet1",
+      sheets: [
+        {
+          id: "sheet1",
+          name: "Sheet 1",
+          rowCount: 3,
+          columns: [
+            { key: "name", header: "Name", width: 100, type: "text" },
+            { key: "amount", header: "Amount", width: 100, type: "number" },
+          ],
+        },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    const bridge = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+    const range = { sheet: "sheet1", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } };
+    const restore = encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [10] });
+    let retained: ChangeEvent | undefined;
+    let projected: unknown;
+    store.on("change", (change) => {
+      if (change.transaction.patches[0]?.op !== "restoreBlock") return;
+      retained = change;
+      Object.assign(restore, encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [20] }));
+      store.applyTransaction({
+        patches: [{ op: "set", addr: { sheet: "sheet1", row: 2, col: 1 }, value: literal(99) }],
+      });
+      projected = bridge.project(change).deltas[0]?.next;
+    });
+    try {
+      expect(store.applyTransaction({ patches: [restore] }).status).toBe("applied");
+      expect(projected).toEqual([literal(20)]);
+      expect(store.getCell({ sheet: "sheet1", row: 0, col: 1 }).resolved).toBe(10);
+      if (!retained) throw new Error("restore event was not emitted");
+      Object.assign(restore, encodeRestoreBlock(range, { rowCount: 1, colCount: 1, values: [30] }));
+      const delayed = createRowBridge({ columns, defaultRows: rows, getRowId: (row) => row.id });
+      expect(delayed.project(retained).deltas[0]?.next).toEqual([literal(30)]);
+    } finally {
+      store.dispose();
+    }
+  });
+
   it("keeps data-space identities through insert, move, and delete", () => {
     const bridge = createRowBridge({
       columns,
@@ -117,6 +162,157 @@ describe("RowBridge", () => {
     );
     expect(remote.status).toBe("remote");
     expect(remote.deltas).toHaveLength(1);
+  });
+
+  for (const maxRecentTransactions of [1, 8, undefined]) {
+    const echoWindowSize = maxRecentTransactions ?? 8192;
+    for (const identity of ["transaction ID", "operation fingerprint"] as const) {
+      for (const laterTransactions of [echoWindowSize - 1, echoWindowSize]) {
+        it(`recognizes ${identity} echoes at the ${maxRecentTransactions ?? "default"} window boundary (${laterTransactions} later transactions)`, () => {
+          const bridge = createRowBridge({
+            columns,
+            defaultRows: rows,
+            getRowId: (row) => row.id,
+            ...(maxRecentTransactions === undefined ? {} : { maxRecentTransactions }),
+          });
+          const addr = { sheet: "sheet1", row: 0, col: 1 };
+          const operations: DocumentOp[] = [{ op: "set", addr, value: literal(0) }];
+          // Use explicit IDs without epochs so version ordering cannot mask identity eviction.
+          bridge.project(event(operations), undefined, "original");
+          for (let index = 1; index <= laterTransactions; index += 1) {
+            bridge.project(
+              event([{ op: "set", addr, value: literal(index) }]),
+              undefined,
+              `later-${index}`,
+            );
+          }
+          const echoValue = identity === "transaction ID" ? -1 : 0;
+          const echo = bridge.project(
+            event(
+              [{ op: "set", addr, value: literal(echoValue) }],
+              [{ addr, oldValue: literal(laterTransactions), newValue: literal(echoValue) }],
+              "remote",
+            ),
+            undefined,
+            identity === "transaction ID" ? "original" : "server-echo",
+          );
+          if (laterTransactions < echoWindowSize) {
+            expect(echo.status).toBe("duplicate");
+            expect(echo.deltas).toEqual([]);
+          } else {
+            expect(echo.status).toBe("remote");
+            expect(echo.deltas).toEqual([
+              expect.objectContaining({
+                kind: "cell",
+                source: "remote",
+                cell: expect.objectContaining({
+                  rowId: "row-a",
+                  columnKey: "amount",
+                  previous: literal(laterTransactions),
+                  next: literal(echoValue),
+                }),
+              }),
+            ]);
+          }
+        });
+      }
+    }
+  }
+
+  it("refreshes repeated local fingerprints and retains other echoes after consuming one", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      maxRecentTransactions: 3,
+    });
+    const addr = { sheet: "sheet1", row: 0, col: 1 };
+    for (const [index, value] of [0, 1, 0, 2, 3].entries()) {
+      bridge.project(
+        event([{ op: "set", addr, value: literal(value) }]),
+        undefined,
+        `local-${index}`,
+      );
+    }
+    // Consume the middle entry, then fill the free slot without evicting the oldest.
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(2) }], [], "remote")).status,
+    ).toBe("duplicate");
+    bridge.project(event([{ op: "set", addr, value: literal(4) }]), undefined, "local-4-new");
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(0) }], [], "remote")).status,
+    ).toBe("duplicate");
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(4) }], [], "remote")).status,
+    ).toBe("duplicate");
+    for (const value of [5, 6]) {
+      bridge.project(
+        event([{ op: "set", addr, value: literal(value) }]),
+        undefined,
+        `local-${value}-new`,
+      );
+    }
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(3) }], [], "remote")).status,
+    ).toBe("duplicate");
+    expect(
+      bridge.project(event([{ op: "set", addr, value: literal(1) }], [], "remote")).status,
+    ).toBe("remote");
+  });
+
+  it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects an invalid recent transaction limit (%s)",
+    (maxRecentTransactions) => {
+      expect(() =>
+        createRowBridge({
+          columns,
+          defaultRows: rows,
+          getRowId: (row) => row.id,
+          maxRecentTransactions,
+        }),
+      ).toThrow("Sheetwrite: maxRecentTransactions must be a positive safe integer");
+    },
+  );
+
+  it("rejects an inserted identity that already exists and releases it when removed", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      createRowId: () => "generated",
+    });
+    bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 1));
+    expect(bridge.rowIds()).toEqual(["row-a", "generated", "row-b", "row-c"]);
+
+    // The same identity at a different position is still a duplicate.
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 2)),
+    ).toThrow(TypeError);
+
+    bridge.project(
+      event([{ op: "moveRows", sheet: "sheet1", from: 1, count: 1, to: 3 }], [], "local", 3),
+    );
+    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c", "generated"]);
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 0, count: 1 }], [], "local", 4)),
+    ).toThrow(TypeError);
+
+    bridge.project(event([{ op: "removeRows", sheet: "sheet1", at: 3, count: 1 }], [], "local", 5));
+    bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 6));
+    expect(bridge.rowIds()).toEqual(["row-a", "generated", "row-b", "row-c"]);
+  });
+
+  it("rejects an insert that collides with a constructor identity", () => {
+    const bridge = createRowBridge({
+      columns,
+      defaultRows: rows,
+      getRowId: (row) => row.id,
+      createRowId: () => "row-a",
+    });
+    expect(() =>
+      bridge.project(event([{ op: "addRows", sheet: "sheet1", at: 1, count: 1 }], [], "local", 1)),
+    ).toThrow(TypeError);
+    expect(bridge.rowIds()).toEqual(["row-a", "row-b", "row-c"]);
   });
 
   it("captures packed and clear before/after cells only when detailed capture is enabled", () => {

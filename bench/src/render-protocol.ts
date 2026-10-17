@@ -1,3 +1,4 @@
+import { validateEngineVersions } from "./engine-versions.js";
 import type { AggregateSample } from "./stats.js";
 import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 
@@ -50,6 +51,12 @@ export const RENDER_SCENARIOS = [
 export const DIAGNOSTIC_RENDER_SCENARIOS = [
   { id: "formula-dense.paint", group: "formulae" },
   { id: "text-heavy.long-scroll", group: "view-scrolling" },
+  { id: "wrap-heavy.scroll", group: "view-scrolling" },
+  { id: "search-many.scroll", group: "view-scrolling" },
+  { id: "frozen.scroll", group: "view-scrolling" },
+  { id: "hscroll-small", group: "view-scrolling" },
+  { id: "cond-format.scroll", group: "formatting" },
+  { id: "number-format.hscroll", group: "formatting" },
   { id: "scroll-fractional.same-window", group: "view-scrolling" },
   { id: "geometry-unresized.1m", group: "geometry" },
   { id: WINDOW_TRANSFER_BASELINE_SCENARIO_ID, group: "view-scrolling" },
@@ -747,6 +754,7 @@ function parseLaunchAttempt(value: unknown, path: string): BrowserLaunchAttempt 
 function parseMetadata(value: unknown, path: string): RenderRunMetadata {
   const input = record(value, path);
   const engineVersions = record(input.engineVersions, `${path}.engineVersions`);
+  validateEngineVersions(engineVersions, ENGINE_IDS);
   const hashes = record(input.datasetHashes, `${path}.datasetHashes`);
   const viewport = record(input.viewport, `${path}.viewport`);
   const engineOrder = array(input.engineOrder, `${path}.engineOrder`).map((entry, round) =>

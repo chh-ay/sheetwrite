@@ -1,4 +1,5 @@
 import type { SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
 import type {
   DataSource,
@@ -17,6 +18,7 @@ export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 const DATASOURCE_NO_PROGRESS_RETRIES = 1;
 const ESTIMATED_CELL_BYTES = 16;
 const LOGICAL_FRAME_MS = 16.7;
+const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
 let datasourceClockForTest: (() => number) | undefined;
 
@@ -80,11 +82,13 @@ class SparseIntervals {
   atOrAfter(row: number): RowBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
@@ -102,51 +106,63 @@ class SparseIntervals {
   intersections(start: number, end: number): RowBand[] {
     const result: RowBand[] = [];
     let band = this.atOrAfter(start);
+
     while (band && band.start < end) {
       result.push({ start: Math.max(start, band.start), end: Math.min(end, band.end) });
       band = this.atOrAfter(band.end);
     }
+
     return result;
   }
 
   add(start: number, end: number): void {
     if (start >= end) return;
+
     let index = 0;
     while (index < this.bands.length && this.bands[index]!.end < start) index += 1;
+
     let nextStart = start;
     let nextEnd = end;
     const first = index;
+
     while (index < this.bands.length && this.bands[index]!.start <= nextEnd) {
       const band = this.bands[index]!;
       nextStart = Math.min(nextStart, band.start);
       nextEnd = Math.max(nextEnd, band.end);
       index += 1;
     }
+
     this.bands.splice(first, index - first, { start: nextStart, end: nextEnd });
   }
 
   remove(start: number, end: number): void {
     if (start >= end) return;
+
     const next: RowBand[] = [];
+
     for (const band of this.bands) {
       if (band.end <= start || band.start >= end) {
         next.push(band);
         continue;
       }
+
       if (band.start < start) next.push({ start: band.start, end: start });
       if (band.end > end) next.push({ start: end, end: band.end });
     }
+
     this.bands.splice(0, this.bands.length, ...next);
   }
 
   forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         visit(cursor, end);
         return;
       }
+
       if (band.start > cursor) visit(cursor, Math.min(end, band.start));
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -178,12 +194,15 @@ class SparseColumnIntervals {
 
   add(columns: readonly number[], start: number, end: number): void {
     if (start >= end) return;
+
     for (const column of columns) {
       let rows = this.columns.get(column);
+
       if (!rows) {
         rows = new SparseIntervals();
         this.columns.set(column, rows);
       }
+
       rows.add(start, end);
     }
   }
@@ -209,13 +228,18 @@ class SparseColumnIntervals {
   firstRectangle(): { start: number; end: number; columns: number[] } | null {
     const firstColumn = [...this.columns.keys()].sort((a, b) => a - b)[0];
     if (firstColumn === undefined) return null;
+
     const band = this.columns.get(firstColumn)!.first();
     if (!band) return null;
+
     const columns: number[] = [];
+
     for (const [column, rows] of this.columns) {
       if (rows.covers(band.start, band.end)) columns.push(column);
     }
+
     columns.sort((a, b) => a - b);
+
     return { start: band.start, end: band.end, columns };
   }
 }
@@ -234,11 +258,13 @@ class SparseOwnerIntervals {
   atOrAfter(row: number): OwnerBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
@@ -250,11 +276,13 @@ class SparseOwnerIntervals {
   forEachGap(start: number, end: number, visit: (start: number, end: number) => void): void {
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         visit(cursor, end);
         return;
       }
+
       if (band.start > cursor) visit(cursor, Math.min(end, band.start));
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -270,6 +298,7 @@ class SparseOwnerIntervals {
     if ((previous && previous.end > start) || (next && next.start < end)) {
       throw new Error("Overlapping datasource request ownership");
     }
+
     this.bands.splice(insertAt, 0, { start, end, owner });
   }
 
@@ -305,10 +334,12 @@ class SparseColumnOwners {
   add(columns: readonly number[], start: number, end: number, owner: number): void {
     for (const column of columns) {
       let rows = this.columns.get(column);
+
       if (!rows) {
         rows = new SparseOwnerIntervals();
         this.columns.set(column, rows);
       }
+
       rows.add(start, end, owner);
     }
   }
@@ -317,6 +348,7 @@ class SparseColumnOwners {
     for (const column of columns) {
       const rows = this.columns.get(column);
       if (!rows) continue;
+
       rows.removeOwner(owner);
       if (rows.bandCount === 0) this.columns.delete(column);
     }
@@ -352,23 +384,28 @@ class SparseVisibleWaits {
   atOrAfter(row: number): VisibleWaitBand | undefined {
     let low = 0;
     let high = this.bands.length;
+
     while (low < high) {
       const middle = (low + high) >>> 1;
       if (this.bands[middle]!.end <= row) low = middle + 1;
       else high = middle;
     }
+
     return this.bands[low];
   }
 
   addMissing(start: number, end: number, startedAt: number): void {
     if (start >= end) return;
+
     let cursor = start;
     let band = this.atOrAfter(start);
+
     while (cursor < end) {
       if (!band || band.start >= end) {
         this.insert(cursor, end, startedAt);
         return;
       }
+
       if (band.start > cursor) this.insert(cursor, Math.min(end, band.start), startedAt);
       cursor = Math.max(cursor, band.end);
       band = this.atOrAfter(cursor);
@@ -377,23 +414,29 @@ class SparseVisibleWaits {
 
   discard(start: number, end: number): void {
     if (start >= end) return;
+
     const next: VisibleWaitBand[] = [];
+
     for (const band of this.bands) {
       if (band.end <= start || band.start >= end) {
         next.push(band);
         continue;
       }
+
       if (band.start < start) next.push({ ...band, end: start });
       if (band.end > end) next.push({ ...band, start: end });
     }
+
     this.bands.splice(0, this.bands.length, ...next);
   }
 
   complete(start: number, end: number, completedAt: number): VisibleWaitSample[] {
     const samples: VisibleWaitSample[] = [];
+
     for (const band of this.bands) {
       const overlapStart = Math.max(start, band.start);
       const overlapEnd = Math.min(end, band.end);
+
       if (overlapStart < overlapEnd) {
         samples.push({
           duration: Math.max(0, completedAt - band.startedAt),
@@ -401,7 +444,9 @@ class SparseVisibleWaits {
         });
       }
     }
+
     this.discard(start, end);
+
     return samples;
   }
 
@@ -420,6 +465,7 @@ class SparseColumnVisibleWaits {
     for (const waits of this.columns.values()) count += waits.bandCount;
     return count;
   }
+
   get columnCount(): number {
     return this.columns.size;
   }
@@ -442,11 +488,13 @@ class SparseColumnVisibleWaits {
 
   retain(columns: readonly number[], start: number, end: number, owners: SparseColumnOwners): void {
     const retained = new Set(columns);
+
     for (const [column, waits] of this.columns) {
       if (!retained.has(column)) {
         this.columns.delete(column);
         continue;
       }
+
       const owned = owners.rows(column);
       if (owned) {
         owned.forEachGap(0, start, (gapStart, gapEnd) => waits.discard(gapStart, gapEnd));
@@ -457,17 +505,20 @@ class SparseColumnVisibleWaits {
         waits.discard(0, start);
         waits.discard(end, Number.MAX_SAFE_INTEGER);
       }
+
       if (waits.bandCount === 0) this.columns.delete(column);
     }
   }
 
   addMissing(column: number, start: number, end: number, startedAt: number): void {
     if (start >= end) return;
+
     let waits = this.columns.get(column);
     if (!waits) {
       waits = new SparseVisibleWaits();
       this.columns.set(column, waits);
     }
+
     waits.addMissing(start, end, startedAt);
   }
 
@@ -475,10 +526,12 @@ class SparseColumnVisibleWaits {
     for (const column of columns) {
       const waits = this.columns.get(column);
       if (!waits) continue;
+
       waits.discard(start, end);
       if (waits.bandCount === 0) this.columns.delete(column);
     }
   }
+
   complete(
     columns: readonly number[],
     start: number,
@@ -486,12 +539,15 @@ class SparseColumnVisibleWaits {
     completedAt: number,
   ): VisibleWaitSample[] {
     const samples: VisibleWaitSample[] = [];
+
     for (const column of columns) {
       const waits = this.columns.get(column);
       if (!waits) continue;
+
       samples.push(...waits.complete(start, end, completedAt));
       if (waits.bandCount === 0) this.columns.delete(column);
     }
+
     return samples;
   }
 }
@@ -510,6 +566,8 @@ interface PendingDemand extends RowBand {
   readonly direction: -1 | 0 | 1;
   readonly viewportOrigin: boolean;
   readonly durableOrigin: boolean;
+  /** Off-viewport cells that formulas in the viewport read. */
+  readonly formulaReadOrigin: boolean;
   readonly attempt: number;
 }
 
@@ -524,6 +582,7 @@ interface ActiveRequest extends RowBand {
   readonly releaseRevision: () => void;
   readonly speculativeOrigin: boolean;
   readonly viewportOrigin: boolean;
+  readonly formulaReadOrigin: boolean;
   durableDemand: boolean;
   priority: RequestPriority;
   direction: -1 | 0 | 1;
@@ -679,6 +738,7 @@ export class DatasourceController {
   private readonly requests = new Set<ActiveRequest>();
   private readonly durableDemand = new SparseColumnIntervals();
   private viewportDemand: PendingDemand | null = null;
+  private formulaReadDemand: PendingDemand[] = [];
   private speculativeDemand: PendingDemand[] = [];
   private retryDemand: PendingDemand[] = [];
   private drainingDemand = false;
@@ -710,24 +770,42 @@ export class DatasourceController {
   /** Requests demand-critical rows for exact canonical physical column indices. */
   ensureLoaded(start: number, end: number, indices: readonly number[]): void {
     if (!this.options.datasource || !this.options.loadable || this.destroyed) return;
+
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) return;
+
     const columns = this.requestColumns(indices);
     if (columns.length === 0) return;
+
     this.durableDemand.add(columns, bounds.start, bounds.end);
     this.drainDemand();
   }
 
-  /** Records the viewport, starts visible work, then bounded row-direction speculation. */
-  updateViewport(start: number, end: number, indices: readonly number[]): void {
+  /**
+   * Records the viewport, starts visible work and the off-viewport cells its
+   * formulas read, then bounded row-direction speculation.
+   */
+  updateViewport(
+    start: number,
+    end: number,
+    indices: readonly number[],
+    formulaBands: Uint32Array = EMPTY_FORMULA_BANDS,
+  ): void {
     if (this.destroyed) return;
+
     const bounds = normalizeBounds(start, end, this.rowCount);
     if (bounds.start === bounds.end || indices.length === 0) {
       this.viewportDemand = null;
+      this.formulaReadDemand =
+        this.options.datasource && this.options.loadable
+          ? this.formulaReadDemands(formulaBands)
+          : [];
       this.speculativeDemand.length = 0;
       this.visibleWaitStarted.clear();
+      this.drainDemand();
       return;
     }
+
     const columns = this.requestColumns(indices);
     if (columns.length === 0) return;
 
@@ -738,11 +816,15 @@ export class DatasourceController {
     const delta = previous ? bounds.start - previous.start : 0;
     const movementDirection: -1 | 0 | 1 = delta === 0 ? 0 : delta > 0 ? 1 : -1;
     const elapsed = previous ? Math.max(0, now - previous.at) : 0;
+
     if (elapsed > 0 && movementDirection !== 0) this.velocityRowsPerMs = delta / elapsed;
+
     const reversal =
       movementDirection !== 0 && this.direction !== 0 && movementDirection !== this.direction;
     const jump = previous !== null && Math.abs(delta) > Math.max(visibleRows, previousRows) * 2;
+
     if (movementDirection !== 0) this.direction = movementDirection;
+
     const effectiveDirection: -1 | 1 = this.direction === 0 ? 1 : this.direction;
 
     const speculative = this.speculativeIntervals(
@@ -752,18 +834,24 @@ export class DatasourceController {
       visibleRows,
       columns.length,
     );
+
     this.lastViewport = { ...bounds, columns, at: now };
+    const formulaReads = this.formulaReadDemands(formulaBands);
+
     this.cancelObsoleteSpeculation(
       { ...bounds, columns },
       speculative,
+      formulaReads,
       jump ? "jump" : reversal ? "reversal" : "obsolete",
       reversal || jump,
     );
 
     this.refreshPagedResidency(this.options.loadable, bounds.start, bounds.end, columns);
     this.visibleWaitStarted.retain(columns, bounds.start, bounds.end, this.owners);
+
     for (const column of columns) {
       const resident = this.loaded.rows(column);
+
       if (!resident) {
         this.visibleWaitStarted.addMissing(column, bounds.start, bounds.end, now);
       } else {
@@ -772,6 +860,7 @@ export class DatasourceController {
         });
       }
     }
+
     const fullyResident = this.loaded.covers(bounds.start, bounds.end, columns);
     this.telemetry.measuredFrames += 1;
     if (fullyResident) this.telemetry.residentFrames += 1;
@@ -784,12 +873,15 @@ export class DatasourceController {
         direction: 0,
         viewportOrigin: true,
         durableOrigin: false,
+        formulaReadOrigin: false,
         attempt: 0,
       };
+      this.formulaReadDemand = formulaReads;
       this.setSpeculativeDemand(speculative, visibleRows, effectiveDirection, columns);
       this.drainDemand();
     } else {
       this.viewportDemand = null;
+      this.formulaReadDemand.length = 0;
       this.speculativeDemand.length = 0;
     }
   }
@@ -798,23 +890,29 @@ export class DatasourceController {
     const waits = [...this.visibleWaitDurations].sort((a, b) => a.duration - b.duration);
     let visibleWaitSamples = 0;
     for (const wait of waits) visibleWaitSamples += wait.rows;
+
     const p95Rank = Math.max(1, Math.ceil(visibleWaitSamples * 0.95));
     let p95VisibleWaitMs = 0;
     let rankedRows = 0;
+
     for (const wait of waits) {
       rankedRows += wait.rows;
       if (rankedRows < p95Rank) continue;
+
       p95VisibleWaitMs = wait.duration;
       break;
     }
 
     const speculativeRows = new SparseIntervals();
     let activeSpeculativeRequests = 0;
+
     for (const request of this.requests) {
       if (!request.speculativeOrigin) continue;
+
       activeSpeculativeRequests += 1;
       speculativeRows.add(request.start, request.end);
     }
+
     const loadable = this.options.loadable;
     const sheet = this.options.activeSheet();
     const cache = loadable?.isPaged(sheet) ? loadable.getPagedStats(sheet) : null;
@@ -861,6 +959,7 @@ export class DatasourceController {
     const queuedDemandEntries =
       this.durableDemand.bandCount +
       (this.viewportDemand?.columns.length ?? 0) +
+      this.formulaReadDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
       this.speculativeDemand.reduce((sum, demand) => sum + demand.columns.length, 0) +
       this.retryDemand.reduce((sum, demand) => sum + demand.columns.length, 0);
     const tileEntries =
@@ -868,13 +967,16 @@ export class DatasourceController {
     const tileColumns =
       this.loaded.columnCount + this.owners.columnCount + this.visibleWaitStarted.columnCount;
     const tileBytes = tileEntries * 32 + tileColumns * 48;
+
     let pendingRequestBytes = 0;
+
     for (const request of this.requests) {
       pendingRequestBytes +=
         192 +
         request.columns.length * 8 +
         request.bands.reduce((bytes, band) => bytes + 32 + band.keys.length * 8, 0);
     }
+
     const requestIndexBytes = this.activeIds.size * 48;
     const queuedDemandBytes = queuedDemandEntries * 40;
     const waitSampleBytes = this.visibleWaitDurations.length * 16;
@@ -885,6 +987,7 @@ export class DatasourceController {
       (this.schemaCache?.keys.length ?? 0) * 8 +
       (this.schemaCache?.allIndices?.length ?? 0) * 8 +
       (this.schemaCache?.singletonIndices.size ?? 0) * 16;
+
     return [
       {
         owner: "js.datasource.tile-state",
@@ -948,6 +1051,7 @@ export class DatasourceController {
     this.generation += 1;
     this.durableDemand.clear();
     this.viewportDemand = null;
+    this.formulaReadDemand.length = 0;
     this.speculativeDemand.length = 0;
     this.retryDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "reset");
@@ -968,6 +1072,7 @@ export class DatasourceController {
     this.generation += 1;
     this.durableDemand.clear();
     this.viewportDemand = null;
+    this.formulaReadDemand.length = 0;
     this.speculativeDemand.length = 0;
     this.retryDemand.length = 0;
     for (const request of [...this.requests]) this.abortRequest(request, "destroy");
@@ -1033,15 +1138,7 @@ export class DatasourceController {
       if (datasource.capabilities?.protocol !== 2) {
         throw new RangeError("Datasource must declare protocol 2 capabilities");
       }
-      if (datasource.capabilities.columns === "full-width") {
-        // Full-width compatibility shares this engine but is horizontally non-scalable.
-        if (!schema.allIndices) {
-          schema.allIndices = Object.freeze(
-            Array.from({ length: schema.keys.length }, (_, index) => index),
-          );
-        }
-        return schema.allIndices;
-      }
+      if (datasource.capabilities.columns === "full-width") return this.allColumns(schema);
       if (datasource.capabilities.columns !== "windowed") {
         throw new RangeError("Datasource column capability must be windowed or full-width");
       }
@@ -1057,6 +1154,64 @@ export class DatasourceController {
     const stable = Object.freeze(normalized);
     this.lastCanonicalColumns = stable;
     return stable;
+  }
+
+  /** Full-width compatibility shares this engine but is horizontally non-scalable. */
+  private allColumns(schema: SchemaSnapshot): readonly number[] {
+    if (!schema.allIndices) {
+      schema.allIndices = Object.freeze(
+        Array.from({ length: schema.keys.length }, (_, index) => index),
+      );
+    }
+    return schema.allIndices;
+  }
+
+  /**
+   * Off-viewport formula inputs and spill destinations required for calculation.
+   * Spill admission needs known-empty source cells as well as loaded inputs;
+   * neither prerequisite is necessarily covered by the viewport request.
+   */
+  private formulaReadDemands(bands: Uint32Array): PendingDemand[] {
+    if (bands.length === 0) return [];
+    const datasource = this.options.datasource;
+    const schema = this.schema();
+    const demands: PendingDemand[] = [];
+    for (let index = 0; index < bands.length; index += 4) {
+      const rowStart = bands[index];
+      const rowEnd = bands[index + 1];
+      const columnStart = bands[index + 2];
+      const columnEnd = bands[index + 3];
+      if (
+        rowStart === undefined ||
+        rowEnd === undefined ||
+        columnStart === undefined ||
+        columnEnd === undefined
+      ) {
+        throw new Error("Sheetwrite: formula read bands are not a quad sequence");
+      }
+      const rows = normalizeBounds(rowStart, rowEnd, this.rowCount);
+      const schemaColumnEnd = Math.min(columnEnd, schema.keys.length);
+      if (rows.start === rows.end || columnStart >= schemaColumnEnd) continue;
+      demands.push({
+        ...rows,
+        columns:
+          datasource?.capabilities.columns === "full-width"
+            ? this.allColumns(schema)
+            : Object.freeze(
+                Array.from(
+                  { length: schemaColumnEnd - columnStart },
+                  (_, offset) => columnStart + offset,
+                ),
+              ),
+        priority: "visible",
+        direction: 0,
+        viewportOrigin: false,
+        durableOrigin: false,
+        formulaReadOrigin: true,
+        attempt: 0,
+      });
+    }
+    return demands;
   }
 
   private canonicalBands(
@@ -1116,6 +1271,7 @@ export class DatasourceController {
             direction,
             viewportOrigin: false,
             durableOrigin: false,
+            formulaReadOrigin: false,
             attempt: 0,
           });
         }
@@ -1129,6 +1285,7 @@ export class DatasourceController {
             direction,
             viewportOrigin: false,
             durableOrigin: false,
+            formulaReadOrigin: false,
             attempt: 0,
           });
         }
@@ -1164,10 +1321,18 @@ export class DatasourceController {
             direction: 0,
             viewportOrigin: false,
             durableOrigin: true,
+            formulaReadOrigin: false,
             attempt: 0,
           };
           if (!this.dispatchRange(datasource, loadable, demand)) return;
           this.durableDemand.remove(durable.columns, durable.start, durable.end);
+          continue;
+        }
+
+        const formulaRead = this.formulaReadDemand[0];
+        if (formulaRead) {
+          if (!this.dispatchRange(datasource, loadable, formulaRead)) return;
+          this.formulaReadDemand.shift();
           continue;
         }
 
@@ -1233,18 +1398,7 @@ export class DatasourceController {
         const requestColumns = demand.columns.filter((candidate) =>
           this.tileUncovered(candidate, row, requestEnd),
         );
-        this.requestBand(
-          datasource,
-          loadable,
-          row,
-          requestEnd,
-          requestColumns,
-          demand.priority,
-          demand.direction,
-          demand.viewportOrigin,
-          demand.durableOrigin,
-          demand.attempt,
-        );
+        this.requestBand(datasource, loadable, demand, row, requestEnd, requestColumns);
         row = requestEnd;
       }
     }
@@ -1275,16 +1429,14 @@ export class DatasourceController {
   private requestBand(
     datasource: DataSource,
     loadable: SheetwriteStore,
+    demand: PendingDemand,
     start: number,
     end: number,
     columns: readonly number[],
-    priority: RequestPriority,
-    direction: -1 | 0 | 1,
-    viewportOrigin: boolean,
-    durableOrigin: boolean,
-    attempt: number,
   ): void {
     if (columns.length === 0 || start >= end) return;
+    const { priority, direction, viewportOrigin, durableOrigin, formulaReadOrigin, attempt } =
+      demand;
     const schema = this.schema();
     const bands = this.canonicalBands(columns, schema);
     const id = this.allocateRequestId();
@@ -1305,6 +1457,7 @@ export class DatasourceController {
       releaseRevision: this.options.retainRevision(revision),
       speculativeOrigin: priority === "speculative",
       viewportOrigin,
+      formulaReadOrigin,
       durableDemand: durableOrigin,
       priority,
       direction,
@@ -1313,6 +1466,7 @@ export class DatasourceController {
     };
     this.activeIds.set(id, activeRequest);
     this.requests.add(activeRequest);
+    storeEngine(loadable)?.beginPageRequest();
 
     const requestedRows = end - start;
     this.telemetry.requests += 1;
@@ -1499,6 +1653,7 @@ export class DatasourceController {
       direction: request.direction,
       viewportOrigin: request.viewportOrigin,
       durableOrigin: request.durableDemand,
+      formulaReadOrigin: request.formulaReadOrigin,
       attempt,
     });
   }
@@ -1573,6 +1728,15 @@ export class DatasourceController {
     return Math.max(0, this.speculativeRowHorizon(columnCount) - active.length);
   }
 
+  /**
+   * Align the known loaded bands with what the paged store actually holds.
+   *
+   * A row band the store holds in full is added outright. Otherwise one span
+   * call per column returns the loaded runs, and every band row outside a run is
+   * dropped — one call per column instead of a call per probed row band. A store
+   * that exposes no engine (a stand-in implementing the public surface only)
+   * keeps the row-band probe.
+   */
   private refreshPagedResidency(
     loadable: SheetwriteStore | null,
     start: number,
@@ -1586,51 +1750,93 @@ export class DatasourceController {
       this.loaded.add(columns, start, end);
       return;
     }
-    const schema = this.schema();
+    const engine = storeEngine(loadable);
     for (const column of columns) {
       const resident = this.loaded.rows(column);
       if (!resident) continue;
-      let singleton = schema.singletonIndices.get(column);
-      if (!singleton) {
-        singleton = Object.freeze([column]);
-        schema.singletonIndices.set(column, singleton);
-      }
+      const spans = engine?.loadedSpans(sheet, start, end, column);
       for (const band of resident.intersections(start, end)) {
-        this.reconcileLoadedResidency(loadable, sheet, singleton, band.start, band.end);
+        if (spans === undefined)
+          this.probeLoadedResidency(loadable, sheet, column, band.start, band.end);
+        else this.retainLoadedRuns(column, band.start, band.end, spans);
       }
     }
   }
 
-  private reconcileLoadedResidency(
+  /**
+   * Drop the rows of `[start, end)` the store does not hold, by asking it about
+   * one row band at a time. Used when no engine is registered.
+   */
+  private probeLoadedResidency(
     loadable: SheetwriteStore,
     sheet: SheetId,
-    columns: readonly number[],
+    column: number,
     start: number,
     end: number,
   ): void {
-    if (loadable.areColumnsFullyLoaded(sheet, start, end, columns)) return;
+    if (loadable.areColumnsFullyLoaded(sheet, start, end, this.singletonColumns(column))) return;
     if (end - start === 1) {
-      this.loaded.removeColumn(columns[0]!, start, end);
+      this.loaded.removeColumn(column, start, end);
       return;
     }
     const middle = start + Math.floor((end - start) / 2);
-    this.reconcileLoadedResidency(loadable, sheet, columns, start, middle);
-    this.reconcileLoadedResidency(loadable, sheet, columns, middle, end);
+    this.probeLoadedResidency(loadable, sheet, column, start, middle);
+    this.probeLoadedResidency(loadable, sheet, column, middle, end);
+  }
+
+  private singletonColumns(column: number): readonly number[] {
+    const schema = this.schema();
+    let singleton = schema.singletonIndices.get(column);
+    if (!singleton) {
+      singleton = Object.freeze([column]);
+      schema.singletonIndices.set(column, singleton);
+    }
+    return singleton;
+  }
+
+  /** Drop every row of `[start, end)` that the ascending `spans` pairs miss. */
+  private retainLoadedRuns(column: number, start: number, end: number, spans: Uint32Array): void {
+    let cursor = start;
+    for (let index = 0; index < spans.length; index += 2) {
+      const spanStart = spans[index];
+      const spanEnd = spans[index + 1];
+      if (spanStart === undefined || spanEnd === undefined) {
+        throw new Error("Sheetwrite: loaded row spans are not a pair sequence");
+      }
+      if (spanEnd <= cursor) continue;
+      if (spanStart >= end) break;
+      if (spanStart > cursor) this.loaded.removeColumn(column, cursor, Math.min(spanStart, end));
+      cursor = Math.min(spanEnd, end);
+      if (cursor >= end) return;
+    }
+    if (cursor < end) this.loaded.removeColumn(column, cursor, end);
   }
 
   private cancelObsoleteSpeculation(
     viewport: RowBand & { columns: readonly number[] },
     intervals: readonly RowBand[],
+    formulaReads: readonly PendingDemand[],
     reason: "obsolete" | "reversal" | "jump",
     cancelGeneration: boolean,
   ): void {
     this.retryDemand = this.retryDemand.filter(
       (demand) =>
         demand.durableOrigin ||
+        (demand.formulaReadOrigin &&
+          formulaReads.some(
+            (read) => rowsIntersect(demand, read) && columnsIntersect(demand.columns, read.columns),
+          )) ||
         (rowsIntersect(demand, viewport) && columnsSubset(demand.columns, viewport.columns)),
     );
     for (const request of [...this.requests]) {
       if (request.durableDemand) continue;
+      if (request.formulaReadOrigin) {
+        const stillRead = formulaReads.some(
+          (read) => rowsIntersect(request, read) && columnsIntersect(request.columns, read.columns),
+        );
+        if (!stillRead) this.abortRequest(request, reason);
+        continue;
+      }
       const intersectsViewport =
         rowsIntersect(request, viewport) && columnsSubset(request.columns, viewport.columns);
       if (request.speculativeOrigin) {
@@ -1680,6 +1886,7 @@ export class DatasourceController {
     request.released = true;
     this.requests.delete(request);
     this.activeIds.delete(request.id);
+    if (this.options.loadable) storeEngine(this.options.loadable)?.endPageRequest();
     request.releaseRevision();
   }
 

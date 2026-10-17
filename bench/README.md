@@ -6,6 +6,8 @@ canvas-rendered grid over a Rust→WASM columnar store) and **Handsontable**
 a grid feels at scale: load, read, edit, sort, filter, aggregate, scroll, and
 navigate.
 
+Release captures always measure the latest released version of each comparison engine; artifacts record the exact installed versions (and the XLSX baseline commit) measured.
+
 Two benchmarks, run independently:
 
 | Benchmark | Where | What it answers |
@@ -20,6 +22,85 @@ virtualize without a browser layout engine**. Headless (happy-dom) it renders
 browser. The data-layer bench therefore runs Handsontable only where it
 completes headlessly (1k/10k) and pushes Sheetwrite to 1M to show its scaling;
 the browser bench carries the at-scale head-to-head.
+
+The formula benchmark also exposes `bun run bench:formula --grid-constant-edit`.
+It loads 100,000 formulas and measures single-cell `SheetwriteStore.applyTransaction`
+edits, the same source-replacement path that Grid uses. The edit alternates two
+constants, checks the computed value after each edit, and reports ten samples
+after two warmups. The scalar `formula-constant-edit` workload remains available
+through `--sample formula-constant-edit 100000` for comparison.
+
+### Engine memory-release gate
+
+From the repository root, run `bun bench/src/engine-memory-release-bench.ts --compare <detached-base-worktree> --engine wasm --output <artifact.json>` under the machine's benchmark runner. Repeat with `--engine formulas`, keeping one CPU slot for all rounds. Both worktrees need release-built engines.
+
+The harness discards forty warmups and records twenty-one samples for edit, read, ingest, and recalculation. Each sample covers 1,024 edits, 2,048 scrolling windows, one 100,000-row ingest, or 32 recalculations, respectively, so JSC tier-up and finalizer scheduling do not dominate a short batch. It runs three A/A controls, then five alternating ABBA/BAAB rounds; the artifact retains every sample, per-round medians, the A/A noise band, and the median-of-round-medians verdict. Ordinary paths may not exceed a 3% slowdown beyond the measured A/A spread. Use `--metric read` with Bun's `--cpu-prof` to isolate read-loop profiles on either worktree.
+
+Use `--mode memory --engine wasm --output <artifact.json>` (and `formulas`) for million-row dense-clear, paged dirty-edit, and large-clear history scenarios. It checks preserved values, undo/redo, no history materialization during migration, a cleared WeakRef to the retired memory, and lower committed WASM/process memory. JavaScript heap is JSC's non-external heap (`heapSize - extraMemorySize`); external accounting is retained separately because JSC counts WASM/ArrayBuffer backing allocations there. Process memory is RSS after five full-GC/event-loop turns, not an estimate from that external counter.
+
+The ordinary-path captures below compare `5a16a55` with the memory-release stack on Bun 1.4.3, using runner slot 4. The read profiles and longer warmed batches are retained in `results/engine-memory-release-{read-profiles,paths-wasm,paths-formulas}.json`. The memory observations below use the formula/spill overlay transfer on Bun 1.4.3 and runner slot 8.
+
+Memory observations below are MiB before → after, after five GC/event-loop turns. Empty-dense is a new million-row, three-column dense store with no data. Dense-clear keeps ten populated rows of the same store. Paged-dirty has a million logical rows, a transient 200,000-row page load under a 64 KiB clean-cache budget, and two dirty edits. Large-clear-history keeps the compact inverse of a three-column million-row clear. The fresh floor is the WASM memory of a store newly built with the same surviving content and row count, plus the compact history bytes. The scenarios run in sequence in one engine.
+
+| Engine | Scenario | WASM MiB | Fresh floor MiB | Non-external JS heap MiB | Process RSS MiB | Pause ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | empty-dense | 38.44 → 38.44 | 38.44 | 5.61 → 5.62 | 111.01 → 109.31 | 47.39 |
+| wasm | dense-clear | 101.06 → 38.44 | 38.44 | 5.63 → 5.64 | 180.89 → 118.54 | 43.34 |
+| wasm | paged-dirty | 38.44 → 1.19 | 1.19 | 5.65 → 5.66 | 136.68 → 82.93 | 3.73 |
+| wasm | large-clear-history | 101.12 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.81 → 7.83 | 197.33 → 160.97 | 223.57 |
+| formulas | empty-dense | 38.44 → 38.44 | 38.44 | 5.68 → 5.69 | 109.84 → 109.77 | 45.38 |
+| formulas | dense-clear | 101.06 → 38.44 | 38.44 | 5.71 → 5.72 | 178.77 → 116.39 | 42.98 |
+| formulas | paged-dirty | 38.44 → 1.19 | 1.19 | 5.72 → 5.73 | 134.92 → 81.89 | 3.22 |
+| formulas | large-clear-history | 101.12 → 75.75 | 75.75 (38.56 + 37.19 history) | 7.89 → 7.90 | 197.34 → 162.70 | 251.62 |
+
+Release never grows the WASM memory, and every scenario lands on its fresh floor. The transfer is sized by content, not row count: runs of empty or default values are encoded as runs, and the new instance decodes from a JavaScript buffer through a bounded 64 KiB reader straight into its final vectors, so no full transfer image stays in its heap. All eight retired-memory WeakRefs cleared. Raw bytes and pause measurements are in `results/engine-memory-release-memory-{wasm,formulas}.json`. These local captures are not portable memory ceilings.
+
+| Engine | Baseline raw B | Changed raw B | Baseline Brotli B | Changed Brotli B | Brotli increase B |
+| --- | --- | --- | --- | --- | --- |
+| wasm | 848920 | 868980 | 250156 | 253254 | 3098 |
+| formulas | 1131855 | 1152337 | 338151 | 341843 | 3692 |
+
+Brotli uses quality 11; the size baseline is stack top `89222d66` (#102), rebuilt with the same toolchain. Exact byte counts are retained in `results/formula-spill-transfer-sizes.json`. Dense calculated overlays encode absent slots as runs; paged overlays transfer only occupied slots, including their compact error codes. Core boot creates only its collectible instance. The published synchronous exports initialize once, on first use, from the module that instance compiled, and the first instance marks the published loader ready. A fresh-process regression counts real instances to guard against a second eager boot instance.
+
+Ordinary-path verdicts (milliseconds per operation; 3 A/A controls, then 5 ABBA rounds on slot 4; the A/A spread is the maximum absolute paired-control delta):
+
+| Engine | Path | A median ms | B median ms | Delta | A/A spread | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| wasm | edit | 0.0031 | 0.0032 | +3.05% | 12.11% | pass |
+| wasm | scroll/read | 0.0059 | 0.0059 | +0.64% | 1.19% | pass |
+| wasm | ingest | 33.108 | 33.337 | +0.69% | 1.39% | pass |
+| wasm | recalculation | 0.6959 | 0.6996 | +0.53% | 2.13% | pass |
+| formulas | edit | 0.0031 | 0.0030 | −1.59% | 5.77% | pass |
+| formulas | scroll/read | 0.0058 | 0.0059 | +1.91% | 5.39% | pass |
+| formulas | ingest | 33.463 | 33.313 | −0.45% | 0.53% | pass |
+| formulas | recalculation | 0.6956 | 0.6941 | −0.22% | 1.25% | pass |
+
+Every path is within the A/A noise plus 3 points; these measurements do not show a speedup. Every unrounded per-round median, raw sample and A/A control is in `results/engine-memory-release-paths-{wasm,formulas}.json`.
+
+The adapter lifetime microbenchmark measures real React, Vue, and Svelte
+mount/unmount and mount/reset/unmount commits, with direct Grid mounting and
+selection controls. Each workload runs in a fresh process to prevent queued
+rendering from contaminating other workloads. Initialization is excluded; each
+workload discards 30 warmup iterations and reports the median of seven
+150-iteration samples in microseconds. Run from the repository root (increase
+`ADAPTER_BENCH_ITERATIONS` to reduce noise, or set `ADAPTER_BENCH_WORKLOAD` to run
+one named workload):
+
+```sh
+/home/vvin/learn/bench-run --slot 4 timeout 1200 bun \
+  --preload ./test-setup.ts --preload ./test-setup-svelte.ts \
+  bench/src/adapter-lifetime-bench.ts
+```
+
+Compare the same harness on both revisions using A/A control captures followed
+by alternating ABBA rounds; compare medians of each round's paired medians.
+Use the same Svelte client-runtime preload in the baseline checkout: a server
+`untrack` implementation changes reactive scheduling and invalidates comparison.
+The recorded gate in `results/adapter-lifetime-gate.json` includes two A/A controls
+and five alternating ABBA rounds on CPU 4. Control medians changed by -0.1% and
+-0.5%; adapter medians improved by 15.8–37.8%. A/A spread reached 16.2%, so these
+captures establish no regression rather than a precise speedup claim.
+
 
 ─────────────────────────────────────────────────────────────────────────────
 
@@ -70,12 +151,110 @@ and preserves all five raw samples plus median/p95 in
 `results/formula-results.json`. Formula memory is the exact WASM linear-memory
 delta from isolated 1K/10K/100K-formula subprocesses.
 
+`bench:formula:engines` runs the same full workload matrix on the default and
+full engines in separate processes. It writes `formula-default-results.json`,
+`formula-full-results.json`, and `full-engine-results.json` under `results/`.
+The last file adds an engine dimension, checked analysis workloads, WASM raw
+and Brotli quality 11 sizes, and five fresh Node initialization samples.
+The shared captures keep the schema-v2 validator and use output mode. Their
+baseline gates stay blocked. These results are local measurements, not a
+passed timing regression gate. The legacy shared source keys name the WASM
+role; their hashes use the selected engine. The outer artifact records the
+physical paths and binds each engine to its captured WASM hash.
+
+Build the packages first. Run one capture at a time from `bench/` on an
+otherwise idle machine, pinned to one CPU. Do not run concurrent builds or
+timing captures: competing work adds scheduler and CPU noise. For example,
+on Linux with CPU 4:
+
+```sh
+taskset -c 4 bun run src/full-engine-bench.ts
+```
+
+`bench:formula:matched` checks the eight shared rows that were slower in the
+first sequential capture. It runs 25 default/full pairs per row (`--rounds`
+changes that count, minimum 2). Each timed sample uses a fresh Bun process,
+runs three untimed warm-up fixtures, then repeats the fixture until at least
+50 ms of measured time and records the per-iteration mean. Repeating a short
+operation is what makes the paired ratio usable: a single cold run of a 2 ms
+workload drifted by more than 4x between fresh processes, while the aggregated
+sample stays inside a few percent. The artifact retains all samples and
+checksums, every sample's iteration count and total, median paired ratios, and
+the p10 to p90 ratio spread; the evidence page marks any row whose spread is
+too wide to support a ratio claim.
+The single-sample runner is
+`bun run src/formula-bench.ts --sample ID SIZE [--aggregate-ms 50] [--warmup-fixtures 3]`.
+It supports the matched workload set. Use the same pinned-runner command as
+above with `src/matched-engine-bench.ts`. `--results-dir <dir>` redirects every
+artifact write of the engine captures, so a rehearsal never overwrites tracked
+evidence.
+
 The suite covers independent parse/load and first recompute, safe-depth linear
 chains, 100K fan-out, diamonds, shared/distinct ranges, cross-sheet ranges,
 scalar edits affecting 0/1/1K/100K formulas, topology removal/addition, cycles,
 removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
+
+A full `bench:formula` capture compares every row with the committed
+`results/formula-results.json` and stops on the first exceedance. For a
+workload whose baseline median is at least 1 ms, the median and p95 may each
+reach `max(baseline × 1.25, baseline + 0.1 ms)`. A workload whose baseline
+median is under 1 ms gates its median only, at
+`max(baseline × 1.25, baseline + 0.3 ms)`. With five samples, p95 is the
+slowest single sample, and below 1 ms it is dominated by GC and timer noise
+(the 0.5.0 A/A study measured a 33–466% spread on those rows). Those medians
+also move with code they do not run: two points of that study with the same
+Rust engine differed by up to 0.29 ms. Retained bytes, peak transient bytes,
+transient allocation counts, and the isolated WASM deltas may not grow at all.
+
+A baseline must itself carry a passed gate, so a regression the maintainer has
+reviewed and accepted cannot be recorded by recapturing the baseline. It is
+recorded in `results/formula-baseline-approvals.json` instead:
+
+```json
+{
+  "baselineCommit": "<meta.commit of formula-results.json>",
+  "baselineSourceDigest": "<source.digest of formula-results.json>",
+  "approvals": [
+    {
+      "workload": "linear-chain",
+      "size": 8,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 9283,
+      "reason": "+4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "field": "memory.10000.wasmDeltaBytes",
+      "maximum": 6291520,
+      "reason": "+524,288 B from the FormulaEntry spill-reference flag (e725d980)"
+    }
+  ]
+}
+```
+
+Use it only for an exceedance that has been measured and explained: a
+deterministic byte cost of a reviewed design, or a timing row whose A/A spread
+on this machine is wider than the gate's tolerance. Every row needs a reason
+that names its measurement; "noise" or "expected" is not a reason. A workload
+row names `workload`, `size`, and one of `median`, `p95` (only where the gate
+checks it), `allocation.retainedBytes.median`, or
+`allocation.retainedBytes.p95`; an aggregate memory row names only
+`memory.<formulas>.wasmDeltaBytes`. Peak transient bytes and transient
+allocation counts cannot be approved. `maximum` is the highest candidate value
+the row may reach: the observed value plus a stated margin, the measured A/A
+spread for timing rows and a small fixed margin for byte rows, which are
+deterministic. A listed row passes at or below its maximum; every other row
+keeps the baseline rule. The gate rejects the file if it has unknown keys,
+duplicate rows, rows missing from the baseline or not checked by it, a blank
+reason, or a maximum that is not a positive number (whole bytes for byte rows).
+
+The file is bound to the baseline it amends. Once `formula-results.json` is
+recaptured, its approvals are stale and the gate rejects them: delete the file
+in the change that records the new baseline, or review every row again against
+it. The passed gate record in `formula-results.json` keeps its exact schema,
+so it does not list the approvals; the committed approval file and its
+`baselineCommit` are the record.
 
 Latest checked capture: `bench:formula:smoke` at
 `2026-07-13T08:56:07Z`, core commit `844da4e`, Bun 1.3.14, linux/x64,
@@ -181,7 +360,96 @@ bun run bench:render:smoke -- --engine handsontable
 
 # Fail-closed schema, completeness, and byte-stable Markdown validation:
 bun run bench:render:validate
+
+# Core write-path evidence (packed block writes, CSV import, large restore,
+# paged residency); writes results/core-paths-results.json
+bun run bench:core-paths
 ```
+
+The evidence page at
+`docs/src/content/docs/guides/performance-resources.md` publishes every
+artifact above. `bench:release` captures render-scale, the interaction
+evidence, paged storage, data, core paths, formula, formula engines, matched
+engines, and XLSX, then records the render regression baseline last. Every
+capture stamps its artifact with the commit, tree state, and timestamp.
+Run unpinned on an otherwise idle machine, with no concurrent builds or timing
+captures. The 0.4.0 and 0.5.0 captures both ran unpinned on the same machine.
+
+```sh
+# Build first: every capture needs the built packages and WASM binaries.
+bun run build:packages
+
+# Then, from bench/, with the prepared XLSX comparison checkout:
+bun run bench:release --xlsx-baseline-root /path/to/sheetwrite-xlsx-baseline
+```
+
+`bench:release` refuses a dirty tree, runs the captures in page order, stops at
+the first failure, and rejects an artifact that does not stamp the current
+clean commit. The XLSX capture compares the current tree against the
+pre-0.5.0 codec, so the run needs a prepared checkout of that commit
+(`git worktree add ../sheetwrite-xlsx-baseline 87fadb72`, then
+`bun install --frozen-lockfile && bun run build:packages` inside it) passed as
+`--xlsx-baseline-root <checkout path>`. `bench:release:smoke`
+rehearses the same order with the smoke
+matrices of the suites that have one, writing to `results/smoke/` (ignored by
+git) so a rehearsal never overwrites published evidence. Regenerate the page
+after a release capture with `bun run docs:generate`.
+
+Render captures retain structured failures, but only Handsontable's million-row
+`altering.insert-5-rows-top` and `altering.remove-5-rows-top` RangeErrors with
+`Maximum call stack size exceeded` are allowed to complete the capture. These
+same comparison-engine overflows occurred in 0.4.0; every other failed cell,
+including every Sheetwrite failure, still fails the run.
+
+The core-paths cold Node metric imports core before timing and measures
+`initSheetwrite()` through construction of the first store, rather than the
+published WASM singleton's `load()`. Core-backed memory probes observe core's
+own engine instance; raw formula-engine probes continue to observe their own
+published singleton.
+
+The performance showcase reads `results/paged-results.json` and
+`results/interaction-results.json`. `bench:paged` writes the paged capture;
+`bench:interaction` measures the current values of the four interaction metrics
+on the current build — packed inverse-index lookup latency, inverse-index
+backing bytes, retained bytes after 100 distant edits, and the cold-route long
+task owned by Sheetwrite — with raw samples, their summary, and the runner.
+Those four metrics are held to the absolute release ceilings recorded in
+`src/interaction-gate.ts`, not to a comparison with another build: the version 1
+artifact was a one-off before/after pair, and a release cannot re-measure a
+baseline build. `bench:release` refreshes both captures, and
+`bench:interaction:smoke` rehearses the interaction one.
+
+`bench:interaction-sessions` supplements that browser capture with synchronous
+Grid-interface timings under happy-dom: row and column resize with twenty move
+events followed by release, editor open/commit, pointer selection, and two
+untouched controls (one hundred cell-input reads and a column aggregate).
+It reports eleven raw samples in milliseconds per operation after three discarded
+warmups. Each sample runs two thousand resize/edit operations, ten thousand
+selection/read operations, or two hundred thousand aggregates. Garbage collection
+and fixture restoration are outside the timed interval; resize includes admission
+and history, but not undo. Longer samples keep sub-millisecond paths from turning
+process startup and scheduling noise into an apparent regression.
+These are imperative-path timings, not browser paint or input-to-frame latency.
+For comparisons, build each checkout's packages first. Run five A/A ABBA control
+rounds with the same baseline in both slots, then five actual ABBA rounds on the
+same CPU under an exclusive lock. Compare medians of the per-round medians and
+retain every raw round. A broad noise band makes a changed-path comparison
+inconclusive; it does not excuse a slower result. Leave fifteen seconds between
+locked commands so other checkouts can acquire the shared lock.
+
+```sh
+flock -x /home/vvin/learn/quiet.lock taskset -c 4 bun run bench:interaction-sessions
+```
+
+A change to a harness source file, to the sampling flags, or to the protocol
+version invalidates the committed render baseline: `bench:check` compares the
+harness hashes, the declared sampling, and the runner (OS, CPU, Bun, Node,
+Chromium, power mode, concurrency) of the fresh capture against
+`results/render-baseline.json` and fails closed on any mismatch. `bench:release`
+therefore ends by re-recording it on the frozen harness: ten controlled rounds
+into `results/render-baseline-raw.json`, then the promotion of that raw artifact
+over the committed baseline. Commit both in the release change; the promotion
+diff is baseline-only and reviewable on its own.
 
 ### Fail-closed gate policy
 
@@ -369,6 +637,38 @@ quoting a result; do not treat an unavailable comparator as a Sheetwrite win.
   relative performance claim is made.
 
 ─────────────────────────────────────────────────────────────────────────────
+
+## String-pool lifetime controls
+
+`src/string-pool-bench.ts` measures a 1M-row repeated-text ingest, 100k
+committed edits, packed window reads, and distinct-value scans. Set
+`STRING_POOL_BENCH_MODE=lifetime` for the 1M-distinct-string all-live rebuild
+and retained text ownership after clearing and unique edits. That mode records
+the cold sweep and seven additional sweeps; its maximum includes the cold
+sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
+ingest and the public cached `getVisibleWindow` path.
+
+Run each sample in a fresh process. To select a built baseline without changing
+its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
+the first harness, and `STRING_POOL_CHECKOUT` to its checkout for the public
+read harness. For example, from the repository root:
+
+```sh
+bun bench/src/string-pool-bench.ts
+STRING_POOL_BENCH_MODE=lifetime bun bench/src/string-pool-bench.ts
+bun bench/src/string-pool-read-bench.ts
+```
+
+The architecture review capture in
+[`results/string-pool-lifetime-results.json`](./results/string-pool-lifetime-results.json)
+used exclusive, memory-capped execution pinned to one CPU, three A/A control
+rounds, and five alternating ABBA/BAAB rounds. Each process discarded one
+warmup before seven samples. Reported comparisons use medians of per-round
+medians; the evidence records the raw round reductions and A/A noise bands.
+The maximum observed 1M-distinct all-live sweep was **68.62 ms**, not a
+cross-device latency guarantee. Post-loop text/index allocation fell from
+84,312,948 bytes to 353,024 bytes; this excludes dense cell buffers and does
+not claim that committed WebAssembly memory shrinks.
 
 ## Files
 

@@ -1,3 +1,4 @@
+import { restoreBlockFacts } from "../restore-block.js";
 import type { CellScalar, CellValue } from "../types/cell.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 import type {
@@ -173,6 +174,7 @@ export class StoreMutationPolicy {
         return [cellRange(patch.addr)];
       case "setRange":
       case "setBlock":
+      case "restoreBlock":
       case "setRangeStyle":
       case "clearRange":
         return [normalizedRange(patch.range)];
@@ -285,6 +287,25 @@ export class StoreMutationPolicy {
 
     if (patch.op === "setRange") {
       const range = normalizedRange(patch.range);
+      // Cell offsets are only required to be non-negative, so the furthest
+      // offset bounds the written area rather than the declared range end.
+      let maxRowOffset = 0;
+      let maxColOffset = 0;
+      for (const cell of patch.cells) {
+        if (cell.rowOffset > maxRowOffset) maxRowOffset = cell.rowOffset;
+        if (cell.colOffset > maxColOffset) maxColOffset = cell.colOffset;
+      }
+      const written: Range = {
+        sheet: range.sheet,
+        start: range.start,
+        end: { row: range.end.row + maxRowOffset, col: range.end.col + maxColOffset },
+      };
+      // A rule can only produce an issue for a cell inside its own range, so
+      // rules that miss the written area are dropped before the cell loop.
+      const candidates = rules.filter(
+        (rule) => rule.policy !== "allow" && rangesIntersect(rule.range, written),
+      );
+      if (candidates.length === 0) return issues;
       for (const cell of patch.cells) {
         if (cell.value.kind !== "literal") continue;
         const addr = {
@@ -292,12 +313,8 @@ export class StoreMutationPolicy {
           row: range.start.row + cell.rowOffset,
           col: range.start.col + cell.colOffset,
         };
-        for (const rule of rules) {
-          if (
-            rule.policy === "allow" ||
-            !rangeContains(rule.range, addr) ||
-            validationAccepts(rule, cell.value.value)
-          ) {
+        for (const rule of candidates) {
+          if (!rangeContains(rule.range, addr) || validationAccepts(rule, cell.value.value)) {
             continue;
           }
           issues.push({
@@ -343,10 +360,12 @@ export class StoreMutationPolicy {
       return issues;
     }
 
-    if (patch.op !== "setBlock") return issues;
-    const range = normalizedRange(patch.range);
-    const formulaOffsets = new Set((patch.block.formulas ?? []).map(([offset]) => offset));
-    const refOffsets = new Set((patch.block.refs ?? []).map(([offset]) => offset));
+    if (patch.op !== "setBlock" && patch.op !== "restoreBlock") return issues;
+    const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+    const range = prepared?.range ?? normalizedRange(patch.range);
+    const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
+    const formulaOffsets = new Set((block.formulas ?? []).map(([offset]) => offset));
+    const refOffsets = new Set((block.refs ?? []).map(([offset]) => offset));
     for (const rule of rules) {
       if (rule.policy === "allow" || rule.range.sheet !== range.sheet) continue;
       const ruleRange = normalizedRange(rule.range);
@@ -357,11 +376,11 @@ export class StoreMutationPolicy {
       if (rowStart > rowEnd || colStart > colEnd) continue;
 
       for (let row = rowStart; row <= rowEnd; row++) {
-        const rowOffset = (row - range.start.row) * patch.block.colCount;
+        const rowOffset = (row - range.start.row) * block.colCount;
         for (let col = colStart; col <= colEnd; col++) {
           const offset = rowOffset + col - range.start.col;
           if (formulaOffsets.has(offset) || refOffsets.has(offset)) continue;
-          const scalar = patch.block.values[offset] ?? null;
+          const scalar = block.values[offset] ?? null;
           if (validationAccepts(rule, scalar)) continue;
           const value: CellValue = { kind: "literal", value: scalar };
           issues.push({

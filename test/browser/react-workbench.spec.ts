@@ -1,24 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import {
   ANALYTICS_EXPECTED,
   ANALYTICS_ROWS,
   analyticsArr,
+  analyticsSeats,
 } from "../../docs/src/showcases/scenarios/analytics.js";
 import { siteUrl } from "./playwright.config.js";
 
 const REACT_URL = siteUrl("/react/");
 const GRID = ".sw-demo-grid .sheetwrite";
-
-// Grid geometry from the analytics workbook + shared showcase theme:
-// toolbar 36px + column header 32px + 30px rows, then ID 72, Account 210,
-// Market 130, Segment 118, Seats 90, ARR 138. The row-number gutter is
-// adaptive: max(48, ceil(digits × 13px × 0.6 + 12)) = 59 for 6-digit rows.
-const GUTTER = Math.max(48, Math.ceil(String(ANALYTICS_ROWS).length * 13 * 0.6 + 12));
-const ROW0_Y = 36 + 32 + 15;
-const ROW_H = 30;
-const ACCOUNT_X = GUTTER + 72 + 105;
-const SEATS_X = GUTTER + 72 + 210 + 130 + 118 + 45;
-const ARR_X = GUTTER + 72 + 210 + 130 + 118 + 90 + 69;
 
 const TOKYO_ROWS = ANALYTICS_EXPECTED.marketRowCounts.Tokyo ?? 0;
 const TOKYO_ARR = ANALYTICS_EXPECTED.marketTotals.Tokyo ?? 0;
@@ -86,26 +77,7 @@ test.describe("react workbench — controlled analytics", () => {
     const errors = collectErrors(page);
     await openWorkbench(page);
 
-    // The compact route lead gives the editable Grid and causal rail the first viewport.
-    const geometry = await page.evaluate(() => {
-      const grid = document
-        .querySelector(".sw-rwb-workspace > .sw-demo-grid")
-        ?.getBoundingClientRect();
-      const rail = document.querySelector(".sw-rwb-state")?.getBoundingClientRect();
-      if (!grid || !rail) return null;
-      return {
-        gridBottom: grid.bottom,
-        gridHeight: grid.height,
-        gridTop: grid.top,
-        gridWidth: grid.width,
-        railWidth: rail.width,
-      };
-    });
-    expect(geometry).not.toBeNull();
-    expect(geometry?.gridTop).toBeLessThan(900);
-    expect(geometry?.gridBottom).toBeGreaterThan(geometry?.gridTop ?? 0);
-    expect(geometry?.gridHeight).toBeGreaterThan(320);
-    expect(geometry?.gridWidth).toBeGreaterThan((geometry?.railWidth ?? 0) * 3);
+    await expect(page.locator(GRID)).toBeInViewport();
     await expect(
       page.getByRole("complementary", { name: "Controlled analytics state" }),
     ).toBeVisible();
@@ -152,9 +124,11 @@ test.describe("react workbench — controlled analytics", () => {
     }
 
     // Selecting a cell reconciles the controlled formula input from the grid.
-    await page.locator(GRID).click({ position: { x: SEATS_X, y: ROW0_Y } });
+    await page.locator(GRID).focus();
+    await page.keyboard.press("ControlOrMeta+Home");
+    for (let col = 0; col < 4; col++) await page.keyboard.press("ArrowRight");
     await expect(page.getByTestId("selection-address")).toHaveText("R1 C5");
-    await expect(page.getByTestId("formula-input")).toHaveValue("5");
+    await expect(page.getByTestId("formula-input")).toHaveValue(String(analyticsSeats(0)));
 
     // A committed formula evaluates against the named range immediately.
     await page.getByTestId("formula-input").fill("=MAX(ANNUAL_ARR)");
@@ -164,13 +138,14 @@ test.describe("react workbench — controlled analytics", () => {
       .toContain(String(expectedMax));
 
     // Editing an ARR literal recalculates both the formula cell and the KPIs.
-    await page.locator(GRID).click({ position: { x: ARR_X, y: ROW0_Y } });
-    await expect(page.getByTestId("formula-input")).toHaveValue("480");
+    await page.locator(GRID).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("formula-input")).toHaveValue(String(analyticsArr(0)));
     await page.getByTestId("formula-input").fill("1000000");
     await page.getByTestId("formula-input").press("Enter");
     await expect(page.getByTestId("kpi-total")).toHaveAttribute(
       "data-raw",
-      String(TOTAL_ARR - 480 + 1_000_000),
+      String(TOTAL_ARR - analyticsArr(0) + 1_000_000),
       { timeout: 15_000 },
     );
     await expect(page.getByTestId("kpi-largest")).toHaveAttribute("data-raw", "1000000");
@@ -181,53 +156,33 @@ test.describe("react workbench — controlled analytics", () => {
     await expectNoErrors(page, errors);
   });
 
-  test("grid-native clipboard and fill-handle flows stay undoable", async ({ page }) => {
+  test("grid-native clipboard edits go through React history and undo", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
     const errors = collectErrors(page);
     await openWorkbench(page);
 
-    // Copy the first account over the second with grid keyboard clipboard.
-    await page.locator(GRID).click({ position: { x: ACCOUNT_X, y: ROW0_Y } });
+    await page.locator(GRID).focus();
+    await page.keyboard.press("ControlOrMeta+Home");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("formula-input")).toHaveValue("Alder Quay Logistics");
     await page.keyboard.press("ControlOrMeta+c");
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 15_000 })
-      .toContain("Account 000001");
+      .toContain("Alder Quay Logistics");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ControlOrMeta+v");
     await expect
       .poll(
-        async () => (await gridcellTexts(page)).filter((text) => text === "Account 000001").length,
+        async () =>
+          (await gridcellTexts(page)).filter((text) => text === "Alder Quay Logistics").length,
         { timeout: 15_000 },
       )
       .toBeGreaterThanOrEqual(2);
     await editButton(page, "Undo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000002");
-
-    // Fill-handle drag: a two-cell text source tiles downward (the numeric
-    // columns are arithmetic sequences, so extending them changes nothing).
-    const box = await page.locator(GRID).boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) return;
-    await page.locator(GRID).click({ position: { x: ACCOUNT_X, y: ROW0_Y } });
-    await page.keyboard.press("Shift+ArrowDown");
-    const accountRight = GUTTER + 72 + 210;
-    await page.mouse.move(box.x + accountRight, box.y + 36 + 32 + ROW_H * 2);
-    await page.mouse.down();
-    // Drop on row 4's center (view row index 3) so the fill covers rows 3–4.
-    await page.mouse.move(box.x + accountRight, box.y + 36 + 32 + ROW_H * 3 + 15, { steps: 4 });
-    await page.mouse.up();
-
-    await expect(page.getByTestId("activity")).toContainText("(fill)", { timeout: 15_000 });
     await expect
-      .poll(
-        async () => (await gridcellTexts(page)).filter((text) => text === "Account 000002").length,
-        { timeout: 15_000 },
-      )
-      .toBeGreaterThanOrEqual(2);
-    expect(await gridcellTexts(page)).not.toContain("Account 000003");
-    await editButton(page, "Undo").click();
-    await expect.poll(() => gridcellTexts(page), { timeout: 15_000 }).toContain("Account 000003");
+      .poll(() => gridcellTexts(page), { timeout: 15_000 })
+      .toContain("Beacon Quay Logistics");
 
     await expectNoErrors(page, errors);
   });

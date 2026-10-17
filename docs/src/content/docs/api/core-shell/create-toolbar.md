@@ -11,7 +11,7 @@ Left/Right/Home/End movement across the controls while the toolbar has
 focus. Returns the mounted piece with an idempotent `destroy`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L27"><code>packages/core/src/shell/toolbar-factory.ts#L27</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/toolbar-factory.ts#L25"><code>packages/core/src/shell/toolbar-factory.ts#L25</code></a></dd></div>
 </dl>
 
 ## Declaration

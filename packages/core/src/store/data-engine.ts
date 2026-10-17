@@ -1,8 +1,10 @@
-import { CellStore, isLoaded, type RangeSnapshot } from "@sheetwrite/wasm";
+import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wasm";
+
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
+import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import { SheetwriteError } from "../errors.js";
 import {
   cloneCellHyperlink,
@@ -26,6 +28,7 @@ import {
   type StoreMemoryBreakdown,
   type TransientResourcePeak,
 } from "../resource-accounting.js";
+import { restoreBlockFacts } from "../restore-block.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
 import { validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
@@ -59,6 +62,7 @@ import type {
   RowGroup,
   Sheet,
   SheetSnapshot,
+  SnapshotCell,
   Workbook,
   WorkbookSnapshot,
 } from "../types/document.js";
@@ -128,6 +132,11 @@ export interface CompactRangeHistory {
   readonly refs: ReadonlyArray<[offset: number, target: CellAddress]>;
   toDocumentOp(range: Range): Extract<DocumentOp, { op: "setBlock" }>;
   dispose(): void;
+}
+
+export interface PreparedEngineMemoryRelease {
+  commit(): void;
+  abort(): void;
 }
 
 export interface RangeMutationAllocationStats {
@@ -265,12 +274,65 @@ function literalOf(value: CellScalar): CellValue {
   return { kind: "literal", value };
 }
 
+/** Shared empty style; keeps change capture from allocating a style per cell. */
+const EMPTY_STYLE: CellStyle = {};
+const TEXT_ENCODER = new TextEncoder();
+/** Worst-case UTF-8 bytes of one UTF-16 code unit, used to size a retry. */
+const MAX_UTF8_BYTES_PER_CODE_UNIT = 3;
+
+/**
+ * Cell strings of one block packed into a single UTF-8 buffer.
+ *
+ * Text crosses into WASM once per block instead of once per cell: `add` appends
+ * each string after the previous one and `offsets` records the byte boundary of
+ * every string, so the native side slices the buffer and never re-encodes.
+ * Strings must be added in the flat input order of their cells: row-major for
+ * document blocks and column-major for columnar imports.
+ */
+class PackedTextBuffer {
+  private written = 0;
+  private count = 0;
+  private bytes: Uint8Array;
+  /** Start of each string, plus the packed length as the final entry. */
+  readonly offsets: Uint32Array;
+
+  constructor(byteCapacity: number, textCount: number) {
+    this.bytes = new Uint8Array(Math.max(byteCapacity, 1));
+    this.offsets = new Uint32Array(textCount + 1);
+  }
+
+  add(value: string): void {
+    this.offsets[this.count] = this.written;
+    let encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
+    if (encoded.read < value.length) {
+      // The initial capacity assumes ASCII text; non-ASCII needs more bytes.
+      this.grow(this.written + value.length * MAX_UTF8_BYTES_PER_CODE_UNIT);
+      encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
+    }
+    this.written += encoded.written;
+    this.count += 1;
+    this.offsets[this.count] = this.written;
+  }
+
+  packedBytes(): Uint8Array {
+    return this.written === this.bytes.length ? this.bytes : this.bytes.subarray(0, this.written);
+  }
+
+  private grow(requiredBytes: number): void {
+    let capacity = this.bytes.length;
+    while (capacity < requiredBytes) capacity *= 2;
+    const grown = new Uint8Array(capacity);
+    grown.set(this.bytes.subarray(0, this.written));
+    this.bytes = grown;
+  }
+}
+
 /**
  * Owns the raw workbook/WASM state and returns typed effects to the public
  * transaction facade. It never owns public listeners, epochs, or policy.
  */
 export class StoreDataEngine {
-  private readonly wasm: RecomputingCellStore;
+  private wasm: RecomputingCellStore;
   private readonly workbook: Workbook;
   private readonly storageOptions: SheetwriteStoreOptions;
   private readonly handles = new Map<SheetId, number>();
@@ -285,6 +347,18 @@ export class StoreDataEngine {
   private disposed = false;
   private committedBytesAfterDispose: number | null = null;
   private readonly spillBlockersDirty = new Set<SheetId>();
+
+  private readonly rangeHistory = new Map<
+    CompactRangeHistory,
+    { sheetHandle: number; replace(resource: RangeSnapshot): void }
+  >();
+
+  private pendingPageRequests = 0;
+
+  private pageIdleWaiters: Array<() => void> | undefined;
+
+  private readonly memoryReleaseListeners = new Set<() => void>();
+
   /** Paged sheets hydrated from a snapshot treat omitted cells as known empty. */
   private readonly authoritativeSnapshotSheets = new Set<SheetId>();
   private snapshotAuthoritative = false;
@@ -304,7 +378,9 @@ export class StoreDataEngine {
 
   constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
     if (!isLoaded()) {
-      throw new Error("Sheetwrite: await initSheetwrite() before constructing SheetwriteStore");
+      throw new Error(
+        `Sheetwrite: await initSheetwrite() before constructing SheetwriteStore. ${ENGINE_LOAD_HINT}`,
+      );
     }
     if (
       options.referenceSimulationLimit !== undefined &&
@@ -323,7 +399,7 @@ export class StoreDataEngine {
     );
     this.workbook = workbook;
     this.storageOptions = options;
-    this.wasm = new CellStore() as RecomputingCellStore;
+    this.wasm = new (getEngine().CellStore)() as RecomputingCellStore;
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, workbook, this.handles);
     this.windowReader = new StoreWindowReader(this.wasm, workbook, this.handles, this.styles);
@@ -541,31 +617,15 @@ export class StoreDataEngine {
     return { sheet: addr.sheet, row, col };
   }
 
-  private rangeCutsSpill(range: Range): boolean {
+  private admitsSourceRange(range: Range): boolean {
     const bounds = normalizedRange(range);
-    const cols = Array.from(
-      { length: bounds.end.col - bounds.start.col + 1 },
-      (_, index) => bounds.start.col + index,
+    return this.wasm.admitSourceRange(
+      this.handleOf(bounds.sheet),
+      bounds.start.row,
+      bounds.start.col,
+      bounds.end.row,
+      bounds.end.col,
     );
-    const owners = this.windowReader.spillOwnerCoordinates(
-      bounds.sheet,
-      { start: bounds.start.row, end: bounds.end.row + 1 },
-      cols,
-    );
-    for (let offset = 0; offset < owners.length; offset += 2) {
-      const row = owners[offset] ?? 0xffffffff;
-      const col = owners[offset + 1] ?? 0xffffffff;
-      if (row === 0xffffffff || col === 0xffffffff) continue;
-      if (
-        row < bounds.start.row ||
-        row > bounds.end.row ||
-        col < bounds.start.col ||
-        col > bounds.end.col
-      ) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private captureSourceProjection(
@@ -756,6 +816,46 @@ export class StoreDataEngine {
     );
   }
 
+  /**
+   * Loaded row runs `[start, end)` of one column inside a row band.
+   *
+   * The pairs are the per-row view of {@link areColumnsFullyLoaded}: a row is in
+   * a run only when the store reports it loaded. One call reconciles a whole
+   * column instead of probing the band row by row with one call per probe.
+   */
+  loadedSpans(sheet: SheetId, startRow: number, endRow: number, column: number): Uint32Array {
+    return this.wasm.loadedSpans(this.handleOf(sheet), startRow, endRow, column);
+  }
+
+  /**
+   * Same-sheet cells that the formulas of a window read, as flat
+   * `[rowStart, rowEnd, columnStart, columnEnd)` rectangles. The walk follows
+   * reads into the formula cells they reach and skips any read that does not
+   * fit the remaining `maxCells` budget.
+   */
+  formulaReadBands(
+    sheet: SheetId,
+    startRow: number,
+    endRow: number,
+    columns: readonly number[],
+    maxCells: number,
+  ): Uint32Array {
+    return this.wasm.formulaReadBands(
+      this.handleOf(sheet),
+      startRow,
+      endRow,
+      Uint32Array.from(columns),
+      maxCells,
+    );
+  }
+
+  /** Empty protection releases remain valid after their sheet has been removed. */
+  pinViewportBands(sheet: SheetId, bands: Uint32Array): void {
+    const handle = this.handles.get(sheet);
+    if (handle === undefined && bands.length === 0) return;
+    this.wasm.pinViewportBands(handle ?? this.handleOf(sheet), bands);
+  }
+
   canApplyLocally(patch: DocumentOp): boolean {
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -794,7 +894,6 @@ export class StoreDataEngine {
     return meta;
   }
 
-  /** True when a set patch can affect an existing cell in workbook metadata. */
   private isCellInBounds(addr: CellAddress): boolean {
     const meta = this.workbook.sheets.find((s) => s.id === addr.sheet);
     return (
@@ -826,14 +925,16 @@ export class StoreDataEngine {
     const rows = range.end.row - range.start.row + 1;
     const cols = range.end.col - range.start.col + 1;
     this.noteRangeMutationFfi();
-    const resource = this.wasm.captureRange(
+    const capturedResource = this.wasm.captureRange(
       this.handleOf(range.sheet),
       range.start.row,
       range.start.col,
       rows,
       cols,
     );
-    if (!resource) return null;
+    if (!capturedResource) return null;
+
+    let resource: RangeSnapshot = capturedResource;
     this.rangeMutationStats.historySnapshots += 1;
     this.rangeMutationStats.historySnapshotBytes += resource.byteLength();
 
@@ -866,10 +967,14 @@ export class StoreDataEngine {
     }
 
     let disposed = false;
-    return {
+    const history: CompactRangeHistory = {
       range,
       byteLength: resource.byteLength(),
-      resource,
+
+      get resource() {
+        return resource;
+      },
+
       refs,
       toDocumentOp: (target) => {
         if (disposed) throw new Error("history range snapshot already disposed");
@@ -922,9 +1027,21 @@ export class StoreDataEngine {
         if (disposed) return;
         disposed = true;
         resource.free();
+        this.rangeHistory.delete(history);
         this.rangeMutationStats.historyDisposals += 1;
       },
     };
+
+    this.rangeHistory.set(history, {
+      sheetHandle: this.handleOf(range.sheet),
+      replace: (replacement) => {
+        const previous = resource;
+        resource = replacement;
+        previous.free();
+      },
+    });
+
+    return history;
   }
 
   getWorkbook(): Workbook {
@@ -933,10 +1050,7 @@ export class StoreDataEngine {
 
   private rawCell(addr: CellAddress): ResolvedCell {
     const cell = this.wasm.getCell(this.handleOf(addr.sheet), addr.row, addr.col);
-    let resolved: CellScalar = null;
-    if (cell.kind === KIND_NUMBER || cell.kind === KIND_FORMULA) resolved = cell.num;
-    else if (cell.kind === KIND_BOOL) resolved = cell.num !== 0;
-    else if (cell.kind === KIND_STRING) resolved = cell.string ?? null;
+    const resolved = resolvedScalar(cell.kind, cell.num, cell.string ?? null);
     const style = this.styles.get(cell.style);
     cell.free();
     return { resolved, style };
@@ -1075,7 +1189,6 @@ export class StoreDataEngine {
   /**
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
-   * Feeds a values-filter picker.
    */
   distinctValues(sheet: SheetId, col: number, limit = 1000): CellScalar[] {
     this.requireCompleteQuery(sheet);
@@ -1096,7 +1209,7 @@ export class StoreDataEngine {
    * Ctrl+Arrow destination. With an active view order `row` is a VIEW position
    * and the scan runs in view space (`dataEdgeOrdered`): a vertical move returns
    * the destination VIEW position, a horizontal move returns a column index.
-   * Without a view it scans data space (`dataEdge`) exactly as before.
+   * Without a view it scans data space (`dataEdge`).
    */
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
     this.requireCompleteQuery(sheet);
@@ -1112,9 +1225,11 @@ export class StoreDataEngine {
     const flat = this.searchCellsFlat(sheet, query, opts);
 
     const out: CellAddress[] = [];
+
     for (let i = 0; i + 1 < flat.length; i += 2) {
       out.push({ sheet, row: flat[i]!, col: flat[i + 1]! });
     }
+
     return out;
   }
 
@@ -1127,6 +1242,7 @@ export class StoreDataEngine {
     this.requireCompleteQuery(sheet);
     const handle = this.handleOf(sheet);
     const columns = opts.columns ?? this.sheetMeta(sheet).columns.map((_, i) => i);
+
     return this.wasm.search(
       handle,
       Uint32Array.from(columns),
@@ -1153,43 +1269,280 @@ export class StoreDataEngine {
     meta.columns.push(...additions);
   }
 
+  /** Persisted cells only: empty space and unstyled spill children need no history payload. */
+  captureSheetCells(sheet: SheetId): SnapshotCell[] {
+    const captured = this.windowReader.capturePersistedCells(sheet);
+    const formulas = new Map<number, string>();
+    const references = new Map<number, CellAddress>();
+    for (const [index, offset] of captured.formulaOffsets.entries()) {
+      const source = captured.formulaSources[index];
+      if (source === undefined) throw new Error("Missing persisted formula source");
+
+      formulas.set(offset, source);
+    }
+    for (const [index, offset] of captured.referenceOffsets.entries()) {
+      const target = referenceTargetFromPacked(
+        captured.referenceTargets.subarray(index * 3, index * 3 + 3),
+        this.sheetIdsByHandle,
+      );
+      if (!target) throw new Error("Missing persisted reference target");
+
+      references.set(offset, target);
+    }
+
+    const cells = captured.values.map((value, index): SnapshotCell => {
+      const row = captured.coordinates[index * 2];
+      const col = captured.coordinates[index * 2 + 1];
+      if (row === undefined || col === undefined)
+        throw new Error("Missing persisted cell coordinate");
+      const formula = formulas.get(index);
+      const reference = references.get(index);
+
+      return {
+        rowOffset: row,
+        colOffset: col,
+        value: formula
+          ? { kind: "formula", src: formula }
+          : reference
+            ? { kind: "ref", target: reference }
+            : { kind: "literal", value },
+        style: captured.styles[index],
+      };
+    });
+
+    return cells.sort(
+      (left, right) => left.rowOffset - right.rowOffset || left.colOffset - right.colOffset,
+    );
+  }
+
+  /** Sources for a whole logical sheet, without reading every resolved cell. */
+  captureSheetSources(sheet: SheetId): RangeSourceProjection | null {
+    const metadata = this.sheetMeta(sheet);
+    if (metadata.rowCount === 0 || metadata.columns.length === 0) return null;
+
+    return this.captureSourceProjection(sheet, 0, 0, metadata.rowCount, metadata.columns.length);
+  }
+
+  /** Whether a rectangular write would include a derived spill child. */
+  hasSpillChildren(range: Range): boolean {
+    const bounds = normalizedRange(range);
+    const columns = Array.from(
+      { length: bounds.end.col - bounds.start.col + 1 },
+      (_, index) => bounds.start.col + index,
+    );
+
+    return this.windowReader
+      .spillDerivedMask(bounds.sheet, { start: bounds.start.row, end: bounds.end.row + 1 }, columns)
+      .some((derived) => derived !== 0);
+  }
+
+  /**
+   * Capture resolved cells and serializable sources in input order. Rows with
+   * the same selected columns share a source read, without capturing the empty
+   * bounding rectangle of a sparse selection.
+   */
+  captureCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): Array<ResolvedCell & { value: CellValue; isSpillChild: boolean }> {
+    if (coordinates.length === 0) return [];
+
+    const resolved = this.captureSparseBeforeCells(
+      { sheet, start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      coordinates.map(({ row, col }) => ({ rowOffset: row, colOffset: col })),
+    );
+    const captured = resolved.map((cell) => ({
+      ...cell,
+      value: { kind: "literal", value: cell.resolved } as CellValue,
+      isSpillChild: false,
+    }));
+
+    const byRow = new Map<number, Map<number, number[]>>();
+    for (const [index, coordinate] of coordinates.entries()) {
+      let columns = byRow.get(coordinate.row);
+      if (!columns) {
+        columns = new Map();
+        byRow.set(coordinate.row, columns);
+      }
+
+      const indices = columns.get(coordinate.col) ?? [];
+      indices.push(index);
+      columns.set(coordinate.col, indices);
+    }
+
+    const groups = new Map<string, { rows: number[]; cols: number[] }>();
+    for (const [row, columns] of byRow) {
+      const cols = [...columns.keys()].sort((left, right) => left - right);
+      const key = cols.join(",");
+      const group = groups.get(key);
+      if (group) group.rows.push(row);
+      else groups.set(key, { rows: [row], cols });
+    }
+
+    for (const { rows, cols } of groups.values()) {
+      const snapshot = this.windowReader.captureSourcesForRows(sheet, Uint32Array.from(rows), cols);
+      if (!snapshot) continue;
+
+      const spillDerived = snapshot.spillDerived();
+      const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
+      for (const [rowIndex, row] of rows.entries()) {
+        const columns = byRow.get(row);
+        if (!columns) throw new Error("Missing row in cell capture");
+
+        for (const [colIndex, col] of cols.entries()) {
+          const offset = rowIndex * cols.length + colIndex;
+          const formula = sources.formulaAt(offset);
+          const reference = sources.referenceAt(offset);
+          for (const index of columns.get(col) ?? []) {
+            const cell = captured[index];
+            if (!cell) throw new Error("Missing resolved cell in cell capture");
+
+            cell.isSpillChild = Boolean(spillDerived[offset]);
+            cell.value = formula
+              ? { kind: "formula", src: formula }
+              : reference
+                ? { kind: "ref", target: reference }
+                : { kind: "literal", value: spillDerived[offset] ? null : cell.resolved };
+          }
+        }
+      }
+    }
+
+    return captured;
+  }
+
+  captureResolvedCells(
+    sheet: SheetId,
+    coordinates: readonly { row: number; col: number }[],
+  ): ResolvedCell[] {
+    const rows = new Uint32Array(coordinates.length);
+    const columns = new Uint32Array(coordinates.length);
+
+    for (const [index, cell] of coordinates.entries()) {
+      rows[index] = cell.row;
+      columns[index] = cell.col;
+    }
+
+    return consumeCellSnapshots(
+      this.wasm.cellSnapshots(this.handleOf(sheet), rows, columns),
+      (styleId) => this.styles.get(styleId),
+    );
+  }
+
+  /**
+   * Previous values of a sparse cell list, read in one batched call.
+   *
+   * Entry `n` belongs to cell `n` of `cells` and matches what `getCell` reports
+   * for that address; the batch exists so a large `setRange` costs one crossing
+   * instead of one per captured cell.
+   */
+  private captureSparseBeforeCells(
+    bounds: Range,
+    cells: readonly { rowOffset: number; colOffset: number }[],
+  ): ResolvedCell[] {
+    const rows = new Uint32Array(cells.length);
+    const columns = new Uint32Array(cells.length);
+
+    for (const [index, cell] of cells.entries()) {
+      rows[index] = bounds.start.row + cell.rowOffset;
+      columns[index] = bounds.start.col + cell.colOffset;
+    }
+
+    return consumeCellSnapshots(
+      this.wasm.cellSnapshots(this.handleOf(bounds.sheet), rows, columns),
+      (styleId) => this.styles.get(styleId),
+    );
+  }
+
+  /**
+   * Previous values of one dense block, read in one packed call.
+   *
+   * Each entry is the resolved value and style `getCell` reports for the same
+   * address, so captured `oldValue`/`oldStyle` payloads stay unchanged while the
+   * read costs one crossing instead of one per cell.
+   */
+  private captureBlockBeforeCells(
+    bounds: Range,
+    rows: number,
+    cols: number,
+  ): Array<{ addr: CellAddress; before: ResolvedCell }> {
+    const columns: number[] = new Array(cols);
+    for (let col = 0; col < cols; col += 1) columns[col] = bounds.start.col + col;
+
+    const snapshot = this.windowReader.readRectangle(bounds.sheet, bounds.start.row, rows, columns);
+    const cells = new Array<{ addr: CellAddress; before: ResolvedCell }>(rows * cols);
+
+    for (let offset = 0; offset < rows * cols; offset += 1) {
+      const row = bounds.start.row + Math.floor(offset / cols);
+      const col = bounds.start.col + (offset % cols);
+      cells[offset] = {
+        addr: { sheet: bounds.sheet, row, col },
+        before: {
+          resolved: snapshot.values[offset] ?? null,
+          style: snapshot.styles[snapshot.styleIds[offset] ?? 0] ?? EMPTY_STYLE,
+        },
+      };
+    }
+
+    return cells;
+  }
+
   private writePackedBlock(bounds: Range, block: PackedCellBlock): boolean {
     const rows = bounds.end.row - bounds.start.row + 1;
     const cols = bounds.end.col - bounds.start.col + 1;
     const cellCount = rows * cols;
+    const values = block.values;
+    const styleIds = block.styleIds;
     const kinds = new Uint8Array(cellCount);
     const numbers = new Float64Array(cellCount);
-    const texts: string[] = new Array(cellCount);
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
+
+    // Sizing the text buffer up front costs one extra pass over `values` and
+    // keeps the packing pass free of reallocations for ASCII text.
+    let textCount = 0;
+    let textBytes = 0;
+
+    for (let offset = 0; offset < cellCount; offset += 1) {
+      const value = values[offset];
+      if (typeof value !== "string") continue;
+
+      textCount += 1;
+      textBytes += value.length;
+    }
+
+    const texts = new PackedTextBuffer(textBytes, textCount);
+
     for (let offset = 0; offset < cellCount; offset++) {
-      const value = block.values[offset]!;
+      const value = values[offset];
       if (value === null || value === undefined) {
-        texts[offset] = "";
+        // Empty cells carry KIND_EMPTY and no payload.
       } else if (typeof value === "number") {
         kinds[offset] = KIND_NUMBER;
         numbers[offset] = value;
-        texts[offset] = "";
       } else if (typeof value === "boolean") {
         kinds[offset] = KIND_BOOL;
         numbers[offset] = value ? 1 : 0;
-        texts[offset] = "";
       } else {
         kinds[offset] = KIND_STRING;
-        texts[offset] = value;
+        texts.add(value);
       }
+
+      const styleId = styleIds === undefined ? undefined : styleIds[offset];
       wasmStyles[offset] = this.styles.intern(
-        block.styleIds === undefined ? undefined : styleTable[block.styleIds[offset]!],
+        styleId === undefined ? undefined : styleTable[styleId],
       );
     }
 
     const formulas = block.formulas ?? [];
     const refs = block.refs ?? [];
     const referenceTargets = new Uint32Array(refs.length * 3);
+
     for (let index = 0; index < refs.length; index++) {
       const target = refs[index]![1];
       const targetHandle = this.handles.get(target.sheet);
       if (targetHandle === undefined || !this.isCellInBounds(target)) return false;
+
       const packed = index * 3;
       referenceTargets[packed] = targetHandle;
       referenceTargets[packed + 1] = target.row;
@@ -1197,8 +1550,9 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi(cellCount);
+
     return (
-      this.wasm.setBlock(
+      this.wasm.setBlockPacked(
         this.handleOf(bounds.sheet),
         bounds.start.row,
         bounds.start.col,
@@ -1206,7 +1560,8 @@ export class StoreDataEngine {
         cols,
         kinds,
         numbers,
-        texts,
+        texts.packedBytes(),
+        texts.offsets,
         wasmStyles,
         Uint32Array.from(formulas, ([offset]) => offset),
         formulas.map(([, source]) => source),
@@ -1229,10 +1584,12 @@ export class StoreDataEngine {
     const formulaSources: string[] = [];
     const referenceOffsets: number[] = [];
     const referenceTargets: number[] = [];
+
     for (let index = 0; index < cells.length; index++) {
       const cell = cells[index]!;
       offsets[index] = cell.offset;
       styles[index] = this.styles.intern(cell.style);
+
       if (cell.value.kind === "formula") {
         formulaOffsets.push(cell.offset);
         formulaSources.push(cell.value.src);
@@ -1240,6 +1597,7 @@ export class StoreDataEngine {
       } else if (cell.value.kind === "ref") {
         const targetHandle = this.handles.get(cell.value.target.sheet);
         if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
+
         referenceOffsets.push(cell.offset);
         referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
         texts[index] = "";
@@ -1263,6 +1621,7 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi(cells.length);
+
     return (
       this.wasm.setSparseBlock(
         this.handleOf(bounds.sheet),
@@ -1295,7 +1654,8 @@ export class StoreDataEngine {
     const touchedSheets = new Set<SheetId>();
     let hasStructuralPatch = false;
     const tracksPagedRevision = !remoteLoad && this.storageOptions.storage === "paged";
-    const storageRevision = tracksPagedRevision ? this.wasm.beginMutation() : 0n;
+    const mutationRevision = remoteLoad ? 0n : this.wasm.beginMutation();
+    const storageRevision = tracksPagedRevision ? mutationRevision : 0n;
 
     if (remoteLoad) this.wasm.beginPageLoad();
     try {
@@ -1307,6 +1667,7 @@ export class StoreDataEngine {
         else if (
           patch.op === "setRange" ||
           patch.op === "setBlock" ||
+          patch.op === "restoreBlock" ||
           patch.op === "setRangeStyle" ||
           patch.op === "clearRange"
         ) {
@@ -1333,22 +1694,18 @@ export class StoreDataEngine {
           hasStructuralPatch = true;
         }
       }
+      if (hasStructuralPatch) {
+        for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
+      }
+      this.flushSpillBlockers();
+      if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
+      this.rangeMutationStats.documentOperations += appliedPatches.length;
+      this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
+
+      return { appliedPatches, changes, storageRevision };
     } finally {
-      if (remoteLoad) this.wasm.endPageLoad();
-      else if (tracksPagedRevision) this.wasm.endMutation();
+      this.wasm.commitSources();
     }
-
-    if (hasStructuralPatch) {
-      for (const touched of touchedSheets) this.spillBlockersDirty.add(touched);
-    }
-    this.flushSpillBlockers();
-    if (appliedPatches.length === 0) return { appliedPatches, changes, storageRevision };
-    this.rangeMutationStats.documentOperations += appliedPatches.length;
-    this.rangeMutationStats.jsPatchObjects += appliedPatches.length;
-
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
-    return { appliedPatches, changes, storageRevision };
   }
 
   private applyPatch(
@@ -1359,8 +1716,14 @@ export class StoreDataEngine {
     switch (patch.op) {
       case "set": {
         if (!this.isCellInBounds(patch.addr)) return false;
-        const owner = this.spillAnchor(patch.addr);
-        if (owner && (owner.row !== patch.addr.row || owner.col !== patch.addr.col)) return false;
+        if (
+          !this.admitsSourceRange({
+            sheet: patch.addr.sheet,
+            start: { row: patch.addr.row, col: patch.addr.col },
+            end: { row: patch.addr.row, col: patch.addr.col },
+          })
+        )
+          return false;
         const before = changes ? this.getCell(patch.addr) : null;
         const bounds: Range = {
           sheet: patch.addr.sheet,
@@ -1405,21 +1768,19 @@ export class StoreDataEngine {
         ) {
           return false;
         }
+        // Grouped source snapshots allocate more than scalar admission for sparse writes.
         if (
           patch.cells.some((cell) => {
-            const addr = {
-              sheet: bounds.sheet,
-              row: bounds.start.row + cell.rowOffset,
-              col: bounds.start.col + cell.colOffset,
-            };
-            const owner = this.spillAnchor(addr);
-            return owner !== null && (owner.row !== addr.row || owner.col !== addr.col);
+            const row = bounds.start.row + cell.rowOffset;
+            const col = bounds.start.col + cell.colOffset;
+            return !this.wasm.admitSourceRange(this.handleOf(bounds.sheet), row, col, row, col);
           })
         ) {
           return false;
         }
         const cols = bounds.end.col - bounds.start.col + 1;
-        const sparseCells = patch.cells.map((cell) => ({
+        const beforeCells = changes ? this.captureSparseBeforeCells(bounds, patch.cells) : null;
+        const sparseCells = patch.cells.map((cell, index) => ({
           offset: cell.rowOffset * cols + cell.colOffset,
           value: cell.value,
           style: cell.style,
@@ -1428,13 +1789,7 @@ export class StoreDataEngine {
             row: bounds.start.row + cell.rowOffset,
             col: bounds.start.col + cell.colOffset,
           },
-          before: changes
-            ? this.getCell({
-                sheet: bounds.sheet,
-                row: bounds.start.row + cell.rowOffset,
-                col: bounds.start.col + cell.colOffset,
-              })
-            : null,
+          before: beforeCells?.[index] ?? null,
         }));
         this.rangeMutationStats.jsPatchObjects += patch.cells.length;
         if (!this.writeSparseBlock(bounds, sparseCells)) return false;
@@ -1452,13 +1807,15 @@ export class StoreDataEngine {
         }
         return true;
       }
-      case "setBlock": {
-        const bounds = normalizedRange(patch.range);
+      case "setBlock":
+      case "restoreBlock": {
+        const prepared = patch.op === "restoreBlock" ? restoreBlockFacts(patch) : undefined;
+        const bounds = prepared?.range ?? normalizedRange(patch.range);
         const sheet = this.sheetMeta(bounds.sheet);
         const rows = bounds.end.row - bounds.start.row + 1;
         const cols = bounds.end.col - bounds.start.col + 1;
         const cellCount = rows * cols;
-        const { block } = patch;
+        const block = prepared?.block ?? (patch as Extract<DocumentOp, { op: "setBlock" }>).block;
         const styleTable = block.styleTable ?? [];
         const styleIds = block.styleIds;
         const exceptions = [...(block.formulas ?? []), ...(block.refs ?? [])];
@@ -1481,18 +1838,11 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        if (this.rangeCutsSpill(bounds)) return false;
+        if (!this.admitsSourceRange(bounds)) return false;
 
         const beforeCells =
           changes && captureDetailedChanges
-            ? Array.from({ length: cellCount }, (_, offset) => {
-                const row = bounds.start.row + Math.floor(offset / cols);
-                const col = bounds.start.col + (offset % cols);
-                return {
-                  addr: { sheet: bounds.sheet, row, col },
-                  before: this.getCell({ sheet: bounds.sheet, row, col }),
-                };
-              })
+            ? this.captureBlockBeforeCells(bounds, rows, cols)
             : null;
         const applied = this.writePackedBlock(bounds, block);
         if (!applied || !changes || !beforeCells) return applied;
@@ -1570,26 +1920,15 @@ export class StoreDataEngine {
         ) {
           return false;
         }
-        if ((patch.contents ?? true) && this.rangeCutsSpill(bounds)) return false;
+        if ((patch.contents ?? true) && !this.admitsSourceRange(bounds)) return false;
         const clearContents = patch.contents ?? true;
         const clearStyle = patch.style ?? true;
         const beforeCells =
           changes && captureDetailedChanges && clearContents
-            ? Array.from(
-                {
-                  length:
-                    (bounds.end.row - bounds.start.row + 1) *
-                    (bounds.end.col - bounds.start.col + 1),
-                },
-                (_, offset) => {
-                  const cols = bounds.end.col - bounds.start.col + 1;
-                  const row = bounds.start.row + Math.floor(offset / cols);
-                  const col = bounds.start.col + (offset % cols);
-                  return {
-                    addr: { sheet: bounds.sheet, row, col },
-                    before: this.getCell({ sheet: bounds.sheet, row, col }),
-                  };
-                },
+            ? this.captureBlockBeforeCells(
+                bounds,
+                bounds.end.row - bounds.start.row + 1,
+                bounds.end.col - bounds.start.col + 1,
               )
             : null;
         const applied = this.wasm.clearRange(
@@ -2720,13 +3059,15 @@ export class StoreDataEngine {
     style: CellStyle | undefined,
     sources?: RangeSourceProjection | null,
     sourceOffset = 0,
+    current: ResolvedCell = this.getCell(addr),
   ): boolean {
-    const current = this.getCell(addr);
     if (this.styles.intern(current.style) !== this.styles.intern(style)) return false;
+
     const formula =
       sources === undefined ? this.getFormula(addr) : sources?.formulaAt(sourceOffset);
     const target =
       sources === undefined ? this.getRefTarget(addr) : sources?.referenceAt(sourceOffset);
+
     if (value.kind === "formula") return formula === value.src;
     if (value.kind === "ref") {
       return (
@@ -2735,6 +3076,7 @@ export class StoreDataEngine {
         target.col === value.target.col
       );
     }
+
     return formula == null && target == null && Object.is(current.resolved, value.value);
   }
 
@@ -2743,11 +3085,14 @@ export class StoreDataEngine {
       this.wasm.acknowledgeRevision(storageRevision);
       return;
     }
+
     for (const operation of operations) {
       if (operation.op === "set") {
+        // Read in operation order so a later invalid address cannot prevent earlier acknowledgements.
         if (!this.acknowledgedSetStillMatches(operation.addr, operation.value, operation.style)) {
           continue;
         }
+
         this.wasm.markRangeClean(
           this.handleOf(operation.addr.sheet),
           operation.addr.row,
@@ -2766,9 +3111,16 @@ export class StoreDataEngine {
           rows,
           cols,
         );
-        for (const cell of operation.cells) {
+
+        const currentCells = this.captureSparseBeforeCells(range, operation.cells);
+        const matchedRowsByColumn = new Map<number, Set<number>>();
+
+        for (const [index, cell] of operation.cells.entries()) {
           const row = range.start.row + cell.rowOffset;
           const col = range.start.col + cell.colOffset;
+          const current = currentCells[index];
+          if (!current) continue;
+
           if (
             !this.acknowledgedSetStillMatches(
               { sheet: range.sheet, row, col },
@@ -2776,14 +3128,43 @@ export class StoreDataEngine {
               cell.style,
               sources,
               cell.rowOffset * cols + cell.colOffset,
+              current,
             )
           ) {
             continue;
           }
-          this.wasm.markRangeClean(this.handleOf(range.sheet), row, row + 1, col, col + 1);
+
+          let matchedRows = matchedRowsByColumn.get(col);
+          if (!matchedRows) {
+            matchedRows = new Set<number>();
+            matchedRowsByColumn.set(col, matchedRows);
+          }
+
+          matchedRows.add(row);
+        }
+
+        for (const [col, matchedRows] of matchedRowsByColumn) {
+          const sortedRows = [...matchedRows].sort((left, right) => left - right);
+          let start: number | undefined;
+          let end: number | undefined;
+
+          for (const row of sortedRows) {
+            if (end !== undefined && row !== end && start !== undefined) {
+              this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+              start = undefined;
+            }
+
+            start ??= row;
+            end = row + 1;
+          }
+
+          if (start !== undefined && end !== undefined) {
+            this.wasm.markRangeClean(this.handleOf(range.sheet), start, end, col, col + 1);
+          }
         }
       } else if (
         operation.op === "setBlock" ||
+        operation.op === "restoreBlock" ||
         operation.op === "setRangeStyle" ||
         operation.op === "clearRange"
       ) {
@@ -2927,12 +3308,10 @@ export class StoreDataEngine {
       accepted = this.writeSparseBlock(bounds, cells);
     } finally {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.endPageLoad();
+      this.wasm.commitSources();
       this.resourceOperation = previousOperation;
     }
     if (!accepted) throw new Error("datasource page contains invalid persisted sources");
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
   }
 
   hydrateSnapshot(snapshot: WorkbookSnapshot): void {
@@ -2963,13 +3342,93 @@ export class StoreDataEngine {
         this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
-      this.wasm.endPageLoad();
+      this.wasm.commitSources();
     }
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
     this.snapshotAuthoritative = true;
     for (const sheet of snapshot.sheets) this.authoritativeSnapshotSheets.add(sheet.id);
-    this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
+  }
+
+  beginPageRequest(): void {
+    this.pendingPageRequests += 1;
+  }
+
+  endPageRequest(): void {
+    this.pendingPageRequests -= 1;
+
+    if (this.pendingPageRequests === 0) {
+      const waiters = this.pageIdleWaiters;
+      this.pageIdleWaiters = undefined;
+      if (waiters) for (const resolve of waiters) resolve();
+    }
+  }
+
+  waitForPageLoads(): Promise<void> | undefined {
+    if (this.disposed || this.pendingPageRequests === 0) return undefined;
+
+    const { promise, resolve } = Promise.withResolvers<void>();
+    this.pageIdleWaiters ??= [];
+    this.pageIdleWaiters.push(resolve);
+
+    return promise;
+  }
+
+  onMemoryRelease(listener: () => void): () => void {
+    this.memoryReleaseListeners.add(listener);
+    return () => this.memoryReleaseListeners.delete(listener);
+  }
+
+  notifyMemoryRelease(): void {
+    for (const listener of this.memoryReleaseListeners) listener();
+  }
+
+  /** Build everything before any live store is changed. Commit is synchronous and non-allocating. */
+  prepareMemoryRelease(instance: EngineInstance): PreparedEngineMemoryRelease | null {
+    if (this.disposed) return null;
+
+    const replacement = instance.CellStore.importMemoryState(
+      this.wasm.exportMemoryState(),
+    ) as RecomputingCellStore;
+    const history: Array<{
+      replacement: RangeSnapshot;
+      replace(resource: RangeSnapshot): void;
+    }> = [];
+
+    try {
+      for (const [snapshot, owner] of this.rangeHistory) {
+        history.push({
+          replacement: replacement.importRangeMemoryState(
+            snapshot.resource.exportMemoryState(owner.sheetHandle),
+            owner.sheetHandle,
+            snapshot.range.start.row,
+            snapshot.range.start.col,
+          ),
+          replace: owner.replace,
+        });
+      }
+    } catch (cause) {
+      for (const snapshot of history) snapshot.replacement.free();
+      replacement.free();
+      throw new Error("Sheetwrite: compact history migration failed", { cause });
+    }
+
+    return {
+      abort: () => {
+        for (const snapshot of history) snapshot.replacement.free();
+        replacement.free();
+      },
+      commit: () => {
+        const previous = this.wasm;
+        this.wasm = replacement;
+        this.view.replaceEngine(replacement);
+        this.windowReader.replaceEngine(replacement);
+        this.pagedDirtyPreflight?.replaceEngine(replacement);
+
+        for (const snapshot of history) snapshot.replace(snapshot.replacement);
+
+        previous.free();
+      },
+    };
   }
 
   /** Release the WASM-side cell store immediately; the store is unusable afterwards. */
@@ -2978,6 +3437,8 @@ export class StoreDataEngine {
     const committed = this.wasm.wasmCommittedBytes();
     this.committedBytesAfterDispose = committed > 0 ? committed : null;
     this.boundaryAccounting.record("teardown", "js-to-wasm", 0, "scalar");
+    for (const history of this.rangeHistory.keys()) history.dispose();
+    this.memoryReleaseListeners.clear();
     this.view.dispose();
     this.windowReader.clear();
     this.styles.clear();
@@ -2987,49 +3448,138 @@ export class StoreDataEngine {
     this.disposed = true;
   }
 
+  /**
+   * Ingest one columnar sheet.
+   *
+   * The source columns arrive column by column, and the store keeps its cells in
+   * the same column-major order, so the packed block arrays are filled column by
+   * column: cell `(row, col)` sits at `col * rowCount + row`. No row-major
+   * `values` copy is built.
+   */
   private loadColumnar(sheet: SheetId, data: ColumnarData): void {
-    const columns = this.sheetMeta(sheet).columns;
-    const rowCount = Math.min(data.rowCount, this.sheetMeta(sheet).rowCount);
+    const meta = this.sheetMeta(sheet);
+    const columns = meta.columns;
+    const rowCount = Math.min(data.rowCount, meta.rowCount);
     if (rowCount === 0 || columns.length === 0) return;
     const colCount = columns.length;
-    const values: CellScalar[] = new Array(rowCount * colCount);
+    const cellCount = rowCount * colCount;
+    const kinds = new Uint8Array(cellCount);
+    const numbers = new Float64Array(cellCount);
+    const wasmStyles = new Uint32Array(cellCount);
     const formulas: Array<[number, string]> = [];
     const refs: Array<[number, CellAddress]> = [];
-    for (let row = 0; row < rowCount; row++) {
-      for (let col = 0; col < colCount; col++) {
-        const offset = row * colCount + col;
-        const column = columns[col]!;
-        const source = data.columns[column.key];
+    const texts: string[] = [];
+    for (let col = 0; col < colCount; col++) {
+      const column = columns[col]!;
+      const source = data.columns[column.key];
+      const base = col * rowCount;
+      for (let row = 0; row < rowCount; row++) {
         const parsed = columnarScalar(source?.[row], column.type);
+        const offset = base + row;
         if (parsed && typeof parsed === "object") {
-          values[offset] = parsed.kind === "literal" ? parsed.value : null;
           if (parsed.kind === "formula") formulas.push([offset, parsed.src]);
           else if (parsed.kind === "ref") refs.push([offset, parsed.target]);
+          else writeColumnarValue(kinds, numbers, texts, offset, parsed.value);
         } else {
-          values[offset] = parsed ?? null;
+          writeColumnarValue(kinds, numbers, texts, offset, parsed);
         }
       }
     }
-    const bounds: Range = {
-      sheet,
-      start: { row: 0, col: 0 },
-      end: { row: rowCount - 1, col: colCount - 1 },
-    };
-    if (
-      !this.writePackedBlock(bounds, {
-        rowCount,
-        colCount,
-        values,
-        formulas: formulas.length === 0 ? undefined : formulas,
-        refs: refs.length === 0 ? undefined : refs,
-      })
-    ) {
+    const referenceTargets = new Uint32Array(refs.length * 3);
+    for (let index = 0; index < refs.length; index++) {
+      const target = refs[index]![1];
+      const targetHandle = this.handles.get(target.sheet);
+      if (targetHandle === undefined || !this.isCellInBounds(target)) {
+        throw new Error("columnar import contains invalid persisted sources");
+      }
+      const packed = index * 3;
+      referenceTargets[packed] = targetHandle;
+      referenceTargets[packed + 1] = target.row;
+      referenceTargets[packed + 2] = target.col;
+    }
+
+    let textBytes = 0;
+    for (const text of texts) textBytes += text.length;
+    const packedText = new PackedTextBuffer(textBytes, texts.length);
+    for (const text of texts) packedText.add(text);
+
+    this.noteRangeMutationFfi(cellCount);
+    const applied = this.wasm.setColumnBlockPacked(
+      this.handleOf(sheet),
+      0,
+      0,
+      rowCount,
+      colCount,
+      kinds,
+      numbers,
+      packedText.packedBytes(),
+      packedText.offsets,
+      wasmStyles,
+      Uint32Array.from(formulas, ([offset]) => offset),
+      formulas.map(([, source]) => source),
+      Uint32Array.from(refs, ([offset]) => offset),
+      referenceTargets,
+    );
+    if (applied !== 0) {
       throw new Error("columnar import contains invalid persisted sources");
     }
     this.noteRangeMutationFfi();
-    this.wasm.recomputeChanged();
+    this.wasm.commitSources();
     this.noteRangeMutationFfi();
     this.wasm.compactStringStorage();
+  }
+}
+
+/** Write one columnar source scalar into the column-major block arrays. */
+function writeColumnarValue(
+  kinds: Uint8Array,
+  numbers: Float64Array,
+  texts: string[],
+  offset: number,
+  value: CellScalar | undefined,
+): void {
+  if (typeof value === "number") {
+    kinds[offset] = KIND_NUMBER;
+    numbers[offset] = value;
+  } else if (typeof value === "boolean") {
+    kinds[offset] = KIND_BOOL;
+    numbers[offset] = value ? 1 : 0;
+  } else if (typeof value === "string") {
+    kinds[offset] = KIND_STRING;
+    texts.push(value);
+  }
+}
+
+function resolvedScalar(kind: number, num: number, text: string | null): CellScalar {
+  if (kind === KIND_NUMBER || kind === KIND_FORMULA) return num;
+  if (kind === KIND_BOOL) return num !== 0;
+  if (kind === KIND_STRING) return text;
+  return null;
+}
+
+/** Read one batched cell snapshot into resolved cells, then release WASM memory. */
+function consumeCellSnapshots(
+  snapshot: CellSnapshot | undefined,
+  styleOf: (styleId: number) => CellStyle,
+): ResolvedCell[] {
+  if (!snapshot) throw new Error("Sheetwrite: cell snapshot batch has mismatched coordinates");
+  try {
+    const { kinds, numbers, styles, textIndex, strings } = snapshot;
+    const cells = new Array<ResolvedCell>(kinds.length);
+    for (const [index, kind] of kinds.entries()) {
+      const slot = textIndex[index] ?? -1;
+      cells[index] = {
+        resolved: resolvedScalar(
+          kind,
+          numbers[index] ?? 0,
+          slot < 0 ? null : (strings[slot] ?? null),
+        ),
+        style: styleOf(styles[index] ?? 0),
+      };
+    }
+    return cells;
+  } finally {
+    snapshot.free();
   }
 }
 

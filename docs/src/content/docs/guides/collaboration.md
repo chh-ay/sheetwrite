@@ -58,6 +58,7 @@ An HTTP adapter can stay transport-neutral at the core boundary:
 ```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import type {
   PersistenceAdapter,
+  PersistenceBatchCommitRequest,
   PersistenceCommitRequest,
   PersistenceCommitResponse,
   WorkbookSnapshot,
@@ -77,6 +78,20 @@ const persistenceAdapter: PersistenceAdapter = {
     const { signal, ...body } = request;
     const response = await fetch(
       `/api/documents/${encodeURIComponent(request.documentId)}/operations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      },
+    );
+    return responseJson<PersistenceCommitResponse>(response);
+  },
+  // Required for undo of very large edits; see "Large undo and atomic batches".
+  async commitBatch(request: PersistenceBatchCommitRequest) {
+    const { signal, ...body } = request;
+    const response = await fetch(
+      `/api/documents/${encodeURIComponent(request.documentId)}/operation-batches`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -128,12 +143,55 @@ Handle `commit()` in one database transaction:
 5. Periodically fold the log into `snapshot_json`; never rewrite operation
    versions or accept client-authored server timestamps.
 
+Handle `commitBatch()` the same way, with one difference: the request has
+`versionOperationCounts`, and it fills several consecutive versions. In one
+database transaction, check the duplicate and the base version once, validate
+every version, then append all of them or none. Store each version with its
+`batch: { index, count }` position, and acknowledge with the last version.
+
 Normalized cell tables are an alternative for products that need SQL queries
 over cell values. They do not replace the protocol: the host must still
 reconstruct a complete schema-versioned `WorkbookSnapshot`, preserve formula
 source/style/metadata, and serialize structural operations under one document
 version. Mixing independent cell writes with the operation log breaks atomic
 row/column/formula semantics.
+
+## Large undo and atomic batches
+
+Undo of a large clear restores the old cells. When the ordinary `setBlock`
+operation is too large for one version, the Grid sends one `restoreBlock`
+operation instead: the same cells as compressed JSON (`deflate-json-v1`). If
+even that does not fit one version, the Grid splits the restore into an atomic
+batch of up to 16 versions and 64 MiB. Undo stays one history step and one
+`change` event.
+
+Before you accept 0.5.0 clients, make sure that your server:
+
+1. accepts `restoreBlock` wherever it switches over the `DocumentOp` union, and
+   decodes it as untrusted input. `@sheetwrite/core` does not export a server
+   decoder, so your decoder must do these checks, in this order, before it
+   changes the document:
+   - `encoding` is `"deflate-json-v1"`, and `decodedBytes` is a positive
+     integer of at most 64 MiB;
+   - `data` is canonical base64 (it decodes and re-encodes to the same text);
+   - the raw DEFLATE stream inflates into a buffer of exactly `decodedBytes`
+     bytes. Never inflate without that output limit: a small stream can expand
+     to gigabytes. Reject a stream that ends early or has bytes left over;
+   - the bytes are valid UTF-8 JSON of a `PackedCellBlock` whose row and
+     column counts match `range`, with at most 4,000,000 cells;
+   - every value, formula, reference, and style in the block passes the same
+     validation as a `setBlock` operation;
+2. implements `commitBatch` as above, or accepts that `SyncCoordinator`
+   rejects a local step that needs more than one version;
+3. publishes batch members with their `batch` field, so that peers apply the
+   whole batch at once; and
+4. folds `restoreBlock` into snapshots as ordinary cells. Snapshots never
+   store restore streams.
+
+The [document operations reference](/docs/reference/document-operations/#atomic-multi-version-batches)
+has the exact field rules, limits, and error codes. When an undo is above the
+transaction limits even after this, the Grid changes nothing and reports it;
+see [Interaction](/docs/guides/interaction/#undo-and-redo).
 
 ## Durable pending commits
 
@@ -173,7 +231,7 @@ IndexedDB record migration is versioned. Unsupported future schemas, blocked upg
 
 ## Remote operations and version gaps
 
-`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries.
+`SyncCoordinator.subscribe` accepts either `RemoteOperationSource` or `AsyncIterable<VersionedOperation>`. Operations apply only at `serverVersion + 1`; own echoed mutation IDs and already acknowledged IDs are deduplicated. Remote application uses `Grid.applyRemoteOperations`, so it does not create outgoing dirty work or local undo entries. Remote row and column inserts and deletes move existing undo entries, so a later undo restores the cell the user edited.
 
 A gap emits `reload-required`. Prefer fetching missing ordered operations through
 `recoverVersionGap`; the coordinator applies them in sequence. A returned
@@ -184,10 +242,37 @@ grid or attach the coordinator to a newly created grid.
 
 ### Conflict and snapshot reload
 
-Never acknowledge or discard a conflicted mutation implicitly. If the server
-returns both `operationsSinceBase` and a current snapshot, the host can gate
-every pending transaction through the conservative rebaser, clear the old
-durable IDs, remount, and submit the safe results as new mutations:
+Never acknowledge or discard a conflicted mutation implicitly. First call
+`sync.recoverConflict()`. It recovers on the live Grid, without a reload, when
+the server returns `operationsSinceBase`, the pending work and the server
+versions it did not see change different cells and sheets, and neither side
+inserts, deletes, or moves rows or columns. It applies the missed versions,
+moves the queue onto the server head, and emits `recovered`; call
+`sync.flush()` to resend:
+
+```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
+import type { PersistenceCommitResponse, SyncConflictReloadReason } from "@sheetwrite/core";
+
+/** Host fallback: the rebase-and-remount recipe below. */
+declare function reloadSession(
+  response: Extract<PersistenceCommitResponse, { status: "conflict" }>,
+  reason: SyncConflictReloadReason,
+): Promise<void>;
+
+sync.on((event) => {
+  if (event.type !== "conflict") return;
+  void sync.recoverConflict().then((result) => {
+    if (result.status === "recovered") return sync.flush();
+    if (result.status === "reload-required") return reloadSession(event.response, result.reason);
+  });
+});
+```
+
+Otherwise the result is `reload-required` with a reason and nothing changes.
+If the server returns both `operationsSinceBase` and a current snapshot, the
+host can then gate every pending transaction through the conservative rebaser,
+clear the old durable IDs, remount, and submit the safe results as new
+mutations:
 
 ```ts prelude="collaboration" partial="requires surrounding host state" title="Partial example"
 import {
@@ -214,6 +299,9 @@ async function reloadAfterConflict(
     return session;
   }
 
+  // Freeze local edits and let queued writes finish before reading the queue.
+  session.grid.setReadOnly(true);
+  await session.sync.ready();
   const pending = session.sync.pendingCommits();
   const remoteOperations = response.operationsSinceBase.flatMap((entry) => [
     ...entry.operations,
@@ -226,6 +314,7 @@ async function reloadAfterConflict(
     const result = rebaseDocumentOperations(record.operations, remoteOperations);
     if (result.status === "conflict") {
       console.error("Manual conflict review required", result.conflict);
+      session.grid.setReadOnly(false);
       return session; // old queue and grid remain intact
     }
     safeBatches.push(result);
@@ -267,6 +356,18 @@ product-specific conflict UI. If the server returns only a snapshot, the host
 cannot infer a safe transform; offer explicit discard/export/manual re-entry
 instead. Reloading a snapshot over pending edits without this decision loses
 intent.
+
+Two ordering rules keep recovery from losing work:
+
+- Freeze the Grid and await `sync.ready()` before reading `pendingCommits()`.
+  An edit made while recovery awaits would be neither rebased nor removed, and
+  a queue write still in flight could land after its removal. Either comes back
+  on the remounted client with a stale base version.
+- Keep remote operations that arrive between loading `latest` and
+  `sync.subscribe(...)`, and deliver them to the new coordinator. Drop versions
+  at or below `latest.version`, which the snapshot already contains. A
+  transport that only forwards to the current subscriber loses them, and the
+  client then waits on a version gap that never closes.
 
 ## Presence
 

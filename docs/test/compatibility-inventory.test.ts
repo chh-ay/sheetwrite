@@ -1,17 +1,18 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
+import {
+  assertCompatibilityInventory,
+  collectCompatibilityIssues,
+  collectMissingCompatibilityFiles,
+} from "../src/showcases/compatibility-validation.ts";
 import {
   COMPATIBILITY_FIXTURES,
   COMPATIBILITY_INVENTORY,
   type CompatibilityFixture,
   type CompatibilityRecord,
 } from "../src/showcases/compatibility.ts";
-import {
-  assertCompatibilityInventory,
-  collectCompatibilityIssues,
-  collectMissingCompatibilityFiles,
-} from "../src/showcases/compatibility-validation.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 type MutableFixture = {

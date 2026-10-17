@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import {
   analyzePublicApi,
   checkManifestBaseline,
@@ -104,19 +105,6 @@ function baselineArtifact(manifest: PublicApiManifest): PublicApiBaseline {
         ),
       ),
   };
-}
-
-async function installBaseline(
-  root: string,
-  manifest: PublicApiManifest,
-): Promise<PublicApiBaseline> {
-  const baseline = baselineArtifact(manifest);
-  await mkdir(join(root, "scripts"), { recursive: true });
-  await writeFile(
-    join(root, "scripts/public-api-baseline.json"),
-    `${JSON.stringify(baseline, null, 2)}\n`,
-  );
-  return baseline;
 }
 
 afterEach(async () => {
@@ -226,11 +214,19 @@ export class LegacyFailure extends RangeError {}`,
   it("writes and reads an explicit baseline artifact without changing reviewed intent", async () => {
     const root = await fixture();
     const { manifest } = await analyzePublicApi(root);
-    const initial = await installBaseline(root, manifest);
+    // A reviewed baseline whose intent differs from a regenerated one, with a stale digest.
+    const generated = baselineArtifact(manifest);
+    const reviewed: typeof generated.intentionalExports = [];
+    expect(generated.intentionalExports.length).toBeGreaterThan(0);
+    await mkdir(join(root, "scripts"), { recursive: true });
+    await writeFile(
+      join(root, "scripts/public-api-baseline.json"),
+      `${JSON.stringify({ ...generated, sha256: "0".repeat(64), intentionalExports: reviewed })}\n`,
+    );
     const written = await writePublicApiBaseline(root, manifest);
 
     expect(written.sha256).toBe(publicApiDigest(manifest));
-    expect(written.intentionalExports).toEqual(initial.intentionalExports);
+    expect(written.intentionalExports).toEqual(reviewed);
     expect(await readPublicApiBaseline(root)).toEqual(written);
     expect(
       JSON.parse(await readFile(join(root, "scripts/public-api-baseline.json"), "utf8")),

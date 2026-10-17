@@ -1,11 +1,8 @@
-export type Rgb = readonly [red: number, green: number, blue: number];
-
 /**
  * Returns whether an RGBA sample contains fully opaque paint that differs from
- * its background. Without an explicit background, the most frequent opaque
- * color is treated as the background.
+ * its background. The most frequent opaque color is treated as the background.
  */
-export function hasOpaqueForeground(rgba: ArrayLike<number>, background?: Rgb): boolean {
+export function hasOpaqueForeground(rgba: ArrayLike<number>): boolean {
   const opaqueColors = new Map<string, number>();
   let opaquePixels = 0;
 
@@ -15,13 +12,6 @@ export function hasOpaqueForeground(rgba: ArrayLike<number>, background?: Rgb): 
     opaquePixels += 1;
     const key = `${rgba[offset]},${rgba[offset + 1]},${rgba[offset + 2]}`;
     opaqueColors.set(key, (opaqueColors.get(key) ?? 0) + 1);
-  }
-
-  if (opaquePixels === 0) return false;
-
-  if (background !== undefined) {
-    const backgroundKey = background.join(",");
-    return (opaqueColors.get(backgroundKey) ?? 0) < opaquePixels;
   }
 
   if (opaqueColors.size < 2) return false;

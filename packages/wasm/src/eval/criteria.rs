@@ -6,6 +6,7 @@ use crate::calc::CmpOp;
 use crate::types::{FormulaError, Value};
 
 use super::matrix::EvalMatrix;
+use super::value::compare_text_case_insensitive;
 
 #[derive(Debug)]
 enum WildcardToken {
@@ -115,14 +116,32 @@ fn wildcard_tokens(pattern: &str) -> Option<Vec<WildcardToken>> {
     has_pattern_syntax.then_some(tokens)
 }
 
-pub(super) fn wildcard_matches_pattern(pattern: &str, candidate: &Value) -> bool {
-    let Some(text) = criterion_text(candidate) else {
-        return false;
-    };
-    if let Some(tokens) = wildcard_tokens(pattern) {
-        wildcard_matches(&tokens, &text)
-    } else {
-        text.eq_ignore_ascii_case(pattern)
+/// A wildcard pattern prepared once and matched against many candidates, so
+/// a search over a column parses the pattern once instead of once per cell.
+pub(super) struct WildcardPattern {
+    pattern: String,
+    tokens: Option<Vec<WildcardToken>>,
+}
+
+impl WildcardPattern {
+    /// Reads the pattern's wildcard syntax once.
+    pub(super) fn new(pattern: &str) -> Self {
+        Self {
+            pattern: pattern.to_string(),
+            tokens: wildcard_tokens(pattern),
+        }
+    }
+
+    /// True when `candidate` matches, with the rules the per-candidate
+    /// pattern check used.
+    pub(super) fn matches(&self, candidate: &Value) -> bool {
+        let Some(text) = criterion_text(candidate) else {
+            return false;
+        };
+        match &self.tokens {
+            Some(tokens) => wildcard_matches(tokens, &text),
+            None => text.eq_ignore_ascii_case(&self.pattern),
+        }
     }
 }
 
@@ -174,9 +193,7 @@ fn criterion_compare(left: &Value, right: &Value) -> Option<Ordering> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => left.partial_cmp(right),
         (Value::Bool(left), Value::Bool(right)) => Some(left.cmp(right)),
-        (Value::Text(left), Value::Text(right)) => {
-            Some(left.to_lowercase().cmp(&right.to_lowercase()))
-        }
+        (Value::Text(left), Value::Text(right)) => Some(compare_text_case_insensitive(left, right)),
         (Value::Blank, Value::Blank) => Some(Ordering::Equal),
         (Value::Blank, Value::Text(right)) if right.is_empty() => Some(Ordering::Equal),
         (Value::Text(left), Value::Blank) if left.is_empty() => Some(Ordering::Equal),
@@ -198,6 +215,87 @@ fn ordering_matches(ordering: Ordering, op: CmpOp) -> bool {
     }
 }
 
+/// Running sum and matching count of the `*IF` family, folded one row at a
+/// time. It applies `aggregate_if`'s rules so a streamed range and a
+/// materialized one answer the same.
+pub(super) struct IfSum {
+    sum: f64,
+    count: u64,
+}
+
+impl IfSum {
+    pub(super) fn new() -> Self {
+        Self { sum: 0.0, count: 0 }
+    }
+
+    /// Folds one matched row: a matched error stops the walk, and only
+    /// numeric values sum.
+    pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
+        match value {
+            Value::Number(value) => {
+                self.sum += value;
+                self.count += 1;
+            }
+            Value::Error(error) => return Err(*error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+        }
+        Ok(())
+    }
+
+    /// The `SUMIF` result, or `AVERAGEIF`'s when `average` is set.
+    pub(super) fn finish(self, average: bool) -> Value {
+        if average {
+            if self.count == 0 {
+                Value::Error(FormulaError::DivZero)
+            } else {
+                Value::number(self.sum / self.count as f64)
+            }
+        } else {
+            Value::number(self.sum)
+        }
+    }
+}
+
+/// Running extreme of `MAXIFS`/`MINIFS`, folded one row at a time with
+/// `extreme_if`'s rules.
+pub(super) struct IfExtreme {
+    found: Option<f64>,
+    maximum: bool,
+}
+
+impl IfExtreme {
+    pub(super) fn new(maximum: bool) -> Self {
+        Self {
+            found: None,
+            maximum,
+        }
+    }
+
+    /// Folds one matched row.
+    pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
+        match value {
+            Value::Number(value) if value.is_finite() => {
+                self.found = Some(self.found.map_or(*value, |current| {
+                    if self.maximum {
+                        current.max(*value)
+                    } else {
+                        current.min(*value)
+                    }
+                }));
+            }
+            Value::Number(_) => return Err(FormulaError::Num),
+            Value::Error(error) => return Err(*error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => {}
+        }
+        Ok(())
+    }
+
+    pub(super) fn finish(self) -> Value {
+        Value::number(self.found.unwrap_or(0.0))
+    }
+}
+
+/// Aggregates the rows whose criteria all match, on a materialized range.
 pub(super) fn aggregate_if(
     sum_range: &EvalMatrix,
     criteria: &[(&EvalMatrix, &Criterion)],

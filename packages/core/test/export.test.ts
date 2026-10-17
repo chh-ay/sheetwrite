@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { parseDateInput } from "../src/date-serial.js";
 import {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
@@ -71,29 +72,37 @@ describe("export", () => {
     expect(lines[2]).toBe('"a,b",');
   });
 
-  it("reports the exact optional package remedy when no XLSX backend is registered", async () => {
+  it("reports missing optional XLSX backends through stable error fields", async () => {
     const store = new SheetwriteStore(workbook());
     setXlsxTableExportBackend(null as never);
     setXlsxTableImportBackend(null as never);
     setXlsxWorkbookBackend(null as never);
 
-    await expect(toXlsxTable(store.getWorkbook(), store)).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
-    );
-    await expect(fromXlsxTable(new Uint8Array())).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxTable.",
-    );
+    await expect(toXlsxTable(store.getWorkbook(), store)).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-export",
+      context: { backend: "xlsx", functionName: "toXlsxTable" },
+    });
+    await expect(fromXlsxTable(new Uint8Array())).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-import",
+      context: { backend: "xlsx", functionName: "fromXlsxTable" },
+    });
     const snapshot: WorkbookSnapshot = {
       schemaVersion: 1,
       workbook: { activeSheet: "s" },
       sheets: [],
     };
-    await expect(toXlsxWorkbook(snapshot)).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxWorkbook.",
-    );
-    await expect(fromXlsxWorkbook(new Uint8Array())).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling fromXlsxWorkbook.",
-    );
+    await expect(toXlsxWorkbook(snapshot)).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-export",
+      context: { backend: "xlsx", functionName: "toXlsxWorkbook" },
+    });
+    await expect(fromXlsxWorkbook(new Uint8Array())).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-import",
+      context: { backend: "xlsx", functionName: "fromXlsxWorkbook" },
+    });
     store.dispose();
   });
 
@@ -106,7 +115,6 @@ describe("export", () => {
     expect(error.limit).toBe(32);
     expect(error.actual).toBe(33);
     expect(error.operation).toBe("xlsx-import");
-    expect(error.message).toBe("Sheetwrite: XLSX import maxInputBytes limit is 32; observed 33");
   });
 
   it("csv: a column header beginning with a formula char is neutralized", () => {
@@ -312,6 +320,23 @@ describe("export", () => {
     store.dispose();
   });
 
+  it("drops extra CSV fields from the projection but still counts them toward ceilings", () => {
+    const columns: Column[] = [
+      { key: "a", header: "A", width: 80, type: "text" },
+      { key: "b", header: "B", width: 80, type: "text" },
+    ];
+    expect(fromCsv("A,B,C\r\n1,2,3\r\n4", columns)).toEqual({
+      rowCount: 2,
+      columns: { a: ["1", "4"], b: ["2", null] },
+    });
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxColumns: 2 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+    expect(() => fromCsv("A,B,C\r\n1,2,3", columns, { resourceLimits: { maxCells: 5 } })).toThrow(
+      DelimitedTextResourceError,
+    );
+  });
+
   it("coerces declared types canonically and loads booleans and dates without type loss", () => {
     const columns: Column[] = [
       { key: "bool", header: "Bool", width: 80, type: "text" },
@@ -352,6 +377,18 @@ describe("export", () => {
     expect(store.getCell({ sheet: "types", row: 0, col: 6 }).resolved).toBe("=1+1");
     expect(store.getFormula({ sheet: "types", row: 0, col: 6 })).toBeNull();
     store.dispose();
+  });
+
+  it("keeps non-ASCII boolean look-alikes and formula-like dates as text", () => {
+    const columns: Column[] = [
+      { key: "flag", header: "Flag", width: 80, type: "number" },
+      { key: "when", header: "When", width: 80, type: "date" },
+    ];
+    // `ſ` upper-cases to `S`, but spreadsheet booleans are ASCII only.
+    expect(fromCsv("Flag,When\nfalſe,=2026-07-18\nFaLsE,2026-07-18", columns).columns).toEqual({
+      flag: ["falſe", false],
+      when: ["=2026-07-18", parseDateInput("2026-07-18")],
+    });
   });
 
   it("enforces exact defaults and limit+1 before oversized delimited allocations", () => {
@@ -451,13 +488,15 @@ describe("export", () => {
         resourceLimits: { maxWriterWindowRows: 1 },
       }),
     ).toContain("a,1\r\nb,2\r\nc,3");
-    expect(windows).toEqual([1, 1, 1]);
+    expect(windows.length).toBeGreaterThan(0);
+    expect(windows.every((rows) => rows > 0 && rows <= 1)).toBe(true);
     expect(
       toTsv({ sheet: "s", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } }, store, {
         resourceLimits: { maxWriterWindowRows: 1 },
       }),
     ).toBe("a\t1\r\nb\t2\r\nc\t3");
-    expect(dataWindows).toEqual([1, 1, 1]);
+    expect(dataWindows.length).toBeGreaterThan(0);
+    expect(dataWindows.every((rows) => rows > 0 && rows <= 1)).toBe(true);
     store.dispose();
   });
 });

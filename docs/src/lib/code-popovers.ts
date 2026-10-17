@@ -7,6 +7,8 @@ interface OpenPopover {
 }
 
 const initializedTriggers = new WeakSet<HTMLElement>();
+// Identical popovers share one panel across many triggers.
+const initializedPanels = new WeakSet<HTMLElement>();
 let activePopover: OpenPopover | null = null;
 let closeTimer: number | undefined;
 let codeMutationObserver: MutationObserver | null = null;
@@ -95,8 +97,12 @@ export function initializeCodePopovers(root: ParentNode = document): void {
       if (!window.matchMedia("(hover: none)").matches) return;
       if (activePopover?.trigger !== trigger) openPopover(trigger, panel);
     });
+    if (initializedPanels.has(panel)) continue;
+    initializedPanels.add(panel);
     panel.addEventListener("pointerenter", cancelScheduledClose);
-    panel.addEventListener("pointerleave", () => scheduleClose(trigger, panel));
+    panel.addEventListener("pointerleave", () => {
+      if (activePopover?.panel === panel) scheduleClose(activePopover.trigger, panel);
+    });
   }
 }
 

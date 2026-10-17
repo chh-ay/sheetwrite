@@ -1,14 +1,15 @@
 ---
 title: "initSheetwrite | @sheetwrite/core"
-description: "Load the WASM data engine once."
+description: "Load one WASM engine before createGrid."
 ---
 <!-- api-export:@sheetwrite/core|.|initSheetwrite -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="function">function</span></div>
 
-Load the WASM data engine once. Must be awaited before `createGrid`.
+Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
+Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L285"><code>packages/core/src/grid.ts#L285</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/grid.ts#L290"><code>packages/core/src/grid.ts#L290</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -18,6 +19,7 @@ Load the WASM data engine once. Must be awaited before `createGrid`.
 ```ts generated
 function initSheetwrite(
   source?: BufferSource | URL | string | Request | WebAssembly.Module,
+  engine?: SheetwriteEngine,
 ): Promise<void>
 ```
 

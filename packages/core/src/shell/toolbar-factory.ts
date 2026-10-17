@@ -1,5 +1,3 @@
-// ── Standalone toolbar factory ───────────────────────────────────────────────
-//
 // Public wrapper over the same renderer the grid's built-in toolbar uses, so
 // custom chrome and the stock toolbar can never drift. Adds toolbar semantics
 // (role, label, roving focus) without duplicating any action binding.

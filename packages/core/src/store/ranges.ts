@@ -275,6 +275,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
       return patch.addr.sheet;
     case "setRange":
     case "setBlock":
+    case "restoreBlock":
     case "setRangeStyle":
     case "clearRange":
       return patch.range.sheet;

@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { initSheetwrite, SheetwriteStore } from "../src/index.js";
 import { makeWorkbook } from "./fixtures.js";
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
 
-// biome-ignore lint/suspicious/noApproximativeNumericConstant: exact three-decimal result of ROUND(PI(), 3).
 const ROUNDED_PI = 3.142;
 
 beforeAll(async () => {
@@ -179,6 +179,25 @@ describe("formula behavior matrix", () => {
     expect(restored.getSpillAnchor(address(4, 2))).toEqual(address(0, 2));
 
     restored.dispose();
+    store.dispose();
+  });
+
+  it("spills an array constant with its row and column shape", () => {
+    const store = new SheetwriteStore(makeWorkbook(12));
+    store.applyTransaction({
+      patches: [{ op: "set", addr: address(0, 0), value: { kind: "formula", src: "={1,2;3,4}" } }],
+    });
+
+    const block = [0, 1, 2].map((row) =>
+      [0, 1, 2].map((col) => store.getCell(address(row, col)).resolved),
+    );
+    expect(block).toEqual([
+      [1, 2, null],
+      [3, 4, null],
+      [null, null, null],
+    ]);
+    expect(store.getSpillAnchor(address(1, 1))).toEqual(address(0, 0));
+    expect(store.getFormula(address(0, 0))).toBe("={1,2;3,4}");
     store.dispose();
   });
 });

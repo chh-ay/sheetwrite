@@ -8,7 +8,7 @@ description: "Whether the WASM module has finished initializing."
 Whether the WASM module has finished initializing.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L24"><code>packages/wasm/loader.d.ts#L24</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L26"><code>packages/wasm/loader.d.ts#L26</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -35,6 +35,6 @@ function isLoaded(): boolean
 <p class="api-consumers-label">Public exports naming <code>isLoaded</code></p>
 
 <ul class="api-consumer-list">
-<li>None.</li>
+<li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

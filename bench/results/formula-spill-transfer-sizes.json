@@ -1,0 +1,22 @@
+{
+  "baselineCommit": "89222d66f4b123eeb86013ecedde7d540ff8e64b",
+  "compression": "Brotli quality 11",
+  "engines": [
+    {
+      "engine": "wasm",
+      "baselineRawBytes": 848920,
+      "candidateRawBytes": 868980,
+      "baselineBrotli11Bytes": 250156,
+      "candidateBrotli11Bytes": 253254,
+      "brotliDeltaBytes": 3098
+    },
+    {
+      "engine": "formulas",
+      "baselineRawBytes": 1131855,
+      "candidateRawBytes": 1152337,
+      "baselineBrotli11Bytes": 338151,
+      "candidateBrotli11Bytes": 341843,
+      "brotliDeltaBytes": 3692
+    }
+  ]
+}

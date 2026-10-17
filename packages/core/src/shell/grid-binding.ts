@@ -1,9 +1,6 @@
-// ── Shell ↔ Grid adaptation layer ────────────────────────────────────────────
-//
-// The single shell file allowed to consolidate how shell chrome reads and
-// writes grid state. Everything here goes through the public `Grid` contract —
-// never `Store` internals, never private grid DOM. If a public name changes,
-// this file (and only this file) absorbs it.
+// Consolidates how shell inputs interpret selections and commit cell text.
+// Everything here goes through the public `Grid` contract — never `Store`
+// internals, never private grid DOM.
 
 import { parseCellInput } from "../cell-input.js";
 import type { Selection } from "../types/coordinates.js";

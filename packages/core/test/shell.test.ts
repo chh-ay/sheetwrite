@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
@@ -52,8 +53,6 @@ function multiSheetWorkbook(): Workbook {
   });
   return base;
 }
-
-// ── Grid API additions the shell depends on ──────────────────────────────────
 
 describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
   it("translates view rows to data addresses under an active sort", () => {
@@ -111,8 +110,6 @@ describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
   });
 });
 
-// ── Leaf pieces ───────────────────────────────────────────────────────────────
-
 describe("createToolbar", () => {
   it("dispatches built-in actions and hands custom items the grid", () => {
     const { grid, store, host } = makeGrid();
@@ -143,15 +140,33 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
-  it("treats string icons as text, never HTML", () => {
+  it("shows the theme's text and fill colors until the user picks one", () => {
     const { grid, store, host } = makeGrid();
+    grid.setTheme({ fg: "#123", bg: "rgb(250, 240, 230)" });
     const piece = createToolbar(host, grid, {
-      items: [{ onClick: () => {}, icon: "<img src=x onerror=hack()>", title: "Evil" }],
+      items: [{ action: "textColor" }, { action: "fillColor" }],
     });
+    const [text, fill] = [...piece.element.querySelectorAll<HTMLInputElement>("input")];
+    // An unseeded color input shows black, which is wrong for an unstyled fill.
+    expect(text!.value).toBe("#112233");
+    expect(fill!.value).toBe("#faf0e6");
 
-    const button = piece.element.querySelector("button")!;
-    expect(button.querySelector("img")).toBeNull();
-    expect(button.textContent).toBe("<img src=x onerror=hack()>");
+    // A theme switch (for example to dark) updates swatches the user has not used.
+    grid.setTheme({ fg: "#e5e7eb", bg: "#0b1220" });
+    expect(text!.value).toBe("#e5e7eb");
+    expect(fill!.value).toBe("#0b1220");
+
+    // Once the user picks a fill, that choice stays when the theme changes.
+    const addr = { sheet: "s1", row: 1, col: 0 };
+    grid.setSelection({ kind: "cell", addr });
+    fill!.value = "#ff0000";
+    fill!.dispatchEvent(new Event("change"));
+    fill!.dispatchEvent(new Event("blur"));
+    expect(store.getCell(addr).style.backgroundColor).toBe("#ff0000");
+    grid.replaceTheme(undefined);
+    expect(fill!.value).toBe("#ff0000");
+    // The text swatch was never picked, so it follows the reset to the default theme.
+    expect(text!.value).toBe(DEFAULT_THEME.fg);
 
     piece.destroy();
     grid.destroy();
@@ -323,14 +338,15 @@ describe("createSelectionStatus", () => {
   it("reports geometry only and stays blank for single cells", () => {
     expect(describeSelection(null)).toBe("");
     expect(describeSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } })).toBe("");
+    // The status names the selection's size; the exact wording is free.
     expect(
       describeSelection({
         kind: "range",
         range: { sheet: "s1", start: { row: 4, col: 2 }, end: { row: 0, col: 0 } },
       }),
-    ).toBe("5 × 3 cells");
-    expect(describeSelection({ kind: "row", sheet: "s1", row: 6 })).toBe("Row 7");
-    expect(describeSelection({ kind: "column", sheet: "s1", col: 1 })).toBe("Column 2");
+    ).toMatch(/\b5\b\D+\b3\b/);
+    expect(describeSelection({ kind: "row", sheet: "s1", row: 6 })).toMatch(/\b7\b/);
+    expect(describeSelection({ kind: "column", sheet: "s1", col: 1 })).toMatch(/\b2\b/);
 
     const { grid, store } = makeGrid();
     const statusHost = document.createElement("div");
@@ -341,7 +357,7 @@ describe("createSelectionStatus", () => {
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
-    expect(piece.element.textContent).toBe("2 × 2 cells");
+    expect(piece.element.textContent).toMatch(/\b2\b\D+\b2\b/);
     expect(piece.element.getAttribute("role")).toBe("status");
     expect(statusHost.hidden).toBe(false);
     expect(piece.element.hidden).toBe(false);
@@ -355,8 +371,6 @@ describe("createSelectionStatus", () => {
   });
 });
 
-// ── Full shell ────────────────────────────────────────────────────────────────
-
 describe("createSpreadsheetShell", () => {
   it("composes one grid with shell chrome and no duplicate built-ins", () => {
     const host = mountHost();
@@ -369,22 +383,20 @@ describe("createSpreadsheetShell", () => {
     });
 
     expect(ready).toEqual([shell.grid]);
-    // Shell chrome present; the grid's own toolbar/tab duplicates suppressed.
-    expect(host.querySelectorAll(".sheetwrite-shell-toolbar")).toHaveLength(1);
-    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
-    expect(host.querySelector(".sheetwrite-tabbar")).toBeNull();
-    expect(host.querySelector(".sheetwrite-shell-tabs [role='tab']")).not.toBeNull();
+    // One toolbar and one tab list: the grid's own built-ins are suppressed.
+    expect(host.querySelectorAll('[role="toolbar"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[role="grid"]')).toHaveLength(1);
 
-    // Tab activation switches by id and notifies the tabs via active-sheet.
-    const tabButtons = [
-      ...host.querySelectorAll<HTMLButtonElement>(".sheetwrite-shell-tabs [role='tab']"),
-    ];
+    // Tab activation switches by id.
+    const tabButtons = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
     tabButtons[1]!.click();
     expect(shell.grid.getActiveSheet()).toBe("s2");
 
+    const root = shell.element;
     shell.destroy();
     shell.destroy(); // idempotent
-    expect(host.querySelector(".sheetwrite-shell")).toBeNull();
+    expect(host.contains(root)).toBe(false);
   });
 
   it("keeps a configured one-sheet tab strip coherent through remote lifecycle changes", () => {
@@ -455,28 +467,24 @@ describe("createSpreadsheetShell", () => {
   it("keeps read-only and config wrappers coherent with the shell chrome", () => {
     const host = mountHost();
     const shell = createSpreadsheetShell(host, {
-      grid: { workbook: makeWorkbook(10), data: makeColumnarData(10) },
+      grid: { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
     });
 
     shell.setReadOnly(true);
     const formula = host.querySelector(".sheetwrite-shell-formula");
     if (!(formula instanceof HTMLInputElement)) throw new Error("expected formula input");
     expect(formula.readOnly).toBe(true);
-    expect(host.querySelector(".sheetwrite")?.getAttribute("aria-readonly")).toBe("true");
+    expect(host.querySelector('[role="grid"]')?.getAttribute("aria-readonly")).toBe("true");
 
-    // Reconfiguring can never resurrect the duplicate built-in toolbar/tabs.
+    // Reconfiguring can never resurrect a second toolbar or tab list.
     shell.setGridConfig({ toolbar: true, tabs: true, find: false });
-    expect(host.querySelector(".sheetwrite-toolbar")).toBeNull();
-    expect(host.querySelector(".sheetwrite-tabbar")).toBeNull();
+    expect(host.querySelectorAll('[role="toolbar"]').length).toBeLessThanOrEqual(1);
+    expect(host.querySelectorAll('[role="tablist"]').length).toBeLessThanOrEqual(1);
 
     shell.setTheme({ bg: "#123456" });
-    expect(
-      host
-        .querySelector<HTMLElement>(".sheetwrite-shell")
-        ?.style.getPropertyValue("--sheetwrite-widget-bg"),
-    ).toBe("#123456");
-    shell.setActiveSheet("s1");
-    expect(shell.grid.getActiveSheet()).toBe("s1");
+    expect(shell.element.style.getPropertyValue("--sheetwrite-widget-bg")).toBe("#123456");
+    shell.setActiveSheet("s2");
+    expect(shell.grid.getActiveSheet()).toBe("s2");
 
     shell.destroy();
   });

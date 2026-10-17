@@ -1,48 +1,48 @@
 {
   "available": true,
   "capture": {
-    "commit": "47f164385fd9cf9280cbdcddcecd261575269384",
-    "timestamp": "2026-07-16T21:59:29.743Z",
-    "browser": "Chromium 149.0.7827.55",
+    "commit": "49e05e298c3f39a8cede038fe8d0062343abc21f",
+    "timestamp": "2026-10-17T05:18:22.963Z",
+    "browser": "Chromium 153.0.8010.12",
     "rounds": 10
   },
   "heroStats": {
     "millionRowScenarios": 14,
     "millionRowMedianMs": 0.6,
-    "millionRowHeapMb": 108
+    "millionRowHeapMb": 81
   },
   "sizes": [
     {
       "size": 1000,
       "comparedScenarios": 14,
-      "medianRatio": 7.2,
-      "bestRatio": 96.7,
-      "bestScenario": "scroll-right.top-left",
+      "medianRatio": 6.5,
+      "bestRatio": 1112.4,
+      "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 10000,
       "comparedScenarios": 14,
-      "medianRatio": 10.7,
-      "bestRatio": 111.3,
-      "bestScenario": "scroll-right.top-left",
+      "medianRatio": 6.4,
+      "bestRatio": 1049.8,
+      "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 100000,
       "comparedScenarios": 14,
-      "medianRatio": 26.3,
-      "bestRatio": 201.2,
-      "bestScenario": "scroll-right.top-left",
+      "medianRatio": 8.2,
+      "bestRatio": 931,
+      "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     },
     {
       "size": 1000000,
-      "comparedScenarios": 12,
-      "medianRatio": 130.3,
-      "bestRatio": 1522.2,
-      "bestScenario": "scroll-smooth.same-window",
-      "handsontableIncomplete": 2
+      "comparedScenarios": 14,
+      "medianRatio": 7.1,
+      "bestRatio": 949.8,
+      "bestScenario": "merge-heavy.paint",
+      "handsontableIncomplete": 0
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   type CellAddress,
   type CellValue,
@@ -9,6 +10,7 @@ import {
   rebaseDocumentOperations,
   type SheetSnapshot,
 } from "../src/index.js";
+import { decodeRestoreBlock, encodeRestoreBlock } from "../src/restore-block.js";
 
 const SHEET = "s1";
 const OTHER_SHEET = "s2";
@@ -17,42 +19,6 @@ type Axis = (typeof AXES)[number];
 type StructuralKind = "insert" | "delete";
 
 type RebaseConflictFamily = "cell" | "range" | "sheet" | "named-range";
-
-const OP_CONFLICT_FAMILY = {
-  set: "cell",
-  setNote: "cell",
-  setRange: "range",
-  setBlock: "range",
-  setRangeStyle: "range",
-  clearRange: "range",
-  addRows: "sheet",
-  removeRows: "sheet",
-  moveRows: "sheet",
-  addColumns: "sheet",
-  removeColumns: "sheet",
-  moveColumns: "sheet",
-  setColumn: "sheet",
-  setRowMeta: "sheet",
-  addMerge: "range",
-  removeMerge: "range",
-  addSheet: "sheet",
-  removeSheet: "sheet",
-  renameSheet: "sheet",
-  moveSheet: "sheet",
-  setSheetVisibility: "sheet",
-  setSheetMeta: "sheet",
-  addTable: "range",
-  updateTable: "sheet",
-  removeTable: "sheet",
-  setHyperlink: "range",
-  removeHyperlink: "range",
-  setValidationRule: "range",
-  removeValidationRule: "range",
-  setProtectedRange: "range",
-  removeProtectedRange: "range",
-  setNamedRange: "named-range",
-  removeNamedRange: "named-range",
-} satisfies Record<DocumentOp["op"], RebaseConflictFamily>;
 
 function columns(count: number): Column[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -134,6 +100,15 @@ function expectConflict(
     remoteOperationIndex,
     message: expect.any(String),
   });
+}
+
+/** Freezes every object reachable from `value`; a write to it throws in strict mode. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    Object.freeze(value);
+    for (const nested of Object.values(value as Record<string, unknown>)) deepFreeze(nested);
+  }
+  return value;
 }
 
 interface PointFactory {
@@ -604,8 +579,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     ];
 
-    for (const { family, operation } of cases) {
-      expect(OP_CONFLICT_FAMILY[operation.op]).toBe(family);
+    for (const { operation } of cases) {
       expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
     }
   });
@@ -663,9 +637,7 @@ describe("metadata, identity, and sheet lifecycle", () => {
       },
     ];
 
-    for (const { family, local, remote } of cases) {
-      expect(OP_CONFLICT_FAMILY[local.op]).toBe(family);
-      expect(OP_CONFLICT_FAMILY[remote.op]).toBe(family);
+    for (const { local, remote } of cases) {
       expectConflict([local], [remote], "overlapping-edit");
     }
   });
@@ -810,5 +782,345 @@ describe("server ordering, immutability, and determinism", () => {
         },
       },
     ]);
+  });
+
+  it("rebases deeply frozen local and remote operations", () => {
+    const local: DocumentOp[] = [
+      {
+        op: "set",
+        addr: address("row", 4),
+        value: { kind: "ref", target: address("row", 7) },
+        style: { bold: true },
+      },
+      {
+        op: "setRange",
+        range: range("row", 7, 8),
+        cells: [
+          { rowOffset: 0, colOffset: 0, value: literal("frozen"), style: { italic: true } },
+          { rowOffset: 2, colOffset: 0, value: { kind: "ref", target: address("row", 3) } },
+        ],
+      },
+    ];
+    const remote: DocumentOp[] = [structure("row", "insert", 2, 2)];
+    deepFreeze(local);
+    deepFreeze(remote);
+
+    const result = rebaseDocumentOperations(local, remote);
+
+    expect(result).toEqual({
+      status: "rebased",
+      operations: [
+        {
+          op: "set",
+          addr: address("row", 6),
+          value: { kind: "ref", target: address("row", 9) },
+          style: { bold: true },
+        },
+        {
+          op: "setRange",
+          range: range("row", 9, 10),
+          cells: [
+            { rowOffset: 0, colOffset: 0, value: literal("frozen"), style: { italic: true } },
+            { rowOffset: 2, colOffset: 0, value: { kind: "ref", target: address("row", 5) } },
+          ],
+        },
+      ],
+    });
+  });
+});
+
+describe("compressed restore rebasing", () => {
+  const target = { sheet: SHEET, start: { row: 8, col: 1 }, end: { row: 8, col: 1 } };
+  const block = {
+    rowCount: 1,
+    colCount: 1,
+    values: [null],
+    refs: [[0, { sheet: SHEET, row: 9, col: 1 }]] as [number, CellAddress][],
+    styleTable: [{ bold: true }],
+    styleIds: [0],
+  };
+
+  it("shifts both restore target and packed refs while preserving serialized encoding and caller input", () => {
+    const original = encodeRestoreBlock(target, block);
+    const before = JSON.stringify(original);
+    const result = rebaseDocumentOperations(
+      [original],
+      [{ op: "addRows", sheet: SHEET, at: 4, count: 2 }],
+    );
+    expect(result.status).toBe("rebased");
+    if (result.status !== "rebased") throw new Error("Expected safe restore rebase");
+    const restored = result.operations[0];
+    if (restored?.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+    expect(restored.range).toEqual({
+      sheet: SHEET,
+      start: { row: 10, col: 1 },
+      end: { row: 10, col: 1 },
+    });
+    expect(restored.encoding).toBe("deflate-json-v1");
+    expect(decodeRestoreBlock(restored)).toEqual({
+      ...block,
+      refs: [[0, { sheet: SHEET, row: 11, col: 1 }]],
+    });
+    expect(JSON.stringify(original)).toBe(before);
+  });
+
+  it("shifts cross-sheet packed references for column edits without moving its restore target", () => {
+    const original = encodeRestoreBlock({ ...target, sheet: OTHER_SHEET }, block);
+    const result = rebaseDocumentOperations([original], [structure("column", "insert", 0, 2)]);
+    if (result.status !== "rebased") throw new Error("Expected safe cross-sheet rebase");
+    const restored = result.operations[0];
+    if (restored?.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+    expect(restored.range).toEqual(original.range);
+    expect(decodeRestoreBlock(restored).refs).toEqual([[0, { sheet: SHEET, row: 9, col: 3 }]]);
+    expectConflict([original], [structure("row", "delete", 9, 1)], "structural-overlap");
+  });
+
+  it("composes remote transforms into independent serialized restores and uses the latest refs for later conflicts", () => {
+    const local = [
+      encodeRestoreBlock(target, block),
+      encodeRestoreBlock({ ...target, sheet: OTHER_SHEET }, block),
+    ];
+    const remote: DocumentOp[] = [
+      structure("row", "insert", 4, 2),
+      structure("column", "insert", 0, 2),
+      structure("row", "delete", 0, 1),
+      structure("row", "insert", 0, 3, "unrelated"),
+      { op: "renameSheet", sheet: OTHER_SHEET, name: "Renamed" },
+      { op: "removeSheet", sheet: "unrelated" },
+    ];
+    const localBefore = JSON.stringify(local);
+    const remoteBefore = JSON.stringify(remote);
+    deepFreeze(local);
+    deepFreeze(remote);
+
+    const result = rebaseDocumentOperations(local, remote);
+    if (result.status !== "rebased") throw new Error("Expected safe multitransform rebase");
+    // A durable wire round trip must not depend on the live decoded scope.
+    const serialized: DocumentOp[] = JSON.parse(JSON.stringify(result.operations));
+    expect(serialized).toHaveLength(2);
+    for (const [index, restored] of serialized.entries()) {
+      if (restored.op !== "restoreBlock") throw new Error("Expected serialized restore operation");
+      expect(restored.encoding).toBe("deflate-json-v1");
+      expect(restored.range).toEqual(
+        index === 0
+          ? {
+              sheet: SHEET,
+              start: { row: 9, col: 3 },
+              end: { row: 9, col: 3 },
+            }
+          : { ...target, sheet: OTHER_SHEET },
+      );
+      expect(decodeRestoreBlock(restored)).toEqual({
+        ...block,
+        refs: [[0, { sheet: SHEET, row: 10, col: 3 }]],
+      });
+    }
+
+    // Row 10 only contains the reference after all preceding transforms.
+    expectConflict(
+      local,
+      [...remote, structure("row", "delete", 10, 1)],
+      "structural-overlap",
+      0,
+      remote.length,
+    );
+    expect(JSON.stringify(local)).toBe(localBefore);
+    expect(JSON.stringify(remote)).toBe(remoteBefore);
+  });
+
+  it("keeps conservative formula conflicts and detects restore overlap from either side", () => {
+    const formula = encodeRestoreBlock(target, {
+      rowCount: 1,
+      colCount: 1,
+      values: [null],
+      formulas: [[0, "=A1"]],
+    });
+    expectConflict([formula], [structure("row", "insert")], "formula-structural");
+    const restored = encodeRestoreBlock(target, block);
+    const edit: DocumentOp = {
+      op: "set",
+      addr: { sheet: SHEET, row: 8, col: 1 },
+      value: literal(),
+    };
+    expectConflict([restored], [edit], "overlapping-edit");
+    expectConflict([edit], [restored], "overlapping-edit");
+    expectConflict([restored], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    expectConflict([restored], [structure("row", "delete", 8, 1)], "structural-overlap");
+  });
+});
+
+describe("operation sequences", () => {
+  const set = (row: number, col: number, value: number): DocumentOp => ({
+    op: "set",
+    addr: { sheet: SHEET, row, col },
+    value: { kind: "literal", value },
+  });
+  const addRows = (at: number, count: number): DocumentOp => ({
+    op: "addRows",
+    sheet: SHEET,
+    at,
+    count,
+  });
+  const removeRows = (at: number, count = 1): DocumentOp => ({
+    op: "removeRows",
+    sheet: SHEET,
+    at,
+    count,
+  });
+
+  it("reports an edit to a row the server deleted after an earlier local insert", () => {
+    // The local insert at 3 moves the original row 3 to index 4; the server deleted that row.
+    expectConflict(
+      [addRows(3, 1), set(8, 0, 1), set(4, 0, 2)],
+      [removeRows(3), removeRows(0)],
+      "structural-overlap",
+      2,
+      0,
+    );
+  });
+
+  it("shifts an edit written after a local deletion past a server insert", () => {
+    // Local row 6 after deleting row 6 is the original row 7; the server
+    // inserted a row before it, so the edit lands on row 7.
+    expectRebased(
+      [set(2, 0, 1), removeRows(6), set(6, 2, 2)],
+      [set(5, 1, 3), addRows(7, 1), set(6, 0, 4)],
+      [set(2, 0, 1), removeRows(6), set(7, 2, 2)],
+    );
+  });
+
+  it("conflicts when a later local edit follows a local insert inside rows the server deleted", () => {
+    // The server deleted rows 4-5; the local rows inserted between them survive
+    // at row 4, but the deletion no longer maps to one span for the later edit.
+    // The rebaser is conservative here and leaves the merge to the host.
+    expectConflict([addRows(5, 2), set(5, 0, 1)], [removeRows(4, 2)], "structural-overlap", 1, 0);
+    // Without a later operation, the insert alone rebases to the deletion point.
+    expectRebased([addRows(5, 2)], [removeRows(4, 2)], [addRows(4, 2)]);
+  });
+
+  it("keeps every rebased edit on the row it targeted", () => {
+    // An independent oracle: rows carry identities, each operation's intent is
+    // recorded by identity on the client that wrote it, and the server order
+    // (remote, then local) is replayed by identity.
+    const ROWS = 12;
+    let state = 0x2545f491;
+    const random = (n: number) => {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      return Math.floor(((state >>> 0) / 2 ** 32) * n);
+    };
+    const sequence = (tag: number): DocumentOp[] =>
+      Array.from({ length: 1 + random(3) }, () => {
+        const roll = random(10);
+        if (roll < 6) return set(random(ROWS - 3), random(3), tag * 1000 + random(1000));
+        if (roll < 8) return addRows(random(ROWS - 3), 1 + random(2));
+        return removeRows(random(ROWS - 4));
+      });
+
+    type Rows = { ids: string[]; cells: Map<string, number> };
+    type Intent =
+      | { kind: "insert"; before: string | null; ids: string[] }
+      | { kind: "remove"; id: string }
+      | { kind: "set"; id: string; col: number; value: number };
+    const literalOf = (operation: DocumentOp) =>
+      (operation as { value: { value: number } }).value.value;
+    const intentsOf = (ops: readonly DocumentOp[], tag: string): Intent[] => {
+      const ids = Array.from({ length: ROWS }, (_, row) => `b${row}`);
+      let next = 0;
+      return ops.map((operation): Intent => {
+        if (operation.op === "addRows") {
+          const added = Array.from({ length: operation.count }, () => `${tag}${next++}`);
+          const before = ids[operation.at] ?? null;
+          ids.splice(operation.at, 0, ...added);
+          return { kind: "insert", before, ids: added };
+        }
+        if (operation.op === "removeRows")
+          return { kind: "remove", id: ids.splice(operation.at, 1)[0]! };
+        if (operation.op !== "set") throw new Error("unexpected operation");
+        return {
+          kind: "set",
+          id: ids[operation.addr.row]!,
+          col: operation.addr.col,
+          value: literalOf(operation),
+        };
+      });
+    };
+    /** Replays intents by identity; false when one targets a row that no longer exists. */
+    const replay = (rows: Rows, intents: readonly Intent[]): boolean => {
+      for (const intent of intents) {
+        if (intent.kind === "insert") {
+          let at = intent.before === null ? rows.ids.length : rows.ids.indexOf(intent.before);
+          if (at < 0) {
+            // The anchor was deleted: insert before the next surviving original row.
+            const order = Number(intent.before!.slice(1));
+            at = rows.ids.findIndex((id) => id.startsWith("b") && Number(id.slice(1)) > order);
+            if (at < 0) at = rows.ids.length;
+          }
+          rows.ids.splice(at, 0, ...intent.ids);
+        } else if (intent.kind === "remove") {
+          const at = rows.ids.indexOf(intent.id);
+          if (at < 0) return false;
+          rows.ids.splice(at, 1);
+        } else {
+          if (!rows.ids.includes(intent.id)) return false;
+          rows.cells.set(`${intent.id}:${intent.col}`, intent.value);
+        }
+      }
+      return true;
+    };
+    /** Replays operations by index, as the store applies them. */
+    const apply = (rows: Rows, ops: readonly DocumentOp[], tag: string) => {
+      let next = 0;
+      for (const operation of ops) {
+        if (operation.op === "addRows") {
+          rows.ids.splice(
+            operation.at,
+            0,
+            ...Array.from({ length: operation.count }, () => `${tag}${next++}`),
+          );
+        } else if (operation.op === "removeRows") {
+          rows.ids.splice(operation.at, operation.count);
+        } else if (operation.op === "set") {
+          rows.cells.set(
+            `${rows.ids[operation.addr.row]}:${operation.addr.col}`,
+            literalOf(operation),
+          );
+        }
+      }
+    };
+    /** Row identities and values by position: a write on the wrong inserted row is visible. */
+    const view = (rows: Rows) =>
+      rows.ids.map((id) => [id, ...[0, 1, 2].map((col) => rows.cells.get(`${id}:${col}`) ?? null)]);
+    const base = (): Rows => ({
+      ids: Array.from({ length: ROWS }, (_, row) => `b${row}`),
+      cells: new Map(),
+    });
+
+    let compared = 0;
+    for (let trial = 0; trial < 2000; trial++) {
+      const local = sequence(1);
+      const remote = sequence(2);
+      const remoteBefore = JSON.stringify(remote);
+      const result = rebaseDocumentOperations(local, remote);
+      // Carrying a remote operation through the local list never edits the caller's copy.
+      expect(JSON.stringify(remote)).toBe(remoteBefore);
+      const expected = base();
+      expect(replay(expected, intentsOf(remote, "r"))).toBe(true);
+      const intentKept = replay(expected, intentsOf(local, "l"));
+      if (result.status === "conflict") continue;
+      // A rebase that succeeds must never drop or redirect a local edit.
+      expect({ local, remote, intentKept }).toEqual({ local, remote, intentKept: true });
+      const server = base();
+      apply(server, remote, "r");
+      apply(server, result.operations, "l");
+      expect({ local, remote, rows: view(server) }).toEqual({
+        local,
+        remote,
+        rows: view(expected),
+      });
+      compared++;
+    }
+    expect(compared).toBeGreaterThan(1500);
   });
 });

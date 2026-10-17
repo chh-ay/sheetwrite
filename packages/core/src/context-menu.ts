@@ -59,7 +59,6 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   exportXlsx: "Export XLSX",
 };
 
-/** Map a built-in action to the matching `GridActions` call; unknown/separator → no-op. */
 function actionHandler(
   action: ContextMenuActionName | undefined,
   actions: GridActions,

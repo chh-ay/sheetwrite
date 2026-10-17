@@ -10,6 +10,7 @@ import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
 import { ExpressiveCode } from "expressive-code";
 import { format } from "prettier";
 import { svelte2tsx } from "svelte2tsx";
+
 import {
   injectHoverPrelude,
   type PreludeInjection,
@@ -260,10 +261,6 @@ async function formatSignature(rawSignature: string, printWidth: number): Promis
   } catch {
     return signature;
   }
-}
-
-export async function formatHoverSignature(raw: string, printWidth = 80): Promise<string> {
-  return formatSignature(normalizeQuickInfo(raw), printWidth);
 }
 
 /**

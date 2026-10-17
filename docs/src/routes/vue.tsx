@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { createApp } from "vue";
+
 import { pageMeta } from "../lib/seo.js";
 import { ShowcasePage } from "../showcases/ShowcasePage.js";
 import VueWorkbench from "../showcases/VueWorkbench.js";
+
 import vueWorkbenchStylesheet from "../styles/vue-workbench.css?url";
 
 const description =
@@ -46,7 +48,7 @@ function VueWorkbenchRoute() {
           detail: "Accepted edits enter the real pending queue before the host version advances.",
         },
       ]}
-      prompt="Attempt the protected G1 override as Reviewer, inspect the rejection, authorize Finance lead, then commit the same edit."
+      prompt="Attempt the protected G1 edit in the Total column as Reviewer. Inspect the rejection, authorize Finance lead, then commit the same edit."
       sourcePath="docs/src/showcases/VueWorkbench.ts"
       title="A governed edit, from rejection to commit."
     >

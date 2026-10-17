@@ -170,6 +170,8 @@ struct NumericAggregate {
 
 pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
     match func {
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => super::analysis::evaluate_scalar(super::analysis::name(id), values),
         Func::Count => Value::number(count_numeric(values) as f64),
         Func::CountA => Value::number(
             values
@@ -360,6 +362,100 @@ fn aggregate_numbers(values: &FuncAccumulator) -> Result<NumericAggregate, Formu
     }
 }
 
+/// The reductions whose result is one running fold over their values.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReductionKind {
+    Sum,
+    Average,
+    Minimum,
+    Maximum,
+    Count,
+    CountA,
+}
+
+/// A running fold for [`ReductionKind`], fed one value at a time. It mirrors
+/// the accumulator path, including its cell limit, error order and empty-input
+/// results, so a streamed range and a materialized one answer the same.
+pub(super) struct ReductionFold {
+    kind: ReductionKind,
+    cells: u64,
+    count: u64,
+    sum: f64,
+    min: f64,
+    max: f64,
+}
+
+impl ReductionFold {
+    /// The fold for `func`, or `None` when the function needs its values.
+    pub(super) fn new(func: Func) -> Option<Self> {
+        let kind = match func {
+            Func::Sum => ReductionKind::Sum,
+            Func::Avg => ReductionKind::Average,
+            Func::Min => ReductionKind::Minimum,
+            Func::Max => ReductionKind::Maximum,
+            Func::Count => ReductionKind::Count,
+            Func::CountA => ReductionKind::CountA,
+            _ => return None,
+        };
+        Some(Self {
+            kind,
+            cells: 0,
+            count: 0,
+            sum: 0.0,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+        })
+    }
+
+    pub(super) fn push(&mut self, value: &Value) -> Result<(), FormulaError> {
+        if self.cells >= RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += 1;
+        match self.kind {
+            ReductionKind::Count => {
+                if matches!(value, Value::Number(number) if number.is_finite()) {
+                    self.count += 1;
+                }
+            }
+            ReductionKind::CountA => {
+                if !matches!(value, Value::Blank) {
+                    self.count += 1;
+                }
+            }
+            _ => {
+                if let Some(number) = aggregate_number(value, true)? {
+                    self.count += 1;
+                    self.sum += number;
+                    self.min = self.min.min(number);
+                    self.max = self.max.max(number);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The single result, with the accumulator path's checks.
+    pub(super) fn finish(self) -> EvalResult {
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => Value::number(self.count as f64),
+            // The accumulator path rejects a non-finite running sum for every
+            // reduction, before it looks at the chosen op.
+            _ if !self.sum.is_finite() => Value::Error(FormulaError::Num),
+            ReductionKind::Sum => Value::number(self.sum),
+            ReductionKind::Average => {
+                if self.count == 0 {
+                    Value::Error(FormulaError::DivZero)
+                } else {
+                    Value::number(self.sum / self.count as f64)
+                }
+            }
+            ReductionKind::Minimum => Value::number(if self.count == 0 { 0.0 } else { self.min }),
+            ReductionKind::Maximum => Value::number(if self.count == 0 { 0.0 } else { self.max }),
+        }
+    }
+}
+
 fn count_numeric(values: &FuncAccumulator) -> u64 {
     values
         .entries()
@@ -458,26 +554,28 @@ pub(super) fn numeric_entries<'a>(
 }
 
 pub(super) fn treats_cell_as_reference(func: Func) -> bool {
-    matches!(
-        func,
+    match func {
         Func::Sum
-            | Func::Avg
-            | Func::Min
-            | Func::Max
-            | Func::Count
-            | Func::CountA
-            | Func::Product
-            | Func::Median
-            | Func::ModeSngl
-            | Func::StdevS
-            | Func::StdevP
-            | Func::VarS
-            | Func::VarP
-            | Func::GeoMean
-            | Func::CountBlank
-            | Func::Npv
-            | Func::Irr
-    )
+        | Func::Avg
+        | Func::Min
+        | Func::Max
+        | Func::Count
+        | Func::CountA
+        | Func::Product
+        | Func::Median
+        | Func::ModeSngl
+        | Func::StdevS
+        | Func::StdevP
+        | Func::VarS
+        | Func::VarP
+        | Func::GeoMean
+        | Func::CountBlank
+        | Func::Npv
+        | Func::Irr => true,
+        #[cfg(feature = "analysis")]
+        Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
+        _ => false,
+    }
 }
 
 #[cfg(test)]

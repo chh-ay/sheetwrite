@@ -12,7 +12,7 @@ a low-level Store concern, while Grid commits are normal host-driven edits
 that participate in read-only policy and undo/redo history.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L146"><code>packages/core/src/types/transaction.ts#L146</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L180"><code>packages/core/src/types/transaction.ts#L180</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>1</span>

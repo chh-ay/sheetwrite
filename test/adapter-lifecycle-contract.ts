@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { setXlsxTableExportBackend } from "../packages/core/dist/index.js";
 import type {
   GridAdapterEventHandlers,
@@ -7,12 +8,14 @@ import type {
 } from "../packages/core/src/adapter.js";
 import type {
   CellEditor,
+  ChangeEvent,
   ColumnarData,
   DataSource,
   DataSourcePage,
   Grid,
   GridEvents,
   GridOptions,
+  Selection,
   Workbook,
 } from "../packages/core/src/index.js";
 
@@ -260,7 +263,10 @@ interface InitializationProbeResult {
   editPreserved: boolean;
 }
 
-async function runInitializationProbe(adapter: string): Promise<InitializationProbeResult> {
+async function runInitializationProbe(
+  adapter: string,
+  pendingLive = false,
+): Promise<InitializationProbeResult | { pendingLiveOptions: true }> {
   const repositoryRoot = new URL("../", import.meta.url).pathname;
   const probe = new URL("./adapter-initialization-probe.ts", import.meta.url).pathname;
   const domSetup = new URL("../test-setup.ts", import.meta.url).pathname;
@@ -269,6 +275,7 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
     ["bun", "--preload", domSetup, "--preload", svelteSetup, probe, adapter],
     {
       cwd: repositoryRoot,
+      env: { ...Bun.env, ADAPTER_PENDING_LIVE_ONLY: pendingLive ? "1" : "0" },
       stdout: "pipe",
       stderr: "pipe",
     },
@@ -284,6 +291,12 @@ async function runInitializationProbe(adapter: string): Promise<InitializationPr
 
 export function runSharedAdapterLifecycleContract(adapter: string, mount: MountAdapter): void {
   describe(`${adapter} shared lifecycle contract`, () => {
+    it("applies pending committed live options before publishing readiness", async () => {
+      expect(await runInitializationProbe(adapter.toLowerCase(), true)).toEqual({
+        pendingLiveOptions: true,
+      });
+    });
+
     it("shares fallback, current-error, retry, and stale-generation semantics", async () => {
       expect(await runInitializationProbe(adapter.toLowerCase())).toEqual({
         adapter: adapter.toLowerCase(),
@@ -298,6 +311,58 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         selectionPreserved: true,
         editPreserved: true,
       });
+    });
+
+    it("retires a generation when onReady throws without reclassifying the consumer error", async () => {
+      const recorder = createLifecycleRecorder();
+      const failure = new Error("ready consumer failed");
+      const initializationErrors: unknown[] = [];
+      const consumerErrors: unknown[] = [];
+      const originalReportError = globalThis.reportError;
+      globalThis.reportError = (error) => consumerErrors.push(error);
+      let mounted: MountedAdapter | undefined;
+      try {
+        try {
+          mounted = await mount({
+            ...initialProps(recorder),
+            onReady(event) {
+              recorder.onReady(event);
+              throw failure;
+            },
+            onInitializationError: (error) => initializationErrors.push(error),
+          });
+        } catch (error) {
+          consumerErrors.push(error);
+        }
+        await Promise.resolve();
+        expect(consumerErrors).toContain(failure);
+        expect(initializationErrors).toEqual([]);
+        expect(document.querySelector('[role="grid"]')).toBeNull();
+        expect(mounted?.getPublishedGrid() ?? null).toBeNull();
+        expect(recorder.ready).toHaveLength(1);
+        expect([...recorder.destroyCalls.values()]).toEqual([1]);
+      } finally {
+        globalThis.reportError = originalReportError;
+        if (mounted) await mounted.unmount();
+      }
+    });
+
+    it("treats the effective default renderer as unchanged and preserves reset precedence", async () => {
+      const recorder = createLifecycleRecorder();
+      const props = initialProps(recorder);
+      const mounted = await mount(props);
+      const first = mounted.getPublishedGrid();
+      await mounted.render({ ...props, renderer: "canvas" });
+      expect(mounted.getPublishedGrid()).toBe(first);
+      expect(recorder.ready).toHaveLength(1);
+      await mounted.render({
+        ...props,
+        workbook: makeConformanceWorkbook("Replacement"),
+        renderer: "worker",
+      });
+      expect(recorder.ready).toHaveLength(2);
+      expect(recorder.ready[1]?.reason).toBe("input-reset");
+      await mounted.unmount();
     });
 
     it("publishes exactly one live grid before generation-one readiness and clears it once", async () => {
@@ -317,7 +382,7 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
       expect(mounted.host.childElementCount).toBe(0);
     });
 
-    it("uses current callbacks and applies theme, overscan, and minColumns live", async () => {
+    it("uses current callbacks, applies theme and minColumns live, and keeps the grid on overscan change", async () => {
       const recorder = createLifecycleRecorder();
       const oldCalls: string[] = [];
       const newCalls: string[] = [];
@@ -350,6 +415,104 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
 
       await mounted.unmount();
       expect(recorder.destroyCalls.get(first)).toBe(1);
+    });
+
+    it("delivers command state only to the currently attached handler", async () => {
+      const recorder = createLifecycleRecorder();
+      const first: Array<GridEvents["command-state-change"]> = [];
+      const second: Array<GridEvents["command-state-change"]> = [];
+      const props: AdapterConformanceProps = {
+        ...initialProps(recorder),
+        onCommandStateChange: (event) => first.push(event),
+      };
+      const mounted = await mount(props);
+      const grid = mounted.getPublishedGrid()!;
+
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 1, col: 0 } });
+      expect(first).toHaveLength(1);
+
+      await mounted.render({ ...props, onCommandStateChange: (event) => second.push(event) });
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 2, col: 0 } });
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+
+      await mounted.render({ ...props, onCommandStateChange: undefined });
+      grid.setSelection({ kind: "cell", addr: { sheet: "lifecycle", row: 0, col: 0 } });
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+
+      await mounted.unmount();
+    });
+
+    it("forwards change, selection, and active-sheet events to the current callbacks", async () => {
+      const recorder = createLifecycleRecorder();
+      const first = {
+        changes: [] as ChangeEvent[],
+        selections: [] as Array<Selection | null>,
+        sheets: [] as Array<GridEvents["active-sheet"]>,
+      };
+      const second = {
+        changes: [] as ChangeEvent[],
+        selections: [] as Array<Selection | null>,
+        sheets: [] as Array<GridEvents["active-sheet"]>,
+      };
+      const base = initialProps(recorder);
+      const workbook = makeConformanceWorkbook();
+      workbook.sheets.push({ ...workbook.sheets[0]!, id: "second", name: "Second" });
+      const handlersFor = (sink: typeof first): Partial<AdapterConformanceProps> => ({
+        onGridChange: (event) => sink.changes.push(event),
+        onSelectionChange: (selection) => sink.selections.push(selection),
+        onActiveSheetChange: (event) => sink.sheets.push(event),
+      });
+      const props: AdapterConformanceProps = { ...base, workbook, ...handlersFor(first) };
+      const mounted = await mount(props);
+      const grid = mounted.getPublishedGrid()!;
+      const exercise = (value: string, row: number, active: string, next: string) => {
+        grid.store.applyTransaction({
+          patches: [
+            {
+              op: "set",
+              addr: { sheet: "lifecycle", row: 0, col: 0 },
+              value: { kind: "literal", value },
+            },
+          ],
+        });
+        grid.setSelection({ kind: "cell", addr: { sheet: active, row, col: 0 } });
+        grid.setActiveSheet(next);
+      };
+
+      exercise("first", 1, "lifecycle", "second");
+      expect(first.changes.map((event) => event.transaction.patches)).toEqual([
+        [
+          {
+            op: "set",
+            addr: { sheet: "lifecycle", row: 0, col: 0 },
+            value: { kind: "literal", value: "first" },
+          },
+        ],
+      ]);
+      expect(first.selections).toContainEqual({
+        kind: "cell",
+        addr: { sheet: "lifecycle", row: 1, col: 0 },
+      });
+      expect(first.sheets).toEqual([{ sheet: "second" }]);
+      const firstSelectionCount = first.selections.length;
+
+      await mounted.render({ ...props, ...handlersFor(second) });
+      expect(mounted.getPublishedGrid()).toBe(grid);
+      expect(recorder.ready).toHaveLength(1);
+      exercise("second", 2, "second", "lifecycle");
+      expect(first.changes).toHaveLength(1);
+      expect(first.selections).toHaveLength(firstSelectionCount);
+      expect(first.sheets).toHaveLength(1);
+      expect(second.changes).toHaveLength(1);
+      expect(second.selections).toContainEqual({
+        kind: "cell",
+        addr: { sheet: "second", row: 2, col: 0 },
+      });
+      expect(second.sheets).toEqual([{ sheet: "lifecycle" }]);
+
+      await mounted.unmount();
     });
 
     it("forwards every operational event with typed payloads and current callbacks", async () => {

@@ -3,15 +3,14 @@
 //! Layout decisions:
 //! - Values are stored **column-major** (each column is a contiguous run) so
 //!   whole-column scans (sort/filter/aggregate) stay cache-local.
-//! - A cell value is a tagged scalar: empty, number (`f64`), interned string,
-//!   or formula. Strings are dictionary-encoded in a per-store pool so repeated
-//!   text costs one `u32` per cell, not a heap allocation.
+//! - A source cell is a tagged scalar: empty, number (`f64`), interned string,
+//!   boolean, or formula. Strings are dictionary-encoded in a per-store pool;
+//!   the cell payload holds the pool ID rather than a heap allocation.
 //! - Styles are *not* held here as objects; the host owns the small style
 //!   dictionary and the store keeps only a `u32` style id per cell. That keeps
 //!   the large per-cell array in linear memory and the tiny dictionary in JS.
-//! - The render loop never reads a single cell across the boundary: it asks for
-//!   a whole visible window in one call (`get_window`) and receives one packed
-//!   fixed-width payload plus the window's unique strings.
+//! - Render-window reads cross the boundary in bulk (`get_window`) and return
+//!   one packed fixed-width payload plus window-local formula-error strings.
 
 #[cfg(not(feature = "formula-engine"))]
 compile_error!(
@@ -22,7 +21,11 @@ compile_error!(
 #[cfg(feature = "formula-engine")]
 mod calc;
 #[cfg(feature = "formula-engine")]
+mod derived;
+#[cfg(feature = "formula-engine")]
 mod eval;
+#[cfg(feature = "formula-engine")]
+mod formula_reads;
 #[cfg(feature = "formula-engine")]
 mod memory;
 #[cfg(feature = "formula-engine")]
@@ -31,6 +34,8 @@ mod query;
 mod sheet;
 #[cfg(feature = "formula-engine")]
 mod store;
+#[cfg(feature = "formula-engine")]
+mod transfer;
 #[cfg(feature = "formula-engine")]
 mod types;
 #[cfg(feature = "formula-engine")]
@@ -44,7 +49,13 @@ pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]
 pub use window::WindowView;
 
-// Test-only preludes: `tests.rs` reaches the whole crate through `use super::*`.
+/// Names accepted by the full engine, including aliases.
+#[cfg(feature = "analysis")]
+#[wasm_bindgen::prelude::wasm_bindgen(js_name = functionNames)]
+pub fn function_names() -> Vec<String> {
+    calc::function_names()
+}
+
 #[cfg(all(test, feature = "formula-engine"))]
 pub(crate) use sheet::*;
 #[cfg(all(test, feature = "formula-engine"))]

@@ -11,9 +11,19 @@
     "bench:range:smoke": "bun run src/range-bench.ts --smoke",
     "bench:paged": "bun run src/paged-bench.ts",
     "bench:paged:smoke": "bun run src/paged-bench.ts --smoke",
+    "bench:interaction": "bun run src/interaction-bench.ts",
+    "bench:interaction:smoke": "bun run src/interaction-bench.ts --smoke",
+    "bench:interaction-sessions": "bun run src/interaction-sessions-bench.ts",
+    "bench:windows": "bun run src/window-ownership-bench.ts",
+    "bench:core-paths": "bun run src/core-paths-bench.ts --output results/core-paths-results.json",
+    "bench:core-paths:smoke": "bun run src/core-paths-bench.ts --smoke",
+    "bench:release": "bun run src/release-capture.ts",
+    "bench:release:smoke": "bun run src/release-capture.ts --smoke",
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
     "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
+    "bench:formula:engines": "bun run src/full-engine-bench.ts",
+    "bench:formula:matched": "bun run src/matched-engine-bench.ts",
     "bench:view-index": "bun run src/view-index-bench.ts",
     "bench:formula:smoke": "bun run src/formula-bench.ts --smoke",
     "bench:resource": "bun run src/resource-bench.ts",
@@ -30,17 +40,18 @@
     "bench:baseline:candidate": "bun run src/generate-baseline.ts",
     "test:gates": "bun test test",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "bench:render:scale": "bun run src/render-driver.ts --rows 1000,10000,100000,1000000 --rounds 10 --compact-samples --output results/render-scale.json --markdown-output results/render-scale.md"
+    "bench:render:scale": "bun run src/render-driver.ts --rows 1000,10000,100000,1000000 --rounds 10 --samples 5 --warmups 2 --compact-samples --output results/render-scale.json --markdown-output results/render-scale.md"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.14.5",
     "@playwright/test": "^1.63.0",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.3",
     "typescript": "^7.0.2"
   },
   "dependencies": {
     "@sheetwrite/core": "workspace:*",
+    "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/wasm": "workspace:*",
-    "handsontable": "^18.0.0"
+    "handsontable": "18.1.2"
   }
 }

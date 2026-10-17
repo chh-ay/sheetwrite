@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { cp, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+
 import { PUBLISHABLE_PACKAGE_ORDER, validateWorkspaceGraph } from "./workspace-tooling.js";
 
 interface PackageManifest {
@@ -15,6 +16,7 @@ interface PackageManifest {
 const GENERATED_OUTPUTS = [
   "packages/wasm/pkg",
   "packages/wasm/target",
+  "packages/formulas/pkg",
   "packages/core/dist",
   "packages/xlsx/dist",
   "packages/react/dist",
@@ -25,6 +27,7 @@ const GENERATED_OUTPUTS = [
 
 const RUNTIME_ENTRY_PATHS = [
   "./packages/wasm/loader-node.mjs",
+  "./packages/formulas/loader-node.mjs",
   "./packages/core/dist/index.js",
   "./packages/xlsx/dist/index.js",
   "./packages/react/dist/index.js",

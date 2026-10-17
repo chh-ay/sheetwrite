@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
+
 import {
   type CoverageLanguage,
   type CoverageRecord,
@@ -16,7 +17,7 @@ import {
 } from "./coverage-check.js";
 
 const CARGO_LLVM_COV_VERSION = "0.8.7";
-const RUST_VERSION = "1.98.1";
+const RUST_VERSION = "1.99.0";
 const TYPESCRIPT_ROOTS = [
   "packages/core/src",
   "packages/react/src",
@@ -254,7 +255,8 @@ export async function runRustCoverage(root = resolve(import.meta.dir, "..")): Pr
 
   const common = ["--manifest-path", "packages/wasm/Cargo.toml"] as const;
   const repositorySources = ["--ignore-filename-regex", String.raw`\.cargo|\.rustup`] as const;
-  await run(["cargo", "llvm-cov", ...common, "--no-report"], root);
+  // The full engine builds every source file; no code is compiled only without it.
+  await run(["cargo", "llvm-cov", ...common, "--features", "analysis", "--no-report"], root);
   await run(
     [
       "cargo",

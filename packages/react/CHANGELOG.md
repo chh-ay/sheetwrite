@@ -1,5 +1,59 @@
 # @sheetwrite/react
 
+## 0.5.0
+
+### Minor Changes
+
+- 4e5b8e2: Align the framework adapters and XLSX integration with the coordinated Sheetwrite 0.5.0 release.
+- e6b6dbb: Share adapter initialization, reset classification, Grid generation publication, and retirement through `createAdapterGridController` in `@sheetwrite/core/adapter`. Apply pending live options before readiness, retire a new Grid when publication or readiness callbacks throw, preserve first-source loader diagnostics without replacing healthy Grids, and treat omitted and canvas renderers as the same input.
+
+### Patch Changes
+
+- ed66b6d: Faster large edits, scrolling and collaboration paths. Results are unchanged; numbers are medians from alternating runs.
+  
+  - A large `setBlock` measures its payload once per commit instead of three times: a 1,000,000-cell block write is 60% faster (1,364 ms to 545 ms), 50% faster with detailed change capture.
+  - Number and date cells reuse their formatted text, and wrapped text stops laying out lines that cannot be drawn: wrapped-text scrolling is 39% faster and number-format scrolling 14% faster.
+  - Inserting rows with a row bridge checks duplicate IDs with a set: inserting 10,000 rows into 1,000,000 fell from 34.7 s to 5 ms.
+  - Framework adapters subscribe to command state only while a command-state handler exists, so selection skips the per-cell summary otherwise (24% faster selection without a handler).
+  - Rebasing operations no longer clones them a second time (98% faster for a large block), and sparse writes skip validation rules outside the written area (22% faster with 100 unrelated rules).
+  - A search highlight or note on a partly visible top row is no longer dropped, and a command-state handler installed inside a selection or change callback now receives the following emission.
+- cb78a4b: Exclude source maps from published library packages to reduce download and install size. Keep maps in local builds for development and size analysis.
+  
+  Declare only CSS files as side effects in the React, Vue, and Svelte adapters. Bundlers can remove unused JavaScript and keep imported stylesheets.
+- Updated dependencies [a490186]
+- Updated dependencies [b2379eb]
+- Updated dependencies [fca4622]
+- Updated dependencies [be6b618]
+- Updated dependencies [ed66b6d]
+- Updated dependencies [a9a3c5f]
+- Updated dependencies [9915236]
+- Updated dependencies [11e9336]
+- Updated dependencies [b8dbb50]
+- Updated dependencies [a767c8b]
+- Updated dependencies [26a3552]
+- Updated dependencies [0f4b9da]
+- Updated dependencies [d1d34b9]
+- Updated dependencies [cf1a10c]
+- Updated dependencies [48be92d]
+- Updated dependencies [ef2b0f5]
+- Updated dependencies [2c03528]
+- Updated dependencies [2b5f1eb]
+- Updated dependencies [cb12daa]
+- Updated dependencies [73cb52a]
+- Updated dependencies [4d4b204]
+- Updated dependencies [be093cd]
+- Updated dependencies [43b0e9c]
+- Updated dependencies [7221484]
+- Updated dependencies [b54b29a]
+- Updated dependencies [e6b6dbb]
+- Updated dependencies [e725d98]
+- Updated dependencies [eb1c786]
+- Updated dependencies [bc7bc53]
+- Updated dependencies [59e8d1a]
+- Updated dependencies [fdc14ce]
+- Updated dependencies [99435f8]
+  - @sheetwrite/core@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes

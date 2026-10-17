@@ -1,7 +1,8 @@
 import { describe, expect, it, jest } from "bun:test";
+
 import type { PanePaint, RenderLayout, Theme, VisibleWindowView } from "../src/types.js";
-import { createWorkerMessageHandler } from "../src/worker.js";
 import { WorkerRenderer } from "../src/worker-renderer.js";
+import { createWorkerMessageHandler } from "../src/worker.js";
 
 let latestConstructedWorker: RecordingWorker | null = null;
 
@@ -148,6 +149,7 @@ function isSharedPaintPost(value: unknown): value is SharedPaintPost {
 function makePackedView(): VisibleWindowView {
   return {
     sheet: "s1",
+    stringPoolEpoch: 17,
     rows: { start: 0, end: 1 },
     cols: [0, 1],
     values: ["alpha", 42],
@@ -172,6 +174,7 @@ describe("WorkerRenderer", () => {
     const styleIds = new Uint32Array([0, 1, 0]);
     const view: VisibleWindowView = {
       sheet: "s1",
+      stringPoolEpoch: 0,
       rows: { start: 0, end: 1 },
       cols: [0, 1, 2],
       values: ["a", "b", "c"],
@@ -205,7 +208,7 @@ describe("WorkerRenderer", () => {
       throw new Error("expected packed paint message");
     }
     const payload = posted.message;
-    expect(posted.message).toMatchObject({ type: "paintPacked", sheet: "s1" });
+    expect(posted.message).toMatchObject({ type: "paintPacked", sheet: "s1", stringPoolEpoch: 17 });
     expect(posted.transfer).toEqual([
       payload.valueKinds.buffer,
       payload.numberValues.buffer,
@@ -234,6 +237,7 @@ describe("WorkerRenderer", () => {
     expect(posted.transfer).toBeUndefined();
     expect(isSharedPaintPost(posted.message)).toBe(true);
     if (!isSharedPaintPost(posted.message)) throw new Error("expected shared paint message");
+    expect(posted.message).toMatchObject({ stringPoolEpoch: 17 });
 
     const { buffer, offsets, lengths } = posted.message.shared;
     expect(Atomics.load(new Int32Array(buffer, 0, 2), 0)).toBe(1);
@@ -269,7 +273,11 @@ describe("WorkerRenderer", () => {
     expect(isSharedPaintPost(worker.messages[1]!.message)).toBe(true);
 
     const fallback = worker.messages[2]!;
-    expect(fallback.message).toMatchObject({ type: "paintPacked", sheet: "s1" });
+    expect(fallback.message).toMatchObject({
+      type: "paintPacked",
+      sheet: "s1",
+      stringPoolEpoch: 17,
+    });
     expect(fallback.transfer?.length).toBe(6);
   });
   it("serializes packed and generic frozen panes with the exact transferable buffers", () => {
@@ -279,6 +287,7 @@ describe("WorkerRenderer", () => {
     const packed = makePackedView();
     const generic: VisibleWindowView = {
       sheet: "s1",
+      stringPoolEpoch: 0,
       rows: { start: 1, end: 2 },
       cols: [0],
       values: ["fallback"],
@@ -310,7 +319,7 @@ describe("WorkerRenderer", () => {
       divider: { x: 100, y: null },
       panes: [
         {
-          packed: { sheet: "s1" },
+          packed: { sheet: "s1", stringPoolEpoch: 17 },
           view: undefined,
           clip: panes[0]!.clip,
           scrollTop: 0,
@@ -337,6 +346,76 @@ describe("WorkerRenderer", () => {
     ]);
     expect(postedPacked.valueKinds).not.toBe(packed.valueKinds);
     expect(postedPacked.styleIds).not.toBe(packed.styleIds);
+  });
+
+  it("drops strings absent from a replacement-epoch frame before later packed paints", () => {
+    const drawnText: string[] = [];
+    const context = new Proxy<Record<string, unknown>>(
+      {},
+      {
+        get(target, property) {
+          if (property in target) return target[String(property)];
+          if (property === "measureText") return (text: string) => ({ width: text.length * 7 });
+          if (property === "fillText") return (text: string) => drawnText.push(text);
+          return () => undefined;
+        },
+      },
+    );
+    const canvas = new EventTarget();
+    Object.defineProperties(canvas, {
+      width: { value: 640, writable: true },
+      height: { value: 480, writable: true },
+      getContext: { value: () => context },
+    });
+    const handler = createWorkerMessageHandler(() => undefined);
+    handler({ type: "init", canvas, theme: TEST_THEME });
+    handler({
+      type: "layout",
+      layout: {
+        columns: [{ key: "name", header: "Name", width: 160, type: "text" }],
+        rowHeight: 20,
+        headerHeight: 24,
+        totalRows: 1,
+      },
+    });
+    handler({
+      type: "viewport",
+      viewport: { width: 640, height: 480, scrollTop: 0, scrollLeft: 0 },
+      dpr: 1,
+    });
+    const frame = {
+      type: "paintPacked",
+      ...makePackedView(),
+      cols: [0],
+      valueKinds: new Uint8Array([2]),
+      numberValues: new Float64Array([0]),
+      stringPoolIds: new Uint32Array([0]),
+      stringLocalIds: new Int32Array([-1]),
+      styleIds: new Uint32Array([0]),
+      stringPoolUpdateIds: new Uint32Array([0]),
+      stringPoolUpdateValues: ["old epoch text"],
+    };
+    handler(frame);
+    expect(drawnText).toContain("old epoch text");
+    drawnText.length = 0;
+    handler({
+      ...frame,
+      stringPoolEpoch: 18,
+      stringPoolIds: new Uint32Array([1]),
+      stringPoolUpdateIds: new Uint32Array([1]),
+      stringPoolUpdateValues: ["new epoch text"],
+    });
+    expect(drawnText).toContain("new epoch text");
+    drawnText.length = 0;
+    // Missing updates cannot resurrect text from an invalid epoch.
+    handler({
+      ...frame,
+      stringPoolEpoch: 18,
+      stringPoolUpdateIds: undefined,
+      stringPoolUpdateValues: undefined,
+    });
+    expect(drawnText).not.toContain("old epoch text");
+    handler({ type: "destroy" });
   });
 
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {

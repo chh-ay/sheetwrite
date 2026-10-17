@@ -3,7 +3,9 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
 import { chromium } from "@playwright/test";
+
 import {
   assertPublishedFilePolicy,
   readReleaseManifestDigest,
@@ -36,7 +38,6 @@ interface PackageSpec {
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const fixtureRoot = join(repositoryRoot, "test/consumer");
-const xlsxCodecPackages = ["fflate"] as const;
 const mitCompatibleLicenses: Record<string, true> = {
   "0BSD": true,
   "Apache-2.0": true,
@@ -113,18 +114,30 @@ const packageSpecs: PackageSpec[] = [
     ],
   },
   {
+    directory: "packages/formulas",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "loader.d.ts",
+      "loader.mjs",
+      "loader-browser.mjs",
+      "loader-node.mjs",
+      "loader-state.mjs",
+      "pkg/sheetwrite_wasm.d.ts",
+      "pkg/sheetwrite_wasm.js",
+      "pkg/sheetwrite_wasm_bg.wasm",
+      "pkg/sheetwrite_wasm_bg.wasm.d.ts",
+    ],
+  },
+  {
     directory: "packages/xlsx",
     requiredFiles: [
       "LICENSE",
       "README.md",
       "dist/index.d.ts",
-      "dist/index.d.ts.map",
       "dist/index.js",
-      "dist/index.js.map",
       "dist/register.d.ts",
-      "dist/register.d.ts.map",
       "dist/register.js",
-      "dist/register.js.map",
       "dist/registration.d.ts",
       "dist/registration.js",
       "dist/table-export.d.ts",
@@ -310,15 +323,6 @@ async function assertTarball(
   ) {
     throw new Error("@sheetwrite/core tarball still contains the removed XLSX backend");
   }
-  for (const dependency of xlsxCodecPackages) {
-    const ownsDependency = manifest.dependencies?.[dependency] !== undefined;
-    if (manifest.name === "@sheetwrite/xlsx" && !ownsDependency) {
-      throw new Error(`${manifest.name} must declare ${dependency}`);
-    }
-    if (manifest.name !== "@sheetwrite/xlsx" && ownsDependency) {
-      throw new Error(`${manifest.name} must not declare ${dependency}`);
-    }
-  }
 
   await mkdir(extractRoot, { recursive: true });
   await run(["tar", "-xzf", tarballPath, "-C", extractRoot], repositoryRoot);
@@ -334,6 +338,29 @@ async function assertTarball(
   }
 
   await assertWorkerBundle(packageRoot, packedManifest);
+  if (manifest.name === "@sheetwrite/formulas") {
+    await run(
+      [
+        "node",
+        "--input-type=module",
+        "-e",
+        `import { strict as assert } from "node:assert";
+         const engine = await import(${JSON.stringify(pathToFileURL(join(packageRoot, "loader-node.mjs")).href)});
+         await engine.load();
+         assert.equal(engine.isLoaded(), true);
+         const store = new engine.CellStore();
+         try {
+           const sheet = store.addSheet(1, 1);
+           store.setFormula(sheet, 0, 0, "=NORM.DIST(0,0,1,TRUE)", 0);
+           store.recompute(sheet);
+           const cell = store.getCell(sheet, 0, 0);
+           try { assert.ok(Math.abs(cell.num - 0.5) < 1e-12); }
+           finally { cell.free(); }
+         } finally { store.free(); }`,
+      ],
+      packageRoot,
+    );
+  }
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -365,14 +392,13 @@ async function verifyNoExcelClosure(
   await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
+  // Core and the adapters must install and run without the optional XLSX package.
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  for (const dependency of xlsxCodecPackages) {
-    if (lock.includes(`node_modules/${dependency}`)) {
-      throw new Error(`${packageName} package-lock unexpectedly contains ${dependency}`);
-    }
-    if (await pathExists(join(root, "node_modules", ...dependency.split("/")))) {
-      throw new Error(`${packageName} node_modules unexpectedly contains ${dependency}`);
-    }
+  if (lock.includes("node_modules/@sheetwrite/xlsx")) {
+    throw new Error(`${packageName} package-lock unexpectedly contains @sheetwrite/xlsx`);
+  }
+  if (await pathExists(join(root, "node_modules", "@sheetwrite", "xlsx"))) {
+    throw new Error(`${packageName} node_modules unexpectedly contains @sheetwrite/xlsx`);
   }
 
   const adapterProbe =
@@ -388,6 +414,37 @@ async function verifyNoExcelClosure(
     }
   `;
   await run(["node", "--input-type=module", "--eval", runtime], root);
+}
+
+async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
+  // Each stylesheet is the only import in its bundle. A combined framework
+  // bundle could hide a dropped adapter import behind another copy of core CSS.
+  await run(
+    [
+      "node",
+      "--input-type=module",
+      "--eval",
+      `import { build } from "esbuild";
+       for (const framework of ["react", "vue", "svelte"]) {
+         const result = await build({
+           stdin: {
+             contents: 'import "@sheetwrite/' + framework + '/styles.css";',
+             resolveDir: process.cwd(),
+             sourcefile: framework + ".js",
+           },
+           bundle: true,
+           treeShaking: true,
+           write: false,
+           outdir: "stylesheet-probe",
+         });
+         const css = result.outputFiles.filter(file => file.path.endsWith(".css"));
+         if (!css.some(file => file.text.includes(".sheetwrite"))) {
+           throw new Error(framework + " packed stylesheet was removed by tree shaking");
+         }
+       }`,
+    ],
+    consumerRoot,
+  );
 }
 
 async function resolveRuntimeDependency(
@@ -615,15 +672,26 @@ try {
   await bindCanonicalTarballIntegrities(join(consumerRoot, "package-lock.json"), tarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], consumerRoot);
   await run(
-    ["npm", "ls", "@sheetwrite/core", "@sheetwrite/wasm", "react", "svelte", "vue"],
+    [
+      "npm",
+      "ls",
+      "@sheetwrite/core",
+      "@sheetwrite/wasm",
+      "@sheetwrite/formulas",
+      "react",
+      "svelte",
+      "vue",
+    ],
     consumerRoot,
   );
   const auditedLicenseCount = await auditRuntimeLicenses(consumerRoot);
   await run(["npm", "run", "typecheck"], consumerRoot);
+  await verifyAdapterStylesheets(consumerRoot);
   await run(["npm", "run", "bundle"], consumerRoot);
   await run(["npm", "run", "bundle:frameworks"], consumerRoot);
   await verifyMountedFrameworkConsumers(consumerRoot);
   await run(["npm", "run", "runtime"], consumerRoot);
+  await run(["npm", "run", "runtime:formulas"], consumerRoot);
 
   // The Vite build must have compiled the packed Svelte adapter and retained
   // its operational-event wiring, in addition to the mounted browser proof.

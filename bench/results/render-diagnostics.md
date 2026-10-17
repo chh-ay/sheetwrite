@@ -1,20 +1,20 @@
 # Auditable render benchmark
 
 Protocol version: **1**  
-Run ID: `a42aaa37-341b-413f-95fd-b25c911d4a2f`  
+Run ID: `217f130c-c6c2-43be-a33d-704de8fc56a1`  
 Matrix: **complete and successful**
 
 ## Environment
 
 | Field | Value |
 |:--|:--|
-| Commit | `66a0df7c6288a89dfb2c8d2226a2fe0b88b3d25e` (clean) |
-| Timestamp | 2026-08-09T14:10:47.440Z |
-| Runtime | Bun 1.3.14; Node 24.3.0 |
-| Browser | 149.0.7827.55 |
-| OS / arch | linux 7.1.3-2-cachyos / x64 |
+| Commit | `ed66b6d7c95c3b652cbc2a89c2d59b5bf693c088` (dirty) |
+| Timestamp | 2026-10-02T18:12:14.942Z |
+| Runtime | Bun 1.4.2; Node 26.3.0 |
+| Browser | 153.0.8010.12 |
+| OS / arch | linux 7.2.8-1-cachyos / x64 |
 | CPU | 12th Gen Intel(R) Core(TM) i9-12900H |
-| Engines | Sheetwrite 0.3.1; Handsontable 18.0.0 |
+| Engines | Sheetwrite 0.4.0; Handsontable 18.0.0 |
 | Dataset | seed 1592639710; 100,000 rows = `fnv1a32:178eac66` |
 | Viewport | 640 × 480 |
 | Sampling | 1 excluded warmup aggregate(s), 3 measured aggregate(s), minimum 100 ms each |
@@ -27,18 +27,30 @@ Every cell below is linked to the raw JSON. Timings are per logical operation an
 
 | round | rows | scenario / raw identity | Sheetwrite | Handsontable |
 |---:|---:|:--|:--|:--|
-| 1 | 100,000 | [`r1-100000-formula-dense.paint`](./render-results.json) | median 0.46972 ms; p95 0.59065; MAD 0.06901; 3 samples / 764 ops |
-| 1 | 100,000 | [`r1-100000-text-heavy.long-scroll`](./render-results.json) | median 4140.7 ms; p95 4450.4; MAD 38.200; 3 samples / 3 ops |
-| 1 | 100,000 | [`r1-100000-scroll-fractional.same-window`](./render-results.json) | median 0.66424 ms; p95 0.68656; MAD 0.02480; 3 samples / 456 ops |
-| 1 | 100,000 | [`r1-100000-geometry-unresized.1m`](./render-results.json) | median 0.00012 ms; p95 0.00013; MAD 0.00000; 3 samples / 2464559 ops |
-| 1 | 100,000 | [`r1-100000-window-transfer.scroll.baseline`](./render-results.json) | median 1.533 ms; p95 1.728; MAD 0.02736; 3 samples / 191 ops; validity product-valid; copied/frame 3432.000 B; allocations/frame 1.000; copied/read 3432.000 B; allocations/read 1.000 |
-| 1 | 100,000 | [`r1-100000-window-transfer.scroll.reuse-decoded-view-upper-bound`](./render-results.json) | median 0.65065 ms; p95 0.69194; MAD 0.00578; 3 samples / 454 ops; validity pixel-data-invalid; copied/frame 0.000 B; allocations/frame 0.000; copied/read n/a; allocations/read n/a |
-| 2 | 100,000 | [`r2-100000-formula-dense.paint`](./render-results.json) | median 0.38697 ms; p95 0.43039; MAD 0.02488; 3 samples / 845 ops |
-| 2 | 100,000 | [`r2-100000-text-heavy.long-scroll`](./render-results.json) | median 4311.3 ms; p95 4356.4; MAD 50.100; 3 samples / 3 ops |
-| 2 | 100,000 | [`r2-100000-scroll-fractional.same-window`](./render-results.json) | median 0.70915 ms; p95 0.71506; MAD 0.00656; 3 samples / 430 ops |
-| 2 | 100,000 | [`r2-100000-geometry-unresized.1m`](./render-results.json) | median 0.00012 ms; p95 0.00015; MAD 0.00001; 3 samples / 2325951 ops |
-| 2 | 100,000 | [`r2-100000-window-transfer.scroll.baseline`](./render-results.json) | median 1.551 ms; p95 1.571; MAD 0.00154; 3 samples / 194 ops; validity product-valid; copied/frame 3432.000 B; allocations/frame 1.000; copied/read 3432.000 B; allocations/read 1.000 |
-| 2 | 100,000 | [`r2-100000-window-transfer.scroll.reuse-decoded-view-upper-bound`](./render-results.json) | median 0.71714 ms; p95 0.75558; MAD 0.00792; 3 samples / 413 ops; validity pixel-data-invalid; copied/frame 0.000 B; allocations/frame 0.000; copied/read n/a; allocations/read n/a |
+| 1 | 100,000 | [`r1-100000-formula-dense.paint`](./render-results.json) | median 0.47814 ms; p95 0.53792; MAD 0.06643; 3 samples / 681 ops |
+| 1 | 100,000 | [`r1-100000-text-heavy.long-scroll`](./render-results.json) | median 3582.1 ms; p95 3585.2; MAD 3.500; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-wrap-heavy.scroll`](./render-results.json) | median 5504.6 ms; p95 5516.7; MAD 13.500; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-search-many.scroll`](./render-results.json) | median 1585.3 ms; p95 1637.6; MAD 1.500; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-frozen.scroll`](./render-results.json) | median 257.9 ms; p95 267.9; MAD 11.100; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-hscroll-small`](./render-results.json) | median 7.100 ms; p95 7.629; MAD 0.58824; 3 samples / 59 ops |
+| 1 | 100,000 | [`r1-100000-cond-format.scroll`](./render-results.json) | median 1726.7 ms; p95 1761.1; MAD 2.300; 3 samples / 3 ops |
+| 1 | 100,000 | [`r1-100000-number-format.hscroll`](./render-results.json) | median 0.90079 ms; p95 1.029; MAD 0.11274; 3 samples / 382 ops |
+| 1 | 100,000 | [`r1-100000-scroll-fractional.same-window`](./render-results.json) | median 0.59000 ms; p95 0.59474; MAD 0.00462; 3 samples / 510 ops |
+| 1 | 100,000 | [`r1-100000-geometry-unresized.1m`](./render-results.json) | median 0.00012 ms; p95 0.00013; MAD 0.00000; 3 samples / 2481696 ops |
+| 1 | 100,000 | [`r1-100000-window-transfer.scroll.baseline`](./render-results.json) | median 1.527 ms; p95 1.841; MAD 0.02130; 3 samples / 187 ops; validity product-valid; copied/frame 3432.000 B; allocations/frame 1.000; copied/read 3432.000 B; allocations/read 1.000 |
+| 1 | 100,000 | [`r1-100000-window-transfer.scroll.reuse-decoded-view-upper-bound`](./render-results.json) | median 0.61790 ms; p95 0.61957; MAD 0.00185; 3 samples / 494 ops; validity pixel-data-invalid; copied/frame 0.000 B; allocations/frame 0.000; copied/read n/a; allocations/read n/a |
+| 2 | 100,000 | [`r2-100000-formula-dense.paint`](./render-results.json) | median 0.36765 ms; p95 0.37384; MAD 0.00528; 3 samples / 818 ops |
+| 2 | 100,000 | [`r2-100000-text-heavy.long-scroll`](./render-results.json) | median 3643.0 ms; p95 3902.1; MAD 44.600; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-wrap-heavy.scroll`](./render-results.json) | median 5535.6 ms; p95 5702.0; MAD 53.600; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-search-many.scroll`](./render-results.json) | median 1620.6 ms; p95 1655.0; MAD 38.200; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-frozen.scroll`](./render-results.json) | median 231.4 ms; p95 252.0; MAD 22.900; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-hscroll-small`](./render-results.json) | median 5.976 ms; p95 6.072; MAD 0.10588; 3 samples / 59 ops |
+| 2 | 100,000 | [`r2-100000-cond-format.scroll`](./render-results.json) | median 1768.3 ms; p95 1834.8; MAD 11.000; 3 samples / 3 ops |
+| 2 | 100,000 | [`r2-100000-number-format.hscroll`](./render-results.json) | median 0.87638 ms; p95 1.025; MAD 0.03613; 3 samples / 382 ops |
+| 2 | 100,000 | [`r2-100000-scroll-fractional.same-window`](./render-results.json) | median 0.58256 ms; p95 0.58413; MAD 0.00116; 3 samples / 516 ops |
+| 2 | 100,000 | [`r2-100000-geometry-unresized.1m`](./render-results.json) | median 0.00012 ms; p95 0.00012; MAD 0.00000; 3 samples / 2529104 ops |
+| 2 | 100,000 | [`r2-100000-window-transfer.scroll.baseline`](./render-results.json) | median 1.451 ms; p95 1.893; MAD 0.19947; 3 samples / 201 ops; validity product-valid; copied/frame 3432.000 B; allocations/frame 1.000; copied/read 3432.000 B; allocations/read 1.000 |
+| 2 | 100,000 | [`r2-100000-window-transfer.scroll.reuse-decoded-view-upper-bound`](./render-results.json) | median 0.61718 ms; p95 0.62647; MAD 0.01032; 3 samples / 490 ops; validity pixel-data-invalid; copied/frame 0.000 B; allocations/frame 0.000; copied/read n/a; allocations/read n/a |
 
 ## Visible-window transfer diagnostic
 
@@ -48,7 +60,7 @@ Counterbalanced scenario order: round 1: window-transfer.scroll.baseline → win
 
 | rows | baseline repetition medians | upper-bound repetition medians | estimated transfer cost | cross-variant spread | maximum within-variant spread | resolution |
 |---:|:--|:--|---:|---:|---:|:--|
-| 100,000 | 1.533, 1.551 ms | 0.65065, 0.71714 ms | 0.85816 ms | 0.85816 ms | 0.06649 ms | resolved |
+| 100,000 | 1.527, 1.451 ms | 0.61790, 0.61718 ms | 0.87146 ms | 0.87146 ms | 0.07655 ms | resolved |
 
 ## Reproduce
 

@@ -5,20 +5,20 @@ use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::translate_relative_refs;
+use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, payload_num, payload_str_id, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringPool, Value, KIND_BOOL,
-    KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+    cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
+    KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
 #[wasm_bindgen]
 impl CellStore {
     /// One bulk read of a rectangular window for the renderer. Returns
-    /// contiguous packed cell data (row-major over `rows x cols`) plus the
-    /// unique strings referenced by the window, so the host paints without
-    /// crossing the boundary per cell.
+    /// contiguous packed cell data (row-major over `rows x cols`) with pool IDs
+    /// and window-local formula-error strings, avoiding per-cell boundary reads.
     #[wasm_bindgen(js_name = getWindow)]
     pub fn get_window(
         &self,
@@ -28,14 +28,14 @@ impl CellStore {
         cols: &[u32],
     ) -> WindowView {
         let Some(s) = self.sheets.get(sheet) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
         let row_start = row_start.min(s.row_count);
         let row_end = row_end.min(s.row_count);
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
         let Some(cells) = n_rows.checked_mul(n_cols) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
 
         let mut kind = vec![KIND_EMPTY; cells];
@@ -44,34 +44,60 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 10];
+        let mut error_slots = [-1i32; FormulaError::COUNT];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
-        // 2026-06 release harness: unchecked indexing was 1.02x here,
-        // below the 2x threshold; keep the clearer safe loop.
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
             if col >= s.n_cols {
                 continue;
             }
-            for row_index in 0..n_rows {
-                let row = row_start + row_index;
-                let dst = row_index * n_cols + col_index;
-                fill_window_cell(
-                    s,
-                    row,
-                    col,
-                    dst,
-                    &mut kind,
-                    &mut num,
-                    &mut str_local,
-                    &mut style_local,
-                    &mut string_ids,
-                    &mut error_slots,
-                    &mut strings,
-                    &mut style_dict,
-                );
+
+            let mut row = row_start;
+            while row < row_end {
+                let start = s.idx(row, col);
+                let chunk = s.calculated_chunk_at(start);
+                let run_end = row_end.min(row + DERIVED_CHUNK_CELLS - start % DERIVED_CHUNK_CELLS);
+
+                for run_row in row..run_end {
+                    let src = s.idx(run_row, col);
+                    let dst = (run_row - row_start) * n_cols + col_index;
+
+                    // Dense cells are resident; only paged reads need a load-state check.
+                    let resolved = if s.is_paged() {
+                        s.is_loaded(run_row, col).then(|| s.resolved_cell_at(src))
+                    } else {
+                        Some(
+                            chunk
+                                .and_then(|values| {
+                                    DerivedOverlay::decode_present(
+                                        values[src % DERIVED_CHUNK_CELLS],
+                                    )
+                                })
+                                .unwrap_or_else(|| {
+                                    (s.source_kind_at(src), s.source_payload_at(src))
+                                }),
+                        )
+                    };
+                    fill_window_cell(
+                        s,
+                        run_row,
+                        col,
+                        dst,
+                        resolved,
+                        &mut kind,
+                        &mut num,
+                        &mut str_local,
+                        &mut style_local,
+                        &mut string_ids,
+                        &mut error_slots,
+                        &mut strings,
+                        &mut style_dict,
+                    );
+                }
+
+                row = run_end;
             }
         }
 
@@ -90,6 +116,7 @@ impl CellStore {
         );
 
         WindowView::new(
+            self.strings.epoch,
             n_rows,
             n_cols,
             kind,
@@ -108,12 +135,12 @@ impl CellStore {
     #[wasm_bindgen(js_name = getWindowRows)]
     pub fn get_window_rows(&self, sheet: usize, rows: &[u32], cols: &[u32]) -> WindowView {
         let Some(s) = self.sheets.get(sheet) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
         let n_rows = rows.len();
         let n_cols = cols.len();
         let Some(cells) = n_rows.checked_mul(n_cols) else {
-            return WindowView::empty();
+            return WindowView::empty(self.strings.epoch);
         };
 
         let mut kind = vec![KIND_EMPTY; cells];
@@ -122,28 +149,50 @@ impl CellStore {
         let mut style_local = vec![0u32; cells];
         let mut string_ids = vec![NO_STRING; cells];
 
-        let mut error_slots = [-1i32; 10];
+        let mut error_slots = [-1i32; FormulaError::COUNT];
         let mut strings: Vec<String> = Vec::new();
         let mut style_dict: Vec<u32> = Vec::new();
 
-        // 2026-06 release harness: unchecked indexing was 0.88x here,
-        // below the 2x threshold; keep the clearer safe loop.
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
             if col >= s.n_cols {
                 continue;
             }
+
+            let mut chunk_index = usize::MAX;
+            let mut chunk = None;
+
+            // Explicit rows preserve view order; cache a chunk until that order leaves it.
             for (row_index, &row_u) in rows.iter().enumerate() {
                 let row = row_u as usize;
                 if row >= s.row_count {
                     continue;
                 }
+
                 let dst = row_index * n_cols + col_index;
+                let src = s.idx(row, col);
+                let resolved = if s.is_paged() {
+                    s.is_loaded(row, col).then(|| s.resolved_cell_at(src))
+                } else {
+                    if src / DERIVED_CHUNK_CELLS != chunk_index {
+                        chunk_index = src / DERIVED_CHUNK_CELLS;
+                        chunk = s.calculated_chunk_at(src);
+                    }
+
+                    Some(
+                        chunk
+                            .and_then(|values| {
+                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
+                            })
+                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src))),
+                    )
+                };
                 fill_window_cell(
                     s,
                     row,
                     col,
                     dst,
+                    resolved,
                     &mut kind,
                     &mut num,
                     &mut str_local,
@@ -170,6 +219,7 @@ impl CellStore {
         );
 
         WindowView::new(
+            self.strings.epoch,
             n_rows,
             n_cols,
             kind,
@@ -184,34 +234,37 @@ impl CellStore {
     }
 }
 
+/// `None` marks an unloaded cell; its payload must not be read before this check.
+#[inline(always)]
 pub(crate) fn fill_window_cell(
     sheet: &SheetData,
     row: usize,
     col: usize,
     dst: usize,
+    resolved: Option<(u8, u64)>,
     kind: &mut [u8],
     num: &mut [f64],
     str_local: &mut [i32],
     style_local: &mut [u32],
     string_ids: &mut [u32],
-    error_slots: &mut [i32; 10],
+    error_slots: &mut [i32; FormulaError::COUNT],
     strings: &mut Vec<String>,
     style_dict: &mut Vec<u32>,
 ) {
-    if !sheet.is_loaded(row, col) {
+    let Some((stored_kind, payload)) = resolved else {
         kind[dst] = KIND_STRING;
         str_local[dst] = local_error_index(FormulaError::Loading, error_slots, strings);
         return;
-    }
+    };
+
     let src = sheet.idx(row, col);
-    let stored_kind = sheet.kind_at(src);
     kind[dst] = stored_kind;
     style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
 
     match stored_kind {
-        KIND_NUMBER | KIND_BOOL => num[dst] = sheet.num_at(src),
+        KIND_NUMBER | KIND_BOOL => num[dst] = payload_num(payload),
         KIND_STRING => {
-            let pool_id = sheet.str_id_at(src);
+            let pool_id = payload_str_id(payload);
             if pool_id == NO_STRING {
                 kind[dst] = KIND_EMPTY;
             } else {
@@ -226,23 +279,8 @@ pub(crate) fn fill_window_cell(
                 kind[dst] = KIND_STRING;
                 str_local[dst] = local_error_index(error, error_slots, strings);
             } else {
-                match entry.map(|entry| entry.value_kind) {
-                    Some(FormulaValueKind::Bool) => {
-                        kind[dst] = KIND_BOOL;
-                        num[dst] = sheet.num_at(src);
-                    }
-                    Some(FormulaValueKind::Text) => {
-                        kind[dst] = KIND_STRING;
-                        string_ids[dst] = sheet.str_id_at(src);
-                    }
-                    Some(FormulaValueKind::Blank) => {
-                        kind[dst] = KIND_EMPTY;
-                    }
-                    _ => {
-                        kind[dst] = KIND_NUMBER;
-                        num[dst] = sheet.num_at(src);
-                    }
-                }
+                kind[dst] = KIND_NUMBER;
+                num[dst] = payload_num(payload);
             }
         }
         _ => {}
@@ -260,11 +298,11 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
     (style_dict.len() - 1) as u32
 }
 
-/// Window-local index of a formula-error sentinel; `slots` is a fixed 6-entry
-/// table (one per `FormulaError` variant), allocation-free.
+/// Window-local index of a formula-error sentinel; `slots` has one entry per
+/// `FormulaError` variant and requires no allocation.
 pub(crate) fn local_error_index(
     error: FormulaError,
-    slots: &mut [i32; 10],
+    slots: &mut [i32; FormulaError::COUNT],
     strings: &mut Vec<String>,
 ) -> i32 {
     let slot = &mut slots[error.slot()];
@@ -387,7 +425,7 @@ fn cond_pred_matches(pred: &CondPred, kind: u8, num: f64, text: Option<&str>) ->
 fn cell_text<'a>(
     pool_id: u32,
     local_id: i32,
-    pool: &'a StringPool,
+    pool: &'a StringStorage,
     local_strings: &'a [String],
 ) -> Option<&'a str> {
     if pool_id != NO_STRING {
@@ -406,6 +444,7 @@ const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 #[wasm_bindgen]
 pub struct WindowView {
+    string_pool_epoch: u32,
     n_rows: u32,
     n_cols: u32,
     packed: Vec<u8>,
@@ -415,6 +454,7 @@ pub struct WindowView {
 impl WindowView {
     #[allow(clippy::too_many_arguments)]
     fn new(
+        string_pool_epoch: u32,
         n_rows: usize,
         n_cols: usize,
         kind: Vec<u8>,
@@ -440,6 +480,7 @@ impl WindowView {
         )
         .unwrap_or_default();
         Self {
+            string_pool_epoch,
             n_rows: n_rows.try_into().unwrap_or_default(),
             n_cols: n_cols.try_into().unwrap_or_default(),
             packed,
@@ -447,8 +488,9 @@ impl WindowView {
         }
     }
 
-    pub(crate) fn empty() -> Self {
+    pub(crate) fn empty(epoch: u32) -> Self {
         Self::new(
+            epoch,
             0,
             0,
             Vec::new(),
@@ -541,6 +583,11 @@ fn align_to_8(value: usize) -> Option<usize> {
 
 #[wasm_bindgen]
 impl WindowView {
+    #[wasm_bindgen(js_name = stringPoolEpoch)]
+    pub fn string_pool_epoch(&self) -> u32 {
+        self.string_pool_epoch
+    }
+
     #[wasm_bindgen(getter, js_name = nRows)]
     pub fn n_rows(&self) -> u32 {
         self.n_rows

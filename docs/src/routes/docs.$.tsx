@@ -1,16 +1,23 @@
-import { createFileRoute, notFound, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
 import { Suspense, useEffect } from "react";
+
+import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
 import {
+  type DocumentComponents,
   documentComponentForSplat,
-  documentForSplat,
   normalizeDocumentHref,
 } from "../lib/content.js";
 import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { pageMeta } from "../lib/seo.js";
 
+/** Documentation content renders its site links through the router. */
+const DOCUMENT_COMPONENTS: DocumentComponents = { a: ContentLink };
+
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {
+    // Dynamic import: the docs page index ships with docs routes, not every page.
+    const { documentForSplat } = await import("../lib/content.js");
     const document = await documentForSplat(params._splat);
     if (document === undefined) throw notFound();
     return { title: document.title, description: document.description };
@@ -45,7 +52,7 @@ function DocumentRoute() {
       title={metadata.title}
     >
       <Suspense fallback={<p className="sw-document-loading">Loading documentation…</p>}>
-        <Content />
+        <Content components={DOCUMENT_COMPONENTS} />
       </Suspense>
     </DocsShell>
   );
@@ -59,7 +66,11 @@ function DocumentNotFound() {
       title="Page not found"
     >
       <p>
-        Return to <a href="/docs/start/installation/">installation</a> or search the documentation.
+        Return to{" "}
+        <Link to="/docs/$/" params={{ _splat: "start/installation" }}>
+          installation
+        </Link>{" "}
+        or search the documentation.
       </p>
     </DocsShell>
   );

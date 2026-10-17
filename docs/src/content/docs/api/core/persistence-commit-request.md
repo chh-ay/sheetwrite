@@ -8,10 +8,10 @@ description: "Cancellable pending commit submitted to a persistence adapter."
 Cancellable pending commit submitted to a persistence adapter.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L104"><code>packages/core/src/types/transaction.ts#L104</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L125"><code>packages/core/src/types/transaction.ts#L125</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>5</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -59,6 +59,19 @@ readonly operations: readonly DocumentOp[];
 ```
 
 </details>
+
+<details class="api-member" id="persistence-commit-request-version-operation-counts" data-pagefind-weight="1">
+<summary><code>versionOperationCounts</code> <span class="api-member-summary">Present only when the operations are too large for one server version.</span></summary>
+
+```ts generated
+readonly versionOperationCounts?: readonly number[];
+```
+
+<p class="api-member-doc">Present only when the operations are too large for one server version.
+Each entry is the operation count of one consecutive version of an atomic
+batch, in order; the counts add up to `operations.length`. A server
+applies and publishes all of these versions, or none of them.</p>
+</details>
 </div>
 
 ## Declaration
@@ -73,6 +86,7 @@ export interface PersistenceCommitRequest {
   baseVersion: number;
   clientMutationId: string;
   readonly operations: readonly DocumentOp[];
+  readonly versionOperationCounts?: readonly number[];
 }
 ```
 

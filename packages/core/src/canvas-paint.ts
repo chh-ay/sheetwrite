@@ -5,7 +5,6 @@ import type { VisibleWindowView } from "./types/store.js";
 
 const CELL_PAD = 6;
 
-/** Pull the pixel size out of a CSS font shorthand ("12px sans-serif"). */
 const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
 const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
@@ -100,7 +99,7 @@ function columnEdges(layout: RenderLayout): number[] {
   return colX;
 }
 
-/** Build the effective canvas font, preserving the default hot path unchanged. */
+/** Resolve the canvas font from the theme and cell style. */
 export function fontFor(
   theme: Theme,
   style: Pick<CellStyle, "bold" | "italic" | "fontSize">,
@@ -142,16 +141,29 @@ export function fontFor(
   return font;
 }
 
-/** Wrapped-only line layout; the ordinary single-line path never calls this. */
-export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
-  const lines: string[] = [];
+/**
+ * Wrapped-only line layout; the ordinary single-line path never calls this.
+ * `maxLines` bounds the work for cells whose block cannot fit: the caller only
+ * draws lines that fit the cell height, so generating more than
+ * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
+ * whose length reaches `maxLines` therefore means "more lines exist".
+ */
+function layoutTextLinesInto(
+  ctx: Ctx,
+  text: string,
+  width: number,
+  maxLines: number,
+  lines: string[],
+): string[] {
+  const limit = Math.max(1, maxLines);
   for (const paragraph of text.split("\n")) {
+    if (lines.length >= limit) break;
     if (paragraph === "") {
       lines.push("");
       continue;
     }
     let start = 0;
-    while (start < paragraph.length) {
+    while (start < paragraph.length && lines.length < limit) {
       let end = start;
       let lastBreak = -1;
       while (end < paragraph.length) {
@@ -169,6 +181,11 @@ export function layoutTextLines(ctx: Ctx, text: string, width: number): string[]
     }
   }
   return lines;
+}
+
+/** Full wrapped layout for callers that need every line, such as auto row height. */
+export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
+  return layoutTextLinesInto(ctx, text, width, Number.POSITIVE_INFINITY, []);
 }
 
 /**
@@ -226,6 +243,7 @@ function paintTextDecoration(
     // Just under the baseline, which sits ~0.4em below the "middle" text origin.
     ctx.fillRect(left, Math.round(cy + effectiveFontPx * 0.4), runWidth, 1);
   }
+
   if (style.strikethrough) {
     // Through the run's visual middle (≈ the "middle" baseline origin at `cy`).
     ctx.fillRect(left, Math.round(cy), runWidth, 1);
@@ -427,7 +445,6 @@ export function paintFrame(
   const paintTop = Math.max(headerHeight, clipTop);
   const paintBottom = Math.min(height, clipBottom);
 
-  // Cell body, clipped below the sticky header.
   ctx.save();
   ctx.beginPath();
   ctx.rect(g, headerHeight, Math.max(0, width - g), Math.max(0, height - headerHeight));
@@ -537,7 +554,6 @@ export function paintFrame(
   state.lastFont = theme.font;
   state.lastFill = theme.bg;
 
-  // Vertical gridlines through header + body.
   ctx.strokeStyle = theme.gridLine;
   ctx.beginPath();
   const appendVerticalGridline = (c: number, lineX: number): void => {
@@ -594,6 +610,17 @@ export function paintFrame(
     ctx.clip();
     applyFill(ctx, state, theme.headerBg);
     ctx.fillRect(0, 0, g, height);
+    ctx.strokeStyle = theme.gridLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(g - 0.5, 0);
+    ctx.lineTo(g - 0.5, height);
+    ctx.stroke();
+    // Row numbers stay below the column header, like the cell body: a row
+    // scrolled half under the header must not paint its number in the corner.
+    ctx.beginPath();
+    ctx.rect(0, headerHeight, g, Math.max(0, height - headerHeight));
+    ctx.clip();
     applyFill(ctx, state, theme.headerFg);
     applyFont(ctx, state, theme.font);
     ctx.textAlign = "center";
@@ -612,12 +639,6 @@ export function paintFrame(
       const cy = bandTop + bandHeight / 2;
       ctx.fillText(String(row + 1), g / 2, cy);
     }
-    ctx.strokeStyle = theme.gridLine;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(g - 0.5, 0);
-    ctx.lineTo(g - 0.5, height);
-    ctx.stroke();
     ctx.restore();
   }
   ctx.restore();
@@ -733,8 +754,12 @@ function paintCell(
   ctx.save();
   if (effective.wrap && !numeric) {
     clipCell(ctx, x, y, w, h);
-    const lines = layoutTextLines(ctx, text, availableTextWidth);
     const lineHeight = fontPx * 1.2;
+    // The draw loop below never paints a line whose band starts past the cell,
+    // and a block taller than the cell is top-anchored either way, so laying
+    // out one line past the last drawable one changes no pixel.
+    const maxLines = Math.floor(h / lineHeight) + 1;
+    const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
     const blockHeight = lines.length * lineHeight;
     const firstCy = y + (h - Math.min(h, blockHeight)) / 2 + lineHeight / 2;
     for (let line = 0; line < lines.length; line++) {

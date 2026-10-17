@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import { MAX_CONDITIONAL_FORMAT_RULES } from "../src/conditional-format.js";
 import { validateWorkbookSnapshot } from "../src/document-protocol.js";
 import { initSheetwrite } from "../src/grid.js";

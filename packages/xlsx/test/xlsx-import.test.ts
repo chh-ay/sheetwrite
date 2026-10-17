@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "bun:test";
+
 import type { Workbook, WorkbookSnapshot, XlsxWorkbookWarning } from "@sheetwrite/core";
 import {
   formatNumber,
@@ -11,7 +12,9 @@ import {
   XlsxResourceError,
 } from "@sheetwrite/core";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+
 import { registerXlsxBackends } from "../src/index.js";
+import { rawXlsx, stylesXml, worksheet } from "./raw-opc.js";
 
 const FIXTURES = new URL("./fixtures/", import.meta.url);
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
@@ -428,19 +431,40 @@ describe("workbook OOXML fidelity", () => {
       { kind: "literal", value: 3 },
     ]);
   });
+
+  it("applies column styles declared after the sheet data", async () => {
+    const styles = stylesXml(
+      '<fonts count="2"><font/><font><b/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0"/></cellXfs>',
+    );
+    const imported = await fromXlsxWorkbook(
+      rawXlsx({
+        styles,
+        sheets: [
+          {
+            xml: worksheet(
+              '<dimension ref="A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><cols><col min="1" max="1" style="1"/></cols>',
+            ),
+          },
+        ],
+      }),
+    );
+    expect(imported.sheets[0]!.cells[0]!.cells[0]!.style).toEqual({ bold: true });
+  });
 });
 
 describe("bounded and corrupt XLSX inputs", () => {
   it("rejects adversarial corpus entries at typed, deterministic boundaries", async () => {
-    await expect(fromXlsxWorkbook(await fixture("traversal.xlsx"))).rejects.toThrow(
-      "unsafe part name",
-    );
-    await expect(fromXlsxWorkbook(await fixture("doctype.xlsx"))).rejects.toThrow(
-      "DTDs and entities are forbidden",
-    );
-    await expect(fromXlsxWorkbook(await fixture("corrupt-deflate.xlsx"))).rejects.toThrow(
-      /corrupt|CRC mismatch/,
-    );
+    // One shared code covers every import failure, so the reason proves the right guard fired.
+    for (const [file, reason] of [
+      ["traversal.xlsx", /unsafe part name/i],
+      ["doctype.xlsx", /DTD/],
+      ["corrupt-deflate.xlsx", /corrupt|CRC/i],
+    ] as const) {
+      await expect(fromXlsxWorkbook(await fixture(file)), file).rejects.toMatchObject({
+        code: "xlsx-import-failed",
+        message: expect.stringMatching(reason),
+      });
+    }
     for (const [file, resource] of [
       ["deep-xml.xlsx", "maxXmlDepth"],
       ["compression-ratio.xlsx", "maxCompressionRatio"],
@@ -477,17 +501,21 @@ describe("bounded and corrupt XLSX inputs", () => {
         });
       }
     }
-    await expect(fromXlsxWorkbook(positive, { maxCells: 0 })).rejects.toThrow(
-      "maxCells must be a positive integer",
-    );
+    await expect(fromXlsxWorkbook(positive, { maxCells: 0 })).rejects.toMatchObject({
+      code: "xlsx-invalid-options",
+      context: { resource: "maxCells" },
+    });
     await expect(
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlDepth: 1.5 } }),
-    ).rejects.toThrow("maxXmlDepth must be a positive integer");
+    ).rejects.toMatchObject({ code: "xlsx-invalid-options", context: { resource: "maxXmlDepth" } });
     await expect(
       fromXlsxWorkbook(positive, {
         resourceLimits: { maxRowsPerSheet: Number.MAX_SAFE_INTEGER + 1 },
       }),
-    ).rejects.toThrow("maxRowsPerSheet must be a positive integer");
+    ).rejects.toMatchObject({
+      code: "xlsx-invalid-options",
+      context: { resource: "maxRowsPerSheet" },
+    });
     await expect(
       fromXlsxWorkbook(positive, { resourceLimits: { maxXmlTextBytes: 4 } }),
     ).rejects.toThrow(XlsxResourceError);
@@ -497,7 +525,10 @@ describe("bounded and corrupt XLSX inputs", () => {
           '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:B2:C3"/><sheetData/></worksheet>',
         ),
       ),
-    ).rejects.toThrow("range A1:B2:C3 is invalid");
+    ).rejects.toMatchObject({
+      code: "xlsx-import-failed",
+      message: expect.stringMatching(/A1:B2:C3/),
+    });
     await expect(toXlsxWorkbook(roundTripWorkbook(), { maxCells: 1 })).rejects.toThrow(
       XlsxResourceError,
     );

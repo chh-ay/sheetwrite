@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import {
   createWindowTransferMetrics,
   type FailedScenario,
@@ -289,6 +290,23 @@ describe("render artifact validation", () => {
         maxAgeMs: 1_000,
       }),
     ).toThrow("stale render result timestamp");
+  });
+
+  test("requires semantic versions for both render engines", () => {
+    const valid = completeArtifact();
+    for (const engine of ["sheetwrite", "handsontable"] as const) {
+      for (const version of [undefined, "", "18", "^18.1.2", "01.2.3"]) {
+        expect(() =>
+          parseRenderArtifact({
+            ...valid,
+            metadata: {
+              ...valid.metadata,
+              engineVersions: { ...valid.metadata.engineVersions, [engine]: version },
+            },
+          }),
+        ).toThrow(`engineVersions.${engine}`);
+      }
+    }
   });
 
   test("rejects non-finite summaries and JSON null coercion", () => {

@@ -17,8 +17,10 @@ export type CapabilityOwnerId =
   | "database"
   | "interoperability"
   | "engine"
+  | "formulas"
   | "performance"
-  | "collaboration";
+  | "collaboration"
+  | "host-rows";
 
 export type CapabilityArea =
   | "editing"
@@ -136,6 +138,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     kind: "capability",
   },
   {
+    id: "formulas",
+    label: "Formula analysis",
+    href: "/showcases/formulas/",
+    routeFile: "docs/src/routes/showcases.formulas.tsx",
+    responsibility:
+      "Full formula engine: grouping and pivot tables, dynamic arrays, statistics, regression, LAMBDA helpers, regex, and spill references over a live ledger.",
+    kind: "capability",
+  },
+  {
     id: "performance",
     label: "Performance & scale",
     href: "/showcases/performance/",
@@ -153,10 +164,20 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
       "Two-client protocol proof: sequencing, duplicate acknowledgements, presence, offline reconnect, version gaps, conflicts, recovery.",
     kind: "capability",
   },
+  {
+    id: "host-rows",
+    label: "Host-owned rows",
+    href: "/showcases/host-rows/",
+    routeFile: "docs/src/routes/showcases.host-rows.tsx",
+    responsibility:
+      "Host entity store as the source of truth: stable row IDs across sort, filter, insert and delete, edit deltas per record, host write policy, bulk lead import.",
+    kind: "capability",
+  },
 ];
 
 const ENGINE_SCENARIO = "docs/src/showcases/scenarios/engine.ts";
 const ENGINE_LIVE_SCENARIO = "docs/src/showcases/scenarios/engine-live.ts";
+const FORMULAS_SCENARIO = "docs/src/showcases/scenarios/formulas.ts";
 const ANALYTICS_SCENARIO = "docs/src/showcases/scenarios/analytics.ts";
 const BUSINESS_SCENARIO = "docs/src/showcases/scenarios/business.ts";
 const OFFLINE_SCENARIO = "docs/src/showcases/scenarios/offline.ts";
@@ -172,8 +193,10 @@ const SVELTE_SPEC = "test/browser/svelte-workbench.spec.ts";
 const INTEROP_SPEC = "test/browser/showcase-interoperability.spec.ts";
 const PERFORMANCE_SPEC = "test/browser/showcase-performance.spec.ts";
 const ENGINE_LIVE_SPEC = "test/browser/showcase-engine.spec.ts";
+const FORMULAS_SPEC = "test/browser/showcase-formulas.spec.ts";
 const DATABASE_COLLAB_SPEC = "test/browser/database-collaboration.spec.ts";
 const LIFECYCLE_SPEC = "test/browser/framework-lifecycle.spec.ts";
+const HOST_ROWS_SPEC = "test/browser/host-owned-rows.spec.ts";
 
 const HOST_CHROME_BOUNDARY =
   "Product chrome beyond the shell pieces (menus, dialogs, app framing) is host-owned.";
@@ -181,7 +204,6 @@ const HOST_PERSISTENCE_BOUNDARY =
   "Authentication, authorization, transport, server database transactions, and deployment are host-owned.";
 
 export const CAPABILITY_INVENTORY: readonly Capability[] = [
-  // ── Editing & interaction ────────────────────────────────────────────────
   {
     id: "editing.cell-edit",
     title: "Cell editing",
@@ -288,7 +310,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "The host owns when and why operations fire; the engine owns applying them.",
   },
 
-  // ── Formulas, aggregation & query ────────────────────────────────────────
   {
     id: "formulas.entry-recalc",
     title: "Formula entry & recalculation",
@@ -314,6 +335,60 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: REACT_SPEC,
     sharedModules: [ANALYTICS_SCENARIO],
     boundary: "External-workbook references are unsupported; names live inside one document.",
+  },
+  {
+    id: "formulas.full-engine",
+    title: "Full formula engine",
+    area: "modeling",
+    primary: "formulas",
+    interaction:
+      "The page selects @sheetwrite/formulas before it creates the Grid; thirteen panels calculate from that engine.",
+    scope: "browser",
+    accessibility:
+      "Every panel has a labeled recipe button that selects its anchor cell; results are Grid cells.",
+    testPath: FORMULAS_SPEC,
+    sharedModules: [FORMULAS_SCENARIO],
+    boundary:
+      "Each app selects one engine before its first Grid. Function vectors such as HSTACK(SUM,AVERAGE) are not supported.",
+  },
+  {
+    id: "formulas.dynamic-arrays",
+    title: "Grouping, pivots & dynamic arrays",
+    area: "modeling",
+    primary: "formulas",
+    interaction:
+      "GROUPBY, PIVOTBY, FILTER, SORTBY and TAKE spill live; the APAC promotion changes them in one transaction.",
+    scope: "browser",
+    accessibility: "The recalculation time and description are announced in a polite live region.",
+    testPath: FORMULAS_SPEC,
+    sharedModules: [FORMULAS_SCENARIO],
+    boundary: "Spills stop at the sheet edge and at occupied cells, which show #SPILL!.",
+  },
+  {
+    id: "formulas.lambda",
+    title: "LAMBDA helpers",
+    area: "modeling",
+    primary: "formulas",
+    interaction: "LET, SCAN and MAP with LAMBDA build a running total and parse order codes.",
+    scope: "browser",
+    accessibility:
+      "The formula text of the selected panel is shown as readable code beside the Grid.",
+    testPath: FORMULAS_SPEC,
+    sharedModules: [FORMULAS_SCENARIO],
+    boundary: "LAMBDA call depth and work are bounded; a violation returns #NUM!.",
+  },
+  {
+    id: "formulas.spill-references",
+    title: "Spill references",
+    area: "modeling",
+    primary: "formulas",
+    interaction:
+      "G11 reads the Top 5 spill through A11#; after the promotion it follows the new ranking.",
+    scope: "browser",
+    accessibility: "The selected panel's first value is shown as text beside the Grid.",
+    testPath: FORMULAS_SPEC,
+    sharedModules: [FORMULAS_SCENARIO],
+    boundary: "A spill reference returns #REF! when its anchor holds no spill.",
   },
   {
     id: "data.aggregation",
@@ -354,7 +429,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "Datasource backends (databases, APIs) are host-owned; paging contracts are engine-owned.",
   },
 
-  // ── Governance & annotation workflow ─────────────────────────────────────
   {
     id: "data.validation-rules",
     title: "Data validation",
@@ -442,7 +516,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "Only leading rows/columns freeze; arbitrary interior panes are unsupported.",
   },
 
-  // ── Scale & rendering ────────────────────────────────────────────────────
   {
     id: "scale.dense-datasource",
     title: "Dense in-memory datasource",
@@ -562,7 +635,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "Numbers come from the checked-in benchmark protocol only — measured, never promised.",
   },
 
-  // ── Spreadsheet interoperability ─────────────────────────────────────────
   {
     id: "io.xlsx-import",
     title: "XLSX import",
@@ -640,7 +712,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary: "Core never bundles the codec; hosts opt in per entry point.",
   },
 
-  // ── Persistence & document lifecycle ─────────────────────────────────────
   {
     id: "persistence.snapshot-load",
     title: "Snapshot load",
@@ -742,7 +813,6 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
       "The durable browser-database proof lives on /showcases/database/; production storage is host-owned.",
   },
 
-  // ── Offline, sync & collaboration ────────────────────────────────────────
   {
     id: "offline.durable-pending",
     title: "Durable pending work",
@@ -892,8 +962,22 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     boundary:
       "Sheetwrite reports Grid work; the host decides when to save and what an acknowledgement means.",
   },
+  {
+    id: "workflow.host-owned-rows",
+    title: "Host-owned rows",
+    area: "workflow",
+    primary: "host-rows",
+    interaction:
+      "Sort, filter, insert, delete, and edit rows; every delta names the same account ID, and the host can reject or transform a write. Import 10,000 leads with unique IDs.",
+    scope: "browser",
+    accessibility:
+      "The account store and the delta log are text tables beside the Grid; every row action is a labelled button.",
+    testPath: HOST_ROWS_SPEC,
+    sharedModules: ["docs/src/showcases/HostRowsShowcase.tsx"],
+    boundary:
+      "The entity store, its persistence, and the write policy are host-owned; Sheetwrite keeps row identity and reports deltas.",
+  },
 
-  // ── Framework lifecycle ──────────────────────────────────────────────────
   {
     id: "lifecycle.vanilla",
     title: "Vanilla lifecycle",

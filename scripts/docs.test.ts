@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+
 import {
   ADAPTER_DOC_CONTRACT,
   adapterContractIssues,
@@ -145,6 +146,7 @@ describe("documentation generation", () => {
       os: "linux",
       arch: "x64",
       cpu: "test",
+      engineVersions: { sheetwrite: "0.4.0", handsontable: "18.1.2" },
       rounds: 2,
       launchAttempts: [],
     },

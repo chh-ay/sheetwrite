@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { siteUrl } from "./playwright.config.js";
 
 const FIXTURE_URL = siteUrl("/test/renderers/");
@@ -78,8 +79,10 @@ test("DOM renderer lifecycle and absolute accessibility indices", async ({ page 
     await bodyBounds.evaluate((element) => Number.parseFloat((element as HTMLElement).style.left)),
   ).toBeLessThan(bodyLeft);
 
+  const unzoomedWidth = Number(await merged.getAttribute("data-width"));
+  expect(unzoomedWidth).toBeGreaterThan(0);
   await page.evaluate(() => window.__sheetwriteRendererFixture?.zoom(1.5));
-  await expect(merged).toHaveAttribute("data-width", "300");
+  await expect(merged).toHaveAttribute("data-width", String(unzoomedWidth * 1.5));
   await page.evaluate(() => window.__sheetwriteRendererFixture?.resize(420, 220));
   await expect(page.locator(HOST)).toHaveCSS("width", "420px");
   await expect
@@ -93,9 +96,9 @@ test("DOM renderer lifecycle and absolute accessibility indices", async ({ page 
       );
       return Boolean(
         hostBox &&
-          visibleBoxes.every(
-            (box) => box.left >= hostBox.x && box.right <= hostBox.x + hostBox.width + 0.5,
-          ),
+        visibleBoxes.every(
+          (box) => box.left >= hostBox.x && box.right <= hostBox.x + hostBox.width + 0.5,
+        ),
       );
     })
     .toBe(true);
@@ -112,12 +115,14 @@ test("DOM renderer lifecycle and absolute accessibility indices", async ({ page 
     absoluteColumns.every((value, index) => index === 0 || value > absoluteColumns[index - 1]!),
   ).toBe(true);
 
-  let peakNodes = 0;
+  // Far scrolling must not accumulate overlay nodes: back at the start, the count matches.
+  const nodeCounts: number[] = [];
   for (const [top, left] of [
     [0, 0],
     [560, 300],
     [1_120, 700],
     [1_680, 900],
+    [0, 0],
   ] as const) {
     const stats = await page.evaluate(
       ([nextTop, nextLeft]) => {
@@ -127,10 +132,11 @@ test("DOM renderer lifecycle and absolute accessibility indices", async ({ page 
       [top, left] as const,
     );
     if (!stats) throw new Error("renderer fixture disappeared");
-    peakNodes = Math.max(peakNodes, stats.nodes);
+    nodeCounts.push(stats.nodes);
     expect(stats.live).toBe(stats.nodes);
   }
-  expect(peakNodes).toBeLessThanOrEqual(80);
+  expect(nodeCounts[0]).toBeGreaterThan(0);
+  expect(nodeCounts.at(-1)).toBe(nodeCounts[0]);
 
   const replacementTarget = page.locator(`${CELL}:visible button`).first();
   await replacementTarget.focus();

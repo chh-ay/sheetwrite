@@ -1,4 +1,5 @@
 import type { SourceSnapshot } from "@sheetwrite/wasm";
+
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -8,6 +9,7 @@ import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+const EMPTY_PIN_COLUMNS = new Uint32Array(0);
 // Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
@@ -31,11 +33,22 @@ export interface DecodedPackedWindow {
   readonly localStringCount: number;
 }
 
+/** Resolved values of one rectangle plus its style dictionary, row-major. */
+export interface RectangleSnapshot {
+  /** Resolved scalar per cell; `null` for empty cells. */
+  readonly values: readonly CellScalar[];
+  /** Style dictionary slot per cell; index into {@link styles}. */
+  readonly styleIds: Uint32Array;
+  /** Style dictionary shared by every cell of the rectangle. */
+  readonly styles: readonly CellStyle[];
+}
+
 /** Validates the internal packed layout before exposing zero-copy owned-buffer views. */
 export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
   if (packed.byteLength < WINDOW_PACKED_HEADER_BYTES) {
     throw new Error("Sheetwrite: truncated packed window");
   }
+
   const header = new DataView(packed.buffer, packed.byteOffset, WINDOW_PACKED_HEADER_BYTES);
   const magic = header.getUint32(0, true);
   const version = header.getUint32(4, true);
@@ -47,6 +60,7 @@ export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
   const styleCount = header.getUint32(28, true);
   const condCount = header.getUint32(32, true);
   const localStringCount = header.getUint32(36, true);
+
   if (
     magic !== WINDOW_PACKED_MAGIC ||
     version !== WINDOW_PACKED_VERSION ||
@@ -54,16 +68,20 @@ export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
   ) {
     throw new Error("Sheetwrite: invalid packed window header");
   }
+
   if (totalBytes > packed.byteLength) {
     throw new Error("Sheetwrite: truncated packed window");
   }
+
   if (totalBytes !== packed.byteLength) {
     throw new Error("Sheetwrite: invalid packed window length");
   }
+
   const expectedCellCount = nRows * nCols;
   if (!Number.isSafeInteger(expectedCellCount) || expectedCellCount !== cellCount) {
     throw new Error("Sheetwrite: invalid packed window dimensions");
   }
+
   if (condCount !== 0 && condCount !== cellCount) {
     throw new Error("Sheetwrite: invalid packed conditional-match length");
   }
@@ -88,6 +106,7 @@ export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
     condMatchesStart,
     condCount * Uint32Array.BYTES_PER_ELEMENT,
   );
+
   if (expectedBytes !== totalBytes) {
     throw new Error("Sheetwrite: invalid packed window layout");
   }
@@ -99,6 +118,7 @@ export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
   ) {
     throw new Error("Sheetwrite: invalid packed window alignment");
   }
+
   return {
     nRows,
     nCols,
@@ -153,16 +173,24 @@ export class StoreWindowReader {
   private readonly colsU32Cache = new WeakMap<ReadonlyArray<number>, Uint32Array>();
   private valuesScratch: CellScalar[] = [];
   private readonly stringCache = new Map<number, string>();
+  private stringPoolEpoch: number | undefined;
+  private visibleStringPoolEpoch: number | undefined;
   private readonly condRulesSynced = new Map<SheetId, string>();
   private conditionalRuleInputBytes = 0;
   private conditionalRuleLargestInputBytes = 0;
 
   constructor(
-    private readonly wasm: RecomputingCellStore,
+    private wasm: RecomputingCellStore,
     private readonly workbook: Workbook,
     private readonly handles: ReadonlyMap<SheetId, number>,
     private readonly styles: StyleDictionary,
   ) {}
+
+  replaceEngine(wasm: RecomputingCellStore): void {
+    this.clear();
+    this.wasm = wasm;
+  }
+
   spillDerivedMask(
     sheet: SheetId,
     rows: { start: number; end: number },
@@ -175,6 +203,7 @@ export class StoreWindowReader {
       this.colsU32For(cols),
     );
   }
+
   captureSourcesForRows(
     sheet: SheetId,
     rows: Uint32Array,
@@ -185,6 +214,7 @@ export class StoreWindowReader {
   }
 
   capturePersistedCells(sheet: SheetId): PersistedCellView {
+    const stringPoolEpoch = this.wasm.stringPoolEpoch();
     const packed = this.wasm.persistedCellData(this.handleOf(sheet));
     const coordinates: number[] = [];
     const values: CellScalar[] = [];
@@ -196,10 +226,12 @@ export class StoreWindowReader {
     const stringIds: number[] = [];
     const stringOffsets: number[] = [];
     let cursor = 0;
+
     while (cursor < packed.length) {
       if (packed.length - cursor < 8) {
         throw new Error("Sheetwrite: truncated persisted-cell projection");
       }
+
       const row = packed[cursor++]!;
       const col = packed[cursor++]!;
       const kind = packed[cursor++]!;
@@ -208,6 +240,7 @@ export class StoreWindowReader {
       const stringId = packed[cursor++]!;
       const sourceKind = packed[cursor++]!;
       const sourceLength = packed[cursor++]!;
+
       if (
         !Number.isSafeInteger(row) ||
         row < 0 ||
@@ -223,22 +256,27 @@ export class StoreWindowReader {
       ) {
         throw new Error("Sheetwrite: invalid persisted-cell projection");
       }
+
       const offset = values.length;
       coordinates.push(row, col);
       values.push(kind === KIND_NUMBER ? number : kind === KIND_BOOL ? number !== 0 : null);
       styles.push(this.styles.get(styleId));
+
       if (kind === KIND_STRING && stringId >= 0) {
         if (!Number.isSafeInteger(stringId)) {
           throw new Error("Sheetwrite: invalid persisted string id");
         }
+
         stringIds.push(stringId);
         stringOffsets.push(offset);
       }
+
       if (sourceKind === 1) {
         const wordCount = Math.ceil(sourceLength / 4);
         if (cursor + wordCount > packed.length) {
           throw new Error("Sheetwrite: truncated persisted formula source");
         }
+
         const bytes = new Uint8Array(sourceLength);
         for (let wordIndex = 0; wordIndex < wordCount; wordIndex++) {
           const word = packed[cursor++]!;
@@ -275,15 +313,18 @@ export class StoreWindowReader {
         throw new Error("Sheetwrite: invalid persisted source kind");
       }
     }
+    this.syncStringPoolEpoch(stringPoolEpoch);
     if (stringIds.length > 0) {
       const texts = this.wasm.poolStrings(Uint32Array.from(stringIds));
       if (texts.length !== stringOffsets.length) {
         throw new Error("Sheetwrite: invalid persisted string projection");
       }
+
       for (let index = 0; index < texts.length; index++) {
         values[stringOffsets[index]!] = texts[index] ?? null;
       }
     }
+
     return {
       coordinates: Uint32Array.from(coordinates),
       values,
@@ -295,19 +336,6 @@ export class StoreWindowReader {
     };
   }
 
-  spillOwnerCoordinates(
-    sheet: SheetId,
-    rows: { start: number; end: number },
-    cols: readonly number[],
-  ): Uint32Array {
-    return this.wasm.spillOwnerCoordinates(
-      this.handleOf(sheet),
-      rows.start,
-      rows.end,
-      this.colsU32For(cols),
-    );
-  }
-
   read(
     sheet: SheetId,
     rows: { start: number; end: number },
@@ -316,17 +344,49 @@ export class StoreWindowReader {
     applyConditionalRules: boolean,
   ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
+    const isPaged = this.wasm.isPaged(handle);
+
+    try {
+      return this.readPinned(sheet, rows, cols, order, applyConditionalRules, isPaged);
+    } finally {
+      if (isPaged) {
+        this.wasm.pinReadWindow(handle, 0, 0, EMPTY_PIN_COLUMNS, EMPTY_PIN_COLUMNS);
+      }
+    }
+  }
+
+  private readPinned(
+    sheet: SheetId,
+    rows: { start: number; end: number },
+    cols: readonly number[],
+    order: Uint32Array | undefined,
+    applyConditionalRules: boolean,
+    isPaged: boolean,
+  ): InstrumentedVisibleWindowView {
+    const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
+    const dataRows = order?.subarray(rows.start, Math.min(rows.end, order.length));
     let ffiCalls = 1;
     let ffiInputBytes = colsU32.byteLength;
     let ffiLargestTransferBytes = colsU32.byteLength;
-    if (this.wasm.isPaged(handle)) {
-      this.wasm.pinRange(handle, rows.start, rows.end, colsU32);
-      ffiCalls += 1;
+
+    if (isPaged) {
+      this.wasm.pinReadWindow(
+        handle,
+        dataRows ? 0 : rows.start,
+        dataRows ? 0 : rows.end,
+        dataRows ?? EMPTY_PIN_COLUMNS,
+        colsU32,
+      );
+      ffiCalls += 2;
       ffiInputBytes += colsU32.byteLength;
+      ffiInputBytes += dataRows?.byteLength ?? 0;
+      ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows?.byteLength ?? 0);
     }
+
     const conditionalSync = applyConditionalRules ? this.syncConditionalRules(sheet, handle) : 0;
     const hasCondRules = (conditionalSync & 1) !== 0;
+
     if ((conditionalSync & 2) !== 0) {
       ffiCalls += 1;
       ffiInputBytes += this.conditionalRuleInputBytes;
@@ -338,8 +398,8 @@ export class StoreWindowReader {
 
     let view: ConsumingWindowView;
     let expectedRows: number;
-    if (order) {
-      const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+
+    if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
@@ -348,14 +408,19 @@ export class StoreWindowReader {
       expectedRows = Math.max(0, rows.end - rows.start);
       view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
     }
+
     ffiCalls += 1;
 
     let packed: Uint8Array;
     let decoded: DecodedPackedWindow;
     let strings: string[];
+    let stringPoolEpoch: number;
+
     try {
+      stringPoolEpoch = view.stringPoolEpoch();
       packed = view.takePacked();
       decoded = decodePackedWindow(packed);
+
       if (
         decoded.nCols !== colsU32.length ||
         decoded.nRows > expectedRows ||
@@ -366,14 +431,17 @@ export class StoreWindowReader {
       ) {
         throw new Error("Sheetwrite: invalid packed window shape");
       }
+
       strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
       if (strings.length !== decoded.localStringCount) {
         throw new Error("Sheetwrite: invalid packed window strings");
       }
+
       for (let index = 0; index < decoded.kinds.length; index++) {
         const kind = decoded.kinds[index];
         const local = decoded.stringIndex[index]!;
         const pool = decoded.stringIds[index]!;
+
         if (
           (kind !== KIND_EMPTY &&
             kind !== KIND_NUMBER &&
@@ -390,12 +458,22 @@ export class StoreWindowReader {
     } finally {
       view.free();
     }
+
     const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
+
+    // Rectangle/history reads may have warmed the host cache without updating the worker.
+    if (this.visibleStringPoolEpoch !== stringPoolEpoch) {
+      this.stringCache.clear();
+      this.visibleStringPoolEpoch = stringPoolEpoch;
+    }
+
     const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
     const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
-    let ffiBoundaryCalls = ffiCalls + 2 + stringOutputAllocationEvents;
+    let ffiBoundaryCalls = ffiCalls + 3 + stringOutputAllocationEvents;
     let localStringBytes = 0;
     for (const value of strings) localStringBytes += utf8ByteLength(value);
+
     let ffiOutputBytes = packed.byteLength + localStringBytes;
     const ffiOutputAllocationEvents = 1 + stringOutputAllocationEvents;
     ffiLargestTransferBytes = Math.max(
@@ -416,6 +494,7 @@ export class StoreWindowReader {
         missingIdSet.add(id);
       }
     }
+
     if (missingIdSet) {
       stringPoolUpdateIds = Uint32Array.from(missingIdSet);
       stringPoolUpdateValues = this.wasm.poolStrings(stringPoolUpdateIds);
@@ -424,18 +503,21 @@ export class StoreWindowReader {
       ffiInputBytes += stringPoolUpdateIds.byteLength;
       let poolStringBytes = 0;
       for (const value of stringPoolUpdateValues) poolStringBytes += utf8ByteLength(value);
+
       ffiOutputBytes += poolStringBytes;
       ffiLargestTransferBytes = Math.max(
         ffiLargestTransferBytes,
         stringPoolUpdateIds.byteLength,
         poolStringBytes,
       );
+
       for (let i = 0; i < stringPoolUpdateValues.length; i++) {
         this.stringCache.set(stringPoolUpdateIds[i] ?? NO_STRING, stringPoolUpdateValues[i] ?? "");
       }
     }
 
     const values = this.valuesFor(kinds.length);
+
     for (let i = 0; i < kinds.length; i++) {
       if (kinds[i] === KIND_NUMBER) {
         values[i] = numbers[i] ?? null;
@@ -443,6 +525,7 @@ export class StoreWindowReader {
         values[i] = (numbers[i] ?? 0) !== 0;
       } else if (kinds[i] === KIND_STRING) {
         const poolId = stringIds[i] ?? NO_STRING;
+
         if (poolId !== NO_STRING) {
           values[i] = this.stringCache.get(poolId) ?? null;
         } else {
@@ -456,6 +539,7 @@ export class StoreWindowReader {
 
     const windowStyles = this.stylesFrom(styleDict);
     this.mergeHyperlinkStyles(sheet, rows, cols, order, styleIds, windowStyles);
+
     if (condMatches.length > 0) {
       this.mergeCondMatches(sheet, condMatches, styleIds, windowStyles);
     }
@@ -469,6 +553,7 @@ export class StoreWindowReader {
       styles: windowStyles,
       valueKinds: kinds,
       numberValues: numbers,
+      stringPoolEpoch,
       stringPoolIds: stringIds,
       stringLocalIds: stringIndex,
       stringPoolUpdateIds,
@@ -486,6 +571,99 @@ export class StoreWindowReader {
   conditionalRulesChanged(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
     this.syncConditionalRules(sheet, this.handleOf(sheet));
+  }
+
+  /**
+   * Previous values and styles of one rectangle, row-major, in one packed read.
+   *
+   * This is the change-capture view of a rectangle: it replaces a `getCell` per
+   * cell. It is not a viewport read — it never pins paged rows and never merges
+   * hyperlink or conditional styles — so every entry is exactly what `getCell`
+   * returns for the same cell.
+   */
+  readRectangle(
+    sheet: SheetId,
+    startRow: number,
+    rows: number,
+    cols: readonly number[],
+  ): RectangleSnapshot {
+    const view = this.wasm.getWindow(
+      this.handleOf(sheet),
+      startRow,
+      startRow + rows,
+      this.colsU32For(cols),
+    ) as ConsumingWindowView;
+    let decoded: DecodedPackedWindow;
+    let strings: string[];
+    let stringPoolEpoch: number;
+    try {
+      stringPoolEpoch = view.stringPoolEpoch();
+      decoded = decodePackedWindow(view.takePacked());
+      if (decoded.nCols !== cols.length || decoded.nRows !== rows) {
+        throw new Error("Sheetwrite: invalid packed window shape");
+      }
+      strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
+      if (strings.length !== decoded.localStringCount) {
+        throw new Error("Sheetwrite: invalid packed window strings");
+      }
+      for (let index = 0; index < decoded.kinds.length; index++) {
+        const kind = decoded.kinds[index];
+        const local = decoded.stringIndex[index] ?? -1;
+        const pool = decoded.stringIds[index] ?? NO_STRING;
+        if (
+          (kind !== KIND_EMPTY &&
+            kind !== KIND_NUMBER &&
+            kind !== KIND_STRING &&
+            kind !== KIND_BOOL) ||
+          local < -1 ||
+          local >= strings.length ||
+          (local >= 0 && (kind !== KIND_STRING || pool !== NO_STRING)) ||
+          (kind === KIND_STRING && pool === NO_STRING && local < 0)
+        ) {
+          throw new Error("Sheetwrite: invalid packed window value");
+        }
+      }
+    } finally {
+      view.free();
+    }
+
+    const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    this.syncStringPoolEpoch(stringPoolEpoch);
+    if (this.stringCache.size >= STRING_CACHE_CAP) this.stringCache.clear();
+    let missingIdSet: Set<number> | null = null;
+    for (let index = 0; index < stringIds.length; index++) {
+      const id = stringIds[index];
+      if (id !== undefined && id !== NO_STRING && !this.stringCache.has(id)) {
+        if (!missingIdSet) missingIdSet = new Set<number>();
+        missingIdSet.add(id);
+      }
+    }
+    if (missingIdSet) {
+      const missingIds = Uint32Array.from(missingIdSet);
+      const resolved = this.wasm.poolStrings(missingIds);
+      for (let index = 0; index < resolved.length; index++) {
+        this.stringCache.set(missingIds[index] ?? NO_STRING, resolved[index] ?? "");
+      }
+    }
+
+    const values = new Array<CellScalar>(kinds.length);
+    for (let index = 0; index < kinds.length; index++) {
+      const kind = kinds[index];
+      if (kind === KIND_NUMBER) {
+        values[index] = numbers[index] ?? null;
+      } else if (kind === KIND_BOOL) {
+        values[index] = (numbers[index] ?? 0) !== 0;
+      } else if (kind === KIND_STRING) {
+        const poolId = stringIds[index] ?? NO_STRING;
+        values[index] =
+          poolId !== NO_STRING
+            ? (this.stringCache.get(poolId) ?? null)
+            : (strings[stringIndex[index] ?? -1] ?? null);
+      } else {
+        values[index] = null;
+      }
+    }
+    return { values, styleIds, styles: this.stylesFrom(styleDict) };
   }
 
   resourceOwners(): ResourceOwnerBytes[] {
@@ -522,11 +700,20 @@ export class StoreWindowReader {
   clear(): void {
     this.valuesScratch = [];
     this.stringCache.clear();
+    this.stringPoolEpoch = undefined;
+    this.visibleStringPoolEpoch = undefined;
     this.condRulesSynced.clear();
   }
 
   removeSheet(sheet: SheetId): void {
     this.condRulesSynced.delete(sheet);
+  }
+
+  private syncStringPoolEpoch(epoch: number): void {
+    if (epoch !== this.stringPoolEpoch) {
+      this.stringCache.clear();
+      this.stringPoolEpoch = epoch;
+    }
   }
 
   private colsU32For(cols: readonly number[]): Uint32Array {

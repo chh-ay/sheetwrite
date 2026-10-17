@@ -225,6 +225,7 @@ export class WorkerRenderer implements Renderer {
         {
           type: "paintPacked",
           sheet: view.sheet,
+          stringPoolEpoch: view.stringPoolEpoch,
           rows: view.rows,
           cols: view.cols,
           styles: view.styles,
@@ -263,6 +264,7 @@ export class WorkerRenderer implements Renderer {
         valueKinds && numberValues && stringPoolIds && stringLocalIds
           ? {
               sheet: view.sheet,
+              stringPoolEpoch: view.stringPoolEpoch,
               rows: view.rows,
               cols: view.cols,
               styles: view.styles,
@@ -409,6 +411,7 @@ export class WorkerRenderer implements Renderer {
       worker.postMessage({
         type: "paintPackedShared",
         sheet: view.sheet,
+        stringPoolEpoch: view.stringPoolEpoch,
         rows: view.rows,
         cols: view.cols,
         styles: view.styles,

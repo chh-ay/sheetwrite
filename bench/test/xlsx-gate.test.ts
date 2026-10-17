@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { summarizeFinite } from "../src/stats.js";
 import {
   validateXlsxBenchmarkArtifact,
@@ -91,7 +92,12 @@ function artifact(): XlsxBenchmarkArtifact {
   return {
     protocol: "sheetwrite-xlsx-codec-v1",
     mode: "smoke",
-    metadata: { commit: "test", dirty: true, timestamp: "2026-07-18T00:00:00.000Z" },
+    metadata: {
+      commit: "test",
+      dirty: true,
+      timestamp: "2026-07-18T00:00:00.000Z",
+      engineVersions: { sheetwrite: "0.4.0" },
+    },
     rounds: 1,
     maxBaselineRatio: 1.25,
     fixture: {
@@ -117,10 +123,10 @@ function artifact(): XlsxBenchmarkArtifact {
   };
 }
 
-function comparedArtifact(): XlsxBenchmarkArtifact {
+function comparedArtifact(importDurationMs = 2): XlsxBenchmarkArtifact {
   const currentOnly = artifact();
   const current = currentOnly.samples.map((value) =>
-    value.operation === "import" ? { ...value, durationMs: 2 } : value,
+    value.operation === "import" ? { ...value, durationMs: importDurationMs } : value,
   );
   const baseline = current
     .filter((value) => value.operation !== "reject")
@@ -129,6 +135,10 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
   return {
     ...currentOnly,
     mode: "full",
+    metadata: {
+      ...currentOnly.metadata,
+      engineVersions: { ...currentOnly.metadata.engineVersions, exceljs: "4.4.0" },
+    },
     toolchain: {
       ...currentOnly.toolchain,
       baselineCommit: "87fadb72397947ea8c6ba576682925c7879579b8",
@@ -139,7 +149,7 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
       ([operation, scenario]) => ({
         operation: operation as "import" | "export",
         scenario,
-        medianWallRatio: operation === "import" ? 2 : 1,
+        medianWallRatio: operation === "import" ? importDurationMs : 1,
         peakRssRatio: 1,
       }),
     ),
@@ -147,6 +157,24 @@ function comparedArtifact(): XlsxBenchmarkArtifact {
 }
 
 describe("XLSX benchmark gate", () => {
+  it("requires versions for the engines actually measured", () => {
+    const valid = comparedArtifact(1);
+    expect(() => validateXlsxBenchmarkArtifact(valid)).not.toThrow();
+    for (const engine of ["sheetwrite", "exceljs"] as const) {
+      for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {
+        expect(() =>
+          validateXlsxBenchmarkArtifact({
+            ...valid,
+            metadata: {
+              ...valid.metadata,
+              engineVersions: { ...valid.metadata.engineVersions, [engine]: version },
+            },
+          }),
+        ).toThrow(`engineVersions.${engine}`);
+      }
+    }
+  });
+
   it("recomputes summaries from raw samples", () => {
     const value = artifact();
     expect(() =>

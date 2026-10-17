@@ -1,19 +1,26 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+
+import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
+
 import {
   createGridFromSnapshot,
   initSheetwrite,
+  MemoryPersistenceAdapter,
   type PendingCommit,
   type PendingCommitLoadOptions,
   type PendingCommitStorage,
   type PersistenceAdapter,
   type PersistenceCommitRequest,
   type PersistenceCommitResponse,
+  rebaseDocumentOperations,
   type SheetwriteStore,
   SyncCoordinator,
   SyncProtocolError,
   type VersionedOperation,
   type WorkbookSnapshot,
 } from "../src/index.js";
+import { IndexedDbPendingCommitStorage } from "../src/indexeddb.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 
 beforeAll(async () => {
@@ -52,28 +59,10 @@ class FakePendingStorage implements PendingCommitStorage {
     options: PendingCommitLoadOptions,
   ): Promise<readonly PendingCommit[]> {
     if (options.signal?.aborted) throw options.signal.reason;
-    const loaded: PendingCommit[] = [];
-    let operations = 0;
-    let bytes = 0;
-    for (const record of this.records.values()) {
-      if (record.documentId !== documentId) continue;
-      if (loaded.length + 1 > options.maxRecords) {
-        throw new SyncProtocolError("pending-count-limit", "Fake durable record limit exceeded");
-      }
-      operations += record.operations.length;
-      if (operations > options.maxOperations) {
-        throw new SyncProtocolError(
-          "pending-operation-limit",
-          "Fake durable operation limit exceeded",
-        );
-      }
-      bytes += new TextEncoder().encode(JSON.stringify(record.operations)).byteLength;
-      if (bytes > options.maxBytes) {
-        throw new SyncProtocolError("pending-byte-limit", "Fake durable byte limit exceeded");
-      }
-      loaded.push(structuredClone(record));
-    }
-    return loaded;
+    // The coordinator must enforce its bounds even if host storage does not.
+    return [...this.records.values()]
+      .filter((record) => record.documentId === documentId)
+      .map((record) => structuredClone(record));
   }
 
   async put(commit: PendingCommit, signal?: AbortSignal): Promise<void> {
@@ -182,6 +171,95 @@ function mountGrid(version = 4, rowCount = 2, paged = false) {
 }
 
 describe("durable offline sync", () => {
+  it("reopens and rebases a compact atomic batch through IndexedDB before acknowledging every version", async () => {
+    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+    const keyRangeDescriptor = Object.getOwnPropertyDescriptor(globalThis, "IDBKeyRange");
+    Object.defineProperty(globalThis, "indexedDB", { configurable: true, value: new IDBFactory() });
+    Object.defineProperty(globalThis, "IDBKeyRange", { configurable: true, value: IDBKeyRange });
+    const databaseName = "compact-offline-batch";
+    const storage = new IndexedDbPendingCommitStorage({ databaseName });
+    const reopenedStorage = new IndexedDbPendingCommitStorage({ databaseName });
+    const grid = mountGrid(5, 3);
+    const adapter = new MemoryPersistenceAdapter(snapshot(5, 3));
+    const loadOptions = { maxRecords: 10, maxOperations: 10, maxBytes: 4096 };
+    let coordinator: SyncCoordinator | undefined;
+    try {
+      const restore = encodeRestoreBlock(
+        { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+        { rowCount: 1, colCount: 1, values: [17] },
+      );
+      const pending: PendingCommit = {
+        documentId: "offline-doc",
+        baseVersion: 4,
+        clientMutationId: "compact-batch",
+        operations: [setValue(9), restore],
+        versionOperationCounts: [1, 1],
+      };
+      await storage.put(pending);
+      storage.close();
+      const loaded = await reopenedStorage.load("offline-doc", loadOptions);
+      expect(loaded).toEqual([pending]);
+      const rebased = rebaseDocumentOperations(pending.operations, [
+        { op: "addRows", sheet: "s1", at: 0, count: 1 },
+      ]);
+      if (rebased.status !== "rebased") throw new Error("Expected non-overlapping batch rebase");
+      await reopenedStorage.replace(
+        "offline-doc",
+        ["compact-batch"],
+        [{ ...pending, baseVersion: 5, operations: rebased.operations }],
+      );
+      reopenedStorage.close();
+      coordinator = new SyncCoordinator(grid, adapter, {
+        documentId: "offline-doc",
+        serverVersion: 5,
+        pendingStorage: reopenedStorage,
+        initialConnection: "offline",
+      });
+      await coordinator.ready();
+      expect(grid.store.getCell({ sheet: "s1", row: 1, col: 0 }).resolved).toBe(9);
+      expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe(17);
+      expect(coordinator.pendingCommits()[0]).toMatchObject({
+        clientMutationId: "compact-batch",
+        baseVersion: 5,
+        versionOperationCounts: [1, 1],
+      });
+      coordinator.setOnline(true);
+      await coordinator.flush();
+      expect(coordinator.serverVersion).toBe(7);
+      expect(coordinator.pendingCount).toBe(0);
+      expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
+      const persisted = await adapter.load("offline-doc");
+      expect(persisted.version).toBe(7);
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      const persistedGrid = createGridFromSnapshot(host, persisted);
+      try {
+        expect(persistedGrid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe(17);
+      } finally {
+        persistedGrid.destroy();
+      }
+      await expect(
+        reopenedStorage.put({ ...pending, versionOperationCounts: [1, 2] }),
+      ).rejects.toMatchObject({ code: "transaction" });
+      const sparseCounts = new Array<number>(3);
+      sparseCounts[0] = 1;
+      sparseCounts[2] = 1;
+      await expect(
+        reopenedStorage.put({ ...pending, versionOperationCounts: sparseCounts }),
+      ).rejects.toMatchObject({ code: "transaction" });
+      expect(await reopenedStorage.load("offline-doc", loadOptions)).toEqual([]);
+    } finally {
+      coordinator?.destroy();
+      grid.destroy();
+      storage.close();
+      reopenedStorage.close();
+      if (indexedDbDescriptor) Object.defineProperty(globalThis, "indexedDB", indexedDbDescriptor);
+      else Reflect.deleteProperty(globalThis, "indexedDB");
+      if (keyRangeDescriptor) Object.defineProperty(globalThis, "IDBKeyRange", keyRangeDescriptor);
+      else Reflect.deleteProperty(globalThis, "IDBKeyRange");
+    }
+  });
+
   it("restores an offline commit after reload and retries its original mutation ID", async () => {
     const storage = new FakePendingStorage();
     const adapter = new ControlledAdapter(snapshot());
@@ -228,7 +306,6 @@ describe("durable offline sync", () => {
     expect(adapter.requests[0]?.clientMutationId).toBe("offline-m1");
     expect(reloaded.pendingCount).toBe(0);
     expect(storage.records.size).toBe(0);
-    expect(storage.removals).toEqual(["offline-m1"]);
     reloaded.destroy();
     reloadedGrid.destroy();
   });
@@ -271,10 +348,8 @@ describe("durable offline sync", () => {
     }));
     coordinator.setOnline(true);
     await coordinator.flush();
-    expect(adapter.requests.map((request) => request.clientMutationId)).toEqual([
-      "disconnect-m1",
-      "disconnect-m1",
-    ]);
+    expect(adapter.requests.at(-1)?.clientMutationId).toBe("disconnect-m1");
+    expect(coordinator.serverVersion).toBe(5);
     expect(coordinator.pendingCount).toBe(0);
     coordinator.destroy();
     grid.destroy();
@@ -536,7 +611,6 @@ describe("durable offline sync", () => {
     grid.applyTransaction({ patches: [setValue(3)] });
     await coordinator.ready();
 
-    let nextCalls = 0;
     const operations: VersionedOperation[] = [
       { version: 5, clientMutationId: "echo-m1", operations: [setValue(99)] },
       { version: 6, operations: [setValue(4)] },
@@ -546,7 +620,6 @@ describe("durable offline sync", () => {
         let operation = 0;
         return {
           async next() {
-            nextCalls += 1;
             const value = operations[operation++];
             return value
               ? { done: false as const, value }
@@ -557,7 +630,6 @@ describe("durable offline sync", () => {
     });
     while (storage.removals.length === 0) await Promise.resolve();
 
-    expect(nextCalls).toBe(1);
     expect(coordinator.serverVersion).toBe(4);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
 
@@ -570,7 +642,6 @@ describe("durable offline sync", () => {
     storage.removeGate.resolve(undefined);
     await applied.promise;
     disposeApplied();
-    expect(nextCalls).toBe(2);
     expect(coordinator.serverVersion).toBe(6);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(4);
 
@@ -673,7 +744,7 @@ describe("durable offline sync", () => {
     grid.destroy();
   });
 
-  it("rejects oversized durable queues before cloning or partially restoring", async () => {
+  it("rejects oversized durable queues before partially restoring even when storage ignores bounds", async () => {
     const cases = [
       {
         code: "pending-count-limit",

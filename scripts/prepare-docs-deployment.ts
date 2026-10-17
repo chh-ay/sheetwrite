@@ -9,6 +9,21 @@ const requiredFiles = [
   "pagefind/pagefind-entry.json",
 ];
 
+/**
+ * Content-hashed outputs never change under one URL, so browsers may keep
+ * them for a year without revalidating. Everything else (HTML, sitemap,
+ * Pagefind's stable entry files) keeps Vercel's revalidating default so a new
+ * deployment is visible immediately.
+ */
+const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+const IMMUTABLE_PATHS = [
+  // Vite emits every bundled script, stylesheet, font, and WASM file here with a content hash.
+  "^/assets/.+$",
+  // Pagefind names its shards and metadata after their content.
+  "^/pagefind/(?:fragment|index)/.+$",
+  "^/pagefind/pagefind\\.[^/]+\\.pf_meta$",
+];
+
 async function requireDirectory(path: string): Promise<void> {
   if (!(await lstat(path)).isDirectory()) {
     throw new Error(`Expected a real directory, not a symlink or special file: ${path}`);
@@ -65,6 +80,11 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
       {
         version: 3,
         routes: [
+          ...IMMUTABLE_PATHS.map((src) => ({
+            src,
+            headers: { "cache-control": IMMUTABLE_CACHE },
+            continue: true,
+          })),
           { src: "^/$", dest: "/index.html" },
           { handle: "filesystem" },
           { src: "^/(.+?)/?$", dest: "/$1/index.html" },

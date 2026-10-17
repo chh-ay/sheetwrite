@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 
+import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 interface SiteTopbarProps {

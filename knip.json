@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreWorkspaces": ["bench", "docs", "examples/*", "packages/wasm"],
+  "ignoreWorkspaces": ["bench", "docs", "examples/*", "packages/wasm", "packages/formulas"],
   "workspaces": {
     "packages/core": {
       "entry": [

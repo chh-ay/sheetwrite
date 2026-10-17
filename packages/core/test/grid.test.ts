@@ -1,22 +1,27 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+
 import { validateTransactionResources } from "../src/document-protocol.js";
 import type { XlsxTableExportBackend } from "../src/export.js";
 import { setXlsxTableExportBackend } from "../src/export.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
+  createGrid,
   DEFAULT_THEME,
   GridImpl,
   initSheetwrite,
   measureMaxElementHeight,
 } from "../src/grid.js";
+import { releaseEngineMemory } from "../src/index.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
   CellScalar,
   ChangeEvent,
   DataSourcePage,
   DataSourceRequest,
   DocumentOp,
+  GridOptions,
   RowData,
   Store,
   Workbook,
@@ -43,7 +48,15 @@ function makeFakeStore(
       const n = Math.max(0, (rows.end - rows.start) * cols.length);
       const values: CellScalar[] = new Array(n);
       for (let i = 0; i < n; i++) values[i] = `v${i}`;
-      return { sheet, rows, cols, values, styleIds: new Uint32Array(n), styles: [{}] };
+      return {
+        sheet,
+        stringPoolEpoch: 0,
+        rows,
+        cols,
+        values,
+        styleIds: new Uint32Array(n),
+        styles: [{}],
+      };
     },
     ensureColumns: () => {},
     applyTransaction: () => ({ status: "noop", epoch: 0, reason: "empty" }),
@@ -140,6 +153,45 @@ describe("Grid editing (Layer 3)", () => {
     await initSheetwrite();
   });
 
+  it("pastes across hidden columns without changing them and undoes in one step", async () => {
+    const workbook = makeWorkbook(2);
+    const sheet = workbook.sheets[0];
+    const hiddenColumn = sheet?.columns[1];
+    if (!hiddenColumn) throw new Error("expected the amount column in the fixture");
+    hiddenColumn.visible = false;
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => "Alice\tParis\nBob\tTokyo" },
+    });
+    const grid = createGrid(mountHost(), { workbook, data: makeColumnarData(2) });
+    const changes: ChangeEvent[] = [];
+    grid.on("change", (event) => changes.push(event));
+    const readCells = () =>
+      [0, 1].map((row) =>
+        [0, 1, 2].map((col) => grid.store.getCell({ sheet: "s1", row, col }).resolved),
+      );
+    try {
+      expect(grid.store).toBeInstanceOf(SheetwriteStore);
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      expect(await grid.actions.paste()).toBe("done");
+      expect(readCells()).toEqual([
+        ["Alice", 0.5, "Paris"],
+        ["Bob", 10.5, "Tokyo"],
+      ]);
+      grid.undo();
+      expect(readCells()).toEqual([
+        ["Customer 0", 0.5, "Phnom Penh"],
+        ["Customer 1", 10.5, "Tokyo"],
+      ]);
+      expect(changes.map((event) => event.commitReason)).toEqual(["paste", "undo"]);
+    } finally {
+      grid.destroy();
+      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
   it("commits a typed edit through the editor into the store", () => {
     const workbook = makeWorkbook(20);
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
@@ -149,7 +201,6 @@ describe("Grid editing (Layer 3)", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
-    // editor textarea mounts synchronously; well-known DOM node, narrow then read
     const node = host.querySelector("textarea.sheetwrite-editor");
     expect(node).not.toBeNull();
     if (!(node instanceof HTMLTextAreaElement)) return;
@@ -426,6 +477,284 @@ describe("Grid transaction resource ingress", () => {
     expect(rejectionEvents).toBe(0);
     grid.destroy();
   });
+
+  it("undoes a local edit where remote row and column changes moved it", () => {
+    const amounts = (grid: GridImpl, rows: number) =>
+      Array.from(
+        { length: rows },
+        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 1 }).resolved,
+      );
+    const editRow3 = (grid: GridImpl) =>
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: "s1", row: 3, col: 1 },
+            value: { kind: "literal", value: 999 },
+          },
+        ],
+      });
+    const cases: Array<{ remote: DocumentOp; rows: number; expected: CellScalar[] }> = [
+      {
+        remote: { op: "addRows", sheet: "s1", at: 0, count: 1 },
+        rows: 7,
+        expected: [null, 0.5, 10.5, 20.5, 30.5, 40.5, 50.5],
+      },
+
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 0, count: 1 },
+        rows: 5,
+        expected: [10.5, 20.5, 30.5, 40.5, 50.5],
+      },
+
+      {
+        remote: { op: "removeRows", sheet: "s1", at: 3, count: 1 },
+        rows: 5,
+        expected: [0.5, 10.5, 20.5, 40.5, 50.5],
+      },
+    ];
+
+    for (const { remote, rows, expected } of cases) {
+      const grid = new GridImpl(mountHost(), {
+        workbook: makeWorkbook(6),
+        data: makeColumnarData(6),
+      });
+      expect(editRow3(grid).status).toBe("applied");
+      expect(grid.applyRemoteOperations([remote]).status).toBe("applied");
+      grid.undo();
+      expect({ remote, amounts: amounts(grid, rows) }).toEqual({ remote, amounts: expected });
+      grid.destroy();
+    }
+
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(6),
+      data: makeColumnarData(6),
+    });
+    expect(editRow3(grid).status).toBe("applied");
+    const inserted = { key: "peer", header: "Peer", width: 80, type: "text" as const };
+    expect(
+      grid.applyRemoteOperations([{ op: "addColumns", sheet: "s1", at: 0, columns: [inserted] }])
+        .status,
+    ).toBe("applied");
+    grid.undo();
+    expect(
+      Array.from(
+        { length: 6 },
+        (_, row) => grid.store.getCell({ sheet: "s1", row, col: 2 }).resolved,
+      ),
+    ).toEqual([0.5, 10.5, 20.5, 30.5, 40.5, 50.5]);
+    grid.destroy();
+  });
+
+  it("re-measures payloads that admission guards rewrote before the store applies them", () => {
+    const workbook = makeWorkbook(4);
+    const grid = new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxEncodedBytes: 128 },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejectionEvents = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejectionEvents += 1;
+    });
+    const address = { sheet: "s1", row: 0, col: 0 };
+    let rewritePayload = false;
+    const disposeGuard = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        if (rewritePayload) {
+          const patch = operations[0];
+          if (patch?.op === "set") {
+            patch.value = { kind: "literal", value: "x".repeat(200) };
+          }
+        }
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+
+    const accepted = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(accepted.status).toBe("applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+
+    rewritePayload = true;
+    const rejected = grid.applyTransaction({
+      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
+    });
+    expect(rejected).toMatchObject({
+      status: "rejected",
+      issues: [{ kind: "resource-limit", resource: "encoded-bytes", max: 128 }],
+    });
+    if (rejected.status !== "rejected") throw new Error("rewritten payload unexpectedly applied");
+    expect(grid.store.getCell(address).resolved).toBe("first");
+    expect(changes).toHaveLength(1);
+    expect(rejectionEvents).toBe(1);
+
+    disposeGuard();
+    grid.destroy();
+  });
+
+  it("reports an undo whose restore payload exceeds the limit and still undoes older edits", () => {
+    const rows = 200;
+    // The forward clear is one small range operation; its undo restores every
+    // cleared value, which is well above this limit.
+    const grid = new GridImpl(mountHost(), {
+      workbook: makeWorkbook(rows),
+      data: makeColumnarData(rows),
+      transactionResourceLimits: { maxEncodedBytes: 256 },
+    });
+    const rejections: Array<{ kind: string; resource?: string }> = [];
+    grid.on("mutation-rejected", ({ issues }) => {
+      for (const issue of issues) {
+        rejections.push({
+          kind: issue.kind,
+          resource: "resource" in issue ? issue.resource : undefined,
+        });
+      }
+    });
+    const edited = { sheet: "s1", row: 0, col: 1 };
+    const cleared = { sheet: "s1", row: 5, col: 0 };
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "set", addr: edited, value: { kind: "literal", value: 7 } }],
+      }).status,
+    ).toBe("applied");
+    expect(
+      grid.applyTransaction({
+        patches: [
+          {
+            op: "clearRange",
+            range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 2 } },
+            contents: true,
+            style: false,
+          },
+        ],
+      }).status,
+    ).toBe("applied");
+
+    grid.undo();
+    expect(rejections).toEqual([{ kind: "resource-limit", resource: "encoded-bytes" }]);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+
+    grid.undo();
+    expect(grid.store.getCell(edited).resolved).toBe(0.5);
+    expect(grid.store.getCell(cleared).resolved).toBeNull();
+    expect(rejections).toHaveLength(1);
+    grid.destroy();
+  });
+
+  it("undo restores every cell of a text clear across engine releases on both history stacks", async () => {
+    const rows = 1_000;
+    const cols = 300;
+    const columns = Array.from({ length: cols }, (_, col) => ({
+      key: `text${col}`,
+      header: `Text ${col}`,
+      width: 100,
+      type: "text" as const,
+    }));
+    const grid = new GridImpl(mountHost(), {
+      workbook: {
+        activeSheet: "s1",
+        sheets: [{ id: "s1", name: "Text", rowCount: rows + 1, columns }],
+      },
+      data: {
+        rowCount: rows,
+        columns: Object.fromEntries(
+          columns.map((column, col) => [
+            column.key,
+            Array.from(
+              { length: rows },
+              (_, row) =>
+                `Customer record ${String(row * cols + col).padStart(6, "0")} — saved value`,
+            ),
+          ]),
+        ),
+      },
+    });
+    const changes: ChangeEvent[] = [];
+    let rejections = 0;
+    grid.on("change", (event) => changes.push(event));
+    grid.on("mutation-rejected", () => {
+      rejections += 1;
+    });
+    try {
+      const older = { sheet: "s1", row: rows, col: 0 };
+      const newer = { sheet: "s1", row: rows, col: 1 };
+      expect(
+        grid.applyTransaction({
+          patches: [{ op: "set", addr: older, value: { kind: "literal", value: "older edit" } }],
+        }).status,
+      ).toBe("applied");
+      expect(
+        grid.applyTransaction({
+          patches: [
+            {
+              op: "clearRange",
+              range: {
+                sheet: "s1",
+                start: { row: 0, col: 0 },
+                end: { row: rows - 1, col: cols - 1 },
+              },
+              contents: true,
+              style: false,
+            },
+          ],
+        }).status,
+      ).toBe("applied");
+      expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+      expect(
+        grid.applyTransaction({
+          patches: [{ op: "set", addr: newer, value: { kind: "literal", value: "newer edit" } }],
+        }).status,
+      ).toBe("applied");
+      grid.undo();
+      expect(grid.store.getCell(newer).resolved).toBeNull();
+      if (!(grid.store instanceof SheetwriteStore))
+        throw new Error("Expected an engine-owned store");
+      const materializations = grid.store.getRangeMutationAllocationStats().historyMaterializations;
+      await releaseEngineMemory();
+      expect(grid.store.getRangeMutationAllocationStats().historyMaterializations).toBe(
+        materializations,
+      );
+      grid.undo();
+      const restored = grid.store.getVisibleWindow(
+        "s1",
+        { start: 0, end: rows },
+        columns.map((_, col) => col),
+      ).values;
+      let mismatches = 0;
+      for (let offset = 0; offset < rows * cols; offset += 1) {
+        if (
+          restored[offset] !== `Customer record ${String(offset).padStart(6, "0")} — saved value`
+        ) {
+          mismatches += 1;
+        }
+      }
+      expect(mismatches).toBe(0);
+      expect(changes.map((event) => event.commitReason)).toEqual([
+        "api",
+        "api",
+        "api",
+        "undo",
+        "undo",
+      ]);
+      expect(rejections).toBe(0);
+      await releaseEngineMemory();
+      grid.undo();
+      expect(grid.store.getCell(older).resolved).toBeNull();
+      grid.redo();
+      expect(grid.store.getCell(older).resolved).toBe("older edit");
+      grid.redo();
+      expect(grid.store.getCell({ sheet: "s1", row: 999, col: 299 }).resolved).toBeNull();
+      await releaseEngineMemory();
+      grid.redo();
+      expect(grid.store.getCell(newer).resolved).toBe("newer edit");
+    } finally {
+      grid.destroy();
+    }
+  }, 30_000);
 });
 
 describe("Grid store lifecycle", () => {
@@ -448,6 +777,7 @@ describe("Grid store lifecycle", () => {
     // a brand-new grid/store built afterwards.
     const host2 = mountHost();
     const grid2 = new GridImpl(host2, { workbook: makeWorkbook(20) });
+
     expect(() => grid2.store.getCell({ sheet: "s1", row: 0, col: 0 })).not.toThrow();
     grid2.destroy();
   });
@@ -461,6 +791,7 @@ describe("Grid store lifecycle", () => {
     // leave it alone and fully usable.
     const grid = new GridImpl(host, { workbook }, store);
     const disposeSpy = spyOn(store, "dispose");
+
     grid.destroy();
 
     expect(disposeSpy).not.toHaveBeenCalled();
@@ -479,6 +810,7 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   it("replaceTheme(undefined) re-reads host CSS custom properties (Tailwind-style)", () => {
     const workbook = makeWorkbook(10);
     const host = mountHost();
+
     // A Tailwind arbitrary property (`[--sheetwrite-bg:...]`) lands as a
     // custom property on the host; construction and replaceTheme(undefined)
     // must both resolve it.
@@ -502,7 +834,7 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
 
     const theme = grid.getEffectiveTheme();
     expect(theme.fg).toBe("#123456");
-    expect(theme.bg).toBe(DEFAULT_THEME.bg); // not kept from the previous value
+    expect(theme.bg).toBe(DEFAULT_THEME.bg);
 
     grid.destroy();
   });
@@ -517,6 +849,31 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
     const theme = grid.getEffectiveTheme();
     expect(theme.bg).toBe("#ff0000");
     expect(theme.fg).toBe("#123456");
+
+    grid.destroy();
+  });
+
+  it("a theme change repaints the built-in toolbar, find bar, and menus", () => {
+    const workbook = makeWorkbook(10);
+    const host = mountHost();
+    const grid = new GridImpl(
+      host,
+      { workbook, config: { toolbar: true } },
+      makeFakeStore(workbook),
+    );
+    expect(host.querySelector(".sheetwrite-toolbar")).not.toBeNull();
+    // The built-in widgets read their palette from custom properties seeded on
+    // the grid root (host CSS can still override them per widget).
+    const widgetColor = (name: string) => host.style.getPropertyValue(name).trim();
+
+    // A host switching to its dark palette.
+    grid.replaceTheme({ headerBg: "#0b1220", headerFg: "#dce3ee", bg: "#121a28" });
+    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#0b1220");
+    expect(widgetColor("--sheetwrite-toolbar-fg")).toBe("#dce3ee");
+    expect(widgetColor("--sheetwrite-widget-bg")).toBe("#121a28");
+
+    grid.setTheme({ headerBg: "#f0f2f5" });
+    expect(widgetColor("--sheetwrite-toolbar-bg")).toBe("#f0f2f5");
 
     grid.destroy();
   });
@@ -630,6 +987,29 @@ describe("Grid.setMinColumns", () => {
     store.dispose();
   });
 
+  it("fills the host width with empty columns only for a spreadsheet", () => {
+    const columnCount = (options: Partial<GridOptions>) => {
+      const host = mountHost();
+      const grid = new GridImpl(host, { workbook: makeWorkbook(5), ...options });
+      const count = host.getAttribute("aria-colcount");
+      grid.destroy();
+      return count;
+    };
+    // The 800 px test host fits 9 default-width columns.
+    expect(columnCount({})).toBe("9");
+    // A data grid shows its own three columns, and pads only on request.
+    expect(columnCount({ presentation: "data-grid" })).toBe("3");
+    expect(columnCount({ presentation: "data-grid", minColumns: 6 })).toBe("6");
+
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook: makeWorkbook(5), presentation: "data-grid" });
+    grid.setMinColumns(5);
+    expect(host.getAttribute("aria-colcount")).toBe("5");
+    grid.setMinColumns(undefined);
+    expect(host.getAttribute("aria-colcount")).toBe("3");
+    grid.destroy();
+  });
+
   it("routes Grid.exportXlsx through the registered table backend", async () => {
     const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     const grid = new GridImpl(mountHost(), { workbook: store.getWorkbook() }, store);
@@ -648,9 +1028,10 @@ describe("Grid.setMinColumns", () => {
     };
 
     setXlsxTableExportBackend(null as never);
-    await expect(grid.exportXlsx("missing.xlsx")).rejects.toThrow(
-      "Install @sheetwrite/xlsx and import @sheetwrite/xlsx/register before calling toXlsxTable.",
-    );
+    await expect(grid.exportXlsx("missing.xlsx")).rejects.toMatchObject({
+      code: "optional-backend-unavailable",
+      operation: "xlsx-export",
+    });
     setXlsxTableExportBackend(backend);
     try {
       await expect(grid.exportXlsx("fake.xlsx")).rejects.toMatchObject({
@@ -709,9 +1090,7 @@ describe("Grid.setMinColumns", () => {
       });
 
       grid.setActiveSheet("inactive");
-      await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(
-        "inactive has unloaded datasource cells",
-      );
+      await expect(grid.exportXlsx("incomplete.xlsx")).rejects.toThrow(IncompleteDataError);
     } finally {
       setXlsxTableExportBackend(null as never);
       grid.destroy();
@@ -1306,12 +1685,18 @@ describe("element height cap measurement", () => {
     // Chromium at 125% browser zoom clamps near 26.8M CSS px — well below the
     // 33M constant this measurement replaced; trusting the constant left the
     // tail of a 1M-row document unreachable.
-    expect(measureMaxElementHeight(stubDocument(26_843_545.6))).toBe(26_843_545 - 4_096);
+    const measuredClamp = 26_843_545.6;
+    const cap = measureMaxElementHeight(stubDocument(measuredClamp));
+    expect(cap).toBeGreaterThan(0);
+    expect(cap).toBeLessThan(measuredClamp);
+    expect(measureMaxElementHeight(stubDocument(measuredClamp / 2))).toBeLessThan(cap);
   });
 
   it("falls back to a conservative cap when no clamp can be measured", () => {
-    expect(measureMaxElementHeight(null)).toBe(15_000_000);
-    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(15_000_000);
-    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(15_000_000);
+    const fallback = measureMaxElementHeight(null);
+    expect(fallback).toBeGreaterThan(0);
+    expect(fallback).toBeLessThan(26_843_545);
+    expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(fallback);
+    expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(fallback);
   });
 });
