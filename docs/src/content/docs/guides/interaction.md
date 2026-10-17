@@ -93,9 +93,10 @@ Write a key combination as a string or as an object:
 - An object names the key and its modifiers: `{ key: "k", mod: true, shift: true }`.
   Use the object form for a key without modifiers, for example `{ key: "F2" }`.
 
-`Mod` is Command on macOS and Control on other systems. `Ctrl` and `Meta` are
-always the Control and Command (or Windows) keys, so `"Ctrl+J"` is Control+J on a
-Mac too. Modifiers must match exactly.
+`Mod` shows as Command on macOS and as Control on other systems. It accepts
+either key, so the same shortcut works with a Mac keyboard and a PC keyboard.
+`Ctrl` and `Meta` are always exactly the Control and Command (or Windows) keys,
+so `"Ctrl+J"` is Control+J on a Mac too. Shift and Alt must match exactly.
 
 ```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
 grid.setConfig({
