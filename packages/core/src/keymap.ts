@@ -26,10 +26,17 @@ const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;
 /** Internal physical-key representation shared by labels, matching, and conflict detection. */
 export interface ParsedShortcut {
   readonly key: string;
+  /** Display modifiers for this platform. */
   readonly ctrl: boolean;
   readonly meta: boolean;
   readonly shift: boolean;
   readonly alt: boolean;
+  /**
+   * `Mod` without a literal Ctrl/Meta: either key matches. Browsers and test
+   * runners can report a Mac platform on other systems, so matching never
+   * depends on platform detection; only the label does.
+   */
+  readonly either: boolean;
 }
 
 interface ActionBinding {
@@ -115,6 +122,7 @@ export function parseShortcut(shortcut: KeyShortcut): ParsedShortcut {
     meta: meta || (mod && mac),
     shift,
     alt,
+    either: mod && !ctrl && !meta,
   };
 }
 
@@ -174,18 +182,33 @@ export function boundShortcutLabel(action: KeyboardAction, options?: KeyboardOpt
   return shortcut ? formatShortcut(parseShortcut(shortcut)) : "";
 }
 
+/** The (Control, Command) pairs a shortcut accepts. */
+function acceptedModifiers(shortcut: ParsedShortcut): ReadonlyArray<readonly [boolean, boolean]> {
+  return shortcut.either
+    ? [
+        [true, false],
+        [false, true],
+      ]
+    : [[shortcut.ctrl, shortcut.meta]];
+}
+
 function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShortcut): boolean {
   return (
     key === shortcut.key &&
-    event.ctrlKey === shortcut.ctrl &&
-    event.metaKey === shortcut.meta &&
     event.shiftKey === shortcut.shift &&
-    event.altKey === shortcut.alt
+    event.altKey === shortcut.alt &&
+    acceptedModifiers(shortcut).some(
+      ([ctrl, meta]) => event.ctrlKey === ctrl && event.metaKey === meta,
+    )
   );
 }
 
-function bindingIdentity(shortcut: ParsedShortcut): string {
-  return `${Number(shortcut.ctrl)}${Number(shortcut.meta)}${Number(shortcut.shift)}${Number(shortcut.alt)}:${shortcut.key}`;
+/** One identity per accepted key press, so `Mod+C` conflicts with `Ctrl+C`. */
+function bindingIdentities(shortcut: ParsedShortcut): string[] {
+  return acceptedModifiers(shortcut).map(
+    ([ctrl, meta]) =>
+      `${Number(ctrl)}${Number(meta)}${Number(shortcut.shift)}${Number(shortcut.alt)}:${shortcut.key}`,
+  );
 }
 
 function registerBinding(
@@ -193,19 +216,20 @@ function registerBinding(
   shortcut: ParsedShortcut,
   command: string,
 ): void {
-  const identity = bindingIdentity(shortcut);
-  const previous = registered.get(identity);
-  if (previous !== undefined) {
-    throw new SheetwriteError(
-      "shortcut-conflict",
-      "keyboard-configure",
-      `Shortcut ${formatShortcut(shortcut)} is bound to both ${previous} and ${command}.`,
-      {
-        context: { shortcut: formatShortcut(shortcut), commands: [previous, command] },
-      },
-    );
+  for (const identity of bindingIdentities(shortcut)) {
+    const previous = registered.get(identity);
+    if (previous !== undefined) {
+      throw new SheetwriteError(
+        "shortcut-conflict",
+        "keyboard-configure",
+        `Shortcut ${formatShortcut(shortcut)} is bound to both ${previous} and ${command}.`,
+        {
+          context: { shortcut: formatShortcut(shortcut), commands: [previous, command] },
+        },
+      );
+    }
+    registered.set(identity, command);
   }
-  registered.set(identity, command);
 }
 
 /** Compiles static registrations once; request-aware menu factories resolve against the focused cell. */

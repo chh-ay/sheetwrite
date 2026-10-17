@@ -252,6 +252,30 @@ describe("custom key combinations", () => {
     }
   });
 
+  it("runs a Mod combination from Control or Command on any reported platform", () => {
+    // WebKit test runners report a Mac platform on Linux, where users press Control.
+    setPlatform("MacIntel");
+    const host = mountHost();
+    let runs = 0;
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: makeColumnarData(3),
+      config: {
+        contextMenu: [{ id: "jump", label: "Jump", shortcut: "Mod+J", onClick: () => runs++ }],
+      },
+    });
+    try {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      press(host, "j", { metaKey: true });
+      press(host, "j", { ctrlKey: true });
+      press(host, "j", { ctrlKey: true, metaKey: true });
+      expect(runs).toBe(2);
+      expect(openMenuLabel(host, "jump")).toBe("⌘J");
+    } finally {
+      grid.destroy();
+    }
+  });
+
   it("does not run a disabled item", () => {
     setPlatform("Linux x86_64");
     const host = mountHost();
