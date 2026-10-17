@@ -52,7 +52,10 @@ describe("CI-completion package release workflow", () => {
       types: ["completed"],
       branches: ["develop"],
     });
-    expect(parsed.concurrency).toEqual({ group: "npm-release", "cancel-in-progress": false });
+    expect(parsed.concurrency).toEqual({
+      group: "npm-release",
+      "cancel-in-progress": false,
+    });
     const identity = parsed.jobs.identity!;
     expect(identity.if).toContain("workflow_run.conclusion == 'success'");
     expect(identity.if).toContain("workflow_run.event == 'push'");
@@ -143,7 +146,11 @@ describe("CI-completion package release workflow", () => {
         },
         async (_root, item) => {
           publishCalls += 1;
-          return { name: item.name, version: item.version, integrity: item.integrity };
+          return {
+            name: item.name,
+            version: item.version,
+            integrity: item.integrity,
+          };
         },
       ),
     ).rejects.toThrow(
@@ -173,7 +180,11 @@ describe("CI-completion package release workflow", () => {
         expect(completed).toHaveLength(started.length / 2 - 1);
         await Promise.resolve();
         completed.push(`${item.name}@${item.version}`);
-        return { name: item.name, version: item.version, integrity: item.integrity };
+        return {
+          name: item.name,
+          version: item.version,
+          integrity: item.integrity,
+        };
       },
     );
     expect(started).toEqual(
@@ -218,7 +229,11 @@ describe("CI-completion package release workflow", () => {
       },
       async (_root, item) => {
         published.push(`${item.name}@${item.version}`);
-        return { name: item.name, version: item.version, integrity: item.integrity };
+        return {
+          name: item.name,
+          version: item.version,
+          integrity: item.integrity,
+        };
       },
     );
     expect(queried).toEqual(artifacts.map((item) => `${item.name}@${item.version}`));
@@ -290,7 +305,11 @@ describe("CI-completion package release workflow", () => {
       async (item) => {
         registryQueries.push(`${item.name}@${item.version}`);
         if (registryQueries.length === 1) throw new Error("registry has not propagated");
-        return { name: item.name, version: item.version, dist: { integrity: item.integrity } };
+        return {
+          name: item.name,
+          version: item.version,
+          dist: { integrity: item.integrity },
+        };
       },
       async (name) => {
         latestQueries.push(name);
@@ -304,16 +323,20 @@ describe("CI-completion package release workflow", () => {
     expect(pauses).toBe(1);
     expect(registryQueries).toEqual([
       "@sheetwrite/wasm@0.7.0",
-      "@sheetwrite/wasm@0.7.0",
       "@sheetwrite/core@1.4.0",
+      "@sheetwrite/wasm@0.7.0",
     ]);
-    expect(latestQueries).toEqual(["@sheetwrite/wasm", "@sheetwrite/core"]);
+    expect(latestQueries).toEqual(["@sheetwrite/core", "@sheetwrite/wasm"]);
 
     const core = artifact("@sheetwrite/core", "1.4.0");
     expect(() =>
       assertRegistryPackage(
         core,
-        { name: core.name, version: core.version, dist: { integrity: "sha512-wrong" } },
+        {
+          name: core.name,
+          version: core.version,
+          dist: { integrity: "sha512-wrong" },
+        },
         core.version,
       ),
     ).toThrow("integrity does not match");
@@ -328,9 +351,113 @@ describe("CI-completion package release workflow", () => {
     expect(() =>
       assertRegistryPackage(
         core,
-        { name: core.name, version: core.version, dist: { integrity: core.integrity } },
+        {
+          name: core.name,
+          version: core.version,
+          dist: { integrity: core.integrity },
+        },
         "1.3.0",
       ),
     ).toThrow("latest is 1.3.0");
+  });
+
+  it("does not publish again when a rerun finds a version that npm still validates", async () => {
+    const artifacts = [
+      artifact("@sheetwrite/wasm", "0.7.0"),
+      artifact("@sheetwrite/core", "1.4.0"),
+    ];
+    const published: string[] = [];
+    const result = await publishArtifactsIdempotently(
+      "/artifacts",
+      artifacts,
+      async (item) => (item.name === "@sheetwrite/wasm" ? "pending" : undefined),
+      async (_root, item) => {
+        published.push(item.name);
+        if (item.name === "@sheetwrite/core") {
+          throw new Error(
+            "npm publish failed (1): npm error code E403 You cannot publish over the previously published versions: 1.4.0.",
+          );
+        }
+        return {
+          name: item.name,
+          version: item.version,
+          integrity: item.integrity,
+        };
+      },
+    );
+    expect(published).toEqual(["@sheetwrite/core"]);
+    expect(result.verifiedPackages.map((entry) => entry.name)).toEqual([
+      "@sheetwrite/wasm",
+      "@sheetwrite/core",
+    ]);
+    expect(result.newlyPublishedPackages).toEqual([]);
+
+    await expect(
+      publishArtifactsIdempotently(
+        "/artifacts",
+        [artifacts[1]!],
+        async () => undefined,
+        async () => {
+          throw new Error("npm publish failed (1): npm error code E401 Unauthorized");
+        },
+      ),
+    ).rejects.toThrow("E401");
+  });
+
+  it("reports accepted versions as pending, and fails versions without publication evidence", async () => {
+    const core = artifact("@sheetwrite/core", "1.4.0");
+    const notFound = async (): Promise<never> => {
+      throw new Error("npm view failed (1): npm error code E404");
+    };
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (message: string) => warnings.push(message);
+    try {
+      expect(
+        await verifyPublishedArtifacts(
+          [core],
+          notFound,
+          async () => core.version,
+          3,
+          async () => undefined,
+          [core],
+        ),
+      ).toBe("pending");
+    } finally {
+      console.warn = warn;
+    }
+    expect(warnings).toEqual([
+      expect.stringContaining("@sheetwrite/core@1.4.0 still validating on npm"),
+    ]);
+
+    await expect(
+      verifyPublishedArtifacts(
+        [core],
+        notFound,
+        async () => core.version,
+        3,
+        async () => undefined,
+      ),
+    ).rejects.toThrow("verification failed after 3 checks");
+
+    let reads = 0;
+    expect(
+      await verifyPublishedArtifacts(
+        [core],
+        async (item) => {
+          reads += 1;
+          if (reads < 3) return notFound();
+          return {
+            name: item.name,
+            version: item.version,
+            dist: { integrity: item.integrity },
+          };
+        },
+        async () => core.version,
+        5,
+        async () => undefined,
+        [core],
+      ),
+    ).toBe("verified");
   });
 });
