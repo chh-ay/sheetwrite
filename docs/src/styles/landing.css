@@ -1644,6 +1644,13 @@
   font-size: var(--sw-type-xs);
 }
 
+.sw-bench__scale {
+  margin: 0;
+  padding: 0 1.5rem 0.9rem;
+  color: var(--sw-fg-dim);
+  font-size: var(--sw-type-xs);
+}
+
 .sw-bench__capture {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

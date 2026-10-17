@@ -143,9 +143,11 @@
 .sw-clb__workbench {
   display: grid;
   /* Client panels stop at 34rem: wider panels would expose the Grid's empty
-     presentation-padding columns, which read as letter-labelled dead space. */
+     presentation-padding columns, which read as letter-labelled dead space.
+     The three columns stay together in the middle, so extra width goes to the
+     outer margins instead of a wide gap between the clients. */
   grid-template-columns: minmax(0, 34rem) minmax(15rem, 17rem) minmax(0, 34rem);
-  justify-content: space-between;
+  justify-content: center;
   gap: var(--sw-demo-space-3);
   align-items: stretch;
   padding: var(--sw-demo-space-3) var(--sw-demo-space-4) var(--sw-demo-space-4);

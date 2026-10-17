@@ -2344,3 +2344,17 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* A measurement without a value yet shows its hint as quiet guidance, not as
+   a large number. `:root body` gives the weight of one class plus one element,
+   which outranks each panel's own value typography (one class plus elements). */
+:root body [data-empty="true"] {
+  color: var(--sw-demo-muted);
+  font-family: var(--sw-font-body);
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}

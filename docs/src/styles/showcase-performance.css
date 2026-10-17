@@ -229,9 +229,13 @@
     font: 500 0.66rem / 1.3 var(--sw-font-mono);
   }
 
+  /* The how-to line is the only instruction for the map, so it reads at body
+     size and contrast rather than as a fine-print label. */
   .sw-sp-flight__map figcaption small {
     flex-basis: 100%;
-    font-family: var(--sw-font-body);
+    margin-top: 0.15rem;
+    color: var(--sw-demo-fg-soft);
+    font: 500 0.75rem / 1.4 var(--sw-font-body);
   }
 
   .sw-sp-flight__report {

@@ -98,14 +98,14 @@ function describeValue(value: unknown): string {
   return String(value);
 }
 
-// Declared business columns fill the desktop stage: 1025px of columns plus the
-// 48px row gutter is exactly the 1073px the grid gets beside the 23rem rail, so
-// the protected Total column stays visible without scrolling to it.
+// Declared business columns fit the stage beside the 23rem rail down to a
+// 1280px viewport (760px of columns plus the 48px row gutter), so the
+// protected Total column stays visible without scrolling to it.
 const STAGE_COLUMN_WIDTHS: ReadonlyArray<ReadonlyArray<number>> = [
-  [96, 220, 136, 128, 88, 132, 225],
-  [430, 330, 265],
+  [76, 170, 110, 104, 64, 100, 136],
+  [300, 240, 220],
 ];
-const ARCHIVE_COLUMN_WIDTHS = [515, 510] as const;
+const ARCHIVE_COLUMN_WIDTHS = [380, 380] as const;
 
 function createWorkbenchWorkbook() {
   const workbook = createBusinessWorkbook();

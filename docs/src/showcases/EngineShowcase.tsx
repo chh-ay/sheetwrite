@@ -79,6 +79,9 @@ const EVENT_LABELS: Record<EngineEvent["type"], string> = {
   "formula-rewrite": "Same reads, new constant",
 };
 
+/** Below this width the ledger drops its frozen columns to fit a phone. */
+const NARROW_VIEWPORT = "(max-width: 48rem)";
+
 /** The four measured steps of one change-to-acknowledgement run. */
 const FOLLOW_STEPS = [
   "Requested page + off-screen band",
@@ -232,15 +235,17 @@ export default function EngineShowcase() {
           renderer,
           ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
         });
-        grid.setFrozen(1, window.matchMedia("(max-width: 48rem)").matches ? 0 : 2);
-        grid.setSelection({
-          kind: "cell",
-          addr: {
-            sheet: ENGINE_LIVE_SHEET,
-            row: currentRowRef.current,
-            col: ENGINE_COLUMN_INDEX.actual,
-          },
-        });
+        const narrow = window.matchMedia(NARROW_VIEWPORT).matches;
+        grid.setFrozen(1, narrow ? 0 : 2);
+        const actualCell = {
+          sheet: ENGINE_LIVE_SHEET,
+          row: currentRowRef.current,
+          col: ENGINE_COLUMN_INDEX.actual,
+        };
+        grid.setSelection({ kind: "cell", addr: actualCell });
+        // Without frozen columns a phone shows only Month and Region; the demo
+        // is about Actual, so the grid starts scrolled to it.
+        if (narrow) grid.scrollToCell(actualCell);
         bindings = bindEngineEvents(grid, emit, setPendingOperations);
         gridRef.current = grid;
         bindingsRef.current = bindings;
@@ -278,7 +283,7 @@ export default function EngineShowcase() {
   }, [emit, generation, requestedRenderer]);
 
   useEffect(() => {
-    const viewport = window.matchMedia("(max-width: 48rem)");
+    const viewport = window.matchMedia(NARROW_VIEWPORT);
     const updateFrozenColumns = () => gridRef.current?.setFrozen(1, viewport.matches ? 0 : 2);
     viewport.addEventListener("change", updateFrozenColumns);
     return () => viewport.removeEventListener("change", updateFrozenColumns);
