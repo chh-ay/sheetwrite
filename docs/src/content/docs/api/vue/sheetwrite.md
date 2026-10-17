@@ -7,8 +7,28 @@ description: "Convenience component for local object rows with live option updat
 
 Convenience component for local object rows with live option updates.
 
+### Examples
+
+```ts compile
+import { createApp, h } from "vue";
+import { Sheetwrite } from "@sheetwrite/vue";
+
+const app = createApp({ render: () => h(Sheetwrite, {
+  columns: [{ key: "amount", title: "Amount", type: "number" }],
+  defaultRows: [{ amount: 12 }, { amount: 18 }],
+  height: 400,
+}) });
+app.mount(document.body);
+// Call app.unmount() before removing the host view.
+```
+
+### See also
+
+- [SheetwriteGrid](/docs/api/vue/sheetwrite-grid/)
+- [/docs/frameworks/vue/](/docs/frameworks/vue/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L456"><code>packages/vue/src/index.ts#L456</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L491"><code>packages/vue/src/index.ts#L491</code></a></dd></div>
 </dl>
 
 ## Declaration

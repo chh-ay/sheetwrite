@@ -11,8 +11,25 @@ concurrency at the storage boundary.
 Calling `Store.applyTransaction` bypasses Grid read-only checks and Grid
 undo/redo history. Host-driven edits should use `Grid.applyTransaction`.
 
+### Examples
+
+```ts compile
+import type { Store, SheetId, Transaction } from "@sheetwrite/core";
+
+function setAmount(store: Store, sheet: SheetId) {
+  const transaction: Transaction = {
+    patches: [{ op: "set", addr: { sheet, row: 0, col: 0 }, value: { kind: "literal", value: 25 } }],
+  };
+  return store.applyTransaction(transaction);
+}
+```
+
+### See also
+
+- [Grid.applyTransaction](/docs/api/core/grid/#grid-apply-transaction)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L27"><code>packages/core/src/types/transaction.ts#L27</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L40"><code>packages/core/src/types/transaction.ts#L40</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

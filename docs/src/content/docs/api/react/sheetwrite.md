@@ -10,8 +10,27 @@ Convenience component for local object rows. It derives a single-sheet workbook 
 through prop-driven resets and unmount cleanup. Pass a `ref` to access the live `Grid`;
 use `SheetwriteGrid` when the host already owns a workbook or datasource.
 
+### Examples
+
+```tsx compile
+import { Sheetwrite } from "@sheetwrite/react";
+
+export function Sales() {
+  return <Sheetwrite
+    columns={[{ key: "amount", title: "Amount", type: "number" }]}
+    defaultRows={[{ amount: 12 }, { amount: 18 }]}
+    height={400}
+  />;
+}
+```
+
+### See also
+
+- [SheetwriteGrid](/docs/api/react/sheetwrite-grid/)
+- [/docs/frameworks/react/](/docs/frameworks/react/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L330"><code>packages/react/src/index.tsx#L330</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L359"><code>packages/react/src/index.tsx#L359</code></a></dd></div>
 </dl>
 
 ## Declaration

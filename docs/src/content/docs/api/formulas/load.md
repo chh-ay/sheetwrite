@@ -11,8 +11,21 @@ call rejects; a different-source call after success warns and no-ops; a
 rejected init is retryable. When `source` is omitted the loader picks the
 right strategy for the runtime.
 
+### Examples
+
+```ts compile
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+### See also
+
+- [/docs/guides/formulas/](/docs/guides/formulas/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L21"><code>packages/formulas/loader.d.ts#L21</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/loader.d.ts#L30"><code>packages/formulas/loader.d.ts#L30</code></a></dd></div>
 </dl>
 
 ## Declaration

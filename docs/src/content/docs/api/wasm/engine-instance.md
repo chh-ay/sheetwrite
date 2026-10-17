@@ -8,7 +8,7 @@ description: "Engine objects and caches owned by one independently collectible W
 Engine objects and caches owned by one independently collectible WASM instance.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L29"><code>packages/wasm/loader.d.ts#L29</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/loader.d.ts#L37"><code>packages/wasm/loader.d.ts#L37</code></a></dd></div>
 </dl>
 
 ## Declaration

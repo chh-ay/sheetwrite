@@ -6,8 +6,27 @@ description: "Convenience component for local object rows."
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/svelte/">@sheetwrite/svelte</a><span class="api-status" data-kind="variable">variable</span></div>
 
 Convenience component for local object rows. Bind `grid` to access the live `Grid`.
-
 Owns a sheet derived from `columns` and `defaultRows`. Bind `grid` for imperative access; it clears on reset or unmount.
+
+### Examples
+
+```ts compile
+import { mount, unmount } from "svelte";
+import { Sheetwrite } from "@sheetwrite/svelte";
+
+const view = mount(Sheetwrite, { target: document.body, props: {
+  columns: [{ key: "amount", title: "Amount", type: "number" }],
+  defaultRows: [{ amount: 12 }, { amount: 18 }],
+  height: 400,
+} });
+// Call when the host view is removed.
+await unmount(view);
+```
+
+### See also
+
+- [SheetwriteGrid](/docs/api/svelte/sheetwrite-grid/)
+- [/docs/frameworks/svelte/](/docs/frameworks/svelte/)
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/svelte/src/Sheetwrite.svelte.d.ts#L7"><code>packages/svelte/src/Sheetwrite.svelte.d.ts#L7</code></a></dd></div>

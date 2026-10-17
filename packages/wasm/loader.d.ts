@@ -17,6 +17,14 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  * call rejects; a different-source call after success warns and no-ops; a
  * rejected init is retryable. When `source` is omitted the loader picks the
  * right strategy for the runtime.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite } from "@sheetwrite/core";
+ *
+ * await initSheetwrite();
+ * ```
+ * @see /docs/start/installation/
  */
 export declare function load(
  source?: BufferSource | URL | string | Request | WebAssembly.Module,

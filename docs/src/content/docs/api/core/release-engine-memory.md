@@ -10,8 +10,23 @@ the main-thread pause scales with resident data and compact undo history.
 Preparation failures leave every live store and the selected instance unchanged.
 A larger replacement is discarded; the report then has zero migrated stores.
 
+### Examples
+
+```ts compile
+import { initSheetwrite, releaseEngineMemory } from "@sheetwrite/core";
+
+await initSheetwrite();
+// Run between user actions, not in an input or render callback.
+const report = await releaseEngineMemory();
+document.body.dataset.engineBytes = String(report.wasmBytesAfter);
+```
+
+### See also
+
+- [EngineMemoryReleaseReport](/docs/api/core/engine-memory-release-report/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/engine-memory.ts#L28"><code>packages/core/src/engine-memory.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/engine-memory.ts#L39"><code>packages/core/src/engine-memory.ts#L39</code></a></dd></div>
 </dl>
 
 ## Declaration

@@ -8,7 +8,7 @@ description: "Pending commit paired with its current synchronization status."
 Pending commit paired with its current synchronization status.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L99"><code>packages/core/src/types/transaction.ts#L99</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/transaction.ts#L112"><code>packages/core/src/types/transaction.ts#L112</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

@@ -130,6 +130,45 @@ describe("re-export documentation", () => {
       { name: "memory", documentation: "Shared linear memory." },
     ]);
   });
+
+  it("preserves example and see tags for symbols and their members", async () => {
+    const tagged = [
+      "/** A documented service.",
+      " * @example",
+      " * ```ts",
+      " * const service = new Service();",
+      " * ```",
+      " * @see {@link DataSource | Load data}",
+      " * @see DataSource",
+      " */",
+      "export declare class Service {",
+      "  /** Run the service.",
+      "   * @example",
+      "   * ```ts",
+      "   * service.run();",
+      "   * ```",
+      "   * @see https://example.com/run",
+      "   */",
+      "  run(): void;",
+      "}",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const service = manifest.packages[0]?.entryPoints[0]?.exports.find(
+      (candidate) => candidate.name === "Service",
+    );
+    expect(service?.documentation).toContain(
+      "@example\n```ts\nconst service = new Service();\n```",
+    );
+    expect(service?.documentation).toContain("@see\n{@link DataSource | Load data}");
+    expect(service?.documentation).toContain("@see\nDataSource");
+    expect(service?.memberDocs).toContainEqual({
+      name: "run",
+      documentation:
+        "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
+    });
+  });
 });
 describe("interface heritage flattening", () => {
   it("inlines repository-owned base members and keeps dependency bases as heritage", async () => {

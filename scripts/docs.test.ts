@@ -89,6 +89,64 @@ describe("documentation generation", () => {
     );
   });
 
+  it("renders examples and related links on symbols and member rows", async () => {
+    const original = coreEntry.exports.find((candidate) => candidate.name === "Grid");
+    if (original === undefined) throw new Error("Grid fixture is missing");
+    const grid: ApiExport = {
+      ...original,
+      documentation: [
+        "Imperative grid handle.",
+        "@example",
+        "```tsx",
+        "const view = <div />;",
+        "```",
+        "@example",
+        "```ts",
+        "const count = 2;",
+        "```",
+        "@see {@link CommitReason | Commit reasons}",
+        "@see https://example.com/guide",
+      ].join("\n"),
+      memberDocs: [
+        {
+          name: "applyTransaction",
+          documentation: [
+            "Apply one transaction.",
+            "@example",
+            "```ts",
+            "grid.applyTransaction({ patches: [] });",
+            "```",
+            "@see Grid",
+            "@see {@link Grid.rendererKind | Renderer}",
+          ].join("\n"),
+        },
+      ],
+    };
+    const entry = {
+      ...coreEntry,
+      exports: [grid, ...coreEntry.exports.filter((candidate) => candidate.name !== "Grid")],
+    };
+    const pkg = { ...corePackage, entryPoints: [entry] };
+    const routes = documentationLinkRoutes({ formatVersion: 2, packages: [pkg] });
+
+    const page = await renderSymbolPage(pkg, entry, grid, routes);
+    expect(page).toContain("```tsx compile\nconst view = <div />;\n```");
+    expect(page).toContain("```ts compile\nconst count = 2;\n```");
+    expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
+    expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
+    const member =
+      /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/.exec(
+        page,
+      )?.[0] ?? "";
+    expect(member).toContain(
+      "### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
+    );
+    expect(member).toContain("### See also");
+    expect(member).toContain("[Grid](/docs/api/core/grid/)");
+    expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
+    expect(page).not.toMatch(/@(?:example|see)\b/);
+  });
+
   it("keeps published package README links valid outside the monorepo", async () => {
     const root = resolve(import.meta.dir, "..");
     for (const name of PUBLISHABLE_PACKAGE_ORDER) {

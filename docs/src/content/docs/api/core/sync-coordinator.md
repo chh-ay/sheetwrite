@@ -9,8 +9,26 @@ Deterministic, transport-neutral optimistic sync. Local rendering is never
 blocked: changes queue immediately, while hosts explicitly call `sendNext`
 or `retry` to perform network work.
 
+### Examples
+
+```ts compile
+import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
+
+async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: string, serverVersion: number) {
+  const sync = new SyncCoordinator(grid, adapter, { documentId, serverVersion });
+  await sync.ready();
+  await sync.flush();
+  return sync; // Call sync.destroy() before removing the Grid.
+}
+```
+
+### See also
+
+- [PersistenceAdapter](/docs/api/core/persistence-adapter/)
+- [SyncCoordinator.recoverConflict](/docs/api/core/sync-coordinator/#sync-coordinator-recover-conflict)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L311"><code>packages/core/src/sync.ts#L311</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/sync.ts#L325"><code>packages/core/src/sync.ts#L325</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -127,14 +145,32 @@ ready: () => Promise<void>;
 recoverConflict: () => Promise<SyncConflictRecovery>;
 ```
 
-<p class="api-member-doc">Recover from the outstanding base-version conflict without reloading the
+Recover from the outstanding base-version conflict without reloading the
 document. This succeeds when the pending work and every server version it
 did not see change different cells, and neither inserts, deletes, or moves
 rows or columns: the local Grid then already shows the server result plus
 the pending work, so recovery applies the missed server versions and moves
 the pending queue onto the new server version. Call `flush` afterwards to
 send it. In every other case nothing changes and the result names the
-reason; the host then reloads and calls `resumeAfterReload`.</p>
+reason; the host then reloads and calls `resumeAfterReload`.
+
+### Examples
+
+```ts compile
+import type { SyncCoordinator } from "@sheetwrite/core";
+
+async function recover(sync: SyncCoordinator) {
+  const result = await sync.recoverConflict();
+  if (result.status === "recovered") await sync.flush();
+  // A reload-required result leaves the document unchanged for host recovery.
+  return result;
+}
+```
+
+### See also
+
+- [SyncCoordinator.resumeAfterReload](/docs/api/core/sync-coordinator/#sync-coordinator-resume-after-reload)
+
 </details>
 
 <details class="api-member" id="sync-coordinator-resume-after-reload" data-pagefind-weight="1">

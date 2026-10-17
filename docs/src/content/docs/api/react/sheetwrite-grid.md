@@ -7,8 +7,24 @@ description: "Advanced framework component with inferred row-bridge identity."
 
 Advanced framework component with inferred row-bridge identity.
 
+### Examples
+
+```tsx compile
+import { SheetwriteGrid } from "@sheetwrite/react";
+import type { Workbook } from "@sheetwrite/core";
+
+export function WorkbookView({ workbook }: { workbook: Workbook }) {
+  return <SheetwriteGrid workbook={workbook} height={400} />;
+}
+```
+
+### See also
+
+- [Sheetwrite](/docs/api/react/sheetwrite/)
+- [/docs/frameworks/react/](/docs/frameworks/react/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L275"><code>packages/react/src/index.tsx#L275</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/react/src/index.tsx#L289"><code>packages/react/src/index.tsx#L289</code></a></dd></div>
 </dl>
 
 ## Declaration

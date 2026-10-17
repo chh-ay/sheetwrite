@@ -7,8 +7,25 @@ description: "Formula-preserving, multi-sheet workbook export through the option
 
 Formula-preserving, multi-sheet workbook export through the optional XLSX backend.
 
+### Examples
+
+```ts compile
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { toXlsxWorkbook, downloadBytes, type Grid } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function download(grid: Grid) {
+  const bytes = await toXlsxWorkbook(grid);
+  downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+```
+
+### See also
+
+- [fromXlsxWorkbook](/docs/api/core/from-xlsx-workbook/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L461"><code>packages/core/src/export.ts#L461</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L503"><code>packages/core/src/export.ts#L503</code></a></dd></div>
 </dl>
 
 ## Declaration

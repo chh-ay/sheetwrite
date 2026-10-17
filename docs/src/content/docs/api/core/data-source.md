@@ -7,8 +7,33 @@ description: "Host callback that asynchronously loads cancellable rectangular pa
 
 Host callback that asynchronously loads cancellable rectangular pages.
 
+### Examples
+
+```ts compile
+import type { DataSource, RowData } from "@sheetwrite/core";
+
+const rows: RowData[] = [{ amount: 12 }, { amount: 18 }];
+const datasource: DataSource = {
+  capabilities: { protocol: 2, columns: "windowed" },
+  async getRows(request) {
+    request.signal.throwIfAborted();
+    return {
+      protocol: 2, start: request.start, columns: request.columns,
+      rows: rows.slice(request.start, request.end).map((row) =>
+        Object.fromEntries(request.columns.flatMap((band) =>
+          band.keys.map((key) => [key, row[key] ?? null])))),
+    };
+  },
+};
+```
+
+### See also
+
+- [GridOptions.datasource](/docs/api/core/grid-options/#grid-options-datasource)
+- [DataSourceRequest](/docs/api/core/data-source-request/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L66"><code>packages/core/src/types/data.ts#L66</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/data.ts#L89"><code>packages/core/src/types/data.ts#L89</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

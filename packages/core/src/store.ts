@@ -103,7 +103,26 @@ function isSnapshotAllocationFailure(error: unknown): boolean {
   );
 }
 
-/** Stable public facade and the sole transaction, epoch, policy, and event barrier. */
+/**
+ * Stable public facade and the sole transaction, epoch, policy, and event barrier.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
+ *
+ * async function total(workbook: Workbook) {
+ *   await initSheetwrite();
+ *   const store = new SheetwriteStore(workbook);
+ *   try {
+ *     return store.aggregate(workbook.activeSheet, 0, "sum");
+ *   } finally {
+ *     store.dispose();
+ *   }
+ * }
+ * ```
+ * @see Store.aggregate
+ * @see createGrid
+ */
 export class SheetwriteStore implements Store {
   private readonly engine: StoreDataEngine;
   private readonly listeners = new Set<ChangeListener>();
@@ -319,6 +338,19 @@ export class SheetwriteStore implements Store {
     return this.engine.getClipboardWindow(sheet, viewRows, cols);
   }
 
+  /**
+   * Aggregate one column. Datasource-backed sheets must be fully loaded.
+   *
+   * @example
+   * ```ts
+   * import type { SheetwriteStore, SheetId } from "@sheetwrite/core";
+   *
+   * function totals(store: SheetwriteStore, sheet: SheetId) {
+   *   return { total: store.aggregate(sheet, 0, "sum"), average: store.aggregate(sheet, 0, "avg") };
+   * }
+   * ```
+   * @see AggregateOp
+   */
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
     return this.engine.aggregate(sheet, col, op);
   }

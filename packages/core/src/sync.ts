@@ -307,6 +307,20 @@ let nextMutation = 1;
  * Deterministic, transport-neutral optimistic sync. Local rendering is never
  * blocked: changes queue immediately, while hosts explicitly call `sendNext`
  * or `retry` to perform network work.
+ *
+ * @example
+ * ```ts
+ * import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
+ *
+ * async function connect(grid: Grid, adapter: PersistenceAdapter, documentId: string, serverVersion: number) {
+ *   const sync = new SyncCoordinator(grid, adapter, { documentId, serverVersion });
+ *   await sync.ready();
+ *   await sync.flush();
+ *   return sync; // Call sync.destroy() before removing the Grid.
+ * }
+ * ```
+ * @see PersistenceAdapter
+ * @see SyncCoordinator.recoverConflict
  */
 export class SyncCoordinator {
   private readonly records = new Map<string, SyncMutationRecord>();
@@ -833,6 +847,19 @@ export class SyncCoordinator {
    * the pending queue onto the new server version. Call `flush` afterwards to
    * send it. In every other case nothing changes and the result names the
    * reason; the host then reloads and calls `resumeAfterReload`.
+   *
+   * @example
+   * ```ts
+   * import type { SyncCoordinator } from "@sheetwrite/core";
+   *
+   * async function recover(sync: SyncCoordinator) {
+   *   const result = await sync.recoverConflict();
+   *   if (result.status === "recovered") await sync.flush();
+   *   // A reload-required result leaves the document unchanged for host recovery.
+   *   return result;
+   * }
+   * ```
+   * @see SyncCoordinator.resumeAfterReload
    */
   async recoverConflict(): Promise<SyncConflictRecovery> {
     await this.ready();

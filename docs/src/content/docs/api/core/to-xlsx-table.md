@@ -7,8 +7,25 @@ description: "Exports a table model through the registered optional XLSX backend
 
 Exports a table model through the registered optional XLSX backend.
 
+### Examples
+
+```ts compile
+import { registerXlsxBackends } from "@sheetwrite/xlsx";
+import { toXlsxTable, downloadBytes, type Workbook, type Store } from "@sheetwrite/core";
+
+registerXlsxBackends();
+async function download(workbook: Workbook, store: Store) {
+  const bytes = await toXlsxTable(workbook, store);
+  downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+```
+
+### See also
+
+- [fromXlsxTable](/docs/api/core/from-xlsx-table/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L348"><code>packages/core/src/export.ts#L348</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L363"><code>packages/core/src/export.ts#L363</code></a></dd></div>
 </dl>
 
 ## Declaration

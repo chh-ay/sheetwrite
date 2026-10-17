@@ -957,7 +957,22 @@ export class RowBridge<
   }
 }
 
-/** Create a typed bridge while preserving row and identity inference. */
+/**
+ * Create a typed bridge while preserving row and identity inference.
+ *
+ * @example
+ * ```ts
+ * import { createRowBridge } from "@sheetwrite/core";
+ *
+ * const bridge = createRowBridge({
+ *   columns: [{ key: "amount" }],
+ *   defaultRows: [{ id: "order-1", amount: 12 }],
+ *   getRowId: (row) => row.id,
+ * });
+ * ```
+ * @see RowBridgeOptions
+ * @see RowBridge
+ */
 export function createRowBridge<
   Row extends Record<string, CellScalar>,
   Id extends RowBridgeId = RowBridgeId,

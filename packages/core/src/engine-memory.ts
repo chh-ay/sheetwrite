@@ -24,6 +24,17 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
  * the main-thread pause scales with resident data and compact undo history.
  * Preparation failures leave every live store and the selected instance unchanged.
  * A larger replacement is discarded; the report then has zero migrated stores.
+ *
+ * @example
+ * ```ts
+ * import { initSheetwrite, releaseEngineMemory } from "@sheetwrite/core";
+ *
+ * await initSheetwrite();
+ * // Run between user actions, not in an input or render callback.
+ * const report = await releaseEngineMemory();
+ * document.body.dataset.engineBytes = String(report.wasmBytesAfter);
+ * ```
+ * @see EngineMemoryReleaseReport
  */
 export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {
   if (pendingRelease) return pendingRelease;

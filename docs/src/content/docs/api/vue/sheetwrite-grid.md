@@ -7,8 +7,27 @@ description: "Advanced framework component for workbook data or datasource input
 
 Advanced framework component for workbook data or datasource input.
 
+### Examples
+
+```ts compile
+import { createApp, h } from "vue";
+import { SheetwriteGrid } from "@sheetwrite/vue";
+import type { Workbook } from "@sheetwrite/core";
+
+function mountWorkbook(host: HTMLElement, workbook: Workbook) {
+  const app = createApp({ render: () => h(SheetwriteGrid, { workbook, height: 400 }) });
+  app.mount(host);
+  return () => app.unmount();
+}
+```
+
+### See also
+
+- [Sheetwrite](/docs/api/vue/sheetwrite/)
+- [/docs/frameworks/vue/](/docs/frameworks/vue/)
+
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L368"><code>packages/vue/src/index.ts#L368</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/vue/src/index.ts#L385"><code>packages/vue/src/index.ts#L385</code></a></dd></div>
 </dl>
 
 ## Declaration

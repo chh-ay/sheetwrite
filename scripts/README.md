@@ -79,6 +79,12 @@ a script nobody will run.
   `docs/public/llms*.txt`**. Never hand-edit its output. `docs:check` rejects
   stale generated content; the agent-readable files contain authored guides
   and API declarations from the same inputs as the site.
+  Source TSDoc `@example` blocks use `ts` or `tsx` fences. The generator marks
+  them for type checking, including examples in member rows. Use `@see Symbol`,
+  `@see {@link Symbol | Label}`, or a guide URL for related links.
+  `docs:check` requires examples for the starter entry points in
+  `REQUIRED_API_EXAMPLES` in `docs.ts`. Add to this list when the starter
+  surface grows.
 - **`docs:prepare-deployment` packages an existing docs build** as
   `.vercel/output`. It does not build packages or install tools. CI tests and
   deploys this output; Vercel does not rebuild it. See

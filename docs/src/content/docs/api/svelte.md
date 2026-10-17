@@ -51,5 +51,5 @@ Source entry: `packages/svelte/src/index.ts`
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/svelte/sheetwrite/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>Sheetwrite</code></span><span class="api-symbol-card__desc">Convenience component for local object rows.</span></a>
-<a class="api-symbol-card" href="/docs/api/svelte/sheetwrite-grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SheetwriteGrid</code></span><span class="api-symbol-card__desc">Advanced framework component for workbook data or datasource input.</span></a>
+<a class="api-symbol-card" href="/docs/api/svelte/sheetwrite-grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>SheetwriteGrid</code></span><span class="api-symbol-card__desc">Advanced component for an existing workbook or datasource.</span></a>
 </div>
