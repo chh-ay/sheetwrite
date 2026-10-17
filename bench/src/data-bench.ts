@@ -1449,6 +1449,9 @@ export function renderDataBenchmarkMarkdown(result: DataBenchmarkResult): string
     `Bun ${result.meta.bun} · ${result.meta.platform}/${result.meta.arch} · seeded dataset (id/date/customer/city/amount) · ` +
       `median (p95) over warmed-up iterations · lower is better.`,
   );
+  out.push(
+    `Measured engines: Sheetwrite ${result.meta.engineVersions.sheetwrite}; Handsontable ${result.meta.engineVersions.handsontable}.`,
+  );
   out.push("");
   if (hot.size > 0) {
     out.push("### Head-to-head (both engines, headless)");

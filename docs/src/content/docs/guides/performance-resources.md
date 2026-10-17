@@ -27,7 +27,6 @@ The main-thread pause scales with resident cells and compact history, so do not 
 | Section | Artifact | Commit | Captured |
 | --- | --- | --- | --- |
 | Render benchmark | `bench/results/render-scale.json` | <code>47f164385fd9</code> | 2026-07-16 21:59 UTC |
-| Data engine benchmark | `bench/results/data-results.json` | <code>6154cca220eb</code> | 2026-07-16 22:05 UTC |
 | Formula engine benchmark | `bench/results/formula-results.json` | <code>ed66b6d7c95c</code> | 2026-10-02 18:09 UTC |
 | Formula engines (analysis capture) | `bench/results/full-engine-results.json` | <code>a50a897e9f93</code> | 2026-10-04 11:20 UTC |
 
@@ -59,7 +58,8 @@ Both engines drive identical scripted interactions in a controlled browser. Pick
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-07-16 21:59 UTC</dd></div>
 <div><dt>Commit</dt><dd><code>47f164385fd9</code> clean worktree</dd></div>
-<div><dt>Environment</dt><dd>Chromium 149.0.7827.55 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
+<div><dt>Engines</dt><dd>Sheetwrite 0.1.0 · Handsontable 18.0.0</dd></div>
+<div><dt>Environment</dt><dd>Bun 1.3.14 · Node compatibility 24.3.0 · Chromium 149.0.7827.55 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
 <div><dt>Protocol</dt><dd>10 rounds · raw artifact <code>bench/results/render-scale.json</code></dd></div>
 </dl>
 
@@ -735,158 +735,6 @@ bun run --filter @sheetwrite/bench bench:resource
 
 ## Data engine benchmark
 
-<div class="evidence-available"><strong>Validated evidence.</strong> Head-to-head store operations at the sizes both engines complete headlessly; Sheetwrite additionally scales to 1M rows below.</div>
-
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Captured</dt><dd>2026-07-16 22:05 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>6154cca220eb</code> clean worktree</dd></div>
-<div><dt>Raw artifact</dt><dd><code>bench/results/data-results.json</code></dd></div>
-</dl>
-
-<figure class="bench-viz bench-widget bench-widget--data" data-pagefind-ignore>
-<input type="radio" name="bench-data-size" id="bench-data-1000">
-<input type="radio" name="bench-data-size" id="bench-data-10000">
-<div class="bench-widget__tabs">
-<div class="bench-tabs" aria-label="Workbook size">
-<label for="bench-data-1000">1k rows</label>
-<label for="bench-data-10000">10k rows</label>
-</div>
-</div>
-<section class="bench-panel bench-ruled" data-size="1000" data-metric="speed" style="--bench-segs:6">
-<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
-<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.001</span><span class="bench-ruler__tick" style="left:16.67%">0.01</span><span class="bench-ruler__tick" style="left:33.33%">0.1</span><span class="bench-ruler__tick" style="left:50.00%">1</span><span class="bench-ruler__tick" style="left:66.67%">10</span><span class="bench-ruler__tick" style="left:83.33%">100</span><span class="bench-ruler__tick" style="left:100.00%">1 s</span></span><span class="bench-bar__value"></span></div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>ingest</code><span class="bench-viz__ratio"><strong>1556.9×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:43.60%"></i><i class="bench-bar__fill" style="width:41.48%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.31 ms</b><b class="bench-num" data-stat="p95">0.41 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:95.63%"></i><i class="bench-bar__fill" style="width:94.68%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">479.7 ms</b><b class="bench-num" data-stat="p95">546.7 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>windowRead</code><span class="bench-viz__ratio"><strong>13.6×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:17.09%"></i><i class="bench-bar__fill" style="width:12.83%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6 µs</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:35.42%"></i><i class="bench-bar__fill" style="width:31.72%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.08 ms</b><b class="bench-num" data-stat="p95">0.13 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>edit</code><span class="bench-viz__ratio"><strong>105.4×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:56.17%"></i><i class="bench-bar__fill" style="width:53.63%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.65 ms</b><b class="bench-num" data-stat="p95">2.34 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:89.72%"></i><i class="bench-bar__fill" style="width:87.34%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">173.9 ms</b><b class="bench-num" data-stat="p95">241.6 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>sort</code><span class="bench-viz__ratio"><strong>1762.9×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:39.38%"></i><i class="bench-bar__fill" style="width:33.98%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.11 ms</b><b class="bench-num" data-stat="p95">0.23 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:89.60%"></i><i class="bench-bar__fill" style="width:88.09%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">192.9 ms</b><b class="bench-num" data-stat="p95">237.5 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>filter</code><span class="bench-viz__ratio"><strong>4708.7×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:25.38%"></i><i class="bench-bar__fill" style="width:21.98%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.02 ms</b><b class="bench-num" data-stat="p95">0.03 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:83.89%"></i><i class="bench-bar__fill" style="width:83.19%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">98.1 ms</b><b class="bench-num" data-stat="p95">108.0 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>aggregate</code><span class="bench-viz__ratio"><strong>57.7×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:12.33%"></i><i class="bench-bar__fill" style="width:8.77%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3 µs</b><b class="bench-num" data-stat="p95">5 µs</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:42.11%"></i><i class="bench-bar__fill" style="width:38.13%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.19 ms</b><b class="bench-num" data-stat="p95">0.34 ms</b></span></div>
-</div>
-</section>
-<section class="bench-panel bench-ruled" data-size="10000" data-metric="speed" style="--bench-segs:6">
-<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
-<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.01</span><span class="bench-ruler__tick" style="left:16.67%">0.1</span><span class="bench-ruler__tick" style="left:33.33%">1</span><span class="bench-ruler__tick" style="left:50.00%">10</span><span class="bench-ruler__tick" style="left:66.67%">100</span><span class="bench-ruler__tick" style="left:83.33%">1k</span><span class="bench-ruler__tick" style="left:100.00%">10 s</span></span><span class="bench-bar__value"></span></div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>ingest</code><span class="bench-viz__ratio"><strong>1709.6×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:40.26%"></i><i class="bench-bar__fill" style="width:39.59%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2.37 ms</b><b class="bench-num" data-stat="p95">2.61 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:94.30%"></i><i class="bench-bar__fill" style="width:93.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4055.9 ms</b><b class="bench-num" data-stat="p95">4552.8 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>windowRead</code><span class="bench-viz__ratio"><strong>20.2×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:0.60%"></i><i class="bench-bar__fill" style="width:0.60%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6 µs</b><b class="bench-num" data-stat="p95">7 µs</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:19.49%"></i><i class="bench-bar__fill" style="width:17.79%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.12 ms</b><b class="bench-num" data-stat="p95">0.15 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>edit</code><span class="bench-viz__ratio"><strong>662.0×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:36.14%"></i><i class="bench-bar__fill" style="width:30.80%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.70 ms</b><b class="bench-num" data-stat="p95">1.47 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:78.98%"></i><i class="bench-bar__fill" style="width:77.81%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">466.4 ms</b><b class="bench-num" data-stat="p95">548.1 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>sort</code><span class="bench-viz__ratio"><strong>9977.5×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:21.59%"></i><i class="bench-bar__fill" style="width:21.00%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.18 ms</b><b class="bench-num" data-stat="p95">0.20 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:90.56%"></i><i class="bench-bar__fill" style="width:87.65%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1815.0 ms</b><b class="bench-num" data-stat="p95">2713.7 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>filter</code><span class="bench-viz__ratio"><strong>20304.6×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:11.48%"></i><i class="bench-bar__fill" style="width:10.88%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.04 ms</b><b class="bench-num" data-stat="p95">0.05 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:88.45%"></i><i class="bench-bar__fill" style="width:82.68%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">913.4 ms</b><b class="bench-num" data-stat="p95">2026.5 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>aggregate</code><span class="bench-viz__ratio"><strong>72.0×</strong> faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:5.01%"></i><i class="bench-bar__fill" style="width:4.70%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.02 ms</b><b class="bench-num" data-stat="p95">0.02 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:38.37%"></i><i class="bench-bar__fill" style="width:35.65%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.38 ms</b><b class="bench-num" data-stat="p95">2.01 ms</b></span></div>
-</div>
-</section>
-</figure>
-
-Sheetwrite alone at scale — Handsontable cannot complete these sizes headlessly:
-
-<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:6">
-<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
-<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.001</span><span class="bench-ruler__tick" style="left:16.67%">0.01</span><span class="bench-ruler__tick" style="left:33.33%">0.1</span><span class="bench-ruler__tick" style="left:50.00%">1</span><span class="bench-ruler__tick" style="left:66.67%">10</span><span class="bench-ruler__tick" style="left:83.33%">100</span><span class="bench-ruler__tick" style="left:100.00%">1 s</span></span><span class="bench-bar__value"></span></div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>ingest</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:74.02%"></i><i class="bench-bar__fill" style="width:73.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">25.6 ms</b><b class="bench-num" data-stat="p95">27.6 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:85.97%"></i><i class="bench-bar__fill" style="width:85.93%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">143.1 ms</b><b class="bench-num" data-stat="p95">143.9 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:91.75%"></i><i class="bench-bar__fill" style="width:91.61%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">313.7 ms</b><b class="bench-num" data-stat="p95">319.9 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>windowRead</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:18.09%"></i><i class="bench-bar__fill" style="width:15.07%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">8 µs</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:18.92%"></i><i class="bench-bar__fill" style="width:15.92%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">9 µs</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:18.52%"></i><i class="bench-bar__fill" style="width:17.26%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.01 ms</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>edit</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:56.22%"></i><i class="bench-bar__fill" style="width:51.60%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.25 ms</b><b class="bench-num" data-stat="p95">2.36 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:48.86%"></i><i class="bench-bar__fill" style="width:47.15%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.67 ms</b><b class="bench-num" data-stat="p95">0.85 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:48.43%"></i><i class="bench-bar__fill" style="width:47.86%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.74 ms</b><b class="bench-num" data-stat="p95">0.80 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>sort</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:54.74%"></i><i class="bench-bar__fill" style="width:54.34%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.82 ms</b><b class="bench-num" data-stat="p95">1.92 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:67.02%"></i><i class="bench-bar__fill" style="width:66.65%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">9.97 ms</b><b class="bench-num" data-stat="p95">10.5 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:73.97%"></i><i class="bench-bar__fill" style="width:73.18%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">24.6 ms</b><b class="bench-num" data-stat="p95">27.4 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>filter</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:42.52%"></i><i class="bench-bar__fill" style="width:41.85%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.32 ms</b><b class="bench-num" data-stat="p95">0.36 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:54.04%"></i><i class="bench-bar__fill" style="width:53.43%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.61 ms</b><b class="bench-num" data-stat="p95">1.75 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:60.50%"></i><i class="bench-bar__fill" style="width:59.37%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3.65 ms</b><b class="bench-num" data-stat="p95">4.27 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><code>aggregate</code></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">100k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:40.17%"></i><i class="bench-bar__fill" style="width:37.94%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.19 ms</b><b class="bench-num" data-stat="p95">0.26 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">500k rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:52.84%"></i><i class="bench-bar__fill" style="width:50.45%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.06 ms</b><b class="bench-num" data-stat="p95">1.48 ms</b></span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1M rows</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:56.05%"></i><i class="bench-bar__fill" style="width:55.32%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2.08 ms</b><b class="bench-num" data-stat="p95">2.31 ms</b></span></div>
-</div>
-</figure>
-
-<details class="bench-method" data-pagefind-ignore>
-<summary>Methodology - what each operation does</summary>
-<div class="bench-method__body">
-<p>Identical columnar datasets, per-operation warmup and iteration plans. Fresh instance per ingest; window reads rotate offsets to defeat caches; sort and filter reset between runs; Handsontable edits run with rendering suspended so only its data path is timed.</p>
-<p>Memory = JS-heap delta around one ingest in an isolated subprocess, plus Sheetwrite's WASM linear-memory delta.</p>
-<dl>
-<div><dt><code>ingest</code></dt><dd>Load the full dataset into a fresh engine instance.</dd></div>
-<div><dt><code>windowRead</code></dt><dd>Read a 50x5 cell window at a rotating offset that sweeps the whole sheet.</dd></div>
-<div><dt><code>edit</code></dt><dd>1,000 single-cell edits.</dd></div>
-<div><dt><code>sort</code></dt><dd>Sort by the numeric amount column.</dd></div>
-<div><dt><code>filter</code></dt><dd>Substring filter over the city column.</dd></div>
-<div><dt><code>aggregate</code></dt><dd>Numeric aggregation over the amount column.</dd></div>
-</dl>
-</div>
-</details>
-
-Reproduce with:
-
-```sh verify title="Data engine evidence"
-bun run --filter @sheetwrite/bench bench:data
-```
-
 ## Formula engine benchmark
 
 <div class="evidence-available"><strong>Validated evidence.</strong> 53 recalculation workloads across dependency shapes; every workload passed the protocol's safety ceilings.</div>
@@ -1391,6 +1239,7 @@ These protocols have no validated artifact in this environment yet, so no number
 
 | Artifact | Status | Reproduce with |
 | --- | --- | --- |
+| `bench/results/data-results.json` | artifact could not be validated: engineVersions must record the measured engine versions | `bun run --filter @sheetwrite/bench bench:data` |
 | `bench/results/core-paths-results.json` | artifact is missing | `bun run --filter @sheetwrite/bench bench:core-paths` |
 | `bench/results/full-engine-matched-results.json` | Matched engine evidence is invalid: Matched engine protocol mismatch | `bun run --filter @sheetwrite/bench bench:formula:matched` |
 | `bench/results/xlsx-results.json` | artifact has no clean-tree protocol stamp (commit, timestamp, dirty=false), so freshness cannot be established | `bun run --filter @sheetwrite/bench bench:xlsx -- --baseline-root <checkout of the baseline commit>` |

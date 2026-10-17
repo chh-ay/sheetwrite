@@ -19,6 +19,7 @@ import {
 } from "typescript/unstable/ast";
 import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 
+import { validateEngineVersions } from "../bench/src/engine-versions.js";
 import {
   collectFenceHovers,
   formatDeclaration,
@@ -1324,6 +1325,7 @@ interface ValidatedRenderEvidence {
     os: string;
     arch: string;
     cpu: string;
+    engineVersions: Readonly<Record<"sheetwrite" | "handsontable", string>>;
     rounds: number;
     launchAttempts: Array<{ success: boolean }>;
   };
@@ -1492,8 +1494,14 @@ async function loadEvidence<T>(
       return { available: false, reason: evidence, source, reproduction };
     }
     return { evidence, source };
-  } catch {
-    return { available: false, reason: "artifact is not valid JSON", source, reproduction };
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    return {
+      available: false,
+      reason: `artifact could not be validated: ${error.message}`,
+      source,
+      reproduction,
+    };
   }
 }
 
@@ -1517,6 +1525,7 @@ function validateRenderArtifact(value: Record<string, unknown>): ValidatedRender
   ) {
     return "artifact does not match controlled render protocol version 1";
   }
+  validateEngineVersions(metadata.engineVersions, ["sheetwrite", "handsontable"]);
 
   // Failed cells are allowed - the page reports them as crashes.
   // Failed cells legitimately carry null samples; only successes must be finite.
@@ -1597,7 +1606,9 @@ function validateCorePathsArtifact(value: Record<string, unknown>): CorePathsEvi
 interface XlsxEvidence {
   protocol: string;
   mode: string;
-  metadata: CaptureMeta;
+  metadata: CaptureMeta & {
+    engineVersions: Readonly<Record<"sheetwrite" | "exceljs", string>>;
+  };
   rounds: number;
   maxBaselineRatio: number;
   fixture: { path: string; bytes: number; sha256: string; producer: string };
@@ -1621,6 +1632,10 @@ function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | st
   const artifact = value as unknown as Partial<XlsxEvidence>;
   if (artifact.protocol !== "sheetwrite-xlsx-codec-v1" || artifact.mode !== "full") {
     return "artifact is not a full-mode XLSX codec capture";
+  }
+  validateEngineVersions(artifact.metadata?.engineVersions, ["sheetwrite", "exceljs"]);
+  if (!/^[0-9a-f]{40}$/u.test(artifact.toolchain?.baselineCommit ?? "")) {
+    return "XLSX comparison is missing its measured baseline commit";
   }
   const rounds = artifact.rounds;
   if (
@@ -1649,7 +1664,10 @@ function validateXlsxArtifact(value: Record<string, unknown>): XlsxEvidence | st
 interface DataEvidence {
   protocolVersion: number;
   mode: string;
-  meta: CaptureMeta & { bun: string };
+  meta: CaptureMeta & {
+    bun: string;
+    engineVersions: Readonly<Record<"sheetwrite" | "handsontable", string>>;
+  };
   sheetwrite: Record<
     string,
     { rows: number; stats: Record<string, { median: number; p95: number }> }
@@ -1665,6 +1683,7 @@ function validateDataArtifact(value: Record<string, unknown>): DataEvidence | st
   if (artifact.protocolVersion !== 1 || artifact.mode !== "full") {
     return "artifact is not a full-mode data protocol capture";
   }
+  validateEngineVersions(artifact.meta?.engineVersions, ["sheetwrite", "handsontable"]);
   for (const engine of ["sheetwrite", "handsontable"] as const) {
     const block = artifact[engine];
     if (block === undefined || typeof block !== "object") return `artifact lacks ${engine} results`;
@@ -2345,6 +2364,7 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
     '<dl class="bench-meta" data-pagefind-ignore>',
     `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
     `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+    `<div><dt>Engines</dt><dd>Sheetwrite ${html(evidence.metadata.engineVersions.sheetwrite)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code>${html(baselineCommit ?? "")}</code></dd></div>`,
     `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
     `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
     `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
@@ -2506,7 +2526,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${metadata.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Environment</dt><dd>Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
+      `<div><dt>Engines</dt><dd>Sheetwrite ${html(metadata.engineVersions.sheetwrite)} · Handsontable ${html(metadata.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Environment</dt><dd>Bun ${html(metadata.bunVersion)} · Node compatibility ${html(metadata.nodeVersion)} · Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
       `<div><dt>Protocol</dt><dd>${metadata.rounds} rounds · raw artifact <code>${source}</code></dd></div>`,
       "</dl>",
       "",
@@ -2554,6 +2575,8 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
+      `<div><dt>Engines</dt><dd>Sheetwrite ${html(evidence.meta.engineVersions.sheetwrite)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Environment</dt><dd>Bun ${html(evidence.meta.bun)}</dd></div>`,
       `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
       "</dl>",
       "",

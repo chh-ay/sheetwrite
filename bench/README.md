@@ -6,6 +6,8 @@ canvas-rendered grid over a Rust→WASM columnar store) and **Handsontable**
 a grid feels at scale: load, read, edit, sort, filter, aggregate, scroll, and
 navigate.
 
+Release captures always measure the latest released version of each comparison engine; artifacts record the exact installed versions (and the XLSX baseline commit) measured.
+
 Two benchmarks, run independently:
 
 | Benchmark | Where | What it answers |
