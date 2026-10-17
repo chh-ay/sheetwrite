@@ -1,4 +1,5 @@
 import apiNav from "../generated/api-nav.json";
+import { RELEASES, RELEASES_HREF, releaseHref } from "./releases.js";
 
 export interface NavigationItem {
   label: string;
@@ -20,7 +21,6 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Overview", href: "/docs/" },
       { label: "Installation", href: "/docs/start/installation/" },
       { label: "First grid", href: "/docs/start/first-grid/" },
-      { label: "What's new in 0.5.0", href: "/docs/releases/0.5.0/" },
       { label: "Performance", href: "/docs/guides/performance-resources/" },
     ],
   },
@@ -68,7 +68,16 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
       { label: "Compatibility limits", href: "/docs/reference/compatibility-limits/" },
       { label: "Compatibility results", href: "/docs/reference/compatibility-results/" },
       { label: "Moved guides", href: "/docs/reference/moved-guides/" },
-      { label: "All releases", href: "/docs/releases/" },
+    ],
+  },
+  {
+    label: "Releases",
+    items: [
+      { label: "All releases", href: RELEASES_HREF },
+      ...RELEASES.map((release) => ({
+        label: `${release.version} · ${release.date}`,
+        href: releaseHref(release.version),
+      })),
     ],
   },
   {

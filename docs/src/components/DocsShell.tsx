@@ -2,6 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { DOCS_NAVIGATION, type DocumentNeighbours, documentNeighbours } from "../lib/navigation.js";
+import {
+  LATEST_RELEASE,
+  RELEASES_HREF,
+  type ReleaseContext,
+  releaseContext,
+  releaseHref,
+} from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
@@ -241,6 +248,42 @@ function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
   );
 }
 
+/** The current version is one click from every page: it opens its release post. */
+function VersionLink() {
+  return (
+    <Link
+      aria-label={`Release notes for Sheetwrite ${LATEST_RELEASE.version}`}
+      className="sw-version-link"
+      to={releaseHref(LATEST_RELEASE.version)}
+    >
+      v{LATEST_RELEASE.version}
+    </Link>
+  );
+}
+
+/** On a release post: its date and a step to the newer and older posts. */
+function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
+  return (
+    <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
+      <span>
+        Released <time dateTime={release.date}>{release.date}</time>
+      </span>
+      {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
+      {older === undefined ? null : (
+        <Link rel="prev" to={releaseHref(older.version)}>
+          ← {older.version}
+        </Link>
+      )}
+      {newer === undefined ? null : (
+        <Link rel="next" to={releaseHref(newer.version)}>
+          {newer.version} →
+        </Link>
+      )}
+      <Link to={RELEASES_HREF}>All releases</Link>
+    </nav>
+  );
+}
+
 export function DocsShell({
   activeHref,
   children,
@@ -253,6 +296,7 @@ export function DocsShell({
   const [titleMain, titlePackage] = title.split(" | ", 2);
   const outline = useDocumentOutline();
   const neighbours = documentNeighbours(activeHref);
+  const release = releaseContext(activeHref);
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -285,12 +329,18 @@ export function DocsShell({
         Skip to content
       </a>
       <header className="sw-docs-header">
-        <Brand />
+        <div className="sw-docs-header__brand">
+          <Brand />
+          <VersionLink />
+        </div>
         <DocsSearch />
         <div className="sw-docs-header__actions">
           <nav aria-label="Product links" className="sw-docs-header__links">
             <Link className="sw-docs-header__home" to="/">
               Home
+            </Link>
+            <Link aria-current="page" className="sw-docs-header__docs" to="/docs/">
+              Docs
             </Link>
             <Link className="sw-docs-header__showcases" to="/showcases/">
               Showcases
@@ -342,6 +392,7 @@ export function DocsShell({
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
           {titlePackage === undefined ? <span>{description}</span> : null}
+          {release === undefined ? null : <ReleaseStrip {...release} />}
         </header>
         <ApiSymbolFilter />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}

@@ -1,11 +1,13 @@
 /* Documentation owns its layout here; shared prose, code, and product styles stay in site.css. */
+/* An open reading layout: the page is one surface, and hairlines (not boxed
+   cards) separate navigation, text and outline. */
 .sw-docs {
-  --sw-sidebar-width: 15.5rem;
-  --sw-header-height: 4.5rem;
+  --sw-sidebar-width: 16.5rem;
+  --sw-header-height: 4rem;
   --sw-content-width: 52rem;
   min-height: 100vh;
   padding-top: var(--sw-header-height);
-  background: var(--sw-surface-0);
+  background: var(--sw-surface-1);
 }
 
 .sw-docs-header {
@@ -19,9 +21,58 @@
   height: var(--sw-header-height);
   padding: 0 1.5rem;
   border-bottom: 1px solid var(--sw-border);
-  background: var(--sw-surface-1);
+  background: color-mix(in srgb, var(--sw-surface-1) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
 }
 
+.sw-docs-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+/* The version reads as a quiet tag beside the wordmark and opens its notes. */
+.sw-version-link {
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+  color: var(--sw-fg-muted);
+  font: 500 0.72rem / 1.4 var(--sw-font-mono);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+}
+.sw-version-link:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  color: var(--sw-accent-strong);
+}
+/* Release post: date and steps to the newer and older posts, under the title. */
+.sw-release-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.1rem;
+  margin-top: 1.1rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.85rem;
+}
+.sw-release-strip a {
+  color: var(--sw-accent-strong);
+  text-decoration: none;
+}
+.sw-release-strip a:hover {
+  text-decoration: underline;
+}
+.sw-release-strip__latest {
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 .sw-docs-header__actions,
 .sw-docs-header__links {
   display: flex;
@@ -41,14 +92,18 @@
   font-size: 0.875rem;
   font-weight: 550;
   text-decoration: none;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
 }
 .sw-docs-header__links > a:hover {
   color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
 }
-.sw-docs-header__links > .sw-docs-header__home {
-  border: 1px solid var(--sw-border);
-  color: var(--sw-fg-strong);
+/* Every docs page is in the Docs section, so the header marks Docs as current. */
+.sw-docs-header__links > a[aria-current="page"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
 }
 .sw-docs .sw-search-button {
   height: 2.6rem;
@@ -64,38 +119,41 @@
   z-index: 10;
   inset: var(--sw-header-height) auto 0 0;
   width: var(--sw-sidebar-width);
-  padding: 1.5rem 1rem;
+  padding: 1.75rem 1rem 2rem 1.25rem;
+  border-right: 1px solid var(--sw-border);
   overflow-y: auto;
   scrollbar-width: thin;
 }
 .sw-sidebar__nav {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.15rem;
 }
 .sw-nav-group > summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 2.7rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 0.5rem;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.4rem;
   color: var(--sw-fg-strong);
-  font-size: 0.875rem;
+  font-size: 0.86rem;
   font-weight: 600;
   cursor: pointer;
   list-style: none;
+  transition: background-color 140ms ease;
 }
 .sw-nav-group > summary::-webkit-details-marker {
   display: none;
 }
 .sw-nav-group > summary::after {
   content: "";
-  width: 0.4rem;
-  height: 0.4rem;
+  width: 0.38rem;
+  height: 0.38rem;
   border-right: 1.5px solid var(--sw-fg-dim);
   border-bottom: 1.5px solid var(--sw-fg-dim);
   transform: rotate(-45deg);
   margin-right: 0.2rem;
+  transition: transform 160ms ease;
 }
 .sw-nav-group[open] > summary::after {
   transform: rotate(45deg);
@@ -103,52 +161,74 @@
 .sw-nav-group > summary:hover {
   background: var(--sw-surface-2);
 }
+/* A tree line ties the pages to their group; the current page owns a short
+   accent segment of that line instead of a filled pill. */
 .sw-nav-group > div {
-  padding: 0.1rem 0 0.7rem 0.65rem;
+  margin: 0.2rem 0 0.8rem 0.6rem;
+  border-left: 1px solid var(--sw-border);
 }
 .sw-sidebar__nav a {
   display: block;
-  padding: 0.55rem 0.75rem;
-  margin: 0.1rem 0;
-  border-radius: 0.5rem;
+  margin-left: -1px;
+  padding: 0.38rem 0.75rem 0.38rem 0.9rem;
+  border-left: 2px solid transparent;
+  border-radius: 0 0.4rem 0.4rem 0;
   color: var(--sw-fg-muted);
-  font-size: 0.875rem;
-  line-height: 1.4;
+  font-size: 0.86rem;
+  line-height: 1.45;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
 }
 .sw-sidebar__nav a:hover {
+  border-left-color: var(--sw-border-strong);
   color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
 }
 .sw-sidebar__nav a[aria-current="page"] {
-  background: var(--sw-accent-soft);
+  border-left-color: var(--sw-accent);
   color: var(--sw-accent-strong);
-  font-weight: 650;
+  background: color-mix(in srgb, var(--sw-accent) 8%, transparent);
+  font-weight: 600;
 }
 .sw-sidebar__nav section {
   border-top: 1px solid var(--sw-border);
   margin-top: 1rem;
   padding-top: 1rem;
 }
+.sw-sidebar__nav section a {
+  margin-left: 0;
+  border-left: 0;
+  border-radius: 0.4rem;
+  padding-left: 0.6rem;
+}
+.sw-sidebar__nav section a:hover {
+  background: var(--sw-surface-2);
+}
 .sw-sidebar__nav h2 {
-  margin: 0 0 0.5rem;
-  padding-inline: 0.75rem;
+  margin: 0 0 0.4rem;
+  padding-inline: 0.6rem;
   color: var(--sw-fg-dim);
-  font: 600 0.75rem / 1.4 var(--sw-font-body);
+  font: 600 0.7rem / 1.4 var(--sw-font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
+/* Text and outline stay a fixed width and center in the space right of the
+   sidebar; the padding absorbs extra width on large screens. */
 .sw-document {
-  width: min(calc(100% - var(--sw-sidebar-width) - 3rem), 76rem);
-  margin: 1.5rem auto 3rem calc(var(--sw-sidebar-width) + 0.5rem);
-  padding: clamp(1.5rem, 3vw, 3rem);
-  border: 1px solid var(--sw-border);
-  border-radius: 1rem;
-  background: var(--sw-surface-1);
+  width: calc(100% - var(--sw-sidebar-width));
+  margin: 0 0 0 var(--sw-sidebar-width);
+  padding: 2.75rem max(clamp(1.5rem, 5vw, 4.5rem), (100% - var(--sw-sidebar-width) - 70rem) / 2)
+    4rem;
   min-width: 0;
 }
 .sw-document__header {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--sw-border);
 }
 .sw-breadcrumb ol {
   display: flex;
@@ -190,8 +270,8 @@
   gap: 0.65rem 1rem;
   margin: 0;
   color: var(--sw-fg-strong);
-  font: 700 clamp(1.8rem, 3vw, 2.5rem) / 1.2 var(--sw-font-body);
-  letter-spacing: -0.04em;
+  font: 700 clamp(1.9rem, 3vw, 2.6rem) / 1.15 var(--sw-font-display);
+  letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
 .sw-document__header h1 > span {
@@ -199,11 +279,11 @@
 }
 .sw-document__header > span {
   display: block;
-  max-width: 44rem;
-  margin-top: 0.8rem;
+  max-width: 42rem;
+  margin-top: 0.9rem;
   color: var(--sw-fg-muted);
-  font-size: 1rem;
-  line-height: 1.65;
+  font-size: 1.08rem;
+  line-height: 1.6;
 }
 .sw-title-package {
   border: 1px solid var(--sw-border);
@@ -216,22 +296,29 @@
 }
 .sw-docs .sw-prose {
   min-width: 0;
-  font-size: 0.96rem;
+  font-size: 1rem;
   line-height: 1.75;
 }
 .sw-docs .sw-prose h2 {
-  margin-top: 2.5rem;
-  font: 650 1.4rem / 1.35 var(--sw-font-body);
-  letter-spacing: -0.025em;
+  margin: 3.5rem 0 1rem;
+  padding-top: 0;
+  font: 650 1.55rem / 1.3 var(--sw-font-display);
+  letter-spacing: -0.03em;
 }
 .sw-docs .sw-prose h3 {
-  font-family: var(--sw-font-body);
-  font-size: 1.1rem;
+  margin: 2.5rem 0 0.75rem;
+  font: 650 1.15rem / 1.4 var(--sw-font-body);
+  letter-spacing: -0.015em;
+}
+.sw-docs .sw-prose h4 {
+  margin: 2rem 0 0.5rem;
+  font: 650 1rem / 1.4 var(--sw-font-body);
+  letter-spacing: -0.01em;
 }
 .sw-docs .sw-prose p,
 .sw-docs .sw-prose li,
 .sw-docs .sw-prose blockquote {
-  max-width: 46rem;
+  max-width: 44rem;
 }
 
 .sw-toc {
@@ -240,8 +327,11 @@
 .sw-toc__label {
   display: block;
   margin-bottom: 0.75rem;
-  color: var(--sw-fg-strong);
-  font: 600 0.8rem / 1.4 var(--sw-font-body);
+  padding-left: 1rem;
+  color: var(--sw-fg-dim);
+  font: 600 0.7rem / 1.4 var(--sw-font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .sw-toc ul,
 .sw-toc-inline ul {
@@ -252,32 +342,44 @@
 .sw-toc a,
 .sw-toc-inline a {
   display: block;
-  border-radius: 0.35rem;
-  padding: 0.35rem 0.6rem;
+  padding: 0.3rem 0.6rem;
   color: var(--sw-fg-muted);
   font-size: 0.8rem;
   line-height: 1.5;
   text-decoration: none;
   overflow-wrap: anywhere;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+}
+/* In the side outline, the current section marks its piece of the rail. */
+.sw-toc a {
+  margin-left: -1px;
+  padding-left: 1rem;
+  border-left: 2px solid transparent;
 }
 .sw-toc a:hover,
 .sw-toc-inline a:hover {
   color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
+}
+.sw-toc a:hover {
+  border-left-color: var(--sw-border-strong);
 }
 .sw-toc a[aria-current="location"] {
+  border-left-color: var(--sw-accent);
   color: var(--sw-accent-strong);
-  background: var(--sw-accent-soft);
   font-weight: 600;
 }
 .sw-toc li[data-depth="1"],
 .sw-toc-inline li[data-depth="1"] {
   padding-left: 0.7rem;
 }
+/* The page header already ends with a rule, so the inline outline closes
+   with one rule of its own instead of adding a second line above. */
 .sw-toc-inline {
-  margin: 0 0 1.5rem;
-  border-block: 1px solid var(--sw-border);
-  padding: 0.65rem 0;
+  margin: -1rem 0 1.75rem;
+  border-bottom: 1px solid var(--sw-border);
+  padding: 0 0 0.75rem;
 }
 .sw-toc-inline:not(:has(li)) {
   display: none;
@@ -360,7 +462,6 @@
 }
 .sw-docs .api-pagehead {
   padding-bottom: 0.8rem;
-  border-bottom: 1px solid var(--sw-border);
 }
 .sw-docs .api-metadata {
   margin: 1rem 0 1.5rem;
@@ -369,40 +470,44 @@
 .sw-docs .api-metadata div {
   grid-template-columns: 5rem minmax(0, 1fr);
 }
+/* Member names read as a scannable index in columns, not as a wall of chips. */
 .sw-docs .api-member-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.1rem 1.25rem;
   padding: 0;
   border: 0;
   background: transparent;
-  gap: 0.4rem;
 }
 .sw-docs .api-member-index a {
-  border: 1px solid var(--sw-border);
-  border-radius: 0.35rem;
-  padding: 0.25rem 0.5rem;
-  background: var(--sw-surface-0);
+  overflow: hidden;
+  padding: 0.15rem 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sw-docs .api-member-list {
   border: 0;
+  border-bottom: 1px solid var(--sw-border);
   margin: 1rem 0 2rem;
 }
+/* Members are a flat list split by hairlines; an open member gets a faint
+   tint so its body reads as part of that row. */
 .sw-docs .api-member {
-  border: 1px solid var(--sw-border);
-  border-radius: 0.6rem;
-  margin-bottom: 0.55rem;
-  background: var(--sw-surface-0);
-}
-.sw-docs .api-member summary {
-  padding: 0.8rem 1rem;
-  border-radius: 0.6rem;
-}
-.sw-docs .api-member[open] {
-  border-color: var(--sw-border-strong);
+  border: 0;
+  border-top: 1px solid var(--sw-border);
+  border-radius: 0;
+  margin: 0;
   background: var(--sw-surface-1);
 }
+.sw-docs .api-member summary {
+  padding: 0.7rem 0.5rem;
+  border-radius: 0.4rem;
+}
+.sw-docs .api-member[open] {
+  background: color-mix(in srgb, var(--sw-fg) 2.5%, var(--sw-surface-1));
+}
 .sw-docs .api-member[open] > summary {
-  border-bottom: 1px solid var(--sw-border);
-  border-radius: 0.6rem 0.6rem 0 0;
-  background: var(--sw-surface-2);
+  border-radius: 0;
 }
 .sw-docs .api-member summary code {
   font-size: 0.85rem;
@@ -737,8 +842,8 @@ html:has(.sw-nav-dialog[open]) {
 @media (min-width: 88rem) {
   .sw-docs:not(.sw-docs--overview) .sw-document {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 11rem;
-    gap: 0 2.5rem;
+    grid-template-columns: minmax(0, 1fr) 13rem;
+    gap: 0 3.5rem;
   }
   .sw-document > .sw-document__header,
   .sw-document > .sw-symbol-filter,
@@ -757,7 +862,7 @@ html:has(.sw-nav-dialog[open]) {
     max-height: calc(100vh - var(--sw-header-height) - 4rem);
     overflow-y: auto;
     border-left: 1px solid var(--sw-border);
-    padding-left: 1rem;
+    padding-left: 0;
     scrollbar-width: thin;
   }
   .sw-document > .sw-toc-inline {
@@ -791,9 +896,9 @@ html:has(.sw-nav-dialog[open]) {
     gap: 1rem;
   }
   .sw-document {
-    width: calc(100% - 2rem);
-    margin: 1rem auto 2rem;
-    padding: 1.5rem;
+    width: 100%;
+    margin: 0;
+    padding: 2rem clamp(1.25rem, 5vw, 3rem) 3rem;
   }
   .sw-docs-header__links > .sw-docs-header__ai {
     display: none;
@@ -812,7 +917,8 @@ html:has(.sw-nav-dialog[open]) {
   .sw-docs .sw-search-button kbd {
     display: none;
   }
-  .sw-docs-header__links > .sw-docs-header__showcases {
+  .sw-docs-header__links > .sw-docs-header__showcases,
+  .sw-docs-header__links > .sw-docs-header__docs {
     display: none;
   }
   .sw-docs-header__links > .sw-docs-header__home {
@@ -827,11 +933,7 @@ html:has(.sw-nav-dialog[open]) {
     font-size: 0.8rem;
   }
   .sw-document {
-    width: 100%;
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    padding: 1.5rem 1rem 3rem;
+    padding: 1.5rem 1.1rem 3rem;
   }
   .sw-document__header h1 {
     font-size: 1.85rem;

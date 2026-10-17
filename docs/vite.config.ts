@@ -67,6 +67,54 @@ function markResponsiveCodeBlocks() {
   };
 }
 
+/** Visible text of a hast subtree. */
+function textOf(node: HastNode): string {
+  if (node.type === "text") return node.value ?? "";
+  return (node.children ?? []).map(textOf).join("");
+}
+
+/** Cells shorter than this read as one token (a name, value or range). */
+const SHORT_CELL_LENGTH = 28;
+
+/** Gives short table cells a class, so a value never breaks over lines. */
+function markShortCells(node: HastNode): void {
+  for (const child of node.children ?? []) {
+    if (
+      (child.tagName === "td" || child.tagName === "th") &&
+      textOf(child).trim().length < SHORT_CELL_LENGTH
+    ) {
+      child.properties = { ...child.properties, className: ["sw-cell-short"] };
+    }
+    markShortCells(child);
+  }
+}
+
+/**
+ * Markdown tables get a scroll frame: a wide table scrolls inside the column
+ * instead of widening the page, so short cells can stay on one line.
+ * Tables with their own class are designed layouts and keep their markup.
+ */
+function wrapProseTables() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (!node.children) return;
+      // Tables never nest tables in this content, so a table is not visited again.
+      for (const child of node.children) if (child.tagName !== "table") visit(child);
+      node.children = node.children.map((child) => {
+        if (child.tagName !== "table" || child.properties?.className) return child;
+        markShortCells(child);
+        return {
+          type: "element",
+          tagName: "div",
+          properties: { className: ["sw-table-frame"], tabIndex: 0 },
+          children: [child],
+        };
+      });
+    };
+    visit(tree);
+  };
+}
+
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   defaultProps: { wrap: false },
   styleOverrides: {
@@ -141,6 +189,7 @@ export default defineConfig({
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
           markResponsiveCodeBlocks,
+          wrapProseTables,
         ],
       }),
       enforce: "pre",

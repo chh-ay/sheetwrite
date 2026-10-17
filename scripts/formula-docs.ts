@@ -233,7 +233,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     "",
     "## Engine builds",
     "",
-    "- `@sheetwrite/wasm` is the default engine. Every function listed for `@sheetwrite/wasm` is in both builds.",
+    "- `@sheetwrite/wasm` is the default engine. In the function tables, the Engine column shows `default, full` for a function in both engines and `full` for a function in `@sheetwrite/formulas` only.",
     '- `@sheetwrite/formulas` is the full engine. It adds the analysis families marked below: distributions and statistics, regression, finance, dates, text and regex, database, math and matrices, reshaping, LAMBDA helpers, and grouping. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.',
     "- The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.",
     "- Numeric functions use binary64 arithmetic with function-specific domains and bounded numerical algorithms. The inventory does not claim unlimited tail accuracy or complete Excel/Google Sheets/OpenFormula parity.",
@@ -265,20 +265,23 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
       "",
       `Taxonomy/source: [${section}](${sourceUrl}).`,
       "",
-      "| Function (aliases) | Builds | Contract | Signature profile | Semantics profile | Dialect profile | Implementation profile |",
+      "| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |",
       "| --- | --- | --- | --- | --- | --- | --- |",
       ...familyFunctions.map((formula) => {
         const aliases =
           formula.aliases.length > 0
             ? ` (${formula.aliases.map((name) => `\`${name}\``).join(", ")})`
             : "";
+        const inDefaultEngine = formula.builds.includes("@sheetwrite/wasm");
         const contractLabel =
           formula.contractStatus === "required-supported"
             ? "required target"
-            : formula.builds.includes("@sheetwrite/wasm")
+            : inDefaultEngine
               ? "incumbent"
               : "optional analysis";
-        return `| \`${formula.canonical}\`${aliases} | ${formula.builds.map((build) => `\`${build}\``).join(", ")} | ${contractLabel} | [\`${formula.signature}\`](#signature-${anchor(formula.signature)}) | [\`${formula.semantics}\`](#semantics-${anchor(formula.semantics)}) | [\`${formula.dialects}\`](#dialect-${anchor(formula.dialects)}) | [\`${formula.implementation}\`](#implementation-${anchor(formula.implementation)}) |`;
+        // The default engine's names are a subset of the full engine's names.
+        const engineLabel = inDefaultEngine ? "default, full" : "full";
+        return `| \`${formula.canonical}\`${aliases} | ${engineLabel} | ${contractLabel} | [\`${formula.signature}\`](#signature-${anchor(formula.signature)}) | [\`${formula.semantics}\`](#semantics-${anchor(formula.semantics)}) | [\`${formula.dialects}\`](#dialect-${anchor(formula.dialects)}) | [\`${formula.implementation}\`](#implementation-${anchor(formula.implementation)}) |`;
       }),
       "",
     );
