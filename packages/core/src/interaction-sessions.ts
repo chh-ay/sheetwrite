@@ -5,7 +5,7 @@ import { CustomEditorController } from "./custom-editor.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import type { FindBar } from "./find-bar.js";
-import { keyboardAction } from "./keymap.js";
+import type { Keymap } from "./keymap.js";
 import { formatNumber } from "./number-format.js";
 import { autofitColumnWidth, MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
@@ -84,6 +84,7 @@ interface InteractionDependencies {
    * intercepts first (returning true consumes the event). See GridConfig.keyboard.
    */
   keyboard: () => boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean);
+  keymap: () => Keymap;
   screenRect: (
     row: number,
     col: number,
@@ -377,6 +378,7 @@ export class InteractionSessions {
       theme: this.deps.theme(),
       onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
       onCancel: () => this.endEditor(),
+      onShortcut: (event) => this.runCustomShortcut(event, true),
     });
   }
 
@@ -777,7 +779,23 @@ export class InteractionSessions {
     return ctx.measureText(text).width;
   }
 
+  /** Runs a host command bound to this key combination; true when one ran. */
+  private runCustomShortcut(e: KeyboardEvent, editing: boolean): boolean {
+    const focusCell = this.deps.selection().focusCell;
+    return this.deps.keymap().runCustom(
+      e,
+      {
+        cell: focusCell ? { sheet: this.deps.activeSheet(), ...focusCell } : null,
+        clientX: 0,
+        clientY: 0,
+      },
+      this.deps.grid,
+      editing,
+    );
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
+    // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
     // Keys typed into an editable widget inside the host (find bar, custom
     // toolbar fields) belong to that widget. Without this guard the grid's
@@ -791,16 +809,18 @@ export class InteractionSessions {
         (target instanceof HTMLElement && target.isContentEditable));
     if (inEditableWidget) return;
 
-    // Headless hosts own the keymap: `false` drops every stock binding, a
-    // handler intercepts first and consumes by returning true.
+    // Headless hosts own the keymap: a handler intercepts first and consumes
+    // by returning true; `false` drops every stock binding but keeps the
+    // host's own menu commands.
     const keyboard = this.deps.keyboard();
-    if (keyboard === false) return;
     if (typeof keyboard === "function" && keyboard(e)) return;
+    if (this.runCustomShortcut(e, false)) return;
+    if (keyboard === false) return;
 
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
 
-    const action = keyboardAction(e, typeof keyboard === "object" ? keyboard : undefined);
+    const action = this.deps.keymap().action(e);
     if (action) {
       e.preventDefault();
       switch (action) {

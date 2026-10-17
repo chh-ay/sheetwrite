@@ -31,7 +31,7 @@ import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
-import { boundShortcutLabel } from "./keymap.js";
+import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { ReadWindowController } from "./read-window-controller.js";
@@ -392,6 +392,7 @@ export class GridImpl implements Grid {
   private sheetTabs: SheetTabs | null = null;
   private tabBarHeight = 0;
   private keyboardPolicy: boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean) = true;
+  private keymap: Keymap;
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
@@ -465,6 +466,7 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    this.keymap = new Keymap(opts.config);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
       opts.transactionResourceLimits,
     );
@@ -738,6 +740,7 @@ export class GridImpl implements Grid {
       },
       dataEdge: (row, col, dRow, dCol) => this.dataEdge(row, col, dRow, dCol),
       keyboard: () => this.keyboardPolicy,
+      keymap: () => this.keymap,
       contentXAt: (viewportX) => this.contentXAt(viewportX),
       contentYAt: (viewportY) => this.contentYAt(viewportY),
       zoom: () => this.zoom,
@@ -1382,11 +1385,7 @@ export class GridImpl implements Grid {
   }
 
   getShortcutLabel(action: KeyboardAction): string {
-    if (this.keyboardPolicy === false) return "";
-    return boundShortcutLabel(
-      action,
-      typeof this.keyboardPolicy === "object" ? this.keyboardPolicy : undefined,
-    );
+    return this.keymap.label(action);
   }
 
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
@@ -2008,6 +2007,13 @@ export class GridImpl implements Grid {
       this.config = config;
       return;
     }
+    const focus = this.selection.focusCell;
+    const keymap = new Keymap(config, {
+      cell: focus ? { sheet: this.activeSheet, ...focus } : null,
+      clientX: 0,
+      clientY: 0,
+    });
+    this.keymap = keymap;
     this.config = config;
 
     const keyboard = config?.keyboard ?? true;

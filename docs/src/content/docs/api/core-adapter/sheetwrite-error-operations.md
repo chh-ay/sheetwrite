@@ -8,7 +8,7 @@ description: "Stable operations at which a consumer-visible failure can surface.
 Stable operations at which a consumer-visible failure can surface.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L58"><code>packages/core/src/errors.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L60"><code>packages/core/src/errors.ts#L60</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -39,6 +39,7 @@ const SHEETWRITE_ERROR_OPERATIONS: readonly [
   "comments",
   "query",
   "hyperlink-activate",
+  "keyboard-configure",
 ]
 ```
 

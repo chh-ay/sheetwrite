@@ -2970,14 +2970,24 @@ When the grid is focused and not editing:
 
 Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions
 keep their defaults. Use `null` to remove an action's keys, or an array for multiple
-bindings. `mod` means Command on macOS and Control elsewhere. Modifiers must match
-exactly. These bindings apply when the grid has focus and is not editing.
+bindings. These bindings apply when the grid has focus and is not editing.
+
+Write a key combination as a string or as an object:
+
+- A string lists modifiers and then one key: `"Mod+Shift+K"`, `"Ctrl+Alt+Delete"`.
+The modifiers are `Mod`, `Ctrl`, `Meta`, `Alt` and `Shift`, in any order.
+- An object names the key and its modifiers: `{ key: "k", mod: true, shift: true }`.
+Use the object form for a key without modifiers, for example `{ key: "F2" }`.
+
+`Mod` is Command on macOS and Control on other systems. `Ctrl` and `Meta` are
+always the Control and Command (or Windows) keys, so `"Ctrl+J"` is Control+J on a
+Mac too. Modifiers must match exactly.
 
 ```ts
 grid.setConfig({
   keyboard: {
     bindings: {
-      copy: { key: "c", mod: true, shift: true },
+      copy: "Mod+Shift+C",
       find: { key: "f", mod: true },
       replace: null,
     },
@@ -2992,13 +3002,36 @@ The Copy label is `⌘⇧C` on macOS and `Ctrl+Shift+C` elsewhere. Its original
 Mod+C binding no longer runs Copy. Menu actions use their bound shortcut by
 default; `shortcut: "copy"` lets a custom item use the same label.
 Built-in toolbar titles and `grid.getShortcutLabel("copy")` use the same keymap.
-An explicit key hint such as `shortcut: { key: "k", mod: true, alt: true }`
-is platform-aware but does not register a key handler. The host must bind it.
-Free-text shortcut hints are no longer accepted.
 
-Use `keyboard: false` to handle all keys in the host. The existing intercept
-function remains available: return `true` to consume a key or `false` to let the
-built-in handler continue. See [KeyboardOptions](https://sheetwrite.vercel.app/docs/api/core/keyboard-options/).
+### Add a shortcut for your own command
+
+Give a context-menu item a `shortcut` and an `onClick`. The grid then runs
+`onClick` when the grid has focus and the user presses that combination, with
+the focused cell as the cell argument. A combination with `Mod`, `Ctrl` or `Meta`
+also works while the inline editor is open. A hidden or disabled item does not run.
+
+```ts
+grid.setConfig({
+  contextMenu: [
+    {
+      id: "open-record",
+      label: "Open record",
+      shortcut: "Mod+Shift+O",
+      onClick: (_grid, cell) => {
+        if (cell) console.log("open record for row", cell.row);
+      },
+    },
+  ],
+});
+```
+
+If two commands use the same combination, `createGrid` and `setConfig` throw a
+`SheetwriteError` with code `shortcut-conflict`, and `setConfig` keeps the
+previous configuration. A malformed combination throws code `invalid-shortcut`.
+
+Use `keyboard: false` to handle all built-in keys in the host. The existing
+intercept function remains available: return `true` to consume a key or `false`
+to let the built-in handler continue. See [KeyboardOptions](https://sheetwrite.vercel.app/docs/api/core/keyboard-options/).
 
 ## Undo and redo
 
@@ -5186,11 +5219,12 @@ Members:
 - `id` — Stable host identifier, exposed as `data-context-menu-item`.
 - `label` — Menu row text. Defaults per action.
 - `onClick` — Custom click handler; receives the grid and the right-clicked cell (null if none).
-- `shortcut` — A bound action or an explicit key combination, rendered for the current platform.
-For example, `shortcut: "copy"` follows `GridConfig.keyboard.bindings.copy`;
-`shortcut: { key: "c", mod: true, shift: true }` displays ⌘⇧C on macOS.
-See {@link KeyboardOptions} for bindings and
-[Interaction and editing](https://sheetwrite.vercel.app/docs/guides/interaction/#rebind-an-action) for examples.
+- `shortcut` — A bound action name or a custom key combination. An explicit combination
+registers `onClick` as a keyboard command; action names only reference the
+existing built-in binding. Both forms display platform-aware labels.
+For example, `shortcut: "copy"` follows the configured Copy binding, while
+`shortcut: "Mod+Shift+K"` binds this item's `onClick` callback.
+See {@link KeyboardOptions} for built-in action overrides.
 - `visible` — Static or request-aware visibility. Hidden separators are normalized.
 
 ##### `ContextMenuItems` — type
@@ -5956,13 +5990,16 @@ export interface KeyboardOptions { bindings?: Partial<Record<KeyboardAction, Key
 
 Overrides replace all default keys for an action; null disables that action's keys.
 
-##### `KeyShortcut` — interface
+##### `KeyShortcut` — type
 
 ```ts
-export interface KeyShortcut { key: string; mod?: boolean; shift?: boolean; alt?: boolean; }
+export type KeyShortcut = | `${"Mod" | "Ctrl" | "Meta" | "Alt" | "Shift"}+${string}` | { key: string; mod?: boolean; ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean; };
 ```
 
-A platform-neutral key combination. `mod` means Command on macOS, Control elsewhere.
+A compact modified key combination or a key object. Modifiers may appear in
+any order before the final key, for example "Mod+Shift+K" or "Ctrl+Alt+Delete".
+`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.
+The parser rejects unknown/repeated modifiers and missing keys.
 
 ##### `labelToCol` — function
 
@@ -7078,7 +7115,7 @@ Private-format MIME type used for rich Sheetwrite clipboard payloads.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -7086,7 +7123,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -7105,7 +7142,7 @@ Members:
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
@@ -8510,7 +8547,7 @@ An explicit projection record for an operation with no row-space meaning.
 ##### `SHEETWRITE_ERROR_CODES` — variable
 
 ```ts
-readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink"]
+readonly ["initialization-failed", "initialization-required", "datasource-request-failed", "renderer-fallback", "export-failed", "xlsx-import-failed", "optional-backend-unavailable", "delimited-text-resource-limit", "delimited-text-invalid-limit", "xlsx-resource-limit", "resource-limit", "invalid-snapshot", "aborted", "not-found", "commit-rejected", "unavailable", "blocked", "quota", "unsupported-schema", "transaction", "conflict", "limit", "invalid-limits", "invalid-version", "invalid-id", "invalid-operations", "operation-limit", "payload-limit", "response-id-mismatch", "future-distance-limit", "buffer-count-limit", "buffer-operation-limit", "buffer-byte-limit", "pending-count-limit", "pending-operation-limit", "pending-byte-limit", "late-echo", "remote-operations-rejected", "invalid-batch", "batch-limit", "pending-capacity", "presence-failed", "revision-failed", "comment-failed", "sync-failed", "sync-storage-failed", "incomplete-data", "xlsx-invalid-options", "unsafe-hyperlink", "invalid-shortcut", "shortcut-conflict"]
 ```
 
 Stable public failure codes. Messages are diagnostic and are not API contracts.
@@ -8518,7 +8555,7 @@ Stable public failure codes. Messages are diagnostic and are not API contracts.
 ##### `SHEETWRITE_ERROR_OPERATIONS` — variable
 
 ```ts
-readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate"]
+readonly ["initialize", "create-grid", "datasource-request", "renderer-worker", "export-xlsx", "xlsx-import", "xlsx-export", "delimited-parse", "delimited-import", "delimited-encode", "delimited-export", "delimited-options", "snapshot-validate", "snapshot-allocate", "persistence", "pending-storage", "synchronize", "presence", "revision", "comments", "query", "hyperlink-activate", "keyboard-configure"]
 ```
 
 Stable operations at which a consumer-visible failure can surface.
@@ -8526,7 +8563,7 @@ Stable operations at which a consumer-visible failure can surface.
 ##### `SheetwriteError` — class
 
 ```ts
-class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
+class SheetwriteError extends Error implements SheetwriteErrorEnvelope { constructor(code: SheetwriteErrorCode, operation: SheetwriteErrorOperation, message: string, options?: SheetwriteErrorOptions); code: "aborted" | "batch-limit" | "blocked" | "buffer-byte-limit" | "buffer-count-limit" | "buffer-operation-limit" | "comment-failed" | "commit-rejected" | "conflict" | "datasource-request-failed" | "delimited-text-invalid-limit" | "delimited-text-resource-limit" | "export-failed" | "future-distance-limit" | "incomplete-data" | "initialization-failed" | "initialization-required" | "invalid-batch" | "invalid-id" | "invalid-limits" | "invalid-operations" | "invalid-shortcut" | "invalid-snapshot" | "invalid-version" | "late-echo" | "limit" | "not-found" | "operation-limit" | "optional-backend-unavailable" | "payload-limit" | "pending-byte-limit" | "pending-capacity" | "pending-count-limit" | "pending-operation-limit" | "presence-failed" | "quota" | "remote-operations-rejected" | "renderer-fallback" | "resource-limit" | "response-id-mismatch" | "revision-failed" | "shortcut-conflict" | "sync-failed" | "sync-storage-failed" | "transaction" | "unavailable" | "unsafe-hyperlink" | "unsupported-schema" | "xlsx-import-failed" | "xlsx-invalid-options" | "xlsx-resource-limit"; context?: Readonly<Record<string, SheetwriteErrorContextValue>> | undefined; name: string; operation: "comments" | "create-grid" | "datasource-request" | "delimited-encode" | "delimited-export" | "delimited-import" | "delimited-options" | "delimited-parse" | "export-xlsx" | "hyperlink-activate" | "initialize" | "keyboard-configure" | "pending-storage" | "persistence" | "presence" | "query" | "renderer-worker" | "revision" | "snapshot-allocate" | "snapshot-validate" | "synchronize" | "xlsx-export" | "xlsx-import"; retryable?: boolean | undefined; toJSON: () => SheetwriteErrorEnvelope }
 ```
 
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.

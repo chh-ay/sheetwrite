@@ -1,55 +1,43 @@
 ---
 title: "KeyShortcut | @sheetwrite/core"
-description: "A platform-neutral key combination."
+description: "A compact modified key combination or a key object."
 ---
 <!-- api-export:@sheetwrite/core|.|KeyShortcut -->
-<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="interface">interface</span></div>
+<div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-A platform-neutral key combination. `mod` means Command on macOS, Control elsewhere.
+A compact modified key combination or a key object. Modifiers may appear in
+any order before the final key, for example "Mod+Shift+K" or "Ctrl+Alt+Delete".
+`Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.
+The parser rejects unknown/repeated modifiers and missing keys.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L252"><code>packages/core/src/types/grid.ts#L252</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L257"><code>packages/core/src/types/grid.ts#L257</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>4</span>
+## Variants <span class="api-count" data-pagefind-ignore>2</span>
 
-<div class="api-member-list">
-
-<details class="api-member" id="key-shortcut-key" data-pagefind-weight="1">
-<summary><code>key</code></summary>
+<div class="api-variant-list" data-pagefind-ignore>
+<div class="api-variant">
 
 ```ts generated
-key: string;
+`${"Mod" | "Ctrl" | "Meta" | "Alt" | "Shift"}+${string}`
 ```
 
-</details>
-
-<details class="api-member" id="key-shortcut-mod" data-pagefind-weight="1">
-<summary><code>mod</code></summary>
+</div>
+<div class="api-variant">
 
 ```ts generated
-mod?: boolean;
+{
+  key: string;
+  mod?: boolean;
+  ctrl?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+}
 ```
 
-</details>
-
-<details class="api-member" id="key-shortcut-shift" data-pagefind-weight="1">
-<summary><code>shift</code></summary>
-
-```ts generated
-shift?: boolean;
-```
-
-</details>
-
-<details class="api-member" id="key-shortcut-alt" data-pagefind-weight="1">
-<summary><code>alt</code></summary>
-
-```ts generated
-alt?: boolean;
-```
-
-</details>
+</div>
 </div>
 
 ## Declaration
@@ -58,12 +46,16 @@ alt?: boolean;
 <summary>View full TypeScript declaration</summary>
 
 ```ts generated
-export interface KeyShortcut {
-  key: string;
-  mod?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-}
+export type KeyShortcut =
+  | `${"Mod" | "Ctrl" | "Meta" | "Alt" | "Shift"}+${string}`
+  | {
+      key: string;
+      mod?: boolean;
+      ctrl?: boolean;
+      meta?: boolean;
+      shift?: boolean;
+      alt?: boolean;
+    };
 ```
 
 </details>

@@ -66,6 +66,8 @@ const SHEETWRITE_ERROR_CODES: readonly [
   "incomplete-data",
   "xlsx-invalid-options",
   "unsafe-hyperlink",
+  "invalid-shortcut",
+  "shortcut-conflict",
 ]
 ```
 

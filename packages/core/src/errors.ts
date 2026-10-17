@@ -49,6 +49,8 @@ export const SHEETWRITE_ERROR_CODES = [
   "incomplete-data",
   "xlsx-invalid-options",
   "unsafe-hyperlink",
+  "invalid-shortcut",
+  "shortcut-conflict",
 ] as const;
 
 /** Exhaustive stable discriminator for consumer-visible Sheetwrite failures. */
@@ -78,6 +80,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "comments",
   "query",
   "hyperlink-activate",
+  "keyboard-configure",
 ] as const;
 
 /** Exhaustive stable operation discriminator for consumer-visible failures. */

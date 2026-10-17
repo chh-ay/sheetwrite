@@ -26,6 +26,8 @@ export interface BeginEditOptions {
   theme: Theme;
   onCommit: (value: string, navigate: EditNavigate) => void;
   onCancel: () => void;
+  /** Runs a host command bound to this key combination; true when one ran. */
+  onShortcut?: (event: KeyboardEvent) => boolean;
 }
 
 /**
@@ -176,6 +178,10 @@ export class EditController {
       return;
     }
     if (this.assist?.handleKeyDown(e)) {
+      e.stopPropagation();
+      return;
+    }
+    if (this.opts?.onShortcut?.(e)) {
       e.stopPropagation();
       return;
     }

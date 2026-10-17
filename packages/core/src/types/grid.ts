@@ -248,13 +248,22 @@ export interface ContextMenuContext {
   readonly clientY: number;
 }
 
-/** A platform-neutral key combination. `mod` means Command on macOS, Control elsewhere. */
-export interface KeyShortcut {
-  key: string;
-  mod?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-}
+/**
+ * A compact modified key combination or a key object. Modifiers may appear in
+ * any order before the final key, for example "Mod+Shift+K" or "Ctrl+Alt+Delete".
+ * `Mod`/`mod` means Command on macOS and Control elsewhere; Ctrl and Meta are literal.
+ * The parser rejects unknown/repeated modifiers and missing keys.
+ */
+export type KeyShortcut =
+  | `${"Mod" | "Ctrl" | "Meta" | "Alt" | "Shift"}+${string}`
+  | {
+      key: string;
+      mod?: boolean;
+      ctrl?: boolean;
+      meta?: boolean;
+      shift?: boolean;
+      alt?: boolean;
+    };
 
 /** Built-in actions that can be rebound without replacing navigation. */
 export type KeyboardAction =
@@ -284,11 +293,12 @@ export interface ContextMenuItem {
   /** Menu row text. Defaults per action. */
   label?: string;
   /**
-   * A bound action or an explicit key combination, rendered for the current platform.
-   * For example, `shortcut: "copy"` follows `GridConfig.keyboard.bindings.copy`;
-   * `shortcut: { key: "c", mod: true, shift: true }` displays ⌘⇧C on macOS.
-   * See {@link KeyboardOptions} for bindings and
-   * [Interaction and editing](/docs/guides/interaction/#rebind-an-action) for examples.
+   * A bound action name or a custom key combination. An explicit combination
+   * registers `onClick` as a keyboard command; action names only reference the
+   * existing built-in binding. Both forms display platform-aware labels.
+   * For example, `shortcut: "copy"` follows the configured Copy binding, while
+   * `shortcut: "Mod+Shift+K"` binds this item's `onClick` callback.
+   * See {@link KeyboardOptions} for built-in action overrides.
    */
   shortcut?: KeyboardAction | KeyShortcut;
   /** Static or request-aware visibility. Hidden separators are normalized. */

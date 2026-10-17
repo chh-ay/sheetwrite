@@ -84,14 +84,24 @@ When the grid is focused and not editing:
 
 Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions
 keep their defaults. Use `null` to remove an action's keys, or an array for multiple
-bindings. `mod` means Command on macOS and Control elsewhere. Modifiers must match
-exactly. These bindings apply when the grid has focus and is not editing.
+bindings. These bindings apply when the grid has focus and is not editing.
+
+Write a key combination as a string or as an object:
+
+- A string lists modifiers and then one key: `"Mod+Shift+K"`, `"Ctrl+Alt+Delete"`.
+  The modifiers are `Mod`, `Ctrl`, `Meta`, `Alt` and `Shift`, in any order.
+- An object names the key and its modifiers: `{ key: "k", mod: true, shift: true }`.
+  Use the object form for a key without modifiers, for example `{ key: "F2" }`.
+
+`Mod` is Command on macOS and Control on other systems. `Ctrl` and `Meta` are
+always the Control and Command (or Windows) keys, so `"Ctrl+J"` is Control+J on a
+Mac too. Modifiers must match exactly.
 
 ```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
 grid.setConfig({
   keyboard: {
     bindings: {
-      copy: { key: "c", mod: true, shift: true },
+      copy: "Mod+Shift+C",
       find: { key: "f", mod: true },
       replace: null,
     },
@@ -106,13 +116,36 @@ The Copy label is `⌘⇧C` on macOS and `Ctrl+Shift+C` elsewhere. Its original
 Mod+C binding no longer runs Copy. Menu actions use their bound shortcut by
 default; `shortcut: "copy"` lets a custom item use the same label.
 Built-in toolbar titles and `grid.getShortcutLabel("copy")` use the same keymap.
-An explicit key hint such as `shortcut: { key: "k", mod: true, alt: true }`
-is platform-aware but does not register a key handler. The host must bind it.
-Free-text shortcut hints are no longer accepted.
 
-Use `keyboard: false` to handle all keys in the host. The existing intercept
-function remains available: return `true` to consume a key or `false` to let the
-built-in handler continue. See [KeyboardOptions](/docs/api/core/keyboard-options/).
+### Add a shortcut for your own command
+
+Give a context-menu item a `shortcut` and an `onClick`. The grid then runs
+`onClick` when the grid has focus and the user presses that combination, with
+the focused cell as the cell argument. A combination with `Mod`, `Ctrl` or `Meta`
+also works while the inline editor is open. A hidden or disabled item does not run.
+
+```ts prelude="core" partial="requires surrounding host state" title="A custom command with its own shortcut"
+grid.setConfig({
+  contextMenu: [
+    {
+      id: "open-record",
+      label: "Open record",
+      shortcut: "Mod+Shift+O",
+      onClick: (_grid, cell) => {
+        if (cell) console.log("open record for row", cell.row);
+      },
+    },
+  ],
+});
+```
+
+If two commands use the same combination, `createGrid` and `setConfig` throw a
+`SheetwriteError` with code `shortcut-conflict`, and `setConfig` keeps the
+previous configuration. A malformed combination throws code `invalid-shortcut`.
+
+Use `keyboard: false` to handle all built-in keys in the host. The existing
+intercept function remains available: return `true` to consume a key or `false`
+to let the built-in handler continue. See [KeyboardOptions](/docs/api/core/keyboard-options/).
 
 ## Undo and redo
 
