@@ -116,14 +116,13 @@ describe("formula capability contract", () => {
     });
   });
 
-  test("publishes default and optional package availability in generated function rows", () => {
+  test("publishes default and optional engine availability in generated function rows", () => {
     const document = renderFormulaFunctionContract(INVENTORY);
     const rows = document.split("\n");
     const defaultRow = rows.find((row) => row.startsWith("| `SUM` |"));
     const optionalRow = rows.find((row) => row.startsWith("| `NORM.DIST` |"));
-    expect(defaultRow).toContain("`@sheetwrite/wasm`, `@sheetwrite/formulas`");
-    expect(optionalRow).toContain("`@sheetwrite/formulas`");
-    expect(optionalRow).not.toContain("@sheetwrite/wasm");
+    expect(defaultRow?.split(" | ")[1]).toBe("default, full");
+    expect(optionalRow?.split(" | ")[1]).toBe("full");
     expect(optionalRow).toContain("optional analysis");
   });
 
