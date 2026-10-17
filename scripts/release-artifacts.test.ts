@@ -28,7 +28,7 @@ import {
   WASM_TARGET,
 } from "./workspace-tooling.js";
 
-const TEST_RELEASE_VERSION = "0.5.0";
+const TEST_RELEASE_VERSION = "0.5.1";
 
 const temporaryRoots: string[] = [];
 

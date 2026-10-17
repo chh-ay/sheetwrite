@@ -10,7 +10,10 @@ interface Release {
   readonly date: string;
 }
 
-const RELEASES: readonly [Release, ...Release[]] = [{ version: "0.5.0", date: "2026-10-17" }];
+const RELEASES: readonly [Release, ...Release[]] = [
+  { version: "0.5.1", date: "2026-10-18" },
+  { version: "0.5.0", date: "2026-10-17" },
+];
 
 const LATEST_RELEASE = RELEASES[0];
 

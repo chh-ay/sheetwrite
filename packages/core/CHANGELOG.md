@@ -1,5 +1,24 @@
 # @sheetwrite/core
 
+## 0.5.1
+
+### Patch Changes
+
+- 1f50d09: Built-in toolbar, context-menu, and find buttons show busy state while commands run and show errors when commands fail. Repeated starts of a pending command are ignored. Blocked clipboard access shows a recovery message.
+  
+  `GridActions.exportXlsx()` returns a promise that never rejects. Built-in export failures show an alert and emit `export-error`; the event format can be `"csv"` or `"xlsx"`. Direct `Grid.exportXlsx()` calls still reject on failure.
+- 7d9b52a: Add checked API examples and links for grid setup, data, synchronization, framework components, engine selection, and XLSX import and export.
+- edb091d: Add declarative keyboard bindings, custom key combinations and platform-aware shortcut labels. Context menus and toolbar titles use the same bindings.
+  
+  API change: a key combination is a string such as `"Mod+Shift+K"` or `"Ctrl+Alt+Delete"`, or an object such as `{ key: "k", mod: true, shift: true }`. `Mod` is Command on macOS and Control elsewhere; `Ctrl` and `Meta` are always literal. `ContextMenuItem.shortcut` accepts a bound action name, such as `"copy"`, or a key combination. Replace free-text shortcut hints with one of these forms. Use `config.keyboard.bindings` to change or disable an action's keys.
+  
+  A context-menu item with a key combination and an `onClick` now runs `onClick` when the grid has focus and the user presses that combination. A combination with `Mod`, `Ctrl` or `Meta` also works in the inline editor. Two commands with the same combination throw a `SheetwriteError` with code `shortcut-conflict`; a malformed combination throws `invalid-shortcut`.
+  
+  Document `highlightCells(null)` to clear temporary highlights. Update showcase menus for their tasks. The Vanilla "Highlight cell" menu item now applies a cell fill, so Undo removes it, and the same item clears it.
+- Updated dependencies [7d9b52a]
+- Updated dependencies [c8db125]
+  - @sheetwrite/wasm@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes
