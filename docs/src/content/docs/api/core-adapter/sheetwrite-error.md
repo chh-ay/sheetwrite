@@ -8,7 +8,7 @@ description: "Canonical envelope for thrown and callback-delivered Sheetwrite fa
 Canonical envelope for thrown and callback-delivered Sheetwrite failures.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L282"><code>packages/core/src/errors.ts#L282</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/errors.ts#L285"><code>packages/core/src/errors.ts#L285</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -124,6 +124,7 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     | "invalid-id"
     | "invalid-limits"
     | "invalid-operations"
+    | "invalid-shortcut"
     | "invalid-snapshot"
     | "invalid-version"
     | "late-echo"
@@ -143,6 +144,7 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     | "resource-limit"
     | "response-id-mismatch"
     | "revision-failed"
+    | "shortcut-conflict"
     | "sync-failed"
     | "sync-storage-failed"
     | "transaction"
@@ -166,6 +168,7 @@ class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     | "export-xlsx"
     | "hyperlink-activate"
     | "initialize"
+    | "keyboard-configure"
     | "pending-storage"
     | "persistence"
     | "presence"

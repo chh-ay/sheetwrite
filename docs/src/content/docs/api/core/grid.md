@@ -8,7 +8,7 @@ description: "Imperative grid handle for document commands, events, rendering, a
 Imperative grid handle for document commands, events, rendering, and teardown.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L484"><code>packages/core/src/types/grid.ts#L484</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L526"><code>packages/core/src/types/grid.ts#L526</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -24,6 +24,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 <a href="#grid-get-selection"><code>getSelection</code></a>
 <a href="#grid-set-selection"><code>setSelection</code></a>
 <a href="#grid-get-theme"><code>getTheme</code></a>
+<a href="#grid-get-shortcut-label"><code>getShortcutLabel</code></a>
 <a href="#grid-set-theme"><code>setTheme</code></a>
 <a href="#grid-replace-theme"><code>replaceTheme</code></a>
 <a href="#grid-get-effective-theme"><code>getEffectiveTheme</code></a>
@@ -103,7 +104,7 @@ Imperative grid handle for document commands, events, rendering, and teardown.
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>89</span>
+## Members <span class="api-count" data-pagefind-ignore>90</span>
 
 <div class="api-member-list">
 
@@ -218,6 +219,15 @@ getTheme(): Theme;
 ```
 
 <p class="api-member-doc">Resolved base theme, before zoom scaling. The returned object is a copy.</p>
+</details>
+
+<details class="api-member" id="grid-get-shortcut-label" data-pagefind-weight="1">
+<summary><code>getShortcutLabel</code> <span class="api-member-summary">Platform-aware label for a bound action, or an empty string when disabled.</span></summary>
+
+```ts generated
+getShortcutLabel(action: KeyboardAction): string;
+```
+
 </details>
 
 <details class="api-member" id="grid-set-theme" data-pagefind-weight="1">
@@ -803,13 +813,15 @@ silently extends presentation padding; `undefined` restores the default.</p>
 </details>
 
 <details class="api-member" id="grid-highlight-cells" data-pagefind-weight="1">
-<summary><code>highlightCells</code> <span class="api-member-summary">Highlight arbitrary cell ranges (null clears).</span></summary>
+<summary><code>highlightCells</code> <span class="api-member-summary">Draw temporary highlights outside document history.</span></summary>
 
 ```ts generated
 highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void;
 ```
 
-<p class="api-member-doc">Highlight arbitrary cell ranges (null clears). Per-range `color` wins over the call color.</p>
+<p class="api-member-doc">Draw temporary highlights outside document history. Pass `null` to clear all
+highlights: `grid.highlightCells(null)`. Per-range `color` wins over the call color.
+Undo does not clear highlights; use `styleRange` for persistent cell fills.</p>
 </details>
 
 <details class="api-member" id="grid-set-presence-overlays" data-pagefind-weight="1">
@@ -981,6 +993,7 @@ export interface Grid {
   getSelection(): Selection | null;
   setSelection(sel: Selection | null): void;
   getTheme(): Theme;
+  getShortcutLabel(action: KeyboardAction): string;
   setTheme(theme: Partial<Theme>): void;
   replaceTheme(theme: Partial<Theme> | undefined): void;
   getEffectiveTheme(): Theme;

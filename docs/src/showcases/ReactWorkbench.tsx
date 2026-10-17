@@ -1,3 +1,4 @@
+import type { GridConfig } from "@sheetwrite/core";
 /**
  * React controlled-analytics workbench. Consumes the shared analytics scenario
  * through `useAnalyticsWorkbench`: query/filter controls, formula entry with
@@ -20,7 +21,17 @@ import { DemoSelect } from "./ui/DemoSelect.js";
 
 import "@sheetwrite/react/styles.css";
 
-const GRID_CONFIG = { toolbar: true } as const;
+const GRID_CONFIG: GridConfig = {
+  toolbar: true,
+  contextMenu: [
+    { action: "copy", label: "Copy analysis value" },
+    { action: "paste" },
+    { action: "clearFilter", label: "Clear analysis filter" },
+    { action: "separator" },
+    { action: "exportCsv", label: "Export analysis CSV" },
+    { action: "exportXlsx", label: "Export analysis workbook" },
+  ],
+};
 const MARKET_OPTIONS = [
   { label: "All markets", value: "all" },
   ...ANALYTICS_MARKETS.map((value) => ({ label: value, value })),

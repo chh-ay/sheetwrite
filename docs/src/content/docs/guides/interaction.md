@@ -80,6 +80,74 @@ When the grid is focused and not editing:
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 
+### Rebind an action
+
+Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions
+keep their defaults. Use `null` to remove an action's keys, or an array for multiple
+bindings. These bindings apply when the grid has focus and is not editing.
+
+Write a key combination as a string or as an object:
+
+- A string lists modifiers and then one key: `"Mod+Shift+K"`, `"Ctrl+Alt+Delete"`.
+  The modifiers are `Mod`, `Ctrl`, `Meta`, `Alt` and `Shift`, in any order.
+- An object names the key and its modifiers: `{ key: "k", mod: true, shift: true }`.
+  Use the object form for a key without modifiers, for example `{ key: "F2" }`.
+
+`Mod` shows as Command on macOS and as Control on other systems. It accepts
+either key, so the same shortcut works with a Mac keyboard and a PC keyboard.
+`Ctrl` and `Meta` are always exactly the Control and Command (or Windows) keys,
+so `"Ctrl+J"` is Control+J on a Mac too. Shift and Alt must match exactly.
+
+```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
+grid.setConfig({
+  keyboard: {
+    bindings: {
+      copy: "Mod+Shift+C",
+      find: { key: "f", mod: true },
+      replace: null,
+    },
+  },
+  contextMenu: [
+    { action: "copy", label: "Copy value", shortcut: "copy" },
+  ],
+});
+```
+
+The Copy label is `⌘⇧C` on macOS and `Ctrl+Shift+C` elsewhere. Its original
+Mod+C binding no longer runs Copy. Menu actions use their bound shortcut by
+default; `shortcut: "copy"` lets a custom item use the same label.
+Built-in toolbar titles and `grid.getShortcutLabel("copy")` use the same keymap.
+
+### Add a shortcut for your own command
+
+Give a context-menu item a `shortcut` and an `onClick`. The grid then runs
+`onClick` when the grid has focus and the user presses that combination, with
+the focused cell as the cell argument. A combination with `Mod`, `Ctrl` or `Meta`
+also works while the inline editor is open. A hidden or disabled item does not run.
+
+```ts prelude="core" partial="requires surrounding host state" title="A custom command with its own shortcut"
+grid.setConfig({
+  contextMenu: [
+    {
+      id: "open-record",
+      label: "Open record",
+      shortcut: "Mod+Shift+O",
+      onClick: (_grid, cell) => {
+        if (cell) console.log("open record for row", cell.row);
+      },
+    },
+  ],
+});
+```
+
+If two commands use the same combination, `createGrid` and `setConfig` throw a
+`SheetwriteError` with code `shortcut-conflict`, and `setConfig` keeps the
+previous configuration. A malformed combination throws code `invalid-shortcut`.
+
+Use `keyboard: false` to handle all built-in keys in the host. The existing
+intercept function remains available: return `true` to consume a key or `false`
+to let the built-in handler continue. See [KeyboardOptions](/docs/api/core/keyboard-options/).
+
 ## Undo and redo
 
 `grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step
@@ -240,6 +308,17 @@ resolves the pointer without exposing renderer internals; the host then owns
 See [Configuration → Context-menu items](/docs/guides/configuration/#context-menu-items)
 for both models and [Styling → Widget and context-menu styling](/docs/guides/styling/#widget-and-context-menu-styling)
 for the bundled menu CSS hooks.
+
+### Temporary highlights
+
+`grid.highlightCells(ranges)` draws an overlay, not a document edit. Undo does not
+clear it. Call `grid.highlightCells(null)` to clear all temporary highlights.
+Choose a distinct overlay color so users can tell it from selection and cell
+formatting. Use `grid.styleRange` when a fill must be saved and undoable.
+
+The Vanilla workbench offers **Clear highlight** in its context menu. Right-click
+the highlighted cell to toggle it off, or right-click another cell and choose
+**Clear highlight**. Both actions write to the host event log.
 
 ## Merged cells
 

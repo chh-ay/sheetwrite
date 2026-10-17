@@ -9,7 +9,7 @@ Toolbar / feature configuration. When `config` is set the built-in toolbar is
 shown; control flags default to `true` except the opt-in `export` flag.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L278"><code>packages/core/src/types/grid.ts#L278</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L319"><code>packages/core/src/types/grid.ts#L319</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -185,15 +185,16 @@ tabs?: boolean;
 <summary><code>keyboard</code> <span class="api-member-summary">Built-in keyboard handling.</span></summary>
 
 ```ts generated
-keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
+keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 ```
 
 <p class="api-member-doc">Built-in keyboard handling. `true` (default) keeps the stock Sheets-style
-bindings (navigation, type-to-edit, clipboard, undo/redo, find). `false`
-disables ALL of them — the host owns key events and drives `grid.actions`,
-selection, editing, and search primitives itself. A function is consulted
-first and consumes the event by returning `true`; returning `false` falls
-through to the stock bindings.</p>
+bindings. An object replaces individual action bindings; omitted actions
+keep their defaults, and `null` disables an action's keys.
+For example: `{ bindings: { copy: { key: &quot;c&quot;, mod: true, shift: true } } }`.
+Menu hints and toolbar titles use these same bindings. `false` disables
+all built-in keys. A function intercepts each keydown before the defaults;
+return true to consume it, false to let the built-in handler continue.</p>
 </details>
 </div>
 
@@ -220,7 +221,8 @@ export interface GridConfig {
   undo?: boolean;
   find?: boolean;
   tabs?: boolean;
-  keyboard?: boolean | ((e: KeyboardEvent, grid: Grid) => boolean);
+  keyboard?:
+    boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
 }
 ```
 

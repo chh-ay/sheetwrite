@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "9793ce9eff0bb66bd1b38c1fc83b9efd35547880d9a4299f03acbfa7fa2fc8e2",
+  "sha256": "4a2a7e36d38781f25626c6032cee6ccce8914a4835e8b486ad4cb64f8f13f83c",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -96,6 +96,9 @@
         "HighlightRange",
         "HyperlinkTarget",
         "IncompleteDataError",
+        "KeyShortcut",
+        "KeyboardAction",
+        "KeyboardOptions",
         "LegacyRowLoader",
         "LegacyRowPage",
         "MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH",

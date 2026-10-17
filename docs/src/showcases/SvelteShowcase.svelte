@@ -4,6 +4,7 @@
 // neutral session (svelte-workbench.ts) owns the durable outbox, connectivity,
 // presence, and conflict recovery. Runes only mirror observable state.
 import type { Grid, PresenceMessage, SyncMutationRecord, SyncStateSnapshot } from "@sheetwrite/core";
+import type { GridConfig } from "@sheetwrite/core";
 import { createFormulaBar, createNameBox, createSelectionStatus } from "@sheetwrite/core/shell";
 import { SheetwriteGrid } from "@sheetwrite/svelte";
 import { Cloud, CloudOff, GitMerge, Radio, RefreshCw, Users } from "lucide-svelte";
@@ -18,7 +19,15 @@ import "@sheetwrite/svelte/styles.css";
 import "@sheetwrite/core/shell.css";
 
 /** Hoisted: a stable identity means the adapter never reconfigures per render. */
-const GRID_CONFIG = { toolbar: true } as const;
+const GRID_CONFIG: GridConfig = {
+  toolbar: true,
+  contextMenu: [
+    { action: "copy", label: "Copy dispatch value" },
+    { action: "paste" },
+    { action: "separator" },
+    { action: "exportXlsx", label: "Export dispatch workbook" },
+  ],
+};
 
 let session = $state<SvelteWorkbenchSession>();
 let bootError = $state<string>();

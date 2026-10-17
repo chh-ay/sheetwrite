@@ -1,3 +1,4 @@
+import { isKeyboardAction } from "./keymap.js";
 import type {
   Grid,
   GridActions,
@@ -222,6 +223,7 @@ export function renderToolbarItems(
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>,
 ): () => void {
   const controls = new Map<GridCommandName, HTMLButtonElement | HTMLInputElement>();
+  const shortcutLabels = new Map<GridCommandName, string>();
   const setIcon = (el: HTMLElement, content: ToolbarIcon): void => {
     if (typeof content === "string") {
       // Icon strings are text-only; never interpret them as HTML.
@@ -320,7 +322,10 @@ export function renderToolbarItems(
       continue;
     }
 
-    const title = item.title ?? (action ? DEFAULT_TITLE[action] : "");
+    const label = item.title ?? (action ? DEFAULT_TITLE[action] : "");
+    const shortcut = action && isKeyboardAction(action) ? grid.getShortcutLabel(action) : "";
+    const title = shortcut ? `${label} (${shortcut})` : label;
+    if (action && isKeyboardAction(action)) shortcutLabels.set(action, label);
     const icon = item.icon ?? (action ? (icons?.[action] ?? DEFAULT_ICON[action] ?? "") : "");
 
     if (item.onClick) {
@@ -366,6 +371,13 @@ export function renderToolbarItems(
 
   const update = (states?: Readonly<Record<GridCommandName, GridCommandState>>): void => {
     for (const [action, control] of controls) {
+      const label = shortcutLabels.get(action);
+      if (label !== undefined && isKeyboardAction(action)) {
+        const shortcut = grid.getShortcutLabel(action);
+        const title = shortcut ? `${label} (${shortcut})` : label;
+        control.title = title;
+        control.setAttribute("aria-label", title);
+      }
       const state = states?.[action] ?? grid.getCommandState(action);
       control.disabled = state.disabled;
       if (

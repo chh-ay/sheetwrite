@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>319</dd></div>
+<div><dt>Exports</dt><dd>322</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -101,7 +101,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>142</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>143</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -153,6 +153,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/grid-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridOptions</code></span><span class="api-symbol-card__desc">Workbook, data, rendering, policy, and built-in UI options used to create a Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-transaction/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>GridTransaction</code></span><span class="api-symbol-card__desc">An undoable transaction submitted through a Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/highlight-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>HighlightRange</code></span><span class="api-symbol-card__desc">A highlight target: a range plus an optional per-range color override.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/keyboard-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>KeyboardOptions</code></span><span class="api-symbol-card__desc">Overrides replace all default keys for an action; null disables that action's keys.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-page/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>LegacyRowPage</code></span><span class="api-symbol-card__desc">Row-only page shape accepted by the full-width compatibility adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/merge-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>MergeRange</code></span><span class="api-symbol-card__desc">Inclusive merged-cell rectangle in data-row/column coordinates.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/named-range-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>NamedRangeSnapshot</code></span><span class="api-symbol-card__desc">Workbook-global or sheet-scoped named range used by formulas and persistence.</span></a>
@@ -248,7 +249,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>79</span>
+### Types <span class="api-count" data-pagefind-ignore>81</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -280,6 +281,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/grid-command-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridCommandName</code></span><span class="api-symbol-card__desc">Built-in command names accepted by state queries and change events.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-presentation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridPresentation</code></span><span class="api-symbol-card__desc">Header semantics used by the retained canvas and accessibility mirror.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HyperlinkTarget</code></span><span class="api-symbol-card__desc">Browser-safe external target or stable workbook-internal range target.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/keyboard-action/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>KeyboardAction</code></span><span class="api-symbol-card__desc">Built-in actions that can be rebound without replacing navigation.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/key-shortcut/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>KeyShortcut</code></span><span class="api-symbol-card__desc">A compact modified key combination or a key object.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-loader/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>LegacyRowLoader</code></span><span class="api-symbol-card__desc">Loads one row-only page for the full-width compatibility adapter.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mutation-issue/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>MutationIssue</code></span><span class="api-symbol-card__desc">Structured warning or rejection produced while applying an operation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/mutation-policy-mode/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>MutationPolicyMode</code></span><span class="api-symbol-card__desc">Atomic or partial handling for locally denied operations.</span></a>

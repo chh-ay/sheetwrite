@@ -31,6 +31,7 @@ import { FindBar } from "./find-bar.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
+import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { ReadWindowController } from "./read-window-controller.js";
@@ -83,6 +84,7 @@ import type {
   SortKey,
   WorkbookSnapshot,
 } from "./types/document.js";
+import type { KeyboardAction, KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellInputSnapshot,
@@ -389,7 +391,8 @@ export class GridImpl implements Grid {
   private tabBar: HTMLDivElement | null = null;
   private sheetTabs: SheetTabs | null = null;
   private tabBarHeight = 0;
-  private keyboardPolicy: boolean | ((e: KeyboardEvent) => boolean) = true;
+  private keyboardPolicy: boolean | KeyboardOptions | ((e: KeyboardEvent) => boolean) = true;
+  private keymap: Keymap;
   private zoom = 1;
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
@@ -463,6 +466,7 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    this.keymap = new Keymap(opts.config);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
       opts.transactionResourceLimits,
     );
@@ -736,6 +740,7 @@ export class GridImpl implements Grid {
       },
       dataEdge: (row, col, dRow, dCol) => this.dataEdge(row, col, dRow, dCol),
       keyboard: () => this.keyboardPolicy,
+      keymap: () => this.keymap,
       contentXAt: (viewportX) => this.contentXAt(viewportX),
       contentYAt: (viewportY) => this.contentYAt(viewportY),
       zoom: () => this.zoom,
@@ -1379,6 +1384,10 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
+  getShortcutLabel(action: KeyboardAction): string {
+    return this.keymap.label(action);
+  }
+
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
     this.overlayPainter.highlightCells(ranges, color);
   }
@@ -1998,6 +2007,13 @@ export class GridImpl implements Grid {
       this.config = config;
       return;
     }
+    const focus = this.selection.focusCell;
+    const keymap = new Keymap(config, {
+      cell: focus ? { sheet: this.activeSheet, ...focus } : null,
+      clientX: 0,
+      clientY: 0,
+    });
+    this.keymap = keymap;
     this.config = config;
 
     const keyboard = config?.keyboard ?? true;
@@ -2029,6 +2045,7 @@ export class GridImpl implements Grid {
     this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
     this.applyLayout();
     this.render();
+    this.emitCommandStateChange();
   }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {

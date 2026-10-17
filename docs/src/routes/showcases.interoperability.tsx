@@ -2,6 +2,7 @@ import type {
   Column,
   ColumnarData,
   Grid,
+  GridOptions,
   Theme,
   WorkbookSnapshot,
   XlsxWorkbookWarning,
@@ -21,7 +22,7 @@ import {
   type ShellPiece,
 } from "@sheetwrite/core/shell";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import compatibilityResultsData from "../generated/compatibility-results.json";
@@ -458,6 +459,9 @@ function InteroperabilityRoute() {
     return bytes;
   }, []);
 
+  const exportFromMenu = useEffectEvent(() => void handleDownload());
+  const compareFromMenu = useEffectEvent(() => void handleRoundTrip());
+
   // Mount one grid generation per workbench source.
   useEffect(() => {
     const host = hostRef.current;
@@ -481,7 +485,19 @@ function InteroperabilityRoute() {
           setProbe(await probeXlsxRegistration());
           if (disposed) return;
         }
-        const base = { theme: CANVAS_THEME, config: { toolbar: false } };
+        const base: Pick<GridOptions, "theme" | "config"> = {
+          theme: CANVAS_THEME,
+          config: {
+            toolbar: false,
+            contextMenu: [
+              { action: "copy", label: "Copy imported value" },
+              { action: "paste" },
+              { action: "separator" },
+              { label: "Export XLSX with fidelity report", onClick: () => exportFromMenu() },
+              { label: "Compare XLSX round-trip", onClick: () => compareFromMenu() },
+            ],
+          },
+        };
         grid =
           source.kind === "snapshot"
             ? createGridFromSnapshot(host, source.snapshot, base)

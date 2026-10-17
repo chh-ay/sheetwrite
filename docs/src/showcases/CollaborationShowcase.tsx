@@ -380,6 +380,14 @@ export default function CollaborationShowcase() {
     host.replaceChildren();
     const grid = createGridFromSnapshot(host, snapshot, {
       presentation: "data-grid",
+      config: {
+        contextMenu: [
+          { action: "copy", label: "Copy shared value" },
+          { action: "paste" },
+          { label: "Retry pending", onClick: () => retryPending(key) },
+          { action: "exportXlsx", label: "Export this client's workbook" },
+        ],
+      },
       transactionResourceLimits: { maxEncodedBytes: DEMO_TRANSACTION_BYTES },
     });
     const storage = new IndexedDbPendingCommitStorage({ databaseName: QUEUE_DATABASE[key] });
@@ -1100,6 +1108,14 @@ export default function CollaborationShowcase() {
       host.replaceChildren();
       const grid = createGridFromSnapshot(host, latest, {
         presentation: "data-grid",
+        config: {
+          contextMenu: [
+            { action: "copy", label: "Copy shared value" },
+            { action: "paste" },
+            { label: "Retry pending", onClick: () => retryPending(key) },
+            { action: "exportXlsx", label: "Export this client's workbook" },
+          ],
+        },
         transactionResourceLimits: { maxEncodedBytes: DEMO_TRANSACTION_BYTES },
       });
       const sync = new SyncCoordinator(grid, link, {

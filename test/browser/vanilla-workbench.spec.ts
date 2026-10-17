@@ -153,6 +153,40 @@ function rendererReadout(requested: string, active: string): RegExp {
   return new RegExp(`Requested:\\s*${requested}\\b[\\s\\S]*Active:\\s*${active}\\b`);
 }
 
+test("context menu shows platform shortcuts, and Undo removes a highlight", async ({ page }) => {
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const surface = page.locator(`${GRID} .sheetwrite-scroller`);
+  await surface.scrollIntoViewIfNeeded();
+  const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
+  const highlightItem = page.locator('[data-context-menu-item="highlight-cell"]');
+  const mac = await page.evaluate(() =>
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent),
+  );
+
+  await openMenu();
+  await expect(
+    page.locator('[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut'),
+  ).toHaveText(mac ? "⌘C" : "Ctrl+C");
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+  await highlightItem.click();
+  await expect(page.getByText(/^Highlighted R\d+ C\d+ · Ctrl\+Z undoes it$/)).toBeVisible();
+
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Clear highlight R\d+ C\d+$/);
+  await highlightItem.click();
+  await expect(page.getByText(/^Highlight cleared R\d+ C\d+/)).toBeVisible();
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+
+  // The highlight is a cell fill in the document, so Undo removes it.
+  await highlightItem.click();
+  await surface.click({ position: { x: 160, y: 80 } });
+  await page.keyboard.press(mac ? "Meta+Z" : "Control+Z");
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+});
+
 test(
   "boots product-first, paints, and exposes the ownership instruments",
   {
