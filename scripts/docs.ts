@@ -2167,6 +2167,24 @@ function formatCaptureTime(timestamp: string): string {
 }
 
 /**
+ * Release captures run before the version bump, so they record the previous
+ * release's package version. Each entry maps such a capture commit to the
+ * release it measured.
+ */
+const RELEASE_CANDIDATE_CAPTURES: Readonly<Record<string, string>> = {
+  "49e05e298c3f39a8cede038fe8d0062343abc21f": "0.5.0",
+};
+
+function sheetwriteLabel(recordedVersion: string, commit: string): string {
+  const release = RELEASE_CANDIDATE_CAPTURES[commit];
+  return html(
+    release === undefined
+      ? `Sheetwrite ${recordedVersion}`
+      : `Sheetwrite ${release} release candidate`,
+  );
+}
+
+/**
  * One capture header for the whole page. A page assembled from artifacts of one
  * commit states that single point-in-time capture; a page assembled from
  * different commits lists every vintage instead of letting each section's own
@@ -2364,7 +2382,7 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
     '<dl class="bench-meta" data-pagefind-ignore>',
     `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
     `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-    `<div><dt>Engines</dt><dd>Sheetwrite ${html(evidence.metadata.engineVersions.sheetwrite)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code>${html(baselineCommit ?? "")}</code></dd></div>`,
+    `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code>${html(baselineCommit ?? "")}</code></dd></div>`,
     `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
     `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
     `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
@@ -2526,7 +2544,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${metadata.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Engines</dt><dd>Sheetwrite ${html(metadata.engineVersions.sheetwrite)} · Handsontable ${html(metadata.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Engines</dt><dd>${sheetwriteLabel(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}</dd></div>`,
       `<div><dt>Environment</dt><dd>Bun ${html(metadata.bunVersion)} · Node compatibility ${html(metadata.nodeVersion)} · Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
       `<div><dt>Protocol</dt><dd>${metadata.rounds} rounds · raw artifact <code>${source}</code></dd></div>`,
       "</dl>",
@@ -2575,7 +2593,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       '<dl class="bench-meta" data-pagefind-ignore>',
       `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
       `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Engines</dt><dd>Sheetwrite ${html(evidence.meta.engineVersions.sheetwrite)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}</dd></div>`,
+      `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}</dd></div>`,
       `<div><dt>Environment</dt><dd>Bun ${html(evidence.meta.bun)}</dd></div>`,
       `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
       "</dl>",
