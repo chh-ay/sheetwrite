@@ -395,6 +395,97 @@
           "unit": "count"
         }
       }
+    },
+    {
+      "version": "0.5.0",
+      "capturedAt": "2026-10-17T10:11:08.224Z",
+      "source": "npm registry published artifacts",
+      "metrics": {
+        "package.@sheetwrite/wasm.tarballBytes": {
+          "actual": 359558,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/wasm.unpackedBytes": {
+          "actual": 1021012,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/wasm.fileCount": {
+          "actual": 13,
+          "unit": "count"
+        },
+        "package.@sheetwrite/formulas.tarballBytes": {
+          "actual": 481506,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/formulas.unpackedBytes": {
+          "actual": 1315970,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/formulas.fileCount": {
+          "actual": 13,
+          "unit": "count"
+        },
+        "package.@sheetwrite/core.tarballBytes": {
+          "actual": 348661,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/core.unpackedBytes": {
+          "actual": 1670698,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/core.fileCount": {
+          "actual": 188,
+          "unit": "count"
+        },
+        "package.@sheetwrite/xlsx.tarballBytes": {
+          "actual": 53612,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/xlsx.unpackedBytes": {
+          "actual": 233692,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/xlsx.fileCount": {
+          "actual": 31,
+          "unit": "count"
+        },
+        "package.@sheetwrite/react.tarballBytes": {
+          "actual": 5874,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/react.unpackedBytes": {
+          "actual": 17630,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/react.fileCount": {
+          "actual": 6,
+          "unit": "count"
+        },
+        "package.@sheetwrite/vue.tarballBytes": {
+          "actual": 6811,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/vue.unpackedBytes": {
+          "actual": 21076,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/vue.fileCount": {
+          "actual": 6,
+          "unit": "count"
+        },
+        "package.@sheetwrite/svelte.tarballBytes": {
+          "actual": 5741,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/svelte.unpackedBytes": {
+          "actual": 15659,
+          "unit": "bytes"
+        },
+        "package.@sheetwrite/svelte.fileCount": {
+          "actual": 10,
+          "unit": "count"
+        }
+      }
     }
   ]
 }
