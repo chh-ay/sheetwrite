@@ -57,6 +57,7 @@ export function DocsSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchEntry[]>([]);
   const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -77,6 +78,7 @@ export function DocsSearch() {
   }, []);
 
   useEffect(() => {
+    setError("");
     if (query.trim().length < 2) {
       setResults([]);
       setStatus("");
@@ -106,10 +108,25 @@ export function DocsSearch() {
         if (controller.signal.aborted) return;
         setResults(data);
         setStatus(data.length === 0 ? "No matching pages." : "");
-      } catch {
+      } catch (searchError) {
         if (!controller.signal.aborted) {
+          console.error("Documentation search failed", searchError);
           setResults([]);
-          setStatus("Search becomes available after the static index is built.");
+          setStatus("");
+          try {
+            const index = await fetch("/pagefind/pagefind-entry.json", {
+              signal: controller.signal,
+            });
+            if (controller.signal.aborted) return;
+            if (index.status === 404) {
+              setStatus("Search becomes available after the static index is built.");
+              return;
+            }
+          } catch (indexError) {
+            if (controller.signal.aborted) return;
+            console.error("Cannot check the documentation search index", indexError);
+          }
+          setError("Search failed; check your connection and change the query to try again.");
         }
       }
     };
@@ -168,6 +185,9 @@ export function DocsSearch() {
             Esc
           </button>
         </form>
+        <p role="alert" data-action-error hidden={error.length === 0}>
+          {error}
+        </p>
         <div aria-live="polite" className="sw-search-results">
           {status.length > 0 ? <p>{status}</p> : null}
           {results.map((result) => (

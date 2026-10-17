@@ -248,6 +248,14 @@ test("landing tab lists follow arrow, Home, and End keys", async ({ page }) => {
   }
 });
 
+test("unknown URLs serve the site 404 with a 404 status", async ({ page, request }) => {
+  const response = await page.goto(siteUrl("/this-page-does-not-exist/"));
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "Page not found", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Documentation", exact: true })).toBeVisible();
+  expect((await request.get(siteUrl("/docs/proof/"))).status()).toBe(404);
+});
+
 test.describe("documentation site", () => {
   for (const route of representativeRoutes) {
     test(`documentation site renders /docs/${route} without browser errors`, async ({ page }) => {
@@ -373,9 +381,10 @@ test.describe("documentation site", () => {
   for (const [term, expectedHref] of Object.entries(searchTargets)) {
     test(`documentation search resolves ${term} to its generated anchor`, async ({ page }) => {
       const { dialog, input } = await openSearch(page);
-      await input.fill(term);
+      await input.pressSequentially(term, { delay: 20 });
       const matchingLink = dialog.locator(`a[href='${expectedHref}']`).first();
       await expect(matchingLink).toBeVisible({ timeout: 15_000 });
+      await expect(dialog.locator("[data-action-error]")).toBeHidden();
       await matchingLink.click();
       await expect(page).toHaveURL(expectedHref);
       await expect(page.getByText(term).first()).toBeVisible();
@@ -391,6 +400,41 @@ test.describe("documentation site", () => {
     });
     await expect(dialog.locator(`a[href^='${SITE_BASE}/test/']`)).toHaveCount(0);
   });
+
+  for (const missingIndex of [false, true]) {
+    test(`documentation search reports ${missingIndex ? "an unbuilt index" : "a failed index"}`, async ({
+      page,
+    }) => {
+      await page.route("**/pagefind/**", async (route) => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (missingIndex || pathname.endsWith(".pf_meta")) {
+          await route.fulfill({
+            status: missingIndex ? 404 : 503,
+            body: "Unavailable",
+          });
+        } else {
+          await route.continue();
+        }
+      });
+      const { dialog, input } = await openSearch(page);
+      await input.fill("applyTransaction");
+      const error = dialog.locator("[data-action-error]");
+      if (missingIndex) {
+        await expect(dialog).toContainText(
+          "Search becomes available after the static index is built.",
+        );
+        await expect(error).toBeHidden();
+      } else {
+        await expect(error).toBeVisible({ timeout: 15_000 });
+        await expect(error).toHaveText(
+          "Search failed; check your connection and change the query to try again.",
+        );
+        await expect(dialog).not.toContainText(
+          "Search becomes available after the static index is built.",
+        );
+      }
+    });
+  }
 
   test("member deep links open the target row in view", async ({ page }) => {
     // The search-anchor form: the fragment targets a hidden h3, and the
