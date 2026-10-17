@@ -867,7 +867,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L385",
+              "source": "src/grid.ts#L390",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1169,7 +1169,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L259",
+              "source": "src/grid.ts#L264",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -1205,7 +1205,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L276",
+              "source": "src/export.ts#L269",
               "jsDocTags": [],
               "documentation": "Codec defaults combine SpreadsheetML worksheet dimensions with independent\nZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.",
               "memberDocs": []
@@ -1335,7 +1335,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2966",
+              "source": "src/document-protocol.ts#L2923",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1383,7 +1383,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L205",
+              "source": "src/export.ts#L198",
               "jsDocTags": [],
               "documentation": "Trigger a browser download from in-memory bytes. The temporary anchor is\nremoved and its object URL is scheduled for revocation even when DOM append or\nclick throws.",
               "memberDocs": []
@@ -1448,7 +1448,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L151",
+              "source": "src/export.ts#L144",
               "jsDocTags": [],
               "documentation": "Parse CSV into `ColumnarData`. The first record is consumed as a positional\nheader. Input fields project onto declared visible columns; hidden declared\ncolumns are initialized to `null`, matching the visible-column CSV export.\nExtra fields are ignored and missing fields become `null`. The returned\ncolumnar table is fully materialized in memory.",
               "memberDocs": []
@@ -1460,7 +1460,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L418",
+              "source": "src/export.ts#L411",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1475,7 +1475,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L536",
+              "source": "src/export.ts#L529",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2113,7 +2113,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L303",
+              "source": "src/grid.ts#L308",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2152,7 +2152,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L315",
+              "source": "src/grid.ts#L320",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -2491,7 +2491,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L140",
+              "source": "src/export.ts#L133",
               "jsDocTags": [],
               "documentation": "Parse the fixed comma dialect: quoted delimiters/newlines, doubled quotes,\nbare CR, LF, or CRLF records, Unicode, trailing empty fields, and one optional\nleading UTF-8 BOM. The synchronous API consumes an existing in-memory string\nand returns an in-memory grid; it does not claim streaming. Scanning enforces\nresource ceilings before materializing the next oversized field or record.",
               "memberDocs": []
@@ -3010,7 +3010,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L320",
+              "source": "src/grid.ts#L325",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -3645,7 +3645,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L331",
+              "source": "src/export.ts#L324",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX export implementation used by core.",
               "memberDocs": []
@@ -3657,7 +3657,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L396",
+              "source": "src/export.ts#L389",
               "jsDocTags": [],
               "documentation": "Registers the optional table XLSX import implementation used by core.",
               "memberDocs": []
@@ -3669,7 +3669,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L477",
+              "source": "src/export.ts#L470",
               "jsDocTags": [],
               "documentation": "Registers the optional workbook XLSX implementation used by core.",
               "memberDocs": []
@@ -4820,7 +4820,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L58",
+              "source": "src/export.ts#L51",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -4888,7 +4888,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L93",
+              "source": "src/export.ts#L86",
               "jsDocTags": [
                 "link",
                 "throws"
@@ -4903,7 +4903,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L363",
+              "source": "src/export.ts#L356",
               "jsDocTags": [
                 "example",
                 "see"
@@ -4918,7 +4918,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L503",
+              "source": "src/export.ts#L496",
               "jsDocTags": [
                 "example",
                 "see"
@@ -5051,7 +5051,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2928",
+              "source": "src/document-protocol.ts#L2885",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -5457,7 +5457,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L302",
+              "source": "src/export.ts#L295",
               "jsDocTags": [],
               "documentation": "Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.",
               "memberDocs": []
@@ -5469,7 +5469,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L235",
+              "source": "src/export.ts#L228",
               "jsDocTags": [],
               "documentation": "Resource dimensions bounded by every XLSX import and export path.",
               "memberDocs": [
@@ -5550,7 +5550,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L323",
+              "source": "src/export.ts#L316",
               "jsDocTags": [],
               "documentation": "Pluggable first-row-header, first-sheet table export backend.",
               "memberDocs": []
@@ -5562,7 +5562,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L385",
+              "source": "src/export.ts#L378",
               "jsDocTags": [],
               "documentation": "Pluggable table import backend. Parses raw `.xlsx` bytes into the same\n`ColumnarData` shape `fromCsv` returns, so host ingestion code can stay\nformat-agnostic.",
               "memberDocs": []
@@ -5574,7 +5574,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L465",
+              "source": "src/export.ts#L458",
               "jsDocTags": [],
               "documentation": "Optional backend contract for complete workbook XLSX interchange.",
               "memberDocs": []
@@ -5586,7 +5586,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L454",
+              "source": "src/export.ts#L447",
               "jsDocTags": [],
               "documentation": "Shared options passed to every registered table and workbook XLSX backend.",
               "memberDocs": [
@@ -5611,7 +5611,7 @@
               "owners": [
                 "src/export.ts"
               ],
-              "source": "src/export.ts#L435",
+              "source": "src/export.ts#L428",
               "jsDocTags": [],
               "documentation": "Structured fidelity warning emitted during XLSX conversion.",
               "memberDocs": []
