@@ -79,6 +79,9 @@ const EVENT_LABELS: Record<EngineEvent["type"], string> = {
   "formula-rewrite": "Same reads, new constant",
 };
 
+/** Below this width the ledger drops its frozen columns to fit a phone. */
+const NARROW_VIEWPORT = "(max-width: 48rem)";
+
 /** The four measured steps of one change-to-acknowledgement run. */
 const FOLLOW_STEPS = [
   "Requested page + off-screen band",
@@ -232,15 +235,17 @@ export default function EngineShowcase() {
           renderer,
           ...(renderer === "worker" ? { workerUrl: workerRendererUrl } : {}),
         });
-        grid.setFrozen(1, window.matchMedia("(max-width: 48rem)").matches ? 0 : 2);
-        grid.setSelection({
-          kind: "cell",
-          addr: {
-            sheet: ENGINE_LIVE_SHEET,
-            row: currentRowRef.current,
-            col: ENGINE_COLUMN_INDEX.actual,
-          },
-        });
+        const narrow = window.matchMedia(NARROW_VIEWPORT).matches;
+        grid.setFrozen(1, narrow ? 0 : 2);
+        const actualCell = {
+          sheet: ENGINE_LIVE_SHEET,
+          row: currentRowRef.current,
+          col: ENGINE_COLUMN_INDEX.actual,
+        };
+        grid.setSelection({ kind: "cell", addr: actualCell });
+        // Without frozen columns a phone shows only Month and Region; the demo
+        // is about Actual, so the grid starts scrolled to it.
+        if (narrow) grid.scrollToCell(actualCell);
         bindings = bindEngineEvents(grid, emit, setPendingOperations);
         gridRef.current = grid;
         bindingsRef.current = bindings;
@@ -278,7 +283,7 @@ export default function EngineShowcase() {
   }, [emit, generation, requestedRenderer]);
 
   useEffect(() => {
-    const viewport = window.matchMedia("(max-width: 48rem)");
+    const viewport = window.matchMedia(NARROW_VIEWPORT);
     const updateFrozenColumns = () => gridRef.current?.setFrozen(1, viewport.matches ? 0 : 2);
     viewport.addEventListener("change", updateFrozenColumns);
     return () => viewport.removeEventListener("change", updateFrozenColumns);
@@ -639,7 +644,7 @@ export default function EngineShowcase() {
                 <span>Change → host acknowledgement</span>
                 <strong data-testid="engine-follow-duration" data-empty={followDuration === null}>
                   {followDuration === null ? (
-                    "Follow a change to measure"
+                    "Not measured yet"
                   ) : (
                     <>
                       {followDuration.toFixed(1)}
@@ -651,7 +656,7 @@ export default function EngineShowcase() {
                   {following
                     ? "Following this change…"
                     : followDuration === null
-                      ? "Not measured yet"
+                      ? "Change an actual to time each step below."
                       : "Rows + recalc + paint + local host"}
                 </span>
               </div>
@@ -661,10 +666,13 @@ export default function EngineShowcase() {
                   return (
                     <li data-testid={`engine-follow-step-${index}`} key={step}>
                       <span>{step}</span>
+                      {/* Unmeasured steps stay blank: the total above already says why. */}
                       <strong data-empty={stepMs === undefined}>
-                        {stepMs === undefined
-                          ? "Follow a change to measure"
-                          : `${stepMs.toFixed(1)} ms`}
+                        {stepMs === undefined ? (
+                          <span className="sw-visually-hidden">Not measured</span>
+                        ) : (
+                          `${stepMs.toFixed(1)} ms`
+                        )}
                       </strong>
                     </li>
                   );
@@ -766,27 +774,38 @@ export default function EngineShowcase() {
               </div>
               <div className="sw-engine-timeline" data-testid="engine-evidence-viewer">
                 <ol aria-label="Latest source observations" data-testid="engine-event-log">
-                  {[...events].reverse().map((event) => (
-                    <li
-                      data-event={event.type}
-                      data-plan-band={
-                        event.type === "datasource-request" && carriesPlanBand(event.columns)
-                          ? ENGINE_PLAN_COLUMN
-                          : undefined
-                      }
-                      key={event.sequence}
-                    >
-                      <div>
-                        <strong>{EVENT_LABELS[event.type]}</strong>
-                        <time>{event.observedAt.toFixed(1)} ms</time>
-                      </div>
-                      <p>{formatEngineEvent(event)}</p>
-                    </li>
-                  ))}
+                  {[...events].reverse().map((event, index, newestFirst) => {
+                    // Each row shows the gap since the observation before it,
+                    // which reads as cause and effect; the page-clock time is
+                    // kept in the title for exact reference.
+                    const previous = newestFirst[index + 1];
+                    return (
+                      <li
+                        data-event={event.type}
+                        data-plan-band={
+                          event.type === "datasource-request" && carriesPlanBand(event.columns)
+                            ? ENGINE_PLAN_COLUMN
+                            : undefined
+                        }
+                        key={event.sequence}
+                      >
+                        <div>
+                          <strong>{EVENT_LABELS[event.type]}</strong>
+                          <time title={`${event.observedAt.toFixed(1)} ms after page load`}>
+                            {previous === undefined
+                              ? "first"
+                              : `+${(event.observedAt - previous.observedAt).toFixed(1)} ms`}
+                          </time>
+                        </div>
+                        <p>{formatEngineEvent(event)}</p>
+                      </li>
+                    );
+                  })}
                 </ol>
               </div>
               <p className="sw-engine-cutaway__resource">
-                Latest {ENGINE_TRACE_LIMIT} observations · clock from page navigation.
+                Latest {ENGINE_TRACE_LIMIT} observations, newest first. Each time is the gap since
+                the observation below it.
                 {rendererFallback &&
                   ` ${requestedRenderer} fell back to ${activeRenderer}: ${rendererFallback}`}
               </p>

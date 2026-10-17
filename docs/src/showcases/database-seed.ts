@@ -49,15 +49,15 @@ export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
         name: "Subscription revenue · Q1",
         order: 0,
         rowCount: DATABASE_REVENUE_ROWS + 2,
-        // Widths total 1010: the exact column space next to the stage rail at
-        // the 1568-wide stage (panel 1058, gutter 48, cell padding 12 per column).
+        // Widths total 810, so every column stays visible beside the commit
+        // journal down to a 1,280 px viewport; wider stages leave free space.
         columns: [
-          { key: "account", header: "Month / account", width: 250, type: "text" },
-          { key: "seats", header: "Seats", width: 120, type: "number" },
-          { key: "rate", header: "Monthly rate", width: 150, type: "number" },
-          { key: "revenue", header: "Revenue", width: 172, type: "number" },
-          { key: "cost", header: "Service cost", width: 160, type: "number" },
-          { key: "margin", header: "Gross margin", width: 158, type: "number" },
+          { key: "account", header: "Month / account", width: 210, type: "text" },
+          { key: "seats", header: "Seats", width: 90, type: "number" },
+          { key: "rate", header: "Monthly rate", width: 120, type: "number" },
+          { key: "revenue", header: "Revenue", width: 130, type: "number" },
+          { key: "cost", header: "Service cost", width: 130, type: "number" },
+          { key: "margin", header: "Gross margin", width: 130, type: "number" },
         ],
         cells: [
           {

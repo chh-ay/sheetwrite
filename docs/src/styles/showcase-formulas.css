@@ -142,7 +142,9 @@
     height: clamp(28rem, 58dvh, 38rem);
   }
 
-  /* All recipes stay visible; the workbook is the only scroll region. */
+  /* All recipes stay visible; the workbook is the only scroll region. Compact
+     chips keep the 13 recipes to about two rows at desktop widths, so the
+     grid starts higher on the page. */
   .sw-fx-recipes {
     border-bottom: 1px solid var(--sw-border);
     background: var(--sw-surface-0);
@@ -150,25 +152,28 @@
 
   .sw-fx-recipes ol {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.35rem;
     flex-wrap: wrap;
     margin: 0;
-    padding: 0.6rem 1rem;
+    padding: 0.55rem 1rem;
     list-style: none;
   }
 
   .sw-fx-recipes button {
     display: inline-flex;
-    gap: 0.45rem;
+    gap: 0.4rem;
     align-items: baseline;
-    padding: 0.45rem 0.7rem;
+    padding: 0.28rem 0.6rem;
     border: 1px solid var(--sw-border);
     border-radius: 999px;
     background: var(--sw-surface-1);
     color: var(--sw-fg);
-    font: 600 var(--sw-type-sm) / 1.3 var(--sw-font-body);
+    font: 600 0.78rem / 1.3 var(--sw-font-body);
     white-space: nowrap;
     cursor: pointer;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease;
   }
 
   .sw-fx-recipes button span {

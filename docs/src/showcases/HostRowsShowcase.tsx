@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import { revenueAccountName } from "./revenue.js";
+import { siteGridTheme } from "./site-grid-theme.js";
 
 const LEAD_IMPORT_ROWS = 10_000;
 const HOST_PREVIEW_ROWS = 120;
@@ -26,12 +27,14 @@ interface HostEntity extends Record<string, string | number | boolean | null> {
   stage: string;
 }
 
+// Widths sum to 1,080 px so every column is visible beside the page gutters
+// at desktop widths; a clipped last column reads as a broken layout.
 const columns = [
-  { key: "name" as const, title: "Account", width: 440 },
-  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 220 },
-  { key: "region" as const, title: "Region", width: 200 },
-  { key: "owner" as const, title: "Owner", width: 260 },
-  { key: "stage" as const, title: "Stage", width: 320 },
+  { key: "name" as const, title: "Account", width: 340 },
+  { key: "amount" as const, title: "ARR · USD", type: "number" as const, width: 170 },
+  { key: "region" as const, title: "Region", width: 150 },
+  { key: "owner" as const, title: "Owner", width: 200 },
+  { key: "stage" as const, title: "Stage", width: 220 },
 ];
 const owners = ["Ada Chen", "Lin Patel", "Maya Reyes", "Noah Ellis"];
 const regions = ["North", "South", "West", "East"];
@@ -112,8 +115,11 @@ export default function HostRowsShowcase() {
     [],
   );
 
+  // The grid paints with resolved colors, so it re-reads the site tokens when
+  // the page theme changes.
+  const applySiteTheme = () => grid.current?.replaceTheme({ ...siteGridTheme(), rowHeight: 36 });
   useEffect(() => {
-    const observer = new MutationObserver(() => grid.current?.replaceTheme({ rowHeight: 36 }));
+    const observer = new MutationObserver(applySiteTheme);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme"],
@@ -371,7 +377,10 @@ export default function HostRowsShowcase() {
             presentation="data-grid"
             theme={{ rowHeight: 36 }}
             rowBridge={bridge}
-            onReady={() => setReady(true)}
+            onReady={() => {
+              applySiteTheme();
+              setReady(true);
+            }}
             onRowDelta={applyProjection}
             onMutationRejected={() =>
               applyProjection(

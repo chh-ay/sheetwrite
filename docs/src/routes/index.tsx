@@ -151,6 +151,9 @@ function BenchmarkBars({ evidence }: Readonly<{ evidence: Required<LandingBenchD
           </li>
         ))}
       </ul>
+      <p className="sw-bench__scale">
+        Bar length uses a log scale from 1× (as fast as Handsontable) to {scaleMax.toFixed(0)}×.
+      </p>
       <dl className="sw-bench__capture">
         <div>
           <dt>Browser</dt>
