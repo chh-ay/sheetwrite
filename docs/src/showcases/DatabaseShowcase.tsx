@@ -14,6 +14,7 @@ import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import "@sheetwrite/core/styles.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ActionError, useAction } from "../lib/use-action.js";
 import { ShowcaseLinkError, ShowcaseNetworkLink } from "./collaboration-protocol.js";
 import {
   DATABASE_DOCUMENT_ID,
@@ -309,8 +310,8 @@ export default function DatabaseShowcase() {
   const sessionRef = useRef<DatabaseSession | null>(null);
   const autosaveRef = useRef(true);
   const logIdRef = useRef(0);
-  const busyRef = useRef(false);
-  const [isBusy, setIsBusy] = useState(false);
+  const action = useAction();
+  const isBusy = action.pending;
   const snapshotVersionRef = useRef<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [statusDetail, setStatusDetail] = useState("Opening IndexedDB…");
@@ -460,21 +461,12 @@ export default function DatabaseShowcase() {
     return () => observer.disconnect();
   }, []);
 
-  /** Runs one control action at a time so overlapping clicks cannot interleave. */
-  const run = (action: () => Promise<void>) => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setIsBusy(true);
-    void action()
-      .catch((error: unknown) => {
-        if (!(error instanceof ShowcaseLinkError)) {
-          pushLog("error", error instanceof Error ? error.message : String(error));
-        }
-      })
-      .finally(() => {
-        busyRef.current = false;
-        setIsBusy(false);
-      });
+  const run = (command: () => Promise<void>) => {
+    void action.run(command, (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!(error instanceof ShowcaseLinkError)) pushLog("error", message);
+      return message;
+    });
   };
   /**
    * 0.5.0 large undo: clear 100,000 usage cells, then undo once. The undo
@@ -914,6 +906,18 @@ export default function DatabaseShowcase() {
       data-state={status}
       data-testid="dbx-instrument"
     >
+      <ActionError error={status === "error" ? statusDetail : action.error} />
+      {status === "error" && (
+        <button
+          className="sw-dbx__button"
+          type="button"
+          disabled={isBusy}
+          aria-busy={isBusy || undefined}
+          onClick={() => run(() => boot(null, "Loaded from IndexedDB"))}
+        >
+          {isBusy ? "Retrying…" : "Retry loading"}
+        </button>
+      )}
       <header className="sw-dbx__bar">
         <div className="sw-dbx__bar-title">
           <p>IndexedDB · versioned document</p>
@@ -1205,11 +1209,12 @@ export default function DatabaseShowcase() {
               <button
                 className="sw-dbx__button"
                 data-variant="danger"
-                disabled={!ready}
+                disabled={isBusy || status === "loading"}
+                aria-busy={isBusy || undefined}
                 onClick={resetDemo}
                 type="button"
               >
-                Reset demo data
+                {isBusy ? "Resetting…" : "Reset demo data"}
               </button>
             </fieldset>
           </div>

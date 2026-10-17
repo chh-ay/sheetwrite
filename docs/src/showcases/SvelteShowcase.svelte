@@ -8,6 +8,7 @@ import type { GridConfig } from "@sheetwrite/core";
 import { createFormulaBar, createNameBox, createSelectionStatus } from "@sheetwrite/core/shell";
 import { SheetwriteGrid } from "@sheetwrite/svelte";
 import { Cloud, CloudOff, GitMerge, Radio, RefreshCw, Users } from "lucide-svelte";
+import { createActionGuard, isRepeatClick, type ActionState } from "../lib/action-guard.js";
 import { OFFLINE_ROWS, OFFLINE_LOCAL_ACTOR, OFFLINE_THEME } from "./scenarios/offline.js";
 import {
   SvelteWorkbenchSession,
@@ -31,6 +32,8 @@ const GRID_CONFIG: GridConfig = {
 
 let session = $state<SvelteWorkbenchSession>();
 let bootError = $state<string>();
+let actionState = $state<ActionState>({ pending: false, error: null });
+const action = createActionGuard((state) => { actionState = state; });
 let mount = $state<WorkbenchMount>();
 let generation = $state(1);
 let remountNote = $state("initial");
@@ -239,17 +242,22 @@ $effect(() => {
   };
 });
 
-function toggleConnection(): void {
-  if (!session) return;
-  online = !online;
-  void session.setOnline(online);
+function toggleConnection(event: MouseEvent): void {
+  if (!session || isRepeatClick(event)) return;
+  const active = session;
+  const next = !online;
+  void action.run(async () => {
+    await active.setOnline(next);
+    online = next;
+  }, () => "Cannot change the connection. Try again.");
 }
 
 async function mergeConflict(): Promise<void> {
   if (!session || merging) return;
+  const active = session;
   merging = true;
   try {
-    await session.mergeAndResync();
+    await action.run(() => active.mergeAndResync(), () => "Cannot merge the queued edits. Try again.");
   } finally {
     merging = false;
   }
@@ -277,10 +285,13 @@ async function mergeConflict(): Promise<void> {
         role="switch"
         aria-checked={online}
         aria-label="Connection to dispatch server"
-        disabled={!ready}
+        disabled={!ready || actionState.pending}
+        aria-busy={actionState.pending || undefined}
         onclick={toggleConnection}
       >
-        {#if online}
+        {#if actionState.pending}
+          Changing connection…
+        {:else if online}
           <Cloud size={15} aria-hidden="true" />
           {syncState?.activity === "sending" ? "Draining" : "Connected · Go offline"}
         {:else}
@@ -307,6 +318,9 @@ async function mergeConflict(): Promise<void> {
       </div>
     </header>
 
+    <p class="sw-action-error" role="alert" data-action-error="" hidden={!bootError && !actionState.error}>
+      {bootError ?? actionState.error}
+    </p>
     <div class="sw-demo-workspace" data-journey-state={journey.state}>
       <section class="sw-svw-gridstage" aria-label="Editable field dispatch workbook">
         <header>
@@ -324,6 +338,8 @@ async function mergeConflict(): Promise<void> {
                 theme={OFFLINE_THEME}
                 config={GRID_CONFIG}
                 fill
+                onReady={() => { bootError = undefined; }}
+                onInitializationError={(error) => { bootError = `Cannot load the workbook: ${String(error)}`; }}
               />
             {/key}
           {/if}
@@ -393,7 +409,7 @@ async function mergeConflict(): Promise<void> {
                 ? "Conservative rebase: no overlap with your queued edits."
                 : "Overlapping edits — your queued values win on resync."}
             </span>
-            <button type="button" data-testid="merge-button" disabled={merging} onclick={() => void mergeConflict()}>
+            <button type="button" data-testid="merge-button" disabled={merging} aria-busy={merging || undefined} onclick={() => void mergeConflict()}>
               <GitMerge size={14} aria-hidden="true" /> {merging ? "Merging…" : "Merge & resync"}
             </button>
           </section>

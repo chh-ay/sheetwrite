@@ -17,6 +17,8 @@ import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
 import "@sheetwrite/core/styles.css";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { isRepeatClick } from "../lib/action-guard.js";
+import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import {
   COLLABORATION_ACTORS,
   type ShowcaseActor,
@@ -205,6 +207,8 @@ const EMPTY_CLIENT_VIEW: ClientView = {
 let nextMutation = 1;
 
 export default function CollaborationShowcase() {
+  const action = useAction();
+  const chaosAction = useAction();
   const hostRefs: Record<ClientKey, React.RefObject<HTMLDivElement | null>> = {
     a: useRef<HTMLDivElement>(null),
     b: useRef<HTMLDivElement>(null),
@@ -682,10 +686,13 @@ export default function CollaborationShowcase() {
   }, []);
 
   const sampleEdit = (key: ClientKey) => {
-    void (async () => {
-      if (!(await showDocument("forecast"))) return;
-      editForecast(key);
-    })();
+    void action.run(
+      async () => {
+        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
+        editForecast(key);
+      },
+      () => "Cannot apply the sample edit. Try again.",
+    );
   };
 
   const editForecast = (key: ClientKey) => {
@@ -752,112 +759,125 @@ export default function CollaborationShowcase() {
     // Publishing first replaces any earlier verdict and keeps the button
     // disabled while the clients leave the usage document of the batch drill.
     publish();
-    if (!(await showDocument("forecast"))) {
-      report.phase = "timed-out";
-      publish();
-      return;
-    }
-    started = performance.now();
-    // Read after the switch: a remount brings both clients back online.
-    const offline: Record<ClientKey, boolean> = {
-      a: clientsRef.current.a?.link.connected === false,
-      b: clientsRef.current.b?.link.connected === false,
-    };
-    // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
-    // every edit and every synced arrival is visible while the storm runs.
-    for (const key of CLIENT_KEYS) {
-      showRows(key, CHAOS_VIEW_ROWS);
-      shownRowsRef.current[key] = visibleRows(key);
-    }
-    // Seeded per run, so a run's fault sequence can be reproduced exactly.
-    const random = seededRandom(run);
+    try {
+      if (!(await showDocument("forecast"))) {
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      started = performance.now();
+      // Read after the switch: a remount brings both clients back online.
+      const offline: Record<ClientKey, boolean> = {
+        a: clientsRef.current.a?.link.connected === false,
+        b: clientsRef.current.b?.link.connected === false,
+      };
+      // Bring the rows where Ana's half meets Bram's on screen in both Grids, so
+      // every edit and every synced arrival is visible while the storm runs.
+      for (const key of CLIENT_KEYS) {
+        showRows(key, CHAOS_VIEW_ROWS);
+        shownRowsRef.current[key] = visibleRows(key);
+      }
+      // Seeded per run, so a run's fault sequence can be reproduced exactly.
+      const random = seededRandom(run);
 
-    while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
-      const key: ClientKey = random() < 0.5 ? "a" : "b";
-      const runtime = clientsRef.current[key];
-      // A recovering client is being remounted and accepts no new edits.
-      if (!runtime || recoveringRef.current[key]) {
+      while (performance.now() - started < CHAOS_STORM_MS && stillRunning()) {
+        const key: ClientKey = random() < 0.5 ? "a" : "b";
+        const runtime = clientsRef.current[key];
+        // A recovering client is being remounted and accepts no new edits.
+        if (!runtime || recoveringRef.current[key]) {
+          await delay(CHAOS_TICK_MS);
+          continue;
+        }
+        const roll = random();
+        if (roll < 0.1) {
+          offline[key] = !offline[key];
+          if (offline[key]) report.disconnects += 1;
+          toggleOnline(key, !offline[key]);
+        } else if (roll < 0.18 && !offline[key]) {
+          holdNextBroadcast(key);
+          report.reorders += 1;
+        } else {
+          // Edit a row the reader can see in this analyst's Grid when one exists.
+          const owned = CHAOS_ROWS[key];
+          const view = shownRowsRef.current[key];
+          const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
+          const rows = onScreen.length > 0 ? onScreen : owned;
+          const row = rows[Math.floor(random() * rows.length)];
+          if (row === undefined) throw new Error("The analyst has no forecast rows.");
+          const addr = { sheet: "plan", row, col: 2 };
+          const outcome = runtime.grid.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr,
+                value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
+              },
+            ],
+          });
+          if (outcome.status === "applied") report.edits += 1;
+        }
+        publish(false);
         await delay(CHAOS_TICK_MS);
-        continue;
       }
-      const roll = random();
-      if (roll < 0.1) {
-        offline[key] = !offline[key];
-        if (offline[key]) report.disconnects += 1;
-        toggleOnline(key, !offline[key]);
-      } else if (roll < 0.18 && !offline[key]) {
-        holdNextBroadcast(key);
-        report.reorders += 1;
-      } else {
-        // Edit a row the reader can see in this analyst's Grid when one exists.
-        const owned = CHAOS_ROWS[key];
-        const view = shownRowsRef.current[key];
-        const onScreen = view ? owned.filter((r) => r >= view.first && r <= view.last) : [];
-        const rows = onScreen.length > 0 ? onScreen : owned;
-        const row = rows[Math.floor(random() * rows.length)];
-        if (row === undefined) throw new Error("The analyst has no forecast rows.");
-        const addr = { sheet: "plan", row, col: 2 };
-        const outcome = runtime.grid.applyTransaction({
-          patches: [
-            {
-              op: "set",
-              addr,
-              value: { kind: "literal", value: 10_000 + Math.floor(random() * 71) * 1_000 },
-            },
-          ],
-        });
-        if (outcome.status === "applied") report.edits += 1;
-      }
-      publish(false);
-      await delay(CHAOS_TICK_MS);
-    }
 
-    report.phase = "settling";
-    publish();
-    for (const key of CLIENT_KEYS) {
-      if (offline[key]) toggleOnline(key, true);
-      releaseHeld(key);
-    }
-    // Wait until both queues drain, no conflict recovery is still running, and
-    // both clients sit at the server head: a client stuck on a version gap has
-    // nothing queued but has not caught up.
-    const settleBy = performance.now() + CHAOS_DRAIN_MS;
-    const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
-    const idle = () =>
-      CLIENT_KEYS.every(
-        (key) =>
-          (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
-          !recoveringRef.current[key] &&
-          clientsRef.current[key]?.sync.serverVersion === head(),
-      );
-    while (stillRunning() && performance.now() < settleBy && !idle()) {
-      for (const key of CLIENT_KEYS) releaseHeld(key);
-      await delay(CHAOS_TICK_MS);
-    }
-    await delay(CHAOS_TICK_MS * 4);
-    if (!stillRunning()) return;
-    if (!idle()) {
-      // Never call a still-moving state converged.
-      report.phase = "timed-out";
+      report.phase = "settling";
       publish();
-      return;
-    }
-    const a = clientsRef.current.a?.grid;
-    const b = clientsRef.current.b?.grid;
-    if (!a || !b || !stillRunning()) return;
-    let mismatches = 0;
-    let cells = 0;
-    for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
-      for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
-        const addr = { sheet: "plan", row, col };
-        cells += 1;
-        if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
+      for (const key of CLIENT_KEYS) {
+        if (offline[key]) toggleOnline(key, true);
+        releaseHeld(key);
+      }
+      // Wait until both queues drain, no conflict recovery is still running, and
+      // both clients sit at the server head: a client stuck on a version gap has
+      // nothing queued but has not caught up.
+      const settleBy = performance.now() + CHAOS_DRAIN_MS;
+      const head = () => serversRef.current.forecast?.headVersion(DOCUMENT_ID.forecast) ?? -1;
+      const idle = () =>
+        CLIENT_KEYS.every(
+          (key) =>
+            (clientsRef.current[key]?.sync.pendingCommits().length ?? 1) === 0 &&
+            !recoveringRef.current[key] &&
+            clientsRef.current[key]?.sync.serverVersion === head(),
+        );
+      while (stillRunning() && performance.now() < settleBy && !idle()) {
+        for (const key of CLIENT_KEYS) releaseHeld(key);
+        await delay(CHAOS_TICK_MS);
+      }
+      await delay(CHAOS_TICK_MS * 4);
+      if (!stillRunning()) return;
+      if (!idle()) {
+        // Never call a still-moving state converged.
+        report.phase = "timed-out";
+        publish();
+        return;
+      }
+      const a = clientsRef.current.a?.grid;
+      const b = clientsRef.current.b?.grid;
+      if (!a || !b || !stillRunning()) return;
+      let mismatches = 0;
+      let cells = 0;
+      for (let row = 0; row < COLLABORATION_WORKBOOK_ROWS; row++) {
+        for (let col = 0; col < COLLABORATION_WORKBOOK_COLUMNS; col++) {
+          const addr = { sheet: "plan", row, col };
+          cells += 1;
+          if (a.store.getCell(addr).resolved !== b.store.getCell(addr).resolved) mismatches += 1;
+        }
+      }
+      report.cells = cells;
+      report.mismatches = mismatches;
+      report.phase = mismatches === 0 ? "converged" : "diverged";
+      publish();
+    } finally {
+      if (stillRunning()) {
+        if (report.phase === "storm" || report.phase === "settling") {
+          report.phase = "timed-out";
+          publish();
+        }
+        for (const key of CLIENT_KEYS) {
+          toggleOnline(key, true);
+          releaseHeld(key);
+        }
       }
     }
-    report.cells = cells;
-    report.mismatches = mismatches;
-    report.phase = mismatches === 0 ? "converged" : "diverged";
-    publish();
   };
 
   const clientsBusy = () =>
@@ -1008,21 +1028,22 @@ export default function CollaborationShowcase() {
   };
 
   const serverEdit = () => {
-    void (async () => {
-      if (!(await showDocument("forecast"))) return;
-      const server = serversRef.current.forecast;
-      if (!server) return;
-      const runtime = clientsRef.current.a ?? clientsRef.current.b;
-      const addr = { sheet: "plan", row: 4, col: 2 };
-      const current = runtime?.grid.store.getCell(addr).resolved;
-      const forecast =
-        typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
-      await server
-        .commitServerOperations(DOCUMENT_ID.forecast, [
+    void action.run(
+      async () => {
+        if (!(await showDocument("forecast"))) throw new Error("The forecast is not ready.");
+        const server = serversRef.current.forecast;
+        if (!server) return;
+        const runtime = clientsRef.current.a ?? clientsRef.current.b;
+        const addr = { sheet: "plan", row: 4, col: 2 };
+        const current = runtime?.grid.store.getCell(addr).resolved;
+        const forecast =
+          typeof current === "number" ? current + FORECAST_ADJUSTMENT : FORECAST_ADJUSTMENT;
+        await server.commitServerOperations(DOCUMENT_ID.forecast, [
           { op: "set", addr, value: { kind: "literal", value: forecast } },
-        ])
-        .catch(() => {});
-    })();
+        ]);
+      },
+      () => "Cannot commit the server edit. Try again.",
+    );
   };
 
   /**
@@ -1170,15 +1191,18 @@ export default function CollaborationShowcase() {
   };
 
   const resetDemo = () => {
-    const generation = bootGenerationRef.current + 1;
-    bootGenerationRef.current = generation;
-    void (async () => {
-      for (const key of CLIENT_KEYS) disposeClient(key);
-      stopServers();
-      if (generation !== bootGenerationRef.current) return;
-      setViews({ a: EMPTY_CLIENT_VIEW, b: EMPTY_CLIENT_VIEW });
-      await bootAll(generation);
-    })();
+    void action.run(
+      async () => {
+        const generation = bootGenerationRef.current + 1;
+        bootGenerationRef.current = generation;
+        for (const key of CLIENT_KEYS) disposeClient(key);
+        stopServers();
+        if (generation !== bootGenerationRef.current) return;
+        setViews({ a: EMPTY_CLIENT_VIEW, b: EMPTY_CLIENT_VIEW });
+        await bootAll(generation);
+      },
+      () => "Cannot reset the demo. Try again.",
+    );
   };
 
   const bramPending = views.b.syncState?.pendingCount ?? 0;
@@ -1213,6 +1237,7 @@ export default function CollaborationShowcase() {
 
   return (
     <section aria-label="Collaboration protocol showcase" className="sw-clb" data-state={status}>
+      <ActionError error={action.error ?? chaosAction.error} />
       <header className="sw-clb__bar">
         <div className="sw-clb__bar-title">
           <p>Two clients · one sequencing server</p>
@@ -1223,14 +1248,18 @@ export default function CollaborationShowcase() {
             <button
               className="sw-clb__button"
               data-testid="clb-chaos"
+              {...pendingProps(chaosAction.pending)}
               data-variant="primary"
               disabled={
+                chaosAction.pending ||
                 status !== "ready" ||
                 chaos?.phase === "storm" ||
                 chaos?.phase === "settling" ||
                 restoreRunning
               }
-              onClick={() => void runChaos()}
+              onClick={() =>
+                void chaosAction.run(runChaos, () => "The chaos test failed. Try again.")
+              }
               type="button"
             >
               {chaos?.phase === "storm"
@@ -1349,6 +1378,7 @@ export default function CollaborationShowcase() {
         <ClientPanel
           account={sampleAccount("a")}
           actor={COLLABORATION_ACTORS[0]}
+          actionPending={action.pending}
           onSampleEdit={() => sampleEdit("a")}
           onToggleOnline={(online) => toggleOnline("a", online)}
           slug="a"
@@ -1392,11 +1422,13 @@ export default function CollaborationShowcase() {
             <li data-current={challengePhase === "offline" ? "true" : undefined}>
               <button
                 className="sw-clb__button"
-                disabled={status !== "ready" || views.b.online}
+                disabled={status !== "ready" || views.b.online || action.pending}
+                aria-busy={action.pending || undefined}
                 onClick={() => sampleEdit("b")}
                 type="button"
               >
-                <span aria-hidden="true">02</span> Queue one Grid edit
+                <span aria-hidden="true">02</span>{" "}
+                {action.pending ? "Queuing edit…" : "Queue one Grid edit"}
               </button>
             </li>
             <li data-current={challengePhase === "queued" ? "true" : undefined}>
@@ -1434,6 +1466,7 @@ export default function CollaborationShowcase() {
         <ClientPanel
           account={sampleAccount("b")}
           actor={COLLABORATION_ACTORS[1]}
+          actionPending={action.pending}
           onSampleEdit={() => sampleEdit("b")}
           onToggleOnline={(online) => toggleOnline("b", online)}
           slug="b"
@@ -1524,16 +1557,22 @@ export default function CollaborationShowcase() {
           <section aria-labelledby="clb-server-tools-title" className="sw-clb__server-tools">
             <h3 id="clb-server-tools-title">Server and recovery</h3>
             <div className="sw-clb__controls">
-              <button className="sw-clb__button" onClick={serverEdit} type="button">
-                Server-authored commit
+              <button
+                className="sw-clb__button"
+                {...pendingProps(action.pending)}
+                onClick={serverEdit}
+                type="button"
+              >
+                {action.pending ? "Committing…" : "Server-authored commit"}
               </button>
               <button
                 className="sw-clb__button"
                 data-variant="danger"
+                {...pendingProps(action.pending)}
                 onClick={resetDemo}
                 type="button"
               >
-                Reset demo
+                {action.pending ? "Resetting…" : "Reset demo"}
               </button>
             </div>
             <p className="sw-clb__server-note">
@@ -1553,6 +1592,7 @@ export default function CollaborationShowcase() {
 
 interface ClientPanelProps {
   account: string;
+  actionPending: boolean;
   actor: ShowcaseActor;
   children: ReactNode;
   onSampleEdit(): void;
@@ -1563,6 +1603,7 @@ interface ClientPanelProps {
 
 function ClientPanel({
   account,
+  actionPending,
   actor,
   children,
   onSampleEdit,
@@ -1594,7 +1635,14 @@ function ClientPanel({
             aria-label={`${actor.displayName} online`}
             checked={view.online}
             disabled={!view.ready}
-            onChange={(event) => onToggleOnline(event.currentTarget.checked)}
+            onChange={(event) => {
+              if (event.nativeEvent instanceof MouseEvent && isRepeatClick(event.nativeEvent))
+                return;
+              onToggleOnline(event.currentTarget.checked);
+            }}
+            onClick={(event) => {
+              if (isRepeatClick(event)) event.preventDefault();
+            }}
             type="checkbox"
           />
           <span aria-hidden="true" className="sw-proofs-switch-track">
@@ -1611,11 +1659,12 @@ function ClientPanel({
       <div className="sw-clb__client-action">
         <button
           className="sw-clb__button"
-          disabled={!view.ready}
+          disabled={!view.ready || actionPending}
+          aria-busy={actionPending || undefined}
           onClick={onSampleEdit}
           type="button"
         >
-          Add $500 to {account}
+          {actionPending ? "Applying edit…" : `Add $500 to ${account}`}
         </button>
         <p aria-live="polite">
           <span>Latest</span>

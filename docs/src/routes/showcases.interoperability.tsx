@@ -29,6 +29,7 @@ import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import compatibilityData from "../generated/compatibility.json";
 import { pageMeta } from "../lib/seo.js";
+import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "../showcases/CapabilityHero.js";
 import type {
   CompatibilityResultStatus,
@@ -385,6 +386,12 @@ function ChoiceMenu({
 }
 
 function InteroperabilityRoute() {
+  const action = useAction();
+  const run = (command: () => unknown) =>
+    void action.run(
+      command,
+      (error) => `The file operation failed: ${describeError(error)}. Try again.`,
+    );
   const hostRef = useRef<HTMLDivElement>(null);
   const formulaRowRef = useRef<HTMLDivElement>(null);
   const statusRowRef = useRef<HTMLDivElement>(null);
@@ -647,6 +654,7 @@ function InteroperabilityRoute() {
       setStatus(`Downloaded ${outcome.bytes.byteLength.toLocaleString()} bytes of .xlsx.`);
     } catch (error) {
       setStatus(`Export failed — ${describeError(error)}`);
+      throw new Error("Cannot export the workbook.", { cause: error });
     }
   };
 
@@ -668,6 +676,7 @@ function InteroperabilityRoute() {
       );
     } catch (error) {
       setStatus(`Round-trip failed — ${describeError(error)}`);
+      throw new Error("Cannot compare the workbook round-trip.", { cause: error });
     } finally {
       setWorking(false);
     }
@@ -741,6 +750,7 @@ function InteroperabilityRoute() {
       setFixtureLoad(null);
     } catch (error) {
       setStatus(`Import rejected — ${describeError(error)}`);
+      throw new Error("Cannot import this file. Check the file and try again.", { cause: error });
     } finally {
       setWorking(false);
     }
@@ -775,6 +785,7 @@ function InteroperabilityRoute() {
       });
     } catch (error) {
       setStatus(`Generated CSV import failed — ${describeError(error)}`);
+      throw new Error("Cannot import the generated CSV.", { cause: error });
     } finally {
       setWorking(false);
     }
@@ -812,6 +823,7 @@ function InteroperabilityRoute() {
         detail: `Import failed — ${describeError(error)}`,
       });
       setStatus(`Fixture import failed — ${describeError(error)}`);
+      throw new Error("Cannot import this fixture.", { cause: error });
     }
   };
 
@@ -851,6 +863,7 @@ function InteroperabilityRoute() {
       setStatus("Active sheet exported to CSV through the hardened text path.");
     } catch (error) {
       setStatus(`CSV export failed — ${describeError(error)}`);
+      throw new Error("Cannot export CSV.", { cause: error });
     }
   };
 
@@ -861,6 +874,7 @@ function InteroperabilityRoute() {
       downloadBytes(csvOfActiveSheet(grid), "sheetwrite-interoperability.csv", "text/csv");
     } catch (error) {
       setStatus(`CSV download failed — ${describeError(error)}`);
+      throw new Error("Cannot download CSV.", { cause: error });
     }
   };
 
@@ -877,6 +891,7 @@ function InteroperabilityRoute() {
       );
     } catch (error) {
       setStatus(`TSV export failed — ${describeError(error)}`);
+      throw new Error("Cannot export TSV.", { cause: error });
     }
   };
 
@@ -895,6 +910,7 @@ function InteroperabilityRoute() {
       });
     } catch (error) {
       setPasteError(error instanceof Error ? error.message : String(error));
+      throw new Error("Cannot import the pasted text.", { cause: error });
     }
   };
 
@@ -996,9 +1012,11 @@ function InteroperabilityRoute() {
             onDrop={(event) => {
               event.preventDefault();
               setDragActive(false);
-              void handleFile(event.dataTransfer.files[0] ?? null);
+              const file = event.dataTransfer.files[0] ?? null;
+              run(() => handleFile(file));
             }}
           >
+            <ActionError error={action.error} />
             <p className="sw-si-workbench__label" data-testid="interop-source">
               <span>Source workbook</span>
               <strong>{source.label}</strong>
@@ -1028,11 +1046,14 @@ function InteroperabilityRoute() {
                 <button
                   className="sw-si-btn sw-si-btn--primary"
                   data-testid="interop-roundtrip"
-                  disabled={!gridReady || working}
-                  onClick={handleRoundTrip}
+                  {...pendingProps(action.pending)}
+                  disabled={!gridReady || working || action.pending}
+                  onClick={() => run(handleRoundTrip)}
                   type="button"
                 >
-                  {working ? "Working…" : "Export, re-import & compare"}
+                  {working || action.pending
+                    ? "Comparing workbook…"
+                    : "Export, re-import & compare"}
                 </button>
               </header>
               <dl
@@ -1260,18 +1281,24 @@ function InteroperabilityRoute() {
               <button
                 className="sw-si-btn sw-si-btn--secondary"
                 data-testid="interop-download"
-                onClick={handleDownload}
+                {...pendingProps(action.pending)}
+                onClick={() => run(handleDownload)}
                 type="button"
               >
-                Download .xlsx
+                {action.pending ? "Exporting XLSX…" : "Download .xlsx"}
               </button>
               <label className="sw-si-btn sw-si-btn--secondary sw-si-file">
-                Drop your own .xlsx / .csv
+                {action.pending ? "Importing file…" : "Drop your own .xlsx / .csv"}
                 <input
                   accept=".xlsx,.csv"
                   data-testid="interop-file-input"
-                  disabled={working}
-                  onChange={(event) => void handleFile(event.currentTarget.files?.[0] ?? null)}
+                  disabled={working || action.pending}
+                  aria-busy={action.pending || undefined}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0] ?? null;
+                    event.currentTarget.value = "";
+                    run(() => handleFile(file));
+                  }}
                   type="file"
                 />
               </label>
@@ -1279,6 +1306,7 @@ function InteroperabilityRoute() {
               <button
                 className="sw-si-btn sw-si-btn--quiet"
                 data-testid="interop-reset"
+                disabled={working || action.pending}
                 onClick={() => {
                   setFileReport(null);
                   setBulkReport(null);
@@ -1310,10 +1338,11 @@ function InteroperabilityRoute() {
               type="button"
               className="sw-si-btn sw-si-btn--secondary"
               data-testid="interop-bulk-import"
-              disabled={working}
-              onClick={handleBulkImport}
+              aria-busy={action.pending || undefined}
+              disabled={working || action.pending}
+              onClick={() => run(handleBulkImport)}
             >
-              Generate &amp; import 200,000 rows
+              {action.pending ? "Importing rows…" : "Generate & import 200,000 rows"}
             </button>
             {bulkReport && (
               <p className="sw-si-bulk-report" data-testid="interop-bulk-report" role="status">
@@ -2156,14 +2185,16 @@ function InteroperabilityRoute() {
                         aria-label={`Load ${fixture.file} in workbench`}
                         className="sw-si-btn sw-si-btn--secondary"
                         data-testid={`fixture-${fixture.id}-load`}
+                        aria-busy={action.pending || undefined}
                         disabled={
                           digests[fixture.id]?.state !== "verified" ||
+                          action.pending ||
                           (fixtureLoad?.id === fixture.id && fixtureLoad.state === "loading")
                         }
-                        onClick={() => void handleFixtureLoad(fixture)}
+                        onClick={() => run(() => handleFixtureLoad(fixture))}
                         type="button"
                       >
-                        Load in workbench
+                        {action.pending ? "Importing fixture…" : "Load in workbench"}
                       </button>
                       {fixtureLoad?.id === fixture.id && (
                         <p
@@ -2291,26 +2322,29 @@ function InteroperabilityRoute() {
                   <button
                     className="sw-si-btn sw-si-btn--primary"
                     data-testid="interop-csv-export"
-                    onClick={handleCsvExport}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleCsvExport)}
                     type="button"
                   >
-                    Export active sheet as CSV
+                    {action.pending ? "Exporting CSV…" : "Export active sheet as CSV"}
                   </button>
                   <button
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-csv-download"
-                    onClick={handleCsvDownload}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleCsvDownload)}
                     type="button"
                   >
-                    Download .csv
+                    {action.pending ? "Exporting CSV…" : "Download .csv"}
                   </button>
                   <button
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-tsv-export"
-                    onClick={handleTsvExport}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleTsvExport)}
                     type="button"
                   >
-                    Export selection as TSV
+                    {action.pending ? "Exporting TSV…" : "Export selection as TSV"}
                   </button>
                 </div>
                 {csvPreview !== null && (
@@ -2358,10 +2392,11 @@ function InteroperabilityRoute() {
                   <button
                     className="sw-si-btn sw-si-btn--primary"
                     data-testid="interop-csv-import"
-                    onClick={handlePasteImport}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handlePasteImport)}
                     type="button"
                   >
-                    Import CSV into workbench
+                    {action.pending ? "Importing CSV…" : "Import CSV into workbench"}
                   </button>
                 </div>
                 {pasteError && (
@@ -2401,6 +2436,7 @@ function InteroperabilityRoute() {
                     type="button"
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-injection-load"
+                    disabled={action.pending}
                     onClick={() => {
                       setRoundTrip(null);
                       setFileReport(null);
@@ -2419,9 +2455,10 @@ function InteroperabilityRoute() {
                     type="button"
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-injection-export"
-                    onClick={handleCsvExport}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleCsvExport)}
                   >
-                    Export probe CSV
+                    {action.pending ? "Exporting CSV…" : "Export probe CSV"}
                   </button>
                 </div>
                 {injectionCsvLine && (
@@ -2443,26 +2480,29 @@ function InteroperabilityRoute() {
                   <button
                     className="sw-si-btn sw-si-btn--danger"
                     data-testid="interop-hostile-run"
-                    onClick={handleHostileRun}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleHostileRun)}
                     type="button"
                   >
-                    Run all 5 hostile packages
+                    {action.pending ? "Importing packages…" : "Run all 5 hostile packages"}
                   </button>
                   <button
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-abort-demo"
-                    onClick={handleAbortDemo}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleAbortDemo)}
                     type="button"
                   >
-                    Import with aborted signal
+                    {action.pending ? "Importing…" : "Import with aborted signal"}
                   </button>
                   <button
                     className="sw-si-btn sw-si-btn--secondary"
                     data-testid="interop-cellcap-demo"
-                    onClick={handleCellCapDemo}
+                    {...pendingProps(action.pending)}
+                    onClick={() => run(handleCellCapDemo)}
                     type="button"
                   >
-                    Import with maxCells: 8
+                    {action.pending ? "Importing…" : "Import with maxCells: 8"}
                   </button>
                   <button
                     className="sw-si-btn sw-si-btn--secondary"

@@ -419,8 +419,11 @@ createGrid(host, { workbook });                            // no toolbar (config
 The export flag always enables CSV. Its XLSX button requires an explicit
 optional installation and `import "@sheetwrite/xlsx/register"` before use; the
 framework packages do not install an XLSX backend.
-Direct `grid.exportXlsx(...)` calls reject on failure; built-in toolbar and
-context-menu actions report the same failure through one `export-error` event.
+Direct `grid.exportXlsx(...)` calls reject on failure. Built-in toolbar and
+context-menu actions show an alert and emit one `export-error` event for CSV or
+XLSX failures. `grid.actions.exportXlsx()` returns a promise that does not reject.
+Built-in buttons show a busy state and ignore repeated starts while their
+command is pending.
 
 Every control acts on the current selection — see [Interaction](/docs/guides/interaction/).
 

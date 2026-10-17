@@ -1,4 +1,5 @@
 import { colToA1 } from "./a1.js";
+import { type ActionFeedback, attachActionFeedback } from "./action-feedback.js";
 import { AriaMirror } from "./aria-mirror.js";
 import {
   fontFor,
@@ -397,6 +398,7 @@ export class GridImpl implements Grid {
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
   private findBar: FindBar | null = null;
+  private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
   private readonly presentation: GridPresentation;
   private readonly hyperlinkActivation: "event-only" | "internal-navigation" | "disabled";
@@ -664,6 +666,7 @@ export class GridImpl implements Grid {
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
+    this.actionFeedback = attachActionFeedback(this, host);
 
     const config = this.config;
     if (config && config.toolbar !== false) {
@@ -2510,12 +2513,19 @@ export class GridImpl implements Grid {
       paste: () => this.clipboard.paste(),
       pasteValues: () => this.clipboard.pasteValues(),
       clearContents: () => this.clearSelection(),
-      exportCsv: (filename) => this.exportCsv(filename ?? "sheetwrite.csv"),
-      exportXlsx: (filename) => {
-        void this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
-          this.emitExportError(error);
-        });
+      exportCsv: (filename) => {
+        try {
+          this.exportCsv(filename ?? "sheetwrite.csv");
+        } catch (error) {
+          this.emitExportError(error, "csv");
+        }
       },
+      // Resolves when the download is handed to the browser; never rejects,
+      // because a failure is reported once through `export-error`.
+      exportXlsx: (filename) =>
+        this.exportXlsx(filename ?? "sheetwrite.xlsx").catch((error: unknown) => {
+          this.emitExportError(error, "xlsx");
+        }),
       undo: () => this.undo(),
       redo: () => this.redo(),
     };
@@ -2845,13 +2855,13 @@ export class GridImpl implements Grid {
     this.queueCommandStateChange();
   }
 
-  private emitExportError(error: unknown): void {
+  private emitExportError(error: unknown, format: "csv" | "xlsx"): void {
     if (this.destroyed) return;
-    const failure = normalizeSheetwriteError(error, "export-failed", "export-xlsx", {
-      format: "xlsx",
-    });
+    const operation = format === "csv" ? "delimited-export" : "export-xlsx";
+    const failure = normalizeSheetwriteError(error, "export-failed", operation, { format });
+    this.actionFeedback.show(`Export failed: ${failure.message} Try again.`);
     for (const listener of this.listeners["export-error"]) {
-      listener({ format: "xlsx", error: failure });
+      listener({ format, error: failure });
     }
   }
 
@@ -2963,6 +2973,7 @@ export class GridImpl implements Grid {
     cleanup(() => this.tabBar?.remove());
     cleanup(() => this.toolbar?.destroy());
     cleanup(() => this.findBar?.destroy());
+    cleanup(() => this.actionFeedback.destroy());
     cleanup(() => this.viewportEl.remove());
     cleanup(() => this.ariaMirror.destroy());
     cleanup(() => this.host.classList.remove("sheetwrite"));
