@@ -206,7 +206,7 @@ describe("formula regression gate", () => {
     expect(() => validateFormulaRegression(p95, baseline)).toThrow(".p95 regression");
   });
 
-  it("gates p95 only for workloads whose baseline median reaches 1 ms", () => {
+  it("gives sub-millisecond workloads a 0.3 ms median floor and no p95 check", () => {
     const withSamples = (samples: number[]) => {
       const result = formulaFixture("full");
       result.workloads[0]!.samplesMs = samples;
@@ -214,16 +214,27 @@ describe("formula regression gate", () => {
       return result;
     };
     const subMillisecond = withSamples([0.5, 0.5, 0.5, 0.5, 0.5]);
+    const millisecond = withSamples([1, 1, 1, 1, 1]);
 
     expect(() =>
       validateFormulaRegression(withSamples([0.5, 0.5, 0.5, 0.5, 3]), subMillisecond),
     ).not.toThrow();
     expect(() =>
-      validateFormulaRegression(withSamples([0.8, 0.8, 0.8, 0.8, 0.8]), subMillisecond),
-    ).toThrow(".median regression");
+      validateFormulaRegression(withSamples([0.75, 0.75, 0.75, 0.75, 0.75]), subMillisecond),
+    ).not.toThrow();
     expect(() =>
-      validateFormulaRegression(withSamples([1, 1, 1, 1, 1.4]), withSamples([1, 1, 1, 1, 1])),
-    ).toThrow(".p95 regression");
+      validateFormulaRegression(withSamples([0.85, 0.85, 0.85, 0.85, 0.85]), subMillisecond),
+    ).toThrow(".median regression: baseline 0.5, candidate 0.85, limit 0.8");
+
+    expect(() =>
+      validateFormulaRegression(withSamples([1.24, 1.24, 1.24, 1.24, 1.24]), millisecond),
+    ).not.toThrow();
+    expect(() =>
+      validateFormulaRegression(withSamples([1.3, 1.3, 1.3, 1.3, 1.3]), millisecond),
+    ).toThrow(".median regression: baseline 1, candidate 1.3, limit 1.25");
+    expect(() => validateFormulaRegression(withSamples([1, 1, 1, 1, 1.4]), millisecond)).toThrow(
+      ".p95 regression",
+    );
   });
 
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {

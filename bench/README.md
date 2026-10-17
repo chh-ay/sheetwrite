@@ -195,13 +195,16 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
 A full `bench:formula` capture compares every row with the committed
-`results/formula-results.json` and stops on the first exceedance. A timing
-median may reach `max(baseline × 1.25, baseline + 0.1 ms)`. The p95 has the
-same limit, but only for workloads whose baseline median is at least 1 ms:
-with five samples, p95 is the slowest single sample, and below 1 ms that
-sample is dominated by GC and timer noise (the 0.5.0 A/A study measured a
-33–466% spread on those rows). Retained bytes, peak transient bytes, transient
-allocation counts, and the isolated WASM deltas may not grow at all.
+`results/formula-results.json` and stops on the first exceedance. For a
+workload whose baseline median is at least 1 ms, the median and p95 may each
+reach `max(baseline × 1.25, baseline + 0.1 ms)`. A workload whose baseline
+median is under 1 ms gates its median only, at
+`max(baseline × 1.25, baseline + 0.3 ms)`. With five samples, p95 is the
+slowest single sample, and below 1 ms it is dominated by GC and timer noise
+(the 0.5.0 A/A study measured a 33–466% spread on those rows). Those medians
+also move with code they do not run: two points of that study with the same
+Rust engine differed by up to 0.29 ms. Retained bytes, peak transient bytes,
+transient allocation counts, and the isolated WASM deltas may not grow at all.
 
 A baseline must itself carry a passed gate, so a regression the maintainer has
 reviewed and accepted cannot be recorded by recapturing the baseline. It is

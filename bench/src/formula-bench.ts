@@ -2276,20 +2276,24 @@ export function validateFormulaBenchmark(
   validateFormulaEvidence(result, expectedMode, true);
 }
 
-function timingRegressionLimit(baseline: number): number {
-  return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + TIMING_REGRESSION_FLOOR_MS);
+function timingRegressionLimit(baseline: number, floorMs: number): number {
+  return Math.max(baseline * TIMING_REGRESSION_RATIO, baseline + floorMs);
 }
 
 /**
- * With five samples, p95 is the slowest single sample. Below a 1 ms baseline
- * median that sample is dominated by GC and timer noise: the 0.5.0
- * timing-rounds A/A study measured a 33–466% spread on those rows. Such
- * workloads gate their median only.
+ * A workload whose baseline median is under 1 ms runs at the GC and timer
+ * floor. With five samples, p95 is the slowest single sample, and the 0.5.0
+ * timing-rounds A/A study measured a 33–466% spread on those rows, so they
+ * gate their median only. Their median also moves with code they do not run:
+ * two points of that study with the same Rust engine (#103, and #106, which
+ * changed only TypeScript) differed by up to 0.29 ms, so the median floor is
+ * 0.3 ms instead of 0.1 ms.
  */
-const P95_GATE_MIN_BASELINE_MEDIAN_MS = 1;
+const SUB_MILLISECOND_BASELINE_MS = 1;
+const SUB_MILLISECOND_MEDIAN_FLOOR_MS = 0.3;
 
-function gatesP95(baseline: FormulaWorkloadResult): boolean {
-  return baseline.stat.median >= P95_GATE_MIN_BASELINE_MEDIAN_MS;
+function isSubMillisecond(baseline: FormulaWorkloadResult): boolean {
+  return baseline.stat.median < SUB_MILLISECOND_BASELINE_MS;
 }
 
 function validateLegacyFormulaBaseline(result: FormulaBenchmarkResult): void {
@@ -2472,7 +2476,7 @@ function approvalTarget(
   if (previous === undefined || (bytes && previous.allocationStat === undefined)) {
     throw new Error(`${path} names ${key}.${field}, which the baseline lacks`);
   }
-  if (field === "p95" && !gatesP95(previous)) {
+  if (field === "p95" && isSubMillisecond(previous)) {
     throw new Error(`${path} names ${key}.p95, which the gate does not check`);
   }
   return { row: `${key}.${field}`, bytes };
@@ -2571,15 +2575,19 @@ export function validateFormulaRegression(
     const previous = baselineWorkloads.get(key);
     if (previous === undefined) continue;
     comparedWorkloads += 1;
+    const subMillisecond = isSubMillisecond(previous);
     for (const field of ["median", "p95"] as const) {
-      if (field === "p95" && !gatesP95(previous)) continue;
+      if (field === "p95" && subMillisecond) continue;
       const before = previous.stat[field];
       assertWithinGate(
         {
           row: `${key}.${field}`,
           baseline: before,
           candidate: workload.stat[field],
-          ruleLimit: timingRegressionLimit(before),
+          ruleLimit: timingRegressionLimit(
+            before,
+            subMillisecond ? SUB_MILLISECOND_MEDIAN_FLOOR_MS : TIMING_REGRESSION_FLOOR_MS,
+          ),
         },
         approved,
       );
