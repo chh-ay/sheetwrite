@@ -164,15 +164,13 @@ impl CellStore {
                 }
             }
         } else {
-            for row in 0..s.row_count {
-                let i = base + row;
-                // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
-                // vectors have the same `n_cols * row_count` length.
+            let value_at = |i| {
+                // SAFETY: both loops below stay within this dense column.
                 let stored_kind = unsafe { *s.kind.get_unchecked(i) };
-                let value = match stored_kind {
+                match stored_kind {
                     KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
                     KIND_FORMULA => {
-                        let bits = unsafe { s.payload_unchecked(i) };
+                        let bits = s.resolved_payload_at(i);
                         if !payload_is_str(bits)
                             && key_for_index(s, i)
                                 .is_some_and(|key| formula_error_at(s, key).is_none())
@@ -183,7 +181,22 @@ impl CellStore {
                         }
                     }
                     _ => None,
-                };
+                }
+            };
+
+            // A sum does not need the count or extrema of each cell.
+            if op == 0 {
+                for row in 0..s.row_count {
+                    if let Some(value) = value_at(base + row) {
+                        sum += value;
+                    }
+                }
+
+                return sum;
+            }
+
+            for row in 0..s.row_count {
+                let value = value_at(base + row);
                 if let Some(value) = value {
                     sum += value;
                     count += 1;
@@ -1158,9 +1171,20 @@ fn sort_finite_number_column_comparison(
     order.sort_unstable_by(|&a, &b| {
         // SAFETY: `order` holds only rows from `0..row_count`, and the scan
         // above proved every value in this column is a finite number.
-        let va = sheet.num_at(base + a as usize);
-        let vb = sheet.num_at(base + b as usize);
-        let ord = va.partial_cmp(&vb).unwrap_or(Ordering::Equal);
+        let (left, right) = if sheet.is_paged() {
+            (
+                sheet.num_at(base + a as usize),
+                sheet.num_at(base + b as usize),
+            )
+        } else {
+            unsafe {
+                (
+                    f64::from_bits(sheet.payload_unchecked(base + a as usize)),
+                    f64::from_bits(sheet.payload_unchecked(base + b as usize)),
+                )
+            }
+        };
+        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
             a.cmp(&b)
@@ -1360,8 +1384,7 @@ impl<'a> ComparableCell<'a> {
                 if let Some(error) = formula_error_at(sheet, key) {
                     ComparableCell::Text(error.sentinel())
                 } else {
-                    // SAFETY: caller guarantees `index` is valid for all cell vectors.
-                    let bits = unsafe { sheet.payload_unchecked(index) };
+                    let bits = sheet.resolved_payload_at(index);
                     if sheet.formula_value_kind(index) == FormulaValueKind::Blank {
                         return ComparableCell::Empty;
                     }
