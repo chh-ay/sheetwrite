@@ -17,7 +17,6 @@ import { Route as VanillaRouteImport } from './routes/vanilla'
 import { Route as VueRouteImport } from './routes/vue'
 import { Route as DocsIndexRouteImport } from './routes/docs.index'
 import { Route as DocsSplatRouteImport } from './routes/docs.$'
-import { Route as DocsProofRouteImport } from './routes/docs.proof'
 import { Route as ShowcasesIndexRouteImport } from './routes/showcases.index'
 import { Route as ShowcasesCollaborationRouteImport } from './routes/showcases.collaboration'
 import { Route as ShowcasesDatabaseRouteImport } from './routes/showcases.database'
@@ -72,11 +71,6 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
 const DocsSplatRoute = DocsSplatRouteImport.update({
   id: '/docs/$',
   path: '/docs/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocsProofRoute = DocsProofRouteImport.update({
-  id: '/docs/proof',
-  path: '/docs/proof',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShowcasesIndexRoute = ShowcasesIndexRouteImport.update({
@@ -165,7 +159,6 @@ export interface FileRoutesByFullPath {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
-  '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
@@ -191,7 +184,6 @@ export interface FileRoutesByTo {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
-  '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
@@ -218,7 +210,6 @@ export interface FileRoutesById {
   '/vanilla': typeof VanillaRoute
   '/vue': typeof VueRoute
   '/docs/$': typeof DocsSplatRoute
-  '/docs/proof': typeof DocsProofRoute
   '/showcases/collaboration': typeof ShowcasesCollaborationRoute
   '/showcases/database': typeof ShowcasesDatabaseRoute
   '/showcases/engine': typeof ShowcasesEngineRoute
@@ -246,7 +237,6 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
-    | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
     | '/showcases/engine'
@@ -272,7 +262,6 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
-    | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
     | '/showcases/engine'
@@ -298,7 +287,6 @@ export interface FileRouteTypes {
     | '/vanilla'
     | '/vue'
     | '/docs/$'
-    | '/docs/proof'
     | '/showcases/collaboration'
     | '/showcases/database'
     | '/showcases/engine'
@@ -325,7 +313,6 @@ export interface RootRouteChildren {
   VanillaRoute: typeof VanillaRoute
   VueRoute: typeof VueRoute
   DocsSplatRoute: typeof DocsSplatRoute
-  DocsProofRoute: typeof DocsProofRoute
   ShowcasesCollaborationRoute: typeof ShowcasesCollaborationRoute
   ShowcasesDatabaseRoute: typeof ShowcasesDatabaseRoute
   ShowcasesEngineRoute: typeof ShowcasesEngineRoute
@@ -400,13 +387,6 @@ declare module '@tanstack/react-router' {
       path: '/docs/$'
       fullPath: '/docs/$'
       preLoaderRoute: typeof DocsSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/docs/proof': {
-      id: '/docs/proof'
-      path: '/docs/proof'
-      fullPath: '/docs/proof'
-      preLoaderRoute: typeof DocsProofRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/showcases/': {
@@ -525,7 +505,6 @@ const rootRouteChildren: RootRouteChildren = {
   VanillaRoute: VanillaRoute,
   VueRoute: VueRoute,
   DocsSplatRoute: DocsSplatRoute,
-  DocsProofRoute: DocsProofRoute,
   ShowcasesCollaborationRoute: ShowcasesCollaborationRoute,
   ShowcasesDatabaseRoute: ShowcasesDatabaseRoute,
   ShowcasesEngineRoute: ShowcasesEngineRoute,

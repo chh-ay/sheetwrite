@@ -40,7 +40,10 @@ function markResponsiveCodeBlocks() {
           ["api-member", "api-declaration", "api-declaration-open", "api-variant"].includes(name),
         );
       if (node.tagName === "pre") {
-        node.properties = { ...node.properties, suppressHydrationWarning: true };
+        node.properties = {
+          ...node.properties,
+          suppressHydrationWarning: true,
+        };
       }
       if (node.children) {
         node.children = node.children.filter(
@@ -155,9 +158,8 @@ export default defineConfig({
         { path: "/showcases/interoperability/" },
         { path: "/showcases/performance/" },
         { path: "/showcases/collaboration/" },
-        { path: "/docs/proof/", sitemap: { exclude: true } },
-        // Static hosts serve /404.html for every URL without a page: the
-        // root notFoundComponent prerendered for an unknown path.
+        // The explicit route renders successfully during prerender; the
+        // deployment fallback supplies the 404 status for unknown URLs.
         {
           path: "/404/",
           prerender: { enabled: true, outputPath: "/404.html" },
@@ -167,9 +169,15 @@ export default defineConfig({
         { path: "/test/xlsx/", sitemap: { exclude: true } },
         { path: "/test/collaboration/", sitemap: { exclude: true } },
         { path: "/test/formulas-engine/", sitemap: { exclude: true } },
-        { path: "/test/framework-lifecycle/react/", sitemap: { exclude: true } },
+        {
+          path: "/test/framework-lifecycle/react/",
+          sitemap: { exclude: true },
+        },
         { path: "/test/framework-lifecycle/vue/", sitemap: { exclude: true } },
-        { path: "/test/framework-lifecycle/svelte/", sitemap: { exclude: true } },
+        {
+          path: "/test/framework-lifecycle/svelte/",
+          sitemap: { exclude: true },
+        },
       ],
       prerender: {
         enabled: true,

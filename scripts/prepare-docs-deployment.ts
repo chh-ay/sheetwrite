@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 const repositoryRoot = resolve(import.meta.dir, "..");
 const requiredFiles = [
   "index.html",
+  "404.html",
   "docs/index.html",
   "sitemap.xml",
   "pagefind/pagefind-entry.json",
@@ -86,8 +87,14 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             continue: true,
           })),
           { src: "^/$", dest: "/index.html" },
+          ...[...files.keys()]
+            .filter((path) => path.endsWith("/index.html"))
+            .map((path) => ({
+              src: `^/${path.slice(0, -"/index.html".length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`,
+              dest: `/${path}`,
+            })),
           { handle: "filesystem" },
-          { src: "^/(.+?)/?$", dest: "/$1/index.html" },
+          { src: "^/.*$", dest: "/404.html", status: 404 },
         ],
       },
       null,
