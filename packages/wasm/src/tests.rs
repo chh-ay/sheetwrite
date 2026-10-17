@@ -1295,6 +1295,10 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     assert!(store.search(sheet, &[0], "", true, false).is_empty());
     assert_close(store.aggregate(sheet, 1, 3), 7.0);
     assert_close(store.aggregate(sheet, 1, 4), 2.0);
+
+    let general_sum = store.aggregate(sheet, 1, 1) * store.aggregate(sheet, 1, 4);
+    assert_close(store.aggregate(sheet, 1, 0), general_sum);
+
     for op in 0..=4 {
         assert_close(store.aggregate(sheet, 2, op), 0.0);
     }

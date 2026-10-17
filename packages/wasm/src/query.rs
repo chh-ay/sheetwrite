@@ -164,12 +164,10 @@ impl CellStore {
                 }
             }
         } else {
-            for row in 0..s.row_count {
-                let i = base + row;
-                // SAFETY: `col < n_cols`, `row < row_count`, and all dense cell
-                // vectors have the same `n_cols * row_count` length.
+            let value_at = |i| {
+                // SAFETY: both loops below stay within this dense column.
                 let stored_kind = unsafe { *s.kind.get_unchecked(i) };
-                let value = match stored_kind {
+                match stored_kind {
                     KIND_NUMBER => Some(f64::from_bits(unsafe { s.payload_unchecked(i) })),
                     KIND_FORMULA => {
                         let bits = s.resolved_payload_at(i);
@@ -183,7 +181,22 @@ impl CellStore {
                         }
                     }
                     _ => None,
-                };
+                }
+            };
+
+            // A sum does not need the count or extrema of each cell.
+            if op == 0 {
+                for row in 0..s.row_count {
+                    if let Some(value) = value_at(base + row) {
+                        sum += value;
+                    }
+                }
+
+                return sum;
+            }
+
+            for row in 0..s.row_count {
+                let value = value_at(base + row);
                 if let Some(value) = value {
                     sum += value;
                     count += 1;
