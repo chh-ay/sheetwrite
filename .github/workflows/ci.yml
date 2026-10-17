@@ -508,7 +508,9 @@ jobs:
           if [ "$missing" = true ]; then
             exit 1
           fi
-          npx --yes vercel@59.25.0 deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN"
+          # One archive upload instead of one request per file: the free plan
+          # allows 5,000 file uploads a day, and a docs build has thousands.
+          npx --yes vercel@59.25.0 deploy --prebuilt --prod --yes --archive=tgz --token "$VERCEL_TOKEN"
       - name: Submit deployed sitemap to IndexNow
         env:
           VERCEL_ENV: production
