@@ -269,7 +269,11 @@ export default function HostRowsShowcase() {
               aria-live="polite"
               data-testid="host-import-timing"
             >
-              <strong>{importResult ? `${importResult.insertMs.toFixed(1)} ms` : "—"}</strong>
+              <strong data-empty={!importResult}>
+                {importResult
+                  ? `${importResult.insertMs.toFixed(1)} ms`
+                  : "Import leads to measure"}
+              </strong>
               <span>
                 {importResult
                   ? `ID checks + row insertion · cell load ${importResult.loadMs.toFixed(0)} ms in ${importResult.batches} commits`

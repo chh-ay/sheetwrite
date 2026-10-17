@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { functionCount } from "../generated/formula-summary.json";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
 import { pageMeta } from "../lib/seo.js";
@@ -248,7 +249,9 @@ function FormulasScene() {
           </span>
         ))}
       </span>
-      <span className="sw-hub-scene__caption">299 functions · LAMBDA · spill references</span>
+      <span className="sw-hub-scene__caption">
+        {functionCount} functions · LAMBDA · spill references
+      </span>
     </span>
   );
 }

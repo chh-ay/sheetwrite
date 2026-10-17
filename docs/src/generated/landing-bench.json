@@ -4,7 +4,11 @@
     "commit": "49e05e298c3f39a8cede038fe8d0062343abc21f",
     "timestamp": "2026-10-17T05:18:22.963Z",
     "browser": "Chromium 153.0.8010.12",
-    "rounds": 10
+    "rounds": 10,
+    "engineVersions": {
+      "sheetwrite": "0.4.0",
+      "handsontable": "18.1.2"
+    }
   },
   "heroStats": {
     "millionRowScenarios": 14,

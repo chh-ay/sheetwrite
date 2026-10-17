@@ -637,9 +637,15 @@ export default function EngineShowcase() {
             <div className="sw-engine-run" data-testid="engine-follow-report">
               <div className="sw-engine-run__total">
                 <span>Change → host acknowledgement</span>
-                <strong data-testid="engine-follow-duration">
-                  {followDuration === null ? "—" : followDuration.toFixed(1)}
-                  <small>ms</small>
+                <strong data-testid="engine-follow-duration" data-empty={followDuration === null}>
+                  {followDuration === null ? (
+                    "Follow a change to measure"
+                  ) : (
+                    <>
+                      {followDuration.toFixed(1)}
+                      <small>ms</small>
+                    </>
+                  )}
                 </strong>
                 <span>
                   {following
@@ -655,7 +661,11 @@ export default function EngineShowcase() {
                   return (
                     <li data-testid={`engine-follow-step-${index}`} key={step}>
                       <span>{step}</span>
-                      <strong>{stepMs === undefined ? "—" : `${stepMs.toFixed(1)} ms`}</strong>
+                      <strong data-empty={stepMs === undefined}>
+                        {stepMs === undefined
+                          ? "Follow a change to measure"
+                          : `${stepMs.toFixed(1)} ms`}
+                      </strong>
                     </li>
                   );
                 })}
@@ -895,9 +905,14 @@ export default function EngineShowcase() {
             >
               Apply the +2% scenario
             </button>
-            <output data-testid="engine-rewrite-duration">
-              {rewriteDuration === null ? "—" : rewriteDuration.toFixed(2)}{" "}
-              <span>ms / one-cell transaction</span>
+            <output data-testid="engine-rewrite-duration" data-empty={rewriteDuration === null}>
+              {rewriteDuration === null ? (
+                "Apply the scenario to measure"
+              ) : (
+                <>
+                  {rewriteDuration.toFixed(2)} <span>ms / one-cell transaction</span>
+                </>
+              )}
             </output>
           </section>
 
