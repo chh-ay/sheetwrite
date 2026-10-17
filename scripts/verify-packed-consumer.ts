@@ -12,6 +12,7 @@ import {
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
+import { captureProcess, readJson } from "./script-io.js";
 
 interface PackageManifest {
   name: string;
@@ -163,23 +164,12 @@ const packageSpecs: PackageSpec[] = [
 ];
 
 async function run(command: string[], cwd: string): Promise<string> {
-  const process = Bun.spawn(command, {
+  return captureProcess(command, {
     cwd,
     env: processEnv(),
-    stderr: "pipe",
-    stdout: "pipe",
+    failure: ({ stdout, stderr }) =>
+      `${command.join(" ")} failed in ${cwd}\n${stdout.trim()}\n${stderr.trim()}`,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ]);
-
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed in ${cwd}\n${stdout.trim()}\n${stderr.trim()}`);
-  }
-
-  return stdout;
 }
 
 function processEnv(): Record<string, string> {
@@ -189,10 +179,6 @@ function processEnv(): Record<string, string> {
   }
   environment.CI = "1";
   return environment;
-}
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, "utf8")) as T;
 }
 
 function collectExportTargets(value: unknown, targets: string[] = []): string[] {

@@ -68,8 +68,3 @@ export function computeColumnWindow(
   const end = Math.min(count, last + 1 + overscan);
   return { start, end };
 }
-
-/** Whether `row` lies within `[window.start, window.end)`. */
-export function windowContains(window: RowWindow, row: number): boolean {
-  return row >= window.start && row < window.end;
-}

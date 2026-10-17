@@ -15,6 +15,7 @@ import {
   scoredRuntimePaths,
   serialiseNormalizedLcov,
 } from "./coverage-check.js";
+import { captureProcess } from "./script-io.js";
 
 const CARGO_LLVM_COV_VERSION = "0.8.7";
 const RUST_VERSION = "1.99.0";
@@ -83,20 +84,12 @@ async function run(command: readonly string[], root: string): Promise<void> {
 }
 
 async function outputOf(command: readonly string[], root: string): Promise<string> {
-  const child = Bun.spawn([...command], {
+  const stdout = await captureProcess(command, {
     cwd: root,
     stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
+    failure: ({ stderr, exitCode }) =>
+      `${command.join(" ")} failed with exit code ${exitCode}: ${stderr.trim()}`,
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(`${command.join(" ")} failed with exit code ${exitCode}: ${stderr.trim()}`);
-  }
   return stdout.trim();
 }
 

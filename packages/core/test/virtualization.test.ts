@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { OffsetIndex } from "../src/fenwick.js";
-import { computeWindow, windowContains } from "../src/virtualization.js";
+import { computeWindow } from "../src/virtualization.js";
 
 describe("computeWindow", () => {
   const idx = new OffsetIndex(1000, 20);
@@ -13,13 +13,5 @@ describe("computeWindow", () => {
 
   it("returns an empty window for an empty sheet", () => {
     expect(computeWindow(new OffsetIndex(0, 20), 0, 100, 2)).toEqual({ start: 0, end: 0 });
-  });
-
-  it("windowContains reflects the half-open range", () => {
-    const win = { start: 3, end: 13 };
-    expect(windowContains(win, 3)).toBe(true);
-    expect(windowContains(win, 12)).toBe(true);
-    expect(windowContains(win, 13)).toBe(false);
-    expect(windowContains(win, 2)).toBe(false);
   });
 });

@@ -2,12 +2,11 @@ import type {
   CellStyle,
   ConditionalFormatRule,
   DataValidationRule,
-  Range,
   SheetSnapshot,
   SnapshotCell,
   WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { colToA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
+import { colToA1, rangeA1, sheetNameKey, validateSheetName } from "@sheetwrite/core";
 
 import { formulaContainsExternalReference, spillReferencesToXlsx } from "./formula.js";
 import { type ContentTypeOverride, contentTypesXml, relationshipsXml } from "./opc.js";
@@ -62,16 +61,6 @@ interface SheetWriteResult {
 
 function quotedSheet(name: string): string {
   return `'${name.replaceAll("'", "''")}'`;
-}
-
-function rangeReference(range: Range): string {
-  const row0 = Math.min(range.start.row, range.end.row);
-  const row1 = Math.max(range.start.row, range.end.row);
-  const col0 = Math.min(range.start.col, range.end.col);
-  const col1 = Math.max(range.start.col, range.end.col);
-  const start = `${colToA1(col0)}${row0 + 1}`;
-  const end = `${colToA1(col1)}${row1 + 1}`;
-  return start === end ? start : `${start}:${end}`;
 }
 
 function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
@@ -615,7 +604,7 @@ function writeSheet(
   }
   const hyperlinkElements: string[] = [];
   for (const hyperlink of sheet.hyperlinks ?? []) {
-    const source = rangeReference(hyperlink.range);
+    const source = rangeA1(hyperlink.range.start, hyperlink.range.end);
     const display =
       hyperlink.display === undefined
         ? ""
@@ -640,7 +629,7 @@ function writeSheet(
         `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
       );
     }
-    const location = `${quotedSheet(targetSheet.name)}!${rangeReference(internalTarget.range)}`;
+    const location = `${quotedSheet(targetSheet.name)}!${rangeA1(internalTarget.range.start, internalTarget.range.end)}`;
     hyperlinkElements.push(
       `<hyperlink ref="${source}" location="${escapeXml(encodeXstring(location))}"${display}/>`,
     );

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
+import { captureProcess, readJson } from "./script-io.js";
 import {
   BUN_VERSION,
   CARGO_AUDIT_VERSION,
@@ -102,27 +103,13 @@ function processEnvironment(): Record<string, string> {
 }
 
 async function run(command: readonly [string, ...string[]], cwd = repositoryRoot): Promise<string> {
-  const child = Bun.spawn([...command], {
+  const stdout = await captureProcess(command, {
     cwd,
     env: processEnvironment(),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (exitCode !== 0) {
-    throw new Error(
+    failure: ({ stdout, stderr, exitCode }) =>
       `${command.join(" ")} failed with exit code ${exitCode}\n${stdout.trim()}\n${stderr.trim()}`,
-    );
-  }
+  });
   return stdout.trim();
-}
-
-async function readJson<T>(path: string): Promise<T> {
-  return JSON.parse(await readFile(path, "utf8")) as T;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -866,17 +853,8 @@ async function cli(): Promise<void> {
     console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(output)}`);
     return;
   }
-  if (command === "verify") {
-    const artifacts = requiredOption(args, "--artifacts");
-    const manifest = await verifyReleaseArtifacts(artifacts);
-    console.log(
-      `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,
-    );
-    console.log(`Artifact manifest SHA-512: ${await readReleaseManifestDigest(artifacts)}`);
-    return;
-  }
-  if (command === "verify-input") {
-    const artifacts = requiredOption(args, "--input");
+  if (command === "verify" || command === "verify-input") {
+    const artifacts = requiredOption(args, command === "verify" ? "--artifacts" : "--input");
     const manifest = await verifyReleaseArtifacts(artifacts);
     console.log(
       `Verified ${manifest.packages.length} canonical release tarballs from ${manifest.sourceCommit}`,

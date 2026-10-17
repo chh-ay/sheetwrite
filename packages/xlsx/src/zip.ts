@@ -9,7 +9,7 @@ const MAX_EOCD_SEARCH = 65_557;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const DOS_EPOCH = new Date(1980, 0, 1, 0, 0, 0, 0);
 
-function asciiFold(value: string): string {
+export function asciiFold(value: string): string {
   return value.replace(/[A-Z]/g, (character) => character.toLowerCase());
 }
 

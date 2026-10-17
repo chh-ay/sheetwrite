@@ -8,7 +8,7 @@ import {
   xmlAttribute,
   xmlChildren,
 } from "./xml.js";
-import { normalizeDecodedPartName, normalizePartName, ZipArchive } from "./zip.js";
+import { asciiFold, normalizeDecodedPartName, normalizePartName, ZipArchive } from "./zip.js";
 
 const TRANSITIONAL_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_REL_NS = "http://purl.oclc.org/ooxml/officeDocument/relationships";
@@ -17,10 +17,6 @@ const CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content
 
 export function relationshipTypeMatches(type: string, kind: string): boolean {
   return type === `${TRANSITIONAL_REL_NS}/${kind}` || type === `${STRICT_REL_NS}/${kind}`;
-}
-
-function foldedPartName(value: string): string {
-  return value.replace(/[A-Z]/g, (character) => character.toLowerCase());
 }
 
 export interface OpcRelationship {
@@ -144,7 +140,7 @@ export class OpcPackage {
         const rawName = xmlAttribute(item, "PartName");
         if (!rawName?.startsWith("/")) opcFailure("override part name must be absolute");
         const name = normalizePartName(rawName.slice(1));
-        const foldedName = foldedPartName(name);
+        const foldedName = asciiFold(name);
         if (!this.archive.has(name)) {
           emitWarning(context, {
             code: "unsupported-feature",
@@ -160,7 +156,7 @@ export class OpcPackage {
       if (!part.toLowerCase().endsWith(".rels")) continue;
       const sourcePart = relationshipSourcePart(part);
       const relationships = parseRelationships(this.readXml(part), sourcePart, context);
-      this.#relationshipCache.set(foldedPartName(sourcePart), relationships);
+      this.#relationshipCache.set(asciiFold(sourcePart), relationships);
     }
   }
 
@@ -175,7 +171,7 @@ export class OpcPackage {
 
   relationships(sourcePart: string): readonly OpcRelationship[] {
     const normalizedSource = sourcePart === "" ? "" : normalizePartName(sourcePart);
-    const key = normalizedSource === "" ? "" : foldedPartName(normalizedSource);
+    const key = normalizedSource === "" ? "" : asciiFold(normalizedSource);
     const cached = this.#relationshipCache.get(key);
     if (cached) return cached;
     const part = relationshipsPart(normalizedSource);
@@ -206,7 +202,7 @@ export class OpcPackage {
 
   contentType(part: string): string | undefined {
     const normalized = normalizePartName(part);
-    const exact = this.contentTypes.get(foldedPartName(normalized));
+    const exact = this.contentTypes.get(asciiFold(normalized));
     if (exact) return exact;
     const dot = normalized.lastIndexOf(".");
     return dot < 0

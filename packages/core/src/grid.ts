@@ -49,7 +49,12 @@ import { sheetNameKey, validateSheetName } from "./sheet-name.js";
 import { SheetTabs } from "./sheet-tabs.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import { visibleSheetNeighbor } from "./store/ranges.js";
+import {
+  addRowGroup,
+  collapseRowGroup,
+  removeRowGroup,
+  visibleSheetNeighbor,
+} from "./store/ranges.js";
 import { StyleActions } from "./style-actions.js";
 import { Toolbar } from "./toolbar.js";
 import { beginGridTransactionAdmission } from "./transaction-admission.js";
@@ -2840,24 +2845,16 @@ export class GridImpl implements Grid {
   }
 
   groupRows(start: number, end: number): void {
-    const sheet = this.sheet();
-    const group = { start: Math.min(start, end), end: Math.max(start, end), collapsed: false };
-    const groups = (sheet.rowGroups ?? []).filter(
-      (existing) => existing.start !== group.start || existing.end !== group.end,
-    );
+    const groups = addRowGroup(this.sheet().rowGroups, start, end);
     this.document.commit(
-      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: [...groups, group] } }],
+      [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
     this.applyView();
   }
 
   ungroupRows(start: number, end: number): void {
-    const r0 = Math.min(start, end);
-    const r1 = Math.max(start, end);
-    const groups = (this.sheet().rowGroups ?? []).filter(
-      (group) => group.start !== r0 || group.end !== r1,
-    );
+    const groups = removeRowGroup(this.sheet().rowGroups, start, end);
     this.document.commit(
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
@@ -2866,9 +2863,7 @@ export class GridImpl implements Grid {
   }
 
   setGroupCollapsed(start: number, collapsed: boolean): void {
-    const groups = (this.sheet().rowGroups ?? []).map((group) =>
-      group.start === start ? { ...group, collapsed } : group,
-    );
+    const groups = collapseRowGroup(this.sheet().rowGroups, start, collapsed);
     this.document.commit(
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
