@@ -1,0 +1,716 @@
+{
+  "baselineCommit": "ed66b6d7c95c3b652cbc2a89c2d59b5bf693c088",
+  "baselineSourceDigest": "e9f9e0f741dd2646d75ab0ce419de8848c4203eb20a387a32ae07b39a67312a4",
+  "approvals": [
+    {
+      "workload": "independent-first-recompute",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 472845,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -3,280 B from #103/#107"
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 472845,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -3,280 B from #103/#107"
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 10000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 4211726,
+      "reason": "+114,696 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +87,008 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 10000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 4211726,
+      "reason": "+114,696 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +87,008 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 38408499,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +808,020 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "independent-first-recompute",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 38408499,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +808,020 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 8,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 9283,
+      "reason": "+64 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 8,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 9283,
+      "reason": "+64 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 16,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 13825,
+      "reason": "+232 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 16,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 13825,
+      "reason": "+232 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 32,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 21093,
+      "reason": "+456 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 32,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 21093,
+      "reason": "+456 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 64,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 35629,
+      "reason": "+904 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "linear-chain",
+      "size": 64,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 35629,
+      "reason": "+904 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 33816605,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "wide-fan-out-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 33816605,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "diamond-edit",
+      "size": 32,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 43158,
+      "reason": "+904 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "diamond-edit",
+      "size": 32,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 43158,
+      "reason": "+904 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "shared-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 530627,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -3,253 B from #103/#107"
+    },
+    {
+      "workload": "shared-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 530627,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -3,253 B from #103/#107"
+    },
+    {
+      "workload": "distinct-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 865161,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,821 B from #103/#107"
+    },
+    {
+      "workload": "distinct-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 865161,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,821 B from #103/#107"
+    },
+    {
+      "workload": "cross-sheet-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 639966,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +8,701 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "cross-sheet-range-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 639966,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +8,701 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-0",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-0",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-1",
+      "size": 1,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 7419,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-1",
+      "size": 1,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 7419,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +4,620 B one-chunk minimum (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-1000",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-1000",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 423560,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,872 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-100000",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 33816605,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "scalar-edit-affects-100000",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 33816605,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "formula-constant-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 57666961,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "formula-constant-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 57666961,
+      "reason": "+917,512 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "topology-remove-add",
+      "size": 10000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 4211726,
+      "reason": "+114,696 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +87,008 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "topology-remove-add",
+      "size": 10000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 4211726,
+      "reason": "+114,696 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +87,008 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "cycles",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 745050,
+      "reason": "+28,680 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,944 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "cycles",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 745050,
+      "reason": "+28,680 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,944 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "removed-sheet-ref",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 236314,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +8,728 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "removed-sheet-ref",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 236314,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +8,728 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "error-propagation",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 314839,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,944 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "error-propagation",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 314839,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,944 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "criteria-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 3914733,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,640 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "criteria-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 3914733,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,640 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "lookup-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 5217243,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "lookup-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 5217243,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "vlookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1100863,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1100863,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1100890,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1100890,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1099863,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1099863,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1099890,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "vlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1099890,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1115183,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1115183,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1115210,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1115210,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1361183,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1361183,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,380 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1361210,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "xlookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1361210,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); -2,353 B from #103/#107"
+    },
+    {
+      "workload": "text-lookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1711151,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1711151,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1711178,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1711178,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1695831,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-sorted",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1695831,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1695858,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "text-lookup-many-sorted-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1695858,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,748 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "spill-filter-resize",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 6663180,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "spill-filter-resize",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 6663180,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +810,360 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "sumproduct-vector-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 3914720,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,640 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sumproduct-vector-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 3914720,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,640 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sumproduct-matrix-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 2742618,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,540 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sumproduct-matrix-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 2742618,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,540 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "criteria-multi-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 5217710,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "criteria-multi-range-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 5217710,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sum-multi-range",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 3914686,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,613 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sum-multi-range",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 3914686,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,613 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sumifs-3-criteria",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 6519893,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,332 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "sumifs-3-criteria",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 6519893,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +16,332 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "countif-100k",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 2612277,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,273 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "countif-100k",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 2612277,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,273 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "unicode-text-date-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 1218778,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,848 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "unicode-text-date-edit",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 1218778,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,848 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "percentile-covariance",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 3915014,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,613 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "percentile-covariance",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 3915014,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +11,613 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "let-reuse-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 2612667,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,300 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "let-reuse-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 2612667,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +9,300 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "let-repeat",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 5217598,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "let-repeat",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 5217598,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +13,992 B: 4,620 B one-chunk minimum plus a 12 B chunk-directory slot per 512 sheet cells (#103/#107)"
+    },
+    {
+      "workload": "iterative-finance",
+      "size": 1000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 899728,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,848 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "iterative-finance",
+      "size": 1000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 899728,
+      "reason": "+14,344 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +12,848 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "incremental-dependency-closure-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 75507921,
+      "reason": "+1,835,016 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +1,609,080 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "incremental-dependency-closure-edit",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 75507921,
+      "reason": "+1,835,016 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +1,609,080 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "spill-sequence-admission",
+      "size": 100000,
+      "field": "allocation.retainedBytes.median",
+      "maximum": 4058119,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +805,680 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "workload": "spill-sequence-admission",
+      "size": 100000,
+      "field": "allocation.retainedBytes.p95",
+      "maximum": 4058119,
+      "reason": "+32 B before #103: 7 B per formula-table slot from the FormulaEntry spill-reference flag (e725d980); +805,680 B: 8 B per calculated cell in 512-cell chunks (#103/#107)"
+    },
+    {
+      "field": "memory.10000.wasmDeltaBytes",
+      "maximum": 6291520,
+      "reason": "+524,288 B from the FormulaEntry spill-reference flag (e725d980 measures 6,356,992 B, its parent 11e8eddb 5,832,704 B); #103/#107 and later changes -65,536 B"
+    },
+    {
+      "field": "memory.100000.wasmDeltaBytes",
+      "maximum": 53542976,
+      "reason": "+1,769,472 B from the FormulaEntry spill-reference flag (e725d980 measures 54,657,024 B, its parent 11e8eddb 52,887,552 B); #103/#107 and later changes -1,114,112 B"
+    }
+  ]
+}
