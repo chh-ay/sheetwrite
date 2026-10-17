@@ -1635,7 +1635,11 @@ function ClientPanel({
             aria-label={`${actor.displayName} online`}
             checked={view.online}
             disabled={!view.ready}
-            onChange={(event) => onToggleOnline(event.currentTarget.checked)}
+            onChange={(event) => {
+              if (event.nativeEvent instanceof MouseEvent && isRepeatClick(event.nativeEvent))
+                return;
+              onToggleOnline(event.currentTarget.checked);
+            }}
             onClick={(event) => {
               if (isRepeatClick(event)) event.preventDefault();
             }}

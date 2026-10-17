@@ -155,7 +155,7 @@ export interface GridActions {
   /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
   exportCsv(filename?: string): void;
   /**
-   * Download the workbook as XLSX. Resolves when the download starts and never
+   * Download the active sheet as XLSX. Resolves when the download starts and never
    * rejects; a failure emits `export-error`.
    */
   exportXlsx(filename?: string): Promise<void>;

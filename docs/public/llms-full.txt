@@ -5755,7 +5755,7 @@ Members:
 - `copy` — Copy the focused rectangle to the system clipboard. Never rejects.
 - `cut` — Copy + clear the source (after the clipboard accepted). Never rejects.
 - `exportCsv` — Download the active sheet as CSV. Never throws; a failure emits `export-error`.
-- `exportXlsx` — Download the workbook as XLSX. Resolves when the download starts and never
+- `exportXlsx` — Download the active sheet as XLSX. Resolves when the download starts and never
 rejects; a failure emits `export-error`.
 - `paste` — Paste at the focus cell. Never rejects.
 - `pasteValues` — Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects.

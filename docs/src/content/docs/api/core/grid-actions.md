@@ -336,13 +336,13 @@ exportCsv(filename?: string): void;
 </details>
 
 <details class="api-member" id="grid-actions-export-xlsx" data-pagefind-weight="1">
-<summary><code>exportXlsx</code> <span class="api-member-summary">Download the workbook as XLSX.</span></summary>
+<summary><code>exportXlsx</code> <span class="api-member-summary">Download the active sheet as XLSX.</span></summary>
 
 ```ts generated
 exportXlsx(filename?: string): Promise<void>;
 ```
 
-<p class="api-member-doc">Download the workbook as XLSX. Resolves when the download starts and never
+<p class="api-member-doc">Download the active sheet as XLSX. Resolves when the download starts and never
 rejects; a failure emits `export-error`.</p>
 </details>
 
