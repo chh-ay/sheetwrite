@@ -604,44 +604,68 @@ interface Grid {
 }
 ```
 
+Each name links to its entry in the [`Grid` API reference](/docs/api/core/grid/).
+
+### Document and sheets
+
 | Method | Purpose |
 | --- | --- |
-| `store` | The underlying [`Store`](/docs/concepts/runtime-ownership/#the-store-contract) — apply transactions, read cells, subscribe. |
-| `actions` | Imperative action surface (`toggleBold()`, `merge()`, `undo()`, `exportCsv()`, …) the toolbar and context menu bind to — use it to wire custom controls. |
-| `setActiveSheet(id)` | Switch the visible sheet. |
-| `scrollToCell(addr)` | Scroll a cell into view. |
-| `getSelection()` / `setSelection(sel)` | Read or set the current [`Selection`](/docs/guides/interaction/#selection-model) (`null` clears it). |
-| `setTheme(partial)` | Merge a partial theme and repaint. |
-| `defineCellRenderer(name, r)` | Register a custom renderer after construction. |
-| `aggregate(col, op)` | Column aggregate; see [Data operations](/docs/guides/data-operations/#aggregate). |
-| `sortBy` / `sortByMulti` | Non-mutating display sorts; see [Data operations](/docs/guides/data-operations/#display-views). |
-| `filterBy` / `setColumnFilter` / `getColumnFilters` | Column filters that compose with sort, hidden rows, and row groups. |
-| `distinctValues(col, limit?)` | First-seen distinct values for building filter menus. |
-| `hideRows` / `showRows` / `hiddenRows` | Explicit row visibility separate from sort/filter state. |
-| `hideColumns` / `showColumns` / `hiddenColumns` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
-| `groupRows` / `ungroupRows` / `setGroupCollapsed` / `rowGroups` | Inclusive data-row groups with collapse state. |
-| `clearView()` | Clears sort/filter state; hidden rows and row groups remain. |
-| `setFrozen(rows, cols?)` | Pin leading view rows/columns while the body scrolls. |
-| `setZoom(z)` / `getZoom()` | Scale grid content between `0.5` and `2` without mutating workbook base sizes. |
-| `undo()` / `redo()` | Undo or redo the last recorded cell edit (also bound to Ctrl+Z / Ctrl+Shift+Z). |
-| `exportCsv` / `exportXlsx` | Download the active data; see [Data operations](/docs/guides/data-operations/#export). |
-| `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a [`SearchResult`](#search). |
-| `findNext()` / `findPrev()` | Step the active match forward / backward and scroll it into view. |
-| `clearSearch()` | Drop the current search and clear its highlights. |
-| `replaceCurrent()` / `replaceAll()` | Replace literal text/number matches through undoable transactions. |
-| `insertRows` / `removeRows` / `insertColumns` / `removeColumns` | Structural edits through undoable patches. |
-| `highlightCells(ranges, color?)` | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
-| `styleRange(range, style)` | Merge or clear store-backed cell styles across a range. |
-| `setValidationRule` / `removeValidationRule` | Add, replace, or remove a serializable range validation rule. List and checkbox rules get accessible editors. |
-| `setProtectedRange` / `removeProtectedRange` / `setProtectionResolver` | Define protected-range metadata and host-owned local permission policy. This is not server authorization. |
-| `setNote` / `getNote` | Set, clear, or read a serializable plain-text cell note. |
-| `beginEdit(row, col, initial?, selectAll?)` | Open the inline editor at a view cell. |
-| `dataEdge(row, col, dRow, dCol)` | Ctrl+Arrow-style data-run jump target; vertical movement is view-aware under sort/filter. |
-| `setRowHeight(row, h)` / `setColumnWidth(col, w)` | Geometry APIs; row height is view-indexed and persists against the underlying data row. |
-| `autoFitRows(range?)` / `autoFitColumns(cols?)` | Explicit, undoable geometry fitting from bulk reads; auto-fit never runs during paint. |
-| `on(evt, fn)` | Subscribe to an event; returns an unsubscribe function. |
-| `refresh()` | Force a re-render (e.g. after mutating the workbook directly). |
-| `destroy()` | Tear down listeners, DOM, and ARIA attributes. |
+| [`store`](/docs/api/core/grid/#grid-store) | The underlying [`Store`](/docs/concepts/runtime-ownership/#the-store-contract) — apply transactions, read cells, subscribe. |
+| [`actions`](/docs/api/core/grid/#grid-actions) | Imperative action surface (`toggleBold()`, `merge()`, `undo()`, `exportCsv()`, …) the toolbar and context menu bind to — use it to wire custom controls. |
+| [`setActiveSheet(id)`](/docs/api/core/grid/#grid-set-active-sheet) | Switch the visible sheet. |
+| [`undo()`](/docs/api/core/grid/#grid-undo) / [`redo()`](/docs/api/core/grid/#grid-redo) | Undo or redo the last recorded cell edit (also bound to Ctrl+Z / Ctrl+Shift+Z). |
+| [`insertRows`](/docs/api/core/grid/#grid-insert-rows) / `removeRows` / `insertColumns` / `removeColumns` | Structural edits through undoable patches. |
+| [`styleRange(range, style)`](/docs/api/core/grid/#grid-style-range) | Merge or clear store-backed cell styles across a range. |
+| [`setValidationRule`](/docs/api/core/grid/#grid-set-validation-rule) / `removeValidationRule` | Add, replace, or remove a serializable range validation rule. List and checkbox rules get accessible editors. |
+| [`setProtectedRange`](/docs/api/core/grid/#grid-set-protected-range) / `removeProtectedRange` / `setProtectionResolver` | Define protected-range metadata and host-owned local permission policy. This is not server authorization. |
+| [`setNote`](/docs/api/core/grid/#grid-set-note) / `getNote` | Set, clear, or read a serializable plain-text cell note. |
+| [`exportCsv`](/docs/api/core/grid/#grid-export-csv) / `exportXlsx` | Download the active data; see [Data operations](/docs/guides/data-operations/#export). |
+
+### Selection, editing and search
+
+| Method | Purpose |
+| --- | --- |
+| [`getSelection()`](/docs/api/core/grid/#grid-get-selection) / `setSelection(sel)` | Read or set the current [`Selection`](/docs/guides/interaction/#selection-model) (`null` clears it). |
+| [`scrollToCell(addr)`](/docs/api/core/grid/#grid-scroll-to-cell) | Scroll a cell into view. |
+| [`beginEdit(row, col, initial?, selectAll?)`](/docs/api/core/grid/#grid-begin-edit) | Open the inline editor at a view cell. |
+| [`dataEdge(row, col, dRow, dCol)`](/docs/api/core/grid/#grid-data-edge) | Ctrl+Arrow-style data-run jump target; vertical movement is view-aware under sort/filter. |
+| [`search(query, opts?)`](/docs/api/core/grid/#grid-search) | Find matching cells; highlights them, emits `search`, returns a [`SearchResult`](#search). |
+| [`findNext()`](/docs/api/core/grid/#grid-find-next) / `findPrev()` | Step the active match forward / backward and scroll it into view. |
+| [`clearSearch()`](/docs/api/core/grid/#grid-clear-search) | Drop the current search and clear its highlights. |
+| [`replaceCurrent()`](/docs/api/core/grid/#grid-replace-current) / `replaceAll()` | Replace literal text/number matches through undoable transactions. |
+| [`highlightCells(ranges, color?)`](/docs/api/core/grid/#grid-highlight-cells) | Highlight arbitrary ranges (`null` clears); `color` overrides the theme highlight. |
+
+### Views: sort, filter, hide and group
+
+| Method | Purpose |
+| --- | --- |
+| [`aggregate(col, op)`](/docs/api/core/grid/#grid-aggregate) | Column aggregate; see [Data operations](/docs/guides/data-operations/#aggregate). |
+| [`sortBy`](/docs/api/core/grid/#grid-sort-by) / `sortByMulti` | Non-mutating display sorts; see [Data operations](/docs/guides/data-operations/#display-views). |
+| [`filterBy`](/docs/api/core/grid/#grid-filter-by) / `setColumnFilter` / `getColumnFilters` | Column filters that compose with sort, hidden rows, and row groups. |
+| [`distinctValues(col, limit?)`](/docs/api/core/grid/#grid-distinct-values) | First-seen distinct values for building filter menus. |
+| [`hideRows`](/docs/api/core/grid/#grid-hide-rows) / `showRows` / `hiddenRows` | Explicit row visibility separate from sort/filter state. |
+| [`hideColumns`](/docs/api/core/grid/#grid-hide-columns) / `showColumns` / `hiddenColumns` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
+| [`groupRows`](/docs/api/core/grid/#grid-group-rows) / `ungroupRows` / `setGroupCollapsed` / `rowGroups` | Inclusive data-row groups with collapse state. |
+| [`clearView()`](/docs/api/core/grid/#grid-clear-view) | Clears sort/filter state; hidden rows and row groups remain. |
+
+### Layout and appearance
+
+| Method | Purpose |
+| --- | --- |
+| [`setFrozen(rows, cols?)`](/docs/api/core/grid/#grid-set-frozen) | Pin leading view rows/columns while the body scrolls. |
+| [`setZoom(z)`](/docs/api/core/grid/#grid-set-zoom) / `getZoom()` | Scale grid content between `0.5` and `2` without mutating workbook base sizes. |
+| [`setRowHeight(row, h)`](/docs/api/core/grid/#grid-set-row-height) / `setColumnWidth(col, w)` | Geometry APIs; row height is view-indexed and persists against the underlying data row. |
+| [`autoFitRows(range?)`](/docs/api/core/grid/#grid-auto-fit-rows) / `autoFitColumns(cols?)` | Explicit, undoable geometry fitting from bulk reads; auto-fit never runs during paint. |
+| [`setTheme(partial)`](/docs/api/core/grid/#grid-set-theme) | Merge a partial theme and repaint. |
+| [`defineCellRenderer(name, r)`](/docs/api/core/grid/#grid-define-cell-renderer) | Register a custom renderer after construction. |
+
+### Lifecycle
+
+| Method | Purpose |
+| --- | --- |
+| [`on(evt, fn)`](/docs/api/core/grid/#grid-on) | Subscribe to an event; returns an unsubscribe function. |
+| [`refresh()`](/docs/api/core/grid/#grid-refresh) | Force a re-render (e.g. after mutating the workbook directly). |
+| [`destroy()`](/docs/api/core/grid/#grid-destroy) | Tear down listeners, DOM, and ARIA attributes. |
 
 ## Search
 

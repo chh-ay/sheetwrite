@@ -421,23 +421,24 @@ a {
   font-weight: 680;
 }
 
+/* Inline code is a quiet tint, not a boxed chip: dense API prose has many of
+   them, and borders turn a sentence into a row of buttons. */
 .sw-prose :not(pre) > code {
-  border: 1px solid var(--sw-border);
-  border-radius: 0.28rem;
-  padding: 0.1rem 0.32rem;
+  border-radius: 0.32rem;
+  padding: 0.12em 0.36em;
   color: var(--sw-fg-strong);
-  background: var(--sw-surface-2);
-  font: 0.82em var(--sw-font-mono);
+  background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
+  font: 0.86em var(--sw-font-mono);
 }
 
 /* Linked inline code (entry points, symbol references) must read as a link. */
 .sw-prose a > code {
-  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
   color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 10%, transparent);
 }
 
 .sw-prose a:hover > code {
-  background: color-mix(in srgb, var(--sw-accent) 10%, var(--sw-surface-2));
+  background: color-mix(in srgb, var(--sw-accent) 18%, transparent);
 }
 
 /* Markdown tables sit in a scroll frame (added at build time), so short cells
@@ -445,10 +446,8 @@ a {
    shadow shows only while more columns sit out of view on that side: the
    covers scroll with the content, the shadows stay with the frame. */
 .sw-prose .sw-table-frame {
-  margin: 1.5rem 0 2rem;
+  margin: 1.75rem -0.75rem 2.25rem;
   overflow-x: auto;
-  border: 1px solid var(--sw-border);
-  border-radius: 0.65rem;
   background:
     linear-gradient(to right, var(--sw-surface-1) 40%, transparent) left / 2rem 100% no-repeat local,
     linear-gradient(to left, var(--sw-surface-1) 40%, transparent) right / 2rem 100% no-repeat local,
@@ -467,10 +466,13 @@ a {
   border-collapse: separate;
   border: 1px solid var(--sw-border);
   border-radius: 0.65rem;
-  font-size: 0.82rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
   font-variant-numeric: tabular-nums;
 }
 
+/* Framed Markdown tables are open lists: a strong rule under the header and
+   hairlines between rows, with no outer box. */
 .sw-prose .sw-table-frame > table {
   margin: 0;
   border: 0;
@@ -479,7 +481,7 @@ a {
 
 .sw-prose th,
 .sw-prose td {
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.75rem;
   border-bottom: 1px solid var(--sw-border);
   text-align: left;
   vertical-align: top;
@@ -491,8 +493,19 @@ a {
   font-weight: 680;
 }
 
-/* A break inside a name, value or range reads as two values. */
-.sw-prose .sw-table-frame td code,
+.sw-prose .sw-table-frame th {
+  padding-block: 0.55rem;
+  border-bottom-color: var(--sw-border-strong);
+  color: var(--sw-fg-muted);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A break inside a name, value or range reads as two values. Longer cells
+   (signatures, sentences) wrap at spaces so the prose column stays readable. */
 .sw-prose .sw-table-frame .sw-cell-short {
   white-space: nowrap;
 }
@@ -502,7 +515,7 @@ a {
 }
 
 .sw-prose tbody tr:hover {
-  background: color-mix(in srgb, var(--sw-surface-2) 60%, transparent);
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
 }
 
 .sw-prose tr:last-child td {
@@ -510,33 +523,47 @@ a {
 }
 
 .sw-prose blockquote {
-  margin: 1.5rem 0;
+  margin: 1.75rem 0;
   border-left: 3px solid var(--sw-accent);
-  padding: 0.15rem 1rem;
-  color: var(--sw-fg-muted);
-  background: color-mix(in srgb, var(--sw-accent) 6%, transparent);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.75rem 1.1rem;
+  color: var(--sw-fg);
+  background: color-mix(in srgb, var(--sw-accent) 7%, transparent);
 }
 
-.sw-prose .expressive-code {
-  margin-block: 1.5rem 2rem;
+.sw-prose blockquote > :first-child {
+  margin-top: 0;
 }
 
-.sw-prose .expressive-code .frame {
-  box-shadow: none;
+.sw-prose blockquote > :last-child {
+  margin-bottom: 0;
 }
 
-/* The copy control rests dimmed so it does not compete with the code; hover
-   and focus bring it to full strength so it reads as clickable. */
+/* The copy control appears with the pointer or keyboard focus, so a page of
+   examples does not carry a column of icons. Touch screens always show it. */
 .sw-prose .expressive-code .copy button {
+  width: 2rem;
+  height: 2rem;
+  opacity: 0;
   transition:
     opacity 140ms ease,
     background-color 140ms ease;
 }
 
-.sw-prose .expressive-code .copy button:hover,
+.sw-prose .expressive-code .frame:hover .copy button,
 .sw-prose .expressive-code .copy button:focus-visible {
+  opacity: 0.8;
+}
+
+.sw-prose .expressive-code .copy button:hover {
   opacity: 1;
   background-color: var(--sw-surface-2);
+}
+
+@media (hover: none) {
+  .sw-prose .expressive-code .copy button {
+    opacity: 0.7;
+  }
 }
 
 .sw-tabs {
@@ -687,13 +714,15 @@ body .sw-code-popover__tag-link:hover {
   box-shadow: none;
 }
 
+/* The code sits one step below the page surface in both themes, and the title
+   strip shares that surface so the frame reads as one object. */
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header {
-  min-height: 2.5rem;
+  min-height: 2.4rem;
   align-items: center;
   justify-content: flex-start;
   padding-inline: 1rem;
   border-bottom: 1px solid var(--sw-border);
-  background: var(--sw-surface-2);
+  background: var(--sw-surface-0);
 }
 
 .sw-prose .expressive-code figure.frame.has-title > figcaption.header::before,
@@ -717,8 +746,11 @@ body .sw-code-popover__tag-link:hover {
 
 .sw-prose .expressive-code pre {
   max-width: 100%;
-  font-size: 0.82rem;
-  line-height: 1.68;
+  border: 0;
+  border-radius: 0;
+  background: var(--sw-surface-0);
+  font-size: 0.84rem;
+  line-height: 1.7;
 }
 
 /* Generated API reference. These rules intentionally sit after the shared
@@ -1376,13 +1408,14 @@ body .sw-code-popover__tag-link:hover {
   }
 }
 
-/* Hover tiers: documented/reference symbols carry the accent underline; plain
-   type reveals stay quiet so the page doesn't read as a wall of squiggles. */
+/* Hover tiers: documented/reference symbols carry a dotted accent underline;
+   plain type reveals stay fainter. A wavy line reads as a spelling error, so
+   no tier uses it. */
 .sw-prose .sw-code-popover__trigger {
   border-radius: 0.2rem;
-  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 65%, transparent);
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-fg-dim) 40%, transparent);
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  text-underline-offset: 0.25em;
   cursor: help;
   outline: none;
   transition:
@@ -1393,8 +1426,8 @@ body .sw-code-popover__tag-link:hover {
 
 .sw-prose .sw-code-popover__trigger[data-hover-kind="documented"],
 .sw-prose .sw-code-popover__trigger[data-hover-kind="reference"] {
-  text-decoration: underline wavy color-mix(in srgb, var(--sw-accent) 72%, transparent);
-  text-decoration-thickness: 1px;
+  text-decoration: underline dotted color-mix(in srgb, var(--sw-accent) 55%, transparent);
+  text-decoration-thickness: 1.5px;
 }
 
 .sw-prose .sw-code-popover__trigger:hover,
@@ -2469,6 +2502,74 @@ body .sw-code-popover__accessible-signature {
   margin: 0;
   color: var(--sw-fg-muted);
   font-size: 0.85rem;
+}
+
+@media (max-width: 30rem) {
+  .bench-meta div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* Headline numbers: the value leads, the label explains it below. */
+.bench-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.bench-stats > div {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--sw-surface-0);
+}
+
+.bench-stats dt {
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.bench-stats dd {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: 650 1.35rem / 1.2 var(--sw-font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Supporting evidence stays on the page but closed, so the section reads as
+   its result first. */
+.bench-all {
+  margin: 1.5rem 0 2rem;
+  border-block: 1px solid var(--sw-border);
+}
+
+.bench-all > summary {
+  padding: 0.8rem 0;
+  color: var(--sw-fg-strong);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: color 140ms ease;
+}
+
+.bench-all > summary:hover {
+  color: var(--sw-accent-strong);
+}
+
+.bench-all[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+.bench-all > :last-child {
+  margin-bottom: 1.25rem;
 }
 
 .bench-viz__row {

@@ -51,6 +51,21 @@ import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
 import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
+import {
+  allMeasurements,
+  capitalized,
+  evidenceHeadline,
+  formatCaptureTime,
+  formatCount,
+  formatMb,
+  formatMs,
+  formatRatio,
+  html,
+  provenanceList,
+  reductionText,
+  shortHash,
+  speedupText,
+} from "./evidence-format.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
   renderFullEngineEvidence,
@@ -379,13 +394,6 @@ interface DeclarationShape {
   variants: string[];
 }
 
-function html(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 interface DocumentationLinkCandidate {
   readonly packageName: string;
   readonly entry: ApiEntryPoint;
@@ -1729,17 +1737,6 @@ const BENCH_SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
 const BENCH_ENGINE_LABELS = { sheetwrite: "Sheetwrite", handsontable: "Handsontable" } as const;
 type BenchEngine = keyof typeof BENCH_ENGINE_LABELS;
 
-function fmtMs(value: number): string {
-  // "0.00 ms" reads like a broken benchmark; sub-hundredth values are real
-  // measurements in the microsecond range.
-  if (value > 0 && value < 0.0095) return `${Math.max(1, Math.round(value * 1000))} µs`;
-  return `${value.toFixed(value < 10 ? 2 : 1)} ms`;
-}
-
-function fmtMb(value: number): string {
-  return `${(value / 1_000_000).toFixed(1)} MB`;
-}
-
 function fmtRows(rows: number): string {
   return rows >= 1_000_000 ? `${rows / 1_000_000}M` : `${rows / 1_000}k`;
 }
@@ -2011,7 +2008,7 @@ function benchScaleFigure(
 ): string[] {
   const scale = benchLogScale(
     groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
-    fmtMs,
+    formatMs,
   );
   const lines = [
     `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
@@ -2032,7 +2029,7 @@ function benchScaleFigure(
           `<span class="bench-bar__track" aria-hidden="true">` +
           `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
           `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
-          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${fmtMs(entry.median)}</b><b class="bench-num" data-stat="p95">${fmtMs(entry.p95)}</b></span>` +
+          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatMs(entry.median)}</b><b class="bench-num" data-stat="p95">${formatMs(entry.p95)}</b></span>` +
           `</div>`,
       );
     }
@@ -2103,17 +2100,17 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
     }
     const speedScale = benchLogScale(
       speedPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main, s.faded] : []))),
-      fmtMs,
+      formatMs,
     );
     const memoryScale = benchLinearScale(
       memoryPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main] : []))),
-      fmtMb,
+      formatMb,
     );
     const speedRows = speedPairs.map(([scenario, a, b]) =>
-      benchPairRow(scenario, a, b, fmtMs, ["faster", "slower"], speedScale.pct),
+      benchPairRow(scenario, a, b, formatMs, ["faster", "slower"], speedScale.pct),
     );
     const memoryRows = memoryPairs.map(([scenario, a, b]) =>
-      benchPairRow(scenario, a, b, fmtMb, ["leaner", "heavier"], memoryScale.pct, false),
+      benchPairRow(scenario, a, b, formatMb, ["leaner", "heavier"], memoryScale.pct, false),
     );
     parts.push(
       benchPanel(
@@ -2163,10 +2160,6 @@ type CapturedEvidence =
   | { evidence: { meta?: CaptureMeta; metadata?: CaptureMeta }; source: string }
   | EvidenceState;
 
-function formatCaptureTime(timestamp: string): string {
-  return timestamp.slice(0, 16).replace("T", " ");
-}
-
 /**
  * Release captures run before the version bump, so they record the previous
  * release's package version. Each entry maps such a capture commit to the
@@ -2207,12 +2200,14 @@ function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
     return [
       "## Capture",
       "",
-      '<dl class="bench-meta" data-pagefind-ignore>',
-      `<div><dt>Captured</dt><dd>${window} UTC</dd></div>`,
-      `<div><dt>Commit</dt><dd><code>${first.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Artifacts</dt><dd>${captures.length} validated captures from that one commit; each section states its own environment (browser or runtime) and protocol</dd></div>`,
-      "</dl>",
-      "",
+      ...provenanceList([
+        ["Captured", `${window} UTC`],
+        ["Commit", `${shortHash(first.meta.commit)} clean worktree`],
+        [
+          "Artifacts",
+          `${captures.length} validated captures from that one commit; each section states its own environment (browser or runtime) and protocol`,
+        ],
+      ]),
     ];
   }
   const vintages = [...captures].sort(
@@ -2229,7 +2224,7 @@ function renderCaptureHeader(captures: readonly EvidenceCapture[]): string[] {
     "| --- | --- | --- | --- |",
     ...vintages.map(
       (capture) =>
-        `| ${capture.label} | \`${capture.source}\` | <code>${capture.meta.commit.slice(0, 12)}</code> | ${formatCaptureTime(capture.meta.timestamp)} UTC |`,
+        `| ${capture.label} | \`${capture.source}\` | ${shortHash(capture.meta.commit)} | ${formatCaptureTime(capture.meta.timestamp)} UTC |`,
     ),
     "",
   ];
@@ -2292,62 +2287,104 @@ function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
 /** Markdown table cells cannot carry a raw pipe. */
 const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
 
+/** Core write-path scenarios that lead the section; the rest stay in the table. */
+const CORE_PATH_HEADLINES = [
+  "setblock-admission",
+  "csv-import",
+  "undo-large-clear",
+  "node-cold-init",
+] as const;
+
+/**
+ * "one fromCsv import of …" reads as a label without the leading count. The
+ * first word can be an identifier, so its case stays as written.
+ */
+function scenarioLabel(unit: string): string {
+  return unit.replace(/^one /u, "");
+}
+
 /**
  * Core write-path evidence: packed block writes, CSV import, large restore,
  * and paged residency work. Every scenario carries the checkpoint it proved,
  * so a timing is never published alone.
  */
 function renderCorePathsSection(evidence: CorePathsEvidence, source: string): string[] {
-  const counters = evidence.scenarios.filter(
-    (scenario) => Object.keys(scenario.counters).length > 0,
+  const headlines = CORE_PATH_HEADLINES.flatMap((id) => {
+    const scenario = evidence.scenarios.find((candidate) => candidate.id === id);
+    return scenario === undefined
+      ? []
+      : [{ value: formatMs(scenario.timing.median), label: scenarioLabel(scenario.unit) }];
+  });
+  const counters = evidence.scenarios.flatMap((scenario) =>
+    Object.entries(scenario.counters).map(
+      ([name, value]) => `| \`${scenario.id}\` | \`${name}\` | ${formatCount(value)} |`,
+    ),
   );
   return [
     "## Core write path",
     "",
-    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes; every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
+    `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
-    '<dl class="bench-meta" data-pagefind-ignore>',
-    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
-    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node compatibility ${evidence.toolchain.nodeCompat} · ${html(evidence.toolchain.cpu)}</dd></div>`,
-    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
-    "</dl>",
-    "",
-    `Scale: ${Object.entries(evidence.scale)
-      .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
-      .join(", ")}.`,
-    "",
-    "| Scenario | One timed iteration | Median | p95 | Samples |",
-    "| --- | --- | ---: | ---: | ---: |",
+    ...evidenceHeadline(headlines),
+    "| Scenario | One timed iteration | Median | p95 |",
+    "| --- | --- | ---: | ---: |",
     ...evidence.scenarios.flatMap((scenario) => [
-      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${fmtMs(scenario.timing.median)} | ${fmtMs(scenario.timing.p95)} | ${scenario.timing.iters} |`,
+      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
       ...(scenario.variants ?? []).map(
         (variant) =>
-          `| \`${scenario.id}:${variant.id}\` | variant measured in the same run | ${fmtMs(variant.timing.median)} | ${fmtMs(variant.timing.p95)} | ${variant.timing.iters} |`,
+          `| \`${variant.id}\` | Variant of \`${scenario.id}\`, measured in the same run | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
       ),
     ]),
     "",
-    ...(counters.length === 0
-      ? []
-      : [
-          "Counters recorded by the same runs (non-time evidence):",
-          "",
-          ...counters.map(
-            (scenario) =>
-              `- \`${scenario.id}\` — ${Object.entries(scenario.counters)
-                .map(([name, value]) => `${name}=${value.toLocaleString("en-US")}`)
-                .join(", ")}`,
-          ),
-          "",
-        ]),
-    "<details><summary>Per-scenario correctness checkpoint</summary>",
-    "",
-    ...evidence.scenarios.map(
-      (scenario) => `- \`${scenario.id}\` — ${markdownCell(scenario.validation)}`,
-    ),
-    "",
-    "</details>",
-    "",
+    ...allMeasurements([
+      ...provenanceList([
+        ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
+        ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
+        [
+          "Environment",
+          `Bun ${html(evidence.toolchain.bun)} · Node compatibility ${html(evidence.toolchain.nodeCompat)} · ${html(evidence.toolchain.cpu)}`,
+        ],
+        ["Raw artifact", `<code>${html(source)}</code>`],
+      ]),
+      "#### Scale",
+      "",
+      "| Parameter | Value |",
+      "| --- | ---: |",
+      ...Object.entries(evidence.scale).map(
+        ([name, value]) => `| \`${name}\` | ${formatCount(value)} |`,
+      ),
+      "",
+      "#### Samples",
+      "",
+      "| Scenario | Samples |",
+      "| --- | ---: |",
+      ...evidence.scenarios.flatMap((scenario) => [
+        `| \`${scenario.id}\` | ${scenario.timing.iters} |`,
+        ...(scenario.variants ?? []).map(
+          (variant) => `| \`${variant.id}\` | ${variant.timing.iters} |`,
+        ),
+      ]),
+      "",
+      ...(counters.length === 0
+        ? []
+        : [
+            "#### Counters",
+            "",
+            "Non-time evidence recorded by the same runs.",
+            "",
+            "| Scenario | Counter | Value |",
+            "| --- | --- | ---: |",
+            ...counters,
+            "",
+          ]),
+      "#### Correctness checkpoints",
+      "",
+      "| Scenario | Checkpoint |",
+      "| --- | --- |",
+      ...evidence.scenarios.map(
+        (scenario) => `| \`${scenario.id}\` | ${markdownCell(scenario.validation)} |`,
+      ),
+    ]),
     "Reproduce with:",
     "",
     '```sh verify title="Core write-path evidence"',
@@ -2375,19 +2412,44 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
         summary.scenario === scenario,
     );
   const baselineCommit = evidence.toolchain.baselineCommit;
+  const operations = [...new Set(evidence.comparisons.map((comparison) => comparison.operation))];
+  const headlines = operations.flatMap((operation) => {
+    const compared = evidence.comparisons.filter(
+      (comparison) => comparison.operation === operation,
+    );
+    const scope = compared.length === 1 ? operation : `${operation}, ${compared.length} scenarios`;
+    return [
+      {
+        value: speedupText(compared.map((comparison) => comparison.medianWallRatio)),
+        label: `${capitalized(scope)}: time`,
+      },
+      {
+        value: reductionText(compared.map((comparison) => comparison.peakRssRatio)),
+        label: `${capitalized(scope)}: peak memory`,
+      },
+    ];
+  });
+  const provenance = provenanceList([
+    ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
+    ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
+    [
+      "Engines",
+      `${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)}${baselineCommit === undefined ? "" : ` at baseline ${shortHash(baselineCommit)}`}`,
+    ],
+    [
+      "Fixture",
+      `<code>${html(evidence.fixture.path)}</code> · ${formatCount(evidence.fixture.bytes)} bytes · ${shortHash(evidence.fixture.sha256)} · ${html(evidence.fixture.producer)}`,
+    ],
+    [
+      "Environment",
+      `Bun ${html(evidence.toolchain.bun)} · Node ${html(evidence.toolchain.node)} · ${html(evidence.toolchain.cpu)}`,
+    ],
+    ["Raw artifact", `<code>${html(source)}</code>`],
+  ]);
   return [
     "## XLSX codec benchmark",
     "",
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
-    "",
-    '<dl class="bench-meta" data-pagefind-ignore>',
-    `<div><dt>Captured</dt><dd>${formatCaptureTime(evidence.metadata.timestamp)} UTC</dd></div>`,
-    `<div><dt>Commit</dt><dd><code>${evidence.metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-    `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.metadata.engineVersions.sheetwrite, evidence.metadata.commit)} · ExcelJS ${html(evidence.metadata.engineVersions.exceljs)} at baseline <code title="${html(baselineCommit ?? "")}">${html((baselineCommit ?? "").slice(0, 12))}</code></dd></div>`,
-    `<div><dt>Fixture</dt><dd><code>${evidence.fixture.path}</code> · ${evidence.fixture.bytes.toLocaleString("en-US")} bytes · <code>${evidence.fixture.sha256.slice(0, 12)}</code> · ${html(evidence.fixture.producer)}</dd></div>`,
-    `<div><dt>Environment</dt><dd>Bun ${evidence.toolchain.bun} · Node ${evidence.toolchain.node} · ${html(evidence.toolchain.cpu)}</dd></div>`,
-    `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
-    "</dl>",
     "",
     ...(baselineCommit === undefined
       ? [
@@ -2399,24 +2461,35 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
             .filter((summary) => summary.engine === "current")
             .map(
               (summary) =>
-                `| ${summary.operation} | ${summary.scenario} | ${fmtMs(summary.durationMs.median)} | ${fmtMs(summary.durationMs.p95)} | ${fmtMb(summary.maxRssBytes.max)} |`,
+                `| ${summary.operation} | ${summary.scenario} | ${formatMs(summary.durationMs.median)} | ${formatMs(summary.durationMs.p95)} | ${formatMb(summary.maxRssBytes.max)} |`,
             ),
           "",
+          ...allMeasurements(provenance),
         ]
       : [
-          `The baseline codec is the same operation at commit <code>${baselineCommit.slice(0, 12)}</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster.`,
+          ...evidenceHeadline(headlines),
+          `The baseline is the same codec at commit ${shortHash(baselineCommit)}, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster or smaller.`,
           "",
-          "| Operation | Scenario | Current median | Baseline median | Ratio | Current peak RSS | Baseline peak RSS | RSS ratio |",
-          "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-          ...evidence.comparisons.flatMap((comparison) => {
-            const current = summaryFor("current", comparison.operation, comparison.scenario);
-            const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
-            if (current === undefined || baseline === undefined) return [];
-            return [
-              `| ${comparison.operation} | ${comparison.scenario} | ${fmtMs(current.durationMs.median)} | ${fmtMs(baseline.durationMs.median)} | ${comparison.medianWallRatio.toFixed(2)}× | ${fmtMb(current.maxRssBytes.max)} | ${fmtMb(baseline.maxRssBytes.max)} | ${comparison.peakRssRatio.toFixed(2)}× |`,
-            ];
-          }),
+          "| Operation | Scenario | Time ratio | Peak memory ratio |",
+          "| --- | --- | ---: | ---: |",
+          ...evidence.comparisons.map(
+            (comparison) =>
+              `| ${comparison.operation} | ${comparison.scenario} | ${formatRatio(comparison.medianWallRatio)} | ${formatRatio(comparison.peakRssRatio)} |`,
+          ),
           "",
+          ...allMeasurements([
+            ...provenance,
+            "| Operation | Scenario | Current median | Baseline median | Current peak RSS | Baseline peak RSS |",
+            "| --- | --- | ---: | ---: | ---: | ---: |",
+            ...evidence.comparisons.flatMap((comparison) => {
+              const current = summaryFor("current", comparison.operation, comparison.scenario);
+              const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
+              if (current === undefined || baseline === undefined) return [];
+              return [
+                `| ${comparison.operation} | ${comparison.scenario} | ${formatMs(current.durationMs.median)} | ${formatMs(baseline.durationMs.median)} | ${formatMb(current.maxRssBytes.max)} | ${formatMb(baseline.maxRssBytes.max)} |`,
+              ];
+            }),
+          ]),
         ]),
     "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
@@ -2542,14 +2615,19 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "",
       "Both engines drive identical scripted interactions in a controlled browser. Pick a workbook size and a metric:",
       "",
-      '<dl class="bench-meta" data-pagefind-ignore>',
-      `<div><dt>Captured</dt><dd>${metadata.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
-      `<div><dt>Commit</dt><dd><code>${metadata.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Engines</dt><dd>${sheetwriteLabel(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}</dd></div>`,
-      `<div><dt>Environment</dt><dd>Bun ${html(metadata.bunVersion)} · Node compatibility ${html(metadata.nodeVersion)} · Chromium ${metadata.browserVersion} · ${html(metadata.cpu)}</dd></div>`,
-      `<div><dt>Protocol</dt><dd>${metadata.rounds} rounds · raw artifact <code>${source}</code></dd></div>`,
-      "</dl>",
-      "",
+      ...provenanceList([
+        ["Captured", `${formatCaptureTime(metadata.timestamp)} UTC`],
+        ["Commit", `${shortHash(metadata.commit)} clean worktree`],
+        [
+          "Engines",
+          `${sheetwriteLabel(metadata.engineVersions.sheetwrite, metadata.commit)} · Handsontable ${html(metadata.engineVersions.handsontable)}`,
+        ],
+        [
+          "Environment",
+          `Bun ${html(metadata.bunVersion)} · Node compatibility ${html(metadata.nodeVersion)} · Chromium ${html(metadata.browserVersion)} · ${html(metadata.cpu)}`,
+        ],
+        ["Protocol", `${metadata.rounds} rounds · raw artifact <code>${html(source)}</code>`],
+      ]),
       renderBenchWidget(evidence),
       ...renderFailureTable(evidence),
       "",
@@ -2591,14 +2669,16 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     lines.push(
       `<div class="evidence-available"><strong>Validated evidence.</strong> Head-to-head store operations at the sizes both engines complete headlessly; Sheetwrite additionally scales to 1M rows below.</div>`,
       "",
-      '<dl class="bench-meta" data-pagefind-ignore>',
-      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
-      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Engines</dt><dd>${sheetwriteLabel(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}</dd></div>`,
-      `<div><dt>Environment</dt><dd>Bun ${html(evidence.meta.bun)}</dd></div>`,
-      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
-      "</dl>",
-      "",
+      ...provenanceList([
+        ["Captured", `${formatCaptureTime(evidence.meta.timestamp)} UTC`],
+        ["Commit", `${shortHash(evidence.meta.commit)} clean worktree`],
+        [
+          "Engines",
+          `${sheetwriteLabel(evidence.meta.engineVersions.sheetwrite, evidence.meta.commit)} · Handsontable ${html(evidence.meta.engineVersions.handsontable)}`,
+        ],
+        ["Environment", `Bun ${html(evidence.meta.bun)}`],
+        ["Raw artifact", `<code>${html(source)}</code>`],
+      ]),
       '<figure class="bench-viz bench-widget bench-widget--data" data-pagefind-ignore>',
       // Uncontrolled radios (a checked attr would make hydrated React revert
       // user toggles); the 10k default lives in CSS fallbacks.
@@ -2619,7 +2699,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
         ops.flatMap((op) =>
           [ours.stats[op], theirs.stats[op]].flatMap((s) => (s ? [s.median, s.p95] : [])),
         ),
-        fmtMs,
+        formatMs,
       );
       lines.push(
         `<section class="bench-panel bench-ruled" data-size="${rows}" data-metric="speed" style="--bench-segs:${scale.segments}">`,
@@ -2635,7 +2715,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
             op,
             { main: a.median, faded: a.p95 },
             { main: b.median, faded: b.p95 },
-            fmtMs,
+            formatMs,
             ["faster", "slower"],
             scale.pct,
           ),
@@ -2693,12 +2773,11 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     lines.push(
       `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.workloads.length} recalculation workloads across dependency shapes; every workload passed the protocol's safety ceilings.</div>`,
       "",
-      '<dl class="bench-meta" data-pagefind-ignore>',
-      `<div><dt>Captured</dt><dd>${evidence.meta.timestamp.slice(0, 16).replace("T", " ")} UTC</dd></div>`,
-      `<div><dt>Commit</dt><dd><code>${evidence.meta.commit.slice(0, 12)}</code> clean worktree</dd></div>`,
-      `<div><dt>Raw artifact</dt><dd><code>${source}</code></dd></div>`,
-      "</dl>",
-      "",
+      ...provenanceList([
+        ["Captured", `${formatCaptureTime(evidence.meta.timestamp)} UTC`],
+        ["Commit", `${shortHash(evidence.meta.commit)} clean worktree`],
+        ["Raw artifact", `<code>${html(source)}</code>`],
+      ]),
     );
 
     // The scalar-edit-affects-N workloads are one scaling series (recompute

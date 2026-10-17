@@ -24,7 +24,7 @@ The main-thread pause scales with resident cells and compact history, so do not 
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:18 → 2026-10-17 08:11 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Artifacts</dt><dd>7 validated captures from that one commit; each section states its own environment (browser or runtime) and protocol</dd></div>
 </dl>
 
@@ -55,7 +55,7 @@ Both engines drive identical scripted interactions in a controlled browser. Pick
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:18 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Engines</dt><dd>Sheetwrite 0.5.0 release candidate · Handsontable 18.1.2</dd></div>
 <div><dt>Environment</dt><dd>Bun 1.4.3 · Node compatibility 26.3.0 · Chromium 153.0.8010.12 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
 <div><dt>Protocol</dt><dd>10 rounds · raw artifact <code>bench/results/render-scale.json</code></dd></div>
@@ -729,7 +729,7 @@ bun run --filter @sheetwrite/bench bench:resource
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:24 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Engines</dt><dd>Sheetwrite 0.5.0 release candidate · Handsontable 18.1.2</dd></div>
 <div><dt>Environment</dt><dd>Bun 1.4.3</dd></div>
 <div><dt>Raw artifact</dt><dd><code>bench/results/data-results.json</code></dd></div>
@@ -784,7 +784,7 @@ bun run --filter @sheetwrite/bench bench:resource
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>ingest</code><span class="bench-viz__ratio"><strong>478.6×</strong> faster</span></div>
 <div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:46.34%"></i><i class="bench-bar__fill" style="width:44.79%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.87 ms</b><b class="bench-num" data-stat="p95">6.03 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:93.82%"></i><i class="bench-bar__fill" style="width:89.46%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2330.4 ms</b><b class="bench-num" data-stat="p95">4259.9 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:93.82%"></i><i class="bench-bar__fill" style="width:89.46%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2,330.4 ms</b><b class="bench-num" data-stat="p95">4,259.9 ms</b></span></div>
 </div>
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>windowRead</code><span class="bench-viz__ratio"><strong>16.2×</strong> faster</span></div>
@@ -794,17 +794,17 @@ bun run --filter @sheetwrite/bench bench:resource
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>edit</code><span class="bench-viz__ratio"><strong>150.1×</strong> faster</span></div>
 <div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:44.75%"></i><i class="bench-bar__fill" style="width:42.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3.57 ms</b><b class="bench-num" data-stat="p95">4.84 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.54%"></i><i class="bench-bar__fill" style="width:78.81%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">535.3 ms</b><b class="bench-num" data-stat="p95">1181.4 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.54%"></i><i class="bench-bar__fill" style="width:78.81%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">535.3 ms</b><b class="bench-num" data-stat="p95">1,181.4 ms</b></span></div>
 </div>
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>sort</code><span class="bench-viz__ratio"><strong>11379.1×</strong> faster</span></div>
 <div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:23.34%"></i><i class="bench-bar__fill" style="width:22.32%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.22 ms</b><b class="bench-num" data-stat="p95">0.25 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:90.17%"></i><i class="bench-bar__fill" style="width:89.92%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2484.8 ms</b><b class="bench-num" data-stat="p95">2571.9 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:90.17%"></i><i class="bench-bar__fill" style="width:89.92%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2,484.8 ms</b><b class="bench-num" data-stat="p95">2,571.9 ms</b></span></div>
 </div>
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>filter</code><span class="bench-viz__ratio"><strong>25557.3×</strong> faster</span></div>
 <div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Sheetwrite</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:9.67%"></i><i class="bench-bar__fill" style="width:9.17%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.04 ms</b><b class="bench-num" data-stat="p95">0.04 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:86.16%"></i><i class="bench-bar__fill" style="width:82.63%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">907.5 ms</b><b class="bench-num" data-stat="p95">1477.1 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Handsontable</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:86.16%"></i><i class="bench-bar__fill" style="width:82.63%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">907.5 ms</b><b class="bench-num" data-stat="p95">1,477.1 ms</b></span></div>
 </div>
 <div class="bench-viz__row" data-outcome="faster">
 <div class="bench-viz__head"><code>aggregate</code><span class="bench-viz__ratio"><strong>20.3×</strong> faster</span></div>
@@ -881,63 +881,143 @@ bun run --filter @sheetwrite/bench bench:data
 
 ## Core write path
 
-<div class="evidence-available"><strong>Validated evidence.</strong> 12 store and document scenarios at production sizes; every scenario passed its own correctness checkpoint before its timing was accepted.</div>
+<div class="evidence-available"><strong>Validated evidence.</strong> 12 store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>
+
+<dl class="bench-stats" data-pagefind-ignore>
+<div><dt>Grid.applyTransaction of a 1,000,000-cell setBlock</dt><dd>488.7 ms</dd></div>
+<div><dt>fromCsv import of 200,000 rows by 10 columns</dt><dd>234.6 ms</dd></div>
+<div><dt>undo of a 1,000,000-cell clearRange</dt><dd>1,609.1 ms</dd></div>
+<div><dt>cold initSheetwrite() through first store in a fresh Node process (7 processes)</dt><dd>4.24 ms</dd></div>
+</dl>
+
+| Scenario | One timed iteration | Median | p95 |
+| --- | --- | ---: | ---: |
+| `row-bridge-insert` | one addRows projection of 10,000 rows into a 1,000,000-row bridge | 5.95 ms | 6.30 ms |
+| `command-state-select` | one 4,096-cell range selection on a framework-style grid | 6.71 ms | 8.84 ms |
+| `with-command-state-handler` | Variant of `command-state-select`, measured in the same run | 6.71 ms | 8.84 ms |
+| `without-command-state-handler` | Variant of `command-state-select`, measured in the same run | 5.07 ms | 5.75 ms |
+| `setblock-admission` | one Grid.applyTransaction of a 1,000,000-cell setBlock | 488.7 ms | 503.5 ms |
+| `setblock-detailed-capture` | one Grid.applyTransaction of a 1,000,000-cell setBlock observed through a change listener with detailed capture | 564.4 ms | 568.2 ms |
+| `sync-offline-queue` | one grid commit admitted into an offline sync queue with no listeners | 0.67 ms | 0.80 ms |
+| `rebase-large` | one rebase of a 100,000-cell block across 50 single-row inserts | 1.54 ms | 1.54 ms |
+| `validation-sparse` | one 100,000-cell sparse setRange with 100 rules outside the range | 168.9 ms | 169.4 ms |
+| `csv-import` | one fromCsv import of 200,000 rows by 10 columns | 234.6 ms | 235.3 ms |
+| `undo-large-clear` | one undo of a 1,000,000-cell clearRange | 1,609.1 ms | 1,621.4 ms |
+| `restore-near-ceiling` | one restoreBlock with 60000044 decoded bytes | 1,060.1 ms | 1,069.8 ms |
+| `paged-evicted-revisit` | one revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric) | 5.86 ms | 6.97 ms |
+| `node-cold-init` | one cold initSheetwrite() through first store in a fresh Node process (7 processes) | 4.24 ms | 4.58 ms |
+
+<details class="bench-all"><summary>All measurements</summary>
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:24 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Environment</dt><dd>Bun 1.4.3 · Node compatibility v26.3.0 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
 <div><dt>Raw artifact</dt><dd><code>bench/results/core-paths-results.json</code></dd></div>
 </dl>
 
-Scale: bridgeRows=1,000,000, bridgeInsertRows=10,000, selectionRows=64, selectionColumns=64, blockRows=1,000, blockColumns=1,000, offlineCommits=5,000, rebaseBlockRows=1,000, rebaseBlockColumns=100, rebaseInsertOperations=50, sparseCells=100,000, validationRules=100, csvRows=200,000, csvColumns=10, clearRows=1,000, clearColumns=1,000, pagedRows=200,000.
+#### Scale
 
-| Scenario | One timed iteration | Median | p95 | Samples |
-| --- | --- | ---: | ---: | ---: |
-| `row-bridge-insert` | one addRows projection of 10,000 rows into a 1,000,000-row bridge | 5.95 ms | 6.30 ms | 2 |
-| `command-state-select` | one 4,096-cell range selection on a framework-style grid | 6.71 ms | 8.84 ms | 10 |
-| `command-state-select:with-command-state-handler` | variant measured in the same run | 6.71 ms | 8.84 ms | 10 |
-| `command-state-select:without-command-state-handler` | variant measured in the same run | 5.07 ms | 5.75 ms | 10 |
-| `setblock-admission` | one Grid.applyTransaction of a 1,000,000-cell setBlock | 488.7 ms | 503.5 ms | 3 |
-| `setblock-detailed-capture` | one Grid.applyTransaction of a 1,000,000-cell setBlock observed through a change listener with detailed capture | 564.4 ms | 568.2 ms | 3 |
-| `sync-offline-queue` | one grid commit admitted into an offline sync queue with no listeners | 0.67 ms | 0.80 ms | 5000 |
-| `rebase-large` | one rebase of a 100,000-cell block across 50 single-row inserts | 1.54 ms | 1.54 ms | 3 |
-| `validation-sparse` | one 100,000-cell sparse setRange with 100 rules outside the range | 168.9 ms | 169.4 ms | 3 |
-| `csv-import` | one fromCsv import of 200,000 rows by 10 columns | 234.6 ms | 235.3 ms | 2 |
-| `undo-large-clear` | one undo of a 1,000,000-cell clearRange | 1609.1 ms | 1621.4 ms | 3 |
-| `restore-near-ceiling` | one restoreBlock with 60000044 decoded bytes | 1060.1 ms | 1069.8 ms | 3 |
-| `paged-evicted-revisit` | one revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric) | 5.86 ms | 6.97 ms | 3 |
-| `node-cold-init` | one cold initSheetwrite() through first store in a fresh Node process (7 processes) | 4.24 ms | 4.58 ms | 6 |
+| Parameter | Value |
+| --- | ---: |
+| `bridgeRows` | 1,000,000 |
+| `bridgeInsertRows` | 10,000 |
+| `selectionRows` | 64 |
+| `selectionColumns` | 64 |
+| `blockRows` | 1,000 |
+| `blockColumns` | 1,000 |
+| `offlineCommits` | 5,000 |
+| `rebaseBlockRows` | 1,000 |
+| `rebaseBlockColumns` | 100 |
+| `rebaseInsertOperations` | 50 |
+| `sparseCells` | 100,000 |
+| `validationRules` | 100 |
+| `csvRows` | 200,000 |
+| `csvColumns` | 10 |
+| `clearRows` | 1,000 |
+| `clearColumns` | 1,000 |
+| `pagedRows` | 200,000 |
 
-Counters recorded by the same runs (non-time evidence):
+#### Samples
 
-- `row-bridge-insert` — bridgeRows=1,000,000, insertedRows=10,000
-- `command-state-select` — selectedCells=4,096, commandStateEvents=13, withoutHandlerMedianMs=5.073
-- `setblock-admission` — blockCells=1,000,000, transactions=4
-- `setblock-detailed-capture` — blockCells=1,000,000, transactions=4, capturedChanges=1,000,000, validatedCapturedChanges=1,000,000
-- `sync-offline-queue` — queuedCommits=5,005, admittedOperations=5,005
-- `rebase-large` — blockCells=100,000, insertOperations=50, verifiedValues=100,000
-- `validation-sparse` — writtenCells=100,000, logicalRangeCells=1,000,000, validationRules=100
-- `csv-import` — importedRows=200,000, importedColumns=10, verifiedCells=2,000,000, inputChars=20,888,985
-- `undo-large-clear` — clearedCells=1,000,000, clears=4, restoredCells=1,000,000, compactRestores=5, peakRssBytes=1,143,246,848
-- `restore-near-ceiling` — restoredCells=4,000,000, decodedBytes=60,000,044, peakRssBytes=1,509,625,856
-- `paged-evicted-revisit` — revisitedRows=3, areColumnsFullyLoadedCalls=108, evictionVisits=3, pagedRows=200,000
-- `node-cold-init` — largestHeartbeatGapMs=3.73, minimalHeartbeatTicks=1, freshProcesses=7
+| Scenario | Samples |
+| --- | ---: |
+| `row-bridge-insert` | 2 |
+| `command-state-select` | 10 |
+| `with-command-state-handler` | 10 |
+| `without-command-state-handler` | 10 |
+| `setblock-admission` | 3 |
+| `setblock-detailed-capture` | 3 |
+| `sync-offline-queue` | 5000 |
+| `rebase-large` | 3 |
+| `validation-sparse` | 3 |
+| `csv-import` | 2 |
+| `undo-large-clear` | 3 |
+| `restore-near-ceiling` | 3 |
+| `paged-evicted-revisit` | 3 |
+| `node-cold-init` | 6 |
 
-<details><summary>Per-scenario correctness checkpoint</summary>
+#### Counters
 
-- `row-bridge-insert` — projected delta is one row-structure insert with every created identity present in the bridge in order
-- `command-state-select` — selection covers 4096 cells and the command-state handler observes one event per selection
-- `setblock-admission` — every setBlock is applied and every cell of the block holds the last written value
-- `setblock-detailed-capture` — every setBlock is applied and every cell of the block holds the last written value, and its change capture reports every cell's address, previous value, and new value exactly once
-- `sync-offline-queue` — every commit is applied, the queue holds every commit at server version 0, and capacity stays available
-- `rebase-large` — the block rebases without conflict, shifts down by exactly the inserted row count, keeps every source value, and leaves the caller's operations untouched
-- `validation-sparse` — every write is applied, probe cells hold the last written values, every rule is retained, and a rule violation is still rejected
-- `csv-import` — row count matches and every imported cell equals the source value for its row and column, including declared number/text types
-- `undo-large-clear` — the clear empties the block and the undos restore every original cell value
-- `restore-near-ceiling` — a valid near-ceiling compressed restore applies its complete block
-- `paged-evicted-revisit` — the band is unloaded before each revisit, the revisit reloads it with the source values, and the revisit asks areColumnsFullyLoaded at least once; areColumnsFullyLoadedCalls per revisit is the accept metric
-- `node-cold-init` — every fresh process loads the module, produces the expected engine result, and reports a plausible heartbeat gap
+Non-time evidence recorded by the same runs.
+
+| Scenario | Counter | Value |
+| --- | --- | ---: |
+| `row-bridge-insert` | `bridgeRows` | 1,000,000 |
+| `row-bridge-insert` | `insertedRows` | 10,000 |
+| `command-state-select` | `selectedCells` | 4,096 |
+| `command-state-select` | `commandStateEvents` | 13 |
+| `command-state-select` | `withoutHandlerMedianMs` | 5.073 |
+| `setblock-admission` | `blockCells` | 1,000,000 |
+| `setblock-admission` | `transactions` | 4 |
+| `setblock-detailed-capture` | `blockCells` | 1,000,000 |
+| `setblock-detailed-capture` | `transactions` | 4 |
+| `setblock-detailed-capture` | `capturedChanges` | 1,000,000 |
+| `setblock-detailed-capture` | `validatedCapturedChanges` | 1,000,000 |
+| `sync-offline-queue` | `queuedCommits` | 5,005 |
+| `sync-offline-queue` | `admittedOperations` | 5,005 |
+| `rebase-large` | `blockCells` | 100,000 |
+| `rebase-large` | `insertOperations` | 50 |
+| `rebase-large` | `verifiedValues` | 100,000 |
+| `validation-sparse` | `writtenCells` | 100,000 |
+| `validation-sparse` | `logicalRangeCells` | 1,000,000 |
+| `validation-sparse` | `validationRules` | 100 |
+| `csv-import` | `importedRows` | 200,000 |
+| `csv-import` | `importedColumns` | 10 |
+| `csv-import` | `verifiedCells` | 2,000,000 |
+| `csv-import` | `inputChars` | 20,888,985 |
+| `undo-large-clear` | `clearedCells` | 1,000,000 |
+| `undo-large-clear` | `clears` | 4 |
+| `undo-large-clear` | `restoredCells` | 1,000,000 |
+| `undo-large-clear` | `compactRestores` | 5 |
+| `undo-large-clear` | `peakRssBytes` | 1,143,246,848 |
+| `restore-near-ceiling` | `restoredCells` | 4,000,000 |
+| `restore-near-ceiling` | `decodedBytes` | 60,000,044 |
+| `restore-near-ceiling` | `peakRssBytes` | 1,509,625,856 |
+| `paged-evicted-revisit` | `revisitedRows` | 3 |
+| `paged-evicted-revisit` | `areColumnsFullyLoadedCalls` | 108 |
+| `paged-evicted-revisit` | `evictionVisits` | 3 |
+| `paged-evicted-revisit` | `pagedRows` | 200,000 |
+| `node-cold-init` | `largestHeartbeatGapMs` | 3.73 |
+| `node-cold-init` | `minimalHeartbeatTicks` | 1 |
+| `node-cold-init` | `freshProcesses` | 7 |
+
+#### Correctness checkpoints
+
+| Scenario | Checkpoint |
+| --- | --- |
+| `row-bridge-insert` | projected delta is one row-structure insert with every created identity present in the bridge in order |
+| `command-state-select` | selection covers 4096 cells and the command-state handler observes one event per selection |
+| `setblock-admission` | every setBlock is applied and every cell of the block holds the last written value |
+| `setblock-detailed-capture` | every setBlock is applied and every cell of the block holds the last written value, and its change capture reports every cell's address, previous value, and new value exactly once |
+| `sync-offline-queue` | every commit is applied, the queue holds every commit at server version 0, and capacity stays available |
+| `rebase-large` | the block rebases without conflict, shifts down by exactly the inserted row count, keeps every source value, and leaves the caller's operations untouched |
+| `validation-sparse` | every write is applied, probe cells hold the last written values, every rule is retained, and a rule violation is still rejected |
+| `csv-import` | row count matches and every imported cell equals the source value for its row and column, including declared number/text types |
+| `undo-large-clear` | the clear empties the block and the undos restore every original cell value |
+| `restore-near-ceiling` | a valid near-ceiling compressed restore applies its complete block |
+| `paged-evicted-revisit` | the band is unloaded before each revisit, the revisit reloads it with the source values, and the revisit asks areColumnsFullyLoaded at least once; areColumnsFullyLoadedCalls per revisit is the accept metric |
+| `node-cold-init` | every fresh process loads the module, produces the expected engine result, and reports a plausible heartbeat gap |
 
 </details>
 
@@ -953,7 +1033,7 @@ bun run --filter @sheetwrite/bench bench:core-paths
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 06:43 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Raw artifact</dt><dd><code>bench/results/formula-results.json</code></dd></div>
 </dl>
 
@@ -1171,36 +1251,58 @@ bun run --filter @sheetwrite/bench bench:formula
 
 ### Default and full formula engines
 
-<div class="evidence-available"><strong>Validated evidence.</strong> Eight shared workloads have 25 paired rounds per engine. The full engine also has eight checked analysis workloads.</div>
+<div class="evidence-available"><strong>Validated evidence.</strong> 8 shared workloads have 25 paired rounds per engine. The full engine also has 8 checked analysis workloads.</div>
 
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Matched capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
-<div><dt>Matched commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
-<div><dt>Analysis capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
-<div><dt>Analysis commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
-<div><dt>Machine</dt><dd>12th Gen Intel(R) Core(TM) i9-12900H · Linux 7.2.8-1-cachyos · x64 · Bun 1.4.3</dd></div>
+<dl class="bench-stats" data-pagefind-ignore>
+<div><dt>Shared workloads more than 5% slower on the full engine</dt><dd>0 of 8</dd></div>
+<div><dt>Widest paired-ratio spread</dt><dd>1.32× (limit 1.50×)</dd></div>
+<div><dt>Default engine WASM, Brotli</dt><dd>256,150 B</dd></div>
+<div><dt>Full engine WASM, Brotli</dt><dd>344,260 B</dd></div>
 </dl>
 
 The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.
 
-The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. Those eight rows were checked with matched rounds. Each pair runs default, then full, in separate Bun processes. A timed sample starts with 3 untimed warm-up fixtures and then repeats the workload until at least 50 ms of measured time; the sample is the per-iteration mean, so a short operation is measured over many repetitions instead of one cold run. The runner used CPU 4 and one concurrent capture.
-
 No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows.
+
+| Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| independent-parse-load | 1,000 | 0.68 ms | 0.67 ms | 1.01× | 0.85×–1.12× |
+| independent-first-recompute | 1,000 | 0.64 ms | 0.54 ms | 0.92× | 0.77×–0.98× |
+| independent-parse-load | 10,000 | 6.72 ms | 6.57 ms | 0.94× | 0.87×–1.09× |
+| independent-first-recompute | 10,000 | 6.44 ms | 5.27 ms | 0.85× | 0.76×–0.93× |
+| linear-chain | 8 | 0.01 ms | 0.01 ms | 0.95× | 0.84×–1.09× |
+| wide-fan-out-edit | 1,000 | 0.38 ms | 0.35 ms | 0.93× | 0.79×–1.02× |
+| scalar-edit-affects-0 | 1,000 | 1 µs | 1 µs | 1.00× | 0.95×–1.06× |
+| vlookup-many | 1,000 | 1.59 ms | 1.44 ms | 0.91× | 0.85×–1.02× |
+
+<details class="bench-all"><summary>All measurements</summary>
+
+<dl class="bench-meta" data-pagefind-ignore>
+<div><dt>Matched capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
+<div><dt>Matched commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Analysis capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
+<div><dt>Analysis commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Machine</dt><dd>12th Gen Intel(R) Core(TM) i9-12900H · Linux 7.2.8-1-cachyos · x64 · Bun 1.4.3</dd></div>
+</dl>
+
+#### Method
+
+The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. Those eight rows were checked with matched rounds. Each pair runs default, then full, in separate Bun processes. A timed sample starts with 3 untimed warm-up fixtures and then repeats the workload until at least 50 ms of measured time; the sample is the per-iteration mean, so a short operation is measured over many repetitions instead of one cold run. The runner used CPU 4 and one concurrent capture.
 
 The ratio is full time divided by default time within each pair. The table shows the median of 25 paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time.
 
-Identical shared work is the control for this protocol: the widest paired-ratio p10–p90 span across the eight rows is 1.32× (ceiling 1.50×), so each median ratio is supported by its paired samples.
+Identical shared work is the control for this protocol: the widest paired-ratio p10–p90 span across the 8 rows is 1.32× (limit 1.50×), so each median ratio is supported by its paired samples.
 
-| Shared workload | Size | Default median ms | Full median ms | Paired median ratio | Ratio p10–p90 | Iterations per sample |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| independent-parse-load | 1,000 | 0.6793 | 0.6721 | 1.0053 | 0.8494–1.1206 | 64–84 |
-| independent-first-recompute | 1,000 | 0.6387 | 0.5424 | 0.9163 | 0.7724–0.9760 | 70–101 |
-| independent-parse-load | 10,000 | 6.7159 | 6.5660 | 0.9397 | 0.8725–1.0909 | 7–9 |
-| independent-first-recompute | 10,000 | 6.4404 | 5.2663 | 0.8462 | 0.7637–0.9306 | 7–11 |
-| linear-chain | 8 | 0.0107 | 0.0102 | 0.9453 | 0.8399–1.0920 | 4177–5658 |
-| wide-fan-out-edit | 1,000 | 0.3847 | 0.3483 | 0.9285 | 0.7855–1.0223 | 117–161 |
-| scalar-edit-affects-0 | 1,000 | 0.0006 | 0.0006 | 1.0012 | 0.9513–1.0645 | 81154–96796 |
-| vlookup-many | 1,000 | 1.5854 | 1.4372 | 0.9060 | 0.8484–1.0225 | 28–40 |
+| Shared workload | Iterations per sample |
+| --- | ---: |
+| independent-parse-load | 64–84 |
+| independent-first-recompute | 70–101 |
+| independent-parse-load | 7–9 |
+| independent-first-recompute | 7–11 |
+| linear-chain | 4,177–5,658 |
+| wide-fan-out-edit | 117–161 |
+| scalar-edit-affects-0 | 81,154–96,796 |
+| vlookup-many | 28–40 |
 
 #### Analysis workloads
 
@@ -1208,27 +1310,31 @@ Each workload has 1,000 formulas. It has one untimed warmup and five measured sa
 
 LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.
 
-| Full-only workload | Median ms | p95 ms |
+| Full-only workload | Median | p95 |
 | --- | ---: | ---: |
-| linest | 4.6590 | 7.6987 |
-| xirr | 1.5385 | 1.6036 |
-| dsum | 2.9761 | 4.1562 |
-| textsplit-regexreplace | 3.0747 | 3.2543 |
-| sortby | 3.4891 | 7.2286 |
-| mode-mult | 1.0305 | 1.3118 |
-| map-reduce | 26.7470 | 26.9450 |
-| mmult | 1.3608 | 1.4326 |
+| linest | 4.66 ms | 7.70 ms |
+| xirr | 1.54 ms | 1.60 ms |
+| dsum | 2.98 ms | 4.16 ms |
+| textsplit-regexreplace | 3.07 ms | 3.25 ms |
+| sortby | 3.49 ms | 7.23 ms |
+| mode-mult | 1.03 ms | 1.31 ms |
+| map-reduce | 26.7 ms | 26.9 ms |
+| mmult | 1.36 ms | 1.43 ms |
 
 #### WASM size and Node initialization
 
-| Engine | Node | WASM raw bytes | Brotli q11 bytes | Node cold init median ms | Node cold init p95 ms |
+| Engine | Node | WASM bytes | Brotli q11 bytes | Cold init median | Cold init p95 |
 | --- | --- | ---: | ---: | ---: | ---: |
-| default | v26.9.0 | 876,918 | 256,150 | 4.0333 | 4.4418 |
-| full | v26.9.0 | 1,160,345 | 344,260 | 5.3348 | 5.9168 |
+| default | v26.9.0 | 876,918 | 256,150 | 4.03 ms | 4.44 ms |
+| full | v26.9.0 | 1,160,345 | 344,260 | 5.33 ms | 5.92 ms |
 
 Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.
 
 Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.
+
+The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
+
+</details>
 
 Reproduce after `bun run build:packages`:
 
@@ -1238,30 +1344,47 @@ bun run bench:formula:engines
 bun run bench:formula:matched
 ```
 
-The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
-
 ## XLSX codec benchmark
 
 <div class="evidence-available"><strong>Validated evidence.</strong> 5 compared operations over 5 process-isolated rounds each, from one checked corpus fixture.</div>
 
+<dl class="bench-stats" data-pagefind-ignore>
+<div><dt>Import: time</dt><dd>5.5× faster</dd></div>
+<div><dt>Import: peak memory</dt><dd>91% less</dd></div>
+<div><dt>Export, 4 scenarios: time</dt><dd>1.3–3.7× faster</dd></div>
+<div><dt>Export, 4 scenarios: peak memory</dt><dd>19–47% less</dd></div>
+</dl>
+
+The baseline is the same codec at commit <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster or smaller.
+
+| Operation | Scenario | Time ratio | Peak memory ratio |
+| --- | --- | ---: | ---: |
+| import | combined | 0.18× | 0.09× |
+| export | scalar | 0.78× | 0.76× |
+| export | rich | 0.69× | 0.80× |
+| export | shared-style | 0.74× | 0.53× |
+| export | sparse | 0.27× | 0.81× |
+
+<details class="bench-all"><summary>All measurements</summary>
+
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 08:11 UTC</dd></div>
-<div><dt>Commit</dt><dd><code>49e05e298c3f</code> clean worktree</dd></div>
+<div><dt>Commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
 <div><dt>Engines</dt><dd>Sheetwrite 0.5.0 release candidate · ExcelJS 4.4.0 at baseline <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code></dd></div>
-<div><dt>Fixture</dt><dd><code>bench/fixtures/xlsx-codec-corpus.xlsx</code> · 1,038,346 bytes · <code>2633e51a4a3c</code> · LibreOffice 26.2.4.2 Calc MS Excel 2007 XML</dd></div>
+<div><dt>Fixture</dt><dd><code>bench/fixtures/xlsx-codec-corpus.xlsx</code> · 1,038,346 bytes · <code title="2633e51a4a3caa8d34b2e2147b997c6ebdd0cf514be6e6c60663a0f7659e6e00">2633e51a4a3c</code> · LibreOffice 26.2.4.2 Calc MS Excel 2007 XML</dd></div>
 <div><dt>Environment</dt><dd>Bun 1.4.3 · Node v26.3.0 · 12th Gen Intel(R) Core(TM) i9-12900H</dd></div>
 <div><dt>Raw artifact</dt><dd><code>bench/results/xlsx-results.json</code></dd></div>
 </dl>
 
-The baseline codec is the same operation at commit <code>87fadb723979</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster.
+| Operation | Scenario | Current median | Baseline median | Current peak RSS | Baseline peak RSS |
+| --- | --- | ---: | ---: | ---: | ---: |
+| import | combined | 913.0 ms | 5,033.7 ms | 329.5 MB | 3642.2 MB |
+| export | scalar | 300.9 ms | 384.5 ms | 165.3 MB | 217.2 MB |
+| export | rich | 217.8 ms | 316.8 ms | 151.4 MB | 188.4 MB |
+| export | shared-style | 534.8 ms | 724.2 ms | 163.0 MB | 307.6 MB |
+| export | sparse | 27.5 ms | 102.4 ms | 97.0 MB | 120.1 MB |
 
-| Operation | Scenario | Current median | Baseline median | Ratio | Current peak RSS | Baseline peak RSS | RSS ratio |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| import | combined | 913.0 ms | 5033.7 ms | 0.18× | 329.5 MB | 3642.2 MB | 0.09× |
-| export | scalar | 300.9 ms | 384.5 ms | 0.78× | 165.3 MB | 217.2 MB | 0.76× |
-| export | rich | 217.8 ms | 316.8 ms | 0.69× | 151.4 MB | 188.4 MB | 0.80× |
-| export | shared-style | 534.8 ms | 724.2 ms | 0.74× | 163.0 MB | 307.6 MB | 0.53× |
-| export | sparse | 27.5 ms | 102.4 ms | 0.27× | 97.0 MB | 120.1 MB | 0.81× |
+</details>
 
 Reproduce with a checkout of the baseline commit, built and passed as the comparison root:
 
