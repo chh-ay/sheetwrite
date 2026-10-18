@@ -1,4 +1,3 @@
-import { colToA1 } from "@sheetwrite/core";
 import type {
   CellValue,
   DataCell,
@@ -153,8 +152,20 @@ const FORECAST_COLUMNS: Workbook["sheets"][number]["columns"] = [
   { key: "plan", header: "Plan USD", width: 132, type: "currency", numberFormat: "$#,##0" },
 ];
 
+// Browser specs import this fixture without built package outputs.
+// Keep its zero-based column labels independent of the runtime core entry.
+function columnLetter(index: number): string {
+  let label = "";
+  let remaining = index;
+  do {
+    label = String.fromCharCode(65 + (remaining % 26)) + label;
+    remaining = Math.floor(remaining / 26) - 1;
+  } while (remaining >= 0);
+  return label;
+}
+
 const COLUMN_LETTER_BY_KEY: Readonly<Record<string, string>> = Object.fromEntries(
-  FORECAST_COLUMNS.map((column, index) => [column.key, colToA1(index)]),
+  FORECAST_COLUMNS.map((column, index) => [column.key, columnLetter(index)]),
 );
 
 function columnLetterOf(key: string): string {
