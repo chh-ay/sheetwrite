@@ -198,8 +198,14 @@ a {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sw-accent) 45%, transparent);
 }
 
+/* The label shortens with an ellipsis before it can break into two lines. */
 .sw-search-button span {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sw-search-button kbd {
@@ -506,7 +512,8 @@ a {
 
 /* A break inside a name, value or range reads as two values. Longer cells
    (signatures, sentences) wrap at spaces so the prose column stays readable. */
-.sw-prose .sw-table-frame .sw-cell-short {
+.sw-prose .sw-table-frame .sw-cell-short,
+.sw-prose .sw-code-token {
   white-space: nowrap;
 }
 
@@ -2588,13 +2595,26 @@ body .sw-code-popover__accessible-signature {
   margin-bottom: 0.55rem;
 }
 
-/* Scenario ids read as row titles, not inline-code chips. */
-.sw-prose .bench-viz__head code {
-  border: 0;
-  padding: 0;
-  background: transparent;
+.bench-viz__label {
   color: var(--sw-fg-strong);
-  font: 600 0.8rem var(--sw-font-mono);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+/* A scenario reads as a named row with its one-line description under it. */
+.bench-scenario {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 16rem;
+}
+.bench-scenario strong {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+.bench-scenario span {
+  color: var(--sw-fg-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 /* Ratio chips reuse the api-status chip system: emerald for faster rows,
@@ -2692,6 +2712,7 @@ body .sw-code-popover__accessible-signature {
 .bench-num {
   font-weight: 600;
   font-style: normal;
+  white-space: nowrap;
 }
 
 .bench-num[data-stat="median"] {
@@ -3046,4 +3067,431 @@ body .sw-code-popover__accessible-signature {
   .bench-method__body dl {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Upgrade checklist: one card per step on a numbered rail. The tag says who
+   must act; the impact chip says how much the step matters. */
+.sw-prose ol.sw-upgrade {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: upgrade-step;
+}
+.sw-prose .sw-upgrade__step {
+  position: relative;
+  margin: 0;
+  padding: 1rem 1.25rem 1rem 3.75rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-surface-1);
+  counter-increment: upgrade-step;
+  --step-hue: var(--sw-accent);
+}
+.sw-prose .sw-upgrade__step[data-impact="api"],
+.sw-prose .sw-upgrade__step[data-impact="breaking"] {
+  --step-hue: var(--sw-type-number);
+}
+.sw-prose .sw-upgrade__step[data-impact="behavior"] {
+  --step-hue: var(--sw-type-name);
+}
+.sw-prose .sw-upgrade__step[data-impact="optional"] {
+  --step-hue: var(--sw-fg-dim);
+}
+.sw-prose .sw-upgrade__step::before {
+  content: counter(upgrade-step);
+  position: absolute;
+  top: 1rem;
+  left: 1.1rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid color-mix(in srgb, var(--step-hue) 45%, var(--sw-border));
+  border-radius: 999px;
+  color: var(--step-hue);
+  background: color-mix(in srgb, var(--step-hue) 10%, var(--sw-surface-1));
+  font: 600 0.8rem / 1 var(--sw-font-mono);
+}
+/* The rail joins each number to the next step. */
+.sw-prose .sw-upgrade__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 3rem;
+  bottom: -0.8rem;
+  left: 1.97rem;
+  width: 1px;
+  background: var(--sw-border);
+}
+.sw-prose .sw-upgrade__step > p {
+  margin: 0;
+}
+.sw-prose .sw-upgrade__step > p + p,
+.sw-prose .sw-upgrade__step > p + div {
+  margin-top: 0.4rem;
+}
+.sw-prose .sw-upgrade__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.8rem;
+}
+.sw-prose .sw-upgrade__impact {
+  border: 1px solid color-mix(in srgb, var(--step-hue) 40%, var(--sw-border));
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  color: var(--step-hue);
+  background: color-mix(in srgb, var(--step-hue) 8%, transparent);
+  font: 600 0.7rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sw-prose .sw-upgrade__title {
+  color: var(--sw-fg-strong);
+  font: 600 1.02rem / 1.35 var(--sw-font-display);
+}
+.sw-prose .sw-upgrade__step > p:not(.sw-upgrade__meta, .sw-upgrade__title) {
+  color: var(--sw-fg-muted);
+  font-size: 0.92rem;
+}
+.sw-prose .sw-upgrade__packages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.sw-prose .sw-upgrade__compare {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.5rem;
+  background: var(--sw-surface-2);
+}
+.sw-prose .sw-upgrade__compare p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.88rem;
+}
+.sw-prose .sw-upgrade__compare span {
+  width: 3.5rem;
+  color: var(--sw-fg-dim);
+  font: 600 0.7rem / 1.6 var(--sw-font-mono);
+  text-transform: uppercase;
+}
+@media (max-width: 40rem) {
+  .sw-prose .sw-upgrade__step {
+    padding: 0.9rem 1rem 0.9rem 3.25rem;
+  }
+  .sw-prose .sw-upgrade__step::before {
+    left: 0.8rem;
+  }
+  .sw-prose .sw-upgrade__step:not(:last-child)::after {
+    left: 1.67rem;
+  }
+}
+
+/* Release results: one card per area. The delta leads each row; the before
+   and after values sit under it, so a long workload name never squeezes them. */
+.sw-prose .sw-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0;
+}
+.sw-prose .sw-results__group {
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.1rem 0.6rem;
+  background: var(--sw-surface-1);
+  --result-hue: var(--sw-accent);
+}
+.sw-prose .sw-results__group[data-kind="slower"] {
+  --result-hue: var(--sw-type-number);
+  border-color: color-mix(in srgb, var(--sw-type-number) 35%, var(--sw-border));
+}
+.sw-prose .sw-results__title {
+  margin: 0 0 0.35rem;
+  color: var(--sw-fg-dim);
+  font: 600 0.72rem / 1.5 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-results ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-prose .sw-results li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--sw-border);
+}
+.sw-prose .sw-results li:first-child {
+  border-top: 0;
+}
+.sw-prose .sw-results__what {
+  color: var(--sw-fg);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.sw-prose .sw-results__delta {
+  color: var(--result-hue);
+  font-weight: 650;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.sw-prose .sw-results__detail {
+  grid-column: 1 / -1;
+  color: var(--sw-fg-dim);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Releases index: a timeline of cards, newest first. */
+.sw-prose ol.sw-release-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1.5rem 0;
+  padding: 0 0 0 1.4rem;
+  list-style: none;
+  border-left: 1px solid var(--sw-border);
+}
+.sw-prose .sw-release-list li {
+  position: relative;
+  margin: 0;
+}
+/* A dot on the timeline marks each release; the newest one is filled. */
+.sw-prose .sw-release-list li::before {
+  content: "";
+  position: absolute;
+  top: 1.25rem;
+  left: calc(-1.4rem - 0.35rem);
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid var(--sw-accent);
+  border-radius: 999px;
+  background: var(--sw-surface-0);
+}
+.sw-prose .sw-release-list li:first-child::before {
+  background: var(--sw-accent);
+}
+.sw-prose a.sw-release-list__card {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.sw-prose a.sw-release-list__card:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  transform: translateY(-1px);
+}
+.sw-prose .sw-release-list__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+}
+.sw-prose .sw-release-list__meta strong {
+  color: var(--sw-accent-strong);
+  font: 650 1.05rem / 1 var(--sw-font-mono);
+}
+.sw-prose .sw-release-list__latest {
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  color: var(--sw-accent-ink);
+  background: var(--sw-accent);
+  font: 700 0.65rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-release-list__title {
+  color: var(--sw-fg-strong);
+  font: 650 1.15rem / 1.3 var(--sw-font-display);
+}
+.sw-prose .sw-release-list__points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.3rem 1.25rem;
+  font-size: 0.86rem;
+}
+.sw-prose .sw-release-list__points span::before {
+  content: "+ ";
+  color: var(--sw-accent);
+  font-family: var(--sw-font-mono);
+}
+
+/* Framework pages: four facts a reader compares across adapters. The 1px gap
+   over a border-coloured background draws dividers at any column count. */
+.sw-prose dl.sw-fw-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  gap: 1px;
+  margin: 1.5rem 0 0.5rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.75rem;
+  background: var(--sw-border);
+  overflow: hidden;
+}
+.sw-prose .sw-fw-facts > div {
+  padding: 0.8rem 1rem;
+  background: var(--sw-surface-1);
+}
+.sw-prose .sw-fw-facts dt {
+  color: var(--sw-fg-dim);
+  font: 600 0.68rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-fw-facts dd {
+  margin: 0.2rem 0 0;
+  color: var(--sw-fg-strong);
+  font-size: 0.88rem;
+}
+
+/* Next steps close a page as cards, not as a bare bullet list. */
+.sw-prose .sw-next-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.7rem;
+  margin: 2rem 0 0;
+}
+.sw-prose .sw-next-links a {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.65rem;
+  background: var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.sw-prose .sw-next-links a:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 55%, var(--sw-border));
+  transform: translateY(-1px);
+}
+.sw-prose .sw-next-links span {
+  color: var(--sw-fg-dim);
+  font: 600 0.68rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-prose .sw-next-links strong {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+.sw-prose .sw-next-links strong::after {
+  content: " →";
+  color: var(--sw-accent);
+}
+
+/* Collaboration sequence diagram. Colours come from the theme tokens, so the
+   SVG follows the light and dark themes; on phones the frame scrolls sideways
+   instead of shrinking the labels below a readable size. */
+.sw-collab-flow {
+  margin: 1.75rem 0;
+}
+.sw-collab-flow__frame {
+  overflow-x: auto;
+  border: 1px solid var(--sw-border);
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  background: var(--sw-surface-1);
+}
+.sw-collab-flow svg {
+  display: block;
+  width: 100%;
+  min-width: 40rem;
+  height: auto;
+  font-family: var(--sw-font-body);
+}
+.sw-collab-flow__lane rect {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+.sw-collab-flow__lane line {
+  stroke: var(--sw-border-strong);
+  stroke-dasharray: 4 5;
+}
+.sw-collab-flow__lane-title {
+  fill: var(--sw-fg-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+.sw-collab-flow__lane-detail {
+  fill: var(--sw-fg-dim);
+  font-family: var(--sw-font-mono);
+  font-size: 10.5px;
+}
+.sw-collab-flow__message line {
+  stroke: var(--sw-accent);
+  stroke-width: 1.6;
+}
+.sw-collab-flow__message path {
+  fill: var(--sw-accent);
+}
+.sw-collab-flow__message text {
+  fill: var(--sw-fg);
+  font-family: var(--sw-font-mono);
+  font-size: 11.5px;
+  paint-order: stroke;
+  stroke: var(--sw-surface-1);
+  stroke-width: 4px;
+}
+.sw-collab-flow__message[data-kind="conflict"] line {
+  stroke: var(--sw-type-number);
+  stroke-dasharray: 6 4;
+}
+.sw-collab-flow__message[data-kind="conflict"] path {
+  fill: var(--sw-type-number);
+}
+.sw-collab-flow__note rect {
+  fill: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-1));
+  stroke: color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
+}
+.sw-collab-flow__note[data-kind="conflict"] rect {
+  fill: color-mix(in srgb, var(--sw-type-number) 10%, var(--sw-surface-1));
+  stroke: color-mix(in srgb, var(--sw-type-number) 40%, var(--sw-border));
+}
+.sw-collab-flow__note text {
+  fill: var(--sw-fg);
+  font-size: 12px;
+}
+.sw-collab-flow__alt rect {
+  fill: none;
+  stroke: color-mix(in srgb, var(--sw-type-number) 45%, var(--sw-border));
+  stroke-dasharray: 5 4;
+}
+.sw-collab-flow__alt text {
+  fill: var(--sw-type-number);
+  font-family: var(--sw-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.sw-collab-flow figcaption {
+  margin-top: 0.6rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.86rem;
 }

@@ -14,20 +14,63 @@ function html(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+/** Three significant figures in the unit a reader expects: µs, ms, then s. */
 function formatMs(value: number): string {
   // "0.00 ms" reads like a broken benchmark; sub-hundredth values are real
   // measurements in the microsecond range.
   if (value > 0 && value < 0.0095) return `${Math.max(1, Math.round(value * 1000))} µs`;
-  const digits = value < 10 ? 2 : 1;
-  return `${value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })} ms`;
+  if (value >= 1000) return `${fixed(value / 1000, value >= 10_000 ? 1 : 2)} s`;
+  return `${fixed(value, value < 10 ? 2 : value < 100 ? 1 : 0)} ms`;
 }
 
 function formatMb(value: number): string {
   return `${(value / 1_000_000).toFixed(1)} MB`;
 }
 
+/** Binary units, as the WASM and package size reports use. */
+function formatBytes(value: number): string {
+  if (value >= 1024 * 1024) return `${fixed(value / (1024 * 1024), 1)} MiB`;
+  if (value >= 1024) return `${fixed(value / 1024, 1)} KiB`;
+  return `${value} B`;
+}
+
+/** Paired ratios sit near 1, so they keep two decimals. */
 function formatRatio(value: number): string {
   return `${value.toFixed(2)}×`;
+}
+
+/** Speedups span 1× to 10,000×; decimals only help below 100×. */
+function formatSpeedup(value: number): string {
+  return `${fixed(value, value < 100 ? 1 : 0)}×`;
+}
+
+function fixed(value: number, digits: number): string {
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
+/**
+ * A benchmark ID as words: "scroll-down.top-left" reads "Scroll down · top
+ * left", "windowRead" reads "Window read". The raw ID stays in the title.
+ */
+function readableId(id: string): string {
+  const words = id
+    .split(".")
+    .map((part) =>
+      part
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replaceAll(/[-_]/g, " ")
+        .toLowerCase(),
+    )
+    .join(" · ");
+  return capitalized(words);
+}
+
+/** Generated prose as a sentence: a capital first letter and grouped digits. */
+function readableText(text: string): string {
+  return capitalized(text.replaceAll(/\b\d{5,}\b/g, (digits) => formatCount(Number(digits))));
 }
 
 function formatCount(value: number): string {
@@ -133,13 +176,17 @@ export {
   capitalized,
   evidenceHeadline,
   formatCaptureTime,
+  formatBytes,
   formatCount,
   formatMb,
   formatMs,
   formatRatio,
+  formatSpeedup,
   html,
   provenanceList,
   reductionText,
+  readableId,
+  readableText,
   shortHash,
   speedupText,
   type HeadlineStat,

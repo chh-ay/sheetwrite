@@ -3,8 +3,6 @@ title: Accessibility
 description: Understand the ARIA grid mirror, keyboard behavior, focus, and visible-window accessibility limits.
 ---
 
-[Installation](/docs/start/installation/)
-
 The grid paints to a `<canvas>`, which assistive technology can not read. To make
 it navigable, Sheetwrite maintains a parallel **ARIA shadow tree**: a
 visually-hidden DOM mirror of the visible window that carries the grid semantics,

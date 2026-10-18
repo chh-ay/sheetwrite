@@ -60,8 +60,11 @@ import {
   formatMb,
   formatMs,
   formatRatio,
+  formatSpeedup,
   html,
   provenanceList,
+  readableId,
+  readableText,
   reductionText,
   shortHash,
   speedupText,
@@ -1820,13 +1823,13 @@ function benchPairRow(
         : '<span class="bench-viz__ratio" data-kind="solo">only Sheetwrite completed</span>';
   } else {
     const faster = theirs.main >= ours.main;
-    const ratio = (faster ? theirs.main / ours.main : ours.main / theirs.main).toFixed(1);
+    const ratio = formatSpeedup(faster ? theirs.main / ours.main : ours.main / theirs.main);
     outcome = faster ? "faster" : "slower";
-    chip = `<span class="bench-viz__ratio"><strong>${ratio}×</strong> ${faster ? betterChip[0] : betterChip[1]}</span>`;
+    chip = `<span class="bench-viz__ratio"><strong>${ratio}</strong> ${faster ? betterChip[0] : betterChip[1]}</span>`;
   }
   return [
     `<div class="bench-viz__row" data-outcome="${outcome}">`,
-    `<div class="bench-viz__head"><code>${label}</code>${chip}</div>`,
+    `<div class="bench-viz__head"><span class="bench-viz__label" title="${html(label)}">${html(readableId(label))}</span>${chip}</div>`,
     bar("sheetwrite", ours),
     bar("handsontable", theirs),
     "</div>",
@@ -1860,7 +1863,7 @@ interface BenchScale {
 }
 
 function trimTick(value: number): string {
-  if (value >= 1000) return `${value / 1000}k`;
+  if (value >= 1000) return `${value / 1000} s`;
   if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
   return `${Number(value.toPrecision(1))}`;
 }
@@ -2053,7 +2056,7 @@ function benchScaleFigure(
     if (group.entries.length === 0) continue;
     lines.push(
       '<div class="bench-viz__row" data-outcome="faster">',
-      `<div class="bench-viz__head"><code>${group.label}</code></div>`,
+      `<div class="bench-viz__head"><span class="bench-viz__label" title="${html(group.label)}">${html(readableId(group.label))}</span></div>`,
     );
     for (const entry of group.entries) {
       const pct = scale.pct;
@@ -2337,6 +2340,13 @@ function scenarioLabel(unit: string): string {
   return unit.replace(/^one /u, "");
 }
 
+/** A readable scenario name over the one-line description; the raw ID is the hover title. */
+function scenarioCell(id: string, description: string): string {
+  return markdownCell(
+    `<span class="bench-scenario" title="${html(id)}"><strong>${html(readableId(id))}</strong><span>${html(description)}</span></span>`,
+  );
+}
+
 /**
  * Core write-path evidence: packed block writes, CSV import, large restore,
  * and paged residency work. Every scenario carries the checkpoint it proved,
@@ -2347,7 +2357,12 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     const scenario = evidence.scenarios.find((candidate) => candidate.id === id);
     return scenario === undefined
       ? []
-      : [{ value: formatMs(scenario.timing.median), label: scenarioLabel(scenario.unit) }];
+      : [
+          {
+            value: formatMs(scenario.timing.median),
+            label: readableText(scenarioLabel(scenario.unit)),
+          },
+        ];
   });
   const counters = evidence.scenarios.flatMap((scenario) =>
     Object.entries(scenario.counters).map(
@@ -2360,13 +2375,13 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    "| Scenario | One timed iteration | Median | p95 |",
-    "| --- | --- | ---: | ---: |",
+    "| Scenario | Median | p95 |",
+    "| --- | ---: | ---: |",
     ...evidence.scenarios.flatMap((scenario) => [
-      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
+      `| ${scenarioCell(scenario.id, readableText(scenario.unit))} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
       ...(scenario.variants ?? []).map(
         (variant) =>
-          `| \`${variant.id}\` | Variant of \`${scenario.id}\`, measured in the same run | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
+          `| ${scenarioCell(variant.id, `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run.`)} | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
       ),
     ]),
     "",
@@ -2599,8 +2614,13 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "Performance and delivery evidence",
       "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
     ).trimEnd(),
-    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
+    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing. Results come first; the capture, the regression method, and the memory API follow them.",
     "",
+    "## Render benchmark",
+    "",
+  ];
+  // Readers come for results; the method and API notes follow every benchmark.
+  const methodLines = [
     "## Release retained engine memory",
     "",
     "WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.",
@@ -2636,8 +2656,6 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
     "",
     "The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
-    "",
-    "## Render benchmark",
     "",
   ];
   if ("evidence" in scale) {
@@ -2678,7 +2696,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(scale);
   }
-  lines.push(
+  methodLines.push(
     "## Runtime resource ownership",
     "",
     "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
@@ -2973,6 +2991,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "",
     );
   }
+  lines.push(...methodLines);
   if (pending.length > 0) {
     lines.push(
       "## Pending local evidence",

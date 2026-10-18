@@ -3,8 +3,6 @@ title: Data operations and export
 description: Sort, filter, aggregate, load paged data, and export CSV, TSV, tables, or workbooks.
 ---
 
-[Installation](/docs/start/installation/)
-
 Sheetwrite can sort, filter, hide, group, aggregate, import, and export the active
 sheet without rewriting the stored row data. Sorts and filters are display views:
 the store keeps a row-order permutation/subset and the renderer reads through it.

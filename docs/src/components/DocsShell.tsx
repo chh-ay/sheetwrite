@@ -7,6 +7,7 @@ import {
   RELEASES_HREF,
   type ReleaseContext,
   releaseContext,
+  releaseDate,
   releaseHref,
 } from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
@@ -83,6 +84,8 @@ function breadcrumbsFor(activeHref: string | undefined, title: string): readonly
   if (activeHref === undefined || activeHref === "/docs/") return trail;
   const nearest = nearestNavigationItem(activeHref);
   if (nearest === undefined) return [...trail, { label: title }];
+  // A section's index page carries the section's name; one crumb is enough.
+  if (nearest.section === title) return [...trail, { label: title }];
   trail.push({ label: nearest.section });
   // The entry the page itself belongs to is not a step above it.
   if (nearest.href !== activeHref) trail.push({ href: nearest.href, label: nearest.label });
@@ -112,6 +115,35 @@ function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
 }
 
 /**
+ * The newest release leads the navigation: a reader who upgrades should not
+ * have to open a collapsed group to find what changed.
+ */
+function LatestReleaseCard({
+  activeHref,
+  onNavigate,
+}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
+  const href = releaseHref(LATEST_RELEASE.version);
+  return (
+    <Link
+      aria-current={activeHref === href ? "page" : undefined}
+      className="sw-release-card"
+      onClick={onNavigate}
+      to={href}
+    >
+      <span className="sw-release-card__meta">
+        <span className="sw-release-card__badge">New</span>
+        <time dateTime={LATEST_RELEASE.date}>{releaseDate(LATEST_RELEASE)}</time>
+      </span>
+      <strong>Sheetwrite {LATEST_RELEASE.version}</strong>
+      <span className="sw-release-card__summary">{LATEST_RELEASE.summary}</span>
+      <span className="sw-release-card__more">
+        Read the release notes <span aria-hidden="true">→</span>
+      </span>
+    </Link>
+  );
+}
+
+/**
  * The section list itself, shared by the sidebar and the drawer so the two can
  * never advertise different documentation. `onNavigate` lets the drawer close
  * once a reader has picked a destination.
@@ -124,6 +156,7 @@ function NavigationSections({
   const currentHref = current?.href;
   return (
     <nav aria-label="Documentation" className="sw-sidebar__nav">
+      <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
       {DOCS_NAVIGATION.map((section) => (
         <details
           className="sw-nav-group"
@@ -266,7 +299,7 @@ function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
   return (
     <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
       <span>
-        Released <time dateTime={release.date}>{release.date}</time>
+        Released <time dateTime={release.date}>{releaseDate(release)}</time>
       </span>
       {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
       {older === undefined ? null : (
@@ -297,6 +330,8 @@ export function DocsShell({
   const outline = useDocumentOutline();
   const neighbours = documentNeighbours(activeHref);
   const release = releaseContext(activeHref);
+  // Release notes are their own header section; every other page is Docs.
+  const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
   const navigationDialog = useRef<HTMLDialogElement>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -339,8 +374,20 @@ export function DocsShell({
             <Link className="sw-docs-header__home" to="/">
               Home
             </Link>
-            <Link aria-current="page" className="sw-docs-header__docs" to="/docs/">
+            <Link
+              activeOptions={{ exact: true }}
+              aria-current={inReleases ? undefined : "page"}
+              className="sw-docs-header__docs"
+              to="/docs/"
+            >
               Docs
+            </Link>
+            <Link
+              aria-current={inReleases ? "page" : undefined}
+              className="sw-docs-header__releases"
+              to={RELEASES_HREF}
+            >
+              Releases
             </Link>
             <Link className="sw-docs-header__showcases" to="/showcases/">
               Showcases

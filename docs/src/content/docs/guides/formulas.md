@@ -3,8 +3,6 @@ title: Formulas
 description: Use Sheetwrite formula syntax, references, functions, errors, and compatibility limits.
 ---
 
-[Installation](/docs/start/installation/)
-
 Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sources are persisted exactly as document values; evaluated results are cached for rendering, queries, export, and dependent formulas.
 
 Sheetwrite intentionally implements a coherent spreadsheet subset. It does **not** claim full Google Sheets or Excel formula parity.

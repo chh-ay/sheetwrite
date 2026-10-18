@@ -115,6 +115,29 @@ function wrapProseTables() {
   };
 }
 
+/**
+ * Inline code shorter than this fits a phone line, so it never needs to break
+ * at a hyphen or quote; longer code keeps wrapping to avoid sideways scroll.
+ */
+const SHORT_CODE_LENGTH = 32;
+
+/** Gives short inline code a class, so an identifier reads as one token. */
+function markShortInlineCode() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      for (const child of node.children ?? []) {
+        if (child.tagName === "pre") continue;
+        if (child.tagName === "code" && textOf(child).length <= SHORT_CODE_LENGTH) {
+          const className = [child.properties?.className ?? []].flat().map(String);
+          child.properties = { ...child.properties, className: [...className, "sw-code-token"] };
+        }
+        visit(child);
+      }
+    };
+    visit(tree);
+  };
+}
+
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   defaultProps: { wrap: false },
   styleOverrides: {
@@ -190,6 +213,7 @@ export default defineConfig({
           rehypeSlug,
           markResponsiveCodeBlocks,
           wrapProseTables,
+          markShortInlineCode,
         ],
       }),
       enforce: "pre",

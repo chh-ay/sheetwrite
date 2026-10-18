@@ -6,13 +6,16 @@ import {
 } from "../bench/src/matched-engine-bench.js";
 import {
   allMeasurements,
+  capitalized,
   evidenceHeadline,
+  formatBytes,
   formatCaptureTime,
   formatCount,
   formatMs,
   formatRatio,
   html,
   provenanceList,
+  readableId,
   shortHash,
 } from "./evidence-format.js";
 
@@ -58,16 +61,17 @@ function analysisDetail(full: FullEngineResult): string[] {
     "| Full-only workload | Median | p95 |",
     "| --- | ---: | ---: |",
     ...full.analysis.map(
-      (row) => `| ${row.id} | ${formatMs(row.stat.median)} | ${formatMs(row.stat.p95)} |`,
+      (row) =>
+        `| ${readableId(row.id)} | ${formatMs(row.stat.median)} | ${formatMs(row.stat.p95)} |`,
     ),
     "",
     "#### WASM size and Node initialization",
     "",
-    "| Engine | Node | WASM bytes | Brotli q11 bytes | Cold init median | Cold init p95 |",
+    "| Engine | Node | WASM size | Brotli q11 size | Cold init median | Cold init p95 |",
     "| --- | --- | ---: | ---: | ---: | ---: |",
     ...full.engines.map(
       (engine) =>
-        `| ${engine.engine} | ${engine.initialization.node} | ${formatCount(engine.wasm.rawBytes)} | ${formatCount(engine.wasm.brotliBytes)} | ${formatMs(engine.initialization.stat.median)} | ${formatMs(engine.initialization.stat.p95)} |`,
+        `| ${capitalized(engine.engine)} | ${engine.initialization.node} | ${formatBytes(engine.wasm.rawBytes)} | ${formatBytes(engine.wasm.brotliBytes)} | ${formatMs(engine.initialization.stat.median)} | ${formatMs(engine.initialization.stat.p95)} |`,
     ),
     "",
     "Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.",
@@ -139,7 +143,7 @@ export function renderFullEngineEvidence(
   );
   const brotliBytes = (name: string): string => {
     const engine = full.engines.find((candidate) => candidate.engine === name);
-    return engine === undefined ? "not captured" : `${formatCount(engine.wasm.brotliBytes)} B`;
+    return engine === undefined ? "not captured" : formatBytes(engine.wasm.brotliBytes);
   };
   lines.push(
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${matched.rows.length} shared workloads have ${matched.rounds} paired rounds per engine. The full engine also has ${full.analysis.length} checked analysis workloads.</div>`,
@@ -150,8 +154,8 @@ export function renderFullEngineEvidence(
         label: "Shared workloads more than 5% slower on the full engine",
       },
       {
-        value: `${formatRatio(widestSpread)} (limit ${formatRatio(MATCHED_SPREAD_CEILING)})`,
-        label: "Widest paired-ratio spread",
+        value: formatRatio(widestSpread),
+        label: `Widest paired-ratio spread (limit ${formatRatio(MATCHED_SPREAD_CEILING)})`,
       },
       { value: brotliBytes("default"), label: "Default engine WASM, Brotli" },
       { value: brotliBytes("full"), label: "Full engine WASM, Brotli" },
@@ -167,7 +171,7 @@ export function renderFullEngineEvidence(
     ...matched.rows.map((row) => {
       const spread = row.ratioP90 / row.ratioP10;
       const marker = spread > MATCHED_SPREAD_CEILING ? " ⚠︎" : "";
-      return `| ${row.id}${marker} | ${formatCount(row.size)} | ${formatMs(row.defaultStat.median)} | ${formatMs(row.fullStat.median)} | ${formatRatio(row.ratioStat.median)} | ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)} |`;
+      return `| ${readableId(row.id)}${marker} | ${formatCount(row.size)} | ${formatMs(row.defaultStat.median)} | ${formatMs(row.fullStat.median)} | ${formatRatio(row.ratioStat.median)} | ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)} |`;
     }),
     "",
     ...allMeasurements([
