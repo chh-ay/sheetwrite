@@ -68,9 +68,14 @@ function readableId(id: string): string {
   return capitalized(words);
 }
 
-/** Generated prose as a sentence: a capital first letter and grouped digits. */
+/**
+ * Generated prose as a sentence: grouped digits, and a capital first letter
+ * unless the first word is an identifier such as "fromCsv" or "initSheetwrite()".
+ */
 function readableText(text: string): string {
-  return capitalized(text.replaceAll(/\b\d{5,}\b/g, (digits) => formatCount(Number(digits))));
+  const grouped = text.replaceAll(/\b\d{5,}\b/g, (digits) => formatCount(Number(digits)));
+  const firstWord = grouped.split(" ", 1)[0] ?? "";
+  return /^[a-z]+$/.test(firstWord) ? capitalized(grouped) : grouped;
 }
 
 function formatCount(value: number): string {

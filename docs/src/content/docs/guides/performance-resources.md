@@ -826,7 +826,7 @@ bun run --filter @sheetwrite/bench bench:data
 
 <dl class="bench-stats" data-pagefind-ignore>
 <div><dt>Grid.applyTransaction of a 1,000,000-cell setBlock</dt><dd>489 ms</dd></div>
-<div><dt>FromCsv import of 200,000 rows by 10 columns</dt><dd>235 ms</dd></div>
+<div><dt>fromCsv import of 200,000 rows by 10 columns</dt><dd>235 ms</dd></div>
 <div><dt>Undo of a 1,000,000-cell clearRange</dt><dd>1.61 s</dd></div>
 <div><dt>Cold initSheetwrite() through first store in a fresh Node process (7 processes)</dt><dd>4.24 ms</dd></div>
 </dl>

@@ -474,6 +474,12 @@ a {
   border-radius: 0.65rem;
   font-size: 0.875rem;
   line-height: 1.6;
+}
+
+/* Tabular figures line numbers up down a column, but this font also widens the
+   hyphen, so only right-aligned (numeric) columns use them. */
+.sw-prose td[style*="right"],
+.sw-prose th[style*="right"] {
   font-variant-numeric: tabular-nums;
 }
 

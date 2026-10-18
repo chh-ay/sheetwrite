@@ -128,8 +128,8 @@ The override object accepts positive safe integers. CSV and TSV still return com
 
 | Resource | Default and unit | Why / evidence class | Behavior at the boundary | Supported override |
 | --- | --- | --- | --- | --- |
-| `heartbeatMs` | 15,000 ms | Interaction tuning: periodic publish and stale pruning | Timer publishes/prunes each interval | `PresenceCoordinatorOptions.heartbeatMs`; `0` disables the timer |
-| `timeoutMs` | 45,000 ms | Interaction tuning: three default heartbeat intervals of silence | An actor at or beyond the idle cutoff is expired | `PresenceCoordinatorOptions.timeoutMs` |
+| `heartbeatMs` | 15,000 ms (15 s) | Interaction tuning: periodic publish and stale pruning | Timer publishes/prunes each interval | `PresenceCoordinatorOptions.heartbeatMs`; `0` disables the timer |
+| `timeoutMs` | 45,000 ms (45 s) | Interaction tuning: three default heartbeat intervals of silence | An actor at or beyond the idle cutoff is expired | `PresenceCoordinatorOptions.timeoutMs` |
 | `maxActors` | 32 remote actors | Resource defense: bound overlay state | Receiving a new actor at capacity evicts the oldest actor | `PresenceCoordinatorOptions.maxActors` (minimum 1) |
 | `maxRangesPerActor` | 8 selection ranges | Resource defense: bound payload and overlay work | Additional outbound/inbound ranges are truncated | `PresenceCoordinatorOptions.maxRangesPerActor` (minimum 1) |
 
