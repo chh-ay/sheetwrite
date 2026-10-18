@@ -42,6 +42,15 @@ timing comparisons run deliberately through the local protocol in
 `bench/README.md`, not as a required CI job. A green `verify:ci` is strong
 evidence, not a guarantee.
 
+CI starts preflight and the canonical artifact build independently. Package
+consumers still verify the same canonical tarballs. Rust build caches are
+separate for release and coverage profiles; tool versions and build inputs
+identify their keys. Bun caches contain downloads, not `node_modules`, and
+every job still installs with the frozen lockfile. Browser caches contain
+engines, not system libraries; installation still checks host dependencies.
+The production browser suite runs in three shards with two workers each.
+Required CI waits for every shard. Pull requests do not deploy docs.
+
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,
 `test:rust` is `cargo test` in `packages/wasm`, and `test:rust:analysis` adds `--features analysis`. To map an id to the exact command:
@@ -94,6 +103,9 @@ a script nobody will run.
   `bun run --filter '@sheetwrite/bench' bench:verify`. Baselines under
   `bench/results/` and the delivery-size budgets are reviewed evidence — changing
   one to make a regression pass defeats the gate's only purpose.
+  On failure, the verifier prints the failing family and its measured artifact
+  to stderr. The structured error and raw evidence remain in
+  `test-results/performance-gates/`.
 - **`compatibility:capture:*` and `compatibility:roundtrip:libreoffice`** need
   external applications or credentials. They are run deliberately, when refreshing
   the oracle corpus, not as part of a normal change.

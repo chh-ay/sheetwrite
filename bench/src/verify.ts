@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { type DataBenchmarkResult, validateDataBenchmark } from "./data-bench.js";
@@ -84,8 +84,11 @@ function validateViewIndexArtifact(value: unknown): void {
     }
   }
   const gates = record(artifact.gates, "view-index gates");
-  if (Object.keys(gates).length === 0 || Object.values(gates).some((passed) => passed !== true)) {
-    throw new Error("view-index runtime gates failed");
+  const failedGates = Object.entries(gates)
+    .filter(([, passed]) => passed !== true)
+    .map(([gate]) => gate);
+  if (Object.keys(gates).length === 0 || failedGates.length > 0) {
+    throw new Error(`view-index runtime gates failed: ${failedGates.join(", ") || "no gates"}`);
   }
   for (const field of ["heapReduction", "lookupP95Regression"] as const) {
     if (typeof artifact[field] !== "number" || !Number.isFinite(artifact[field])) {
@@ -134,6 +137,12 @@ function validateFamily(family: GateFamily, value: unknown): void {
 
 function writeFailure(family: GateFamily, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`benchmark ${family} failed: ${message}\n`);
+  const artifactPath = resolve(ARTIFACT_ROOT, `${family}.json`);
+  if (existsSync(artifactPath)) {
+    process.stderr.write(`Failing ${family} measurements: ${readFileSync(artifactPath, "utf8")}\n`);
+  }
+
   writeFileSync(
     resolve(ARTIFACT_ROOT, `${family}-error.json`),
     `${JSON.stringify({ family, status: "failed", message }, null, 2)}\n`,

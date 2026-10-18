@@ -45,6 +45,11 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Classify documentation impact
         id: paths
         env:
@@ -104,21 +109,41 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - name: Cache Rust and WASM compilation
+      - name: Cache Bun downloads
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: packages/wasm/target
-          key: wasm-target-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock', 'packages/wasm/Cargo.toml', 'packages/wasm/src/**/*.rs') }}
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Cache Rust coverage compilation
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            packages/wasm/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: coverage-target-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock', 'packages/wasm/Cargo.toml', 'packages/wasm/src/**/*.rs') }}
           restore-keys: |
-            wasm-target-${{ runner.os }}-${{ env.RUST_VERSION }}-
+            coverage-target-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}-
+      - name: Cache release verification tools
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-audit
+            ~/.cargo/bin/cargo-llvm-cov
+          key: release-tools-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Install pinned Rust toolchain
         run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install coverage toolchain
-        run: cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
+        run: command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       # `bench:verify` launches Chromium only; Firefox and WebKit are exercised
       # separately by `browser-smoke`.
+      - name: Cache Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install Chromium for the render smoke
         run: bun run browser:install:chromium
       - name: Download canonical tarballs
@@ -157,7 +182,6 @@ jobs:
 
   artifact-build:
     name: Canonical Artifacts
-    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
@@ -175,22 +199,30 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Cache Rust and WASM compilation
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: packages/wasm/target
-          key: wasm-target-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.lock', 'packages/wasm/Cargo.toml', 'packages/wasm/src/**/*.rs') }}
+          path: |
+            packages/wasm/target
+            packages/wasm/pkg
+            packages/formulas/pkg
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'packages/wasm/Cargo.*', 'packages/wasm/src/**', 'packages/wasm/build.rs', 'packages/wasm/package.json', 'packages/formulas/package.json', 'scripts/wasm-factory.ts', 'scripts/workspace-tooling.ts', 'bun.lock') }}
           restore-keys: |
-            wasm-target-${{ runner.os }}-${{ env.RUST_VERSION }}-
+            wasm-target-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.WASM_PACK_VERSION }}-
       - name: Cache release verification tools
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/cargo-audit
             ~/.cargo/bin/cargo-llvm-cov
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: release-tools-${{ runner.os }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
+          key: release-tools-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install pinned Rust toolchain
         run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install release verification tools
@@ -236,8 +268,18 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Cache Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
         run: bun run browser:install:chromium
       - name: Download canonical tarballs
@@ -272,8 +314,18 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Cache Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
         run: bun run browser:install:chromium
       - name: Download canonical tarballs
@@ -308,8 +360,18 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Cache Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install Chromium
         run: bun run browser:install:chromium
       - name: Download canonical tarballs
@@ -350,6 +412,11 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Download canonical tarballs
@@ -385,10 +452,14 @@ jobs:
           retention-days: 7
 
   browser-smoke:
-    name: Browser Smoke
+    name: Browser Smoke (${{ matrix.shard }}/3)
     needs: docs-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -396,6 +467,16 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      - name: Cache Bun downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
+      - name: Cache browser engines
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-all-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
       - name: Install dependencies and browser engines
         run: |
           bun install --frozen-lockfile
@@ -408,12 +489,12 @@ jobs:
       - name: Exercise production site
         env:
           DOCS_OUTPUT_DIR: .vercel/output/static
-        run: bun run test:browser
+        run: bun run test:browser --workers=2 --shard=${{ matrix.shard }}/3
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: browser-failure-evidence
+          name: browser-failure-evidence-${{ matrix.shard }}
           path: |
             test-results/playwright/
             playwright-report/
