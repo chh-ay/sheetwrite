@@ -194,14 +194,20 @@ export function createScaleWorkbook(): Workbook {
         rowCount: SCALE_ROWS,
         columns: Array.from({ length: SCALE_COLUMNS }, (_, column) => {
           const financialColumn = FINANCIAL_COLUMNS[column];
+          const type = financialColumn?.type ?? ("currency" as const);
           return {
             key: scaleColumnKey(column),
             header:
               financialColumn?.header ??
               `Forecast M+${String(column - (FINANCIAL_COLUMNS.length - 1)).padStart(3, "0")}`,
             width: financialColumn?.width ?? 116,
-            type: financialColumn?.type ?? ("currency" as const),
-            ...(column === 8 ? { numberFormat: "0.0%" } : {}),
+            type,
+            // Whole units: mixed one- and two-decimal amounts read as noise.
+            ...(column === 8
+              ? { numberFormat: "0.0%" }
+              : type === "currency"
+                ? { numberFormat: "#,##0" }
+                : {}),
           };
         }),
       },

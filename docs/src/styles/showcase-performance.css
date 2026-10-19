@@ -1068,25 +1068,38 @@
     background: var(--sw-demo-danger);
   }
 
+  /* Landmarks sit right beside the track, each with a short tick toward it,
+     so a label reads as a position on the slider and not as loose text. */
   .sw-sp-landmarks {
     position: absolute;
     z-index: 4;
-    inset: 0 0 0 auto;
+    inset: 0 auto 0 calc(var(--sw-sp-space-4) + var(--sw-sp-space-6));
     width: var(--sw-sp-space-7);
     pointer-events: none;
   }
 
   .sw-sp-landmarks button {
     position: absolute;
-    min-width: var(--sw-sp-space-7);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sw-sp-space-1);
     min-height: var(--sw-sp-space-5);
     padding: 0 var(--sw-sp-space-1);
     border: 0;
-    background: var(--sw-surface-2);
+    border-radius: var(--sw-demo-radius-1);
+    background: transparent;
     color: var(--sw-fg-muted);
     font: 620 var(--sw-type-xs) / 1 var(--sw-font-mono);
+    white-space: nowrap;
     pointer-events: auto;
     transform: translateY(-50%);
+  }
+
+  .sw-sp-landmarks button::before {
+    content: "";
+    width: var(--sw-sp-space-2);
+    height: 1px;
+    background: var(--sw-border-strong);
   }
 
   .sw-sp-landmarks button:hover:not(:disabled) {
