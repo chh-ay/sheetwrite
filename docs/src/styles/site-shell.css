@@ -893,6 +893,8 @@ html:has(.sw-nav-dialog[open]) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 13rem;
     gap: 0 3.5rem;
+    /* Keep the 70rem reading area; the outline gets its own 16.5rem. */
+    padding-inline: max(clamp(1.5rem, 5vw, 4.5rem), (100% - var(--sw-sidebar-width) - 86.5rem) / 2);
   }
   .sw-document > .sw-document__header,
   .sw-document > .sw-symbol-filter,

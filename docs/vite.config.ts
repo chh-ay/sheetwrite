@@ -84,6 +84,47 @@ function hydrateFormulaReference() {
   };
 }
 
+/** Draw release reductions from the displayed value, so labels and bars cannot drift. */
+function visualizeReleaseResults() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      const delta =
+        node.tagName === "li"
+          ? node.children?.find((child) =>
+              String(child.properties?.className ?? "")
+                .split(/[ ,]+/)
+                .includes("sw-results__delta"),
+            )
+          : undefined;
+      if (delta !== undefined) {
+        const label = textOf(delta).trim();
+        const percent = /^(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?% (?:faster|less)$/.exec(label);
+        const ratio = /^([\d,]+(?:\.\d+)?)× faster$/.exec(label);
+        const low = percent
+          ? Number(percent[1])
+          : ratio
+            ? (1 - 1 / Number(ratio[1]?.replaceAll(",", ""))) * 100
+            : undefined;
+        const high = percent ? Number(percent[2] ?? percent[1]) : low;
+        if (low !== undefined && high !== undefined) {
+          node.children?.push({
+            type: "element",
+            tagName: "span",
+            properties: {
+              className: ["sw-results__bar"],
+              ariaHidden: "true",
+              style: `--result-min:${low}%;--result-max:${high}%`,
+            },
+            children: [],
+          });
+        }
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
 /** Keeps code focus client-owned and removes copy controls from API signatures. */
 function markResponsiveCodeBlocks() {
   return (tree: HastNode): void => {
@@ -265,6 +306,7 @@ export default defineConfig({
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
           hydrateFormulaReference,
+          visualizeReleaseResults,
           dedupeCodePopovers,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,

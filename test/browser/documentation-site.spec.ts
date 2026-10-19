@@ -294,9 +294,9 @@ test.describe("documentation site", () => {
   test("framework tabs synchronize and persist across guides", async ({ page }) => {
     await page.goto(docsUrl("start/installation/"));
     await waitForHydration(page);
+    const frameworkPanel = page.getByRole("tabpanel", { name: /^(Vanilla|React|Vue|Svelte)$/ });
     const expectStyledPanel = async (language: string) => {
-      const panel = page.getByRole("tabpanel");
-      const colors = await panel
+      const colors = await frameworkPanel
         .locator(`pre[data-language="${language}"] .code`)
         .first()
         .evaluate((code) => ({
@@ -313,7 +313,7 @@ test.describe("documentation site", () => {
     await expect(reactTab).toBeVisible();
     await reactTab.click();
     await expect(reactTab).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("tabpanel")).toContainText("@sheetwrite/react");
+    await expect(frameworkPanel).toContainText("@sheetwrite/react");
     await expectStyledPanel("tsx");
     expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("React");
 
@@ -322,7 +322,7 @@ test.describe("documentation site", () => {
       "aria-selected",
       "true",
     );
-    await expect(page.getByRole("tabpanel")).toContainText("SheetwriteGrid");
+    await expect(frameworkPanel).toContainText("SheetwriteGrid");
 
     await page.getByRole("tab", { name: "Vue", exact: true }).click();
     expect(await page.evaluate(() => localStorage.getItem("sheetwrite-framework"))).toBe("Vue");

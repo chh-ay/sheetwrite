@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
@@ -75,7 +76,7 @@ export function ShowcasePage({
                       ? "Rules + permissions"
                       : "Offline outbox",
             },
-            { label: "Version", value: "Sheetwrite 0.5.0" },
+            { label: "Version", value: `Sheetwrite ${corePackage.version}` },
           ]}
         />
 

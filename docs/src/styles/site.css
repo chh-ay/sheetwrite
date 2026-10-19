@@ -3027,6 +3027,9 @@ body .sw-code-popover__accessible-signature {
 /* On a phone the centered last tick sticks out past the page edge and makes the
    page scroll sideways; there, it ends at its gridline instead. */
 @media (max-width: 40rem) {
+  .bench-ruler__tick:first-child {
+    transform: none;
+  }
   .bench-ruler__tick:last-child {
     transform: translateX(-100%);
   }
@@ -3518,6 +3521,49 @@ body .sw-code-popover__accessible-signature {
   font-variant-numeric: tabular-nums;
 }
 
+.sw-prose .sw-results__title::after {
+  content: "0–100% saved";
+  float: right;
+  margin-left: 0.75rem;
+  color: var(--sw-fg-muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.sw-results__bar {
+  --result-min: 0%;
+  --result-max: 0%;
+  display: block;
+  position: relative;
+  grid-column: 1 / -1;
+  height: 0.45rem;
+  margin: 0.3rem 0 0.2rem;
+  overflow: hidden;
+  border-radius: 0.2rem;
+  background: var(--sw-surface-3);
+}
+.sw-results__bar::before,
+.sw-results__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--result-hue);
+}
+.sw-results__bar::before {
+  width: var(--result-max);
+  opacity: 0.3;
+}
+.sw-results__bar::after {
+  width: var(--result-min);
+}
+.sw-release-regressions .bench-bar[data-regression] .bench-bar__fill {
+  background: var(--sw-state-pending);
+}
+.sw-release-regressions .bench-bar[data-regression] .bench-bar__spread {
+  background: color-mix(in srgb, var(--sw-state-pending) 30%, transparent);
+}
+
 /* Releases index: a timeline of cards, newest first. */
 .sw-prose ol.sw-release-list {
   display: grid;
@@ -3873,7 +3919,7 @@ body .sw-code-popover__accessible-signature {
   font-size: 0.8rem;
   color: var(--sw-fg-muted);
 }
-.sw-prose .sw-engine-choice h4 {
+.sw-docs .sw-prose .sw-engine-choice h4 {
   margin: 0.5rem 0;
 }
 .sw-prose .sw-engine-choice p {

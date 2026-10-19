@@ -14,8 +14,8 @@ interface BenchScale {
 
 function trimTick(value: number): string {
   if (value >= 1000) return `${value / 1000} s`;
-  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
-  return `${Number(value.toPrecision(1))}`;
+  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))} ms`;
+  return `${Number((value * 1000).toPrecision(1))} µs`;
 }
 
 function benchRuler(ticks: string[]): string {
@@ -50,14 +50,8 @@ function benchLogScale(values: number[]): BenchScale {
   for (let exp = lo; exp <= hi; exp++) {
     const at = ((exp - lo) / segments) * 100;
     const value = 10 ** exp;
-    // Decade ticks are whole numbers; the last carries the unit, in seconds
-    // from 1,000 ms because "1 s" reads better than "1000 ms".
-    const label =
-      exp === hi
-        ? value >= 1000
-          ? `${value / 1000} s`
-          : `${trimTick(value)} ms`
-        : trimTick(value);
+    // Each tick names its unit; this axis can span microseconds to seconds.
+    const label = trimTick(value);
     ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
   }
   return { pct, ruler: benchRuler(ticks), segments };

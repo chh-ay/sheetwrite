@@ -4563,27 +4563,10 @@ These medians come from alternating runs on the same machine. Times vary by
 device and workload. The [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/)
 has the full measurements and package sizes.
 
-OperationLinear scale · shorter is fasterMedian time
-00.511.52 s
+### Faster paths
 
-Write a 1,000,000-cell block
-0.4.01.36 s
-0.5.0**545 ms**
-
-Import a 1 MB XLSX workbook
-0.4.01.68 s
-0.5.01.04 s
-
-Import CSV · 200,000 rows × 10 columns
-0.4.0**493 ms**
-0.5.0**239 ms**
-
-Slower in 0.5.0
-
-Column sum (`aggregate`), 100,000 to 1,000,000 rowsAbout 2× slower0.21 → 0.44 ms at 100,000 rows; 1.9 → 4.2 ms at 1,000,000 rows. 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/) is about 2× faster again; at 100,000 rows it can still be slower than 0.4.0. Tracked in #110 (https://github.com/chh-ay/sheetwrite/issues/110).
-Create a 100,000-cell spill6–27% slower10.6 ms → 11.2–13.5 ms. Tracked in #109 (https://github.com/chh-ay/sheetwrite/issues/109).
-
-All performance changes
+Bars show the time saved compared with 0.4.0. A full bar is 100%.
+The lighter end shows the reported range. The Memory group shows bytes saved.
 
 Load and import
 
@@ -4626,6 +4609,32 @@ Memory
 
 String-pool storage after 100,000 unique overwrites (not WebAssembly heap size)99.6% less84.3 MB → 0.35 MB
 XLSX import peak memory34% less476 MiB → 312 MiB
+
+### Slower paths
+
+These paths took longer in 0.5.0. The bars show measured times, not speed ratios.
+
+OperationLog scale · each tick is 10×Median time
+0.1110100 ms
+
+Column sum · 100,000 rows
+0.4.0**0.21 ms**
+0.5.0**0.44 ms**
+
+Column sum · 1,000,000 rows
+0.4.0**1.9 ms**
+0.5.0**4.2 ms**
+
+Create a 100,000-cell spill
+0.4.0**10.6 ms**
+0.5.0**11.2–13.5 ms**
+
+The lighter end of the spill bar shows its reported range, not p95.
+
+Column sums use `aggregate`. They were about 2× slower in 0.5.0.
+[0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/) made them about 2× faster again, but the
+100,000-row case can still be slower than 0.4.0. See [#110](https://github.com/chh-ay/sheetwrite/issues/110).
+The spill case was 6–27% slower. See [#109](https://github.com/chh-ay/sheetwrite/issues/109).
 
 ## Upgrade checklist
 

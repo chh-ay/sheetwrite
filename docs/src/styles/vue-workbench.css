@@ -10,6 +10,10 @@
   --sw-demo-dim: var(--sw-fg-dim);
   --sw-demo-border: var(--sw-border);
   --sw-demo-border-strong: var(--sw-border-strong);
+  --sw-demo-accent: var(--sw-accent);
+  --sw-demo-accent-strong: var(--sw-accent-strong);
+  --sw-demo-warn: var(--sw-state-pending);
+  --sw-demo-danger: var(--sw-state-error);
   --sw-demo-shadow: var(--sw-shadow);
   --sw-demo-popup-shadow: var(--sw-shadow);
 }
