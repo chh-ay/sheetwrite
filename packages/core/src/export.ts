@@ -180,11 +180,16 @@ export function fromCsv(
   assertDelimitedTextDimensions(rowCount, columns.length, limits, "import");
 
   const result: Record<string, CellScalar[]> = Object.create(null);
-  for (const column of columns) result[column.key] = new Array<CellScalar>(rowCount).fill(null);
-  for (let index = 0; index < projected.length; index++) {
-    const column = projected[index];
-    const bucket = values[index];
-    if (column !== undefined && bucket !== undefined) result[column.key] = bucket;
+  let visibleIndex = 0;
+  for (const column of columns) {
+    if (column.visible === false) {
+      // Keep declared key order without replacing a visible bucket for the same key.
+      result[column.key] ??= new Array<CellScalar>(rowCount).fill(null);
+    } else {
+      const bucket = values[visibleIndex];
+      if (bucket !== undefined) result[column.key] = bucket;
+      visibleIndex += 1;
+    }
   }
 
   return { rowCount, columns: result };

@@ -306,6 +306,7 @@ describe("export", () => {
     ];
     const data = fromCsv("A,C\r\nleft,right", columns);
     expect(data.columns).toEqual({ a: ["left"], hidden: [null], c: ["right"] });
+    expect(Object.keys(data.columns)).toEqual(["a", "hidden", "c"]);
 
     const store = new SheetwriteStore(
       {
