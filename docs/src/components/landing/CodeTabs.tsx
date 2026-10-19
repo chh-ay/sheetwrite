@@ -1,6 +1,6 @@
 import { type ComponentType, lazy, Suspense, useState } from "react";
 
-import { InstallCommand } from "../InstallCommand.js";
+import { PackageCommand } from "../PackageCommand.js";
 import VanillaSnippet from "./snippets/vanilla.mdx";
 import { onTabListKey } from "./tabKeys.js";
 
@@ -98,7 +98,7 @@ export function CodeTabs() {
         </Suspense>
       </div>
       <div className="sw-code-tabs__install">
-        <InstallCommand packageName={current.pkg} />
+        <PackageCommand packages={current.pkg} />
       </div>
     </div>
   );

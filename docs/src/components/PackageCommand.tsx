@@ -16,7 +16,7 @@ const MANAGER_STORAGE_KEY = "sheetwrite-package-manager";
 const MANAGER_EVENT = "sheetwrite:package-manager";
 const COPIED_FEEDBACK_MS = 1600;
 
-function isManagerId(value: string | null): value is ManagerId {
+function isManagerId(value: unknown): value is ManagerId {
   return MANAGERS.some((manager) => manager.id === value);
 }
 
@@ -67,10 +67,37 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
           {MANAGERS.map((entry) => (
             <button
               aria-controls={`${id}-command`}
+              id={`${id}-${entry.id}`}
               aria-selected={entry.id === manager}
               key={entry.id}
               onClick={() => choose(entry.id)}
+              onKeyDown={(event) => {
+                const index = MANAGERS.findIndex((item) => item.id === entry.id);
+                let nextIndex: number;
+                switch (event.key) {
+                  case "ArrowRight":
+                    nextIndex = (index + 1) % MANAGERS.length;
+                    break;
+                  case "ArrowLeft":
+                    nextIndex = (index + MANAGERS.length - 1) % MANAGERS.length;
+                    break;
+                  case "Home":
+                    nextIndex = 0;
+                    break;
+                  case "End":
+                    nextIndex = MANAGERS.length - 1;
+                    break;
+                  default:
+                    return;
+                }
+                event.preventDefault();
+                const next = MANAGERS[nextIndex]?.id;
+                if (!next) return;
+                choose(next);
+                document.getElementById(`${id}-${next}`)?.focus();
+              }}
               role="tab"
+              tabIndex={entry.id === manager ? 0 : -1}
               type="button"
             >
               {entry.id}
@@ -95,7 +122,13 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
           <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
         </button>
       </div>
-      <pre className="sw-terminal__body" id={`${id}-command`} role="tabpanel">
+      <pre
+        aria-labelledby={`${id}-${manager}`}
+        className="sw-terminal__body"
+        id={`${id}-command`}
+        role="tabpanel"
+        tabIndex={0}
+      >
         <code>
           <span aria-hidden="true" className="sw-terminal__prompt">
             ${" "}

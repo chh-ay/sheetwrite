@@ -2,19 +2,18 @@
 title: "Moved guides"
 description: "Where each former repository guide now lives in the documentation site."
 ---
-The old loose Markdown files were removed only after every source guide had a canonical routed replacement.
+Each guide now has a page in the docs site. Choose its new home below.
 
-| Former repository guide | Canonical route |
-| --- | --- |
-| `docs/README.md` | [`/docs/start/installation/`](/docs/start/installation/) |
-| `docs/getting-started.md` | [`/docs/start/installation/`](/docs/start/installation/) |
-| `docs/concepts.md` | [`/docs/concepts/runtime-ownership/`](/docs/concepts/runtime-ownership/) |
-| `docs/configuration.md` | [`/docs/guides/configuration/`](/docs/guides/configuration/) |
-| `docs/framework-integration.md` | [`/docs/frameworks/lifecycle/`](/docs/frameworks/lifecycle/) |
-| `docs/interaction.md` | [`/docs/guides/interaction/`](/docs/guides/interaction/) |
-| `docs/data-operations.md` | [`/docs/guides/data-operations/`](/docs/guides/data-operations/) |
-| `docs/formulas.md` | [`/docs/guides/formulas/`](/docs/guides/formulas/) |
-| `docs/collaboration.md` | [`/docs/guides/collaboration/`](/docs/guides/collaboration/) |
-| `docs/worker-rendering.md` | [`/docs/guides/worker-rendering/`](/docs/guides/worker-rendering/) |
-| `docs/styling.md` | [`/docs/guides/styling/`](/docs/guides/styling/) |
-| `docs/accessibility.md` | [`/docs/guides/accessibility/`](/docs/guides/accessibility/) |
+<div class="sw-next-links sw-moved-guides">
+<a href="/docs/start/installation/"><strong>Installation</strong><code>docs/README.md</code><code>docs/getting-started.md</code></a>
+<a href="/docs/concepts/runtime-ownership/"><strong>Runtime ownership</strong><code>docs/concepts.md</code></a>
+<a href="/docs/guides/configuration/"><strong>Configuration</strong><code>docs/configuration.md</code></a>
+<a href="/docs/frameworks/lifecycle/"><strong>Lifecycle</strong><code>docs/framework-integration.md</code></a>
+<a href="/docs/guides/interaction/"><strong>Interaction</strong><code>docs/interaction.md</code></a>
+<a href="/docs/guides/data-operations/"><strong>Data operations</strong><code>docs/data-operations.md</code></a>
+<a href="/docs/guides/formulas/"><strong>Formulas</strong><code>docs/formulas.md</code></a>
+<a href="/docs/guides/collaboration/"><strong>Collaboration</strong><code>docs/collaboration.md</code></a>
+<a href="/docs/guides/worker-rendering/"><strong>Worker rendering</strong><code>docs/worker-rendering.md</code></a>
+<a href="/docs/guides/styling/"><strong>Styling</strong><code>docs/styling.md</code></a>
+<a href="/docs/guides/accessibility/"><strong>Accessibility</strong><code>docs/accessibility.md</code></a>
+</div>

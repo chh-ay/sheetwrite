@@ -4,7 +4,7 @@
  * draws with these, so all charts share one axis style and one number format.
  */
 
-import { formatMs, html, readableId } from "./evidence-format.js";
+import { formatBytes, formatMs, html, readableId } from "./evidence-format.js";
 
 interface BenchScale {
   pct: (value: number) => string;
@@ -91,18 +91,27 @@ interface BenchFigureGroup {
   }>;
 }
 
-/**
- * Log-scale bar figure: one row per operation or workload, one bar per entry
- * (an input size, a variant, or an engine). Every bar maps through the
- * figure-wide scale, so even a single-bar row carries its position on the ruler.
- */
-function benchScaleFigure(lead: string, groups: readonly BenchFigureGroup[]): string[] {
-  const scale = benchLogScale(
-    groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
+/** Time uses a shared log scale; memory uses a shared linear byte scale. */
+function benchScaleFigure(
+  lead: string,
+  groups: readonly BenchFigureGroup[],
+  metric: "time" | "memory" = "time",
+): string[] {
+  const values = groups.flatMap((group) =>
+    group.entries.flatMap((entry) => [entry.median, entry.p95]),
+  );
+  const formatValue = metric === "memory" ? formatBytes : formatMs;
+  const scale = metric === "memory" ? benchLinearScale(values, formatValue) : benchLogScale(values);
+  const axisNote =
+    metric === "memory"
+      ? "linear scale — shorter uses less memory"
+      : "log scale — every tick is 10× — shorter is faster";
+  const unlabelled = groups.every((group) =>
+    group.entries.every((entry) => entry.sizeLabel === ""),
   );
   const lines = [
-    `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
-    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+    `<figure class="bench-viz bench-ruled${unlabelled ? " bench-viz--unlabelled" : ""}" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">${axisNote}</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
     scale.ruler,
   ];
   for (const group of groups) {
@@ -125,7 +134,7 @@ function benchScaleFigure(lead: string, groups: readonly BenchFigureGroup[]): st
           `<span class="bench-bar__track" aria-hidden="true">` +
           `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
           `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
-          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatMs(entry.median)}</b><b class="bench-num" data-stat="p95">${formatMs(entry.p95)}</b></span>` +
+          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatValue(entry.median)}</b><b class="bench-num" data-stat="p95">${formatValue(entry.p95)}</b></span>` +
           `</div>`,
       );
     }

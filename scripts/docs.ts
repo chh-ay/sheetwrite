@@ -59,21 +59,17 @@ import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import {
   allMeasurements,
-  capitalized,
   evidenceHeadline,
   formatCaptureTime,
   formatCount,
   formatMb,
   formatMs,
-  formatRatio,
   formatSpeedup,
   html,
   provenanceList,
   readableId,
   readableText,
-  reductionText,
   shortHash,
-  speedupText,
 } from "./evidence-format.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
@@ -1329,14 +1325,21 @@ function renderMovedGuides(): string {
       "Moved guides",
       "Where each former repository guide now lives in the documentation site.",
     ).trimEnd(),
-    "The old loose Markdown files were removed only after every source guide had a canonical routed replacement.",
+    "Each guide now has a page in the docs site. Choose its new home below.",
     "",
-    "| Former repository guide | Canonical route |",
-    "| --- | --- |",
+    '<div class="sw-next-links sw-moved-guides">',
   ];
+  const guides = new Map<string, string[]>();
   for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
-    lines.push(`| \`${oldPath}\` | [\`${route}\`](${route}) |`);
+    guides.set(route, [...(guides.get(route) ?? []), oldPath]);
   }
+  for (const [route, oldPaths] of guides) {
+    const title = readableId(route.split("/").filter(Boolean).at(-1) ?? route);
+    lines.push(
+      `<a href="${html(route)}"><strong>${html(title)}</strong>${oldPaths.map((path) => `<code>${html(path)}</code>`).join("")}</a>`,
+    );
+  }
+  lines.push("</div>");
   return `${lines.join("\n")}\n`;
 }
 
@@ -2220,7 +2223,7 @@ function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
 /** Markdown table cells cannot carry a raw pipe. */
 const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
 
-/** Core write-path scenarios that lead the section; the rest stay in the table. */
+/** Four representative scenarios lead the complete measurement chart. */
 const CORE_PATH_HEADLINES = [
   "setblock-admission",
   "csv-import",
@@ -2234,13 +2237,6 @@ const CORE_PATH_HEADLINES = [
  */
 function scenarioLabel(unit: string): string {
   return unit.replace(/^one /u, "");
-}
-
-/** A readable scenario name over the one-line description; the raw ID is the hover title. */
-function scenarioCell(id: string, description: string): string {
-  return markdownCell(
-    `<span class="bench-scenario" title="${html(id)}"><strong>${html(readableId(id))}</strong><span>${html(description)}</span></span>`,
-  );
 }
 
 /**
@@ -2271,32 +2267,22 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    ...benchScaleFigure(
-      "scenario",
-      evidence.scenarios.flatMap((scenario) => [
-        {
-          label: scenario.id,
-          detail: readableText(scenarioLabel(scenario.unit)),
-          entries: [{ sizeLabel: "", median: scenario.timing.median, p95: scenario.timing.p95 }],
-        },
-        ...(scenario.variants ?? []).map((variant) => ({
-          label: variant.id,
-          detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
-          entries: [{ sizeLabel: "", median: variant.timing.median, p95: variant.timing.p95 }],
-        })),
-      ]),
-    ),
-    "",
     ...allMeasurements([
-      "| Scenario | Median | p95 |",
-      "| --- | ---: | ---: |",
-      ...evidence.scenarios.flatMap((scenario) => [
-        `| ${scenarioCell(scenario.id, readableText(scenario.unit))} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
-        ...(scenario.variants ?? []).map(
-          (variant) =>
-            `| ${scenarioCell(variant.id, `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run.`)} | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
-        ),
-      ]),
+      ...benchScaleFigure(
+        "scenario",
+        evidence.scenarios.flatMap((scenario) => [
+          {
+            label: scenario.id,
+            detail: readableText(scenarioLabel(scenario.unit)),
+            entries: [{ sizeLabel: "", median: scenario.timing.median, p95: scenario.timing.p95 }],
+          },
+          ...(scenario.variants ?? []).map((variant) => ({
+            label: variant.id,
+            detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
+            entries: [{ sizeLabel: "", median: variant.timing.median, p95: variant.timing.p95 }],
+          })),
+        ]),
+      ),
       "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
@@ -2373,23 +2359,6 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
         summary.scenario === scenario,
     );
   const baselineCommit = evidence.toolchain.baselineCommit;
-  const operations = [...new Set(evidence.comparisons.map((comparison) => comparison.operation))];
-  const headlines = operations.flatMap((operation) => {
-    const compared = evidence.comparisons.filter(
-      (comparison) => comparison.operation === operation,
-    );
-    const scope = compared.length === 1 ? operation : `${operation}, ${compared.length} scenarios`;
-    return [
-      {
-        value: speedupText(compared.map((comparison) => comparison.medianWallRatio)),
-        label: `${capitalized(scope)}: time`,
-      },
-      {
-        value: reductionText(compared.map((comparison) => comparison.peakRssRatio)),
-        label: `${capitalized(scope)}: peak memory`,
-      },
-    ];
-  });
   const provenance = provenanceList([
     ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
     ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
@@ -2407,51 +2376,57 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
     ],
     ["Raw artifact", `<code>${html(source)}</code>`],
   ]);
+  const measurementGroups = (metric: "time" | "memory") =>
+    evidence.summaries
+      .filter((summary) => summary.engine === "current")
+      .map((current) => {
+        const baseline =
+          baselineCommit === undefined
+            ? undefined
+            : summaryFor("baseline", current.operation, current.scenario);
+        const stat = (summary: XlsxEvidence["summaries"][number]) =>
+          metric === "time" ? summary.durationMs : summary.maxRssBytes;
+        return {
+          label: `${current.operation} ${current.scenario}`,
+          detail:
+            metric === "time"
+              ? undefined
+              : `Maximum peak RSS: current ${formatMb(current.maxRssBytes.max)}${baseline === undefined ? "" : ` · baseline ${formatMb(baseline.maxRssBytes.max)}`}`,
+          entries: [
+            { sizeLabel: "Current", median: stat(current).median, p95: stat(current).p95 },
+            ...(baseline === undefined
+              ? []
+              : [
+                  {
+                    sizeLabel: "Baseline",
+                    median: stat(baseline).median,
+                    p95: stat(baseline).p95,
+                    series: "compare" as const,
+                  },
+                ]),
+          ],
+        };
+      });
   return [
     "## XLSX codec benchmark",
     "",
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
     "",
     ...(baselineCommit === undefined
-      ? [
-          "This capture ran the current tree only, so no codec comparison is published.",
-          "",
-          "| Operation | Scenario | Median | p95 | Peak RSS |",
-          "| --- | --- | ---: | ---: | ---: |",
-          ...evidence.summaries
-            .filter((summary) => summary.engine === "current")
-            .map(
-              (summary) =>
-                `| ${summary.operation} | ${summary.scenario} | ${formatMs(summary.durationMs.median)} | ${formatMs(summary.durationMs.p95)} | ${formatMb(summary.maxRssBytes.max)} |`,
-            ),
-          "",
-          ...allMeasurements(provenance),
-        ]
+      ? ["This capture ran the current tree only. No codec comparison is claimed.", ""]
       : [
-          ...evidenceHeadline(headlines),
-          `The baseline is the same codec at commit ${shortHash(baselineCommit)}, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster or smaller.`,
+          `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baselineCommit)}.`,
           "",
-          "| Operation | Scenario | Time ratio | Peak memory ratio |",
-          "| --- | --- | ---: | ---: |",
-          ...evidence.comparisons.map(
-            (comparison) =>
-              `| ${comparison.operation} | ${comparison.scenario} | ${formatRatio(comparison.medianWallRatio)} | ${formatRatio(comparison.peakRssRatio)} |`,
-          ),
-          "",
-          ...allMeasurements([
-            ...provenance,
-            "| Operation | Scenario | Current median | Baseline median | Current peak RSS | Baseline peak RSS |",
-            "| --- | --- | ---: | ---: | ---: | ---: |",
-            ...evidence.comparisons.flatMap((comparison) => {
-              const current = summaryFor("current", comparison.operation, comparison.scenario);
-              const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
-              if (current === undefined || baseline === undefined) return [];
-              return [
-                `| ${comparison.operation} | ${comparison.scenario} | ${formatMs(current.durationMs.median)} | ${formatMs(baseline.durationMs.median)} | ${formatMb(current.maxRssBytes.max)} | ${formatMb(baseline.maxRssBytes.max)} |`,
-              ];
-            }),
-          ]),
         ]),
+    "#### Operation time",
+    "",
+    ...benchScaleFigure("operation", measurementGroups("time")),
+    "",
+    "#### Peak resident memory",
+    "",
+    ...benchScaleFigure("operation", measurementGroups("memory"), "memory"),
+    "",
+    ...allMeasurements(provenance),
     "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
     '```sh verify title="XLSX codec evidence"',

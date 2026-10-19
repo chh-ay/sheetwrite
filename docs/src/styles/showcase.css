@@ -1203,44 +1203,6 @@
     text-underline-offset: 0.25rem;
   }
 
-  .sw-install-command {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--sw-border-strong);
-    border-radius: 0.5rem;
-    color: var(--sw-fg-muted);
-    background: var(--sw-surface-0);
-    cursor: pointer;
-    transition:
-      border-color 160ms ease-out,
-      background 160ms ease-out;
-  }
-
-  .sw-install-command:hover {
-    border-color: var(--sw-accent);
-    background: var(--sw-surface-2);
-  }
-
-  .sw-install-command code {
-    overflow: hidden;
-    color: var(--sw-fg-strong);
-    font: 500 var(--sw-type-xs) var(--sw-font-mono);
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sw-install-command strong {
-    color: var(--sw-accent-strong);
-    font: 700 var(--sw-type-xs) var(--sw-font-mono);
-    text-transform: uppercase;
-  }
-
   .sw-showcase-page__stage {
     overflow: hidden;
     border: 1px solid var(--sw-border);
@@ -1752,7 +1714,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sw-install-command,
     .sw-showcase-page__footer-links a {
       transition: none;
     }

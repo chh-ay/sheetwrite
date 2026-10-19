@@ -67,6 +67,23 @@ function installCommandsAsTerminals() {
   };
 }
 
+/** Generated Markdown keeps its content static; only the filter needs hydration. */
+function hydrateFormulaReference() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.tagName === "formulareference") {
+        node.type = "mdxJsxFlowElement";
+        node.name = "FormulaReference";
+        node.attributes = [];
+        delete node.tagName;
+        delete node.properties;
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
 /** Keeps code focus client-owned and removes copy controls from API signatures. */
 function markResponsiveCodeBlocks() {
   return (tree: HastNode): void => {
@@ -247,6 +264,7 @@ export default defineConfig({
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          hydrateFormulaReference,
           dedupeCodePopovers,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,

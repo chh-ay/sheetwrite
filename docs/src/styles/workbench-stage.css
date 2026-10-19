@@ -132,9 +132,6 @@
   .sw-workbench-stage .sw-demo-controlbar__identity {
     min-width: 0;
   }
-  .sw-showcase-page__footer .sw-install-command {
-    max-width: 100%;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .sw-workbench-stage *,

@@ -194,6 +194,8 @@ interface RenderedHover {
   narrowSignature: ElementContent[];
   docs?: string;
   tags: readonly [name: string, text: string | undefined][];
+  examples?: ReadonlyMap<string, ElementContent[]>;
+  seeRoutes?: ReadonlyMap<string, string>;
   referenceRoute?: string;
   /** When set, the trigger itself is an anchor: hover previews, click navigates. */
   navigable?: boolean;
@@ -291,7 +293,12 @@ function codeLineContents(ast: Element): ElementContent[] {
   const lines = selectAll(".ec-line > .code", ast);
   const output: ElementContent[] = [];
   for (const [index, line] of lines.entries()) {
-    output.push(h("span.sw-code-popover__line", line.children));
+    // Block lines use a newline placeholder; flattened code has separators below.
+    const placeholder =
+      line.children.length === 1 &&
+      line.children[0]?.type === "text" &&
+      line.children[0].value === "\n";
+    output.push(h("span.sw-code-popover__line", placeholder ? [] : line.children));
     if (index < lines.length - 1) output.push({ type: "text", value: "\n" });
   }
   return output;
@@ -478,11 +485,11 @@ function exampleCode(value: string): string {
   return (fenced?.[1] ?? value).replace(/^\n+|\s+$/g, "");
 }
 
-/** Render a cleaned tag value with bare URLs as real links, like the reference footer. */
+/** Make external URLs and site paths clickable in tag text. */
 function tagValueContents(value: string): ElementContent[] {
   const cleaned = cleanDocumentation(value);
   const contents: ElementContent[] = [];
-  const urlPattern = /https?:\/\/[^\s"'<>)]+/g;
+  const urlPattern = /https?:\/\/[^\s"'<>)]+|\/(?:docs|showcases)\/[^\s"'<>)`]*/g;
   let cursor = 0;
   for (const match of cleaned.matchAll(urlPattern)) {
     const start = match.index ?? 0;
@@ -490,8 +497,13 @@ function tagValueContents(value: string): ElementContent[] {
     contents.push(
       h(
         "a.sw-code-popover__tag-link",
-        { href: match[0], rel: "noreferrer", target: "_blank" },
-        match[0].replace(/^https?:\/\//, "").replace(/\/$/, ""),
+        {
+          href: match[0],
+          ...(match[0].startsWith("http") ? { rel: "noreferrer", target: "_blank" } : {}),
+        },
+        match[0].startsWith("http")
+          ? match[0].replace(/^https?:\/\//, "").replace(/\/$/, "")
+          : match[0],
       ),
     );
     cursor = start + match[0].length;
@@ -572,12 +584,32 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
                     name === "example" && value
                       ? h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
                           h("span.sw-code-popover__tag-name", "Example"),
-                          h("code.sw-code-popover__example", exampleCode(value)),
+                          h(
+                            "code.sw-code-popover__example",
+                            structuredClone(
+                              this.rendered.examples?.get(value) ?? [
+                                { type: "text" as const, value: exampleCode(value) },
+                              ],
+                            ),
+                          ),
                         ])
                       : h("span.sw-code-popover__tag", [
-                          h("span.sw-code-popover__tag-name", `@${name}`),
+                          h(
+                            "span.sw-code-popover__tag-name",
+                            name === "see" ? "See also" : `@${name}`,
+                          ),
                           ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
-                          ...(value ? tagValueContents(value) : []),
+                          ...(value
+                            ? name === "see" && this.rendered.seeRoutes?.has(value)
+                              ? [
+                                  h(
+                                    "a.sw-code-popover__tag-link",
+                                    { href: this.rendered.seeRoutes.get(value) },
+                                    cleanDocumentation(value),
+                                  ),
+                                ]
+                              : tagValueContents(value)
+                            : []),
                         ]),
                   ),
                 )
@@ -676,6 +708,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
     string,
     { accessible: string; wide: ElementContent[]; narrow: ElementContent[] }
   >();
+  const exampleParts = new Map<string, ElementContent[]>();
 
   const resolveManifest = async (): Promise<void> => {
     if (referenceRoutes && memberReferences && symbolPreviews) return;
@@ -825,6 +858,27 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
               meta: "",
             }),
           ]);
+          const examples = new Map<string, ElementContent[]>();
+          const seeRoutes = new Map<string, string>();
+          for (const [name, value] of hover.tags ?? []) {
+            if (name === "see" && value) {
+              const label = cleanDocumentation(value);
+              const route = referenceRouteForHover(label, label, routes);
+              if (route) seeRoutes.set(value, route);
+            }
+            if (name !== "example" || !value) continue;
+            let contents = exampleParts.get(value);
+            if (contents === undefined) {
+              const rendered = await signatureRenderer.render({
+                code: exampleCode(value),
+                language: /```([\w-]+)/.exec(value)?.[1] ?? "ts",
+                meta: "",
+              });
+              contents = codeLineContents(rendered.renderedGroupAst);
+              exampleParts.set(value, contents);
+            }
+            examples.set(value, contents);
+          }
           const popoverId = hoverPopoverId(codeBlock, hover, hoverIndex);
           line.addAnnotation(
             new SheetwriteHoverAnnotation(
@@ -835,6 +889,8 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
                 docs: hover.docs ?? memberReference?.docs,
                 tags: hover.tags ?? [],
+                examples,
+                seeRoutes,
                 referenceRoute,
                 navigable: referenceRoute !== undefined,
               },

@@ -2892,7 +2892,7 @@ Unsupported names evaluate to `#NAME?` while preserving source for snapshots and
 
 ## Performance evidence
 
-The [default and full formula engine results](https://sheetwrite.vercel.app/docs/guides/performance-resources/#default-and-full-formula-engines) compare both engines on the formula benchmark and time the analysis families. Follow the [performance evidence guide](https://sheetwrite.vercel.app/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
+The [engine guide](https://sheetwrite.vercel.app/docs/guides/performance-resources/#choose-a-formula-engine) shows function coverage, download size, and analysis workloads. Shared functions use the same implementation in both builds. Small timing differences do not show that one package is faster. Follow the [performance evidence guide](https://sheetwrite.vercel.app/docs/guides/performance-resources/) to capture and check measurements; resource ceilings are not benchmark results.
 
 ## Point mode and reference rewriting
 
@@ -4426,27 +4426,49 @@ instance and lets the browser free the old one. Values, formulas and their
 cached results, spills, loaded datasource pages, unsaved edits, and undo
 history all move. If any store cannot move, nothing changes.
 
-| After | WebAssembly memory | Pause |
-| --- | --- | --- |
-| A million-row, three-column sheet is cleared to ten rows | 173 MiB → 38 MiB | about 50 ms |
-| The same clear, with its undo history kept | 173 MiB → 76 MiB | about 270 ms |
-| A paged store with unsaved edits | 38 MiB → 1.2 MiB | about 5 ms |
+WebAssembly memory before and after release Shorter is less memory · shared scale
+
+**Million-row sheet cleared to ten rows**Pause ≈ 50 ms
+Before**173 MiB**
+After**38 MiB**
+
+**Same clear, undo history kept**Pause ≈ 270 ms
+Before**173 MiB**
+After**76 MiB**
+
+**Paged store with unsaved edits**Pause ≈ 5 ms
+Before**38 MiB**
+After**1.2 MiB**
 
 Release never makes memory larger, and the pause grows with the live data.
 See [Release retained engine memory](https://sheetwrite.vercel.app/docs/guides/performance-resources/#release-retained-engine-memory).
 
 ### Other new APIs
 
-| API | Package | Purpose |
-| --- | --- | --- |
-| `grid.getTheme()`, `theme-change` event | core | Read the base theme and react to `setTheme` or `replaceTheme`. |
-| `maxRecentTransactions` in `createRowBridge` | core | Size the row bridge's window of recent transaction IDs (default 8,192). |
-| `SyncConflictRecovery`, `SyncConflictReloadReason`, `recovered` event | core | Result and reasons of in-place conflict recovery. |
-| `releaseEngineMemory()`, `EngineMemoryReleaseReport` | core | Give engine memory back to the browser. |
-| `createEngine()`, `EngineInstance` | wasm, formulas | Create an independent engine instance from shared compiled code. |
-| `setBlockPacked`, `setColumnBlockPacked`, `loadedSpans`, `cellSnapshots` | wasm | Packed bulk writes and reads for direct engine users. |
-| `formulaReadBands` | wasm | The cells that visible formulas read, for windowed loading. |
-| `stringPoolEpoch` | wasm | The string-pool generation that raw string IDs belong to. |
+Choose the layer you use:
+
+Core — themes, row bridges, recovery, and memory
+
+- **Read the theme:** `grid.getTheme()` returns the base theme.
+Listen to `theme-change` for `setTheme` or `replaceTheme`.
+- **Bound row-bridge history:** `maxRecentTransactions` in `createRowBridge`
+sets the recent transaction ID window (default 8,192).
+- **Inspect conflict recovery:** `SyncConflictRecovery`,
+`SyncConflictReloadReason`, and the `recovered` event describe the result
+and reasons of in-place recovery.
+- **Return engine memory:** `releaseEngineMemory()` returns an
+`EngineMemoryReleaseReport`. See the memory comparison above.
+
+Engine — independent instances, bulk data, and windowed reads
+
+- **Create an independent instance:** `createEngine()` and `EngineInstance`
+in `wasm` and `formulas` share compiled code.
+- **Read and write bulk data:** `setBlockPacked`, `setColumnBlockPacked`,
+`loadedSpans`, and `cellSnapshots` in `wasm` use packed data.
+- **Load formula inputs:** `formulaReadBands` in `wasm` identifies the cells
+that visible formulas read.
+- **Track raw string IDs:** `stringPoolEpoch` in `wasm` identifies their
+string-pool generation.
 
 ## Breaking changes
 
@@ -4537,9 +4559,31 @@ unrelated part of the page scrolls.
 
 ## Performance
 
-Numbers are medians from alternating runs on the same machine; results do not
-change. The [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/) has the full
-measurements and the package sizes of both engines.
+These medians come from alternating runs on the same machine. Times vary by
+device and workload. The [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/)
+has the full measurements and package sizes.
+
+OperationLinear scale · shorter is fasterMedian time
+00.511.52 s
+
+Write a 1,000,000-cell block
+0.4.01.36 s
+0.5.0**545 ms**
+
+Import a 1 MB XLSX workbook
+0.4.01.68 s
+0.5.01.04 s
+
+Import CSV · 200,000 rows × 10 columns
+0.4.0**493 ms**
+0.5.0**239 ms**
+
+Slower in 0.5.0
+
+Column sum (`aggregate`), 100,000 to 1,000,000 rowsAbout 2× slower0.21 → 0.44 ms at 100,000 rows; 1.9 → 4.2 ms at 1,000,000 rows. 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/) is about 2× faster again; at 100,000 rows it can still be slower than 0.4.0. Tracked in #110 (https://github.com/chh-ay/sheetwrite/issues/110).
+Create a 100,000-cell spill6–27% slower10.6 ms → 11.2–13.5 ms. Tracked in #109 (https://github.com/chh-ay/sheetwrite/issues/109).
+
+All performance changes
 
 Load and import
 
@@ -4582,11 +4626,6 @@ Memory
 
 String-pool storage after 100,000 unique overwrites (not WebAssembly heap size)99.6% less84.3 MB → 0.35 MB
 XLSX import peak memory34% less476 MiB → 312 MiB
-
-Slower in 0.5.0
-
-Column sum (`aggregate`), 100,000 to 1,000,000 rowsAbout 2× slower0.21 → 0.44 ms at 100,000 rows. 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/) is about 2× faster again; at 100,000 rows it can still be slower than 0.4.0. Tracked in #110 (https://github.com/chh-ay/sheetwrite/issues/110).
-Create a 100,000-cell spill6–27% slower10.6 ms → 11.2–13.5 ms. Tracked in #109 (https://github.com/chh-ay/sheetwrite/issues/109).
 
 ## Upgrade checklist
 
@@ -4651,29 +4690,46 @@ pages make guides and examples easier to find.
 
 ### Typed shortcuts
 
-A key combination can be a string such as `"Mod+Shift+K"` or an object such as
-`{ key: "k", mod: true, shift: true }`. `Mod` shows as Command on macOS and as Control
-elsewhere, and accepts either key. `Ctrl` and `Meta` always mean those specific keys.
+macOS⌘⇧K
+Windows / LinuxCtrlShiftK
+`Mod+Shift+K`
 
-**API change:** `ContextMenuItem.shortcut` accepts a bound action name, such as
-`"copy"`, or a key combination. Replace free-text shortcut hints with one of
-these forms. Use `config.keyboard.bindings` to change or disable an action's keys.
+Binding rules and API changes
 
-A context-menu item with a key combination and an `onClick` handler now runs
-that handler when the Grid has focus and the user presses the combination.
-Combinations with `Mod`, `Ctrl`, or `Meta` also work in the inline editor.
-Conflicting commands throw `SheetwriteError` with code `shortcut-conflict`;
-malformed combinations throw `invalid-shortcut`.
+The same binding can use an object:
+
+```ts
+const shortcut = {
+  key: "k",
+  mod: true,
+  shift: true
+};
+```
+
+- `Mod` accepts Command or Control. `Ctrl` and `Meta` mean those specific keys.
+- `ContextMenuItem.shortcut` accepts a bound action name, such as `"copy"`,
+or a key combination. Replace free-text hints with one of these forms.
+- Use `config.keyboard.bindings` to change or disable an action's keys.
+- With Grid focus, a context-menu item's key combination runs its `onClick`
+handler. Combinations with `Mod`, `Ctrl`, or `Meta` also work in the inline editor.
+- Conflicts throw `SheetwriteError` with code `shortcut-conflict`.
+Malformed combinations throw `invalid-shortcut`.
 
 ### Action feedback
 
-Built-in toolbar, context-menu, and find buttons show a busy state while a
-command runs and show errors when it fails. Repeated starts of a pending
-command are ignored. Blocked clipboard access shows a recovery message.
+ReadyExport XLSXStart the command.
+Running◌ Exporting…Busy state. Repeated starts are ignored.
+FailedExport failedA visible error explains the failure.
 
-`GridActions.exportXlsx()` now returns a promise that never rejects. Built-in
-export failures show an alert and emit `export-error`, whose format can be
-`"csv"` or `"xlsx"`. Direct `Grid.exportXlsx()` calls still reject on failure.
+Built-in toolbar, context-menu, and find buttons show these states.
+Blocked clipboard access shows a recovery message.
+
+Export completion and error handling
+
+`GridActions.exportXlsx()` returns a promise that never rejects. Await it to
+wait for the command to finish, including after a failure. Built-in export
+failures show an alert and emit `export-error`, with format `"csv"` or `"xlsx"`.
+Direct `Grid.exportXlsx()` calls still reject on failure.
 
 ## Fixes
 
@@ -4928,7 +4984,7 @@ webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node 
 
 ## Full formula engine
 
-By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It is the same engine with more functions and the same API, and a larger download. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples, and the [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/#default-and-full-formula-engines) compares both engines.
+By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It uses the same engine code, with more functions and a larger download. The [analysis formulas guide](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) shows each family with examples. [Choose an engine](https://sheetwrite.vercel.app/docs/guides/performance-resources/#choose-a-formula-engine) by its functions and download size.
 
 ```sh
 npm install @sheetwrite/core @sheetwrite/formulas

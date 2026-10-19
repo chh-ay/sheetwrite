@@ -296,7 +296,7 @@ Unsupported names evaluate to `#NAME?` while preserving source for snapshots and
 
 ## Performance evidence
 
-The [default and full formula engine results](/docs/guides/performance-resources/#default-and-full-formula-engines) compare both engines on the formula benchmark and time the analysis families. Follow the [performance evidence guide](/docs/guides/performance-resources/) to capture and freshness-check measurements; do not treat resource ceilings as benchmark results.
+The [engine guide](/docs/guides/performance-resources/#choose-a-formula-engine) shows function coverage, download size, and analysis workloads. Shared functions use the same implementation in both builds. Small timing differences do not show that one package is faster. Follow the [performance evidence guide](/docs/guides/performance-resources/) to capture and check measurements; resource ceilings are not benchmark results.
 
 ## Point mode and reference rewriting
 

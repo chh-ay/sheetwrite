@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
-import { InstallCommand } from "../components/InstallCommand.js";
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
@@ -9,6 +8,7 @@ import { GridGlow } from "../components/landing/GridGlow.js";
 import { HeroScene } from "../components/landing/HeroScene.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
 import { useScenePlayback } from "../components/landing/useScenePlayback.js";
+import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
@@ -238,7 +238,7 @@ function Landing() {
               </Link>
             </div>
             <div className="sw-lp-hero__install">
-              <InstallCommand packageName="@sheetwrite/core" />
+              <PackageCommand packages="@sheetwrite/core" />
             </div>
           </div>
           <HeroScene />

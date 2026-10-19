@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { InstallCommand } from "../components/InstallCommand.js";
+import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { SHOWCASE_NAVIGATION } from "../lib/navigation.js";
 import { CapabilityHero } from "./CapabilityHero.js";
@@ -118,7 +118,7 @@ export function ShowcasePage({
             <span>Build with this adapter</span>
             <strong>Install {packageName}.</strong>
             <p>The guide documents lifecycle, SSR, reset, and event contracts for this adapter.</p>
-            <InstallCommand packageName={packageName} />
+            <PackageCommand packages={packageName} />
           </div>
           <nav aria-label="Example resources" className="sw-showcase-page__footer-links">
             <a href={guide}>

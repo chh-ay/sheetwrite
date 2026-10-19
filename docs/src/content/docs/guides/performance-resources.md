@@ -831,7 +831,9 @@ bun run --filter @sheetwrite/bench bench:data
 <div><dt>Cold initSheetwrite() through first store in a fresh Node process (7 processes)</dt><dd>4.24 ms</dd></div>
 </dl>
 
-<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:5">
+<details class="bench-all"><summary>All measurements</summary>
+
+<figure class="bench-viz bench-ruled bench-viz--unlabelled" data-pagefind-ignore style="--bench-segs:5">
 <div class="bench-viz__scale"><span class="bench-viz__lead">scenario</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
 <div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.1</span><span class="bench-ruler__tick" style="left:20.00%">1</span><span class="bench-ruler__tick" style="left:40.00%">10</span><span class="bench-ruler__tick" style="left:60.00%">100</span><span class="bench-ruler__tick" style="left:80.00%">1 s</span><span class="bench-ruler__tick" style="left:100.00%">10 s</span></span><span class="bench-bar__value"></span></div>
 <div class="bench-viz__row" data-outcome="faster">
@@ -891,25 +893,6 @@ bun run --filter @sheetwrite/bench bench:data
 <div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:33.22%"></i><i class="bench-bar__fill" style="width:32.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.24 ms</b><b class="bench-num" data-stat="p95">4.58 ms</b></span></div>
 </div>
 </figure>
-
-<details class="bench-all"><summary>All measurements</summary>
-
-| Scenario | Median | p95 |
-| --- | ---: | ---: |
-| <span class="bench-scenario" title="row-bridge-insert"><strong>Row bridge insert</strong><span>One addRows projection of 10,000 rows into a 1,000,000-row bridge</span></span> | 5.95 ms | 6.30 ms |
-| <span class="bench-scenario" title="command-state-select"><strong>Command state select</strong><span>One 4,096-cell range selection on a framework-style grid</span></span> | 6.71 ms | 8.84 ms |
-| <span class="bench-scenario" title="with-command-state-handler"><strong>With command state handler</strong><span>Variant of command state select, measured in the same run.</span></span> | 6.71 ms | 8.84 ms |
-| <span class="bench-scenario" title="without-command-state-handler"><strong>Without command state handler</strong><span>Variant of command state select, measured in the same run.</span></span> | 5.07 ms | 5.75 ms |
-| <span class="bench-scenario" title="setblock-admission"><strong>Setblock admission</strong><span>One Grid.applyTransaction of a 1,000,000-cell setBlock</span></span> | 489 ms | 503 ms |
-| <span class="bench-scenario" title="setblock-detailed-capture"><strong>Setblock detailed capture</strong><span>One Grid.applyTransaction of a 1,000,000-cell setBlock observed through a change listener with detailed capture</span></span> | 564 ms | 568 ms |
-| <span class="bench-scenario" title="sync-offline-queue"><strong>Sync offline queue</strong><span>One grid commit admitted into an offline sync queue with no listeners</span></span> | 0.67 ms | 0.80 ms |
-| <span class="bench-scenario" title="rebase-large"><strong>Rebase large</strong><span>One rebase of a 100,000-cell block across 50 single-row inserts</span></span> | 1.54 ms | 1.54 ms |
-| <span class="bench-scenario" title="validation-sparse"><strong>Validation sparse</strong><span>One 100,000-cell sparse setRange with 100 rules outside the range</span></span> | 169 ms | 169 ms |
-| <span class="bench-scenario" title="csv-import"><strong>Csv import</strong><span>One fromCsv import of 200,000 rows by 10 columns</span></span> | 235 ms | 235 ms |
-| <span class="bench-scenario" title="undo-large-clear"><strong>Undo large clear</strong><span>One undo of a 1,000,000-cell clearRange</span></span> | 1.61 s | 1.62 s |
-| <span class="bench-scenario" title="restore-near-ceiling"><strong>Restore near ceiling</strong><span>One restoreBlock with 60,000,044 decoded bytes</span></span> | 1.06 s | 1.07 s |
-| <span class="bench-scenario" title="paged-evicted-revisit"><strong>Paged evicted revisit</strong><span>One revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric)</span></span> | 5.86 ms | 6.97 ms |
-| <span class="bench-scenario" title="node-cold-init"><strong>Node cold init</strong><span>One cold initSheetwrite() through first store in a fresh Node process (7 processes)</span></span> | 4.24 ms | 4.58 ms |
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:24 UTC</dd></div>
@@ -1251,105 +1234,18 @@ Reproduce with:
 bun run --filter @sheetwrite/bench bench:formula
 ```
 
-### Default and full formula engines
+### Choose a formula engine
 
-<div class="evidence-available"><strong>Validated evidence.</strong> 8 shared workloads have 25 paired rounds per engine. The full engine also has 8 checked analysis workloads.</div>
+Shared functions use the same implementation in both builds. Choose by function coverage and download size, not small timing differences.
 
-<dl class="bench-stats" data-pagefind-ignore>
-<div><dt>Shared workloads more than 5% slower on the full engine</dt><dd>0 of 8</dd></div>
-<div><dt>Widest paired-ratio spread (limit 1.50×)</dt><dd>1.32×</dd></div>
-<div><dt>Default engine WASM, Brotli</dt><dd>250.1 KiB</dd></div>
-<div><dt>Full engine WASM, Brotli</dt><dd>336.2 KiB</dd></div>
-</dl>
+<div class="sw-engine-choices">
+<div class="sw-engine-choice"><span>Default engine</span><h4><code>@sheetwrite/wasm</code></h4><p>Core spreadsheet functions, with the smaller download.</p><strong>250.1 KiB</strong><small>Brotli WASM · 856.4 KiB uncompressed</small></div>
+<div class="sw-engine-choice"><span>Full engine</span><h4><code>@sheetwrite/formulas</code></h4><p>Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions.</p><strong>336.2 KiB</strong><small>Brotli WASM · 1.1 MiB uncompressed</small></div>
+</div>
 
-The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.
-
-No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows.
-
-<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:5">
-<div class="bench-viz__scale"><span class="bench-viz__lead">shared workload</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
-<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.0001</span><span class="bench-ruler__tick" style="left:20.00%">0.001</span><span class="bench-ruler__tick" style="left:40.00%">0.01</span><span class="bench-ruler__tick" style="left:60.00%">0.1</span><span class="bench-ruler__tick" style="left:80.00%">1</span><span class="bench-ruler__tick" style="left:100.00%">10 ms</span></span><span class="bench-bar__value"></span></div>
-<div class="bench-viz__row" data-outcome="even">
-<div class="bench-viz__head"><span class="bench-viz__label" title="independent-parse-load">Independent parse load<span class="bench-viz__detail">Size 1,000 · paired ratio 0.85×–1.12×</span></span><span class="bench-viz__ratio" data-kind="even">About the same</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:77.51%"></i><i class="bench-bar__fill" style="width:76.64%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.68 ms</b><b class="bench-num" data-stat="p95">0.75 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:77.81%"></i><i class="bench-bar__fill" style="width:76.55%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.67 ms</b><b class="bench-num" data-stat="p95">0.78 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="independent-first-recompute">Independent first recompute<span class="bench-viz__detail">Size 1,000 · paired ratio 0.77×–0.98×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.09× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:76.85%"></i><i class="bench-bar__fill" style="width:76.11%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.64 ms</b><b class="bench-num" data-stat="p95">0.70 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:76.19%"></i><i class="bench-bar__fill" style="width:74.69%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.54 ms</b><b class="bench-num" data-stat="p95">0.65 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="independent-parse-load">Independent parse load<span class="bench-viz__detail">Size 10,000 · paired ratio 0.87×–1.09×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.06× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:97.29%"></i><i class="bench-bar__fill" style="width:96.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.72 ms</b><b class="bench-num" data-stat="p95">7.32 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:96.96%"></i><i class="bench-bar__fill" style="width:96.35%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.57 ms</b><b class="bench-num" data-stat="p95">7.05 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="independent-first-recompute">Independent first recompute<span class="bench-viz__detail">Size 10,000 · paired ratio 0.76×–0.93×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.18× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:97.00%"></i><i class="bench-bar__fill" style="width:96.18%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.44 ms</b><b class="bench-num" data-stat="p95">7.08 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:95.70%"></i><i class="bench-bar__fill" style="width:94.43%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.27 ms</b><b class="bench-num" data-stat="p95">6.10 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="linear-chain">Linear chain<span class="bench-viz__detail">Size 8 · paired ratio 0.84×–1.09×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.06× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:41.36%"></i><i class="bench-bar__fill" style="width:40.56%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.01 ms</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:40.90%"></i><i class="bench-bar__fill" style="width:40.13%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.01 ms</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="wide-fan-out-edit">Wide fan out edit<span class="bench-viz__detail">Size 1,000 · paired ratio 0.79×–1.02×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.08× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:72.52%"></i><i class="bench-bar__fill" style="width:71.70%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.38 ms</b><b class="bench-num" data-stat="p95">0.42 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:71.76%"></i><i class="bench-bar__fill" style="width:70.84%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.35 ms</b><b class="bench-num" data-stat="p95">0.39 ms</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="even">
-<div class="bench-viz__head"><span class="bench-viz__label" title="scalar-edit-affects-0">Scalar edit affects 0<span class="bench-viz__detail">Size 1,000 · paired ratio 0.95×–1.06×</span></span><span class="bench-viz__ratio" data-kind="even">About the same</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:15.66%"></i><i class="bench-bar__fill" style="width:15.35%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1 µs</b><b class="bench-num" data-stat="p95">1 µs</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:15.63%"></i><i class="bench-bar__fill" style="width:15.31%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1 µs</b><b class="bench-num" data-stat="p95">1 µs</b></span></div>
-</div>
-<div class="bench-viz__row" data-outcome="faster">
-<div class="bench-viz__head"><span class="bench-viz__label" title="vlookup-many">Vlookup many<span class="bench-viz__detail">Size 1,000 · paired ratio 0.85×–1.02×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.10× faster</span></div>
-<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.87%"></i><i class="bench-bar__fill" style="width:84.00%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.59 ms</b><b class="bench-num" data-stat="p95">1.75 ms</b></span></div>
-<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.08%"></i><i class="bench-bar__fill" style="width:83.15%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.44 ms</b><b class="bench-num" data-stat="p95">1.60 ms</b></span></div>
-</div>
-</figure>
+[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/guides/analysis-formulas/)
 
 <details class="bench-all"><summary>All measurements</summary>
-
-| Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Independent parse load | 1,000 | 0.68 ms | 0.67 ms | 1.01× | 0.85×–1.12× |
-| Independent first recompute | 1,000 | 0.64 ms | 0.54 ms | 0.92× | 0.77×–0.98× |
-| Independent parse load | 10,000 | 6.72 ms | 6.57 ms | 0.94× | 0.87×–1.09× |
-| Independent first recompute | 10,000 | 6.44 ms | 5.27 ms | 0.85× | 0.76×–0.93× |
-| Linear chain | 8 | 0.01 ms | 0.01 ms | 0.95× | 0.84×–1.09× |
-| Wide fan out edit | 1,000 | 0.38 ms | 0.35 ms | 0.93× | 0.79×–1.02× |
-| Scalar edit affects 0 | 1,000 | 1 µs | 1 µs | 1.00× | 0.95×–1.06× |
-| Vlookup many | 1,000 | 1.59 ms | 1.44 ms | 0.91× | 0.85×–1.02× |
-
-<dl class="bench-meta" data-pagefind-ignore>
-<div><dt>Matched capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
-<div><dt>Matched commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
-<div><dt>Analysis capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
-<div><dt>Analysis commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
-<div><dt>Machine</dt><dd>12th Gen Intel(R) Core(TM) i9-12900H · Linux 7.2.8-1-cachyos · x64 · Bun 1.4.3</dd></div>
-</dl>
-
-#### Method
-
-The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. Those eight rows were checked with matched rounds. Each pair runs default, then full, in separate Bun processes. A timed sample starts with 3 untimed warm-up fixtures and then repeats the workload until at least 50 ms of measured time; the sample is the per-iteration mean, so a short operation is measured over many repetitions instead of one cold run. The runner used CPU 4 and one concurrent capture.
-
-The ratio is full time divided by default time within each pair. The table shows the median of 25 paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time.
-
-Identical shared work is the control for this protocol: the widest paired-ratio p10–p90 span across the 8 rows is 1.32× (limit 1.50×), so each median ratio is supported by its paired samples.
-
-| Shared workload | Iterations per sample |
-| --- | ---: |
-| independent-parse-load | 64–84 |
-| independent-first-recompute | 70–101 |
-| independent-parse-load | 7–9 |
-| independent-first-recompute | 7–11 |
-| linear-chain | 4,177–5,658 |
-| wide-fan-out-edit | 117–161 |
-| scalar-edit-affects-0 | 81,154–96,796 |
-| vlookup-many | 28–40 |
 
 #### Analysis workloads
 
@@ -1357,29 +1253,53 @@ Each workload has 1,000 formulas. It has one untimed warmup and five measured sa
 
 LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.
 
-| Full-only workload | Median | p95 |
-| --- | ---: | ---: |
-| Linest | 4.66 ms | 7.70 ms |
-| Xirr | 1.54 ms | 1.60 ms |
-| Dsum | 2.98 ms | 4.16 ms |
-| Textsplit regexreplace | 3.07 ms | 3.25 ms |
-| Sortby | 3.49 ms | 7.23 ms |
-| Mode mult | 1.03 ms | 1.31 ms |
-| Map reduce | 26.7 ms | 26.9 ms |
-| Mmult | 1.36 ms | 1.43 ms |
+<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:2">
+<div class="bench-viz__scale"><span class="bench-viz__lead">analysis workload</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
+<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">1</span><span class="bench-ruler__tick" style="left:50.00%">10</span><span class="bench-ruler__tick" style="left:100.00%">100 ms</span></span><span class="bench-bar__value"></span></div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="linest">Linest</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:44.32%"></i><i class="bench-bar__fill" style="width:33.41%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.66 ms</b><b class="bench-num" data-stat="p95">7.70 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="xirr">Xirr</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:10.26%"></i><i class="bench-bar__fill" style="width:9.35%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.54 ms</b><b class="bench-num" data-stat="p95">1.60 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="dsum">Dsum</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:30.93%"></i><i class="bench-bar__fill" style="width:23.68%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">2.98 ms</b><b class="bench-num" data-stat="p95">4.16 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="textsplit-regexreplace">Textsplit regexreplace</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:25.62%"></i><i class="bench-bar__fill" style="width:24.39%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3.07 ms</b><b class="bench-num" data-stat="p95">3.25 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="sortby">Sortby</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:42.95%"></i><i class="bench-bar__fill" style="width:27.14%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3.49 ms</b><b class="bench-num" data-stat="p95">7.23 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="mode-mult">Mode mult</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:5.89%"></i><i class="bench-bar__fill" style="width:0.65%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.03 ms</b><b class="bench-num" data-stat="p95">1.31 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="map-reduce">Map reduce</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:71.52%"></i><i class="bench-bar__fill" style="width:71.36%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">26.7 ms</b><b class="bench-num" data-stat="p95">26.9 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="mmult">Mmult</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">1,000 formulas</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:7.81%"></i><i class="bench-bar__fill" style="width:6.69%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.36 ms</b><b class="bench-num" data-stat="p95">1.43 ms</b></span></div>
+</div>
+</figure>
 
-#### WASM size and Node initialization
-
-| Engine | Node | WASM size | Brotli q11 size | Cold init median | Cold init p95 |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Default | v26.9.0 | 856.4 KiB | 250.1 KiB | 4.03 ms | 4.44 ms |
-| Full | v26.9.0 | 1.1 MiB | 336.2 KiB | 5.33 ms | 5.92 ms |
-
-Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.
+Brotli size uses quality 11 on the WASM file only. It is not the full package transfer size. The raw artifacts retain cold-initialization samples; those samples do not establish that one engine initializes faster.
 
 Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.
 
-The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.
+<dl class="bench-meta" data-pagefind-ignore>
+<div><dt>Analysis capture</dt><dd>2026-10-17 06:44 UTC</dd></div>
+<div><dt>Analysis commit</dt><dd><code title="49e05e298c3f39a8cede038fe8d0062343abc21f">49e05e298c3f</code> clean worktree</dd></div>
+</dl>
+
+Shared-workload captures are validation data, not evidence that one package is faster.
 
 </details>
 
@@ -1395,22 +1315,87 @@ bun run bench:formula:matched
 
 <div class="evidence-available"><strong>Validated evidence.</strong> 5 compared operations over 5 process-isolated rounds each, from one checked corpus fixture.</div>
 
-<dl class="bench-stats" data-pagefind-ignore>
-<div><dt>Import: time</dt><dd>5.5× faster</dd></div>
-<div><dt>Import: peak memory</dt><dd>91% less</dd></div>
-<div><dt>Export, 4 scenarios: time</dt><dd>1.3–3.7× faster</dd></div>
-<div><dt>Export, 4 scenarios: peak memory</dt><dd>19–47% less</dd></div>
-</dl>
+Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code>.
 
-The baseline is the same codec at commit <code title="87fadb72397947ea8c6ba576682925c7879579b8">87fadb723979</code>, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster or smaller.
+#### Operation time
 
-| Operation | Scenario | Time ratio | Peak memory ratio |
-| --- | --- | ---: | ---: |
-| import | combined | 0.18× | 0.09× |
-| export | scalar | 0.78× | 0.76× |
-| export | rich | 0.69× | 0.80× |
-| export | shared-style | 0.74× | 0.53× |
-| export | sparse | 0.27× | 0.81× |
+<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:4">
+<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
+<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">1</span><span class="bench-ruler__tick" style="left:25.00%">10</span><span class="bench-ruler__tick" style="left:50.00%">100</span><span class="bench-ruler__tick" style="left:75.00%">1 s</span><span class="bench-ruler__tick" style="left:100.00%">10 s</span></span><span class="bench-bar__value"></span></div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export rich">Export rich</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:58.79%"></i><i class="bench-bar__fill" style="width:58.45%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">218 ms</b><b class="bench-num" data-stat="p95">225 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:62.91%"></i><i class="bench-bar__fill" style="width:62.52%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">317 ms</b><b class="bench-num" data-stat="p95">328 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export scalar">Export scalar</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:62.20%"></i><i class="bench-bar__fill" style="width:61.96%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">301 ms</b><b class="bench-num" data-stat="p95">308 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:64.90%"></i><i class="bench-bar__fill" style="width:64.62%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">385 ms</b><b class="bench-num" data-stat="p95">395 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export shared-style">Export shared style</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:68.30%"></i><i class="bench-bar__fill" style="width:68.21%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">535 ms</b><b class="bench-num" data-stat="p95">539 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:71.78%"></i><i class="bench-bar__fill" style="width:71.50%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">724 ms</b><b class="bench-num" data-stat="p95">743 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export sparse">Export sparse</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:37.14%"></i><i class="bench-bar__fill" style="width:35.98%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">27.5 ms</b><b class="bench-num" data-stat="p95">30.6 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:51.14%"></i><i class="bench-bar__fill" style="width:50.25%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">102 ms</b><b class="bench-num" data-stat="p95">111 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="import combined">Import combined</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:74.34%"></i><i class="bench-bar__fill" style="width:74.01%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">913 ms</b><b class="bench-num" data-stat="p95">941 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:92.75%"></i><i class="bench-bar__fill" style="width:92.55%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.03 s</b><b class="bench-num" data-stat="p95">5.13 s</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="reject compression-ratio">Reject compression ratio</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:8.45%"></i><i class="bench-bar__fill" style="width:3.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.38 ms</b><b class="bench-num" data-stat="p95">2.18 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="reject deep-xml">Reject deep xml</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:18.05%"></i><i class="bench-bar__fill" style="width:16.99%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.78 ms</b><b class="bench-num" data-stat="p95">5.27 ms</b></span></div>
+</div>
+</figure>
+
+#### Peak resident memory
+
+<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:4">
+<div class="bench-viz__scale"><span class="bench-viz__lead">operation</span><span class="bench-viz__axis-note">linear scale — shorter uses less memory</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
+<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0</span><span class="bench-ruler__tick" style="left:25.00%">866.0 MiB</span><span class="bench-ruler__tick" style="left:50.00%">1,731.9 MiB</span><span class="bench-ruler__tick" style="left:75.00%">2,597.9 MiB</span><span class="bench-ruler__tick" style="left:100.00%">3,463.9 MiB</span></span><span class="bench-bar__value"></span></div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export rich">Export rich<span class="bench-viz__detail">Maximum peak RSS: current 151.4 MB · baseline 188.4 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:4.17%"></i><i class="bench-bar__fill" style="width:4.11%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">142.2 MiB</b><b class="bench-num" data-stat="p95">144.4 MiB</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:5.18%"></i><i class="bench-bar__fill" style="width:5.11%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">177.1 MiB</b><b class="bench-num" data-stat="p95">179.5 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export scalar">Export scalar<span class="bench-viz__detail">Maximum peak RSS: current 165.3 MB · baseline 217.2 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:4.55%"></i><i class="bench-bar__fill" style="width:4.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">157.3 MiB</b><b class="bench-num" data-stat="p95">157.6 MiB</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:5.98%"></i><i class="bench-bar__fill" style="width:5.96%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">206.4 MiB</b><b class="bench-num" data-stat="p95">207.1 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export shared-style">Export shared style<span class="bench-viz__detail">Maximum peak RSS: current 163.0 MB · baseline 307.6 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:4.49%"></i><i class="bench-bar__fill" style="width:4.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">154.9 MiB</b><b class="bench-num" data-stat="p95">155.4 MiB</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:8.47%"></i><i class="bench-bar__fill" style="width:8.39%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">290.7 MiB</b><b class="bench-num" data-stat="p95">293.3 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="export sparse">Export sparse<span class="bench-viz__detail">Maximum peak RSS: current 97.0 MB · baseline 120.1 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:2.67%"></i><i class="bench-bar__fill" style="width:2.65%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">91.6 MiB</b><b class="bench-num" data-stat="p95">92.5 MiB</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:3.30%"></i><i class="bench-bar__fill" style="width:3.27%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">113.3 MiB</b><b class="bench-num" data-stat="p95">114.5 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="import combined">Import combined<span class="bench-viz__detail">Maximum peak RSS: current 329.5 MB · baseline 3642.2 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:9.06%"></i><i class="bench-bar__fill" style="width:9.00%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">311.6 MiB</b><b class="bench-num" data-stat="p95">313.8 MiB</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Baseline</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:100.00%"></i><i class="bench-bar__fill" style="width:97.18%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">3,366.1 MiB</b><b class="bench-num" data-stat="p95">3,463.9 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="reject compression-ratio">Reject compression ratio<span class="bench-viz__detail">Maximum peak RSS: current 49.4 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:1.36%"></i><i class="bench-bar__fill" style="width:1.34%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">46.5 MiB</b><b class="bench-num" data-stat="p95">47.0 MiB</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="reject deep-xml">Reject deep xml<span class="bench-viz__detail">Maximum peak RSS: current 52.1 MB</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Current</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:1.43%"></i><i class="bench-bar__fill" style="width:1.41%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">49.0 MiB</b><b class="bench-num" data-stat="p95">49.5 MiB</b></span></div>
+</div>
+</figure>
 
 <details class="bench-all"><summary>All measurements</summary>
 
@@ -1423,13 +1408,6 @@ The baseline is the same codec at commit <code title="87fadb72397947ea8c6ba57668
 <div><dt>Raw artifact</dt><dd><code>bench/results/xlsx-results.json</code></dd></div>
 </dl>
 
-| Operation | Scenario | Current median | Baseline median | Current peak RSS | Baseline peak RSS |
-| --- | --- | ---: | ---: | ---: | ---: |
-| import | combined | 913 ms | 5.03 s | 329.5 MB | 3642.2 MB |
-| export | scalar | 301 ms | 385 ms | 165.3 MB | 217.2 MB |
-| export | rich | 218 ms | 317 ms | 151.4 MB | 188.4 MB |
-| export | shared-style | 535 ms | 724 ms | 163.0 MB | 307.6 MB |
-| export | sparse | 27.5 ms | 102 ms | 97.0 MB | 120.1 MB |
 
 </details>
 

@@ -11,12 +11,20 @@ A function's presence means only the signature and semantic profiles linked in i
 
 ## Engine builds
 
-- `@sheetwrite/wasm` is the default engine. In the function tables, the Engine column shows `default, full` for a function in both engines and `full` for a function in `@sheetwrite/formulas` only.
+<details>
+<summary>Choose and initialize an engine</summary>
+
+- `@sheetwrite/wasm` is the default engine. The Engine column shows `Default + full` for a function in both engines and `Full only` for a function in `@sheetwrite/formulas` only.
 - `@sheetwrite/formulas` is the full engine. It adds the analysis families marked below: distributions and statistics, regression, finance, dates, text and regex, database, math and matrices, reshaping, LAMBDA helpers, and grouping. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.
 - The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.
 - Numeric functions use binary64 arithmetic with function-specific domains and bounded numerical algorithms. The inventory does not claim unlimited tail accuracy or complete Excel/Google Sheets/OpenFormula parity.
 
+</details>
+
 ## Bounded evaluation contract
+
+<details>
+<summary>Evaluation limits and numerical behavior</summary>
 
 - Parsing and dependency evaluation are each capped at 256 recursive levels. Range and matrix work is capped at 1,000,000 cells, 1,048,576 rows, 16,384 columns, and 64 MiB of value/intermediate storage; excess work returns an explicit formula error rather than truncating.
 - One dynamic-array recompute pass is capped at 2,000,000 cell operations. Spill installation is atomic and collision-checked; see the [formula guide](/docs/guides/formulas/#dynamic-arrays-and-spills) for admission rules.
@@ -26,389 +34,439 @@ A function's presence means only the signature and semantic profiles linked in i
 
 No formula throughput or latency number is published here because this contract has no checked final formula-performance artifact. Use the [performance evidence protocol](/docs/guides/performance-resources/) to capture and validate measurements; limits above are implementation ceilings, not benchmark results.
 
+</details>
+
 ## Functions by family
+
+<FormulaReference>
+
+<section class="sw-formula-family">
 
 ### Dynamic array
 
 Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `FILTER` | default, full | incumbent | [`filter`](#signature-filter) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SORT` | default, full | incumbent | [`sort`](#signature-sort) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNIQUE` | default, full | incumbent | [`unique`](#signature-unique) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRANSPOSE` | default, full | required target | [`array-unary`](#signature-array-unary) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SEQUENCE` | default, full | required target | [`sequence`](#signature-sequence) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TAKE` | default, full | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DROP` | default, full | required target | [`take-drop`](#signature-take-drop) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSECOLS` | default, full | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSEROWS` | default, full | required target | [`choose-axis`](#signature-choose-axis) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EXPAND` | full | optional analysis | [`reshape-expand`](#signature-reshape-expand) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `HSTACK` | full | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `SORTBY` | full | optional analysis | [`sort-by`](#signature-sort-by) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `TOCOL` | full | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `TOROW` | full | optional analysis | [`reshape-flatten`](#signature-reshape-flatten) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `VSTACK` | full | optional analysis | [`reshape-stack`](#signature-reshape-stack) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `WRAPCOLS` | full | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `WRAPROWS` | full | optional analysis | [`reshape-wrap`](#signature-reshape-wrap) | [`array`](#semantics-array) | [`excel-documented`](#dialect-excel-documented) | [`analysis-reshape`](#implementation-analysis-reshape) |
-| `GROUPBY` | full | optional analysis | [`groupby-groupby`](#signature-groupby-groupby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
-| `PIVOTBY` | full | optional analysis | [`groupby-pivotby`](#signature-groupby-pivotby) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
-| `PERCENTOF` | full | optional analysis | [`groupby-percentof`](#signature-groupby-percentof) | [`analysis-groupby`](#semantics-analysis-groupby) | [`analysis-groupby`](#dialect-analysis-groupby) | [`analysis-groupby`](#implementation-analysis-groupby) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="FILTER" data-engine="default"><td><code>FILTER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-filter">Signature: <code>filter</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SORT" data-engine="default"><td><code>SORT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sort">Signature: <code>sort</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="UNIQUE" data-engine="default"><td><code>UNIQUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unique">Signature: <code>unique</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TRANSPOSE" data-engine="default"><td><code>TRANSPOSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-array-unary">Signature: <code>array-unary</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SEQUENCE" data-engine="default"><td><code>SEQUENCE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-sequence">Signature: <code>sequence</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TAKE" data-engine="default"><td><code>TAKE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-take-drop">Signature: <code>take-drop</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DROP" data-engine="default"><td><code>DROP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-take-drop">Signature: <code>take-drop</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHOOSECOLS" data-engine="default"><td><code>CHOOSECOLS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-choose-axis">Signature: <code>choose-axis</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHOOSEROWS" data-engine="default"><td><code>CHOOSEROWS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-choose-axis">Signature: <code>choose-axis</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EXPAND" data-engine="full"><td><code>EXPAND</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-expand">Signature: <code>reshape-expand</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="HSTACK" data-engine="full"><td><code>HSTACK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-stack">Signature: <code>reshape-stack</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="SORTBY" data-engine="full"><td><code>SORTBY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-sort-by">Signature: <code>sort-by</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="TOCOL" data-engine="full"><td><code>TOCOL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-flatten">Signature: <code>reshape-flatten</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="TOROW" data-engine="full"><td><code>TOROW</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-flatten">Signature: <code>reshape-flatten</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="VSTACK" data-engine="full"><td><code>VSTACK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-stack">Signature: <code>reshape-stack</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="WRAPCOLS" data-engine="full"><td><code>WRAPCOLS</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-wrap">Signature: <code>reshape-wrap</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="WRAPROWS" data-engine="full"><td><code>WRAPROWS</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-reshape-wrap">Signature: <code>reshape-wrap</code></a><br /><a href="#semantics-array">Semantics: <code>array</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-reshape">Implementation: <code>analysis-reshape</code></a></details></td></tr>
+<tr data-formula-name="GROUPBY" data-engine="full"><td><code>GROUPBY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-groupby">Signature: <code>groupby-groupby</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
+<tr data-formula-name="PIVOTBY" data-engine="full"><td><code>PIVOTBY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-pivotby">Signature: <code>groupby-pivotby</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
+<tr data-formula-name="PERCENTOF" data-engine="full"><td><code>PERCENTOF</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-groupby-percentof">Signature: <code>groupby-percentof</code></a><br /><a href="#semantics-analysis-groupby">Semantics: <code>analysis-groupby</code></a><br /><a href="#dialect-analysis-groupby">Dialect: <code>analysis-groupby</code></a><br /><a href="#implementation-analysis-groupby">Implementation: <code>analysis-groupby</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Date and time
 
 Taxonomy/source: [Date and time functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `DATE` | default, full | incumbent | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DATEVALUE` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAY` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MONTH` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `YEAR` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TODAY` | default, full | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NOW` | default, full | incumbent | [`zero`](#signature-zero) | [`volatile-date`](#semantics-volatile-date) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TIME` | default, full | required target | [`date-three`](#signature-date-three) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TIMEVALUE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `HOUR` | default, full | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MINUTE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SECOND` | default, full | required target | [`unary-value`](#signature-unary-value) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAYS` | default, full | required target | [`date-pair`](#signature-date-pair) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EDATE` | default, full | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EOMONTH` | default, full | required target | [`date-offset`](#signature-date-offset) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WEEKDAY` | default, full | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WEEKNUM` | default, full | required target | [`weekday-weeknum`](#signature-weekday-weeknum) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `WORKDAY` | default, full | required target | [`workday`](#signature-workday) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NETWORKDAYS` | default, full | required target | [`networkdays`](#signature-networkdays) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `YEARFRAC` | default, full | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DAYS360` | default, full | required target | [`yearfrac-days360`](#signature-yearfrac-days360) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `DATEDIF` | full | optional analysis | [`datedif`](#signature-datedif) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
-| `ISOWEEKNUM` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
-| `NETWORKDAYS.INTL` | full | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
-| `WORKDAY.INTL` | full | optional analysis | [`calendar-intl`](#signature-calendar-intl) | [`date-time`](#semantics-date-time) | [`excel-documented`](#dialect-excel-documented) | [`analysis-dates`](#implementation-analysis-dates) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="DATE" data-engine="default"><td><code>DATE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-date-three">Signature: <code>date-three</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DATEVALUE" data-engine="default"><td><code>DATEVALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DAY" data-engine="default"><td><code>DAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MONTH" data-engine="default"><td><code>MONTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="YEAR" data-engine="default"><td><code>YEAR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TODAY" data-engine="default"><td><code>TODAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-date">Semantics: <code>volatile-date</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NOW" data-engine="default"><td><code>NOW</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-volatile-date">Semantics: <code>volatile-date</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TIME" data-engine="default"><td><code>TIME</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-date-three">Signature: <code>date-three</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TIMEVALUE" data-engine="default"><td><code>TIMEVALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="HOUR" data-engine="default"><td><code>HOUR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MINUTE" data-engine="default"><td><code>MINUTE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SECOND" data-engine="default"><td><code>SECOND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DAYS" data-engine="default"><td><code>DAYS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-date-pair">Signature: <code>date-pair</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EDATE" data-engine="default"><td><code>EDATE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-date-offset">Signature: <code>date-offset</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EOMONTH" data-engine="default"><td><code>EOMONTH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-date-offset">Signature: <code>date-offset</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="WEEKDAY" data-engine="default"><td><code>WEEKDAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-weekday-weeknum">Signature: <code>weekday-weeknum</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="WEEKNUM" data-engine="default"><td><code>WEEKNUM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-weekday-weeknum">Signature: <code>weekday-weeknum</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="WORKDAY" data-engine="default"><td><code>WORKDAY</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-workday">Signature: <code>workday</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NETWORKDAYS" data-engine="default"><td><code>NETWORKDAYS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-networkdays">Signature: <code>networkdays</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="YEARFRAC" data-engine="default"><td><code>YEARFRAC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-yearfrac-days360">Signature: <code>yearfrac-days360</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DAYS360" data-engine="default"><td><code>DAYS360</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-yearfrac-days360">Signature: <code>yearfrac-days360</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="DATEDIF" data-engine="full"><td><code>DATEDIF</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-datedif">Signature: <code>datedif</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-dates">Implementation: <code>analysis-dates</code></a></details></td></tr>
+<tr data-formula-name="ISOWEEKNUM" data-engine="full"><td><code>ISOWEEKNUM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-dates">Implementation: <code>analysis-dates</code></a></details></td></tr>
+<tr data-formula-name="NETWORKDAYS.INTL" data-engine="full"><td><code>NETWORKDAYS.INTL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-calendar-intl">Signature: <code>calendar-intl</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-dates">Implementation: <code>analysis-dates</code></a></details></td></tr>
+<tr data-formula-name="WORKDAY.INTL" data-engine="full"><td><code>WORKDAY.INTL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-calendar-intl">Signature: <code>calendar-intl</code></a><br /><a href="#semantics-date-time">Semantics: <code>date-time</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-dates">Implementation: <code>analysis-dates</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Financial
 
 Taxonomy/source: [Financial functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `PV` | default, full | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FV` | default, full | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PMT` | default, full | required target | [`pv-fv-pmt`](#signature-pv-fv-pmt) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NPV` | default, full | required target | [`npv`](#signature-npv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IRR` | default, full | required target | [`irr`](#signature-irr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RATE` | default, full | required target | [`rate`](#signature-rate) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IPMT` | default, full | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PPMT` | default, full | required target | [`period-payment`](#signature-period-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CUMIPMT` | full | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `CUMPRINC` | full | optional analysis | [`cumulative-payment`](#signature-cumulative-payment) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `DB` | full | optional analysis | [`db`](#signature-db) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `DDB` | full | optional analysis | [`ddb`](#signature-ddb) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `EFFECT` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `FVSCHEDULE` | full | optional analysis | [`fvschedule`](#signature-fvschedule) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `MIRR` | full | optional analysis | [`mirr`](#signature-mirr) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `NOMINAL` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `NPER` | full | optional analysis | [`nper`](#signature-nper) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `PDURATION` | full | optional analysis | [`pduration`](#signature-pduration) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `RRI` | full | optional analysis | [`rri`](#signature-rri) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `SLN` | full | optional analysis | [`sln`](#signature-sln) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `SYD` | full | optional analysis | [`syd`](#signature-syd) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `XIRR` | full | optional analysis | [`xirr`](#signature-xirr) | [`financial-iterative`](#semantics-financial-iterative) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
-| `XNPV` | full | optional analysis | [`xnpv`](#signature-xnpv) | [`financial`](#semantics-financial) | [`excel-documented`](#dialect-excel-documented) | [`analysis-finance`](#implementation-analysis-finance) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="PV" data-engine="default"><td><code>PV</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pv-fv-pmt">Signature: <code>pv-fv-pmt</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FV" data-engine="default"><td><code>FV</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pv-fv-pmt">Signature: <code>pv-fv-pmt</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PMT" data-engine="default"><td><code>PMT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pv-fv-pmt">Signature: <code>pv-fv-pmt</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NPV" data-engine="default"><td><code>NPV</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-npv">Signature: <code>npv</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="IRR" data-engine="default"><td><code>IRR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-irr">Signature: <code>irr</code></a><br /><a href="#semantics-financial-iterative">Semantics: <code>financial-iterative</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RATE" data-engine="default"><td><code>RATE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-rate">Signature: <code>rate</code></a><br /><a href="#semantics-financial-iterative">Semantics: <code>financial-iterative</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="IPMT" data-engine="default"><td><code>IPMT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-period-payment">Signature: <code>period-payment</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PPMT" data-engine="default"><td><code>PPMT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-period-payment">Signature: <code>period-payment</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CUMIPMT" data-engine="full"><td><code>CUMIPMT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-cumulative-payment">Signature: <code>cumulative-payment</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="CUMPRINC" data-engine="full"><td><code>CUMPRINC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-cumulative-payment">Signature: <code>cumulative-payment</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="DB" data-engine="full"><td><code>DB</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-db">Signature: <code>db</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="DDB" data-engine="full"><td><code>DDB</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-ddb">Signature: <code>ddb</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="EFFECT" data-engine="full"><td><code>EFFECT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="FVSCHEDULE" data-engine="full"><td><code>FVSCHEDULE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-fvschedule">Signature: <code>fvschedule</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="MIRR" data-engine="full"><td><code>MIRR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-mirr">Signature: <code>mirr</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="NOMINAL" data-engine="full"><td><code>NOMINAL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="NPER" data-engine="full"><td><code>NPER</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-nper">Signature: <code>nper</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="PDURATION" data-engine="full"><td><code>PDURATION</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pduration">Signature: <code>pduration</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="RRI" data-engine="full"><td><code>RRI</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-rri">Signature: <code>rri</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="SLN" data-engine="full"><td><code>SLN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-sln">Signature: <code>sln</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="SYD" data-engine="full"><td><code>SYD</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-syd">Signature: <code>syd</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="XIRR" data-engine="full"><td><code>XIRR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-xirr">Signature: <code>xirr</code></a><br /><a href="#semantics-financial-iterative">Semantics: <code>financial-iterative</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+<tr data-formula-name="XNPV" data-engine="full"><td><code>XNPV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-xnpv">Signature: <code>xnpv</code></a><br /><a href="#semantics-financial">Semantics: <code>financial</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-analysis-finance">Implementation: <code>analysis-finance</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Information and error
 
 Taxonomy/source: [Information functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `IFERROR` | default, full | incumbent | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IFNA` | default, full | required target | [`if-error`](#signature-if-error) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISBLANK` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISNUMBER` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISTEXT` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISLOGICAL` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISERROR` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISERR` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISNA` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TYPE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `N` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `T` | default, full | required target | [`unary-value`](#signature-unary-value) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NA` | default, full | incumbent | [`zero`](#signature-zero) | [`information`](#semantics-information) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ISOMITTED` | full | optional analysis | [`lambda-isomitted`](#signature-lambda-isomitted) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="IFERROR" data-engine="default"><td><code>IFERROR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-if-error">Signature: <code>if-error</code></a><br /><a href="#semantics-lazy-control">Semantics: <code>lazy-control</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="IFNA" data-engine="default"><td><code>IFNA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-if-error">Signature: <code>if-error</code></a><br /><a href="#semantics-lazy-control">Semantics: <code>lazy-control</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISBLANK" data-engine="default"><td><code>ISBLANK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISNUMBER" data-engine="default"><td><code>ISNUMBER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISTEXT" data-engine="default"><td><code>ISTEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISLOGICAL" data-engine="default"><td><code>ISLOGICAL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISERROR" data-engine="default"><td><code>ISERROR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISERR" data-engine="default"><td><code>ISERR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISNA" data-engine="default"><td><code>ISNA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TYPE" data-engine="default"><td><code>TYPE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="N" data-engine="default"><td><code>N</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="T" data-engine="default"><td><code>T</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NA" data-engine="default"><td><code>NA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-information">Semantics: <code>information</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ISOMITTED" data-engine="full"><td><code>ISOMITTED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-isomitted">Signature: <code>lambda-isomitted</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Logical and control flow
 
 Taxonomy/source: [Logical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `IF` | default, full | incumbent | [`if`](#signature-if) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AND` | default, full | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `OR` | default, full | incumbent | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NOT` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `IFS` | default, full | required target | [`ifs`](#signature-ifs) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SWITCH` | default, full | required target | [`switch`](#signature-switch) | [`lazy-control`](#semantics-lazy-control) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XOR` | default, full | required target | [`logical-variadic`](#signature-logical-variadic) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRUE` | default, full | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FALSE` | default, full | required target | [`zero`](#signature-zero) | [`logical`](#semantics-logical) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LET` | default, full | required target | [`let`](#signature-let) | [`let-binding`](#semantics-let-binding) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LAMBDA` | full | optional analysis | [`lambda-lambda`](#signature-lambda-lambda) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `MAP` | full | optional analysis | [`lambda-map`](#signature-lambda-map) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `REDUCE` | full | optional analysis | [`lambda-reduce`](#signature-lambda-reduce) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `SCAN` | full | optional analysis | [`lambda-scan`](#signature-lambda-scan) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `BYROW` | full | optional analysis | [`lambda-byrow`](#signature-lambda-byrow) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `BYCOL` | full | optional analysis | [`lambda-bycol`](#signature-lambda-bycol) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
-| `MAKEARRAY` | full | optional analysis | [`lambda-makearray`](#signature-lambda-makearray) | [`analysis-lambda`](#semantics-analysis-lambda) | [`analysis-lambda`](#dialect-analysis-lambda) | [`analysis-lambda`](#implementation-analysis-lambda) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="IF" data-engine="default"><td><code>IF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-if">Signature: <code>if</code></a><br /><a href="#semantics-lazy-control">Semantics: <code>lazy-control</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="AND" data-engine="default"><td><code>AND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-logical-variadic">Signature: <code>logical-variadic</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="OR" data-engine="default"><td><code>OR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-logical-variadic">Signature: <code>logical-variadic</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NOT" data-engine="default"><td><code>NOT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="IFS" data-engine="default"><td><code>IFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-ifs">Signature: <code>ifs</code></a><br /><a href="#semantics-lazy-control">Semantics: <code>lazy-control</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SWITCH" data-engine="default"><td><code>SWITCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-switch">Signature: <code>switch</code></a><br /><a href="#semantics-lazy-control">Semantics: <code>lazy-control</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="XOR" data-engine="default"><td><code>XOR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-logical-variadic">Signature: <code>logical-variadic</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TRUE" data-engine="default"><td><code>TRUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FALSE" data-engine="default"><td><code>FALSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-logical">Semantics: <code>logical</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LET" data-engine="default"><td><code>LET</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-let">Signature: <code>let</code></a><br /><a href="#semantics-let-binding">Semantics: <code>let-binding</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LAMBDA" data-engine="full"><td><code>LAMBDA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-lambda">Signature: <code>lambda-lambda</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="MAP" data-engine="full"><td><code>MAP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-map">Signature: <code>lambda-map</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="REDUCE" data-engine="full"><td><code>REDUCE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-reduce">Signature: <code>lambda-reduce</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="SCAN" data-engine="full"><td><code>SCAN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-scan">Signature: <code>lambda-scan</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="BYROW" data-engine="full"><td><code>BYROW</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-byrow">Signature: <code>lambda-byrow</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="BYCOL" data-engine="full"><td><code>BYCOL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-bycol">Signature: <code>lambda-bycol</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+<tr data-formula-name="MAKEARRAY" data-engine="full"><td><code>MAKEARRAY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lambda-makearray">Signature: <code>lambda-makearray</code></a><br /><a href="#semantics-analysis-lambda">Semantics: <code>analysis-lambda</code></a><br /><a href="#dialect-analysis-lambda">Dialect: <code>analysis-lambda</code></a><br /><a href="#implementation-analysis-lambda">Implementation: <code>analysis-lambda</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Lookup and reference
 
 Taxonomy/source: [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `INDEX` | default, full | incumbent | [`index`](#signature-index) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MATCH` | default, full | incumbent | [`match`](#signature-match) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VLOOKUP` | default, full | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `HLOOKUP` | default, full | incumbent | [`table-lookup`](#signature-table-lookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XLOOKUP` | default, full | incumbent | [`xlookup`](#signature-xlookup) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `XMATCH` | default, full | required target | [`xmatch`](#signature-xmatch) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHOOSE` | default, full | required target | [`choose`](#signature-choose) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROW` | default, full | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROWS` | default, full | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COLUMN` | default, full | required target | [`optional-reference`](#signature-optional-reference) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COLUMNS` | default, full | required target | [`unary-value`](#signature-unary-value) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ADDRESS` | default, full | required target | [`address`](#signature-address) | [`lookup`](#semantics-lookup) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="INDEX" data-engine="default"><td><code>INDEX</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-index">Signature: <code>index</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MATCH" data-engine="default"><td><code>MATCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-match">Signature: <code>match</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VLOOKUP" data-engine="default"><td><code>VLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-table-lookup">Signature: <code>table-lookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="HLOOKUP" data-engine="default"><td><code>HLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-table-lookup">Signature: <code>table-lookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="XLOOKUP" data-engine="default"><td><code>XLOOKUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-xlookup">Signature: <code>xlookup</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="XMATCH" data-engine="default"><td><code>XMATCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-xmatch">Signature: <code>xmatch</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHOOSE" data-engine="default"><td><code>CHOOSE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-choose">Signature: <code>choose</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROW" data-engine="default"><td><code>ROW</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-optional-reference">Signature: <code>optional-reference</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROWS" data-engine="default"><td><code>ROWS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COLUMN" data-engine="default"><td><code>COLUMN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-optional-reference">Signature: <code>optional-reference</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COLUMNS" data-engine="default"><td><code>COLUMNS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ADDRESS" data-engine="default"><td><code>ADDRESS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-address">Signature: <code>address</code></a><br /><a href="#semantics-lookup">Semantics: <code>lookup</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Math and trigonometry
 
 Taxonomy/source: [Math and trigonometry functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `SUM` | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ABS` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUND` | default, full | incumbent | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SQRT` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MOD` | default, full | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `POW` | default, full | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`parser-assisted-evaluator-declared`](#implementation-parser-assisted-evaluator-declared) |
-| `FLOOR` | default, full | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CEILING` | default, full | incumbent | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `INT` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRUNC` | default, full | incumbent | [`trunc`](#signature-trunc) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SIGN` | default, full | incumbent | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PI` | default, full | incumbent | [`zero`](#signature-zero) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMIF` | default, full | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMIFS` | default, full | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PRODUCT` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUMPRODUCT` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `POWER` | default, full | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EXP` | default, full | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LN` | default, full | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOG` | default, full | required target | [`log`](#signature-log) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOG10` | default, full | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUNDUP` | default, full | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ROUNDDOWN` | default, full | required target | [`round`](#signature-round) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MROUND` | default, full | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EVEN` | default, full | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `ODD` | default, full | required target | [`unary-number`](#signature-unary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `QUOTIENT` | default, full | required target | [`binary-number`](#signature-binary-number) | [`scalar`](#semantics-scalar) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `GCD` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LCM` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUBTOTAL` | default, full | required target | [`subtotal`](#signature-subtotal) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AGGREGATE` | full | optional analysis | [`aggregate`](#signature-aggregate) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `CEILING.MATH` | full | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `COMBIN` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `COMBINA` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `FACT` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `FACTDOUBLE` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `FLOOR.MATH` | full | optional analysis | [`round-math`](#signature-round-math) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `MDETERM` | full | optional analysis | [`array-unary`](#signature-array-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `MINVERSE` | full | optional analysis | [`matrix-unary`](#signature-matrix-unary) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `MMULT` | full | optional analysis | [`matrix-pair`](#signature-matrix-pair) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `MULTINOMIAL` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `MUNIT` | full | optional analysis | [`matrix-unit`](#signature-matrix-unit) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `PERMUT` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `PERMUTATIONA` | full | optional analysis | [`binary-number`](#signature-binary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SERIESSUM` | full | optional analysis | [`series-sum`](#signature-series-sum) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SQRTPI` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SUMSQ` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SUMX2MY2` | full | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SUMX2PY2` | full | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
-| `SUMXMY2` | full | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-math`](#semantics-analysis-math) | [`analysis-math`](#dialect-analysis-math) | [`analysis-math`](#implementation-analysis-math) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="SUM" data-engine="default"><td><code>SUM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ABS" data-engine="default"><td><code>ABS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROUND" data-engine="default"><td><code>ROUND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-round">Signature: <code>round</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SQRT" data-engine="default"><td><code>SQRT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MOD" data-engine="default"><td><code>MOD</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="POW" data-engine="default"><td><code>POW</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-parser-assisted-evaluator-declared">Implementation: <code>parser-assisted-evaluator-declared</code></a></details></td></tr>
+<tr data-formula-name="FLOOR" data-engine="default"><td><code>FLOOR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CEILING" data-engine="default"><td><code>CEILING</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="INT" data-engine="default"><td><code>INT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TRUNC" data-engine="default"><td><code>TRUNC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-trunc">Signature: <code>trunc</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SIGN" data-engine="default"><td><code>SIGN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PI" data-engine="default"><td><code>PI</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-zero">Signature: <code>zero</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUMIF" data-engine="default"><td><code>SUMIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUMIFS" data-engine="default"><td><code>SUMIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PRODUCT" data-engine="default"><td><code>PRODUCT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUMPRODUCT" data-engine="default"><td><code>SUMPRODUCT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="POWER" data-engine="default"><td><code>POWER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EXP" data-engine="default"><td><code>EXP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LN" data-engine="default"><td><code>LN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LOG" data-engine="default"><td><code>LOG</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-log">Signature: <code>log</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LOG10" data-engine="default"><td><code>LOG10</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROUNDUP" data-engine="default"><td><code>ROUNDUP</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-round">Signature: <code>round</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ROUNDDOWN" data-engine="default"><td><code>ROUNDDOWN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-round">Signature: <code>round</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MROUND" data-engine="default"><td><code>MROUND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EVEN" data-engine="default"><td><code>EVEN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="ODD" data-engine="default"><td><code>ODD</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="QUOTIENT" data-engine="default"><td><code>QUOTIENT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-scalar">Semantics: <code>scalar</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="GCD" data-engine="default"><td><code>GCD</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LCM" data-engine="default"><td><code>LCM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUBTOTAL" data-engine="default"><td><code>SUBTOTAL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-subtotal">Signature: <code>subtotal</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="AGGREGATE" data-engine="full"><td><code>AGGREGATE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-aggregate">Signature: <code>aggregate</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="CEILING.MATH" data-engine="full"><td><code>CEILING.MATH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-round-math">Signature: <code>round-math</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="COMBIN" data-engine="full"><td><code>COMBIN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="COMBINA" data-engine="full"><td><code>COMBINA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="FACT" data-engine="full"><td><code>FACT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="FACTDOUBLE" data-engine="full"><td><code>FACTDOUBLE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="FLOOR.MATH" data-engine="full"><td><code>FLOOR.MATH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-round-math">Signature: <code>round-math</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="MDETERM" data-engine="full"><td><code>MDETERM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-array-unary">Signature: <code>array-unary</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="MINVERSE" data-engine="full"><td><code>MINVERSE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-matrix-unary">Signature: <code>matrix-unary</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="MMULT" data-engine="full"><td><code>MMULT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-matrix-pair">Signature: <code>matrix-pair</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="MULTINOMIAL" data-engine="full"><td><code>MULTINOMIAL</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="MUNIT" data-engine="full"><td><code>MUNIT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-matrix-unit">Signature: <code>matrix-unit</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="PERMUT" data-engine="full"><td><code>PERMUT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="PERMUTATIONA" data-engine="full"><td><code>PERMUTATIONA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SERIESSUM" data-engine="full"><td><code>SERIESSUM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-series-sum">Signature: <code>series-sum</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SQRTPI" data-engine="full"><td><code>SQRTPI</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SUMSQ" data-engine="full"><td><code>SUMSQ</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SUMX2MY2" data-engine="full"><td><code>SUMX2MY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SUMX2PY2" data-engine="full"><td><code>SUMX2PY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+<tr data-formula-name="SUMXMY2" data-engine="full"><td><code>SUMXMY2</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-math">Semantics: <code>analysis-math</code></a><br /><a href="#dialect-analysis-math">Dialect: <code>analysis-math</code></a><br /><a href="#implementation-analysis-math">Implementation: <code>analysis-math</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Statistical
 
 Taxonomy/source: [Statistical functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `AVERAGE` (`AVG`) | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MIN` | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MAX` | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNT` | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTA` | default, full | incumbent | [`optional-variadic-values`](#signature-optional-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTIF` | default, full | incumbent | [`criteria-one`](#signature-criteria-one) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTIFS` | default, full | incumbent | [`criteria-many`](#signature-criteria-many) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AVERAGEIF` | default, full | incumbent | [`sumif`](#signature-sumif) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `AVERAGEIFS` | default, full | incumbent | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MEDIAN` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MODE.SNGL` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LARGE` | default, full | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SMALL` | default, full | required target | [`value-k`](#signature-value-k) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RANK.EQ` | default, full | required target | [`rank`](#signature-rank) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PERCENTILE.INC` | default, full | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `QUARTILE.INC` | default, full | required target | [`percentile`](#signature-percentile) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `STDEV.S` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `STDEV.P` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VAR.S` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VAR.P` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `GEOMEAN` | default, full | required target | [`variadic-values`](#signature-variadic-values) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CORREL` | default, full | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COVARIANCE.S` | default, full | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COVARIANCE.P` | default, full | required target | [`pair-arrays`](#signature-pair-arrays) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `COUNTBLANK` | default, full | required target | [`unary-value`](#signature-unary-value) | [`aggregate`](#semantics-aggregate) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MAXIFS` | default, full | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MINIFS` | default, full | required target | [`sumifs`](#signature-sumifs) | [`criteria`](#semantics-criteria) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NORM.DIST` | full | optional analysis | [`norm-dist`](#signature-norm-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `NORM.INV` | full | optional analysis | [`norm-inv`](#signature-norm-inv) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `NORM.S.DIST` | full | optional analysis | [`norm-s-dist`](#signature-norm-s-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `NORM.S.INV` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `T.DIST` | full | optional analysis | [`t-dist`](#signature-t-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `T.DIST.2T` | full | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `T.DIST.RT` | full | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `T.INV` | full | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `T.INV.2T` | full | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CHISQ.DIST` | full | optional analysis | [`t-dist`](#signature-t-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CHISQ.DIST.RT` | full | optional analysis | [`distribution-tail`](#signature-distribution-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CHISQ.INV` | full | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CHISQ.INV.RT` | full | optional analysis | [`distribution-inverse`](#signature-distribution-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `F.DIST` | full | optional analysis | [`f-dist`](#signature-f-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `F.DIST.RT` | full | optional analysis | [`f-tail`](#signature-f-tail) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `F.INV` | full | optional analysis | [`f-inverse`](#signature-f-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `F.INV.RT` | full | optional analysis | [`f-inverse`](#signature-f-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `BINOM.DIST` | full | optional analysis | [`binom-dist`](#signature-binom-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `POISSON.DIST` | full | optional analysis | [`poisson-dist`](#signature-poisson-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `EXPON.DIST` | full | optional analysis | [`expon-dist`](#signature-expon-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `GAMMA` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `GAMMALN` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `GAMMA.DIST` | full | optional analysis | [`gamma-dist`](#signature-gamma-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `GAMMA.INV` | full | optional analysis | [`gamma-inverse`](#signature-gamma-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `BETA.DIST` | full | optional analysis | [`beta-dist`](#signature-beta-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `BETA.INV` | full | optional analysis | [`beta-inverse`](#signature-beta-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `LOGNORM.DIST` | full | optional analysis | [`lognorm-dist`](#signature-lognorm-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `LOGNORM.INV` | full | optional analysis | [`lognorm-inverse`](#signature-lognorm-inverse) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `WEIBULL.DIST` | full | optional analysis | [`weibull-dist`](#signature-weibull-dist) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CONFIDENCE.NORM` | full | optional analysis | [`confidence`](#signature-confidence) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `CONFIDENCE.T` | full | optional analysis | [`confidence`](#signature-confidence) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `STANDARDIZE` | full | optional analysis | [`standardize`](#signature-standardize) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `FISHER` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `FISHERINV` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `PHI` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `GAUSS` | full | optional analysis | [`unary-number`](#signature-unary-number) | [`analysis-distributions`](#semantics-analysis-distributions) | [`analysis-distributions`](#dialect-analysis-distributions) | [`analysis-distributions`](#implementation-analysis-distributions) |
-| `AVEDEV` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `DEVSQ` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `HARMEAN` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `KURT` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `SKEW` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `SKEW.P` | full | optional analysis | [`variadic-values`](#signature-variadic-values) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `TRIMMEAN` | full | optional analysis | [`trim-mean`](#signature-trim-mean) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `PERCENTILE.EXC` | full | optional analysis | [`percentile`](#signature-percentile) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `QUARTILE.EXC` | full | optional analysis | [`percentile`](#signature-percentile) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `PERCENTRANK.INC` | full | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `PERCENTRANK.EXC` | full | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `RANK.AVG` | full | optional analysis | [`rank`](#signature-rank) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `PEARSON` | full | optional analysis | [`pair-arrays`](#signature-pair-arrays) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `RSQ` | full | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `SLOPE` | full | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `INTERCEPT` | full | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `STEYX` | full | optional analysis | [`known-y-x`](#signature-known-y-x) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `FORECAST.LINEAR` (`FORECAST`) | full | optional analysis | [`forecast`](#signature-forecast) | [`analysis-descriptive`](#semantics-analysis-descriptive) | [`analysis-descriptive`](#dialect-analysis-descriptive) | [`analysis-descriptive`](#implementation-analysis-descriptive) |
-| `FREQUENCY` | full | optional analysis | [`frequency`](#signature-frequency) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `MODE.MULT` | full | optional analysis | [`variadic-values-array`](#signature-variadic-values-array) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `GROWTH` | full | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `LINEST` | full | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `LOGEST` | full | optional analysis | [`regression-fit`](#signature-regression-fit) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `PERCENTILE` | full | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `PERCENTRANK` | full | optional analysis | [`percent-rank`](#signature-percent-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `PROB` | full | optional analysis | [`probability-range`](#signature-probability-range) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `QUARTILE` | full | optional analysis | [`percentile`](#signature-percentile) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `RANK` | full | optional analysis | [`rank`](#signature-rank) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
-| `TREND` | full | optional analysis | [`regression-predict`](#signature-regression-predict) | [`analysis-regression`](#semantics-analysis-regression) | [`analysis-regression`](#dialect-analysis-regression) | [`analysis-regression`](#implementation-analysis-regression) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="AVERAGE AVG" data-engine="default"><td><code>AVERAGE</code><small><code>AVG</code></small></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MIN" data-engine="default"><td><code>MIN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MAX" data-engine="default"><td><code>MAX</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNT" data-engine="default"><td><code>COUNT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNTA" data-engine="default"><td><code>COUNTA</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-optional-variadic-values">Signature: <code>optional-variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNTIF" data-engine="default"><td><code>COUNTIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-criteria-one">Signature: <code>criteria-one</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNTIFS" data-engine="default"><td><code>COUNTIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-criteria-many">Signature: <code>criteria-many</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="AVERAGEIF" data-engine="default"><td><code>AVERAGEIF</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumif">Signature: <code>sumif</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="AVERAGEIFS" data-engine="default"><td><code>AVERAGEIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MEDIAN" data-engine="default"><td><code>MEDIAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MODE.SNGL" data-engine="default"><td><code>MODE.SNGL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LARGE" data-engine="default"><td><code>LARGE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-value-k">Signature: <code>value-k</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SMALL" data-engine="default"><td><code>SMALL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-value-k">Signature: <code>value-k</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RANK.EQ" data-engine="default"><td><code>RANK.EQ</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-rank">Signature: <code>rank</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PERCENTILE.INC" data-engine="default"><td><code>PERCENTILE.INC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="QUARTILE.INC" data-engine="default"><td><code>QUARTILE.INC</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="STDEV.S" data-engine="default"><td><code>STDEV.S</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="STDEV.P" data-engine="default"><td><code>STDEV.P</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VAR.S" data-engine="default"><td><code>VAR.S</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VAR.P" data-engine="default"><td><code>VAR.P</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="GEOMEAN" data-engine="default"><td><code>GEOMEAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CORREL" data-engine="default"><td><code>CORREL</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COVARIANCE.S" data-engine="default"><td><code>COVARIANCE.S</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COVARIANCE.P" data-engine="default"><td><code>COVARIANCE.P</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="COUNTBLANK" data-engine="default"><td><code>COUNTBLANK</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-aggregate">Semantics: <code>aggregate</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MAXIFS" data-engine="default"><td><code>MAXIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MINIFS" data-engine="default"><td><code>MINIFS</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-sumifs">Signature: <code>sumifs</code></a><br /><a href="#semantics-criteria">Semantics: <code>criteria</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NORM.DIST" data-engine="full"><td><code>NORM.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-norm-dist">Signature: <code>norm-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="NORM.INV" data-engine="full"><td><code>NORM.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-norm-inv">Signature: <code>norm-inv</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="NORM.S.DIST" data-engine="full"><td><code>NORM.S.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-norm-s-dist">Signature: <code>norm-s-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="NORM.S.INV" data-engine="full"><td><code>NORM.S.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="T.DIST" data-engine="full"><td><code>T.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-t-dist">Signature: <code>t-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="T.DIST.2T" data-engine="full"><td><code>T.DIST.2T</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-tail">Signature: <code>distribution-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="T.DIST.RT" data-engine="full"><td><code>T.DIST.RT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-tail">Signature: <code>distribution-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="T.INV" data-engine="full"><td><code>T.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="T.INV.2T" data-engine="full"><td><code>T.INV.2T</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CHISQ.DIST" data-engine="full"><td><code>CHISQ.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-t-dist">Signature: <code>t-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CHISQ.DIST.RT" data-engine="full"><td><code>CHISQ.DIST.RT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-tail">Signature: <code>distribution-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CHISQ.INV" data-engine="full"><td><code>CHISQ.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CHISQ.INV.RT" data-engine="full"><td><code>CHISQ.INV.RT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-distribution-inverse">Signature: <code>distribution-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="F.DIST" data-engine="full"><td><code>F.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-dist">Signature: <code>f-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="F.DIST.RT" data-engine="full"><td><code>F.DIST.RT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-tail">Signature: <code>f-tail</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="F.INV" data-engine="full"><td><code>F.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-inverse">Signature: <code>f-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="F.INV.RT" data-engine="full"><td><code>F.INV.RT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-f-inverse">Signature: <code>f-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="BINOM.DIST" data-engine="full"><td><code>BINOM.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-binom-dist">Signature: <code>binom-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="POISSON.DIST" data-engine="full"><td><code>POISSON.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-poisson-dist">Signature: <code>poisson-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="EXPON.DIST" data-engine="full"><td><code>EXPON.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-expon-dist">Signature: <code>expon-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="GAMMA" data-engine="full"><td><code>GAMMA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="GAMMALN" data-engine="full"><td><code>GAMMALN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="GAMMA.DIST" data-engine="full"><td><code>GAMMA.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-gamma-dist">Signature: <code>gamma-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="GAMMA.INV" data-engine="full"><td><code>GAMMA.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-gamma-inverse">Signature: <code>gamma-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="BETA.DIST" data-engine="full"><td><code>BETA.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-beta-dist">Signature: <code>beta-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="BETA.INV" data-engine="full"><td><code>BETA.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-beta-inverse">Signature: <code>beta-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="LOGNORM.DIST" data-engine="full"><td><code>LOGNORM.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lognorm-dist">Signature: <code>lognorm-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="LOGNORM.INV" data-engine="full"><td><code>LOGNORM.INV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-lognorm-inverse">Signature: <code>lognorm-inverse</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="WEIBULL.DIST" data-engine="full"><td><code>WEIBULL.DIST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-weibull-dist">Signature: <code>weibull-dist</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CONFIDENCE.NORM" data-engine="full"><td><code>CONFIDENCE.NORM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-confidence">Signature: <code>confidence</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="CONFIDENCE.T" data-engine="full"><td><code>CONFIDENCE.T</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-confidence">Signature: <code>confidence</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="STANDARDIZE" data-engine="full"><td><code>STANDARDIZE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-standardize">Signature: <code>standardize</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="FISHER" data-engine="full"><td><code>FISHER</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="FISHERINV" data-engine="full"><td><code>FISHERINV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="PHI" data-engine="full"><td><code>PHI</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="GAUSS" data-engine="full"><td><code>GAUSS</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-analysis-distributions">Semantics: <code>analysis-distributions</code></a><br /><a href="#dialect-analysis-distributions">Dialect: <code>analysis-distributions</code></a><br /><a href="#implementation-analysis-distributions">Implementation: <code>analysis-distributions</code></a></details></td></tr>
+<tr data-formula-name="AVEDEV" data-engine="full"><td><code>AVEDEV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="DEVSQ" data-engine="full"><td><code>DEVSQ</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="HARMEAN" data-engine="full"><td><code>HARMEAN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="KURT" data-engine="full"><td><code>KURT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="SKEW" data-engine="full"><td><code>SKEW</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="SKEW.P" data-engine="full"><td><code>SKEW.P</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="TRIMMEAN" data-engine="full"><td><code>TRIMMEAN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-trim-mean">Signature: <code>trim-mean</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="PERCENTILE.EXC" data-engine="full"><td><code>PERCENTILE.EXC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="QUARTILE.EXC" data-engine="full"><td><code>QUARTILE.EXC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="PERCENTRANK.INC" data-engine="full"><td><code>PERCENTRANK.INC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percent-rank">Signature: <code>percent-rank</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="PERCENTRANK.EXC" data-engine="full"><td><code>PERCENTRANK.EXC</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percent-rank">Signature: <code>percent-rank</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="RANK.AVG" data-engine="full"><td><code>RANK.AVG</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-rank">Signature: <code>rank</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="PEARSON" data-engine="full"><td><code>PEARSON</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-pair-arrays">Signature: <code>pair-arrays</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="RSQ" data-engine="full"><td><code>RSQ</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-known-y-x">Signature: <code>known-y-x</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="SLOPE" data-engine="full"><td><code>SLOPE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-known-y-x">Signature: <code>known-y-x</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="INTERCEPT" data-engine="full"><td><code>INTERCEPT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-known-y-x">Signature: <code>known-y-x</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="STEYX" data-engine="full"><td><code>STEYX</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-known-y-x">Signature: <code>known-y-x</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="FORECAST.LINEAR FORECAST" data-engine="full"><td><code>FORECAST.LINEAR</code><small><code>FORECAST</code></small></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-forecast">Signature: <code>forecast</code></a><br /><a href="#semantics-analysis-descriptive">Semantics: <code>analysis-descriptive</code></a><br /><a href="#dialect-analysis-descriptive">Dialect: <code>analysis-descriptive</code></a><br /><a href="#implementation-analysis-descriptive">Implementation: <code>analysis-descriptive</code></a></details></td></tr>
+<tr data-formula-name="FREQUENCY" data-engine="full"><td><code>FREQUENCY</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-frequency">Signature: <code>frequency</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="MODE.MULT" data-engine="full"><td><code>MODE.MULT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-variadic-values-array">Signature: <code>variadic-values-array</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="GROWTH" data-engine="full"><td><code>GROWTH</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regression-predict">Signature: <code>regression-predict</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="LINEST" data-engine="full"><td><code>LINEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regression-fit">Signature: <code>regression-fit</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="LOGEST" data-engine="full"><td><code>LOGEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regression-fit">Signature: <code>regression-fit</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="PERCENTILE" data-engine="full"><td><code>PERCENTILE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="PERCENTRANK" data-engine="full"><td><code>PERCENTRANK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percent-rank">Signature: <code>percent-rank</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="PROB" data-engine="full"><td><code>PROB</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-probability-range">Signature: <code>probability-range</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="QUARTILE" data-engine="full"><td><code>QUARTILE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-percentile">Signature: <code>percentile</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="RANK" data-engine="full"><td><code>RANK</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-rank">Signature: <code>rank</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+<tr data-formula-name="TREND" data-engine="full"><td><code>TREND</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regression-predict">Signature: <code>regression-predict</code></a><br /><a href="#semantics-analysis-regression">Semantics: <code>analysis-regression</code></a><br /><a href="#dialect-analysis-regression">Dialect: <code>analysis-regression</code></a><br /><a href="#implementation-analysis-regression">Implementation: <code>analysis-regression</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Text
 
 Taxonomy/source: [Text functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `ARRAYTOTEXT` | full | optional analysis | [`array-to-text`](#signature-array-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `DOLLAR` | full | optional analysis | [`text-dollar`](#signature-text-dollar) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `FIXED` | full | optional analysis | [`text-fixed`](#signature-text-fixed) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `REGEXEXTRACT` | full | optional analysis | [`regex-extract`](#signature-regex-extract) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
-| `REGEXREPLACE` | full | optional analysis | [`regex-replace`](#signature-regex-replace) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
-| `REGEXTEST` | full | optional analysis | [`regex-test`](#signature-regex-test) | [`text`](#semantics-text) | [`regex-lite-subset`](#dialect-regex-lite-subset) | [`text-analysis`](#implementation-text-analysis) |
-| `TEXTAFTER` | full | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `TEXTBEFORE` | full | optional analysis | [`text-delimiter`](#signature-text-delimiter) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `TEXTSPLIT` | full | optional analysis | [`text-split`](#signature-text-split) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `VALUETOTEXT` | full | optional analysis | [`value-to-text`](#signature-value-to-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`text-analysis`](#implementation-text-analysis) |
-| `LEN` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LEFT` | default, full | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `RIGHT` | default, full | incumbent | [`left-right`](#signature-left-right) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `MID` | default, full | incumbent | [`mid`](#signature-mid) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CONCAT` (`CONCATENATE`) | default, full | incumbent | [`variadic-values`](#signature-variadic-values) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UPPER` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `LOWER` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TRIM` | default, full | incumbent | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TEXT` | default, full | incumbent | [`text-format`](#signature-text-format) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `EXACT` | default, full | incumbent | [`binary-number`](#signature-binary-number) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `TEXTJOIN` | default, full | required target | [`text-join`](#signature-text-join) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SUBSTITUTE` | default, full | required target | [`substitute`](#signature-substitute) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `REPLACE` | default, full | required target | [`replace`](#signature-replace) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `FIND` | default, full | required target | [`find-search`](#signature-find-search) | [`text-sensitive`](#semantics-text-sensitive) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `SEARCH` | default, full | required target | [`find-search`](#signature-find-search) | [`text-search`](#semantics-text-search) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `VALUE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CLEAN` | default, full | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `REPT` | default, full | required target | [`repeat-text`](#signature-repeat-text) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CHAR` | default, full | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `CODE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNICHAR` | default, full | required target | [`unary-number`](#signature-unary-number) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `UNICODE` | default, full | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `PROPER` | default, full | required target | [`unary-value`](#signature-unary-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
-| `NUMBERVALUE` | default, full | required target | [`number-value`](#signature-number-value) | [`text`](#semantics-text) | [`excel-documented`](#dialect-excel-documented) | [`implemented-assisted`](#implementation-implemented-assisted) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="ARRAYTOTEXT" data-engine="full"><td><code>ARRAYTOTEXT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-array-to-text">Signature: <code>array-to-text</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="DOLLAR" data-engine="full"><td><code>DOLLAR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-dollar">Signature: <code>text-dollar</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="FIXED" data-engine="full"><td><code>FIXED</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-fixed">Signature: <code>text-fixed</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="REGEXEXTRACT" data-engine="full"><td><code>REGEXEXTRACT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-extract">Signature: <code>regex-extract</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="REGEXREPLACE" data-engine="full"><td><code>REGEXREPLACE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-replace">Signature: <code>regex-replace</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="REGEXTEST" data-engine="full"><td><code>REGEXTEST</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-regex-test">Signature: <code>regex-test</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-regex-lite-subset">Dialect: <code>regex-lite-subset</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="TEXTAFTER" data-engine="full"><td><code>TEXTAFTER</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-delimiter">Signature: <code>text-delimiter</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="TEXTBEFORE" data-engine="full"><td><code>TEXTBEFORE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-delimiter">Signature: <code>text-delimiter</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="TEXTSPLIT" data-engine="full"><td><code>TEXTSPLIT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-text-split">Signature: <code>text-split</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="VALUETOTEXT" data-engine="full"><td><code>VALUETOTEXT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-value-to-text">Signature: <code>value-to-text</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-text-analysis">Implementation: <code>text-analysis</code></a></details></td></tr>
+<tr data-formula-name="LEN" data-engine="default"><td><code>LEN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LEFT" data-engine="default"><td><code>LEFT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-left-right">Signature: <code>left-right</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="RIGHT" data-engine="default"><td><code>RIGHT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-left-right">Signature: <code>left-right</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="MID" data-engine="default"><td><code>MID</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-mid">Signature: <code>mid</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CONCAT CONCATENATE" data-engine="default"><td><code>CONCAT</code><small><code>CONCATENATE</code></small></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-variadic-values">Signature: <code>variadic-values</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="UPPER" data-engine="default"><td><code>UPPER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="LOWER" data-engine="default"><td><code>LOWER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TRIM" data-engine="default"><td><code>TRIM</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TEXT" data-engine="default"><td><code>TEXT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-text-format">Signature: <code>text-format</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="EXACT" data-engine="default"><td><code>EXACT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>incumbent</summary><a href="#signature-binary-number">Signature: <code>binary-number</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="TEXTJOIN" data-engine="default"><td><code>TEXTJOIN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-text-join">Signature: <code>text-join</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SUBSTITUTE" data-engine="default"><td><code>SUBSTITUTE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-substitute">Signature: <code>substitute</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="REPLACE" data-engine="default"><td><code>REPLACE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-replace">Signature: <code>replace</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="FIND" data-engine="default"><td><code>FIND</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-sensitive">Semantics: <code>text-sensitive</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="SEARCH" data-engine="default"><td><code>SEARCH</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-find-search">Signature: <code>find-search</code></a><br /><a href="#semantics-text-search">Semantics: <code>text-search</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="VALUE" data-engine="default"><td><code>VALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CLEAN" data-engine="default"><td><code>CLEAN</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="REPT" data-engine="default"><td><code>REPT</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-repeat-text">Signature: <code>repeat-text</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CHAR" data-engine="default"><td><code>CHAR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="CODE" data-engine="default"><td><code>CODE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="UNICHAR" data-engine="default"><td><code>UNICHAR</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-number">Signature: <code>unary-number</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="UNICODE" data-engine="default"><td><code>UNICODE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="PROPER" data-engine="default"><td><code>PROPER</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-unary-value">Signature: <code>unary-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+<tr data-formula-name="NUMBERVALUE" data-engine="default"><td><code>NUMBERVALUE</code></td><td><span class="sw-formula-build" data-build="default">Default + full</span></td><td><details><summary>required target</summary><a href="#signature-number-value">Signature: <code>number-value</code></a><br /><a href="#semantics-text">Semantics: <code>text</code></a><br /><a href="#dialect-excel-documented">Dialect: <code>excel-documented</code></a><br /><a href="#implementation-implemented-assisted">Implementation: <code>implemented-assisted</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Formula operators
 
 Taxonomy/source: [Types of operators](https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+</tbody></table>
+
+</section>
+
+<section class="sw-formula-family">
 
 ### Database
 
 Taxonomy/source: [Database functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb).
 
-| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |
-| --- | --- | --- | --- | --- | --- | --- |
-| `DAVERAGE` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DCOUNT` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DCOUNTA` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DGET` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DMAX` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DMIN` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DPRODUCT` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DSTDEV` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DSTDEVP` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DSUM` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DVAR` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
-| `DVARP` | full | optional analysis | [`database`](#signature-database) | [`analysis-database`](#semantics-analysis-database) | [`analysis-database`](#dialect-analysis-database) | [`analysis-database`](#implementation-analysis-database) |
+<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>
+<tr data-formula-name="DAVERAGE" data-engine="full"><td><code>DAVERAGE</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DCOUNT" data-engine="full"><td><code>DCOUNT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DCOUNTA" data-engine="full"><td><code>DCOUNTA</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DGET" data-engine="full"><td><code>DGET</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DMAX" data-engine="full"><td><code>DMAX</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DMIN" data-engine="full"><td><code>DMIN</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DPRODUCT" data-engine="full"><td><code>DPRODUCT</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DSTDEV" data-engine="full"><td><code>DSTDEV</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DSTDEVP" data-engine="full"><td><code>DSTDEVP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DSUM" data-engine="full"><td><code>DSUM</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DVAR" data-engine="full"><td><code>DVAR</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+<tr data-formula-name="DVARP" data-engine="full"><td><code>DVARP</code></td><td><span class="sw-formula-build" data-build="full">Full only</span></td><td><details><summary>optional analysis</summary><a href="#signature-database">Signature: <code>database</code></a><br /><a href="#semantics-analysis-database">Semantics: <code>analysis-database</code></a><br /><a href="#dialect-analysis-database">Dialect: <code>analysis-database</code></a><br /><a href="#implementation-analysis-database">Implementation: <code>analysis-database</code></a></details></td></tr>
+</tbody></table>
+
+</section>
+
+</FormulaReference>
 
 ## Signature profiles
 
 Argument order, required/default state, accepted shapes, repetition, and return shape come directly from the inventory.
 
-### Signature: text-delimiter
+<details id="signature-text-delimiter"><summary>Signature: text-delimiter</summary>
 
 Return shape: `scalar`.
 
@@ -421,7 +479,9 @@ Return shape: `scalar`.
 | `matchEnd` | no | 0 | `scalar`, `reference` | `once` |
 | `ifNotFound` | no | #N/A | `scalar`, `reference` | `once` |
 
-### Signature: text-split
+</details>
+
+<details id="signature-text-split"><summary>Signature: text-split</summary>
 
 Return shape: `array`.
 
@@ -434,7 +494,9 @@ Return shape: `array`.
 | `matchMode` | no | 0 | `scalar`, `reference` | `once` |
 | `padWith` | no | #N/A | `scalar`, `reference` | `once` |
 
-### Signature: text-fixed
+</details>
+
+<details id="signature-text-fixed"><summary>Signature: text-fixed</summary>
 
 Return shape: `scalar`.
 
@@ -444,7 +506,9 @@ Return shape: `scalar`.
 | `decimals` | no | 2 | `scalar`, `reference` | `once` |
 | `noCommas` | no | false | `scalar`, `reference` | `once` |
 
-### Signature: text-dollar
+</details>
+
+<details id="signature-text-dollar"><summary>Signature: text-dollar</summary>
 
 Return shape: `scalar`.
 
@@ -453,7 +517,9 @@ Return shape: `scalar`.
 | `number` | yes | none | `scalar`, `reference` | `once` |
 | `decimals` | no | 2 | `scalar`, `reference` | `once` |
 
-### Signature: value-to-text
+</details>
+
+<details id="signature-value-to-text"><summary>Signature: value-to-text</summary>
 
 Return shape: `scalar`.
 
@@ -462,7 +528,9 @@ Return shape: `scalar`.
 | `value` | yes | none | `scalar`, `reference` | `once` |
 | `format` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: array-to-text
+</details>
+
+<details id="signature-array-to-text"><summary>Signature: array-to-text</summary>
 
 Return shape: `scalar`.
 
@@ -471,7 +539,9 @@ Return shape: `scalar`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `format` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: regex-test
+</details>
+
+<details id="signature-regex-test"><summary>Signature: regex-test</summary>
 
 Return shape: `scalar`.
 
@@ -481,7 +551,9 @@ Return shape: `scalar`.
 | `pattern` | yes | none | `scalar`, `reference` | `once` |
 | `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: regex-extract
+</details>
+
+<details id="signature-regex-extract"><summary>Signature: regex-extract</summary>
 
 Return shape: `contextual`.
 
@@ -492,7 +564,9 @@ Return shape: `contextual`.
 | `returnMode` | no | 0 | `scalar`, `reference` | `once` |
 | `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: regex-replace
+</details>
+
+<details id="signature-regex-replace"><summary>Signature: regex-replace</summary>
 
 Return shape: `scalar`.
 
@@ -504,7 +578,9 @@ Return shape: `scalar`.
 | `occurrence` | no | 0 | `scalar`, `reference` | `once` |
 | `caseSensitivity` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: zero
+</details>
+
+<details id="signature-zero"><summary>Signature: zero</summary>
 
 Return shape: `scalar`.
 
@@ -512,7 +588,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | _none_ | — | — | — | — |
 
-### Signature: unary-value
+</details>
+
+<details id="signature-unary-value"><summary>Signature: unary-value</summary>
 
 Return shape: `scalar`.
 
@@ -520,7 +598,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: unary-number
+</details>
+
+<details id="signature-unary-number"><summary>Signature: unary-number</summary>
 
 Return shape: `scalar`.
 
@@ -528,7 +608,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `number` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: binary-number
+</details>
+
+<details id="signature-binary-number"><summary>Signature: binary-number</summary>
 
 Return shape: `scalar`.
 
@@ -537,7 +619,9 @@ Return shape: `scalar`.
 | `number1` | yes | none | `scalar`, `reference` | `once` |
 | `number2` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: variadic-values
+</details>
+
+<details id="signature-variadic-values"><summary>Signature: variadic-values</summary>
 
 Return shape: `scalar`.
 
@@ -545,7 +629,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: variadic-values-array
+</details>
+
+<details id="signature-variadic-values-array"><summary>Signature: variadic-values-array</summary>
 
 Return shape: `array`.
 
@@ -553,7 +639,9 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: optional-variadic-values
+</details>
+
+<details id="signature-optional-variadic-values"><summary>Signature: optional-variadic-values</summary>
 
 Return shape: `scalar`.
 
@@ -561,7 +649,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `value` | no | none | `scalar`, `range`, `array`, `reference` | `zero-or-more` |
 
-### Signature: logical-variadic
+</details>
+
+<details id="signature-logical-variadic"><summary>Signature: logical-variadic</summary>
 
 Return shape: `scalar`.
 
@@ -569,7 +659,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `logical` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: if
+</details>
+
+<details id="signature-if"><summary>Signature: if</summary>
 
 Return shape: `contextual`.
 
@@ -579,7 +671,9 @@ Return shape: `contextual`.
 | `valueIfTrue` | no | true | `scalar`, `range`, `array`, `reference` | `once` |
 | `valueIfFalse` | no | false | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: if-error
+</details>
+
+<details id="signature-if-error"><summary>Signature: if-error</summary>
 
 Return shape: `contextual`.
 
@@ -588,7 +682,9 @@ Return shape: `contextual`.
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `valueIfError` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: ifs
+</details>
+
+<details id="signature-ifs"><summary>Signature: ifs</summary>
 
 Return shape: `contextual`.
 
@@ -596,7 +692,9 @@ Return shape: `contextual`.
 | --- | --- | --- | --- | --- |
 | `testAndValue` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 
-### Signature: switch
+</details>
+
+<details id="signature-switch"><summary>Signature: switch</summary>
 
 Return shape: `contextual`.
 
@@ -606,7 +704,9 @@ Return shape: `contextual`.
 | `valueAndResult` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 | `defaultValue` | no | #N/A | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: let
+</details>
+
+<details id="signature-let"><summary>Signature: let</summary>
 
 Return shape: `contextual`.
 
@@ -615,7 +715,9 @@ Return shape: `contextual`.
 | `nameAndValue` | yes | none | `scalar`, `range`, `array`, `name`, `reference` | `paired` |
 | `calculation` | yes | none | `scalar`, `range`, `array`, `name`, `reference` | `once` |
 
-### Signature: round
+</details>
+
+<details id="signature-round"><summary>Signature: round</summary>
 
 Return shape: `scalar`.
 
@@ -624,7 +726,9 @@ Return shape: `scalar`.
 | `number` | yes | none | `scalar`, `reference` | `once` |
 | `digits` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: trunc
+</details>
+
+<details id="signature-trunc"><summary>Signature: trunc</summary>
 
 Return shape: `scalar`.
 
@@ -633,7 +737,9 @@ Return shape: `scalar`.
 | `number` | yes | none | `scalar`, `reference` | `once` |
 | `digits` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: log
+</details>
+
+<details id="signature-log"><summary>Signature: log</summary>
 
 Return shape: `scalar`.
 
@@ -642,7 +748,9 @@ Return shape: `scalar`.
 | `number` | yes | none | `scalar`, `reference` | `once` |
 | `base` | no | 10 | `scalar`, `reference` | `once` |
 
-### Signature: subtotal
+</details>
+
+<details id="signature-subtotal"><summary>Signature: subtotal</summary>
 
 Return shape: `scalar`.
 
@@ -651,7 +759,9 @@ Return shape: `scalar`.
 | `functionNumber` | yes | none | `scalar`, `reference` | `once` |
 | `reference` | yes | none | `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: left-right
+</details>
+
+<details id="signature-left-right"><summary>Signature: left-right</summary>
 
 Return shape: `scalar`.
 
@@ -660,7 +770,9 @@ Return shape: `scalar`.
 | `text` | yes | none | `scalar`, `reference` | `once` |
 | `count` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: mid
+</details>
+
+<details id="signature-mid"><summary>Signature: mid</summary>
 
 Return shape: `scalar`.
 
@@ -670,7 +782,9 @@ Return shape: `scalar`.
 | `start` | yes | none | `scalar`, `reference` | `once` |
 | `count` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: text-format
+</details>
+
+<details id="signature-text-format"><summary>Signature: text-format</summary>
 
 Return shape: `scalar`.
 
@@ -679,7 +793,9 @@ Return shape: `scalar`.
 | `value` | yes | none | `scalar`, `reference` | `once` |
 | `formatText` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: text-join
+</details>
+
+<details id="signature-text-join"><summary>Signature: text-join</summary>
 
 Return shape: `scalar`.
 
@@ -689,7 +805,9 @@ Return shape: `scalar`.
 | `ignoreEmpty` | yes | none | `scalar`, `reference` | `once` |
 | `text` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: substitute
+</details>
+
+<details id="signature-substitute"><summary>Signature: substitute</summary>
 
 Return shape: `scalar`.
 
@@ -700,7 +818,9 @@ Return shape: `scalar`.
 | `newText` | yes | none | `scalar`, `reference` | `once` |
 | `instance` | no | all | `scalar`, `reference` | `once` |
 
-### Signature: replace
+</details>
+
+<details id="signature-replace"><summary>Signature: replace</summary>
 
 Return shape: `scalar`.
 
@@ -711,7 +831,9 @@ Return shape: `scalar`.
 | `count` | yes | none | `scalar`, `reference` | `once` |
 | `newText` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: find-search
+</details>
+
+<details id="signature-find-search"><summary>Signature: find-search</summary>
 
 Return shape: `scalar`.
 
@@ -721,7 +843,9 @@ Return shape: `scalar`.
 | `withinText` | yes | none | `scalar`, `reference` | `once` |
 | `start` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: repeat-text
+</details>
+
+<details id="signature-repeat-text"><summary>Signature: repeat-text</summary>
 
 Return shape: `scalar`.
 
@@ -730,7 +854,9 @@ Return shape: `scalar`.
 | `text` | yes | none | `scalar`, `reference` | `once` |
 | `count` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: number-value
+</details>
+
+<details id="signature-number-value"><summary>Signature: number-value</summary>
 
 Return shape: `scalar`.
 
@@ -740,7 +866,9 @@ Return shape: `scalar`.
 | `decimalSeparator` | no | . | `scalar`, `reference` | `once` |
 | `groupSeparator` | no | , | `scalar`, `reference` | `once` |
 
-### Signature: date-three
+</details>
+
+<details id="signature-date-three"><summary>Signature: date-three</summary>
 
 Return shape: `scalar`.
 
@@ -750,7 +878,9 @@ Return shape: `scalar`.
 | `part2` | yes | none | `scalar`, `reference` | `once` |
 | `part3` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: date-pair
+</details>
+
+<details id="signature-date-pair"><summary>Signature: date-pair</summary>
 
 Return shape: `scalar`.
 
@@ -759,7 +889,9 @@ Return shape: `scalar`.
 | `endDate` | yes | none | `scalar`, `reference` | `once` |
 | `startDate` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: date-offset
+</details>
+
+<details id="signature-date-offset"><summary>Signature: date-offset</summary>
 
 Return shape: `scalar`.
 
@@ -768,7 +900,9 @@ Return shape: `scalar`.
 | `startDate` | yes | none | `scalar`, `reference` | `once` |
 | `offset` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: weekday-weeknum
+</details>
+
+<details id="signature-weekday-weeknum"><summary>Signature: weekday-weeknum</summary>
 
 Return shape: `scalar`.
 
@@ -777,7 +911,9 @@ Return shape: `scalar`.
 | `serialNumber` | yes | none | `scalar`, `reference` | `once` |
 | `returnType` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: workday
+</details>
+
+<details id="signature-workday"><summary>Signature: workday</summary>
 
 Return shape: `scalar`.
 
@@ -787,7 +923,9 @@ Return shape: `scalar`.
 | `days` | yes | none | `scalar`, `reference` | `once` |
 | `holidays` | no | none | `range`, `array`, `reference` | `once` |
 
-### Signature: networkdays
+</details>
+
+<details id="signature-networkdays"><summary>Signature: networkdays</summary>
 
 Return shape: `scalar`.
 
@@ -797,7 +935,9 @@ Return shape: `scalar`.
 | `endDate` | yes | none | `scalar`, `reference` | `once` |
 | `holidays` | no | none | `range`, `array`, `reference` | `once` |
 
-### Signature: yearfrac-days360
+</details>
+
+<details id="signature-yearfrac-days360"><summary>Signature: yearfrac-days360</summary>
 
 Return shape: `scalar`.
 
@@ -807,7 +947,9 @@ Return shape: `scalar`.
 | `endDate` | yes | none | `scalar`, `reference` | `once` |
 | `basisOrMethod` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: value-k
+</details>
+
+<details id="signature-value-k"><summary>Signature: value-k</summary>
 
 Return shape: `scalar`.
 
@@ -816,7 +958,9 @@ Return shape: `scalar`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `k` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: rank
+</details>
+
+<details id="signature-rank"><summary>Signature: rank</summary>
 
 Return shape: `scalar`.
 
@@ -826,7 +970,9 @@ Return shape: `scalar`.
 | `reference` | yes | none | `range`, `array`, `reference` | `once` |
 | `order` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: percentile
+</details>
+
+<details id="signature-percentile"><summary>Signature: percentile</summary>
 
 Return shape: `scalar`.
 
@@ -835,7 +981,9 @@ Return shape: `scalar`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `fraction` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: pair-arrays
+</details>
+
+<details id="signature-pair-arrays"><summary>Signature: pair-arrays</summary>
 
 Return shape: `scalar`.
 
@@ -844,7 +992,9 @@ Return shape: `scalar`.
 | `array1` | yes | none | `range`, `array`, `reference` | `once` |
 | `array2` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: criteria-one
+</details>
+
+<details id="signature-criteria-one"><summary>Signature: criteria-one</summary>
 
 Return shape: `scalar`.
 
@@ -853,7 +1003,9 @@ Return shape: `scalar`.
 | `range` | yes | none | `range`, `array`, `reference` | `once` |
 | `criteria` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: criteria-many
+</details>
+
+<details id="signature-criteria-many"><summary>Signature: criteria-many</summary>
 
 Return shape: `scalar`.
 
@@ -861,7 +1013,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `rangeAndCriteria` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 
-### Signature: sumif
+</details>
+
+<details id="signature-sumif"><summary>Signature: sumif</summary>
 
 Return shape: `scalar`.
 
@@ -871,7 +1025,9 @@ Return shape: `scalar`.
 | `criteria` | yes | none | `scalar`, `reference` | `once` |
 | `sumRange` | no | range | `range`, `array`, `reference` | `once` |
 
-### Signature: sumifs
+</details>
+
+<details id="signature-sumifs"><summary>Signature: sumifs</summary>
 
 Return shape: `scalar`.
 
@@ -880,7 +1036,9 @@ Return shape: `scalar`.
 | `sumRange` | yes | none | `range`, `array`, `reference` | `once` |
 | `rangeAndCriteria` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 
-### Signature: match
+</details>
+
+<details id="signature-match"><summary>Signature: match</summary>
 
 Return shape: `scalar`.
 
@@ -890,7 +1048,9 @@ Return shape: `scalar`.
 | `lookupArray` | yes | none | `range`, `array`, `reference` | `once` |
 | `matchMode` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: xmatch
+</details>
+
+<details id="signature-xmatch"><summary>Signature: xmatch</summary>
 
 Return shape: `scalar`.
 
@@ -901,7 +1061,9 @@ Return shape: `scalar`.
 | `matchMode` | no | 0 | `scalar`, `reference` | `once` |
 | `searchMode` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: index
+</details>
+
+<details id="signature-index"><summary>Signature: index</summary>
 
 Return shape: `contextual`.
 
@@ -911,7 +1073,9 @@ Return shape: `contextual`.
 | `row` | yes | none | `scalar`, `reference` | `once` |
 | `column` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: xlookup
+</details>
+
+<details id="signature-xlookup"><summary>Signature: xlookup</summary>
 
 Return shape: `contextual`.
 
@@ -924,7 +1088,9 @@ Return shape: `contextual`.
 | `matchMode` | no | 0 | `scalar`, `reference` | `once` |
 | `searchMode` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: table-lookup
+</details>
+
+<details id="signature-table-lookup"><summary>Signature: table-lookup</summary>
 
 Return shape: `scalar`.
 
@@ -935,7 +1101,9 @@ Return shape: `scalar`.
 | `index` | yes | none | `scalar`, `reference` | `once` |
 | `approximate` | no | true | `scalar`, `reference` | `once` |
 
-### Signature: filter
+</details>
+
+<details id="signature-filter"><summary>Signature: filter</summary>
 
 Return shape: `array`.
 
@@ -945,7 +1113,9 @@ Return shape: `array`.
 | `include` | yes | none | `range`, `array`, `reference` | `once` |
 | `ifEmpty` | no | #CALC! | `scalar`, `reference` | `once` |
 
-### Signature: sort
+</details>
+
+<details id="signature-sort"><summary>Signature: sort</summary>
 
 Return shape: `array`.
 
@@ -956,7 +1126,9 @@ Return shape: `array`.
 | `sortOrder` | no | 1 | `scalar`, `reference` | `once` |
 | `byColumn` | no | false | `scalar`, `reference` | `once` |
 
-### Signature: unique
+</details>
+
+<details id="signature-unique"><summary>Signature: unique</summary>
 
 Return shape: `array`.
 
@@ -966,7 +1138,9 @@ Return shape: `array`.
 | `byColumn` | no | false | `scalar`, `reference` | `once` |
 | `exactlyOnce` | no | false | `scalar`, `reference` | `once` |
 
-### Signature: choose
+</details>
+
+<details id="signature-choose"><summary>Signature: choose</summary>
 
 Return shape: `contextual`.
 
@@ -975,7 +1149,9 @@ Return shape: `contextual`.
 | `index` | yes | none | `scalar`, `reference` | `once` |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: optional-reference
+</details>
+
+<details id="signature-optional-reference"><summary>Signature: optional-reference</summary>
 
 Return shape: `contextual`.
 
@@ -983,7 +1159,9 @@ Return shape: `contextual`.
 | --- | --- | --- | --- | --- |
 | `reference` | no | formula-cell | `range`, `array`, `reference` | `once` |
 
-### Signature: address
+</details>
+
+<details id="signature-address"><summary>Signature: address</summary>
 
 Return shape: `scalar`.
 
@@ -995,7 +1173,9 @@ Return shape: `scalar`.
 | `a1` | no | true | `scalar`, `reference` | `once` |
 | `sheetText` | no | none | `scalar`, `reference` | `once` |
 
-### Signature: array-unary
+</details>
+
+<details id="signature-array-unary"><summary>Signature: array-unary</summary>
 
 Return shape: `array`.
 
@@ -1003,7 +1183,9 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: sequence
+</details>
+
+<details id="signature-sequence"><summary>Signature: sequence</summary>
 
 Return shape: `array`.
 
@@ -1014,7 +1196,9 @@ Return shape: `array`.
 | `start` | no | 1 | `scalar`, `reference` | `once` |
 | `step` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: take-drop
+</details>
+
+<details id="signature-take-drop"><summary>Signature: take-drop</summary>
 
 Return shape: `array`.
 
@@ -1024,7 +1208,9 @@ Return shape: `array`.
 | `rows` | yes | none | `scalar`, `reference` | `once` |
 | `columns` | no | all | `scalar`, `reference` | `once` |
 
-### Signature: sort-by
+</details>
+
+<details id="signature-sort-by"><summary>Signature: sort-by</summary>
 
 Return shape: `array`.
 
@@ -1033,7 +1219,9 @@ Return shape: `array`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `byArrayAndOrder` | yes | none | `scalar`, `range`, `array`, `reference` | `paired` |
 
-### Signature: choose-axis
+</details>
+
+<details id="signature-choose-axis"><summary>Signature: choose-axis</summary>
 
 Return shape: `array`.
 
@@ -1042,7 +1230,9 @@ Return shape: `array`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `index` | yes | none | `scalar`, `array`, `reference` | `one-or-more` |
 
-### Signature: pv-fv-pmt
+</details>
+
+<details id="signature-pv-fv-pmt"><summary>Signature: pv-fv-pmt</summary>
 
 Return shape: `scalar`.
 
@@ -1054,7 +1244,9 @@ Return shape: `scalar`.
 | `futureValue` | no | 0 | `scalar`, `reference` | `once` |
 | `type` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: npv
+</details>
+
+<details id="signature-npv"><summary>Signature: npv</summary>
 
 Return shape: `scalar`.
 
@@ -1063,7 +1255,9 @@ Return shape: `scalar`.
 | `rate` | yes | none | `scalar`, `reference` | `once` |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: irr
+</details>
+
+<details id="signature-irr"><summary>Signature: irr</summary>
 
 Return shape: `scalar`.
 
@@ -1072,7 +1266,9 @@ Return shape: `scalar`.
 | `values` | yes | none | `range`, `array`, `reference` | `once` |
 | `guess` | no | 0.1 | `scalar`, `reference` | `once` |
 
-### Signature: rate
+</details>
+
+<details id="signature-rate"><summary>Signature: rate</summary>
 
 Return shape: `scalar`.
 
@@ -1085,7 +1281,9 @@ Return shape: `scalar`.
 | `type` | no | 0 | `scalar`, `reference` | `once` |
 | `guess` | no | 0.1 | `scalar`, `reference` | `once` |
 
-### Signature: period-payment
+</details>
+
+<details id="signature-period-payment"><summary>Signature: period-payment</summary>
 
 Return shape: `scalar`.
 
@@ -1098,7 +1296,9 @@ Return shape: `scalar`.
 | `futureValue` | no | 0 | `scalar`, `reference` | `once` |
 | `type` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: norm-dist
+</details>
+
+<details id="signature-norm-dist"><summary>Signature: norm-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1109,7 +1309,9 @@ Return shape: `scalar`.
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: norm-inv
+</details>
+
+<details id="signature-norm-inv"><summary>Signature: norm-inv</summary>
 
 Return shape: `scalar`.
 
@@ -1119,7 +1321,9 @@ Return shape: `scalar`.
 | `mean` | yes | none | `scalar`, `reference` | `once` |
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: norm-s-dist
+</details>
+
+<details id="signature-norm-s-dist"><summary>Signature: norm-s-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1128,7 +1332,9 @@ Return shape: `scalar`.
 | `z` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: t-dist
+</details>
+
+<details id="signature-t-dist"><summary>Signature: t-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1138,7 +1344,9 @@ Return shape: `scalar`.
 | `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: distribution-tail
+</details>
+
+<details id="signature-distribution-tail"><summary>Signature: distribution-tail</summary>
 
 Return shape: `scalar`.
 
@@ -1147,7 +1355,9 @@ Return shape: `scalar`.
 | `x` | yes | none | `scalar`, `reference` | `once` |
 | `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: distribution-inverse
+</details>
+
+<details id="signature-distribution-inverse"><summary>Signature: distribution-inverse</summary>
 
 Return shape: `scalar`.
 
@@ -1156,7 +1366,9 @@ Return shape: `scalar`.
 | `probability` | yes | none | `scalar`, `reference` | `once` |
 | `degreesFreedom` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: f-dist
+</details>
+
+<details id="signature-f-dist"><summary>Signature: f-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1167,7 +1379,9 @@ Return shape: `scalar`.
 | `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: f-tail
+</details>
+
+<details id="signature-f-tail"><summary>Signature: f-tail</summary>
 
 Return shape: `scalar`.
 
@@ -1177,7 +1391,9 @@ Return shape: `scalar`.
 | `degreesFreedom1` | yes | none | `scalar`, `reference` | `once` |
 | `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: f-inverse
+</details>
+
+<details id="signature-f-inverse"><summary>Signature: f-inverse</summary>
 
 Return shape: `scalar`.
 
@@ -1187,7 +1403,9 @@ Return shape: `scalar`.
 | `degreesFreedom1` | yes | none | `scalar`, `reference` | `once` |
 | `degreesFreedom2` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: binom-dist
+</details>
+
+<details id="signature-binom-dist"><summary>Signature: binom-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1198,7 +1416,9 @@ Return shape: `scalar`.
 | `probability` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: poisson-dist
+</details>
+
+<details id="signature-poisson-dist"><summary>Signature: poisson-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1208,7 +1428,9 @@ Return shape: `scalar`.
 | `mean` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: expon-dist
+</details>
+
+<details id="signature-expon-dist"><summary>Signature: expon-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1218,7 +1440,9 @@ Return shape: `scalar`.
 | `lambda` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: gamma-dist
+</details>
+
+<details id="signature-gamma-dist"><summary>Signature: gamma-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1229,7 +1453,9 @@ Return shape: `scalar`.
 | `beta` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: gamma-inverse
+</details>
+
+<details id="signature-gamma-inverse"><summary>Signature: gamma-inverse</summary>
 
 Return shape: `scalar`.
 
@@ -1239,7 +1465,9 @@ Return shape: `scalar`.
 | `alpha` | yes | none | `scalar`, `reference` | `once` |
 | `beta` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: beta-dist
+</details>
+
+<details id="signature-beta-dist"><summary>Signature: beta-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1252,7 +1480,9 @@ Return shape: `scalar`.
 | `lower` | no | 0 | `scalar`, `reference` | `once` |
 | `upper` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: beta-inverse
+</details>
+
+<details id="signature-beta-inverse"><summary>Signature: beta-inverse</summary>
 
 Return shape: `scalar`.
 
@@ -1264,7 +1494,9 @@ Return shape: `scalar`.
 | `lower` | no | 0 | `scalar`, `reference` | `once` |
 | `upper` | no | 1 | `scalar`, `reference` | `once` |
 
-### Signature: lognorm-dist
+</details>
+
+<details id="signature-lognorm-dist"><summary>Signature: lognorm-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1275,7 +1507,9 @@ Return shape: `scalar`.
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: lognorm-inverse
+</details>
+
+<details id="signature-lognorm-inverse"><summary>Signature: lognorm-inverse</summary>
 
 Return shape: `scalar`.
 
@@ -1285,7 +1519,9 @@ Return shape: `scalar`.
 | `mean` | yes | none | `scalar`, `reference` | `once` |
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: weibull-dist
+</details>
+
+<details id="signature-weibull-dist"><summary>Signature: weibull-dist</summary>
 
 Return shape: `scalar`.
 
@@ -1296,7 +1532,9 @@ Return shape: `scalar`.
 | `beta` | yes | none | `scalar`, `reference` | `once` |
 | `cumulative` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: confidence
+</details>
+
+<details id="signature-confidence"><summary>Signature: confidence</summary>
 
 Return shape: `scalar`.
 
@@ -1306,7 +1544,9 @@ Return shape: `scalar`.
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 | `size` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: standardize
+</details>
+
+<details id="signature-standardize"><summary>Signature: standardize</summary>
 
 Return shape: `scalar`.
 
@@ -1316,7 +1556,9 @@ Return shape: `scalar`.
 | `mean` | yes | none | `scalar`, `reference` | `once` |
 | `standardDeviation` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: trim-mean
+</details>
+
+<details id="signature-trim-mean"><summary>Signature: trim-mean</summary>
 
 Return shape: `scalar`.
 
@@ -1325,7 +1567,9 @@ Return shape: `scalar`.
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 | `percent` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: percent-rank
+</details>
+
+<details id="signature-percent-rank"><summary>Signature: percent-rank</summary>
 
 Return shape: `scalar`.
 
@@ -1335,7 +1579,9 @@ Return shape: `scalar`.
 | `x` | yes | none | `scalar`, `reference` | `once` |
 | `significance` | no | 3 | `scalar`, `reference` | `once` |
 
-### Signature: known-y-x
+</details>
+
+<details id="signature-known-y-x"><summary>Signature: known-y-x</summary>
 
 Return shape: `scalar`.
 
@@ -1344,7 +1590,9 @@ Return shape: `scalar`.
 | `knownYs` | yes | none | `range`, `array`, `reference` | `once` |
 | `knownXs` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: forecast
+</details>
+
+<details id="signature-forecast"><summary>Signature: forecast</summary>
 
 Return shape: `scalar`.
 
@@ -1354,7 +1602,9 @@ Return shape: `scalar`.
 | `knownYs` | yes | none | `range`, `array`, `reference` | `once` |
 | `knownXs` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: datedif
+</details>
+
+<details id="signature-datedif"><summary>Signature: datedif</summary>
 
 Return shape: `scalar`.
 
@@ -1364,7 +1614,9 @@ Return shape: `scalar`.
 | `endDate` | yes | none | `scalar`, `reference` | `once` |
 | `unit` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: calendar-intl
+</details>
+
+<details id="signature-calendar-intl"><summary>Signature: calendar-intl</summary>
 
 Return shape: `scalar`.
 
@@ -1375,7 +1627,9 @@ Return shape: `scalar`.
 | `weekend` | no | 1 | `scalar`, `reference` | `once` |
 | `holidays` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: nper
+</details>
+
+<details id="signature-nper"><summary>Signature: nper</summary>
 
 Return shape: `scalar`.
 
@@ -1387,7 +1641,9 @@ Return shape: `scalar`.
 | `futureValue` | no | 0 | `scalar`, `reference` | `once` |
 | `type` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: xnpv
+</details>
+
+<details id="signature-xnpv"><summary>Signature: xnpv</summary>
 
 Return shape: `scalar`.
 
@@ -1397,7 +1653,9 @@ Return shape: `scalar`.
 | `values` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: xirr
+</details>
+
+<details id="signature-xirr"><summary>Signature: xirr</summary>
 
 Return shape: `scalar`.
 
@@ -1407,7 +1665,9 @@ Return shape: `scalar`.
 | `dates` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `guess` | no | 0.1 | `scalar`, `reference` | `once` |
 
-### Signature: mirr
+</details>
+
+<details id="signature-mirr"><summary>Signature: mirr</summary>
 
 Return shape: `scalar`.
 
@@ -1417,7 +1677,9 @@ Return shape: `scalar`.
 | `financeRate` | yes | none | `scalar`, `reference` | `once` |
 | `reinvestRate` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: cumulative-payment
+</details>
+
+<details id="signature-cumulative-payment"><summary>Signature: cumulative-payment</summary>
 
 Return shape: `scalar`.
 
@@ -1430,7 +1692,9 @@ Return shape: `scalar`.
 | `endPeriod` | yes | none | `scalar`, `reference` | `once` |
 | `type` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: sln
+</details>
+
+<details id="signature-sln"><summary>Signature: sln</summary>
 
 Return shape: `scalar`.
 
@@ -1440,7 +1704,9 @@ Return shape: `scalar`.
 | `salvage` | yes | none | `scalar`, `reference` | `once` |
 | `life` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: syd
+</details>
+
+<details id="signature-syd"><summary>Signature: syd</summary>
 
 Return shape: `scalar`.
 
@@ -1451,7 +1717,9 @@ Return shape: `scalar`.
 | `life` | yes | none | `scalar`, `reference` | `once` |
 | `period` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: db
+</details>
+
+<details id="signature-db"><summary>Signature: db</summary>
 
 Return shape: `scalar`.
 
@@ -1463,7 +1731,9 @@ Return shape: `scalar`.
 | `period` | yes | none | `scalar`, `reference` | `once` |
 | `month` | no | 12 | `scalar`, `reference` | `once` |
 
-### Signature: ddb
+</details>
+
+<details id="signature-ddb"><summary>Signature: ddb</summary>
 
 Return shape: `scalar`.
 
@@ -1475,7 +1745,9 @@ Return shape: `scalar`.
 | `period` | yes | none | `scalar`, `reference` | `once` |
 | `factor` | no | 2 | `scalar`, `reference` | `once` |
 
-### Signature: rri
+</details>
+
+<details id="signature-rri"><summary>Signature: rri</summary>
 
 Return shape: `scalar`.
 
@@ -1485,7 +1757,9 @@ Return shape: `scalar`.
 | `presentValue` | yes | none | `scalar`, `reference` | `once` |
 | `futureValue` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: pduration
+</details>
+
+<details id="signature-pduration"><summary>Signature: pduration</summary>
 
 Return shape: `scalar`.
 
@@ -1495,7 +1769,9 @@ Return shape: `scalar`.
 | `presentValue` | yes | none | `scalar`, `reference` | `once` |
 | `futureValue` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: fvschedule
+</details>
+
+<details id="signature-fvschedule"><summary>Signature: fvschedule</summary>
 
 Return shape: `scalar`.
 
@@ -1504,7 +1780,9 @@ Return shape: `scalar`.
 | `principal` | yes | none | `scalar`, `reference` | `once` |
 | `schedule` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: regression-fit
+</details>
+
+<details id="signature-regression-fit"><summary>Signature: regression-fit</summary>
 
 Return shape: `array`.
 
@@ -1515,7 +1793,9 @@ Return shape: `array`.
 | `const` | no | true | `scalar`, `reference` | `once` |
 | `stats` | no | false | `scalar`, `reference` | `once` |
 
-### Signature: regression-predict
+</details>
+
+<details id="signature-regression-predict"><summary>Signature: regression-predict</summary>
 
 Return shape: `array`.
 
@@ -1526,7 +1806,9 @@ Return shape: `array`.
 | `newX` | no | knownX | `range`, `array`, `reference` | `once` |
 | `const` | no | true | `scalar`, `reference` | `once` |
 
-### Signature: frequency
+</details>
+
+<details id="signature-frequency"><summary>Signature: frequency</summary>
 
 Return shape: `array`.
 
@@ -1535,7 +1817,9 @@ Return shape: `array`.
 | `data` | yes | none | `range`, `array`, `reference` | `once` |
 | `bins` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: probability-range
+</details>
+
+<details id="signature-probability-range"><summary>Signature: probability-range</summary>
 
 Return shape: `scalar`.
 
@@ -1546,7 +1830,9 @@ Return shape: `scalar`.
 | `lowerLimit` | no | 0 | `scalar`, `reference` | `once` |
 | `upperLimit` | no | lowerLimit | `scalar`, `reference` | `once` |
 
-### Signature: database
+</details>
+
+<details id="signature-database"><summary>Signature: database</summary>
 
 Return shape: `scalar`.
 
@@ -1556,7 +1842,9 @@ Return shape: `scalar`.
 | `field` | yes | none | `scalar`, `reference` | `once` |
 | `criteria` | yes | none | `range`, `reference` | `once` |
 
-### Signature: round-math
+</details>
+
+<details id="signature-round-math"><summary>Signature: round-math</summary>
 
 Return shape: `scalar`.
 
@@ -1566,7 +1854,9 @@ Return shape: `scalar`.
 | `significance` | no | 1 | `scalar`, `reference` | `once` |
 | `mode` | no | 0 | `scalar`, `reference` | `once` |
 
-### Signature: series-sum
+</details>
+
+<details id="signature-series-sum"><summary>Signature: series-sum</summary>
 
 Return shape: `scalar`.
 
@@ -1577,7 +1867,9 @@ Return shape: `scalar`.
 | `m` | yes | none | `scalar`, `reference` | `once` |
 | `coefficients` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: aggregate
+</details>
+
+<details id="signature-aggregate"><summary>Signature: aggregate</summary>
 
 Return shape: `scalar`.
 
@@ -1587,7 +1879,9 @@ Return shape: `scalar`.
 | `options` | yes | none | `scalar`, `reference` | `once` |
 | `reference` | yes | none | `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: matrix-pair
+</details>
+
+<details id="signature-matrix-pair"><summary>Signature: matrix-pair</summary>
 
 Return shape: `array`.
 
@@ -1596,7 +1890,9 @@ Return shape: `array`.
 | `array1` | yes | none | `range`, `array`, `reference` | `once` |
 | `array2` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: matrix-unary
+</details>
+
+<details id="signature-matrix-unary"><summary>Signature: matrix-unary</summary>
 
 Return shape: `array`.
 
@@ -1604,7 +1900,9 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `array` | yes | none | `range`, `array`, `reference` | `once` |
 
-### Signature: matrix-unit
+</details>
+
+<details id="signature-matrix-unit"><summary>Signature: matrix-unit</summary>
 
 Return shape: `array`.
 
@@ -1612,7 +1910,9 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `dimension` | yes | none | `scalar`, `reference` | `once` |
 
-### Signature: reshape-flatten
+</details>
+
+<details id="signature-reshape-flatten"><summary>Signature: reshape-flatten</summary>
 
 Return shape: `array`.
 
@@ -1622,7 +1922,9 @@ Return shape: `array`.
 | `ignore` | no | 0 | `scalar`, `reference` | `once` |
 | `scanByColumn` | no | FALSE | `scalar`, `reference` | `once` |
 
-### Signature: reshape-wrap
+</details>
+
+<details id="signature-reshape-wrap"><summary>Signature: reshape-wrap</summary>
 
 Return shape: `array`.
 
@@ -1632,7 +1934,9 @@ Return shape: `array`.
 | `wrapCount` | yes | none | `scalar`, `reference` | `once` |
 | `padWith` | no | #N/A | `scalar`, `reference` | `once` |
 
-### Signature: reshape-expand
+</details>
+
+<details id="signature-reshape-expand"><summary>Signature: reshape-expand</summary>
 
 Return shape: `array`.
 
@@ -1643,7 +1947,9 @@ Return shape: `array`.
 | `columns` | no | source columns | `scalar`, `reference` | `once` |
 | `padWith` | no | #N/A | `scalar`, `reference` | `once` |
 
-### Signature: reshape-stack
+</details>
+
+<details id="signature-reshape-stack"><summary>Signature: reshape-stack</summary>
 
 Return shape: `array`.
 
@@ -1651,7 +1957,9 @@ Return shape: `array`.
 | --- | --- | --- | --- | --- |
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 
-### Signature: lambda-lambda
+</details>
+
+<details id="signature-lambda-lambda"><summary>Signature: lambda-lambda</summary>
 
 Return shape: `contextual`.
 
@@ -1660,7 +1968,9 @@ Return shape: `contextual`.
 | `parameter` | no | none | `scalar`, `range`, `array`, `reference` | `zero-or-more` |
 | `calculation` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-map
+</details>
+
+<details id="signature-lambda-map"><summary>Signature: lambda-map</summary>
 
 Return shape: `array`.
 
@@ -1669,7 +1979,9 @@ Return shape: `array`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `one-or-more` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-reduce
+</details>
+
+<details id="signature-lambda-reduce"><summary>Signature: lambda-reduce</summary>
 
 Return shape: `scalar`.
 
@@ -1679,7 +1991,9 @@ Return shape: `scalar`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-scan
+</details>
+
+<details id="signature-lambda-scan"><summary>Signature: lambda-scan</summary>
 
 Return shape: `array`.
 
@@ -1689,7 +2003,9 @@ Return shape: `array`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-byrow
+</details>
+
+<details id="signature-lambda-byrow"><summary>Signature: lambda-byrow</summary>
 
 Return shape: `array`.
 
@@ -1698,7 +2014,9 @@ Return shape: `array`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-bycol
+</details>
+
+<details id="signature-lambda-bycol"><summary>Signature: lambda-bycol</summary>
 
 Return shape: `array`.
 
@@ -1707,7 +2025,9 @@ Return shape: `array`.
 | `array` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-makearray
+</details>
+
+<details id="signature-lambda-makearray"><summary>Signature: lambda-makearray</summary>
 
 Return shape: `array`.
 
@@ -1717,7 +2037,9 @@ Return shape: `array`.
 | `columns` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `lambda` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: lambda-isomitted
+</details>
+
+<details id="signature-lambda-isomitted"><summary>Signature: lambda-isomitted</summary>
 
 Return shape: `scalar`.
 
@@ -1725,7 +2047,9 @@ Return shape: `scalar`.
 | --- | --- | --- | --- | --- |
 | `value` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: groupby-groupby
+</details>
+
+<details id="signature-groupby-groupby"><summary>Signature: groupby-groupby</summary>
 
 Return shape: `array`.
 
@@ -1740,7 +2064,9 @@ Return shape: `array`.
 | `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `fieldRelationship` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: groupby-pivotby
+</details>
+
+<details id="signature-groupby-pivotby"><summary>Signature: groupby-pivotby</summary>
 
 Return shape: `array`.
 
@@ -1758,7 +2084,9 @@ Return shape: `array`.
 | `filterArray` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `relativeTo` | no | none | `scalar`, `range`, `array`, `reference` | `once` |
 
-### Signature: groupby-percentof
+</details>
+
+<details id="signature-groupby-percentof"><summary>Signature: groupby-percentof</summary>
 
 Return shape: `scalar`.
 
@@ -1767,11 +2095,13 @@ Return shape: `scalar`.
 | `dataSubset` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 | `dataAll` | yes | none | `scalar`, `range`, `array`, `reference` | `once` |
 
+</details>
+
 ## Semantic profiles
 
 These values are normative for the listed Sheetwrite subset. `function-defined` and `contextual` are explicit limitations: consult the formula guide's function-specific sections rather than assuming another spreadsheet's edge behavior.
 
-### Semantics: scalar
+<details id="semantics-scalar"><summary>Semantics: scalar</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1783,7 +2113,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: aggregate
+</details>
+
+<details id="semantics-aggregate"><summary>Semantics: aggregate</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1795,7 +2127,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: information
+</details>
+
+<details id="semantics-information"><summary>Semantics: information</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1807,7 +2141,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: logical
+</details>
+
+<details id="semantics-logical"><summary>Semantics: logical</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1819,7 +2155,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: lazy-control
+</details>
+
+<details id="semantics-lazy-control"><summary>Semantics: lazy-control</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1831,7 +2169,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: contextual<br />lazy: lazy-branches<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: let-binding
+</details>
+
+<details id="semantics-let-binding"><summary>Semantics: let-binding</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1843,7 +2183,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: contextual<br />lazy: lazy-bindings<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: text
+</details>
+
+<details id="semantics-text"><summary>Semantics: text</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1855,7 +2197,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: text-sensitive
+</details>
+
+<details id="semantics-text-sensitive"><summary>Semantics: text-sensitive</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1867,7 +2211,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: text-search
+</details>
+
+<details id="semantics-text-search"><summary>Semantics: text-search</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1879,7 +2225,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: criteria
+</details>
+
+<details id="semantics-criteria"><summary>Semantics: criteria</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1891,7 +2239,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: date-time
+</details>
+
+<details id="semantics-date-time"><summary>Semantics: date-time</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1903,7 +2253,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: volatile-date
+</details>
+
+<details id="semantics-volatile-date"><summary>Semantics: volatile-date</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1915,7 +2267,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: none<br />lazy: not-applicable<br />spill: scalar<br />fill: source-preserved<br />copy: source-preserved<br />structuralRewrite: source-preserved |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: lookup
+</details>
+
+<details id="semantics-lookup"><summary>Semantics: lookup</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1927,7 +2281,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: array
+</details>
+
+<details id="semantics-array"><summary>Semantics: array</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1939,7 +2295,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: array<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: financial
+</details>
+
+<details id="semantics-financial"><summary>Semantics: financial</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1951,7 +2309,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: financial-iterative
+</details>
+
+<details id="semantics-financial-iterative"><summary>Semantics: financial-iterative</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1963,7 +2323,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-distributions
+</details>
+
+<details id="semantics-analysis-distributions"><summary>Semantics: analysis-distributions</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1975,7 +2337,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-descriptive
+</details>
+
+<details id="semantics-analysis-descriptive"><summary>Semantics: analysis-descriptive</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1987,7 +2351,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-regression
+</details>
+
+<details id="semantics-analysis-regression"><summary>Semantics: analysis-regression</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -1999,7 +2365,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-math
+</details>
+
+<details id="semantics-analysis-math"><summary>Semantics: analysis-math</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -2011,7 +2379,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-database
+</details>
+
+<details id="semantics-analysis-database"><summary>Semantics: analysis-database</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -2023,7 +2393,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: eager<br />spill: scalar<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-lambda
+</details>
+
+<details id="semantics-analysis-lambda"><summary>Semantics: analysis-lambda</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -2035,7 +2407,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
-### Semantics: analysis-groupby
+</details>
+
+<details id="semantics-analysis-groupby"><summary>Semantics: analysis-groupby</summary>
 
 | Dimension | Contract |
 | --- | --- |
@@ -2047,9 +2421,11 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 | calculation | dependencies: tracked<br />lazy: function-defined<br />spill: contextual<br />fill: relative-reference-rewrite<br />copy: relative-reference-rewrite<br />structuralRewrite: ast-reference-rewrite |
 | persistence | snapshot: formula-source<br />history: formula-source<br />collaboration: formula-source<br />xlsxSource: rewrite-on-structural-edit |
 
+</details>
+
 ## Dialect profiles
 
-### Dialect: regex-lite-subset
+<details id="dialect-regex-lite-subset"><summary>Dialect: regex-lite-subset</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2059,7 +2435,9 @@ These values are normative for the listed Sheetwrite subset. `function-defined` 
 
 Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax, not full PCRE2. Lookaround, backreferences, Unicode classes such as \p{L}, and other patterns the engine cannot compile return #VALUE!. \d, \s, and \w use ASCII character classes. \b uses ASCII word boundaries. As in Excel, caseSensitivity is 0 (case-sensitive, the default) or 1 (case-insensitive). Case-insensitive matching and the (?i) flag fold ASCII letters only. If caseSensitivity is 1 or the pattern enables an inline i flag, a pattern with a non-ASCII cased letter or a \x, \u, or \U escape returns #VALUE!. Regex programs are limited to 2 MiB. Text inputs and outputs are limited to 32,767 characters.
 
-### Dialect: excel-documented
+</details>
+
+<details id="dialect-excel-documented"><summary>Dialect: excel-documented</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2069,7 +2447,9 @@ Limitations: REGEXTEST, REGEXEXTRACT, and REGEXREPLACE use the regex-lite syntax
 
 Limitations: Google Sheets and OpenFormula results require producer evidence before compatibility is claimed.
 
-### Dialect: analysis-distributions
+</details>
+
+<details id="dialect-analysis-distributions"><summary>Dialect: analysis-distributions</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2079,7 +2459,9 @@ Limitations: Google Sheets and OpenFormula results require producer evidence bef
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Scalar binary64 evaluation, not array broadcasting or blanket spreadsheet parity. Domain validation and finite numerical convergence may return #NUM!.
 
-### Dialect: analysis-descriptive
+</details>
+
+<details id="dialect-analysis-descriptive"><summary>Dialect: analysis-descriptive</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2089,7 +2471,9 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Regression functions skip pairs where either value is not a number. PERCENTRANK results are truncated, not rounded, to the requested significant digits.
 
-### Dialect: analysis-regression
+</details>
+
+<details id="dialect-analysis-regression"><summary>Dialect: analysis-regression</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2099,7 +2483,9 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?.
 
-### Dialect: analysis-math
+</details>
+
+<details id="dialect-analysis-math"><summary>Dialect: analysis-math</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2109,7 +2495,9 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Hidden rows are not part of the engine model. AGGREGATE row visibility options therefore have no effect. Matrix functions use engine resource limits.
 
-### Dialect: analysis-database
+</details>
+
+<details id="dialect-analysis-database"><summary>Dialect: analysis-database</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2119,7 +2507,9 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in the optional @sheetwrite/formulas analysis build; default @sheetwrite/wasm returns #NAME?. Database criteria use header names, AND across columns, and OR across rows. Custom formula predicates under headers that are not database fields are not supported.
 
-### Dialect: analysis-lambda
+</details>
+
+<details id="dialect-analysis-lambda"><summary>Dialect: analysis-lambda</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2129,7 +2519,9 @@ Limitations: Available only in the optional @sheetwrite/formulas analysis build;
 
 Limitations: Available only in @sheetwrite/formulas. Named ranges are supported, but workbook-defined named formulas are not available. LAMBDA uses lexical parameters and LET bindings. Calls are limited to depth 64 and 2000000 work units. Helpers reject nested arrays.
 
-### Dialect: analysis-groupby
+</details>
+
+<details id="dialect-analysis-groupby"><summary>Dialect: analysis-groupby</summary>
 
 | Dialect | Status |
 | --- | --- |
@@ -2139,9 +2531,11 @@ Limitations: Available only in @sheetwrite/formulas. Named ranges are supported,
 
 Limitations: Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported. Grouping and output use the engine spill and work limits.
 
+</details>
+
 ## Implementation profiles
 
-### Implementation: text-analysis
+<details id="implementation-text-analysis"><summary>Implementation: text-analysis</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2150,7 +2544,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/wasm/src/eval/analysis/mod.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/mod.rs) |
 | Evidence | behavior-tested<br />[`packages/wasm/src/eval/analysis/text.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/text.rs) |
 
-### Implementation: implemented-assisted
+</details>
+
+<details id="implementation-implemented-assisted"><summary>Implementation: implemented-assisted</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2159,7 +2555,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/tests.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/tests.rs)<br />[`packages/core/test/formula-assist.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/test/formula-assist.test.ts) |
 
-### Implementation: parser-assisted-evaluator-declared
+</details>
+
+<details id="implementation-parser-assisted-evaluator-declared"><summary>Implementation: parser-assisted-evaluator-declared</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2168,7 +2566,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 
-### Implementation: parser-declared-target
+</details>
+
+<details id="implementation-parser-declared-target"><summary>Implementation: parser-declared-target</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2177,7 +2577,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | missing<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | registration-tested<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-distributions
+</details>
+
+<details id="implementation-analysis-distributions"><summary>Implementation: analysis-distributions</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2186,7 +2588,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-descriptive
+</details>
+
+<details id="implementation-analysis-descriptive"><summary>Implementation: analysis-descriptive</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2195,7 +2599,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-dates
+</details>
+
+<details id="implementation-analysis-dates"><summary>Implementation: analysis-dates</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2204,7 +2610,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-finance
+</details>
+
+<details id="implementation-analysis-finance"><summary>Implementation: analysis-finance</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2213,7 +2621,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-regression
+</details>
+
+<details id="implementation-analysis-regression"><summary>Implementation: analysis-regression</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2222,7 +2632,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/regression.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/regression.rs)<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-math
+</details>
+
+<details id="implementation-analysis-math"><summary>Implementation: analysis-math</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2231,7 +2643,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-database
+</details>
+
+<details id="implementation-analysis-database"><summary>Implementation: analysis-database</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2240,7 +2654,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-### Implementation: analysis-reshape
+</details>
+
+<details id="implementation-analysis-reshape"><summary>Implementation: analysis-reshape</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2249,7 +2665,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/reshape.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/reshape.rs) |
 
-### Implementation: analysis-lambda
+</details>
+
+<details id="implementation-analysis-lambda"><summary>Implementation: analysis-lambda</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2258,7 +2676,9 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/lambda.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/lambda.rs) |
 
-### Implementation: analysis-groupby
+</details>
+
+<details id="implementation-analysis-groupby"><summary>Implementation: analysis-groupby</summary>
 
 | Layer | Status and source/evidence |
 | --- | --- |
@@ -2266,6 +2686,8 @@ Limitations: Available only in @sheetwrite/formulas. Aggregators must be a singl
 | Evaluator | implemented<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
 | Formula assist | implemented<br />[`packages/core/src/formula-assist.ts`](https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/formula-assist.ts) |
 | Evidence | source-linked<br />[`packages/wasm/src/eval/analysis/groupby.rs`](https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/src/eval/analysis/groupby.rs) |
+
+</details>
 
 ## Unsupported categories
 
@@ -2279,4 +2701,4 @@ Unknown functions retain their source and evaluate to `#NAME?`; Sheetwrite does 
 | **Cube functions** (`cube`) | OLAP cube members, sets, and values are not resolved. | `CUBEMEMBER`, `CUBESET`, `CUBEVALUE` | [Cube functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 | **Arbitrary external workbook references** (`external-workbook`) | References to arbitrary workbook files are not loaded or dereferenced. | `'[Book.xlsx]Sheet1'!A1` | [Lookup and reference functions](https://support.microsoft.com/en-us/office/excel-functions-by-category-5f91f4e9-7b42-46d2-9bd1-63f26a86c0eb) | [`scripts/formula-contract.test.ts`](https://github.com/chh-ay/sheetwrite/blob/main/scripts/formula-contract.test.ts) |
 
-In particular, automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, database functions, cube/OLAP functions, and `LAMBDA`/higher-order execution are unsupported. `TODAY` and `NOW` are the documented clock-function exception; `LET` is supported and is not a `LAMBDA` fallback.
+Automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `TODAY` and `NOW` are the documented clock-function exception. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.
