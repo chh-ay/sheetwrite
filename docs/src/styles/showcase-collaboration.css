@@ -518,11 +518,21 @@
     grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.5fr) minmax(0, 1fr);
   }
 
+  /* The clients share the full width, and their grids show more rows. */
   .sw-clb__workbench {
-    grid-template-columns: minmax(0, 34rem) minmax(0, 34rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
       "ana bram"
       "lane lane";
+  }
+
+  .sw-clb__grid {
+    min-height: 22rem;
+  }
+
+  /* Beside the short step list, the log grows with its entries. */
+  .sw-clb__server-log {
+    min-height: 8rem;
   }
 
   .sw-clb__client[data-client="a"] {
