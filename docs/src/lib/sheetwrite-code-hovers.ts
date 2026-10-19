@@ -469,6 +469,15 @@ export function hoverPopoverId(
   return `sheetwrite-code-popover-${blockIdentity}-${hoverIndex}-${hover.line}-${hover.character}-${hover.length}-${hashIdentifier(hover.target)}`;
 }
 
+/**
+ * An `@example` is code: keep its own line breaks and indentation, which the
+ * prose cleanup would fold into one line. A fenced example loses its fence.
+ */
+function exampleCode(value: string): string {
+  const fenced = /```[\w-]*\n?([\s\S]*?)```/.exec(value);
+  return (fenced?.[1] ?? value).replace(/^\n+|\s+$/g, "");
+}
+
 /** Render a cleaned tag value with bare URLs as real links, like the reference footer. */
 function tagValueContents(value: string): ElementContent[] {
   const cleaned = cleanDocumentation(value);
@@ -560,11 +569,16 @@ class SheetwriteHoverAnnotation extends ExpressiveCodeAnnotation {
               ? h(
                   "span.sw-code-popover__tags",
                   this.rendered.tags.map(([name, value]) =>
-                    h("span.sw-code-popover__tag", [
-                      h("span.sw-code-popover__tag-name", `@${name}`),
-                      ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
-                      ...(value ? tagValueContents(value) : []),
-                    ]),
+                    name === "example" && value
+                      ? h("span.sw-code-popover__tag.sw-code-popover__tag--example", [
+                          h("span.sw-code-popover__tag-name", "Example"),
+                          h("code.sw-code-popover__example", exampleCode(value)),
+                        ])
+                      : h("span.sw-code-popover__tag", [
+                          h("span.sw-code-popover__tag-name", `@${name}`),
+                          ...(value ? [{ type: "text", value: " " } as ElementContent] : []),
+                          ...(value ? tagValueContents(value) : []),
+                        ]),
                   ),
                 )
               : [],

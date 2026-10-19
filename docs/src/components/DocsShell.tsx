@@ -12,6 +12,7 @@ import {
 } from "../lib/releases.js";
 import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
 import { DocsSearch } from "./DocsSearch.js";
+import { PackageCommand } from "./PackageCommand.js";
 import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
@@ -439,7 +440,15 @@ export function DocsShell({
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
           {titlePackage === undefined ? <span>{description}</span> : null}
-          {release === undefined ? null : <ReleaseStrip {...release} />}
+          {release === undefined ? null : (
+            <>
+              <ReleaseStrip {...release} />
+              <PackageCommand
+                note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
+                packages={`@sheetwrite/core@${release.release.version}`}
+              />
+            </>
+          )}
         </header>
         <ApiSymbolFilter />
         {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}

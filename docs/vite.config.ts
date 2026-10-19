@@ -27,6 +27,42 @@ interface HastNode {
   value?: string;
   properties?: Record<string, unknown>;
   children?: HastNode[];
+  name?: string;
+  attributes?: Array<{ type: string; name: string; value: string }>;
+}
+
+/** One install command on one line, in any package manager's spelling. */
+const INSTALL_COMMAND = /^(?:npm install|npm i|pnpm add|yarn add|bun add)\s+((?:[@\w./-]+\s*)+)$/;
+
+/**
+ * A one-line install fence becomes a `PackageCommand` terminal, so every page
+ * offers npm, pnpm, Yarn, and Bun from the same Markdown. Runs before
+ * Expressive Code, which would otherwise render the fence as plain code.
+ */
+function installCommandsAsTerminals() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      node.children = node.children?.map((child) => {
+        const code = child.tagName === "pre" ? child.children?.[0] : undefined;
+        const language = [code?.properties?.className ?? []].flat().map(String);
+        const match =
+          code?.tagName === "code" && language.includes("language-sh")
+            ? INSTALL_COMMAND.exec(textOf(code).trim())
+            : null;
+        if (match?.[1] === undefined) {
+          visit(child);
+          return child;
+        }
+        return {
+          type: "mdxJsxFlowElement",
+          name: "PackageCommand",
+          attributes: [{ type: "mdxJsxAttribute", name: "packages", value: match[1].trim() }],
+          children: [],
+        };
+      });
+    };
+    visit(tree);
+  };
 }
 
 /** Keeps code focus client-owned and removes copy controls from API signatures. */
@@ -195,6 +231,7 @@ export default defineConfig({
       ...mdx({
         remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
         rehypePlugins: [
+          installCommandsAsTerminals,
           [
             rehypeExpressiveCode,
             {
