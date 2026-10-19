@@ -93,6 +93,12 @@ const FOLLOW_STEPS = [
   "Host acknowledgement",
 ] as const;
 
+/** A sub-millisecond step still gets a visible slice of the timing bar. */
+const MIN_STEP_SHARE = 0.02;
+
+/** Region, the column left of Actual: phones start with it at the left edge. */
+const REGION_COLUMN = ENGINE_COLUMN_INDEX.actual - 1;
+
 function carriesPlanBand(columns: readonly EngineColumnBand[]): boolean {
   return columns.some((band) => band.keys.includes(ENGINE_PLAN_KEY));
 }
@@ -267,8 +273,14 @@ export default function EngineShowcase() {
         };
         grid.setSelection({ kind: "cell", addr: actualCell });
         // Without frozen columns a phone shows only Month and Region; the demo
-        // is about Actual, so the grid starts scrolled to it.
-        if (narrow) grid.scrollToCell(actualCell);
+        // is about Actual. scrollToCell moves as little as it can, and only a
+        // move to the left aligns a column with the left edge: scrolling past
+        // Region to Forecast and back puts Region at the edge and Actual fully
+        // in view, with no column cut in half.
+        if (narrow) {
+          grid.scrollToCell({ ...actualCell, col: ENGINE_COLUMN_INDEX.forecast });
+          grid.scrollToCell({ ...actualCell, col: REGION_COLUMN });
+        }
         bindings = bindEngineEvents(grid, emit, setPendingOperations);
         gridRef.current = grid;
         bindingsRef.current = bindings;
@@ -714,7 +726,7 @@ export default function EngineShowcase() {
                   ? followSteps.map((stepMs, index) => (
                       <i
                         key={FOLLOW_STEPS[index]}
-                        style={{ flexGrow: Math.max(stepMs, followDuration * 0.02) }}
+                        style={{ flexGrow: Math.max(stepMs, followDuration * MIN_STEP_SHARE) }}
                       />
                     ))
                   : null}
