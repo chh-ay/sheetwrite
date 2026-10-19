@@ -42,7 +42,9 @@ const INSTALL_COMMAND = /^(?:npm install|npm i|pnpm add|yarn add|bun add)\s+((?:
 function installCommandsAsTerminals() {
   return (tree: HastNode): void => {
     const visit = (node: HastNode): void => {
-      node.children = node.children?.map((child) => {
+      // Text nodes have no children key; writing one breaks later plugins.
+      if (node.children === undefined) return;
+      node.children = node.children.map((child) => {
         const code = child.tagName === "pre" ? child.children?.[0] : undefined;
         const language = [code?.properties?.className ?? []].flat().map(String);
         const match =

@@ -130,8 +130,6 @@ calls `store.recalculateVolatile(date)`.
 
 Source: https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/
 
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
-
 ## Architecture at a glance
 
 Sheetwrite splits cleanly into a **data engine** (Rust → WASM) and a **renderer**
@@ -545,9 +543,27 @@ No framework owns the global runtime. All adapters converge on the same monotoni
 
 Source: https://sheetwrite.vercel.app/docs/frameworks/react/
 
-`@sheetwrite/react` initializes WASM after client mount. Use `Sheetwrite` for the simple `columns` and `defaultRows` contract; use `SheetwriteGrid` when the host supplies a `Workbook` plus eager data or a datasource.
+`@sheetwrite/react` wraps a Grid in a React component. It initializes WASM after
+the component mounts on the client, so the page stays server-renderable.
 
-`onGridChange` reports committed grid changes. `onReady` receives `{ grid, generation, reason }` after the forwarded ref is assigned. Replacing reset-sensitive inputs creates a new generation; destroy persistence/sync coordinators attached to the previous grid.
+Package`@sheetwrite/react`
+Components`Sheetwrite`, `SheetwriteGrid`
+Grid accessForwarded ref and `onReady`
+Change events`onGridChange` prop
+
+## Install
+
+```sh
+npm install @sheetwrite/react
+```
+
+Import `@sheetwrite/react/styles.css` once in your app.
+
+## Mount a grid
+
+Use `Sheetwrite` for the simple `columns` and `defaultRows` contract. Use
+`SheetwriteGrid` when the host supplies a `Workbook` plus eager data or a
+datasource.
 
 ```tsx
 import { Sheetwrite, type GridReadyEvent, type SimpleColumn } from "@sheetwrite/react";
@@ -576,19 +592,51 @@ export function Sheet({ columns, rows, save, onReady }: SheetProps) {
 }
 ```
 
-Server rendering the component does not initialize WASM. Mount it in a client component in frameworks that render on the server.
+## Listen to changes
 
-- [Run the React example](https://sheetwrite.vercel.app/react/)
-- [Lifecycle and reset semantics](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
-- [`@sheetwrite/react` API](https://sheetwrite.vercel.app/docs/api/react/)
+`onGridChange` reports committed Grid changes. `onReady` receives
+`{ grid, generation, reason }` after the forwarded ref is assigned.
+
+## Resets and cleanup
+
+Replacing a reset-sensitive input creates a new Grid generation. Destroy the
+persistence and sync coordinators that you attached to the previous Grid, then
+attach new ones in `onReady`. The [lifecycle page](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
+lists which inputs update in place and which reset.
+
+## Server rendering
+
+Rendering the component on the server does not initialize WASM. In frameworks
+that render on the server, mount it in a client component.
+
+Example Run the React example (https://sheetwrite.vercel.app/react/)
+Lifecycle Updates and resets (https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
+Reference @sheetwrite/react API (https://sheetwrite.vercel.app/docs/api/react/)
 
 ### Svelte
 
 Source: https://sheetwrite.vercel.app/docs/frameworks/svelte/
 
-`@sheetwrite/svelte` initializes WASM in the browser. Bind `grid` when the host needs imperative access and pass `onGridChange` or `onReady` callbacks using the adapter's camel-case props.
+`@sheetwrite/svelte` wraps a Grid in a Svelte 5 component. It initializes WASM
+in the browser.
 
-The binding is populated before `onReady` and cleared before reset or unmount. A reset publishes a new generation and reason; coordinators attached to the previous grid must be destroyed and recreated.
+Package`@sheetwrite/svelte`
+Component`Sheetwrite`
+Grid access`bind:grid` and `onReady`
+Change events`onGridChange` prop
+
+## Install
+
+```sh
+npm install @sheetwrite/svelte
+```
+
+Import `@sheetwrite/svelte/styles.css` once in your app.
+
+## Mount a grid
+
+Bind `grid` when the host needs imperative access. Pass callbacks with the
+adapter's camel-case props.
 
 ```svelte
 <script lang="ts">
@@ -624,17 +672,49 @@ The binding is populated before `onReady` and cleared before reset or unmount. A
 />
 ```
 
-Use a client-only boundary in SvelteKit when the surrounding route is server rendered.
+## Listen to changes
 
-- [Run the Svelte shell example](https://sheetwrite.vercel.app/svelte/)
-- [Lifecycle and reset semantics](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
-- [`@sheetwrite/svelte` API](https://sheetwrite.vercel.app/docs/api/svelte/)
+`onGridChange` reports committed Grid changes. The `grid` binding is set before
+`onReady` runs.
+
+## Resets and cleanup
+
+The binding is cleared before a reset or unmount. A reset publishes a new
+generation and reason; destroy the coordinators attached to the previous Grid
+and create new ones. The [lifecycle page](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/) lists
+which inputs update in place and which reset.
+
+## Server rendering
+
+When the surrounding SvelteKit route renders on the server, use a client-only
+boundary.
+
+Example Run the Svelte example (https://sheetwrite.vercel.app/svelte/)
+Lifecycle Updates and resets (https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
+Reference @sheetwrite/svelte API (https://sheetwrite.vercel.app/docs/api/svelte/)
 
 ### Vanilla JavaScript
 
 Source: https://sheetwrite.vercel.app/docs/frameworks/vanilla/
 
-Use `@sheetwrite/core` when the host owns DOM lifetime directly. Call `initSheetwrite()` on the client, pass an existing element to `createGrid`, and retain the returned `Grid` for events and commands.
+Use `@sheetwrite/core` directly when the host owns the DOM lifetime. You
+initialize the engine, create the Grid, and destroy it yourself.
+
+Package`@sheetwrite/core`
+Entry points`initSheetwrite`, `createGrid`
+Grid accessThe returned `Grid`
+Change events`grid.on("change")`
+
+## Install
+
+```sh
+npm install @sheetwrite/core
+```
+
+## Mount a grid
+
+Call `initSheetwrite()` on the client, pass an existing element to `createGrid`,
+and keep the returned `Grid` for events and commands.
 
 ```ts
 import {
@@ -662,20 +742,48 @@ export async function mountSheetwrite(
 }
 ```
 
-A datasource-backed grid may use dense storage or allocation-lazy paged storage. Full-sheet operations can throw `IncompleteDataError` until every required page is loaded. Worker rendering automatically falls back to the main-thread canvas when capabilities or startup fail; observe `renderer-fallback` if the host needs to report that transition.
+## Listen to changes
 
-- [Run the Vanilla example](https://sheetwrite.vercel.app/vanilla/)
-- [Installation and explicit WASM sources](https://sheetwrite.vercel.app/docs/start/installation/)
-- [Runtime ownership](https://sheetwrite.vercel.app/docs/concepts/runtime-ownership/)
-- [`@sheetwrite/core` API](https://sheetwrite.vercel.app/docs/api/core/)
+`grid.on("change", …)` reports committed changes and returns a function that
+removes the listener. The cleanup function in the example removes the listener
+and then destroys the Grid.
+
+## Data and rendering
+
+A datasource-backed Grid can use dense storage or allocation-lazy paged storage.
+Full-sheet operations can throw `IncompleteDataError` until every required page
+is loaded. Worker rendering falls back to the main-thread canvas when the
+browser lacks a capability or the worker fails to start; listen to
+`renderer-fallback` if the host must report that change.
+
+Example Run the Vanilla example (https://sheetwrite.vercel.app/vanilla/)
+Setup Installation and WASM sources (https://sheetwrite.vercel.app/docs/start/installation/)
+Reference @sheetwrite/core API (https://sheetwrite.vercel.app/docs/api/core/)
 
 ### Vue
 
 Source: https://sheetwrite.vercel.app/docs/frameworks/vue/
 
-`@sheetwrite/vue` initializes WASM after client mount. The simple component accepts `columns` and `defaultRows`; Vue templates use kebab-case event listeners such as `@grid-change` and `@ready`.
+`@sheetwrite/vue` wraps a Grid in a Vue component. It initializes WASM after the
+component mounts on the client.
 
-The component exposes `grid` before emitting `ready`. A reset clears the old exposed handle, creates a new generation, and then publishes the replacement. Reattach any coordinator that subscribed to the old grid.
+Package`@sheetwrite/vue`
+Component`Sheetwrite`
+Grid accessExposed `grid` and `@ready`
+Change events`@grid-change`
+
+## Install
+
+```sh
+npm install @sheetwrite/vue
+```
+
+Import `@sheetwrite/vue/styles.css` once in your app.
+
+## Mount a grid
+
+The component accepts `columns` and `default-rows`. Templates use kebab-case
+event listeners.
 
 ```vue
 <script setup lang="ts">
@@ -709,17 +817,30 @@ const handleReady = (event: GridReadyEvent) => emit("ready", event);
 </template>
 ```
 
-Use a client-only boundary in Nuxt or another server-rendered host; importing or rendering the component on the server does not start WASM.
+## Listen to changes
 
-- [Run the Vue datasource example](https://sheetwrite.vercel.app/vue/)
-- [Lifecycle and reset semantics](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
-- [`@sheetwrite/vue` API](https://sheetwrite.vercel.app/docs/api/vue/)
+`@grid-change` reports committed Grid changes. The component exposes `grid`
+before it emits `ready`.
+
+## Resets and cleanup
+
+A reset clears the old exposed handle, creates a new generation, and then
+publishes the replacement. Attach again any coordinator that subscribed to the
+old Grid. The [lifecycle page](https://sheetwrite.vercel.app/docs/frameworks/lifecycle/) lists which inputs
+update in place and which reset.
+
+## Server rendering
+
+Importing or rendering the component on the server does not start WASM. In Nuxt
+or another server-rendered host, use a client-only boundary.
+
+Example Run the Vue example (https://sheetwrite.vercel.app/vue/)
+Lifecycle Updates and resets (https://sheetwrite.vercel.app/docs/frameworks/lifecycle/)
+Reference @sheetwrite/vue API (https://sheetwrite.vercel.app/docs/api/vue/)
 
 ### Accessibility
 
 Source: https://sheetwrite.vercel.app/docs/guides/accessibility/
-
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
 
 The grid paints to a `<canvas>`, which assistive technology can not read. To make
 it navigable, Sheetwrite maintains a parallel **ARIA shadow tree**: a
@@ -1467,8 +1588,6 @@ This choice preserves stable sheet IDs and authoritative formula source without 
 
 Source: https://sheetwrite.vercel.app/docs/guides/configuration/
 
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
-
 Everything you pass to `createGrid(host, opts)` lives in `GridOptions`. This page
 lists every field with its type and default, the optional toolbar `GridConfig`,
 and the `Grid` instance API.
@@ -2199,8 +2318,6 @@ sync.destroy();
 
 Source: https://sheetwrite.vercel.app/docs/guides/data-operations/
 
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
-
 Sheetwrite can sort, filter, hide, group, aggregate, import, and export the active
 sheet without rewriting the stored row data. Sorts and filters are display views:
 the store keeps a row-order permutation/subset and the renderer reads through it.
@@ -2481,8 +2598,6 @@ any role by implementing `XlsxWorkbookBackend` or the table backend contracts.
 ### Formulas
 
 Source: https://sheetwrite.vercel.app/docs/guides/formulas/
-
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
 
 Sheetwrite evaluates formulas in the Rust/WASM calculation engine. Formula sources are persisted exactly as document values; evaluated results are cached for rendering, queries, export, and dependent formulas.
 
@@ -2895,8 +3010,6 @@ const bridge = createRowBridge({
 
 Source: https://sheetwrite.vercel.app/docs/guides/interaction/
 
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
-
 Sheetwrite handles selection, keyboard navigation, inline editing, the clipboard,
 the toolbar, merges, and drag-to-fill out of the box. The host element is made
 focusable (`tabindex="0"`) so it receives keyboard events. Setting
@@ -3302,8 +3415,6 @@ Undo of a large clear can be larger than one transaction allows. Sheetwrite 0.5.
 
 Source: https://sheetwrite.vercel.app/docs/guides/styling/
 
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
-
 Sheetwrite paints cells on a canvas, so styling has two layers: the **`Theme`**
 (colors, fonts, and geometry the renderer uses) and **`CellStyle`** (per-cell and
 per-column formatting). A small stylesheet provides the host container chrome and
@@ -3633,8 +3744,6 @@ overrides it.
 ### Worker rendering
 
 Source: https://sheetwrite.vercel.app/docs/guides/worker-rendering/
-
-[Installation](https://sheetwrite.vercel.app/docs/start/installation/)
 
 By default Sheetwrite paints on the main thread (`renderer: "canvas"`). For sheets
 where a busy main thread could stall scrolling, you can move painting onto a Web
@@ -3985,8 +4094,8 @@ The override object accepts positive safe integers. CSV and TSV still return com
 
 | Resource | Default and unit | Why / evidence class | Behavior at the boundary | Supported override |
 | --- | --- | --- | --- | --- |
-| `heartbeatMs` | 15,000 ms | Interaction tuning: periodic publish and stale pruning | Timer publishes/prunes each interval | `PresenceCoordinatorOptions.heartbeatMs`; `0` disables the timer |
-| `timeoutMs` | 45,000 ms | Interaction tuning: three default heartbeat intervals of silence | An actor at or beyond the idle cutoff is expired | `PresenceCoordinatorOptions.timeoutMs` |
+| `heartbeatMs` | 15,000 ms (15 s) | Interaction tuning: periodic publish and stale pruning | Timer publishes/prunes each interval | `PresenceCoordinatorOptions.heartbeatMs`; `0` disables the timer |
+| `timeoutMs` | 45,000 ms (45 s) | Interaction tuning: three default heartbeat intervals of silence | An actor at or beyond the idle cutoff is expired | `PresenceCoordinatorOptions.timeoutMs` |
 | `maxActors` | 32 remote actors | Resource defense: bound overlay state | Receiving a new actor at capacity evicts the oldest actor | `PresenceCoordinatorOptions.maxActors` (minimum 1) |
 | `maxRangesPerActor` | 8 selection ranges | Resource defense: bound payload and overlay work | Additional outbound/inbound ranges are truncated | `PresenceCoordinatorOptions.maxRangesPerActor` (minimum 1) |
 
@@ -4201,10 +4310,13 @@ All Sheetwrite packages release together with one version number. Each release
 post lists what is new, what changed, what is fixed, the measured performance
 results, and the steps to upgrade.
 
-| Version | Highlights |
-| --- | --- |
-| [0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/) | Typed shortcuts, action feedback, restored column sum speed, and redesigned documentation. |
-| [0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/) | Full formula engine, spill references, large undo, conflict recovery without a reload, bounded string storage, faster loading and import. |
+**0.5.1**Oct 18, 2026Latest
+Typed shortcuts and command feedback
+Typed key combinations with platform-aware labelsBusy states and visible errors for built-in commandsColumn sums about 2× faster than 0.5.0Redesigned documentation
+
+**0.5.0**Oct 17, 2026
+The full formula engine
+Optional full formula engine with analysis functionsSpill references and array constantsLarge undo and conflict recovery without a reloadFaster loading and import, bounded string storage
 
 Releases before 0.5.0 are listed in each package's `CHANGELOG.md` in the
 [repository](https://github.com/chh-ay/sheetwrite).
@@ -4429,56 +4541,90 @@ Numbers are medians from alternating runs on the same machine; results do not
 change. The [performance page](https://sheetwrite.vercel.app/docs/guides/performance-resources/) has the full
 measurements and the package sizes of both engines.
 
-| Workload | 0.4.0 → 0.5.0 |
-| --- | --- |
-| Load 100,000 to 1,000,000 rows | 26–35% faster |
-| Load number-only columns | 56–59% faster |
-| Write a 1,000,000-cell block | 1,364 ms → 545 ms (60% faster) |
-| Insert 10,000 rows into 1,000,000 with a row bridge | 34.7 s → 5 ms |
-| Change one constant among 100,000 formulas | 35 ms → 0.03 ms |
-| `SUMPRODUCT`, `COUNTIF`, `SUMIFS`, `PERCENTILE` over ranges | 27–59% faster |
-| `LET(x, lookup, x+x+x)` | 87% faster |
-| Value-list filter, 1,000 picks over 1,000,000 rows | 2.9 s → 28 ms |
-| Distinct values | 25–85% faster |
-| Multi-key sort | 34–38% faster |
-| XLSX import, 1 MB workbook | 1,675 ms → 1,039 ms (38% faster) |
-| XLSX import peak memory | 476 MiB → 312 MiB (34% lower) |
-| CSV import, 200,000 × 10 | 493 ms → 239 ms (52% faster) |
-| Scroll with wrapped text | 39% faster |
-| Scroll with number formats | 14% faster |
-| Restore 4,000,000 cells | 2,213 ms → 1,346 ms (39% faster) |
-| Undo a 1,000,000-cell clear | 2,536 ms → 1,833 ms (28% faster) |
-| Row resize | 0.218 ms → 0.144 ms (34% faster) |
-| Framework adapter mount (React, Vue, Svelte) | 16–38% faster mount and reset |
-| One-cell commit to a 110,000-cell `MemoryPersistenceAdapter` document | ~450 ms → no full rebuild |
-| Read a sheet with a spill | 32% faster |
-| Write next to a spill | 61% faster |
-| Fill 10,000 to 100,000 cells | 66–67% faster |
-| Replace all, 10,000 to 100,000 matches | 49–50% faster |
-| Delete a 100,000-cell sheet | 85% faster |
-| Toolbar state for a 4,096-cell selection | 52% faster |
-| String-pool storage after 100,000 unique overwrites (not WebAssembly heap size) | 84.3 MB → 0.35 MB (99.6% lower) |
+Load and import
 
-Two operations are slower in 0.5.0. Both are tracked for a later release.
+Load 100,000 to 1,000,000 rows26–35% faster
+Load number-only columns56–59% faster
+Write a 1,000,000-cell block60% faster1.36 s → 0.55 s
+CSV import, 200,000 × 1052% faster493 ms → 239 ms
+XLSX import, 1 MB workbook38% faster1.68 s → 1.04 s
+Restore 4,000,000 cells39% faster2.21 s → 1.35 s
 
-| Workload | Change |
-| --- | --- |
-| Column sum (`aggregate`), 100,000 to 1,000,000 rows | About 2× slower than 0.4.0: 0.21 ms → 0.44 ms at 100,000 rows, 1.9 ms → 4.2 ms at 1,000,000. Fix planned for 0.5.1 ([#110](https://github.com/chh-ay/sheetwrite/issues/110)). |
-| Create a 100,000-cell spill | 6–27% slower than before formula results moved out of the cells: 10.6 ms → 11.2–13.5 ms. Tracked in [#109](https://github.com/chh-ay/sheetwrite/issues/109). |
+Formulas
+
+Change one constant among 100,000 formulas1,167× faster35 ms → 0.03 ms
+`LET(x, lookup, x+x+x)`87% faster
+Write next to a spill61% faster
+`SUMPRODUCT`, `COUNTIF`, `SUMIFS`, `PERCENTILE` over ranges27–59% faster
+Read a sheet with a spill32% faster
+
+Rows and data operations
+
+Insert 10,000 rows into 1,000,000 with a row bridge6,940× faster34.7 s → 5 ms
+Value-list filter, 1,000 picks over 1,000,000 rows104× faster2.9 s → 28 ms
+Delete a 100,000-cell sheet85% faster
+Fill 10,000 to 100,000 cells66–67% faster
+Replace all, 10,000 to 100,000 matches49–50% faster
+Multi-key sort34–38% faster
+Distinct values25–85% faster
+
+Editing and rendering
+
+One-cell commit to a 110,000-cell `MemoryPersistenceAdapter` documentNo full rebuildwas about 450 ms
+Toolbar state for a 4,096-cell selection52% faster
+Scroll with wrapped text39% faster
+Row resize34% faster0.218 ms → 0.144 ms
+Undo a 1,000,000-cell clear28% faster2.54 s → 1.83 s
+Framework adapter mount and reset16–38% faster
+Scroll with number formats14% faster
+
+Memory
+
+String-pool storage after 100,000 unique overwrites (not WebAssembly heap size)99.6% less84.3 MB → 0.35 MB
+XLSX import peak memory34% less476 MiB → 312 MiB
+
+Slower in 0.5.0
+
+Column sum (`aggregate`), 100,000 to 1,000,000 rowsAbout 2× slower0.21 → 0.44 ms at 100,000 rows. 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/) is about 2× faster again; at 100,000 rows it can still be slower than 0.4.0. Tracked in #110 (https://github.com/chh-ay/sheetwrite/issues/110).
+Create a 100,000-cell spill6–27% slower10.6 ms → 11.2–13.5 ms. Tracked in #109 (https://github.com/chh-ay/sheetwrite/issues/109).
 
 ## Upgrade checklist
 
-| You | Do this |
-| --- | --- |
-| Use Sheetwrite through `@sheetwrite/core` or an adapter | Make sure you `await initSheetwrite()` before you create a Grid or store. Upgrade all `@sheetwrite/*` packages to 0.5.0 together. |
-| Use `presentation: "data-grid"` and rely on filler columns | Set `minColumns`. |
-| Hold large documents for a long time | Optional: call `releaseEngineMemory()` when idle after a large clear or import. |
-| Want the analysis functions | Install `@sheetwrite/formulas` and select it before you create a Grid. |
-| Run a persistence or collaboration server | Accept `restoreBlock` operations before you accept 0.5.0 clients. Optional: implement `commitBatch` for undo that needs more than one version. See [Large undo and atomic batches](https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches). |
-| Recover from sync conflicts | Optional: call `sync.recoverConflict()` before your reload path. See [Conflict and snapshot reload](https://sheetwrite.vercel.app/docs/guides/collaboration/#conflict-and-snapshot-reload). |
-| Call `CellStore.setBlock` from `@sheetwrite/wasm` directly | **Breaking.** Use `setBlockPacked` (row-major) or `setColumnBlockPacked` (column-major). They take all string cells as one UTF-8 buffer plus byte offsets. |
-| Cache raw string IDs from `@sheetwrite/wasm` | Drop the cache when `stringPoolEpoch` changes. |
-| Check dependency licenses or lockfiles | `@sheetwrite/core` now depends on `fflate` 0.8.3. Your package manager installs it; you do not add it yourself. |
+EveryoneRequired
+Initialize the engine, then update every package together
+Make sure you `await initSheetwrite()` before you create a Grid or store. Install 0.5.0 for each `@sheetwrite/*` package that you use.
+
+If you call `CellStore.setBlock` from `@sheetwrite/wasm`Breaking
+Use the packed block writers
+Use `setBlockPacked` (row-major) or `setColumnBlockPacked` (column-major). They take all string cells as one UTF-8 buffer plus byte offsets.
+
+If you run a persistence or collaboration serverRequired
+Accept `restoreBlock` before 0.5.0 clients connect
+Optional: implement `commitBatch` for undo that needs more than one version. See Large undo and atomic batches (https://sheetwrite.vercel.app/docs/guides/collaboration/#large-undo-and-atomic-batches).
+
+If you cache raw string IDs from `@sheetwrite/wasm`Required
+Drop the cache when the string pool changes
+Clear cached IDs when `stringPoolEpoch` changes.
+
+If you use `presentation: "data-grid"` with filler columnsBehavior change
+Set `minColumns`
+Data-grid presentation no longer adds filler columns by itself.
+
+If you want the analysis functionsOptional
+Install the full formula engine
+Install `@sheetwrite/formulas` and select it before you create a Grid.
+
+If you hold large documents for a long timeOptional
+Release engine memory when idle
+Call `releaseEngineMemory()` after a large clear or import.
+
+If you recover from sync conflictsOptional
+Recover in place before you reload
+Call `sync.recoverConflict()` before your reload path. See Conflict and snapshot reload (https://sheetwrite.vercel.app/docs/guides/collaboration/#conflict-and-snapshot-reload).
+
+If you check dependency licenses or lockfilesFor information
+Expect `fflate` 0.8.3
+`@sheetwrite/core` now depends on `fflate`. Your package manager installs it; you do not add it yourself.
 
 The full list of changes is in each package's `CHANGELOG.md`.
 
@@ -4553,16 +4699,29 @@ are in a closed "All measurements" section.
 
 ## Upgrade checklist
 
-1. Update all installed `@sheetwrite/*` packages to **0.5.1** together:
-`core`, `wasm`, `formulas`, `xlsx`, `react`, `vue`, and `svelte` as applicable.
-2. Replace free-text `ContextMenuItem.shortcut` hints with an action name or a
-typed key combination. Check custom bindings for conflicts.
-3. Await `GridActions.exportXlsx()` when you need to wait for the built-in
-command to finish. It handles failures without rejecting; direct
-`Grid.exportXlsx()` still requires error handling.
-4. Update `export-error` handlers to accept both `"csv"` and `"xlsx"` formats.
-5. If you upgrade from before 0.5.0, complete the
-[0.5.0 upgrade checklist](https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist) too.
+EveryoneRequired
+Update every package together
+Install 0.5.1 for each `@sheetwrite/*` package that you use. Packages from different versions are not supported together.
+`core``wasm``formulas``xlsx``react``vue``svelte`
+
+If you set `ContextMenuItem.shortcut`API change
+Replace free-text shortcut hints
+Use a bound action name or a typed key combination. The Grid now runs the item when the user presses the keys, and a conflict throws `shortcut-conflict`.
+
+Before`shortcut: "⌘⇧O"`
+After`shortcut: "Mod+Shift+O"` or `shortcut: "copy"`
+
+If you call `grid.actions.exportXlsx()`Behavior change
+Await the action, but do not catch it
+The action returns a promise that resolves when the command finishes, also after a failure. Failures show an alert and emit `export-error`. Direct `grid.exportXlsx()` calls still reject.
+
+If you listen to `export-error`Behavior change
+Handle CSV and XLSX failures
+The event `format` is now `"csv"` or `"xlsx"`.
+
+If you upgrade from before 0.5.0Also do
+Complete the 0.5.0 steps first
+Read the 0.5.0 upgrade checklist (https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist). It covers `initSheetwrite()`, the server `restoreBlock` operation, and the breaking `CellStore.setBlock` change.
 
 ### Your first grid
 
