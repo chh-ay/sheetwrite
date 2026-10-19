@@ -279,9 +279,7 @@ export default function HostRowsShowcase() {
               data-testid="host-import-timing"
             >
               <strong data-empty={!importResult}>
-                {importResult
-                  ? `${importResult.insertMs.toFixed(1)} ms`
-                  : "Import leads to measure"}
+                {importResult ? `${importResult.insertMs.toFixed(1)} ms` : "Not run"}
               </strong>
               <span>
                 {importResult

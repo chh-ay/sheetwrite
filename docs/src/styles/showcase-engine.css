@@ -53,8 +53,8 @@
 
 .sw-engine-stage__head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem) auto;
-  gap: var(--sw-demo-space-4) calc(var(--sw-demo-space-4) * 2);
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 27rem);
+  gap: var(--sw-demo-space-4) calc(var(--sw-demo-space-4) * 2.5);
   align-items: center;
   padding: calc(var(--sw-demo-space-4) * 1.25) calc(var(--sw-demo-space-4) * 1.5);
   border-bottom: 1px solid var(--sw-demo-border);
@@ -82,6 +82,11 @@
   line-height: 1.5;
 }
 
+/* The action sits under the story it starts. */
+.sw-engine-stage__intro .sw-engine-primary {
+  margin-top: var(--sw-demo-space-4);
+}
+
 /* The measured run: one big number and the four steps that produced it. */
 .sw-engine-run {
   display: grid;
@@ -107,8 +112,15 @@
   text-transform: uppercase;
 }
 
-.sw-engine-run__total > span:last-child {
+/* Label on its own line; the number and its caption share the next one. */
+.sw-engine-run__total > span:first-child {
   flex-basis: 100%;
+}
+
+.sw-engine-run__total > span:last-child {
+  font-family: var(--sw-font-body);
+  font-size: var(--sw-type-sm);
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -125,9 +137,53 @@
   font-size: 0.72rem;
 }
 
+/* Step colours: the bar segment and the dot beside its row share one hue. */
+.sw-engine-run {
+  --step-1: var(--sw-demo-accent);
+  --step-2: #60a5fa;
+  --step-3: #f59e0b;
+  --step-4: #c084fc;
+}
+
+.sw-engine-run__bar {
+  display: flex;
+  gap: 2px;
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sw-demo-border);
+}
+
+.sw-engine-run__bar i {
+  flex-basis: 0;
+  min-width: 3px;
+  transition: flex-grow 240ms ease;
+}
+
+.sw-engine-run__bar i:nth-child(1),
+.sw-engine-run__steps li:nth-child(1) {
+  --step: var(--step-1);
+}
+.sw-engine-run__bar i:nth-child(2),
+.sw-engine-run__steps li:nth-child(2) {
+  --step: var(--step-2);
+}
+.sw-engine-run__bar i:nth-child(3),
+.sw-engine-run__steps li:nth-child(3) {
+  --step: var(--step-3);
+}
+.sw-engine-run__bar i:nth-child(4),
+.sw-engine-run__steps li:nth-child(4) {
+  --step: var(--step-4);
+}
+
+.sw-engine-run__bar i {
+  background: var(--step);
+}
+
 .sw-engine-run__steps {
   display: grid;
-  gap: 0.15rem;
+  gap: 0.3rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -135,19 +191,29 @@
 
 .sw-engine-run__steps li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--sw-demo-space-3);
+  grid-template-columns: 0.5rem minmax(0, 1fr) auto;
+  gap: var(--sw-demo-space-2);
+  align-items: center;
   color: var(--sw-demo-fg-soft);
-  font: 600 var(--sw-type-xs) / 1.5 var(--sw-font-mono);
+  font-size: var(--sw-type-sm);
+  line-height: 1.4;
+}
+
+.sw-engine-run__steps li::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--step);
 }
 
 .sw-engine-run__steps li span {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .sw-engine-run__steps li strong {
   color: var(--sw-demo-fg-strong);
+  font: 600 var(--sw-type-xs) / 1.4 var(--sw-font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -736,15 +802,7 @@
 
 @media (max-width: 64rem) {
   .sw-engine-stage__head {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .sw-engine-stage__intro {
-    grid-column: 1 / -1;
-  }
-
-  .sw-engine-primary {
-    justify-self: end;
+    grid-template-columns: 1fr;
   }
 
   .sw-engine-stage__workspace {
@@ -785,7 +843,7 @@
   }
 
   .sw-engine-primary {
-    justify-self: stretch;
+    width: 100%;
     justify-content: center;
   }
 

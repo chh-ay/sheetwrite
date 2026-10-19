@@ -29,6 +29,7 @@ import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import compatibilityData from "../generated/compatibility.json";
 import { errorText } from "../lib/errors.js";
+import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
@@ -71,6 +72,9 @@ import {
 import stylesheet from "../styles/showcase-interoperability.css?url";
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
+
+/** Empty value for an exchange measurement that has not run yet. */
+const NOT_RUN = "Not run";
 
 declare global {
   interface Window {
@@ -1045,12 +1049,12 @@ function InteroperabilityRoute() {
                 data-state={roundTrip ? "complete" : "ready"}
                 aria-live="polite"
               >
+                {/* Before the first exchange every card reads "Not run": the badge
+                    above and the button beside it already say how to fill them. */}
                 <div>
                   <dt>Cells compared</dt>
                   <dd data-testid="interop-cells-compared" data-empty={!roundTrip}>
-                    {roundTrip
-                      ? roundTrip.cellsCompared.toLocaleString()
-                      : "Run an exchange to compare"}
+                    {roundTrip ? roundTrip.cellsCompared.toLocaleString() : NOT_RUN}
                   </dd>
                 </div>
                 <div>
@@ -1058,29 +1062,25 @@ function InteroperabilityRoute() {
                   <dd data-empty={!roundTrip}>
                     {roundTrip
                       ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}`
-                      : "Run an exchange to check"}
+                      : NOT_RUN}
                   </dd>
                 </div>
                 <div>
                   <dt>Warnings</dt>
                   <dd data-empty={!warningLog}>
-                    {warningLog ? warningLog.warnings.length : "Run an exchange to check"}
+                    {warningLog ? warningLog.warnings.length : NOT_RUN}
                   </dd>
                 </div>
                 <div>
-                  <dt>XLSX bytes</dt>
+                  <dt>XLSX size</dt>
                   <dd data-empty={!roundTrip}>
-                    {roundTrip
-                      ? roundTrip.exportedBytes.toLocaleString()
-                      : "Run an exchange to measure"}
+                    {roundTrip ? formatBytes(roundTrip.exportedBytes, { kib: 1, mib: 2 }) : NOT_RUN}
                   </dd>
                 </div>
                 <div>
                   <dt>Exchange time</dt>
                   <dd data-empty={!roundTrip}>
-                    {roundTrip
-                      ? `${roundTrip.elapsedMs.toFixed(0)} ms`
-                      : "Run an exchange to measure"}
+                    {roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : NOT_RUN}
                   </dd>
                 </div>
               </dl>
