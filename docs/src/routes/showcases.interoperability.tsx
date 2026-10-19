@@ -29,6 +29,7 @@ import compatibilityResultsData from "../generated/compatibility-results.json";
 import compatibilityResultsUrl from "../generated/compatibility-results.json?url";
 import compatibilityData from "../generated/compatibility.json";
 import { errorText } from "../lib/errors.js";
+import { formatBytes } from "../lib/format.js";
 import { pageMeta } from "../lib/seo.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
@@ -71,6 +72,9 @@ import {
 import stylesheet from "../styles/showcase-interoperability.css?url";
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
+
+/** Empty value for an exchange measurement that has not run yet. */
+const NOT_RUN = "Not run";
 
 declare global {
   interface Window {
@@ -453,11 +457,14 @@ function InteroperabilityRoute() {
   const [selectedCompatibilityId, setSelectedCompatibilityId] = useState<string | null>(null);
   const [resultPage, setResultPage] = useState(0);
   const [inventoryPage, setInventoryPage] = useState(0);
+  // The vault holds about 250 buttons; mount them only when a reader opens it.
+  const [vaultOpen, setVaultOpen] = useState(false);
 
   const { compatibility: requestedCompatibility } = Route.useSearch();
   useEffect(() => {
     if (compatibilityData.records.some((record) => record.id === requestedCompatibility)) {
       setSelectedCompatibilityId(requestedCompatibility ?? null);
+      setVaultOpen(true);
       document.getElementById("contract")?.scrollIntoView();
     }
   }, [requestedCompatibility]);
@@ -1045,12 +1052,12 @@ function InteroperabilityRoute() {
                 data-state={roundTrip ? "complete" : "ready"}
                 aria-live="polite"
               >
+                {/* Before the first exchange every card reads "Not run": the badge
+                    above and the button beside it already say how to fill them. */}
                 <div>
                   <dt>Cells compared</dt>
                   <dd data-testid="interop-cells-compared" data-empty={!roundTrip}>
-                    {roundTrip
-                      ? roundTrip.cellsCompared.toLocaleString()
-                      : "Run an exchange to compare"}
+                    {roundTrip ? roundTrip.cellsCompared.toLocaleString() : NOT_RUN}
                   </dd>
                 </div>
                 <div>
@@ -1058,29 +1065,25 @@ function InteroperabilityRoute() {
                   <dd data-empty={!roundTrip}>
                     {roundTrip
                       ? `${roundTrip.formulasPreserved}/${roundTrip.formulasBefore}`
-                      : "Run an exchange to check"}
+                      : NOT_RUN}
                   </dd>
                 </div>
                 <div>
                   <dt>Warnings</dt>
                   <dd data-empty={!warningLog}>
-                    {warningLog ? warningLog.warnings.length : "Run an exchange to check"}
+                    {warningLog ? warningLog.warnings.length : NOT_RUN}
                   </dd>
                 </div>
                 <div>
-                  <dt>XLSX bytes</dt>
+                  <dt>XLSX size</dt>
                   <dd data-empty={!roundTrip}>
-                    {roundTrip
-                      ? roundTrip.exportedBytes.toLocaleString()
-                      : "Run an exchange to measure"}
+                    {roundTrip ? formatBytes(roundTrip.exportedBytes, { kib: 1, mib: 2 }) : NOT_RUN}
                   </dd>
                 </div>
                 <div>
                   <dt>Exchange time</dt>
                   <dd data-empty={!roundTrip}>
-                    {roundTrip
-                      ? `${roundTrip.elapsedMs.toFixed(0)} ms`
-                      : "Run an exchange to measure"}
+                    {roundTrip ? `${roundTrip.elapsedMs.toFixed(0)} ms` : NOT_RUN}
                   </dd>
                 </div>
               </dl>
@@ -1457,372 +1460,380 @@ function InteroperabilityRoute() {
           <details
             className="sw-si-disclosure"
             data-testid="interop-compatibility-disclosure"
-            open={selectedCompatibilityId !== null}
+            onToggle={(event) => setVaultOpen(event.currentTarget.open)}
+            open={vaultOpen}
           >
             <summary id="contract-summary">
               <span>Evidence vault</span>
               <strong>Compatibility test set and raw app results</strong>
               <small>Filters, expected values, checksums, and explicit nonclaims</small>
             </summary>
-            <div className="sw-si-disclosure__body">
-              <h2 id="contract-title">Compatibility results you can inspect</h2>
-              <p>
-                This page publishes a fixed, checked test set and the product&apos;s declared
-                feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice, or
-                OpenFormula compatibility.{" "}
-                <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
-                  Read the detailed checked results →
-                </Link>
-              </p>
-
-              <section
-                aria-label="Checked compatibility test set summary"
-                className="sw-si-results__summary"
-                data-testid="compatibility-results-summary"
-              >
+            {vaultOpen ? (
+              <div className="sw-si-disclosure__body">
+                <h2 id="contract-title">Compatibility results you can inspect</h2>
                 <p>
-                  <strong>Local result</strong>
-                  <span>
-                    {(
-                      (COMPATIBILITY_RESULTS.testSet.localPassed /
-                        (COMPATIBILITY_RESULTS.testSet.totalTests -
-                          COMPATIBILITY_RESULTS.testSet.unsupported)) *
-                      100
-                    ).toFixed(0)}
-                    % — {COMPATIBILITY_RESULTS.testSet.localPassed.toLocaleString()} of{" "}
-                    {(
-                      COMPATIBILITY_RESULTS.testSet.totalTests -
-                      COMPATIBILITY_RESULTS.testSet.unsupported
-                    ).toLocaleString()}{" "}
-                    supported tests passed locally
-                  </span>
+                  This page publishes a fixed, checked test set and the product&apos;s declared
+                  feature boundaries. It does not claim blanket Excel, Google Sheets, LibreOffice,
+                  or OpenFormula compatibility.{" "}
+                  <Link to="/docs/$/" params={{ _splat: "reference/compatibility-results" }}>
+                    Read the detailed checked results →
+                  </Link>
                 </p>
-                <dl>
-                  <div>
-                    <dt>Test set version</dt>
-                    <dd>{COMPATIBILITY_RESULTS.testSet.version}</dd>
-                  </div>
-                  <div>
-                    <dt>Total tests</dt>
-                    <dd>{COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Formula tests</dt>
-                    <dd>{COMPATIBILITY_RESULTS.testSet.formulaTests.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Edit sequences</dt>
-                    <dd>{COMPATIBILITY_RESULTS.testSet.editSequenceTests.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Workbook tests</dt>
-                    <dd>{COMPATIBILITY_RESULTS.testSet.workbookTests.toLocaleString()}</dd>
-                  </div>
-                </dl>
-                <p className="sw-si-results__gate" data-state="blocked">
-                  <strong>External app evidence is incomplete.</strong>
-                  <span>
-                    {COMPATIBILITY_RESULTS.testSet.reviewedResults.toLocaleString()} reviewed
-                    results; {COMPATIBILITY_RESULTS.testSet.missingReviewedResults.toLocaleString()}{" "}
-                    supported tests still lack a reviewed tested-app result.{" "}
-                    {COMPATIBILITY_RESULTS.testSet.unsupported.toLocaleString()} unsupported tests
-                    are explicit nonclaims and are excluded from the local percentage.
-                  </span>
-                </p>
-                <p>
-                  <strong>Explicit result categories</strong>
-                  <span>
-                    {COMPATIBILITY_RESULTS.testSet.warningChecks.toLocaleString()} warning-behavior
-                    checks · {COMPATIBILITY_RESULTS.testSet.knownDifferences.toLocaleString()} known
-                    difference · {COMPATIBILITY_RESULTS.testSet.regressions.toLocaleString()}{" "}
-                    reviewed regressions
-                  </span>
-                </p>
-                <p className="sw-si-results__checksum">
-                  <span>Checked test set SHA-256</span>
-                  <code data-testid="compatibility-test-set-checksum">
-                    {COMPATIBILITY_RESULTS.testSet.checksum}
-                  </code>
-                </p>
-              </section>
 
-              <h3>Inspect representative checked tests</h3>
-              <p>
-                The compact page includes the first checked example for every function or feature,
-                plus every available result state. Counts above always refer to the full{" "}
-                {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}-test set; the browser
-                below contains {COMPATIBILITY_RESULTS.testSet.publishedExamples.toLocaleString()}{" "}
-                inspectable examples.
-              </p>
-              <fieldset className="sw-si-compat__filters">
-                <legend>Filter checked tests</legend>
-                <ChoiceMenu
-                  label="Function or feature"
-                  onChange={(value) => {
-                    setResultFeature(value);
-                    setSelectedResultId(null);
-                  }}
-                  options={[
-                    { value: "all", label: "All functions and features" },
-                    ...COMPATIBILITY_RESULTS.filterOptions.features,
-                  ]}
-                  testId="compatibility-feature-filter"
-                  value={resultFeature}
-                />
-                <ChoiceMenu
-                  label="Behavior"
-                  onChange={(value) => {
-                    setResultBehavior(value);
-                    setSelectedResultId(null);
-                  }}
-                  options={[
-                    { value: "all", label: "All behavior scopes" },
-                    ...COMPATIBILITY_RESULTS.filterOptions.behaviors.map((behavior) => ({
-                      value: behavior,
-                      label: BEHAVIOR_LABELS[behavior] ?? behavior,
-                    })),
-                  ]}
-                  testId="compatibility-behavior-filter"
-                  value={resultBehavior}
-                />
-                <ChoiceMenu
-                  label="Result status"
-                  onChange={(value) => {
-                    setResultStatus(value as ResultFilter);
-                    setSelectedResultId(null);
-                  }}
-                  options={[
-                    { value: "all", label: "All result states" },
-                    ...COMPATIBILITY_RESULTS.filterOptions.statuses.map((entryStatus) => ({
-                      value: entryStatus,
-                      label: RESULT_STATUS_LABELS[entryStatus],
-                    })),
-                  ]}
-                  testId="compatibility-status-filter"
-                  value={resultStatus}
-                />
-                <span aria-live="polite" className="sw-si-compat__count">
-                  {visibleResults.length}/{COMPATIBILITY_RESULTS.testSet.publishedExamples} examples
-                </span>
-              </fieldset>
-              {resultPageCount > 1 && (
-                <ChoiceMenu
-                  label="Example page"
-                  value={String(currentResultPage)}
-                  onChange={(value) => {
-                    const page = Number(value);
-                    setResultPage(page);
-                    setSelectedResultId(visibleResults[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null);
-                  }}
-                  testId="compatibility-example-page"
-                  options={Array.from({ length: resultPageCount }, (_, page) => ({
-                    value: String(page),
-                    label: `${page + 1} of ${resultPageCount}`,
-                  }))}
-                />
-              )}
-
-              <div className="sw-si-compat sw-si-results">
-                <ul aria-label="Checked compatibility tests" className="sw-si-compat__records">
-                  {visibleResults
-                    .slice(
-                      currentResultPage * COMPATIBILITY_PAGE_SIZE,
-                      (currentResultPage + 1) * COMPATIBILITY_PAGE_SIZE,
-                    )
-                    .map((entry) => (
-                      <li key={entry.id}>
-                        <button
-                          aria-pressed={selectedResult?.id === entry.id}
-                          data-behavior={entry.behavior}
-                          data-status={entry.statusTags.join(" ")}
-                          data-testid={`compatibility-result-${entry.position}`}
-                          data-tolerance={entry.tolerance.kind}
-                          onClick={() => setSelectedResultId(entry.id)}
-                          type="button"
-                        >
-                          <span>
-                            {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
-                          </span>
-                          <strong>{entry.label}</strong>
-                          <small className="sw-si-compat__tags">
-                            <ResultStatusTags tags={entry.statusTags} as="i" />
-                          </small>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-                {selectedResult && selectedResultSource && selectedResultEvidence ? (
-                  <CompatibilityResultDetail
-                    selectedResult={selectedResult}
-                    selectedResultSource={selectedResultSource}
-                    selectedResultEvidence={selectedResultEvidence}
-                  />
-                ) : (
-                  <p className="sw-si-empty" data-testid="compatibility-results-empty">
-                    {resultStatus === "regression"
-                      ? "No reviewed regressions are recorded. Tested-app results are currently unavailable rather than assumed."
-                      : "No published example matches these filters. Choose a broader function, behavior, or status."}
-                  </p>
-                )}
-              </div>
-
-              <h3>Declared feature boundaries</h3>
-              <p>
-                These product-level records cover import, export, preservation, warnings, and
-                explicit unsupported behavior. They come from the existing checked inventory and
-                link to exact sources; they do not turn missing Excel or Google Sheets results into
-                claims.
-              </p>
-              <fieldset className="sw-si-compat__filters sw-si-compat__filters--inventory">
-                <legend>Filter feature boundary records</legend>
-                <ChoiceMenu
-                  label="Status"
-                  onChange={(value) => setCompatibilityStatus(value as CompatibilityFilter)}
-                  options={[
-                    { value: "all", label: "All statuses" },
-                    ...Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => ({
-                      value,
-                      label,
-                    })),
-                  ]}
-                  testId="inventory-status-filter"
-                  value={compatibilityStatus}
-                />
-                <ChoiceMenu
-                  label="Feature area"
-                  onChange={setCompatibilityArea}
-                  options={[
-                    { value: "all", label: "All feature areas" },
-                    ...COMPATIBILITY_AREAS.map((area) => ({
-                      value: area,
-                      label: areaName(area),
-                    })),
-                  ]}
-                  testId="inventory-area-filter"
-                  value={compatibilityArea}
-                />
-                <ChoiceMenu
-                  label="Behavior"
-                  onChange={setCompatibilityDialect}
-                  options={[
-                    { value: "all", label: "All behavior scopes" },
-                    ...COMPATIBILITY_DIALECTS.map((behavior) => ({
-                      value: behavior,
-                      label: BEHAVIOR_LABELS[behavior] ?? behavior,
-                    })),
-                  ]}
-                  testId="inventory-behavior-filter"
-                  value={compatibilityDialect}
-                />
-                <span aria-live="polite" className="sw-si-compat__count">
-                  {visibleCompatibility.length}/{compatibilityData.records.length} records
-                </span>
-              </fieldset>
-              {inventoryPageCount > 1 && (
-                <ChoiceMenu
-                  label="Record page"
-                  value={String(currentInventoryPage)}
-                  onChange={(value) => {
-                    const page = Number(value);
-                    setInventoryPage(page);
-                    setSelectedCompatibilityId(
-                      visibleCompatibility[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null,
-                    );
-                  }}
-                  testId="compatibility-record-page"
-                  options={Array.from({ length: inventoryPageCount }, (_, page) => ({
-                    value: String(page),
-                    label: `${page + 1} of ${inventoryPageCount}`,
-                  }))}
-                />
-              )}
-              <div className="sw-si-compat sw-si-inventory">
-                <ul
-                  aria-label="Declared feature boundary records"
-                  className="sw-si-compat__records"
+                <section
+                  aria-label="Checked compatibility test set summary"
+                  className="sw-si-results__summary"
+                  data-testid="compatibility-results-summary"
                 >
-                  {visibleCompatibility
-                    .slice(
-                      currentInventoryPage * COMPATIBILITY_PAGE_SIZE,
-                      (currentInventoryPage + 1) * COMPATIBILITY_PAGE_SIZE,
-                    )
-                    .map((record) => (
-                      <li key={record.id}>
-                        <button
-                          aria-label={`${record.label}; ${areaName(record.area)}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
-                          aria-pressed={selectedCompatibility?.id === record.id}
-                          data-result={record.resultMode}
-                          data-status={record.status}
-                          data-testid={`compatibility-${record.id}`}
-                          onClick={() => setSelectedCompatibilityId(record.id)}
-                          type="button"
-                        >
-                          <span>
-                            {areaName(record.area)} · {BEHAVIOR_LABELS[record.dialect]}
-                          </span>
-                          <strong>{record.label}</strong>
-                          <small className="sw-si-compat__record-status">
-                            {compatibilityStatusSummary(record)}
-                          </small>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-                {selectedCompatibility ? (
-                  <article
-                    className="sw-si-compat__detail"
-                    data-result={selectedCompatibility.resultMode}
-                    data-status={selectedCompatibility.status}
-                    data-testid="compatibility-detail"
-                  >
-                    <p className="sw-si-compat__mode">
-                      <span
-                        data-mode={selectedCompatibility.resultMode}
-                        data-state={selectedCompatibility.status}
-                      >
-                        {compatibilityStatusSummary(selectedCompatibility)}
-                      </span>
+                  <p>
+                    <strong>Local result</strong>
+                    <span>
+                      {(
+                        (COMPATIBILITY_RESULTS.testSet.localPassed /
+                          (COMPATIBILITY_RESULTS.testSet.totalTests -
+                            COMPATIBILITY_RESULTS.testSet.unsupported)) *
+                        100
+                      ).toFixed(0)}
+                      % — {COMPATIBILITY_RESULTS.testSet.localPassed.toLocaleString()} of{" "}
+                      {(
+                        COMPATIBILITY_RESULTS.testSet.totalTests -
+                        COMPATIBILITY_RESULTS.testSet.unsupported
+                      ).toLocaleString()}{" "}
+                      supported tests passed locally
+                    </span>
+                  </p>
+                  <dl>
+                    <div>
+                      <dt>Test set version</dt>
+                      <dd>{COMPATIBILITY_RESULTS.testSet.version}</dd>
+                    </div>
+                    <div>
+                      <dt>Total tests</dt>
+                      <dd>{COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Formula tests</dt>
+                      <dd>{COMPATIBILITY_RESULTS.testSet.formulaTests.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Edit sequences</dt>
+                      <dd>{COMPATIBILITY_RESULTS.testSet.editSequenceTests.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Workbook tests</dt>
+                      <dd>{COMPATIBILITY_RESULTS.testSet.workbookTests.toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                  <p className="sw-si-results__gate" data-state="blocked">
+                    <strong>External app evidence is incomplete.</strong>
+                    <span>
+                      {COMPATIBILITY_RESULTS.testSet.reviewedResults.toLocaleString()} reviewed
+                      results;{" "}
+                      {COMPATIBILITY_RESULTS.testSet.missingReviewedResults.toLocaleString()}{" "}
+                      supported tests still lack a reviewed tested-app result.{" "}
+                      {COMPATIBILITY_RESULTS.testSet.unsupported.toLocaleString()} unsupported tests
+                      are explicit nonclaims and are excluded from the local percentage.
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Explicit result categories</strong>
+                    <span>
+                      {COMPATIBILITY_RESULTS.testSet.warningChecks.toLocaleString()}{" "}
+                      warning-behavior checks ·{" "}
+                      {COMPATIBILITY_RESULTS.testSet.knownDifferences.toLocaleString()} known
+                      difference · {COMPATIBILITY_RESULTS.testSet.regressions.toLocaleString()}{" "}
+                      reviewed regressions
+                    </span>
+                  </p>
+                  <p className="sw-si-results__checksum">
+                    <span>Checked test set SHA-256</span>
+                    <code data-testid="compatibility-test-set-checksum">
+                      {COMPATIBILITY_RESULTS.testSet.checksum}
+                    </code>
+                  </p>
+                </section>
+
+                <h3>Inspect representative checked tests</h3>
+                <p>
+                  The compact page includes the first checked example for every function or feature,
+                  plus every available result state. Counts above always refer to the full{" "}
+                  {COMPATIBILITY_RESULTS.testSet.totalTests.toLocaleString()}-test set; the browser
+                  below contains {COMPATIBILITY_RESULTS.testSet.publishedExamples.toLocaleString()}{" "}
+                  inspectable examples.
+                </p>
+                <fieldset className="sw-si-compat__filters">
+                  <legend>Filter checked tests</legend>
+                  <ChoiceMenu
+                    label="Function or feature"
+                    onChange={(value) => {
+                      setResultFeature(value);
+                      setSelectedResultId(null);
+                    }}
+                    options={[
+                      { value: "all", label: "All functions and features" },
+                      ...COMPATIBILITY_RESULTS.filterOptions.features,
+                    ]}
+                    testId="compatibility-feature-filter"
+                    value={resultFeature}
+                  />
+                  <ChoiceMenu
+                    label="Behavior"
+                    onChange={(value) => {
+                      setResultBehavior(value);
+                      setSelectedResultId(null);
+                    }}
+                    options={[
+                      { value: "all", label: "All behavior scopes" },
+                      ...COMPATIBILITY_RESULTS.filterOptions.behaviors.map((behavior) => ({
+                        value: behavior,
+                        label: BEHAVIOR_LABELS[behavior] ?? behavior,
+                      })),
+                    ]}
+                    testId="compatibility-behavior-filter"
+                    value={resultBehavior}
+                  />
+                  <ChoiceMenu
+                    label="Result status"
+                    onChange={(value) => {
+                      setResultStatus(value as ResultFilter);
+                      setSelectedResultId(null);
+                    }}
+                    options={[
+                      { value: "all", label: "All result states" },
+                      ...COMPATIBILITY_RESULTS.filterOptions.statuses.map((entryStatus) => ({
+                        value: entryStatus,
+                        label: RESULT_STATUS_LABELS[entryStatus],
+                      })),
+                    ]}
+                    testId="compatibility-status-filter"
+                    value={resultStatus}
+                  />
+                  <span aria-live="polite" className="sw-si-compat__count">
+                    {visibleResults.length}/{COMPATIBILITY_RESULTS.testSet.publishedExamples}{" "}
+                    examples
+                  </span>
+                </fieldset>
+                {resultPageCount > 1 && (
+                  <ChoiceMenu
+                    label="Example page"
+                    value={String(currentResultPage)}
+                    onChange={(value) => {
+                      const page = Number(value);
+                      setResultPage(page);
+                      setSelectedResultId(
+                        visibleResults[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null,
+                      );
+                    }}
+                    testId="compatibility-example-page"
+                    options={Array.from({ length: resultPageCount }, (_, page) => ({
+                      value: String(page),
+                      label: `${page + 1} of ${resultPageCount}`,
+                    }))}
+                  />
+                )}
+
+                <div className="sw-si-compat sw-si-results">
+                  <ul aria-label="Checked compatibility tests" className="sw-si-compat__records">
+                    {visibleResults
+                      .slice(
+                        currentResultPage * COMPATIBILITY_PAGE_SIZE,
+                        (currentResultPage + 1) * COMPATIBILITY_PAGE_SIZE,
+                      )
+                      .map((entry) => (
+                        <li key={entry.id}>
+                          <button
+                            aria-pressed={selectedResult?.id === entry.id}
+                            data-behavior={entry.behavior}
+                            data-status={entry.statusTags.join(" ")}
+                            data-testid={`compatibility-result-${entry.position}`}
+                            data-tolerance={entry.tolerance.kind}
+                            onClick={() => setSelectedResultId(entry.id)}
+                            type="button"
+                          >
+                            <span>
+                              {entry.featureLabel} / {BEHAVIOR_LABELS[entry.behavior]}
+                            </span>
+                            <strong>{entry.label}</strong>
+                            <small className="sw-si-compat__tags">
+                              <ResultStatusTags tags={entry.statusTags} as="i" />
+                            </small>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                  {selectedResult && selectedResultSource && selectedResultEvidence ? (
+                    <CompatibilityResultDetail
+                      selectedResult={selectedResult}
+                      selectedResultSource={selectedResultSource}
+                      selectedResultEvidence={selectedResultEvidence}
+                    />
+                  ) : (
+                    <p className="sw-si-empty" data-testid="compatibility-results-empty">
+                      {resultStatus === "regression"
+                        ? "No reviewed regressions are recorded. Tested-app results are currently unavailable rather than assumed."
+                        : "No published example matches these filters. Choose a broader function, behavior, or status."}
                     </p>
-                    <h3>{selectedCompatibility.label}</h3>
-                    <p>{selectedCompatibility.semantics}</p>
-                    <dl>
-                      <div>
-                        <dt>Import</dt>
-                        <dd>{selectedCompatibility.importBehavior}</dd>
-                      </div>
-                      <div>
-                        <dt>Export</dt>
-                        <dd>{selectedCompatibility.exportBehavior}</dd>
-                      </div>
-                      <div>
-                        <dt>Known boundary</dt>
-                        <dd>{selectedCompatibility.divergence}</dd>
-                      </div>
-                      <div>
-                        <dt>Exact source</dt>
-                        <dd>
-                          <a href={selectedCompatibility.source}>Open the checked source</a>
-                        </dd>
-                      </div>
-                      {selectedCompatibility.warningCode && (
+                  )}
+                </div>
+
+                <h3>Declared feature boundaries</h3>
+                <p>
+                  These product-level records cover import, export, preservation, warnings, and
+                  explicit unsupported behavior. They come from the existing checked inventory and
+                  link to exact sources; they do not turn missing Excel or Google Sheets results
+                  into claims.
+                </p>
+                <fieldset className="sw-si-compat__filters sw-si-compat__filters--inventory">
+                  <legend>Filter feature boundary records</legend>
+                  <ChoiceMenu
+                    label="Status"
+                    onChange={(value) => setCompatibilityStatus(value as CompatibilityFilter)}
+                    options={[
+                      { value: "all", label: "All statuses" },
+                      ...Object.entries(INVENTORY_STATUS_LABELS).map(([value, label]) => ({
+                        value,
+                        label,
+                      })),
+                    ]}
+                    testId="inventory-status-filter"
+                    value={compatibilityStatus}
+                  />
+                  <ChoiceMenu
+                    label="Feature area"
+                    onChange={setCompatibilityArea}
+                    options={[
+                      { value: "all", label: "All feature areas" },
+                      ...COMPATIBILITY_AREAS.map((area) => ({
+                        value: area,
+                        label: areaName(area),
+                      })),
+                    ]}
+                    testId="inventory-area-filter"
+                    value={compatibilityArea}
+                  />
+                  <ChoiceMenu
+                    label="Behavior"
+                    onChange={setCompatibilityDialect}
+                    options={[
+                      { value: "all", label: "All behavior scopes" },
+                      ...COMPATIBILITY_DIALECTS.map((behavior) => ({
+                        value: behavior,
+                        label: BEHAVIOR_LABELS[behavior] ?? behavior,
+                      })),
+                    ]}
+                    testId="inventory-behavior-filter"
+                    value={compatibilityDialect}
+                  />
+                  <span aria-live="polite" className="sw-si-compat__count">
+                    {visibleCompatibility.length}/{compatibilityData.records.length} records
+                  </span>
+                </fieldset>
+                {inventoryPageCount > 1 && (
+                  <ChoiceMenu
+                    label="Record page"
+                    value={String(currentInventoryPage)}
+                    onChange={(value) => {
+                      const page = Number(value);
+                      setInventoryPage(page);
+                      setSelectedCompatibilityId(
+                        visibleCompatibility[page * COMPATIBILITY_PAGE_SIZE]?.id ?? null,
+                      );
+                    }}
+                    testId="compatibility-record-page"
+                    options={Array.from({ length: inventoryPageCount }, (_, page) => ({
+                      value: String(page),
+                      label: `${page + 1} of ${inventoryPageCount}`,
+                    }))}
+                  />
+                )}
+                <div className="sw-si-compat sw-si-inventory">
+                  <ul
+                    aria-label="Declared feature boundary records"
+                    className="sw-si-compat__records"
+                  >
+                    {visibleCompatibility
+                      .slice(
+                        currentInventoryPage * COMPATIBILITY_PAGE_SIZE,
+                        (currentInventoryPage + 1) * COMPATIBILITY_PAGE_SIZE,
+                      )
+                      .map((record) => (
+                        <li key={record.id}>
+                          <button
+                            aria-label={`${record.label}; ${areaName(record.area)}; ${BEHAVIOR_LABELS[record.dialect]}; ${compatibilityStatusSummary(record)}`}
+                            aria-pressed={selectedCompatibility?.id === record.id}
+                            data-result={record.resultMode}
+                            data-status={record.status}
+                            data-testid={`compatibility-${record.id}`}
+                            onClick={() => setSelectedCompatibilityId(record.id)}
+                            type="button"
+                          >
+                            <span>
+                              {areaName(record.area)} · {BEHAVIOR_LABELS[record.dialect]}
+                            </span>
+                            <strong>{record.label}</strong>
+                            <small className="sw-si-compat__record-status">
+                              {compatibilityStatusSummary(record)}
+                            </small>
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                  {selectedCompatibility ? (
+                    <article
+                      className="sw-si-compat__detail"
+                      data-result={selectedCompatibility.resultMode}
+                      data-status={selectedCompatibility.status}
+                      data-testid="compatibility-detail"
+                    >
+                      <p className="sw-si-compat__mode">
+                        <span
+                          data-mode={selectedCompatibility.resultMode}
+                          data-state={selectedCompatibility.status}
+                        >
+                          {compatibilityStatusSummary(selectedCompatibility)}
+                        </span>
+                      </p>
+                      <h3>{selectedCompatibility.label}</h3>
+                      <p>{selectedCompatibility.semantics}</p>
+                      <dl>
                         <div>
-                          <dt>Warning code</dt>
+                          <dt>Import</dt>
+                          <dd>{selectedCompatibility.importBehavior}</dd>
+                        </div>
+                        <div>
+                          <dt>Export</dt>
+                          <dd>{selectedCompatibility.exportBehavior}</dd>
+                        </div>
+                        <div>
+                          <dt>Known boundary</dt>
+                          <dd>{selectedCompatibility.divergence}</dd>
+                        </div>
+                        <div>
+                          <dt>Exact source</dt>
                           <dd>
-                            <code>{selectedCompatibility.warningCode}</code>
+                            <a href={selectedCompatibility.source}>Open the checked source</a>
                           </dd>
                         </div>
-                      )}
-                    </dl>
-                    <details className="sw-si-results__technical">
-                      <summary>Technical evidence record IDs</summary>
-                      <code>{selectedCompatibility.fixtureIds.join(", ")}</code>
-                    </details>
-                  </article>
-                ) : (
-                  <p className="sw-si-empty">No feature boundary record matches these filters.</p>
-                )}
+                        {selectedCompatibility.warningCode && (
+                          <div>
+                            <dt>Warning code</dt>
+                            <dd>
+                              <code>{selectedCompatibility.warningCode}</code>
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                      <details className="sw-si-results__technical">
+                        <summary>Technical evidence record IDs</summary>
+                        <code>{selectedCompatibility.fixtureIds.join(", ")}</code>
+                      </details>
+                    </article>
+                  ) : (
+                    <p className="sw-si-empty">No feature boundary record matches these filters.</p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : null}
           </details>
         </section>
 

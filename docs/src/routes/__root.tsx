@@ -6,6 +6,7 @@ import { type ReactNode, useEffect } from "react";
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
 import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
+import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 
 import showcaseStylesheet from "../styles/showcase.css?url";
@@ -112,11 +113,13 @@ function RootComponent() {
   useEffect(() => {
     const cleanup = initializeCodeEnhancements();
     const uninstallReveal = installAnchorReveal();
+    const uninstallScrollHints = installGridScrollHints();
     // Deterministic signal for interaction tests: listeners are attached.
     document.documentElement.dataset.hydrated = "true";
     return () => {
       cleanup();
       uninstallReveal();
+      uninstallScrollHints();
     };
   }, []);
 

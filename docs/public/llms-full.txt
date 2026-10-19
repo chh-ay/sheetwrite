@@ -2990,6 +2990,11 @@ either key, so the same shortcut works with a Mac keyboard and a PC keyboard.
 `Ctrl` and `Meta` are always exactly the Control and Command (or Windows) keys,
 so `"Ctrl+J"` is Control+J on a Mac too. Shift and Alt must match exactly.
 
+Name the key as printed without Shift: `"Mod+Shift+1"` and `"Mod+Shift+/"`
+run when the user presses Shift with the 1 or / key, although the browser
+reports `!` and `?` for those presses. Letters and digits keep their meaning
+on other keyboard layouts.
+
 ```ts
 grid.setConfig({
   keyboard: {

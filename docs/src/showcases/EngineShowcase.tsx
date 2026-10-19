@@ -93,6 +93,12 @@ const FOLLOW_STEPS = [
   "Host acknowledgement",
 ] as const;
 
+/** A sub-millisecond step still gets a visible slice of the timing bar. */
+const MIN_STEP_SHARE = 0.02;
+
+/** Region, the column left of Actual: phones start with it at the left edge. */
+const REGION_COLUMN = ENGINE_COLUMN_INDEX.actual - 1;
+
 function carriesPlanBand(columns: readonly EngineColumnBand[]): boolean {
   return columns.some((band) => band.keys.includes(ENGINE_PLAN_KEY));
 }
@@ -267,8 +273,14 @@ export default function EngineShowcase() {
         };
         grid.setSelection({ kind: "cell", addr: actualCell });
         // Without frozen columns a phone shows only Month and Region; the demo
-        // is about Actual, so the grid starts scrolled to it.
-        if (narrow) grid.scrollToCell(actualCell);
+        // is about Actual. scrollToCell moves as little as it can, and only a
+        // move to the left aligns a column with the left edge: scrolling past
+        // Region to Forecast and back puts Region at the edge and Actual fully
+        // in view, with no column cut in half.
+        if (narrow) {
+          grid.scrollToCell({ ...actualCell, col: ENGINE_COLUMN_INDEX.forecast });
+          grid.scrollToCell({ ...actualCell, col: REGION_COLUMN });
+        }
         bindings = bindEngineEvents(grid, emit, setPendingOperations);
         gridRef.current = grid;
         bindingsRef.current = bindings;
@@ -674,13 +686,24 @@ export default function EngineShowcase() {
                 Monthly revenue for one product line in one region. Variance and attainment are
                 formulas, and the annual totals are sums of those rows.
               </p>
+              <button
+                className="sw-engine-primary"
+                data-testid="engine-follow"
+                aria-busy={following || undefined}
+                disabled={disabled}
+                onClick={() => void followChange()}
+                type="button"
+              >
+                {following ? "Following the change…" : "Change an actual and follow it"}
+                <span aria-hidden="true">↗</span>
+              </button>
             </div>
             <div className="sw-engine-run" data-testid="engine-follow-report">
               <div className="sw-engine-run__total">
                 <span>Change → host acknowledgement</span>
                 <strong data-testid="engine-follow-duration" data-empty={followDuration === null}>
                   {followDuration === null ? (
-                    "Not measured yet"
+                    "Not measured"
                   ) : (
                     <>
                       {followDuration.toFixed(1)}
@@ -695,6 +718,18 @@ export default function EngineShowcase() {
                       ? "Change an actual to time each step below."
                       : "Rows + recalc + paint + local host"}
                 </span>
+              </div>
+              {/* One bar split by step: the reader sees where the time went
+                  before reading any number. */}
+              <div aria-hidden="true" className="sw-engine-run__bar">
+                {followSteps && followDuration
+                  ? followSteps.map((stepMs, index) => (
+                      <i
+                        key={FOLLOW_STEPS[index]}
+                        style={{ flexGrow: Math.max(stepMs, followDuration * MIN_STEP_SHARE) }}
+                      />
+                    ))
+                  : null}
               </div>
               <ol aria-label="Measured steps of the last run" className="sw-engine-run__steps">
                 {FOLLOW_STEPS.map((step, index) => {
@@ -715,17 +750,6 @@ export default function EngineShowcase() {
                 })}
               </ol>
             </div>
-            <button
-              className="sw-engine-primary"
-              data-testid="engine-follow"
-              aria-busy={following || undefined}
-              disabled={disabled}
-              onClick={() => void followChange()}
-              type="button"
-            >
-              {following ? "Following the change…" : "Change an actual and follow it"}
-              <span aria-hidden="true">↗</span>
-            </button>
           </header>
 
           <div className="sw-engine-stage__workspace" data-testid="engine-workbench">
@@ -985,7 +1009,7 @@ export default function EngineShowcase() {
             </button>
             <output data-testid="engine-rewrite-duration" data-empty={rewriteDuration === null}>
               {rewriteDuration === null ? (
-                "Apply the scenario to measure"
+                "Not measured"
               ) : (
                 <>
                   {rewriteDuration.toFixed(2)} <span>ms / one-cell transaction</span>

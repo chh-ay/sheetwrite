@@ -14,7 +14,6 @@ import type {
   DataValidationRule,
   DocumentOp,
   ProtectedRange,
-  RowMetadata,
   SnapshotCell,
   Theme,
   Workbook,
@@ -141,12 +140,6 @@ export const BUSINESS_NOTES: readonly CellNote[] = [
   },
 ];
 
-/** Row display metadata applied through `setRowMeta` document operations. */
-export const BUSINESS_ROW_META: ReadonlyArray<[row: number, meta: RowMetadata]> = [
-  [2, { height: 44 }],
-  [7, { height: 44 }],
-];
-
 /** Suppliers directory rows seeded onto the second sheet, in order-book order. */
 export const BUSINESS_SUPPLIER_ROWS: ReadonlyArray<[name: string, region: string, rating: string]> =
   [
@@ -245,9 +238,6 @@ export function businessSuppliersSeedOps(): DocumentOp[] {
       },
     );
   });
-  for (const [row, meta] of BUSINESS_ROW_META) {
-    ops.push({ op: "setRowMeta", sheet: BUSINESS_SHEET_ID, row, meta });
-  }
   return ops;
 }
 

@@ -2407,3 +2407,24 @@ button[aria-busy="true"]::after {
 .sw-action-error[hidden] {
   display: none;
 }
+
+/* A sheet wider than its panel fades out at the right edge while columns stay
+   hidden there (marked by lib/grid-scroll-hint.ts), so a cut column reads as
+   "scroll for more" and not as a broken layout. Only the right edge fades: the
+   left edge holds row numbers and frozen columns. */
+.sheetwrite-viewport::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: var(--grid-scrollbar-width, 0px);
+  bottom: var(--grid-scrollbar-width, 0px);
+  width: 2.75rem;
+  background: linear-gradient(to left, var(--sheetwrite-bg, var(--sw-surface-1)), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+.sheetwrite-viewport[data-more-right]::after {
+  opacity: 0.92;
+}

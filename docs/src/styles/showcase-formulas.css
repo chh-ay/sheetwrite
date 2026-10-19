@@ -142,9 +142,8 @@
     height: clamp(28rem, 58dvh, 38rem);
   }
 
-  /* All recipes stay visible; the workbook is the only scroll region. Compact
-     chips keep the 13 recipes to about two rows at desktop widths, so the
-     grid starts higher on the page. */
+  /* The 13 recipes sit in one row that scrolls sideways, so the grid starts
+     right under the toolbar. The right edge fades to show there is more. */
   .sw-fx-recipes {
     border-bottom: 1px solid var(--sw-border);
     background: var(--sw-surface-0);
@@ -153,10 +152,16 @@
   .sw-fx-recipes ol {
     display: flex;
     gap: 0.35rem;
-    flex-wrap: wrap;
     margin: 0;
-    padding: 0.55rem 1rem;
+    padding: 0.55rem 2.5rem 0.55rem 1rem;
+    overflow-x: auto;
     list-style: none;
+    scrollbar-width: thin;
+    mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+  }
+
+  .sw-fx-recipes li {
+    flex: none;
   }
 
   .sw-fx-recipes button {

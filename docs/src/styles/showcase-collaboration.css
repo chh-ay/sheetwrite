@@ -241,7 +241,7 @@
   color: var(--sw-demo-fg-strong);
   font-family: var(--sw-font-mono);
   font-size: var(--sw-type-sm);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .sw-clb__stats dd[data-state="queued"] {
@@ -518,11 +518,21 @@
     grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.5fr) minmax(0, 1fr);
   }
 
+  /* The clients share the full width, and their grids show more rows. */
   .sw-clb__workbench {
-    grid-template-columns: minmax(0, 34rem) minmax(0, 34rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
       "ana bram"
       "lane lane";
+  }
+
+  .sw-clb__grid {
+    min-height: 22rem;
+  }
+
+  /* Beside the short step list, the log grows with its entries. */
+  .sw-clb__server-log {
+    min-height: 8rem;
   }
 
   .sw-clb__client[data-client="a"] {
@@ -662,6 +672,13 @@
 
   .sw-clb__steps .sw-clb__button {
     min-height: calc(var(--sw-demo-space-4) * 2);
+  }
+
+  /* Four stats in a phone-width row would split "$36,499,500"; two per row
+     keep every value on one line. */
+  .sw-clb__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: var(--sw-demo-space-3);
   }
 
   .sw-clb__advanced {
