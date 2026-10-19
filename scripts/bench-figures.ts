@@ -1,0 +1,144 @@
+/**
+ * Bar figures for the generated performance page: shared log and linear
+ * scales, their rulers, and the single-series figure. Every benchmark section
+ * draws with these, so all charts share one axis style and one number format.
+ */
+
+import { formatMs, html, readableId } from "./evidence-format.js";
+
+interface BenchScale {
+  pct: (value: number) => string;
+  ruler: string;
+  segments: number;
+}
+
+function trimTick(value: number): string {
+  if (value >= 1000) return `${value / 1000} s`;
+  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
+  return `${Number(value.toPrecision(1))}`;
+}
+
+function benchRuler(ticks: string[]): string {
+  return (
+    '<div class="bench-bar bench-bar--ruler" aria-hidden="true">' +
+    '<span class="bench-bar__engine"></span>' +
+    `<span class="bench-bar__track">${ticks.join("")}</span>` +
+    '<span class="bench-bar__value"></span>' +
+    "</div>"
+  );
+}
+
+/**
+ * Shared per-panel log scale: every bar maps through the same decade domain,
+ * so lengths compare across rows, and the ruler labels each 10x tick. The
+ * domain rounds outward to decades, ignoring values below maxValue / 100_000
+ * when choosing its lower bound so tiny noise cannot flatten the axis.
+ */
+function benchLogScale(values: number[]): BenchScale {
+  const positive = values.filter((value) => value > 0);
+  const maxValue = positive.length ? Math.max(...positive) : 1;
+  const minValue = positive.length ? Math.min(...positive) : 0.1;
+  const hi = Math.ceil(Math.log10(maxValue));
+  const lo = Math.min(Math.floor(Math.log10(Math.max(minValue, maxValue / 100_000))), hi - 1);
+  const segments = hi - lo;
+  const pct = (value: number): string => {
+    if (!(value > 0)) return "0.60%";
+    const t = ((Math.log10(value) - lo) / segments) * 100;
+    return `${Math.min(100, Math.max(0.6, t)).toFixed(2)}%`;
+  };
+  const ticks: string[] = [];
+  for (let exp = lo; exp <= hi; exp++) {
+    const at = ((exp - lo) / segments) * 100;
+    const value = 10 ** exp;
+    // Decade ticks are whole numbers; the last carries the unit, in seconds
+    // from 1,000 ms because "1 s" reads better than "1000 ms".
+    const label =
+      exp === hi
+        ? value >= 1000
+          ? `${value / 1000} s`
+          : `${trimTick(value)} ms`
+        : trimTick(value);
+    ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
+  }
+  return { pct, ruler: benchRuler(ticks), segments };
+}
+
+function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
+  const maxValue = Math.max(...values.filter((value) => value > 0), 1);
+  const pct = (value: number): string =>
+    `${Math.min(100, Math.max(0.6, (value / maxValue) * 100)).toFixed(2)}%`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+    // Every nonzero tick goes through the panel formatter - these are raw
+    // values (bytes for memory), not display numbers.
+    const label = t === 0 ? "0" : fmt(maxValue * t);
+    return `<span class="bench-ruler__tick" style="left:${(t * 100).toFixed(2)}%">${label}</span>`;
+  });
+  return { pct, ruler: benchRuler(ticks), segments: 4 };
+}
+
+interface BenchFigureGroup {
+  label: string;
+  /** One muted line under the label: what one timed iteration does. */
+  detail?: string;
+  /** A result chip beside the label, for example "1.09× faster". */
+  chip?: { text: string; outcome: "faster" | "slower" | "even" };
+  entries: Array<{
+    sizeLabel: string;
+    median: number;
+    p95: number;
+    /** Bar colour: the default series, or the compared engine. */
+    series?: "sheetwrite" | "compare";
+  }>;
+}
+
+/**
+ * Log-scale bar figure: one row per operation or workload, one bar per entry
+ * (an input size, a variant, or an engine). Every bar maps through the
+ * figure-wide scale, so even a single-bar row carries its position on the ruler.
+ */
+function benchScaleFigure(lead: string, groups: readonly BenchFigureGroup[]): string[] {
+  const scale = benchLogScale(
+    groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
+  );
+  const lines = [
+    `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
+    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
+    scale.ruler,
+  ];
+  for (const group of groups) {
+    if (group.entries.length === 0) continue;
+    const chip = group.chip
+      ? `<span class="bench-viz__ratio" data-kind="${group.chip.outcome}">${html(group.chip.text)}</span>`
+      : "";
+    const detail = group.detail
+      ? `<span class="bench-viz__detail">${html(group.detail)}</span>`
+      : "";
+    lines.push(
+      `<div class="bench-viz__row" data-outcome="${group.chip?.outcome ?? "faster"}">`,
+      `<div class="bench-viz__head"><span class="bench-viz__label" title="${html(group.label)}">${html(readableId(group.label))}${detail}</span>${chip}</div>`,
+    );
+    for (const entry of group.entries) {
+      const pct = scale.pct;
+      lines.push(
+        `<div class="bench-bar" data-engine="${entry.series === "compare" ? "handsontable" : "sheetwrite"}">` +
+          `<span class="bench-bar__engine">${html(entry.sizeLabel)}</span>` +
+          `<span class="bench-bar__track" aria-hidden="true">` +
+          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
+          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
+          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatMs(entry.median)}</b><b class="bench-num" data-stat="p95">${formatMs(entry.p95)}</b></span>` +
+          `</div>`,
+      );
+    }
+    lines.push("</div>");
+  }
+  lines.push("</figure>");
+  return lines;
+}
+
+export {
+  benchLinearScale,
+  benchLogScale,
+  benchScaleFigure,
+  type BenchFigureGroup,
+  type BenchScale,
+};

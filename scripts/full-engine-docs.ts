@@ -4,6 +4,7 @@ import {
   type MatchedEngineRow,
   validateMatchedEngineResult,
 } from "../bench/src/matched-engine-bench.js";
+import { type BenchFigureGroup, benchScaleFigure } from "./bench-figures.js";
 import {
   allMeasurements,
   capitalized,
@@ -25,6 +26,17 @@ import {
  * paired ratio stays near 1 and its spread stays narrow.
  */
 const MATCHED_SPREAD_CEILING = 1.5;
+
+/** Within this band of 1× a paired ratio reads as "about the same". */
+const EVEN_RATIO_BAND = 0.05;
+
+/** Paired ratio (full ÷ default) as the chip beside each workload. */
+function engineRatioChip(ratio: number): BenchFigureGroup["chip"] {
+  if (Math.abs(ratio - 1) <= EVEN_RATIO_BAND) return { text: "About the same", outcome: "even" };
+  return ratio < 1
+    ? { text: `Full ${(1 / ratio).toFixed(2)}× faster`, outcome: "faster" }
+    : { text: `Full ${ratio.toFixed(2)}× slower`, outcome: "slower" };
+}
 
 export function validateFullEngineArtifact(
   value: Record<string, unknown>,
@@ -166,15 +178,33 @@ export function renderFullEngineEvidence(
       ? "No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows."
       : `${slowerCount} shared workloads tested in the matched rounds had a median paired ratio more than 5% slower with the full engine.`,
     "",
-    "| Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
-    ...matched.rows.map((row) => {
-      const spread = row.ratioP90 / row.ratioP10;
-      const marker = spread > MATCHED_SPREAD_CEILING ? " ⚠︎" : "";
-      return `| ${readableId(row.id)}${marker} | ${formatCount(row.size)} | ${formatMs(row.defaultStat.median)} | ${formatMs(row.fullStat.median)} | ${formatRatio(row.ratioStat.median)} | ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)} |`;
-    }),
+    ...benchScaleFigure(
+      "shared workload",
+      matched.rows.map((row) => ({
+        label: row.id,
+        detail: `Size ${formatCount(row.size)} · paired ratio ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)}${row.ratioP90 / row.ratioP10 > MATCHED_SPREAD_CEILING ? " · spread above the limit" : ""}`,
+        chip: engineRatioChip(row.ratioStat.median),
+        entries: [
+          { sizeLabel: "Default", median: row.defaultStat.median, p95: row.defaultStat.p95 },
+          {
+            sizeLabel: "Full",
+            median: row.fullStat.median,
+            p95: row.fullStat.p95,
+            series: "compare" as const,
+          },
+        ],
+      })),
+    ),
     "",
     ...allMeasurements([
+      "| Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |",
+      "| --- | ---: | ---: | ---: | ---: | ---: |",
+      ...matched.rows.map((row) => {
+        const spread = row.ratioP90 / row.ratioP10;
+        const marker = spread > MATCHED_SPREAD_CEILING ? " ⚠︎" : "";
+        return `| ${readableId(row.id)}${marker} | ${formatCount(row.size)} | ${formatMs(row.defaultStat.median)} | ${formatMs(row.fullStat.median)} | ${formatRatio(row.ratioStat.median)} | ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)} |`;
+      }),
+      "",
       ...provenanceList([
         ["Matched capture", `${formatCaptureTime(matched.meta.timestamp)} UTC`],
         ["Matched commit", `${shortHash(matched.meta.commit)} clean worktree`],

@@ -2625,6 +2625,23 @@ body .sw-code-popover__accessible-signature {
   font-size: 0.92rem;
 }
 
+/* What one timed iteration does, under the scenario name. */
+.bench-viz__detail {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--sw-fg-muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+/* A ratio inside the noise band says so in a neutral chip. */
+.bench-viz__row[data-outcome="even"] .bench-viz__ratio {
+  border-color: var(--sw-border);
+  color: var(--sw-fg-muted);
+  background: var(--sw-surface-2);
+}
+
 /* A scenario reads as a named row with its one-line description under it. */
 .bench-scenario {
   display: grid;

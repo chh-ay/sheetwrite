@@ -831,6 +831,69 @@ bun run --filter @sheetwrite/bench bench:data
 <div><dt>Cold initSheetwrite() through first store in a fresh Node process (7 processes)</dt><dd>4.24 ms</dd></div>
 </dl>
 
+<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:5">
+<div class="bench-viz__scale"><span class="bench-viz__lead">scenario</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
+<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.1</span><span class="bench-ruler__tick" style="left:20.00%">1</span><span class="bench-ruler__tick" style="left:40.00%">10</span><span class="bench-ruler__tick" style="left:60.00%">100</span><span class="bench-ruler__tick" style="left:80.00%">1 s</span><span class="bench-ruler__tick" style="left:100.00%">10 s</span></span><span class="bench-bar__value"></span></div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="row-bridge-insert">Row bridge insert<span class="bench-viz__detail">addRows projection of 10,000 rows into a 1,000,000-row bridge</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:35.98%"></i><i class="bench-bar__fill" style="width:35.49%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.95 ms</b><b class="bench-num" data-stat="p95">6.30 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="command-state-select">Command state select<span class="bench-viz__detail">4,096-cell range selection on a framework-style grid</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:38.93%"></i><i class="bench-bar__fill" style="width:36.53%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.71 ms</b><b class="bench-num" data-stat="p95">8.84 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="with-command-state-handler">With command state handler<span class="bench-viz__detail">Variant of command state select, measured in the same run</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:38.93%"></i><i class="bench-bar__fill" style="width:36.53%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.71 ms</b><b class="bench-num" data-stat="p95">8.84 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="without-command-state-handler">Without command state handler<span class="bench-viz__detail">Variant of command state select, measured in the same run</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:35.19%"></i><i class="bench-bar__fill" style="width:34.11%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.07 ms</b><b class="bench-num" data-stat="p95">5.75 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="setblock-admission">Setblock admission<span class="bench-viz__detail">Grid.applyTransaction of a 1,000,000-cell setBlock</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:74.04%"></i><i class="bench-bar__fill" style="width:73.78%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">489 ms</b><b class="bench-num" data-stat="p95">503 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="setblock-detailed-capture">Setblock detailed capture<span class="bench-viz__detail">Grid.applyTransaction of a 1,000,000-cell setBlock observed through a change listener with detailed capture</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:75.09%"></i><i class="bench-bar__fill" style="width:75.03%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">564 ms</b><b class="bench-num" data-stat="p95">568 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="sync-offline-queue">Sync offline queue<span class="bench-viz__detail">Grid commit admitted into an offline sync queue with no listeners</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:18.02%"></i><i class="bench-bar__fill" style="width:16.47%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.67 ms</b><b class="bench-num" data-stat="p95">0.80 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="rebase-large">Rebase large<span class="bench-viz__detail">Rebase of a 100,000-cell block across 50 single-row inserts</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:23.76%"></i><i class="bench-bar__fill" style="width:23.73%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.54 ms</b><b class="bench-num" data-stat="p95">1.54 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="validation-sparse">Validation sparse<span class="bench-viz__detail">100,000-cell sparse setRange with 100 rules outside the range</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:64.58%"></i><i class="bench-bar__fill" style="width:64.55%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">169 ms</b><b class="bench-num" data-stat="p95">169 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="csv-import">Csv import<span class="bench-viz__detail">fromCsv import of 200,000 rows by 10 columns</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:67.43%"></i><i class="bench-bar__fill" style="width:67.41%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">235 ms</b><b class="bench-num" data-stat="p95">235 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="undo-large-clear">Undo large clear<span class="bench-viz__detail">Undo of a 1,000,000-cell clearRange</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.20%"></i><i class="bench-bar__fill" style="width:84.13%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.61 s</b><b class="bench-num" data-stat="p95">1.62 s</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="restore-near-ceiling">Restore near ceiling<span class="bench-viz__detail">restoreBlock with 60,000,044 decoded bytes</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:80.59%"></i><i class="bench-bar__fill" style="width:80.51%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.06 s</b><b class="bench-num" data-stat="p95">1.07 s</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="paged-evicted-revisit">Paged evicted revisit<span class="bench-viz__detail">Revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric)</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:36.87%"></i><i class="bench-bar__fill" style="width:35.36%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.86 ms</b><b class="bench-num" data-stat="p95">6.97 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="node-cold-init">Node cold init<span class="bench-viz__detail">Cold initSheetwrite() through first store in a fresh Node process (7 processes)</span></span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine"></span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:33.22%"></i><i class="bench-bar__fill" style="width:32.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">4.24 ms</b><b class="bench-num" data-stat="p95">4.58 ms</b></span></div>
+</div>
+</figure>
+
+<details class="bench-all"><summary>All measurements</summary>
+
 | Scenario | Median | p95 |
 | --- | ---: | ---: |
 | <span class="bench-scenario" title="row-bridge-insert"><strong>Row bridge insert</strong><span>One addRows projection of 10,000 rows into a 1,000,000-row bridge</span></span> | 5.95 ms | 6.30 ms |
@@ -847,8 +910,6 @@ bun run --filter @sheetwrite/bench bench:data
 | <span class="bench-scenario" title="restore-near-ceiling"><strong>Restore near ceiling</strong><span>One restoreBlock with 60,000,044 decoded bytes</span></span> | 1.06 s | 1.07 s |
 | <span class="bench-scenario" title="paged-evicted-revisit"><strong>Paged evicted revisit</strong><span>One revisit of an evicted paged band: scroll back plus a fixed async settle floor (wall time is not the accept metric)</span></span> | 5.86 ms | 6.97 ms |
 | <span class="bench-scenario" title="node-cold-init"><strong>Node cold init</strong><span>One cold initSheetwrite() through first store in a fresh Node process (7 processes)</span></span> | 4.24 ms | 4.58 ms |
-
-<details class="bench-all"><summary>All measurements</summary>
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Captured</dt><dd>2026-10-17 05:24 UTC</dd></div>
@@ -1205,6 +1266,53 @@ The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formul
 
 No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows.
 
+<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:5">
+<div class="bench-viz__scale"><span class="bench-viz__lead">shared workload</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>
+<div class="bench-bar bench-bar--ruler" aria-hidden="true"><span class="bench-bar__engine"></span><span class="bench-bar__track"><span class="bench-ruler__tick" style="left:0.00%">0.0001</span><span class="bench-ruler__tick" style="left:20.00%">0.001</span><span class="bench-ruler__tick" style="left:40.00%">0.01</span><span class="bench-ruler__tick" style="left:60.00%">0.1</span><span class="bench-ruler__tick" style="left:80.00%">1</span><span class="bench-ruler__tick" style="left:100.00%">10 ms</span></span><span class="bench-bar__value"></span></div>
+<div class="bench-viz__row" data-outcome="even">
+<div class="bench-viz__head"><span class="bench-viz__label" title="independent-parse-load">Independent parse load<span class="bench-viz__detail">Size 1,000 · paired ratio 0.85×–1.12×</span></span><span class="bench-viz__ratio" data-kind="even">About the same</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:77.51%"></i><i class="bench-bar__fill" style="width:76.64%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.68 ms</b><b class="bench-num" data-stat="p95">0.75 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:77.81%"></i><i class="bench-bar__fill" style="width:76.55%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.67 ms</b><b class="bench-num" data-stat="p95">0.78 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="independent-first-recompute">Independent first recompute<span class="bench-viz__detail">Size 1,000 · paired ratio 0.77×–0.98×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.09× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:76.85%"></i><i class="bench-bar__fill" style="width:76.11%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.64 ms</b><b class="bench-num" data-stat="p95">0.70 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:76.19%"></i><i class="bench-bar__fill" style="width:74.69%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.54 ms</b><b class="bench-num" data-stat="p95">0.65 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="independent-parse-load">Independent parse load<span class="bench-viz__detail">Size 10,000 · paired ratio 0.87×–1.09×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.06× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:97.29%"></i><i class="bench-bar__fill" style="width:96.54%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.72 ms</b><b class="bench-num" data-stat="p95">7.32 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:96.96%"></i><i class="bench-bar__fill" style="width:96.35%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.57 ms</b><b class="bench-num" data-stat="p95">7.05 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="independent-first-recompute">Independent first recompute<span class="bench-viz__detail">Size 10,000 · paired ratio 0.76×–0.93×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.18× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:97.00%"></i><i class="bench-bar__fill" style="width:96.18%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">6.44 ms</b><b class="bench-num" data-stat="p95">7.08 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:95.70%"></i><i class="bench-bar__fill" style="width:94.43%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">5.27 ms</b><b class="bench-num" data-stat="p95">6.10 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="linear-chain">Linear chain<span class="bench-viz__detail">Size 8 · paired ratio 0.84×–1.09×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.06× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:41.36%"></i><i class="bench-bar__fill" style="width:40.56%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.01 ms</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:40.90%"></i><i class="bench-bar__fill" style="width:40.13%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.01 ms</b><b class="bench-num" data-stat="p95">0.01 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="wide-fan-out-edit">Wide fan out edit<span class="bench-viz__detail">Size 1,000 · paired ratio 0.79×–1.02×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.08× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:72.52%"></i><i class="bench-bar__fill" style="width:71.70%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.38 ms</b><b class="bench-num" data-stat="p95">0.42 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:71.76%"></i><i class="bench-bar__fill" style="width:70.84%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">0.35 ms</b><b class="bench-num" data-stat="p95">0.39 ms</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="even">
+<div class="bench-viz__head"><span class="bench-viz__label" title="scalar-edit-affects-0">Scalar edit affects 0<span class="bench-viz__detail">Size 1,000 · paired ratio 0.95×–1.06×</span></span><span class="bench-viz__ratio" data-kind="even">About the same</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:15.66%"></i><i class="bench-bar__fill" style="width:15.35%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1 µs</b><b class="bench-num" data-stat="p95">1 µs</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:15.63%"></i><i class="bench-bar__fill" style="width:15.31%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1 µs</b><b class="bench-num" data-stat="p95">1 µs</b></span></div>
+</div>
+<div class="bench-viz__row" data-outcome="faster">
+<div class="bench-viz__head"><span class="bench-viz__label" title="vlookup-many">Vlookup many<span class="bench-viz__detail">Size 1,000 · paired ratio 0.85×–1.02×</span></span><span class="bench-viz__ratio" data-kind="faster">Full 1.10× faster</span></div>
+<div class="bench-bar" data-engine="sheetwrite"><span class="bench-bar__engine">Default</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.87%"></i><i class="bench-bar__fill" style="width:84.00%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.59 ms</b><b class="bench-num" data-stat="p95">1.75 ms</b></span></div>
+<div class="bench-bar" data-engine="handsontable"><span class="bench-bar__engine">Full</span><span class="bench-bar__track" aria-hidden="true"><i class="bench-bar__spread" style="width:84.08%"></i><i class="bench-bar__fill" style="width:83.15%"></i></span><span class="bench-bar__value"><b class="bench-num" data-stat="median">1.44 ms</b><b class="bench-num" data-stat="p95">1.60 ms</b></span></div>
+</div>
+</figure>
+
+<details class="bench-all"><summary>All measurements</summary>
+
 | Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Independent parse load | 1,000 | 0.68 ms | 0.67 ms | 1.01× | 0.85×–1.12× |
@@ -1215,8 +1323,6 @@ No shared workload tested in the matched rounds had a median paired ratio more t
 | Wide fan out edit | 1,000 | 0.38 ms | 0.35 ms | 0.93× | 0.79×–1.02× |
 | Scalar edit affects 0 | 1,000 | 1 µs | 1 µs | 1.00× | 0.95×–1.06× |
 | Vlookup many | 1,000 | 1.59 ms | 1.44 ms | 0.91× | 0.85×–1.02× |
-
-<details class="bench-all"><summary>All measurements</summary>
 
 <dl class="bench-meta" data-pagefind-ignore>
 <div><dt>Matched capture</dt><dd>2026-10-17 06:44 UTC</dd></div>

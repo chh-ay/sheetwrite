@@ -46,6 +46,12 @@ import {
   type CompatibilityFixture,
   type CompatibilityRecord,
 } from "../docs/src/showcases/compatibility.js";
+import {
+  benchLinearScale,
+  benchLogScale,
+  benchScaleFigure,
+  type BenchScale,
+} from "./bench-figures.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
@@ -1856,70 +1862,6 @@ function benchPanel(
   ].join("\n");
 }
 
-interface BenchScale {
-  pct: (value: number) => string;
-  ruler: string;
-  segments: number;
-}
-
-function trimTick(value: number): string {
-  if (value >= 1000) return `${value / 1000} s`;
-  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
-  return `${Number(value.toPrecision(1))}`;
-}
-
-function benchRuler(ticks: string[]): string {
-  return (
-    '<div class="bench-bar bench-bar--ruler" aria-hidden="true">' +
-    '<span class="bench-bar__engine"></span>' +
-    `<span class="bench-bar__track">${ticks.join("")}</span>` +
-    '<span class="bench-bar__value"></span>' +
-    "</div>"
-  );
-}
-
-/**
- * Shared per-panel log scale: every bar maps through the same decade domain,
- * so lengths compare across rows, and the ruler labels each 10x tick. The
- * domain rounds outward to decades, ignoring values below maxValue / 100_000
- * when choosing its lower bound so tiny noise cannot flatten the axis.
- */
-function benchLogScale(values: number[], fmt: (value: number) => string): BenchScale {
-  const positive = values.filter((value) => value > 0);
-  const maxValue = positive.length ? Math.max(...positive) : 1;
-  const minValue = positive.length ? Math.min(...positive) : 0.1;
-  const hi = Math.ceil(Math.log10(maxValue));
-  const lo = Math.min(Math.floor(Math.log10(Math.max(minValue, maxValue / 100_000))), hi - 1);
-  const segments = hi - lo;
-  const pct = (value: number): string => {
-    if (!(value > 0)) return "0.60%";
-    const t = ((Math.log10(value) - lo) / segments) * 100;
-    return `${Math.min(100, Math.max(0.6, t)).toFixed(2)}%`;
-  };
-  const ticks: string[] = [];
-  for (let exp = lo; exp <= hi; exp++) {
-    const at = ((exp - lo) / segments) * 100;
-    const value = 10 ** exp;
-    // The last tick carries the unit; a second reads better than "1000.0 ms".
-    const label = exp === hi ? (value >= 1000 ? `${value / 1000} s` : fmt(value)) : trimTick(value);
-    ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
-  }
-  return { pct, ruler: benchRuler(ticks), segments };
-}
-
-function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
-  const maxValue = Math.max(...values.filter((value) => value > 0), 1);
-  const pct = (value: number): string =>
-    `${Math.min(100, Math.max(0.6, (value / maxValue) * 100)).toFixed(2)}%`;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
-    // Every nonzero tick goes through the panel formatter - these are raw
-    // values (bytes for memory), not display numbers.
-    const label = t === 0 ? "0" : fmt(maxValue * t);
-    return `<span class="bench-ruler__tick" style="left:${(t * 100).toFixed(2)}%">${label}</span>`;
-  });
-  return { pct, ruler: benchRuler(ticks), segments: 4 };
-}
-
 function benchMethod(
   summary: string,
   paragraphs: string[],
@@ -2031,51 +1973,6 @@ const FORMULA_METHOD = benchMethod(
   ],
 );
 
-/**
- * Single-engine scaling figure: one row per operation/workload, one bar per
- * input size. Every bar maps through the figure-wide log scale, so even a
- * single-size workload's bar carries information - its position on the ruler.
- */
-function benchScaleFigure(
-  lead: string,
-  groups: Array<{
-    label: string;
-    entries: Array<{ sizeLabel: string; median: number; p95: number; size: number }>;
-  }>,
-): string[] {
-  const scale = benchLogScale(
-    groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
-    formatMs,
-  );
-  const lines = [
-    `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
-    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
-    scale.ruler,
-  ];
-  for (const group of groups) {
-    if (group.entries.length === 0) continue;
-    lines.push(
-      '<div class="bench-viz__row" data-outcome="faster">',
-      `<div class="bench-viz__head"><span class="bench-viz__label" title="${html(group.label)}">${html(readableId(group.label))}</span></div>`,
-    );
-    for (const entry of group.entries) {
-      const pct = scale.pct;
-      lines.push(
-        `<div class="bench-bar" data-engine="sheetwrite">` +
-          `<span class="bench-bar__engine">${entry.sizeLabel}</span>` +
-          `<span class="bench-bar__track" aria-hidden="true">` +
-          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
-          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
-          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatMs(entry.median)}</b><b class="bench-num" data-stat="p95">${formatMs(entry.p95)}</b></span>` +
-          `</div>`,
-      );
-    }
-    lines.push("</div>");
-  }
-  lines.push("</figure>");
-  return lines;
-}
-
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -2137,7 +2034,6 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
     }
     const speedScale = benchLogScale(
       speedPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main, s.faded] : []))),
-      formatMs,
     );
     const memoryScale = benchLinearScale(
       memoryPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main] : []))),
@@ -2375,17 +2271,33 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    "| Scenario | Median | p95 |",
-    "| --- | ---: | ---: |",
-    ...evidence.scenarios.flatMap((scenario) => [
-      `| ${scenarioCell(scenario.id, readableText(scenario.unit))} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
-      ...(scenario.variants ?? []).map(
-        (variant) =>
-          `| ${scenarioCell(variant.id, `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run.`)} | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
-      ),
-    ]),
+    ...benchScaleFigure(
+      "scenario",
+      evidence.scenarios.flatMap((scenario) => [
+        {
+          label: scenario.id,
+          detail: readableText(scenarioLabel(scenario.unit)),
+          entries: [{ sizeLabel: "", median: scenario.timing.median, p95: scenario.timing.p95 }],
+        },
+        ...(scenario.variants ?? []).map((variant) => ({
+          label: variant.id,
+          detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
+          entries: [{ sizeLabel: "", median: variant.timing.median, p95: variant.timing.p95 }],
+        })),
+      ]),
+    ),
     "",
     ...allMeasurements([
+      "| Scenario | Median | p95 |",
+      "| --- | ---: | ---: |",
+      ...evidence.scenarios.flatMap((scenario) => [
+        `| ${scenarioCell(scenario.id, readableText(scenario.unit))} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
+        ...(scenario.variants ?? []).map(
+          (variant) =>
+            `| ${scenarioCell(variant.id, `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run.`)} | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
+        ),
+      ]),
+      "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
         ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
@@ -2751,7 +2663,6 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
         ops.flatMap((op) =>
           [ours.stats[op], theirs.stats[op]].flatMap((s) => (s ? [s.median, s.p95] : [])),
         ),
-        formatMs,
       );
       lines.push(
         `<section class="bench-panel bench-ruled" data-size="${rows}" data-metric="speed" style="--bench-segs:${scale.segments}">`,
