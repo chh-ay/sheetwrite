@@ -2417,8 +2417,8 @@ button[aria-busy="true"]::after {
   position: absolute;
   z-index: 3;
   top: 0;
-  right: var(--sw-scrollbar-width, 0px);
-  bottom: var(--sw-scrollbar-width, 0px);
+  right: var(--grid-scrollbar-width, 0px);
+  bottom: var(--grid-scrollbar-width, 0px);
   width: 2.75rem;
   background: linear-gradient(to left, var(--sheetwrite-bg, var(--sw-surface-1)), transparent);
   opacity: 0;

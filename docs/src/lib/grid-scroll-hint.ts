@@ -17,7 +17,7 @@ function updateEdges(scroller: HTMLElement): void {
   viewport.toggleAttribute("data-more-right", hidden - scroller.scrollLeft > EDGE_TOLERANCE_PX);
   // The fade stops at the vertical scrollbar instead of covering it.
   viewport.style.setProperty(
-    "--sw-scrollbar-width",
+    "--grid-scrollbar-width",
     `${scroller.offsetWidth - scroller.clientWidth}px`,
   );
 }
