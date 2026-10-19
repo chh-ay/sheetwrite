@@ -84,6 +84,12 @@ a script nobody will run.
 
 ## Things worth knowing before you touch them
 
+- **Package builds run `minify-package.ts` on generated JavaScript.** It removes
+  comments and extra whitespace without bundling modules or renaming symbols.
+  Type declarations keep their documentation. Svelte source and WebAssembly
+  binaries are unchanged. The size report measures the resulting packed files;
+  `size-history.json` records published releases, not unreleased measurements.
+
 - **`docs:generate` owns `docs/src/generated/*`, the API pages, and
   `docs/public/llms*.txt`**. Never hand-edit its output. `docs:check` rejects
   stale generated content; the agent-readable files contain authored guides
