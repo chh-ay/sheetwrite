@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import { isRepeatClick } from "../lib/action-guard.js";
+import { errorText } from "../lib/errors.js";
 import { ActionError, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
@@ -284,7 +285,7 @@ export default function EngineShowcase() {
       })
       .catch((cause: unknown) => {
         if (disposed) return;
-        const message = cause instanceof Error ? cause.message : String(cause);
+        const message = errorText(cause);
         setError(message);
         setStatus(`The calculation engine could not start: ${message}`);
       });
@@ -519,7 +520,7 @@ export default function EngineShowcase() {
       setFollowDuration(finishedAt - startedAt);
     } catch (cause) {
       if (!controller.signal.aborted && mountedRef.current) {
-        setStatus(cause instanceof Error ? cause.message : String(cause));
+        setStatus(errorText(cause));
         setError(`Cannot follow the change: ${String(cause)}. Try again.`);
       }
     } finally {

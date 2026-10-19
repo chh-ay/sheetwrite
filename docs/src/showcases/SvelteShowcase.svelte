@@ -1,4 +1,6 @@
 <script lang="ts">
+import { errorText } from "../lib/errors.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 // Svelte 5 runes island for the offline/collaborative dispatch workbench.
 // The adapter owns canonical mount/reset/destroy of the Grid; a framework-
 // neutral session (svelte-workbench.ts) owns the durable outbox, connectivity,
@@ -39,7 +41,8 @@ let generation = $state(1);
 let remountNote = $state("initial");
 let grid = $state<Grid>();
 let online = $state(true);
-let merging = $state(false);
+let actionKind = $state<"connection" | "merge">("connection");
+let merging = $derived(actionState.pending && actionKind === "merge");
 let syncState = $state<SyncStateSnapshot>();
 let queue = $state<readonly SyncMutationRecord[]>([]);
 let conflict = $state<WorkbenchConflict | null>(null);
@@ -184,7 +187,7 @@ $effect(() => {
       mount = value.initialMount();
     },
     (error: unknown) => {
-      if (!cancelled) bootError = error instanceof Error ? error.message : String(error);
+      if (!cancelled) bootError = errorText(error);
     },
   );
   return () => {
@@ -211,12 +214,7 @@ $effect(() => {
 $effect(() => {
   const activeGrid = grid;
   if (!activeGrid) return;
-  const observer = new MutationObserver(() => activeGrid.replaceTheme(OFFLINE_THEME));
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["data-theme"],
-  });
-  return () => observer.disconnect();
+  return observeSiteTheme(() => activeGrid.replaceTheme(OFFLINE_THEME));
 });
 
 // Shell chrome (name box, formula bar, selection status) binds to the same
@@ -247,20 +245,19 @@ function toggleConnection(event: MouseEvent): void {
   const active = session;
   const next = !online;
   void action.run(async () => {
+    actionKind = "connection";
     await active.setOnline(next);
     online = next;
   }, () => "Cannot change the connection. Try again.");
 }
 
 async function mergeConflict(): Promise<void> {
-  if (!session || merging) return;
+  if (!session) return;
   const active = session;
-  merging = true;
-  try {
-    await action.run(() => active.mergeAndResync(), () => "Cannot merge the queued edits. Try again.");
-  } finally {
-    merging = false;
-  }
+  await action.run(() => {
+    actionKind = "merge";
+    return active.mergeAndResync();
+  }, () => "Cannot merge the queued edits. Try again.");
 }
 </script>
 

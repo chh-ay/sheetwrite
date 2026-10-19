@@ -1,5 +1,7 @@
 import type { ColumnarData, DocumentOp, Workbook } from "@sheetwrite/core";
 
+import { seededRandom } from "../../lib/random.js";
+
 /**
  * Shared scenario for /showcases/formulas/: a deterministic sales ledger and a
  * dashboard of live full-engine formulas over it. The route, its browser
@@ -48,17 +50,6 @@ export const ORDER_COLUMNS = {
   code: 7,
 } as const;
 
-function seeded(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
-  };
-}
-
 function pick<T>(items: readonly T[], weights: readonly number[], roll: number): T {
   let total = 0;
   for (let index = 0; index < items.length; index++) {
@@ -77,7 +68,7 @@ export interface OrdersLedger {
 
 /** Fresh deterministic ledger: seasonality peaks in November, demand falls as price rises. */
 export function buildOrdersLedger(): OrdersLedger {
-  const random = seeded(2026);
+  const random = seededRandom(2026);
   const month: string[] = new Array(ORDER_ROWS);
   const region: string[] = new Array(ORDER_ROWS);
   const product: string[] = new Array(ORDER_ROWS);

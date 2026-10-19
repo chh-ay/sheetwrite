@@ -103,12 +103,12 @@ export function makeDatabaseSeedSnapshot(): WorkbookSnapshot {
                 colOffset: 0,
                 value: { kind: "literal" as const, value: "Q1 total" },
               },
-              ...[3, 4, 5].map((col) => ({
+              ...["D", "E", "F"].map((column, index) => ({
                 rowOffset: DATABASE_TOTAL_CELL.row,
-                colOffset: col,
+                colOffset: index + 3,
                 value: {
                   kind: "formula" as const,
-                  src: `=SUM(${String.fromCharCode(65 + col)}1:${String.fromCharCode(65 + col)}${DATABASE_REVENUE_ROWS})`,
+                  src: `=SUM(${column}1:${column}${DATABASE_REVENUE_ROWS})`,
                 },
               })),
             ],

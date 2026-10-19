@@ -10,6 +10,7 @@ import { SheetwriteGrid } from "@sheetwrite/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SiteTopbar } from "../components/SiteTopbar.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import { revenueAccountName } from "./revenue.js";
 import { siteGridTheme } from "./site-grid-theme.js";
@@ -127,14 +128,7 @@ export default function HostRowsShowcase() {
   // The grid paints with resolved colors, so it re-reads the site tokens when
   // the page theme changes.
   const applySiteTheme = () => grid.current?.replaceTheme({ ...siteGridTheme(), rowHeight: 36 });
-  useEffect(() => {
-    const observer = new MutationObserver(applySiteTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSiteTheme(applySiteTheme), []);
 
   const applyProjection = (projection: RowBridgeProjection<string>) => {
     const details = projection.deltas.slice(0, 3).map((delta) => {

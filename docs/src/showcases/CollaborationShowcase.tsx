@@ -13,11 +13,14 @@ import {
   type SyncStateSnapshot,
 } from "@sheetwrite/core";
 import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
-
-import "@sheetwrite/core/styles.css";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { isRepeatClick } from "../lib/action-guard.js";
+import { errorText } from "../lib/errors.js";
+
+import "@sheetwrite/core/styles.css";
+import { seededRandom } from "../lib/random.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import {
   COLLABORATION_ACTORS,
@@ -104,18 +107,6 @@ interface BatchReport {
   peerTotal: number;
   ms: number;
   passed: boolean;
-}
-
-/** Small deterministic generator (mulberry32) for repeatable chaos runs. */
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
-  };
 }
 
 /** Waits between drill steps so React state and the durable queue keep up. */
@@ -498,11 +489,7 @@ export default function CollaborationShowcase() {
             } else if (
               !(event.error instanceof Error && event.error.name === "SyncProtocolError")
             ) {
-              pushClientLog(
-                key,
-                "error",
-                event.error instanceof Error ? event.error.message : String(event.error),
-              );
+              pushClientLog(key, "error", errorText(event.error));
             }
             break;
           default:
@@ -656,7 +643,7 @@ export default function CollaborationShowcase() {
     } catch (error) {
       if (generation !== bootGenerationRef.current) return;
       setStatus("error");
-      setStatusDetail(error instanceof Error ? error.message : String(error));
+      setStatusDetail(errorText(error));
     }
   };
 
@@ -674,16 +661,13 @@ export default function CollaborationShowcase() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      for (const key of CLIENT_KEYS) clientsRef.current[key]?.grid.replaceTheme({});
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(
+    () =>
+      observeSiteTheme(() => {
+        for (const key of CLIENT_KEYS) clientsRef.current[key]?.grid.replaceTheme({});
+      }),
+    [],
+  );
 
   const sampleEdit = (key: ClientKey) => {
     void action.run(
@@ -984,7 +968,7 @@ export default function CollaborationShowcase() {
           stopUndo();
         }
       } catch (error) {
-        pushClientLog("a", "error", error instanceof Error ? error.message : String(error));
+        pushClientLog("a", "error", errorText(error));
       } finally {
         drillRef.current = false;
         setRestoreRunning(false);
@@ -1182,7 +1166,7 @@ export default function CollaborationShowcase() {
         `Recovered at v${latest.version ?? 0}: rebased work resubmitted as new mutations`,
       );
     } catch (error) {
-      pushClientLog(key, "error", error instanceof Error ? error.message : String(error));
+      pushClientLog(key, "error", errorText(error));
     } finally {
       // A recovery that stopped before the remount leaves the old Grid live.
       if (frozen && clientsRef.current[key]?.grid === frozen) frozen.setReadOnly(false);

@@ -9,7 +9,8 @@
 
 import type { ColumnarData, DocumentOp, Theme, Workbook } from "@sheetwrite/core";
 
-import { REACT_SHOWCASE_THEME, revenueAccountName } from "../revenue.js";
+import { revenueAccountName } from "../revenue.js";
+import { SCENARIO_THEME } from "./presentation.js";
 
 export const ANALYTICS_ROWS = 100_000;
 export const ANALYTICS_SHEET_ID = "pipeline";
@@ -42,12 +43,7 @@ export const ANALYTICS_COLUMNS = {
   arr: 5,
 } as const;
 
-export const ANALYTICS_THEME: Partial<Theme> = {
-  font: REACT_SHOWCASE_THEME.font,
-  rowHeight: REACT_SHOWCASE_THEME.rowHeight,
-  headerHeight: REACT_SHOWCASE_THEME.headerHeight,
-  rowHeaderWidth: REACT_SHOWCASE_THEME.rowHeaderWidth,
-};
+export const ANALYTICS_THEME: Partial<Theme> = { ...SCENARIO_THEME };
 
 /**
  * Deterministic integer ARR per row. Integer dollars keep aggregate

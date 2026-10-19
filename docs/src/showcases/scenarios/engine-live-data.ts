@@ -88,17 +88,6 @@ const TOTAL_ROW_STYLE = {
   color: "#c5eadc",
 } as const;
 
-/** A1 letters for one-based column numbers. */
-export function columnLetter(index: number): string {
-  let label = "";
-  let remaining = index;
-  do {
-    label = String.fromCharCode(65 + (remaining % 26)) + label;
-    remaining = Math.floor(remaining / 26) - 1;
-  } while (remaining >= 0);
-  return label;
-}
-
 /** Twelve monthly records followed by their formula-backed annual total. */
 export function engineAccountTotalRow(row: number): number {
   return 1 + Math.floor((row - 1) / ENGINE_ACCOUNT_ROWS) * ENGINE_ACCOUNT_ROWS + 12;
@@ -162,6 +151,18 @@ const FORECAST_COLUMNS: Workbook["sheets"][number]["columns"] = [
   { key: "planVersion", header: "Plan version", width: 136, type: "text" },
   { key: "plan", header: "Plan USD", width: 132, type: "currency", numberFormat: "$#,##0" },
 ];
+
+// Browser specs import this fixture without built package outputs.
+// Keep its zero-based column labels independent of the runtime core entry.
+function columnLetter(index: number): string {
+  let label = "";
+  let remaining = index;
+  do {
+    label = String.fromCharCode(65 + (remaining % 26)) + label;
+    remaining = Math.floor(remaining / 26) - 1;
+  } while (remaining >= 0);
+  return label;
+}
 
 const COLUMN_LETTER_BY_KEY: Readonly<Record<string, string>> = Object.fromEntries(
   FORECAST_COLUMNS.map((column, index) => [column.key, columnLetter(index)]),

@@ -1,3 +1,4 @@
+import { clamp, count, ease, lerp, span } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /**
@@ -97,14 +98,9 @@ const EDITS = CELLS.filter((cell) => cell.index % 2 === 0);
 
 /* ---- Timing helpers ---------------------------------------------------------- */
 
-const clamp = (value: number, low = 0, high = 1) => Math.min(high, Math.max(low, value));
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-const span = (t: number, from: number, to: number) => ease(clamp((t - from) / (to - from)));
-const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 /** Fade in, hold, fade out over [from, to]. */
 const windowed = (t: number, from: number, to: number, fade = 0.2) =>
   t < from || t > to ? 0 : clamp(Math.min((t - from) / fade, (to - t) / fade));
-const count = (value: number) => Math.round(value).toLocaleString("en-US");
 
 /* ---- Drawing ----------------------------------------------------------------- */
 

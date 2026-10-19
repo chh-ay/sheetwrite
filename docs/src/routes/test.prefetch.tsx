@@ -351,4 +351,7 @@ function PrefetchFixture() {
   return <main data-testid="prefetch-fixture" data-ready={ready || undefined} />;
 }
 
-export const Route = createFileRoute("/test/prefetch")({ component: PrefetchFixture });
+export const Route = createFileRoute("/test/prefetch")({
+  head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
+  component: PrefetchFixture,
+});

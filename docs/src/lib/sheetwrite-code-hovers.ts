@@ -48,6 +48,27 @@ interface ApiManifestShape {
   }[];
 }
 
+type ManifestPackage = ApiManifestShape["packages"][number];
+
+function coreFirst(packages: ApiManifestShape["packages"]): ManifestPackage[] {
+  return [...packages].sort((left, right) =>
+    left.name === "@sheetwrite/core" ? -1 : right.name === "@sheetwrite/core" ? 1 : 0,
+  );
+}
+
+function rootFirst(entryPoints: ManifestPackage["entryPoints"]) {
+  return [...entryPoints].sort((left, right) =>
+    left.subpath === "." ? -1 : right.subpath === "." ? 1 : 0,
+  );
+}
+
+function entrySlug(packageName: string, subpath: string): string {
+  const packageSlug = packageName.replace("@sheetwrite/", "");
+  return subpath === "."
+    ? packageSlug
+    : `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+}
+
 interface MemberReference {
   docs: string;
   route: string;
@@ -68,20 +89,10 @@ function referenceAnchor(value: string): string {
  */
 export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<string, string> {
   const routes = new Map<string, string>();
-  const packages = [...manifest.packages].sort((a, b) =>
-    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
-  );
-  for (const pkg of packages) {
-    const packageSlug = pkg.name.replace("@sheetwrite/", "");
-    const entryPoints = [...pkg.entryPoints].sort((a, b) =>
-      a.subpath === "." ? -1 : b.subpath === "." ? 1 : 0,
-    );
-    for (const entry of entryPoints) {
+  for (const pkg of coreFirst(manifest.packages)) {
+    for (const entry of rootFirst(pkg.entryPoints)) {
       if (entry.classification !== "supported") continue;
-      const slug =
-        entry.subpath === "."
-          ? packageSlug
-          : `${packageSlug}-${entry.subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+      const slug = entrySlug(pkg.name, entry.subpath);
       for (const item of entry.exports ?? []) {
         if (!routes.has(item.name)) {
           routes.set(item.name, `/docs/api/${slug}/${referenceAnchor(item.name)}/`);
@@ -104,14 +115,8 @@ export interface SymbolPreview {
  */
 export function apiSymbolPreviews(manifest: ApiManifestShape): ReadonlyMap<string, SymbolPreview> {
   const previews = new Map<string, SymbolPreview>();
-  const packages = [...manifest.packages].sort((a, b) =>
-    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
-  );
-  for (const pkg of packages) {
-    const entryPoints = [...pkg.entryPoints].sort((a, b) =>
-      a.subpath === "." ? -1 : b.subpath === "." ? 1 : 0,
-    );
-    for (const entry of entryPoints) {
+  for (const pkg of coreFirst(manifest.packages)) {
+    for (const entry of rootFirst(pkg.entryPoints)) {
       if (entry.classification !== "supported") continue;
       for (const item of entry.exports ?? []) {
         if (!item.signature || previews.has(item.name)) continue;
@@ -134,17 +139,10 @@ export function apiMemberReferences(
   manifest: ApiManifestShape,
 ): ReadonlyMap<string, MemberReference> {
   const members = new Map<string, MemberReference>();
-  const packages = [...manifest.packages].sort((a, b) =>
-    a.name === "@sheetwrite/core" ? -1 : b.name === "@sheetwrite/core" ? 1 : 0,
-  );
-  for (const pkg of packages) {
-    const packageSlug = pkg.name.replace("@sheetwrite/", "");
+  for (const pkg of coreFirst(manifest.packages)) {
     for (const entry of pkg.entryPoints) {
       if (entry.classification !== "supported") continue;
-      const slug =
-        entry.subpath === "."
-          ? packageSlug
-          : `${packageSlug}-${entry.subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
+      const slug = entrySlug(pkg.name, entry.subpath);
       for (const item of entry.exports ?? []) {
         for (const member of item.memberDocs ?? []) {
           if (!member.documentation || members.has(member.name)) continue;

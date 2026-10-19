@@ -1,3 +1,4 @@
+import { cellA1 } from "@sheetwrite/core";
 import type {
   ChangeEvent,
   DataSource,
@@ -10,8 +11,8 @@ import type {
 } from "@sheetwrite/core";
 import { SheetwriteStore } from "@sheetwrite/core";
 
+import { formatBytes } from "../../lib/format.js";
 import {
-  columnLetter,
   ENGINE_COLUMN_INDEX,
   ENGINE_LIVE_SHEET,
   type EngineColumnBand,
@@ -395,7 +396,7 @@ export function bindEngineEvents(
     return cells.map(({ row: dependencyRow, col, label, kind }) => {
       const address = { sheet: ENGINE_LIVE_SHEET, row: dependencyRow, col };
       return {
-        address: `${columnLetter(col)}${dependencyRow + 1}`,
+        address: cellA1(dependencyRow, col),
         label,
         kind,
         formula: grid.store.getFormula(address) ?? "",
@@ -495,12 +496,6 @@ export function createEngineHostSaver(): EngineHostSaver {
   };
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
-}
-
 const engineMoney = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -533,7 +528,7 @@ export function formatEngineEvent(event: EngineEvent): string {
     case "transaction-result":
       return `${event.action === "undo" ? "Undo" : "Edit"}: ${event.status}, ${event.changedCells} cell${event.changedCells === 1 ? "" : "s"} changed`;
     case "page-resource":
-      return `Page sample: ${event.loadedCells.toLocaleString()} cells loaded, ${event.dirtyCells.toLocaleString()} changed, ${formatBytes(event.pageBytes)} kept in pages, ${formatBytes(event.engineBytes)} in the calculation engine`;
+      return `Page sample: ${event.loadedCells.toLocaleString()} cells loaded, ${event.dirtyCells.toLocaleString()} changed, ${formatBytes(event.pageBytes, { kib: 1, mib: 2 })} kept in pages, ${formatBytes(event.engineBytes, { kib: 1, mib: 2 })} in the calculation engine`;
     case "formula-update": {
       const changed = event.dependencies.filter(
         (dependency) => dependency.before !== dependency.after,

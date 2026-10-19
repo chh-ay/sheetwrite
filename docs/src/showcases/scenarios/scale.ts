@@ -381,12 +381,6 @@ export function queryCapabilityOf(grid: Grid, sheet: SheetId): QueryCapability |
   return loadableStoreOf(grid)?.queryCapability?.(sheet) ?? null;
 }
 
-/** What a dense engine would allocate for the same logical sheet (8 bytes/cell). */
-export function denseEquivalentBytes(grid: Grid, sheet: SheetId): number {
-  const schema = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet);
-  return schema ? schema.rowCount * schema.columns.length * 8 : 0;
-}
-
 export type FullExportAttempt =
   | { ok: true; bytes: number }
   | { ok: false; loadedCells: number; totalCells: number; message: string };
@@ -694,11 +688,3 @@ export const COMPARISON_EVIDENCE = {
   heroStats: landingBench.heroStats,
   sizes: landingBench.sizes,
 } as const;
-
-/** Human-readable byte counts for evidence and live stat panels. */
-export function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${bytes} B`;
-}

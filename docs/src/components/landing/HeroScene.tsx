@@ -1,3 +1,6 @@
+import { colToA1 } from "@sheetwrite/core";
+
+import { clamp, count, ease, lerp, span } from "./scene-math.js";
 import { useTimeline } from "./useTimeline.js";
 
 /**
@@ -80,24 +83,7 @@ const LAST_COL = 1_000;
 
 /* ---- Timing helpers ---------------------------------------------------------- */
 
-const clamp = (value: number, low = 0, high = 1) => Math.min(high, Math.max(low, value));
-const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-/** 0 → 1 between `from` and `to`, eased. */
-const span = (t: number, from: number, to: number) => ease(clamp((t - from) / (to - from)));
-const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 const money = (value: number) => `$${Math.round(value).toLocaleString("en-US")}`;
-const count = (value: number) => Math.round(value).toLocaleString("en-US");
-
-function columnLetters(index: number): string {
-  let n = index + 1;
-  let out = "";
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    out = String.fromCharCode(65 + rem) + out;
-    n = Math.floor((n - 1) / 26);
-  }
-  return out;
-}
 
 function viewportAt(t: number): { x: number; y: number; flash: number } {
   const first = ROUTE[0] as Waypoint;
@@ -278,7 +264,7 @@ function frameAt(t: number): Frame {
       opacity: clamp(viewOpacity) * (1 - memoryIn),
       flash: view.flash,
     },
-    address: `${columnLetters(column)}${row.toLocaleString("en-US")}`,
+    address: `${colToA1(column)}${row.toLocaleString("en-US")}`,
     rows: `Rows ${row.toLocaleString("en-US")}–${(row + 21).toLocaleString("en-US")}`,
     memory: {
       opacity: memoryIn,

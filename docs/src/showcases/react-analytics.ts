@@ -21,6 +21,9 @@ import { downloadBytes, fromCsv, parseCellInput, toCsv } from "@sheetwrite/core"
 import type { GridReadyEvent, GridReadyReason } from "@sheetwrite/core/adapter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { errorText } from "../lib/errors.js";
+import { selectionLabel } from "../lib/selection-label.js";
+import { observeSiteTheme } from "../lib/site-theme.js";
 import { useAction } from "../lib/use-action.js";
 import {
   ANALYTICS_COLUMNS,
@@ -47,18 +50,7 @@ export const money = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-export function describeSelection(selection: Selection | null): string {
-  if (!selection) return "No selection";
-  if (selection.kind === "cell") {
-    return `R${selection.addr.row + 1} C${selection.addr.col + 1}`;
-  }
-  if (selection.kind === "range") {
-    return `R${selection.range.start.row + 1}:R${selection.range.end.row + 1}`;
-  }
-  return selection.kind;
-}
-
-export interface KpiValues {
+interface KpiValues {
   total: number | null;
   average: number | null;
   largest: number | null;
@@ -141,7 +133,7 @@ export function fitColumnsToHost(workbook: Workbook, hostWidth: number): void {
 }
 
 /** Host width the workbench fits its columns to; 0 until the stage is measured. */
-export interface AnalyticsWorkbenchOptions {
+interface AnalyticsWorkbenchOptions {
   gridHostWidth?: number;
 }
 
@@ -283,7 +275,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
         setActiveRenderer("canvas");
         setRendererFallback((current) => ({
           count: (current?.count ?? 0) + 1,
-          reason: error instanceof Error ? error.message : String(error),
+          reason: errorText(error),
         }));
       });
 
@@ -319,7 +311,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
   );
 
   const onSelectionChange = useCallback((value: Selection | null): void => {
-    setSelection(describeSelection(value));
+    setSelection(selectionLabel(value, "No selection"));
     const grid = gridRef.current;
     if (!grid) return;
     if (value?.kind !== "cell" || value.addr.sheet !== ANALYTICS_SHEET_ID) {
@@ -579,14 +571,7 @@ export function useAnalyticsWorkbench(options: AnalyticsWorkbenchOptions = {}) {
     setRendererFallback(null);
   }, []);
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => gridRef.current?.replaceTheme(ANALYTICS_THEME));
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    });
-    return () => observer.disconnect();
-  }, []);
+  useEffect(() => observeSiteTheme(() => gridRef.current?.replaceTheme(ANALYTICS_THEME)), []);
 
   return {
     csvAction,

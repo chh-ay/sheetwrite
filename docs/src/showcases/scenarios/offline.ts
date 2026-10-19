@@ -18,7 +18,7 @@ import type {
   WorkbookSnapshot,
 } from "@sheetwrite/core";
 
-import { SVELTE_SHOWCASE_THEME } from "../revenue.js";
+import { SCENARIO_THEME } from "./presentation.js";
 
 export const OFFLINE_DOCUMENT_ID = "sheetwrite-offline-dispatch";
 export const OFFLINE_ROWS = 240;
@@ -56,12 +56,7 @@ export const OFFLINE_COLUMNS = {
   hours: 6,
 } as const;
 
-export const OFFLINE_THEME: Partial<Theme> = {
-  font: SVELTE_SHOWCASE_THEME.font,
-  rowHeight: SVELTE_SHOWCASE_THEME.rowHeight,
-  headerHeight: SVELTE_SHOWCASE_THEME.headerHeight,
-  rowHeaderWidth: SVELTE_SHOWCASE_THEME.rowHeaderWidth,
-};
+export const OFFLINE_THEME: Partial<Theme> = { ...SCENARIO_THEME };
 
 /** Local device identity shown in presence overlays. */
 export const OFFLINE_LOCAL_ACTOR: PresenceActor = {
