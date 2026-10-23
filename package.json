@@ -2,7 +2,7 @@
   "name": "sheetwrite",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "type": "module",
   "description": "Framework-agnostic, high-performance spreadsheet grid.",
   "license": "MIT",
@@ -13,8 +13,8 @@
     "bench"
   ],
   "engines": {
-    "bun": ">=1.4.0",
-    "node": "24.21.0"
+    "bun": ">=1.4.4",
+    "node": "24.22.1"
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",

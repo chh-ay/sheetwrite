@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { brotliDecompressSync } from "node:zlib";
 
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
@@ -28,7 +29,7 @@ describe("contributor and CI toolchain contract", () => {
   it("pins Node and npm as exact release inputs", () => {
     expect(nodeVersion).toBe(NODE_VERSION);
     // Consumer engines and the exact CI/dev runtime are separate contracts.
-    expect(packageManifest.engines?.node).toBe("24.21.0");
+    expect(packageManifest.engines?.node).toBe("24.22.1");
     expect(workflow).toContain(`NODE_VERSION: "${NODE_VERSION}"`);
     expect(workflow).toContain(`NPM_VERSION: "${NPM_VERSION}"`);
     expect(workflow).toContain(`node-version: ${WORKFLOW_NODE_VERSION}`);
@@ -37,6 +38,14 @@ describe("contributor and CI toolchain contract", () => {
     expect(workflow).toContain('test "$(npm --version)" = "$NPM_VERSION"');
     expect(sizeReport.toolchain?.node).toBe(NODE_VERSION);
     expect(sizeReport.toolchain?.npm).toBe(NPM_VERSION);
+  });
+
+  it("rejects the invalid Brotli block switch from CVE-2026-111497", () => {
+    // Public Node/Bun regression input; the vulnerable decoder reports -9.
+    const invalid = Buffer.from("200010414141fcffff07002228f00b60f7f41f000000", "hex");
+    expect(() => brotliDecompressSync(invalid)).toThrow(
+      expect.objectContaining({ code: "ERR__ERROR_FORMAT_BLOCK_SWITCH", errno: -17 }),
+    );
   });
 
   it("pins Rust, its WASM target, wasm-pack, cargo-audit, and coverage tooling", () => {

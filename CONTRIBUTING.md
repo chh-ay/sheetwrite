@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-Use Bun 1.4.3, Rust 1.99.0 with `wasm32-unknown-unknown`, Node 26.9.0, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
+Use Bun 1.4.4, Rust 1.99.0 with `wasm32-unknown-unknown`, Node 26.12.1, and npm 11.19.1. Install the pinned Rust toolchain explicitly — rustup no longer auto-installs toolchain files for most commands — then install dependencies:
 
 ```sh
 rustup toolchain install
