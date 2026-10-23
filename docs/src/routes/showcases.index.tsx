@@ -250,7 +250,7 @@ function FormulasScene() {
         ))}
       </span>
       <span className="sw-hub-scene__caption">
-        {functionCount} functions · LAMBDA · spill references
+        {functionCount} function names · LAMBDA · spill references
       </span>
     </span>
   );
