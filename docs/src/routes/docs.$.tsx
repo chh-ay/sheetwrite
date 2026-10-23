@@ -57,7 +57,14 @@ function DocumentRoute() {
       reserveOutline
       title={metadata.title}
     >
-      <Suspense fallback={<p className="sw-document-loading">Loading documentation…</p>}>
+      {/* Prerendered HTML can still hold this placeholder; search must not quote it. */}
+      <Suspense
+        fallback={
+          <p className="sw-document-loading" data-pagefind-ignore="">
+            Loading documentation…
+          </p>
+        }
+      >
         <Content components={DOCUMENT_COMPONENTS} />
       </Suspense>
     </DocsShell>
