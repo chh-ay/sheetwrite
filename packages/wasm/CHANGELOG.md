@@ -1,5 +1,11 @@
 # @sheetwrite/wasm
 
+## 0.5.2
+
+### Patch Changes
+
+- 2e4231c: Remove comments and extra whitespace from published JavaScript to reduce package download and installed sizes. Keep module paths, exported names, type documentation, and WebAssembly binaries unchanged.
+
 ## 0.5.1
 
 ### Patch Changes

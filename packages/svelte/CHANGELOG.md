@@ -1,5 +1,14 @@
 # @sheetwrite/svelte
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [e09f014]
+- Updated dependencies [f836aba]
+- Updated dependencies [2e4231c]
+  - @sheetwrite/core@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
