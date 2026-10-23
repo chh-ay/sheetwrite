@@ -7,16 +7,12 @@
 //! both stop the walk at the same cell. `next_allow_errors` instead returns
 //! error cells as values for criteria ranges.
 
-use std::collections::{HashMap, HashSet};
-
-use super::LiteralSources;
+use super::{EvalPass, LiteralSources};
 
 use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{
-    AbsCellKey, CellRange, EvalResult, FormulaError, Value, KIND_EMPTY, RANGE_CELL_LIMIT,
-};
+use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, RANGE_CELL_LIMIT};
 
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
@@ -100,13 +96,8 @@ impl<'a> RangeReader<'a> {
 
     /// The next value in row-major order, or `None` once the range is spent.
     /// An error cell stops the walk with that error.
-    pub(crate) fn next(
-        &mut self,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
-    ) -> Result<Option<Value>, FormulaError> {
-        let Some(value) = self.next_allow_errors(affected, memo, visiting)? else {
+    pub(crate) fn next(&mut self, pass: &mut EvalPass<'_>) -> Result<Option<Value>, FormulaError> {
+        let Some(value) = self.next_allow_errors(pass)? else {
             return Ok(None);
         };
 
@@ -122,9 +113,7 @@ impl<'a> RangeReader<'a> {
     /// stops the walk.
     pub(crate) fn next_allow_errors(
         &mut self,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
     ) -> Result<Option<Value>, FormulaError> {
         if self.row > self.row_end {
             return Ok(None);
@@ -174,15 +163,8 @@ impl<'a> RangeReader<'a> {
         } else if self.data.kind_at(index) == KIND_EMPTY {
             Value::Blank
         } else {
-            self.store.eval_at(
-                self.sheet,
-                self.row,
-                self.col,
-                affected,
-                memo,
-                visiting,
-                self.depth + 1,
-            )
+            self.store
+                .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
         };
 
         self.col += 1;
@@ -202,6 +184,7 @@ mod tests {
 
     use super::RangeReader;
     use crate::eval::functions::FuncAccumulator;
+    use crate::eval::EvalPass;
     use crate::store::CellStore;
     use crate::types::{CellRange, FormulaError, Value};
 
@@ -210,8 +193,13 @@ mod tests {
         let affected = HashSet::new();
         let mut memo = HashMap::new();
         let mut visiting = HashSet::new();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
         let mut values = FuncAccumulator::default();
-        store.eval_range_values(range, &affected, &mut memo, &mut visiting, 0, &mut values)?;
+        store.eval_range_values(range, &mut pass, 0, &mut values)?;
         Ok(values
             .entries()
             .iter()
@@ -224,9 +212,14 @@ mod tests {
         let affected = HashSet::new();
         let mut memo = HashMap::new();
         let mut visiting = HashSet::new();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
         let mut reader = RangeReader::new(store, range, 0)?;
         let mut values = Vec::new();
-        while let Some(value) = reader.next(&affected, &mut memo, &mut visiting)? {
+        while let Some(value) = reader.next(&mut pass)? {
             values.push(value);
         }
         Ok(values)
@@ -239,9 +232,14 @@ mod tests {
         let affected = HashSet::new();
         let mut memo = HashMap::new();
         let mut visiting = HashSet::new();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
         let mut reader = RangeReader::new(store, range, 0)?;
         let mut values = Vec::new();
-        while let Some(value) = reader.next_allow_errors(&affected, &mut memo, &mut visiting)? {
+        while let Some(value) = reader.next_allow_errors(&mut pass)? {
             values.push(value);
         }
         Ok(values)

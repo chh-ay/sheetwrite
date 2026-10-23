@@ -146,6 +146,10 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     cwd: "packages/wasm",
   },
   {
+    id: "lint:rust",
+    command: ["bun", "run", "lint:rust"],
+  },
+  {
     id: "audit:rust",
     command: ["cargo", "audit"],
     cwd: "packages/wasm",

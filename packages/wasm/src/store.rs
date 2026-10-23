@@ -280,6 +280,26 @@ enum BlockInputOrder {
     ColumnMajor,
 }
 
+/// Flat input arrays of one packed block write, as documented on
+/// [`CellStore::set_block_packed`].
+struct PackedBlock<'a> {
+    order: BlockInputOrder,
+    sheet: usize,
+    start_row: usize,
+    start_col: usize,
+    rows: usize,
+    cols: usize,
+    kinds: &'a [u8],
+    numbers: &'a [f64],
+    text_buf: &'a [u8],
+    text_offsets: &'a [u32],
+    styles: &'a [u32],
+    formula_offsets: &'a [u32],
+    formula_sources: &'a [String],
+    reference_offsets: &'a [u32],
+    reference_targets: &'a [u32],
+}
+
 impl BlockInputOrder {
     #[inline]
     fn index(self, row_offset: usize, col_offset: usize, rows: usize, cols: usize) -> usize {
@@ -979,6 +999,10 @@ impl CellStore {
     /// allocating by logical rectangle size. Inside `beginPageLoad`, dirty
     /// paged cells are skipped; otherwise the whole sparse write is preflighted.
     #[wasm_bindgen(js_name = setSparseBlock)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn set_sparse_block(
         &mut self,
         sheet: usize,
@@ -1167,6 +1191,10 @@ impl CellStore {
 
     /// Clear a rectangle while independently controlling contents and style.
     #[wasm_bindgen(js_name = clearRange)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn clear_range(
         &mut self,
         sheet: usize,
@@ -1467,6 +1495,10 @@ impl CellStore {
 
     /// Remap styles over a rectangle using parallel old/new id tables.
     #[wasm_bindgen(js_name = remapRangeStyles)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn remap_range_styles(
         &mut self,
         sheet: usize,
@@ -1771,6 +1803,10 @@ impl CellStore {
 
     /// Packed-string counterpart to [`CellStore::hydrate_page_numbers`].
     #[wasm_bindgen(js_name = hydratePageStringsPacked)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn hydrate_page_strings_packed(
         &mut self,
         sheet: usize,
@@ -2120,6 +2156,10 @@ impl CellStore {
     }
 
     #[wasm_bindgen(js_name = setNamedRange)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn set_named_range(
         &mut self,
         name: &str,
@@ -2184,7 +2224,10 @@ impl CellStore {
         true
     }
     #[wasm_bindgen(js_name = setTable)]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn set_table(
         &mut self,
         id: &str,
@@ -2625,7 +2668,10 @@ impl CellStore {
     /// status is `0` success, `1` invalid shape/bounds, `2` invalid or duplicate
     /// source metadata, and `3` paged dirty-capacity rejection.
     #[wasm_bindgen(js_name = setBlockPacked)]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn set_block_packed(
         &mut self,
         sheet: usize,
@@ -2643,8 +2689,8 @@ impl CellStore {
         reference_offsets: &[u32],
         reference_targets: &[u32],
     ) -> u32 {
-        self.write_packed_block(
-            BlockInputOrder::RowMajor,
+        self.write_packed_block(PackedBlock {
+            order: BlockInputOrder::RowMajor,
             sheet,
             start_row,
             start_col,
@@ -2656,10 +2702,10 @@ impl CellStore {
             text_offsets,
             styles,
             formula_offsets,
-            &formula_sources,
+            formula_sources: &formula_sources,
             reference_offsets,
             reference_targets,
-        )
+        })
     }
 
     /// Atomically write one column-major mixed literal/formula/reference block
@@ -2671,7 +2717,10 @@ impl CellStore {
     /// Text packing, source metadata and every status code behave exactly as in
     /// [`Self::set_block_packed`].
     #[wasm_bindgen(js_name = setColumnBlockPacked)]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn set_column_block_packed(
         &mut self,
         sheet: usize,
@@ -2689,8 +2738,8 @@ impl CellStore {
         reference_offsets: &[u32],
         reference_targets: &[u32],
     ) -> u32 {
-        self.write_packed_block(
-            BlockInputOrder::ColumnMajor,
+        self.write_packed_block(PackedBlock {
+            order: BlockInputOrder::ColumnMajor,
             sheet,
             start_row,
             start_col,
@@ -2702,34 +2751,33 @@ impl CellStore {
             text_offsets,
             styles,
             formula_offsets,
-            &formula_sources,
+            formula_sources: &formula_sources,
             reference_offsets,
             reference_targets,
-        )
+        })
     }
 
-    /// Shared body of the two packed writes. `order` says how the flat input
-    /// arrays of a `rows` × `cols` block are laid out; the store itself is
+    /// Shared body of the two packed writes. `block.order` says how the flat
+    /// input arrays of a `rows` × `cols` block are laid out; the store itself is
     /// always written column-major.
-    #[allow(clippy::too_many_arguments)]
-    fn write_packed_block(
-        &mut self,
-        order: BlockInputOrder,
-        sheet: usize,
-        start_row: usize,
-        start_col: usize,
-        rows: usize,
-        cols: usize,
-        kinds: &[u8],
-        numbers: &[f64],
-        text_buf: &[u8],
-        text_offsets: &[u32],
-        styles: &[u32],
-        formula_offsets: &[u32],
-        formula_sources: &[String],
-        reference_offsets: &[u32],
-        reference_targets: &[u32],
-    ) -> u32 {
+    fn write_packed_block(&mut self, block: PackedBlock<'_>) -> u32 {
+        let PackedBlock {
+            order,
+            sheet,
+            start_row,
+            start_col,
+            rows,
+            cols,
+            kinds,
+            numbers,
+            text_buf,
+            text_offsets,
+            styles,
+            formula_offsets,
+            formula_sources,
+            reference_offsets,
+            reference_targets,
+        } = block;
         let Some(cell_count) = rows.checked_mul(cols) else {
             return BLOCK_INVALID;
         };

@@ -8,9 +8,10 @@ use regex_lite::{Captures, Regex, RegexBuilder};
 
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS};
 use super::super::value::{bool_from_value, number_from_value, text_from_value};
+use super::super::EvalPass;
 use crate::calc::Ast;
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &[
     "ARRAYTOTEXT",
@@ -42,25 +43,17 @@ thread_local! {
     static REGEX_CACHE: RefCell<Vec<CachedRegex>> = const { RefCell::new(Vec::new()) };
 }
 
-struct Context<'a> {
+struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
-impl Context<'_> {
+impl Context<'_, '_> {
     fn scalar(&mut self, args: &[Ast], index: usize, default: Value) -> Value {
         optional_ast(args, index).map_or(default, |ast| {
-            self.store.eval_ast(
-                ast,
-                self.sheet,
-                self.affected,
-                self.memo,
-                self.visiting,
-                self.depth + 1,
-            )
+            self.store
+                .eval_ast(ast, self.sheet, self.pass, self.depth + 1)
         })
     }
     fn text(&mut self, args: &[Ast], index: usize, default: &str) -> Result<String, FormulaError> {
@@ -83,26 +76,15 @@ impl Context<'_> {
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
         if range_from_ast(ast, self.sheet).is_some() || super::super::array::ast_produces_array(ast)
         {
-            self.store.eval_matrix_arg(
-                ast,
-                self.sheet,
-                self.affected,
-                self.memo,
-                self.visiting,
-                self.depth + 1,
-            )
+            self.store
+                .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
         } else {
             Ok(EvalMatrix::new(
                 1,
                 1,
-                vec![self.store.eval_ast(
-                    ast,
-                    self.sheet,
-                    self.affected,
-                    self.memo,
-                    self.visiting,
-                    self.depth + 1,
-                )],
+                vec![self
+                    .store
+                    .eval_ast(ast, self.sheet, self.pass, self.depth + 1)],
             ))
         }
     }
@@ -143,7 +125,7 @@ fn text_value(text: String) -> Result<Value, FormulaError> {
         Ok(Value::text(text))
     }
 }
-fn mode(context: &mut Context<'_>, args: &[Ast], index: usize) -> Result<bool, FormulaError> {
+fn mode(context: &mut Context<'_, '_>, args: &[Ast], index: usize) -> Result<bool, FormulaError> {
     match number_from_value(&context.scalar(args, index, Value::number(0.0)))? {
         0.0 => Ok(false),
         1.0 => Ok(true),
@@ -238,7 +220,7 @@ fn split_parts<'a>(
     Ok(parts)
 }
 fn before_after(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     name: &str,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
@@ -313,7 +295,7 @@ fn before_after(
         Err(FormulaError::Na)
     }
 }
-fn fixed(context: &mut Context<'_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
+fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, if name == "FIXED" { 3 } else { 2 })?;
     let number = number_from_value(&context.scalar(args, 0, Value::Blank))?;
     let decimals = context.integer(args, 1, 2)?;
@@ -375,7 +357,7 @@ fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), For
     }
     Ok(())
 }
-fn to_text(context: &mut Context<'_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
+fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, 2)?;
     let strict = mode(context, args, 1)?;
     if name == "VALUETOTEXT" {
@@ -505,7 +487,7 @@ fn append_replacement(
     append_text(output, replacement)
 }
 fn regex_scalar(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     name: &str,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
@@ -542,7 +524,7 @@ fn regex_scalar(
     append_text(&mut output, &text[offset..])?;
     text_value(output)
 }
-fn extract(context: &mut Context<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 4)?;
     let text = context.text(args, 0, "")?;
     let pattern = context.text(args, 1, "")?;
@@ -594,7 +576,7 @@ fn checked_matrix(
     matrix.validate_bytes()?;
     Ok(matrix)
 }
-fn text_split(context: &mut Context<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+fn text_split(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
     let columns = context.delimiters(args, 1)?;
@@ -630,7 +612,7 @@ fn text_split(context: &mut Context<'_>, args: &[Ast]) -> Result<EvalMatrix, For
     checked_matrix(parts.len(), column_count, values)
 }
 fn scalar_result(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     name: &str,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
@@ -644,24 +626,19 @@ fn scalar_result(
         _ => Err(FormulaError::Name),
     }
 }
-#[allow(clippy::too_many_arguments)]
 pub(super) fn evaluate_ast(
     store: &CellStore,
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     scalar_result(
         &mut Context {
             store,
             sheet,
-            affected,
-            memo,
-            visiting,
+            pass,
             depth,
         },
         name,
@@ -672,23 +649,18 @@ pub(super) fn evaluate_ast(
 pub(super) fn produces_array(name: &str, _args: &[Ast]) -> bool {
     matches!(name, "TEXTSPLIT" | "REGEXEXTRACT")
 }
-#[allow(clippy::too_many_arguments)]
 pub(super) fn evaluate_matrix(
     store: &CellStore,
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
     };
     match name {
@@ -703,16 +675,15 @@ pub(super) fn shape(
     args: &[Ast],
     sheet: usize,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let matrix = evaluate_matrix(
-        store,
-        name,
-        args,
-        sheet,
-        &HashSet::new(),
-        &mut HashMap::new(),
-        &mut HashSet::new(),
-        0,
-    )?;
+    let affected = HashSet::new();
+    let mut memo = HashMap::new();
+    let mut visiting = HashSet::new();
+    let mut pass = EvalPass {
+        affected: &affected,
+        memo: &mut memo,
+        visiting: &mut visiting,
+    };
+    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0)?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
 pub(super) fn bound(

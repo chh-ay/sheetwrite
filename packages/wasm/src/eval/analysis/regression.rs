@@ -5,11 +5,11 @@ use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAc
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
 use super::super::value::{aggregate_number, bool_from_value};
+use super::super::EvalPass;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 
 pub(crate) const NAMES: &[&str] = &[
     "FREQUENCY",
@@ -230,34 +230,23 @@ fn validate_frequency_resources(data_cells: usize, bin_cells: usize) -> Result<(
     Ok(())
 }
 
-struct Evaluation<'a> {
+struct Evaluation<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
-impl Evaluation<'_> {
+impl Evaluation<'_, '_> {
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if let Some(matrix) = self.store.eval_dynamic_array(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        ) {
+        if let Some(matrix) =
+            self.store
+                .eval_dynamic_array(ast, self.sheet, self.pass, self.depth + 1)
+        {
             return matrix;
         }
-        let value = self.store.eval_ast(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        );
+        let value = self
+            .store
+            .eval_ast(ast, self.sheet, self.pass, self.depth + 1);
         if let Value::Error(error) = value {
             return Err(error);
         }
@@ -265,36 +254,28 @@ impl Evaluation<'_> {
     }
     fn boolean(&mut self, args: &[Ast], index: usize, default: bool) -> Result<bool, FormulaError> {
         optional_ast(args, index).map_or(Ok(default), |ast| {
-            bool_from_value(&self.store.eval_ast(
-                ast,
-                self.sheet,
-                self.affected,
-                self.memo,
-                self.visiting,
-                self.depth + 1,
-            ))
+            bool_from_value(
+                &self
+                    .store
+                    .eval_ast(ast, self.sheet, self.pass, self.depth + 1),
+            )
         })
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn evaluate_array(
     store: &CellStore,
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     shape(store, name, args, sheet)?;
     let mut evaluation = Evaluation {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
     };
     match name {
@@ -402,7 +383,10 @@ fn numeric_values(matrix: &EvalMatrix) -> Result<Vec<f64>, FormulaError> {
 /// Each bin counts the values above the next smaller bin and at most the bin.
 /// Results keep the order of `bins_array`; for equal bins, the first bin gets
 /// the count. The last row counts the values above the largest bin.
-fn frequency(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+fn frequency(
+    evaluation: &mut Evaluation<'_, '_>,
+    args: &[Ast],
+) -> Result<EvalMatrix, FormulaError> {
     let numbers = numeric_values(&evaluation.matrix(&args[0])?)?;
     let bins = numeric_values(&evaluation.matrix(&args[1])?)?;
     let mut order = super::sorted_positions(bins.len(), &mut |left, right| {
@@ -430,7 +414,7 @@ fn frequency(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix
 /// first occurrence. No repeated value gives #N/A. Values typed directly as
 /// arguments follow the scalar rules (TRUE and numeric text count); values
 /// from references and arrays count only when they are numbers.
-fn modes(evaluation: &mut Evaluation<'_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let mut numbers = Vec::new();
     for arg in args {
         let from_range = is_reference(arg) || ast_produces_array(arg);

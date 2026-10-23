@@ -1,14 +1,14 @@
 //! Shared scalar semantics for scalar and element-wise operators.
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 
 use crate::calc::{Ast, CmpOp, Op};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
+use crate::types::{FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
 use super::value::{compare_values, number_from_value, text_from_value};
+use super::EvalPass;
 
 #[derive(Clone, Copy)]
 pub(super) enum UnaryOp {
@@ -128,21 +128,12 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Operand, FormulaError> {
-        match self.eval_dynamic_array(ast, sheet, affected, memo, visiting, depth + 1) {
+        match self.eval_dynamic_array(ast, sheet, pass, depth + 1) {
             Some(matrix) => matrix.map(Operand::Array),
-            None => Ok(Operand::Scalar(self.eval_ast(
-                ast,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ))),
+            None => Ok(Operand::Scalar(self.eval_ast(ast, sheet, pass, depth + 1))),
         }
     }
 
@@ -150,9 +141,7 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if depth > FORMULA_RECURSION_LIMIT {
@@ -164,13 +153,12 @@ impl CellStore {
                 Ast::Pos(_) => UnaryOp::Pos,
                 _ => UnaryOp::Percent,
             };
-            let mut matrix =
-                match self.operator_operand(inner, sheet, affected, memo, visiting, depth + 1)? {
-                    Operand::Array(matrix) => matrix,
-                    Operand::Scalar(value) => {
-                        return Ok(EvalMatrix::new(1, 1, vec![unary(op, &value)]));
-                    }
-                };
+            let mut matrix = match self.operator_operand(inner, sheet, pass, depth + 1)? {
+                Operand::Array(matrix) => matrix,
+                Operand::Scalar(value) => {
+                    return Ok(EvalMatrix::new(1, 1, vec![unary(op, &value)]));
+                }
+            };
             for value in &mut matrix.values {
                 *value = unary(op, value);
             }
@@ -180,8 +168,8 @@ impl CellStore {
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => (left, right),
             _ => return Err(FormulaError::Value),
         };
-        let left = self.operator_operand(left, sheet, affected, memo, visiting, depth + 1)?;
-        let right = self.operator_operand(right, sheet, affected, memo, visiting, depth + 1)?;
+        let left = self.operator_operand(left, sheet, pass, depth + 1)?;
+        let right = self.operator_operand(right, sheet, pass, depth + 1)?;
         let (left_rows, left_cols) = left.shape();
         let (right_rows, right_cols) = right.shape();
         let rows = left_rows.max(right_rows);

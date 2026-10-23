@@ -3053,7 +3053,7 @@ fn loaded_spans_match_per_row_loaded_probes() {
     let mut loaded = Vec::with_capacity(64);
     for row in 0..64 {
         state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-        let is_loaded = state % 3 != 0;
+        let is_loaded = !state.is_multiple_of(3);
         loaded.push(is_loaded);
         if is_loaded {
             brute.set_number(brute_sheet, row, 0, row as f64, 0);
@@ -3063,8 +3063,8 @@ fn loaded_spans_match_per_row_loaded_probes() {
         for band_end in [band_start + 1, band_start + 9, 64] {
             let mut expected = Vec::new();
             let mut run: Option<usize> = None;
-            for row in band_start..band_end {
-                if loaded[row] {
+            for (row, &is_loaded) in loaded.iter().enumerate().take(band_end).skip(band_start) {
+                if is_loaded {
                     run = run.or(Some(row));
                 } else if let Some(start) = run.take() {
                     expected.push(start as u32);

@@ -666,6 +666,32 @@ impl<Materialized> Clone for ReuseEntry<Materialized> {
     }
 }
 
+/// The reuse state of the range one lookup argument reads, and how to record
+/// what this lookup learns about it.
+pub(super) struct LookupReuse<Materialized, Remember> {
+    /// `None` when the argument is not a plain range; such arguments are never reused.
+    pub(super) range: Option<CellRange>,
+    pub(super) previous: Option<ReuseEntry<Materialized>>,
+    pub(super) remember: Remember,
+}
+
+impl<Materialized, Remember> LookupReuse<Materialized, Remember>
+where
+    Remember: FnOnce(CellRange, ReuseEntry<Materialized>),
+{
+    pub(super) fn new(
+        range: Option<CellRange>,
+        reuse: impl FnOnce(CellRange) -> Option<ReuseEntry<Materialized>>,
+        remember: Remember,
+    ) -> Self {
+        Self {
+            range,
+            previous: range.and_then(reuse),
+            remember,
+        }
+    }
+}
+
 thread_local! {
     /// Reuse state belongs to the active guard, which releases decoded
     /// ranges even when recalculation returns early.

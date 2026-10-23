@@ -19,7 +19,7 @@ bun test path/to/focused.test.ts
 bun run verify:ci
 ```
 
-Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm`.
+Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm` and `bun run lint:rust`, which runs Clippy with warnings denied for both engine builds on the native and WASM targets.
 
 A change to the engine (the Rust source in `packages/wasm`, which also builds `@sheetwrite/formulas`) or to its TypeScript callers must also pass two benchmark checks before it merges, not only at the release capture. Run the formula gate, `bun run src/formula-bench.ts` from `bench/`, which compares a fresh capture with the committed baseline. Run the engine memory probe described in [`bench/README.md`](bench/README.md#engine-memory-release-gate). Retained bytes are deterministic, so any growth must be fixed or approved in the same change, with a measured reason in `bench/results/formula-baseline-approvals.json` (see [the formula-engine protocol](bench/README.md#formula-engine-protocol)).
 

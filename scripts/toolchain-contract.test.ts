@@ -50,7 +50,7 @@ describe("contributor and CI toolchain contract", () => {
 
   it("pins Rust, its WASM target, wasm-pack, cargo-audit, and coverage tooling", () => {
     expect(rustToolchain).toContain(`channel = "${RUST_VERSION}"`);
-    expect(rustToolchain).toContain('components = ["llvm-tools-preview"]');
+    expect(rustToolchain).toContain('components = ["clippy", "llvm-tools-preview"]');
     expect(rustToolchain).toContain(`targets = ["${WASM_TARGET}"]`);
     expect(workflow).toContain(`RUST_VERSION: "${RUST_VERSION}"`);
     expect(workflow).toContain(`WASM_TARGET: "${WASM_TARGET}"`);

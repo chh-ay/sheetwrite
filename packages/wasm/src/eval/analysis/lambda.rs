@@ -5,9 +5,10 @@ use std::rc::Rc;
 use super::super::array::ast_produces_array;
 use super::super::matrix::{EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::number_from_value;
+use super::super::EvalPass;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
+use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
 pub(crate) const NAMES: &[&str] = &[
     "BYCOL",
@@ -274,12 +275,15 @@ pub(crate) fn shape(
             let affected = HashSet::new();
             let mut memo = HashMap::new();
             let mut visiting = HashSet::new();
-            let mut context = Context {
-                store,
-                sheet,
+            let mut pass = EvalPass {
                 affected: &affected,
                 memo: &mut memo,
                 visiting: &mut visiting,
+            };
+            let mut context = Context {
+                store,
+                sheet,
+                pass: &mut pass,
                 depth: 0,
             };
             (
@@ -326,16 +330,14 @@ pub(crate) fn bound(
     shape(store, name, arguments, sheet).map(|(_, _, cells)| cells)
 }
 
-struct Context<'a> {
+struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
 
-impl Context<'_> {
+impl Context<'_, '_> {
     fn call_body(&mut self, arguments: &[Ast]) -> Result<Ast, FormulaError> {
         let function = arguments.first().ok_or(FormulaError::Value)?;
         let (parameters, _) = definition(function)?;
@@ -366,24 +368,12 @@ impl Context<'_> {
         apply(function, &evaluated)
     }
     fn scalar(&mut self, expression: &Ast) -> Value {
-        self.store.eval_ast(
-            expression,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        )
+        self.store
+            .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
-        self.store.eval_matrix_arg(
-            expression,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        )
+        self.store
+            .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
     fn dimension(&mut self, expression: &Ast) -> Result<usize, FormulaError> {
         let number = number_from_value(&self.scalar(expression))?;
@@ -433,9 +423,7 @@ pub(crate) fn evaluate(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     let _budget = match CallBudget::enter() {
@@ -445,9 +433,7 @@ pub(crate) fn evaluate(
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
     };
     let result = match name {
@@ -474,9 +460,7 @@ pub(in crate::eval) fn evaluate_matrix(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     let _budget = CallBudget::enter()?;
@@ -486,16 +470,14 @@ pub(in crate::eval) fn evaluate_matrix(
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
     };
     evaluate_with_context(&mut context, name, arguments)
 }
 
 fn reduce(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     arguments: &[Ast],
     scan: bool,
 ) -> Result<EvalMatrix, FormulaError> {
@@ -519,7 +501,7 @@ fn reduce(
 }
 
 fn evaluate_with_context(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     name: &str,
     arguments: &[Ast],
 ) -> Result<EvalMatrix, FormulaError> {

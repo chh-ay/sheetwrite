@@ -45,7 +45,7 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 use lookup::{
     find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
     remember_result, remember_table, result_reuse, table_reuse, CachedList, CachedResult,
-    CachedTable, LookupPassGuard, ReuseEntry, TablePart,
+    CachedTable, LookupPassGuard, LookupReuse, ReuseEntry, TablePart,
 };
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
@@ -108,6 +108,15 @@ impl Drop for FormulaOriginGuard {
 
 fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
+}
+
+/// State shared by every evaluation in one recompute pass: the formulas the
+/// pass recomputes, the results computed so far, and the formulas on the
+/// current evaluation path, which detect cycles.
+pub(crate) struct EvalPass<'a> {
+    pub(crate) affected: &'a HashSet<AbsCellKey>,
+    pub(crate) memo: &'a mut HashMap<AbsCellKey, EvalResult>,
+    pub(crate) visiting: &'a mut HashSet<AbsCellKey>,
 }
 
 fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
@@ -506,12 +515,17 @@ impl CellStore {
             .as_ref()
             .is_some_and(|index| !index.has_dynamic_arrays)
         {
+            let mut pass = EvalPass {
+                affected: &affected,
+                memo: &mut memo,
+                visiting: &mut visiting,
+            };
             for key in &affected {
-                let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
+                let _ = self.eval_formula_cell(*key, &mut pass, 0);
             }
 
             for key in &affected {
-                if let Some(result) = memo.remove(key) {
+                if let Some(result) = pass.memo.remove(key) {
                     self.store_formula_result(*key, result);
                 }
             }
@@ -612,6 +626,11 @@ impl CellStore {
                 }
 
                 memo.remove(&key);
+                let mut pass = EvalPass {
+                    affected: &affected,
+                    memo: &mut memo,
+                    visiting: &mut visiting,
+                };
 
                 let evaluated = match self.dynamic_array_bound(&ast, output_sheet) {
                     _ if cyclic.contains(&key) => Err(FormulaError::Cycle),
@@ -619,35 +638,21 @@ impl CellStore {
                         Some(total) => {
                             spill_work = total;
                             let _origin = FormulaOriginGuard::push(local);
-                            self.eval_dynamic_array(
-                                &ast,
-                                output_sheet,
-                                &affected,
-                                &mut memo,
-                                &mut visiting,
-                                0,
-                            )
-                            .unwrap_or(Err(FormulaError::Value))
+                            self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0)
+                                .unwrap_or(Err(FormulaError::Value))
                         }
                         None => Err(FormulaError::Num),
                     },
                     Some(Err(error)) => Err(error),
                     // Resolving a missing spill removes its array marker.
                     // Keep the scalar expression's error instead of replacing it.
-                    None => match self.eval_ast(
-                        &ast,
-                        output_sheet,
-                        &affected,
-                        &mut memo,
-                        &mut visiting,
-                        0,
-                    ) {
+                    None => match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
                         Value::Error(error) => Err(error),
                         _ => Err(FormulaError::Value),
                     },
                 };
 
-                let changed = self.install_spill_result(key, evaluated, &mut memo);
+                let changed = self.install_spill_result(key, evaluated, pass.memo);
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
@@ -714,12 +719,17 @@ impl CellStore {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo: &mut memo,
+            visiting: &mut visiting,
+        };
         for key in &affected {
-            let _ = self.eval_formula_cell(*key, &affected, &mut memo, &mut visiting, 0);
+            let _ = self.eval_formula_cell(*key, &mut pass, 0);
         }
 
         for key in &affected {
-            if let Some(result) = memo.remove(key) {
+            if let Some(result) = pass.memo.remove(key) {
                 self.store_formula_result(*key, result);
             }
         }
@@ -904,9 +914,7 @@ impl CellStore {
         sheet: usize,
         row: usize,
         col: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
@@ -943,8 +951,8 @@ impl CellStore {
         if let Some(key) = cell_key(row, col) {
             let abs_key = AbsCellKey::from_local(sheet, key);
             if let Some(entry) = s.formulas.get(&key) {
-                if affected.contains(&abs_key) {
-                    return self.eval_formula_cell(abs_key, affected, memo, visiting, depth + 1);
+                if pass.affected.contains(&abs_key) {
+                    return self.eval_formula_cell(abs_key, pass, depth + 1);
                 }
 
                 return cached_formula_value(
@@ -966,18 +974,16 @@ impl CellStore {
     pub(crate) fn eval_formula_cell(
         &self,
         key: AbsCellKey,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
             return Value::Error(FormulaError::Num);
         }
-        if let Some(result) = memo.get(&key) {
+        if let Some(result) = pass.memo.get(&key) {
             return result.clone();
         }
-        if !visiting.insert(key) {
+        if !pass.visiting.insert(key) {
             return Value::Error(FormulaError::Cycle);
         }
 
@@ -989,9 +995,9 @@ impl CellStore {
                     let _origin = FormulaOriginGuard::push(local);
                     if entry.has_spill_refs {
                         let resolved = self.resolve_spill_refs(ast, sheet);
-                        self.eval_ast(&resolved, sheet, affected, memo, visiting, depth + 1)
+                        self.eval_ast(&resolved, sheet, pass, depth + 1)
                     } else {
-                        self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
+                        self.eval_ast(ast, sheet, pass, depth + 1)
                     }
                 }
                 None => Value::Error(entry.error.unwrap_or(FormulaError::Value)),
@@ -999,8 +1005,8 @@ impl CellStore {
             None => Value::Number(0.0),
         };
 
-        visiting.remove(&key);
-        memo.insert(key, result.clone());
+        pass.visiting.remove(&key);
+        pass.memo.insert(key, result.clone());
         result
     }
 
@@ -1017,17 +1023,20 @@ impl CellStore {
         visiting: &mut HashSet<AbsCellKey>,
     ) -> EvalResult {
         let affected = HashSet::new();
+        let mut pass = EvalPass {
+            affected: &affected,
+            memo,
+            visiting,
+        };
         let _origin = FormulaOriginGuard::push((row, col));
-        self.eval_ast(ast, sheet, &affected, memo, visiting, 0)
+        self.eval_ast(ast, sheet, &mut pass, 0)
     }
 
     pub(crate) fn eval_ast(
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
@@ -1044,9 +1053,7 @@ impl CellStore {
                     analysis::lambda::CALL,
                     args,
                     sheet,
-                    affected,
-                    memo,
-                    visiting,
+                    pass,
                     depth + 1,
                 )
             }
@@ -1055,29 +1062,21 @@ impl CellStore {
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
             Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
-            Ast::Cell(row, col, _) => self.eval_at(
-                sheet,
-                *row as usize,
-                *col as usize,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ),
+            Ast::Cell(row, col, _) => {
+                self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
+            }
             Ast::AbsCell(sheet_ref, row, col, _) => self.eval_at(
                 sheet_ref.handle as usize,
                 *row as usize,
                 *col as usize,
-                affected,
-                memo,
-                visiting,
+                pass,
                 depth + 1,
             ),
             Ast::SheetCell(..) | Ast::InvalidRef => Value::Error(FormulaError::Ref),
             Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
                 Some(value) => value,
                 None => {
-                    let value = self.eval_ast(expression, sheet, affected, memo, visiting, depth);
+                    let value = self.eval_ast(expression, sheet, pass, depth);
                     remember_let_slot(*slot, value.clone());
                     value
                 }
@@ -1092,9 +1091,7 @@ impl CellStore {
                     named.sheet as usize,
                     named.row_start as usize,
                     named.col_start as usize,
-                    affected,
-                    memo,
-                    visiting,
+                    pass,
                     depth + 1,
                 )
             }
@@ -1102,9 +1099,7 @@ impl CellStore {
                 reference.sheet as usize,
                 reference.row_start as usize,
                 reference.col as usize,
-                affected,
-                memo,
-                visiting,
+                pass,
                 depth + 1,
             ),
             Ast::Structured(_)
@@ -1118,20 +1113,15 @@ impl CellStore {
                     Ast::Pos(_) => operators::UnaryOp::Pos,
                     _ => operators::UnaryOp::Percent,
                 };
-                operators::unary(
-                    op,
-                    &self.eval_ast(expr, sheet, affected, memo, visiting, depth + 1),
-                )
+                operators::unary(op, &self.eval_ast(expr, sheet, pass, depth + 1))
             }
             Ast::Bin(op, left, right) => {
-                let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
-                operators::binary(*op, &left, || {
-                    self.eval_ast(right, sheet, affected, memo, visiting, depth + 1)
-                })
+                let left = self.eval_ast(left, sheet, pass, depth + 1);
+                operators::binary(*op, &left, || self.eval_ast(right, sheet, pass, depth + 1))
             }
             Ast::Cmp(op, left, right) => {
-                let left = self.eval_ast(left, sheet, affected, memo, visiting, depth + 1);
-                let right = self.eval_ast(right, sheet, affected, memo, visiting, depth + 1);
+                let left = self.eval_ast(left, sheet, pass, depth + 1);
+                let right = self.eval_ast(right, sheet, pass, depth + 1);
                 operators::comparison(*op, &left, &right)
             }
             Ast::Func(
@@ -1147,16 +1137,14 @@ impl CellStore {
                 _,
             ) => {
                 match self
-                    .eval_dynamic_array(ast, sheet, affected, memo, visiting, depth + 1)
+                    .eval_dynamic_array(ast, sheet, pass, depth + 1)
                     .unwrap_or(Err(FormulaError::Value))
                 {
                     Ok(matrix) => matrix.into_first(),
                     Err(error) => Value::Error(error),
                 }
             }
-            Ast::Func(func, args) => {
-                self.eval_func(*func, args, sheet, affected, memo, visiting, depth + 1)
-            }
+            Ast::Func(func, args) => self.eval_func(*func, args, sheet, pass, depth + 1),
         }
     }
 
@@ -1165,9 +1153,7 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
@@ -1180,29 +1166,27 @@ impl CellStore {
             if let Some(family) = analysis::family(name) {
                 if let Some(hooks) = &family.array {
                     if (hooks.produces_array)(name, args) {
-                        return match (hooks.evaluate)(
-                            self, name, args, sheet, affected, memo, visiting, depth,
-                        )
-                        .and_then(|matrix| {
-                            matrix.validate_bytes()?;
-                            Ok(matrix)
-                        }) {
+                        return match (hooks.evaluate)(self, name, args, sheet, pass, depth)
+                            .and_then(|matrix| {
+                                matrix.validate_bytes()?;
+                                Ok(matrix)
+                            }) {
                             Ok(matrix) => matrix.into_first(),
                             Err(error) => Value::Error(error),
                         };
                     }
                 }
                 if let Some(evaluate) = family.evaluate_ast {
-                    return evaluate(self, name, args, sheet, affected, memo, visiting, depth);
+                    return evaluate(self, name, args, sheet, pass, depth);
                 }
             }
         }
 
         if func == Func::Let {
             return match expand_let_ast(args) {
-                Ok((expanded, slots)) => with_let_slots(slots, || {
-                    self.eval_ast(&expanded, sheet, affected, memo, visiting, depth + 1)
-                }),
+                Ok((expanded, slots)) => {
+                    with_let_slots(slots, || self.eval_ast(&expanded, sheet, pass, depth + 1))
+                }
                 Err(error) => Value::Error(error),
             };
         }
@@ -1211,7 +1195,7 @@ impl CellStore {
             if args.len() < 2 {
                 return Value::Error(FormulaError::Value);
             }
-            let index = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            let index = self.eval_ast(&args[0], sheet, pass, depth + 1);
             let index = match positive_index(&index) {
                 Ok(index) if index + 1 < args.len() => index + 1,
                 Ok(_) => return Value::Error(FormulaError::Value),
@@ -1219,24 +1203,15 @@ impl CellStore {
             };
             let selected = &args[index];
             if range_from_ast(selected, sheet).is_some() {
-                return match self.eval_matrix_arg(
-                    selected,
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix.into_first(),
                     Err(error) => Value::Error(error),
                 };
             }
-            if let Some(result) =
-                self.eval_dynamic_array(selected, sheet, affected, memo, visiting, depth + 1)
-            {
+            if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
                 return result.map_or_else(Value::Error, EvalMatrix::into_first);
             }
-            return self.eval_ast(selected, sheet, affected, memo, visiting, depth + 1);
+            return self.eval_ast(selected, sheet, pass, depth + 1);
         }
 
         if matches!(func, Func::Row | Func::Column) {
@@ -1269,11 +1244,10 @@ impl CellStore {
             if args.len() != 1 {
                 return Value::Error(FormulaError::Value);
             }
-            let matrix =
-                match self.eval_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1) {
-                    Ok(matrix) => matrix,
-                    Err(error) => return Value::Error(error),
-                };
+            let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
+                Ok(matrix) => matrix,
+                Err(error) => return Value::Error(error),
+            };
             return Value::number(if func == Func::Rows {
                 matrix.rows as f64
             } else {
@@ -1285,35 +1259,32 @@ impl CellStore {
             if !(2..=5).contains(&args.len()) {
                 return Value::Error(FormulaError::Value);
             }
-            let scalar = |ast: &Ast,
-                          memo: &mut HashMap<AbsCellKey, EvalResult>,
-                          visiting: &mut HashSet<AbsCellKey>| {
-                self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
-            };
-            let row = match positive_index(&scalar(&args[0], memo, visiting)) {
+            let scalar =
+                |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
+            let row = match positive_index(&scalar(&args[0], pass)) {
                 Ok(row) => row,
                 Err(error) => return Value::Error(error),
             };
-            let col = match positive_index(&scalar(&args[1], memo, visiting)) {
+            let col = match positive_index(&scalar(&args[1], pass)) {
                 Ok(col) => col,
                 Err(error) => return Value::Error(error),
             };
             let abs = match optional_ast(args, 2) {
-                Some(ast) => match integer_arg(&scalar(ast, memo, visiting)) {
+                Some(ast) => match integer_arg(&scalar(ast, pass)) {
                     Ok(value @ 1..=4) => value,
                     _ => return Value::Error(FormulaError::Value),
                 },
                 None => 1,
             };
             let a1 = match optional_ast(args, 3) {
-                Some(ast) => match bool_from_value(&scalar(ast, memo, visiting)) {
+                Some(ast) => match bool_from_value(&scalar(ast, pass)) {
                     Ok(value) => value,
                     Err(error) => return Value::Error(error),
                 },
                 None => true,
             };
             let sheet_name = match optional_ast(args, 4) {
-                Some(ast) => match text_from_value(&scalar(ast, memo, visiting)) {
+                Some(ast) => match text_from_value(&scalar(ast, pass)) {
                     Ok(value) => Some(value),
                     Err(error) => return Value::Error(error),
                 },
@@ -1330,7 +1301,7 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             let condition = &args[0];
-            let condition = self.eval_ast(condition, sheet, affected, memo, visiting, depth + 1);
+            let condition = self.eval_ast(condition, sheet, pass, depth + 1);
             let use_true_branch = match bool_from_value(&condition) {
                 Ok(value) => value,
                 Err(error) => return Value::Error(error),
@@ -1341,7 +1312,7 @@ impl CellStore {
                 args.get(2)
             };
             return if let Some(branch) = branch {
-                self.eval_ast(branch, sheet, affected, memo, visiting, depth + 1)
+                self.eval_ast(branch, sheet, pass, depth + 1)
             } else {
                 Value::Number(0.0)
             };
@@ -1352,10 +1323,10 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             let primary = &args[0];
-            let value = self.eval_ast(primary, sheet, affected, memo, visiting, depth + 1);
+            let value = self.eval_ast(primary, sheet, pass, depth + 1);
             return if matches!(value, Value::Error(_)) {
                 if let Some(fallback) = args.get(1) {
-                    self.eval_ast(fallback, sheet, affected, memo, visiting, depth + 1)
+                    self.eval_ast(fallback, sheet, pass, depth + 1)
                 } else {
                     Value::Number(0.0)
                 }
@@ -1368,9 +1339,9 @@ impl CellStore {
             if args.len() != 2 {
                 return Value::Error(FormulaError::Value);
             }
-            let value = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
             return if value == Value::Error(FormulaError::Na) {
-                self.eval_ast(&args[1], sheet, affected, memo, visiting, depth + 1)
+                self.eval_ast(&args[1], sheet, pass, depth + 1)
             } else {
                 value
             };
@@ -1381,10 +1352,10 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             for pair in args.as_chunks::<2>().0 {
-                let condition = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
+                let condition = self.eval_ast(&pair[0], sheet, pass, depth + 1);
                 match bool_from_value(&condition) {
                     Ok(true) => {
-                        return self.eval_ast(&pair[1], sheet, affected, memo, visiting, depth + 1);
+                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
                     }
                     Ok(false) => {}
                     Err(error) => return Value::Error(error),
@@ -1397,7 +1368,7 @@ impl CellStore {
             if args.len() < 3 {
                 return Value::Error(FormulaError::Value);
             }
-            let expression = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            let expression = self.eval_ast(&args[0], sheet, pass, depth + 1);
             if let Value::Error(error) = expression {
                 return Value::Error(error);
             }
@@ -1407,17 +1378,17 @@ impl CellStore {
                 args.len()
             };
             for pair in args[1..pairs_end].as_chunks::<2>().0 {
-                let case = self.eval_ast(&pair[0], sheet, affected, memo, visiting, depth + 1);
+                let case = self.eval_ast(&pair[0], sheet, pass, depth + 1);
                 match compare_values(&expression, &case) {
                     Ok(Ordering::Equal) => {
-                        return self.eval_ast(&pair[1], sheet, affected, memo, visiting, depth + 1);
+                        return self.eval_ast(&pair[1], sheet, pass, depth + 1);
                     }
                     Ok(_) => {}
                     Err(error) => return Value::Error(error),
                 }
             }
             return if pairs_end < args.len() {
-                self.eval_ast(&args[pairs_end], sheet, affected, memo, visiting, depth + 1)
+                self.eval_ast(&args[pairs_end], sheet, pass, depth + 1)
             } else {
                 Value::Error(FormulaError::Na)
             };
@@ -1439,7 +1410,7 @@ impl CellStore {
             if args.len() != 1 {
                 return Value::Error(FormulaError::Value);
             }
-            let value = self.eval_ast(&args[0], sheet, affected, memo, visiting, depth + 1);
+            let value = self.eval_ast(&args[0], sheet, pass, depth + 1);
             return match func {
                 Func::IsBlank => Value::Bool(matches!(value, Value::Blank)),
                 Func::IsNumber => Value::Bool(matches!(value, Value::Number(_))),
@@ -1494,7 +1465,7 @@ impl CellStore {
                 | Func::MaxIfs
                 | Func::MinIfs
         ) {
-            return self.eval_criteria_func(func, args, sheet, affected, memo, visiting, depth + 1);
+            return self.eval_criteria_func(func, args, sheet, pass, depth + 1);
         }
 
         if matches!(
@@ -1506,7 +1477,7 @@ impl CellStore {
                 | Func::XLookup
                 | Func::XMatch
         ) {
-            return self.eval_lookup_func(func, args, sheet, affected, memo, visiting, depth + 1);
+            return self.eval_lookup_func(func, args, sheet, pass, depth + 1);
         }
 
         if func == Func::Sum && args.len() == 1 {
@@ -1538,13 +1509,11 @@ impl CellStore {
                 _ => None,
             };
             if let Some(range) = range {
-                return self.eval_sum_range(range, affected, memo, visiting, depth + 1);
+                return self.eval_sum_range(range, pass, depth + 1);
             }
         }
 
-        if let Some(result) =
-            self.streamed_reduction(func, args, sheet, affected, memo, visiting, depth + 1)
-        {
+        if let Some(result) = self.streamed_reduction(func, args, sheet, pass, depth + 1) {
             return result;
         }
 
@@ -1552,23 +1521,13 @@ impl CellStore {
         if let Func::Analysis(id) = func {
             let name = analysis::name(id);
             let result = match name {
-                "SUMSQ" => analysis::math::streamed_sum_squares(
-                    self,
-                    args,
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ),
+                "SUMSQ" => analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1),
                 "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
                     self,
                     name,
                     args,
                     sheet,
-                    affected,
-                    memo,
-                    visiting,
+                    pass,
                     depth + 1,
                 ),
                 _ => None,
@@ -1608,19 +1567,12 @@ impl CellStore {
                 _ => None,
             };
             let shape = if let Some(range) = range {
-                match self.eval_range_values(
-                    range,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                    &mut values,
-                ) {
+                match self.eval_range_values(range, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
             } else if ast_produces_array(arg) {
-                match self.eval_dynamic_array(arg, sheet, affected, memo, visiting, depth + 1) {
+                match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {
                             return Value::Error(error);
@@ -1638,7 +1590,7 @@ impl CellStore {
                     }
                     Some(Err(error)) => return Value::Error(error),
                     None => {
-                        let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
+                        let value = self.eval_ast(arg, sheet, pass, depth + 1);
                         if let Value::Error(error) = value {
                             return Value::Error(error);
                         }
@@ -1656,7 +1608,7 @@ impl CellStore {
                     }
                 }
             } else {
-                let value = self.eval_ast(arg, sheet, affected, memo, visiting, depth + 1);
+                let value = self.eval_ast(arg, sheet, pass, depth + 1);
                 if let Value::Error(error) = value {
                     return Value::Error(error);
                 }
@@ -1685,15 +1637,11 @@ impl CellStore {
         &self,
         ast: &Ast,
         formula_sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if range_from_ast(ast, formula_sheet).is_none() {
-            let Some(result) =
-                self.eval_dynamic_array(ast, formula_sheet, affected, memo, visiting, depth + 1)
-            else {
+            let Some(result) = self.eval_dynamic_array(ast, formula_sheet, pass, depth + 1) else {
                 return Err(FormulaError::Value);
             };
             let matrix = result?;
@@ -1747,9 +1695,7 @@ impl CellStore {
                 let index = data.idx(row, col);
                 let value = literals
                     .and_then(|sources| sources.value_at(&self.strings, index))
-                    .unwrap_or_else(|| {
-                        self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
-                    });
+                    .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
                 values.push(value);
             }
         }
@@ -1760,12 +1706,10 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Criterion, FormulaError> {
-        let value = self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1);
+        let value = self.eval_ast(ast, sheet, pass, depth + 1);
         if let Value::Error(error) = value {
             return Err(error);
         }
@@ -1781,9 +1725,7 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         let mut fold = ReductionFold::new(func)?;
@@ -1797,7 +1739,7 @@ impl CellStore {
                 Err(error) => return Some(Value::Error(error)),
             };
             loop {
-                match reader.next(affected, memo, visiting) {
+                match reader.next(pass) {
                     Ok(Some(value)) => {
                         if let Err(error) = fold.push(&value) {
                             return Some(Value::Error(error));
@@ -1819,19 +1761,15 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         match func {
-            Func::CountIf => self.streamed_count_if(args, sheet, affected, memo, visiting, depth),
-            Func::CountIfs => self.streamed_count_ifs(args, sheet, affected, memo, visiting, depth),
-            Func::SumIf | Func::AverageIf => {
-                self.streamed_sum_if(func, args, sheet, affected, memo, visiting, depth)
-            }
+            Func::CountIf => self.streamed_count_if(args, sheet, pass, depth),
+            Func::CountIfs => self.streamed_count_ifs(args, sheet, pass, depth),
+            Func::SumIf | Func::AverageIf => self.streamed_sum_if(func, args, sheet, pass, depth),
             Func::SumIfs | Func::AverageIfs | Func::MaxIfs | Func::MinIfs => {
-                self.streamed_sum_ifs_or_extreme(func, args, sheet, affected, memo, visiting, depth)
+                self.streamed_sum_ifs_or_extreme(func, args, sheet, pass, depth)
             }
             _ => None,
         }
@@ -1841,9 +1779,7 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         if args.len() != 2 {
@@ -1854,14 +1790,13 @@ impl CellStore {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
-        let criterion =
-            match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
-                Ok(criterion) => criterion,
-                Err(error) => return Some(Value::Error(error)),
-            };
+        let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+            Ok(criterion) => criterion,
+            Err(error) => return Some(Value::Error(error)),
+        };
         let mut matches = 0.0;
         loop {
-            match reader.next_allow_errors(affected, memo, visiting) {
+            match reader.next_allow_errors(pass) {
                 Ok(Some(value)) => {
                     if criterion.matches(&value) {
                         matches += 1.0;
@@ -1878,9 +1813,7 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         if args.is_empty() || !args.len().is_multiple_of(2) {
@@ -1900,24 +1833,23 @@ impl CellStore {
             {
                 return Some(Value::Error(FormulaError::Value));
             }
-            let criterion =
-                match self.eval_criterion(&pair[1], sheet, affected, memo, visiting, depth + 1) {
-                    Ok(criterion) => criterion,
-                    Err(error) => return Some(Value::Error(error)),
-                };
+            let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
             readers.push(reader);
             criteria.push(criterion);
         }
         let mut matches = 0.0;
         loop {
-            let first = match readers[0].next_allow_errors(affected, memo, visiting) {
+            let first = match readers[0].next_allow_errors(pass) {
                 Ok(Some(value)) => value,
                 Ok(None) => break,
                 Err(error) => return Some(Value::Error(error)),
             };
             let mut row_matches = criteria[0].matches(&first);
             for index in 1..readers.len() {
-                let candidate = match readers[index].next_allow_errors(affected, memo, visiting) {
+                let candidate = match readers[index].next_allow_errors(pass) {
                     Ok(Some(value)) => value,
                     // The shapes are checked equal, so every reader ends on
                     // the same row.
@@ -1940,9 +1872,7 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         if !(2..=3).contains(&args.len()) {
@@ -1953,11 +1883,10 @@ impl CellStore {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
-        let criterion =
-            match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1) {
-                Ok(criterion) => criterion,
-                Err(error) => return Some(Value::Error(error)),
-            };
+        let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+            Ok(criterion) => criterion,
+            Err(error) => return Some(Value::Error(error)),
+        };
         let value_range = match args.get(2) {
             Some(ast) => range_from_ast(ast, sheet)?,
             None => criteria_range,
@@ -1971,12 +1900,12 @@ impl CellStore {
         }
         let mut fold = IfSum::new();
         loop {
-            let candidate = match criteria_reader.next_allow_errors(affected, memo, visiting) {
+            let candidate = match criteria_reader.next_allow_errors(pass) {
                 Ok(Some(value)) => value,
                 Ok(None) => break,
                 Err(error) => return Some(Value::Error(error)),
             };
-            let value = match value_reader.next_allow_errors(affected, memo, visiting) {
+            let value = match value_reader.next_allow_errors(pass) {
                 Ok(Some(value)) => value,
                 // The shapes are checked equal, so both readers end together.
                 Ok(None) => return Some(Value::Error(FormulaError::Value)),
@@ -1996,9 +1925,7 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
         if args.len() < 3 || args.len().is_multiple_of(2) {
@@ -2020,11 +1947,10 @@ impl CellStore {
             if value_reader.shape() != reader.shape() {
                 return Some(Value::Error(FormulaError::Value));
             }
-            let criterion =
-                match self.eval_criterion(&pair[1], sheet, affected, memo, visiting, depth + 1) {
-                    Ok(criterion) => criterion,
-                    Err(error) => return Some(Value::Error(error)),
-                };
+            let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
+                Ok(criterion) => criterion,
+                Err(error) => return Some(Value::Error(error)),
+            };
             readers.push(reader);
             criteria.push(criterion);
         }
@@ -2032,14 +1958,14 @@ impl CellStore {
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(func == Func::MaxIfs);
         loop {
-            let value = match value_reader.next_allow_errors(affected, memo, visiting) {
+            let value = match value_reader.next_allow_errors(pass) {
                 Ok(Some(value)) => value,
                 Ok(None) => break,
                 Err(error) => return Some(Value::Error(error)),
             };
             let mut row_matches = true;
             for index in 0..readers.len() {
-                let candidate = match readers[index].next_allow_errors(affected, memo, visiting) {
+                let candidate = match readers[index].next_allow_errors(pass) {
                     Ok(Some(value)) => value,
                     // The shapes are checked equal, so every reader ends on
                     // the same row.
@@ -2073,14 +1999,10 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        if let Some(result) =
-            self.streamed_criteria(func, args, sheet, affected, memo, visiting, depth)
-        {
+        if let Some(result) = self.streamed_criteria(func, args, sheet, pass, depth) {
             return result;
         }
         let result = match func {
@@ -2088,23 +2010,14 @@ impl CellStore {
                 if args.len() != 2 {
                     return Value::Error(FormulaError::Value);
                 }
-                let range = match self.eval_matrix_arg(
-                    &args[0],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
                     Ok(range) => range,
                     Err(error) => return Value::Error(error),
                 };
-                let criterion =
-                    match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1)
-                    {
-                        Ok(criterion) => criterion,
-                        Err(error) => return Value::Error(error),
-                    };
+                let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Value::Error(error),
+                };
                 Ok((
                     range
                         .values
@@ -2121,14 +2034,7 @@ impl CellStore {
                 let mut ranges = Vec::with_capacity(args.len() / 2);
                 let mut criteria = Vec::with_capacity(args.len() / 2);
                 for pair in args.as_chunks::<2>().0 {
-                    let range = match self.eval_matrix_arg(
-                        &pair[0],
-                        sheet,
-                        affected,
-                        memo,
-                        visiting,
-                        depth + 1,
-                    ) {
+                    let range = match self.eval_matrix_arg(&pair[0], sheet, pass, depth + 1) {
                         Ok(range) => range,
                         Err(error) => return Value::Error(error),
                     };
@@ -2138,14 +2044,7 @@ impl CellStore {
                     {
                         return Value::Error(FormulaError::Value);
                     }
-                    let criterion = match self.eval_criterion(
-                        &pair[1],
-                        sheet,
-                        affected,
-                        memo,
-                        visiting,
-                        depth + 1,
-                    ) {
+                    let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
                         Ok(criterion) => criterion,
                         Err(error) => return Value::Error(error),
                     };
@@ -2166,25 +2065,16 @@ impl CellStore {
                 if !(2..=3).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let criteria_range = match self.eval_matrix_arg(
-                    &args[0],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let criteria_range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
                     Ok(range) => range,
                     Err(error) => return Value::Error(error),
                 };
-                let criterion =
-                    match self.eval_criterion(&args[1], sheet, affected, memo, visiting, depth + 1)
-                    {
-                        Ok(criterion) => criterion,
-                        Err(error) => return Value::Error(error),
-                    };
+                let criterion = match self.eval_criterion(&args[1], sheet, pass, depth + 1) {
+                    Ok(criterion) => criterion,
+                    Err(error) => return Value::Error(error),
+                };
                 let value_range = if let Some(ast) = args.get(2) {
-                    match self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1) {
+                    match self.eval_matrix_arg(ast, sheet, pass, depth + 1) {
                         Ok(range) => range,
                         Err(error) => return Value::Error(error),
                     }
@@ -2204,42 +2094,21 @@ impl CellStore {
                 if args.len() < 3 || args.len().is_multiple_of(2) {
                     return Value::Error(FormulaError::Value);
                 }
-                let value_range = match self.eval_matrix_arg(
-                    &args[0],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let value_range = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
                     Ok(range) => range,
                     Err(error) => return Value::Error(error),
                 };
                 let mut ranges = Vec::with_capacity((args.len() - 1) / 2);
                 let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
                 for pair in args[1..].as_chunks::<2>().0 {
-                    let range = match self.eval_matrix_arg(
-                        &pair[0],
-                        sheet,
-                        affected,
-                        memo,
-                        visiting,
-                        depth + 1,
-                    ) {
+                    let range = match self.eval_matrix_arg(&pair[0], sheet, pass, depth + 1) {
                         Ok(range) => range,
                         Err(error) => return Value::Error(error),
                     };
                     if !value_range.same_shape(&range) {
                         return Value::Error(FormulaError::Value);
                     }
-                    let criterion = match self.eval_criterion(
-                        &pair[1],
-                        sheet,
-                        affected,
-                        memo,
-                        visiting,
-                        depth + 1,
-                    ) {
+                    let criterion = match self.eval_criterion(&pair[1], sheet, pass, depth + 1) {
                         Ok(criterion) => criterion,
                         Err(error) => return Value::Error(error),
                     };
@@ -2276,26 +2145,23 @@ impl CellStore {
         ast: &Ast,
         sheet: usize,
         part: TablePart,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Rc<CachedTable>, FormulaError> {
-        let range = range_from_ast(ast, sheet);
-        let previous = range.and_then(|range| table_reuse(range, part));
+        let reuse = LookupReuse::new(
+            range_from_ast(ast, sheet),
+            |range| table_reuse(range, part),
+            |range, state| remember_table(range, part, state),
+        );
         self.reused_lookup_range(
             ast,
             sheet,
-            range,
-            previous,
+            reuse,
             |rows, cols, values| match part {
                 TablePart::FirstColumn => CachedTable::from_column(rows, cols, values),
                 TablePart::FirstRow => CachedTable::from_row(rows, cols, values),
             },
-            |range, state| remember_table(range, part, state),
-            affected,
-            memo,
-            visiting,
+            pass,
             depth,
         )
     }
@@ -2304,48 +2170,27 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Rc<CachedList>, FormulaError> {
-        let range = range_from_ast(ast, sheet);
-        let previous = range.and_then(list_reuse);
-        self.reused_lookup_range(
-            ast,
-            sheet,
-            range,
-            previous,
-            CachedList::new,
-            remember_list,
-            affected,
-            memo,
-            visiting,
-            depth,
-        )
+        let reuse = LookupReuse::new(range_from_ast(ast, sheet), list_reuse, remember_list);
+        self.reused_lookup_range(ast, sheet, reuse, CachedList::new, pass, depth)
     }
 
     fn lookup_result_argument(
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Rc<CachedResult>, FormulaError> {
-        let range = range_from_ast(ast, sheet);
-        let previous = range.and_then(result_reuse);
+        let reuse = LookupReuse::new(range_from_ast(ast, sheet), result_reuse, remember_result);
         self.reused_lookup_range(
             ast,
             sheet,
-            range,
-            previous,
+            reuse,
             |_, _, values| CachedResult::new(values),
-            remember_result,
-            affected,
-            memo,
-            visiting,
+            pass,
             depth,
         )
     }
@@ -2360,20 +2205,20 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        range: Option<CellRange>,
-        previous: Option<ReuseEntry<Materialized>>,
+        reuse: LookupReuse<Materialized, impl FnOnce(CellRange, ReuseEntry<Materialized>)>,
         build: impl FnOnce(usize, usize, Vec<Value>) -> Materialized,
-        remember: impl FnOnce(CellRange, ReuseEntry<Materialized>),
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Rc<Materialized>, FormulaError> {
+        let LookupReuse {
+            range,
+            previous,
+            remember,
+        } = reuse;
         if let Some(ReuseEntry::Reusable(entry)) = &previous {
             return Ok(Rc::clone(entry));
         }
-        let (rows, cols, values) =
-            self.eval_matrix_values(ast, sheet, affected, memo, visiting, depth)?;
+        let (rows, cols, values) = self.eval_matrix_values(ast, sheet, pass, depth)?;
         let entry = Rc::new(build(rows, cols, values));
         if let Some(range) = range {
             match previous {
@@ -2398,12 +2243,10 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<(usize, usize, Vec<Value>), FormulaError> {
-        let mut matrix = self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth)?;
+        let mut matrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
         let rows = matrix.rows;
         let cols = matrix.cols;
         let values = std::mem::take(&mut matrix.values);
@@ -2442,33 +2285,21 @@ impl CellStore {
         func: Func,
         args: &[Ast],
         sheet: usize,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let scalar = |ast: &Ast,
-                      memo: &mut HashMap<AbsCellKey, EvalResult>,
-                      visiting: &mut HashSet<AbsCellKey>| {
-            self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
-        };
+        let scalar =
+            |ast: &Ast, pass: &mut EvalPass<'_>| self.eval_ast(ast, sheet, pass, depth + 1);
         match func {
             Func::Index => {
                 if !(2..=3).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let matrix = match self.eval_matrix_arg(
-                    &args[0],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let matrix = match self.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
                     Err(error) => return Value::Error(error),
                 };
-                let first = scalar(&args[1], memo, visiting);
+                let first = scalar(&args[1], pass);
                 let first = match positive_index(&first) {
                     Ok(index) => index,
                     Err(error) => return Value::Error(error),
@@ -2481,7 +2312,7 @@ impl CellStore {
                     let Some(col_arg) = args.get(2) else {
                         return Value::Error(FormulaError::Value);
                     };
-                    let col = scalar(col_arg, memo, visiting);
+                    let col = scalar(col_arg, pass);
                     let col = match positive_index(&col) {
                         Ok(index) => index,
                         Err(error) => return Value::Error(error),
@@ -2497,18 +2328,11 @@ impl CellStore {
                 if !(2..=3).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let key = scalar(&args[0], memo, visiting);
+                let key = scalar(&args[0], pass);
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let lookup = match self.lookup_list_argument(
-                    &args[1],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
                     Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
@@ -2517,7 +2341,7 @@ impl CellStore {
                     return Value::Error(FormulaError::Na);
                 }
                 let mode = optional_ast(args, 2)
-                    .map(|arg| scalar(arg, memo, visiting))
+                    .map(|arg| scalar(arg, pass))
                     .map_or(Ok(1), |value| integer_arg(&value));
                 let mode = match mode {
                     Ok(mode @ (-1..=1)) => mode,
@@ -2538,18 +2362,11 @@ impl CellStore {
                 if !(2..=4).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let key = scalar(&args[0], memo, visiting);
+                let key = scalar(&args[0], pass);
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let lookup = match self.lookup_list_argument(
-                    &args[1],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
                     Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
@@ -2558,14 +2375,14 @@ impl CellStore {
                     return Value::Error(FormulaError::Value);
                 }
                 let match_mode = match optional_ast(args, 2) {
-                    Some(arg) => match integer_arg(&scalar(arg, memo, visiting)) {
+                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
                         Ok(mode @ (-1..=2)) => mode,
                         _ => return Value::Error(FormulaError::Value),
                     },
                     None => 0,
                 };
                 let search_mode = match optional_ast(args, 3) {
-                    Some(arg) => match integer_arg(&scalar(arg, memo, visiting)) {
+                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
                         Ok(mode @ (-2 | -1 | 1 | 2)) => mode,
                         _ => return Value::Error(FormulaError::Value),
                     },
@@ -2581,7 +2398,7 @@ impl CellStore {
                 if !(3..=4).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let key = scalar(&args[0], memo, visiting);
+                let key = scalar(&args[0], pass);
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
@@ -2590,24 +2407,17 @@ impl CellStore {
                 } else {
                     TablePart::FirstRow
                 };
-                let table = match self.lookup_table_argument(
-                    &args[1],
-                    sheet,
-                    part,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let table = match self.lookup_table_argument(&args[1], sheet, part, pass, depth + 1)
+                {
                     Ok(table) => table,
                     Err(error) => return Value::Error(error),
                 };
-                let result_index = match positive_index(&scalar(&args[2], memo, visiting)) {
+                let result_index = match positive_index(&scalar(&args[2], pass)) {
                     Ok(index) => index,
                     Err(error) => return Value::Error(error),
                 };
                 let sorted = match optional_ast(args, 3) {
-                    Some(arg) => match bool_from_value(&scalar(arg, memo, visiting)) {
+                    Some(arg) => match bool_from_value(&scalar(arg, pass)) {
                         Ok(value) => value,
                         Err(error) => return Value::Error(error),
                     },
@@ -2634,29 +2444,15 @@ impl CellStore {
                 if !(3..=6).contains(&args.len()) {
                     return Value::Error(FormulaError::Value);
                 }
-                let key = scalar(&args[0], memo, visiting);
+                let key = scalar(&args[0], pass);
                 if let Value::Error(error) = key {
                     return Value::Error(error);
                 }
-                let lookup = match self.lookup_list_argument(
-                    &args[1],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let lookup = match self.lookup_list_argument(&args[1], sheet, pass, depth + 1) {
                     Ok(list) => list,
                     Err(error) => return Value::Error(error),
                 };
-                let result = match self.lookup_result_argument(
-                    &args[2],
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                ) {
+                let result = match self.lookup_result_argument(&args[2], sheet, pass, depth + 1) {
                     Ok(range) => range,
                     Err(error) => return Value::Error(error),
                 };
@@ -2667,14 +2463,14 @@ impl CellStore {
                     return Value::Error(FormulaError::Value);
                 }
                 let match_mode = match optional_ast(args, 4) {
-                    Some(arg) => match integer_arg(&scalar(arg, memo, visiting)) {
+                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
                         Ok(mode @ (-1..=2)) => mode,
                         _ => return Value::Error(FormulaError::Value),
                     },
                     None => 0,
                 };
                 let search_mode = match optional_ast(args, 5) {
-                    Some(arg) => match integer_arg(&scalar(arg, memo, visiting)) {
+                    Some(arg) => match integer_arg(&scalar(arg, pass)) {
                         Ok(mode @ (-2 | -1 | 1 | 2)) => mode,
                         _ => return Value::Error(FormulaError::Value),
                     },
@@ -2686,9 +2482,7 @@ impl CellStore {
                         .cloned()
                         .unwrap_or(Value::Error(FormulaError::Ref)),
                     Ok(None) => optional_ast(args, 3)
-                        .map_or(Value::Error(FormulaError::Na), |arg| {
-                            scalar(arg, memo, visiting)
-                        }),
+                        .map_or(Value::Error(FormulaError::Na), |arg| scalar(arg, pass)),
                     Err(error) => Value::Error(error),
                 }
             }
@@ -2699,9 +2493,7 @@ impl CellStore {
     fn eval_sum_range(
         &self,
         range: CellRange,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
         if depth > FORMULA_RECURSION_LIMIT {
@@ -2757,7 +2549,7 @@ impl CellStore {
                 } else if kind == KIND_EMPTY {
                     Value::Blank
                 } else {
-                    self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
+                    self.eval_at(sheet, row, col, pass, depth + 1)
                 };
                 match aggregate_number(&value, true) {
                     Ok(Some(number)) => sum += number,
@@ -2782,9 +2574,7 @@ impl CellStore {
     fn eval_range_values(
         &self,
         range: CellRange,
-        affected: &HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
         values: &mut FuncAccumulator,
     ) -> Result<(usize, usize), FormulaError> {
@@ -2832,7 +2622,7 @@ impl CellStore {
                 } else if s.kind_at(i) == KIND_EMPTY {
                     Value::Blank
                 } else {
-                    self.eval_at(sheet, row, col, affected, memo, visiting, depth + 1)
+                    self.eval_at(sheet, row, col, pass, depth + 1)
                 };
                 if let Value::Error(error) = value {
                     return Err(error);

@@ -609,13 +609,8 @@ impl PagedStorage {
 
     fn pin_viewport_bands(&mut self, bands: &[u32]) {
         let mut next = std::mem::take(&mut self.viewport_pin_scratch);
-        for band in bands.chunks_exact(4) {
-            let [r0, r1, c0, c1] = [
-                band[0] as usize,
-                band[1] as usize,
-                band[2] as usize,
-                band[3] as usize,
-            ];
+        for &[r0, r1, c0, c1] in bands.as_chunks::<4>().0 {
+            let [r0, r1, c0, c1] = [r0 as usize, r1 as usize, c0 as usize, c1 as usize];
             if r0 >= r1 {
                 continue;
             }
