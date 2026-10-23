@@ -210,6 +210,11 @@ test(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       ),
     ).toBeLessThanOrEqual(1);
+    const installCommand = page.locator(".sw-showcase-page .sw-terminal__body").first();
+    await expect(installCommand).toContainText("@sheetwrite/core");
+    expect(
+      await installCommand.evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
 
     const scenarios = page.getByRole("tablist", { name: "Vanilla Grid scenarios" });
     await expect(scenarios).toBeVisible();
