@@ -1,5 +1,15 @@
 # @sheetwrite/core
 
+## 0.5.2
+
+### Patch Changes
+
+- e09f014: Reduce peak memory during CSV import by reusing parsed arrays for visible columns.
+- f836aba: Key combinations with Shift or Alt and a digit or symbol now run. For example, `"Mod+Shift+1"` runs when the browser reports `!` for Shift+1. Letters and digits keep their meaning on other keyboard layouts.
+- 2e4231c: Remove comments and extra whitespace from published JavaScript to reduce package download and installed sizes. Keep module paths, exported names, type documentation, and WebAssembly binaries unchanged.
+- Updated dependencies [2e4231c]
+  - @sheetwrite/wasm@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes

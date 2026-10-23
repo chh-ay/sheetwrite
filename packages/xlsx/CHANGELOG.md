@@ -1,5 +1,15 @@
 # @sheetwrite/xlsx
 
+## 0.5.2
+
+### Patch Changes
+
+- 2e4231c: Remove comments and extra whitespace from published JavaScript to reduce package download and installed sizes. Keep module paths, exported names, type documentation, and WebAssembly binaries unchanged.
+- Updated dependencies [e09f014]
+- Updated dependencies [f836aba]
+- Updated dependencies [2e4231c]
+  - @sheetwrite/core@0.5.2
+
 ## 0.5.1
 
 ### Patch Changes
