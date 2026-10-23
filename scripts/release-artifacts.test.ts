@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,7 +29,10 @@ import {
   WASM_TARGET,
 } from "./workspace-tooling.js";
 
-const TEST_RELEASE_VERSION = "0.5.1";
+// Fixture tarballs must carry the workspace's own version; verification rejects any other.
+const { version: TEST_RELEASE_VERSION } = JSON.parse(
+  readFileSync(join(import.meta.dir, "../packages/core/package.json"), "utf8"),
+) as { version: string };
 
 const temporaryRoots: string[] = [];
 
