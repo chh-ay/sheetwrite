@@ -4,7 +4,7 @@
 
 Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from https://sheetwrite.vercel.app/llms.txt instead of being repeated here.
 
-Packages: 0.5.1. Canonical HTML: https://sheetwrite.vercel.app/docs/
+Packages: 0.5.2. Canonical HTML: https://sheetwrite.vercel.app/docs/
 
 ## Contents
 
