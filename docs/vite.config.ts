@@ -27,6 +27,102 @@ interface HastNode {
   value?: string;
   properties?: Record<string, unknown>;
   children?: HastNode[];
+  name?: string;
+  attributes?: Array<{ type: string; name: string; value: string }>;
+}
+
+/** One install command on one line, in any package manager's spelling. */
+const INSTALL_COMMAND = /^(?:npm install|npm i|pnpm add|yarn add|bun add)\s+((?:[@\w./-]+\s*)+)$/;
+
+/**
+ * A one-line install fence becomes a `PackageCommand` terminal, so every page
+ * offers npm, pnpm, Yarn, and Bun from the same Markdown. Runs before
+ * Expressive Code, which would otherwise render the fence as plain code.
+ */
+function installCommandsAsTerminals() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      // Text nodes have no children key; writing one breaks later plugins.
+      if (node.children === undefined) return;
+      node.children = node.children.map((child) => {
+        const code = child.tagName === "pre" ? child.children?.[0] : undefined;
+        const language = [code?.properties?.className ?? []].flat().map(String);
+        const match =
+          code?.tagName === "code" && language.includes("language-sh")
+            ? INSTALL_COMMAND.exec(textOf(code).trim())
+            : null;
+        if (match?.[1] === undefined) {
+          visit(child);
+          return child;
+        }
+        return {
+          type: "mdxJsxFlowElement",
+          name: "PackageCommand",
+          attributes: [{ type: "mdxJsxAttribute", name: "packages", value: match[1].trim() }],
+          children: [],
+        };
+      });
+    };
+    visit(tree);
+  };
+}
+
+/** Generated Markdown keeps its content static; only the filter needs hydration. */
+function hydrateFormulaReference() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      if (node.tagName === "formulareference") {
+        node.type = "mdxJsxFlowElement";
+        node.name = "FormulaReference";
+        node.attributes = [];
+        delete node.tagName;
+        delete node.properties;
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
+}
+
+/** Draw release reductions from the displayed value, so labels and bars cannot drift. */
+function visualizeReleaseResults() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      const delta =
+        node.tagName === "li"
+          ? node.children?.find((child) =>
+              String(child.properties?.className ?? "")
+                .split(/[ ,]+/)
+                .includes("sw-results__delta"),
+            )
+          : undefined;
+      if (delta !== undefined) {
+        const label = textOf(delta).trim();
+        const percent = /^(\d+(?:\.\d+)?)(?:–(\d+(?:\.\d+)?))?% (?:faster|less)$/.exec(label);
+        const ratio = /^([\d,]+(?:\.\d+)?)× faster$/.exec(label);
+        const low = percent
+          ? Number(percent[1])
+          : ratio
+            ? (1 - 1 / Number(ratio[1]?.replaceAll(",", ""))) * 100
+            : undefined;
+        const high = percent ? Number(percent[2] ?? percent[1]) : low;
+        if (low !== undefined && high !== undefined) {
+          node.children?.push({
+            type: "element",
+            tagName: "span",
+            properties: {
+              className: ["sw-results__bar"],
+              ariaHidden: "true",
+              style: `--result-min:${low}%;--result-max:${high}%`,
+            },
+            children: [],
+          });
+        }
+      }
+      node.children?.forEach(visit);
+    };
+    visit(tree);
+  };
 }
 
 /** Keeps code focus client-owned and removes copy controls from API signatures. */
@@ -115,6 +211,29 @@ function wrapProseTables() {
   };
 }
 
+/**
+ * Inline code shorter than this fits a phone line, so it never needs to break
+ * at a hyphen or quote; longer code keeps wrapping to avoid sideways scroll.
+ */
+const SHORT_CODE_LENGTH = 32;
+
+/** Gives short inline code a class, so an identifier reads as one token. */
+function markShortInlineCode() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      for (const child of node.children ?? []) {
+        if (child.tagName === "pre") continue;
+        if (child.tagName === "code" && textOf(child).length <= SHORT_CODE_LENGTH) {
+          const className = [child.properties?.className ?? []].flat().map(String);
+          child.properties = { ...child.properties, className: [...className, "sw-code-token"] };
+        }
+        visit(child);
+      }
+    };
+    visit(tree);
+  };
+}
+
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   defaultProps: { wrap: false },
   styleOverrides: {
@@ -172,6 +291,7 @@ export default defineConfig({
       ...mdx({
         remarkPlugins: [remarkFrontmatter, remarkMdxFrontmatter, remarkGfm],
         rehypePlugins: [
+          installCommandsAsTerminals,
           [
             rehypeExpressiveCode,
             {
@@ -185,11 +305,14 @@ export default defineConfig({
           ],
           // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
           [rehypeRaw, { passThrough: nodeTypes }],
+          hydrateFormulaReference,
+          visualizeReleaseResults,
           dedupeCodePopovers,
           // Prerendered heading ids: fragment links must resolve before hydration.
           rehypeSlug,
           markResponsiveCodeBlocks,
           wrapProseTables,
+          markShortInlineCode,
         ],
       }),
       enforce: "pre",

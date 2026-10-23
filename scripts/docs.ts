@@ -46,6 +46,12 @@ import {
   type CompatibilityFixture,
   type CompatibilityRecord,
 } from "../docs/src/showcases/compatibility.js";
+import {
+  benchLinearScale,
+  benchLogScale,
+  benchScaleFigure,
+  type BenchScale,
+} from "./bench-figures.js";
 import { compareReviewedObservation } from "./conformance/compare.js";
 import { loadCorpus } from "./conformance/corpus.js";
 import { readConformanceManifest } from "./conformance/generate.js";
@@ -53,18 +59,17 @@ import { runOffline } from "./conformance/offline.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import {
   allMeasurements,
-  capitalized,
   evidenceHeadline,
   formatCaptureTime,
   formatCount,
   formatMb,
   formatMs,
-  formatRatio,
+  formatSpeedup,
   html,
   provenanceList,
-  reductionText,
+  readableId,
+  readableText,
   shortHash,
-  speedupText,
 } from "./evidence-format.js";
 import { loadFormulaContractInventory, renderFormulaFunctionContract } from "./formula-docs.js";
 import {
@@ -1320,14 +1325,21 @@ function renderMovedGuides(): string {
       "Moved guides",
       "Where each former repository guide now lives in the documentation site.",
     ).trimEnd(),
-    "The old loose Markdown files were removed only after every source guide had a canonical routed replacement.",
+    "Each guide now has a page in the docs site. Choose its new home below.",
     "",
-    "| Former repository guide | Canonical route |",
-    "| --- | --- |",
+    '<div class="sw-next-links sw-moved-guides">',
   ];
+  const guides = new Map<string, string[]>();
   for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
-    lines.push(`| \`${oldPath}\` | [\`${route}\`](${route}) |`);
+    guides.set(route, [...(guides.get(route) ?? []), oldPath]);
   }
+  for (const [route, oldPaths] of guides) {
+    const title = readableId(route.split("/").filter(Boolean).at(-1) ?? route);
+    lines.push(
+      `<a href="${html(route)}"><strong>${html(title)}</strong>${oldPaths.map((path) => `<code>${html(path)}</code>`).join("")}</a>`,
+    );
+  }
+  lines.push("</div>");
   return `${lines.join("\n")}\n`;
 }
 
@@ -1820,13 +1832,13 @@ function benchPairRow(
         : '<span class="bench-viz__ratio" data-kind="solo">only Sheetwrite completed</span>';
   } else {
     const faster = theirs.main >= ours.main;
-    const ratio = (faster ? theirs.main / ours.main : ours.main / theirs.main).toFixed(1);
+    const ratio = formatSpeedup(faster ? theirs.main / ours.main : ours.main / theirs.main);
     outcome = faster ? "faster" : "slower";
-    chip = `<span class="bench-viz__ratio"><strong>${ratio}×</strong> ${faster ? betterChip[0] : betterChip[1]}</span>`;
+    chip = `<span class="bench-viz__ratio"><strong>${ratio}</strong> ${faster ? betterChip[0] : betterChip[1]}</span>`;
   }
   return [
     `<div class="bench-viz__row" data-outcome="${outcome}">`,
-    `<div class="bench-viz__head"><code>${label}</code>${chip}</div>`,
+    `<div class="bench-viz__head"><span class="bench-viz__label" title="${html(label)}">${html(readableId(label))}</span>${chip}</div>`,
     bar("sheetwrite", ours),
     bar("handsontable", theirs),
     "</div>",
@@ -1851,70 +1863,6 @@ function benchPanel(
     ...rows,
     "</section>",
   ].join("\n");
-}
-
-interface BenchScale {
-  pct: (value: number) => string;
-  ruler: string;
-  segments: number;
-}
-
-function trimTick(value: number): string {
-  if (value >= 1000) return `${value / 1000}k`;
-  if (value >= 1) return `${Number(value.toFixed(value >= 100 ? 0 : 1))}`;
-  return `${Number(value.toPrecision(1))}`;
-}
-
-function benchRuler(ticks: string[]): string {
-  return (
-    '<div class="bench-bar bench-bar--ruler" aria-hidden="true">' +
-    '<span class="bench-bar__engine"></span>' +
-    `<span class="bench-bar__track">${ticks.join("")}</span>` +
-    '<span class="bench-bar__value"></span>' +
-    "</div>"
-  );
-}
-
-/**
- * Shared per-panel log scale: every bar maps through the same decade domain,
- * so lengths compare across rows, and the ruler labels each 10x tick. The
- * domain rounds outward to decades, ignoring values below maxValue / 100_000
- * when choosing its lower bound so tiny noise cannot flatten the axis.
- */
-function benchLogScale(values: number[], fmt: (value: number) => string): BenchScale {
-  const positive = values.filter((value) => value > 0);
-  const maxValue = positive.length ? Math.max(...positive) : 1;
-  const minValue = positive.length ? Math.min(...positive) : 0.1;
-  const hi = Math.ceil(Math.log10(maxValue));
-  const lo = Math.min(Math.floor(Math.log10(Math.max(minValue, maxValue / 100_000))), hi - 1);
-  const segments = hi - lo;
-  const pct = (value: number): string => {
-    if (!(value > 0)) return "0.60%";
-    const t = ((Math.log10(value) - lo) / segments) * 100;
-    return `${Math.min(100, Math.max(0.6, t)).toFixed(2)}%`;
-  };
-  const ticks: string[] = [];
-  for (let exp = lo; exp <= hi; exp++) {
-    const at = ((exp - lo) / segments) * 100;
-    const value = 10 ** exp;
-    // The last tick carries the unit; a second reads better than "1000.0 ms".
-    const label = exp === hi ? (value >= 1000 ? `${value / 1000} s` : fmt(value)) : trimTick(value);
-    ticks.push(`<span class="bench-ruler__tick" style="left:${at.toFixed(2)}%">${label}</span>`);
-  }
-  return { pct, ruler: benchRuler(ticks), segments };
-}
-
-function benchLinearScale(values: number[], fmt: (value: number) => string): BenchScale {
-  const maxValue = Math.max(...values.filter((value) => value > 0), 1);
-  const pct = (value: number): string =>
-    `${Math.min(100, Math.max(0.6, (value / maxValue) * 100)).toFixed(2)}%`;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => {
-    // Every nonzero tick goes through the panel formatter - these are raw
-    // values (bytes for memory), not display numbers.
-    const label = t === 0 ? "0" : fmt(maxValue * t);
-    return `<span class="bench-ruler__tick" style="left:${(t * 100).toFixed(2)}%">${label}</span>`;
-  });
-  return { pct, ruler: benchRuler(ticks), segments: 4 };
 }
 
 function benchMethod(
@@ -2028,51 +1976,6 @@ const FORMULA_METHOD = benchMethod(
   ],
 );
 
-/**
- * Single-engine scaling figure: one row per operation/workload, one bar per
- * input size. Every bar maps through the figure-wide log scale, so even a
- * single-size workload's bar carries information - its position on the ruler.
- */
-function benchScaleFigure(
-  lead: string,
-  groups: Array<{
-    label: string;
-    entries: Array<{ sizeLabel: string; median: number; p95: number; size: number }>;
-  }>,
-): string[] {
-  const scale = benchLogScale(
-    groups.flatMap((group) => group.entries.flatMap((entry) => [entry.median, entry.p95])),
-    formatMs,
-  );
-  const lines = [
-    `<figure class="bench-viz bench-ruled" data-pagefind-ignore style="--bench-segs:${scale.segments}">`,
-    `<div class="bench-viz__scale"><span class="bench-viz__lead">${lead}</span><span class="bench-viz__axis-note">log scale — every tick is 10× — shorter is faster</span><span class="bench-viz__legend"><i class="bench-legend-swatch" data-kind="median"></i>median<i class="bench-legend-swatch" data-kind="p95"></i>p95</span></div>`,
-    scale.ruler,
-  ];
-  for (const group of groups) {
-    if (group.entries.length === 0) continue;
-    lines.push(
-      '<div class="bench-viz__row" data-outcome="faster">',
-      `<div class="bench-viz__head"><code>${group.label}</code></div>`,
-    );
-    for (const entry of group.entries) {
-      const pct = scale.pct;
-      lines.push(
-        `<div class="bench-bar" data-engine="sheetwrite">` +
-          `<span class="bench-bar__engine">${entry.sizeLabel}</span>` +
-          `<span class="bench-bar__track" aria-hidden="true">` +
-          `<i class="bench-bar__spread" style="width:${pct(entry.p95)}"></i>` +
-          `<i class="bench-bar__fill" style="width:${pct(entry.median)}"></i></span>` +
-          `<span class="bench-bar__value"><b class="bench-num" data-stat="median">${formatMs(entry.median)}</b><b class="bench-num" data-stat="p95">${formatMs(entry.p95)}</b></span>` +
-          `</div>`,
-      );
-    }
-    lines.push("</div>");
-  }
-  lines.push("</figure>");
-  return lines;
-}
-
 function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -2134,7 +2037,6 @@ function renderBenchWidget(evidence: ValidatedRenderEvidence): string {
     }
     const speedScale = benchLogScale(
       speedPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main, s.faded] : []))),
-      formatMs,
     );
     const memoryScale = benchLinearScale(
       memoryPairs.flatMap(([, a, b]) => [a, b].flatMap((s) => (s ? [s.main] : []))),
@@ -2321,7 +2223,7 @@ function renderFailureTable(evidence: ValidatedRenderEvidence): string[] {
 /** Markdown table cells cannot carry a raw pipe. */
 const markdownCell = (text: string): string => text.replaceAll("|", "\\|");
 
-/** Core write-path scenarios that lead the section; the rest stay in the table. */
+/** Four representative scenarios lead the complete measurement chart. */
 const CORE_PATH_HEADLINES = [
   "setblock-admission",
   "csv-import",
@@ -2347,7 +2249,12 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     const scenario = evidence.scenarios.find((candidate) => candidate.id === id);
     return scenario === undefined
       ? []
-      : [{ value: formatMs(scenario.timing.median), label: scenarioLabel(scenario.unit) }];
+      : [
+          {
+            value: formatMs(scenario.timing.median),
+            label: readableText(scenarioLabel(scenario.unit)),
+          },
+        ];
   });
   const counters = evidence.scenarios.flatMap((scenario) =>
     Object.entries(scenario.counters).map(
@@ -2360,17 +2267,23 @@ function renderCorePathsSection(evidence: CorePathsEvidence, source: string): st
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.scenarios.length} store and document scenarios at production sizes. Every scenario passed its own correctness checkpoint before its timing was accepted.</div>`,
     "",
     ...evidenceHeadline(headlines),
-    "| Scenario | One timed iteration | Median | p95 |",
-    "| --- | --- | ---: | ---: |",
-    ...evidence.scenarios.flatMap((scenario) => [
-      `| \`${scenario.id}\` | ${markdownCell(scenario.unit)} | ${formatMs(scenario.timing.median)} | ${formatMs(scenario.timing.p95)} |`,
-      ...(scenario.variants ?? []).map(
-        (variant) =>
-          `| \`${variant.id}\` | Variant of \`${scenario.id}\`, measured in the same run | ${formatMs(variant.timing.median)} | ${formatMs(variant.timing.p95)} |`,
-      ),
-    ]),
-    "",
     ...allMeasurements([
+      ...benchScaleFigure(
+        "scenario",
+        evidence.scenarios.flatMap((scenario) => [
+          {
+            label: scenario.id,
+            detail: readableText(scenarioLabel(scenario.unit)),
+            entries: [{ sizeLabel: "", median: scenario.timing.median, p95: scenario.timing.p95 }],
+          },
+          ...(scenario.variants ?? []).map((variant) => ({
+            label: variant.id,
+            detail: `Variant of ${readableId(scenario.id).toLowerCase()}, measured in the same run`,
+            entries: [{ sizeLabel: "", median: variant.timing.median, p95: variant.timing.p95 }],
+          })),
+        ]),
+      ),
+      "",
       ...provenanceList([
         ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
         ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
@@ -2446,23 +2359,6 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
         summary.scenario === scenario,
     );
   const baselineCommit = evidence.toolchain.baselineCommit;
-  const operations = [...new Set(evidence.comparisons.map((comparison) => comparison.operation))];
-  const headlines = operations.flatMap((operation) => {
-    const compared = evidence.comparisons.filter(
-      (comparison) => comparison.operation === operation,
-    );
-    const scope = compared.length === 1 ? operation : `${operation}, ${compared.length} scenarios`;
-    return [
-      {
-        value: speedupText(compared.map((comparison) => comparison.medianWallRatio)),
-        label: `${capitalized(scope)}: time`,
-      },
-      {
-        value: reductionText(compared.map((comparison) => comparison.peakRssRatio)),
-        label: `${capitalized(scope)}: peak memory`,
-      },
-    ];
-  });
   const provenance = provenanceList([
     ["Captured", `${formatCaptureTime(evidence.metadata.timestamp)} UTC`],
     ["Commit", `${shortHash(evidence.metadata.commit)} clean worktree`],
@@ -2480,51 +2376,57 @@ function renderXlsxSection(evidence: XlsxEvidence, source: string): string[] {
     ],
     ["Raw artifact", `<code>${html(source)}</code>`],
   ]);
+  const measurementGroups = (metric: "time" | "memory") =>
+    evidence.summaries
+      .filter((summary) => summary.engine === "current")
+      .map((current) => {
+        const baseline =
+          baselineCommit === undefined
+            ? undefined
+            : summaryFor("baseline", current.operation, current.scenario);
+        const stat = (summary: XlsxEvidence["summaries"][number]) =>
+          metric === "time" ? summary.durationMs : summary.maxRssBytes;
+        return {
+          label: `${current.operation} ${current.scenario}`,
+          detail:
+            metric === "time"
+              ? undefined
+              : `Maximum peak RSS: current ${formatMb(current.maxRssBytes.max)}${baseline === undefined ? "" : ` · baseline ${formatMb(baseline.maxRssBytes.max)}`}`,
+          entries: [
+            { sizeLabel: "Current", median: stat(current).median, p95: stat(current).p95 },
+            ...(baseline === undefined
+              ? []
+              : [
+                  {
+                    sizeLabel: "Baseline",
+                    median: stat(baseline).median,
+                    p95: stat(baseline).p95,
+                    series: "compare" as const,
+                  },
+                ]),
+          ],
+        };
+      });
   return [
     "## XLSX codec benchmark",
     "",
     `<div class="evidence-available"><strong>Validated evidence.</strong> ${evidence.comparisons.length > 0 ? `${evidence.comparisons.length} compared operations` : `${evidence.summaries.length} measured operations`} over ${evidence.rounds} process-isolated rounds each, from one checked corpus fixture.</div>`,
     "",
     ...(baselineCommit === undefined
-      ? [
-          "This capture ran the current tree only, so no codec comparison is published.",
-          "",
-          "| Operation | Scenario | Median | p95 | Peak RSS |",
-          "| --- | --- | ---: | ---: | ---: |",
-          ...evidence.summaries
-            .filter((summary) => summary.engine === "current")
-            .map(
-              (summary) =>
-                `| ${summary.operation} | ${summary.scenario} | ${formatMs(summary.durationMs.median)} | ${formatMs(summary.durationMs.p95)} | ${formatMb(summary.maxRssBytes.max)} |`,
-            ),
-          "",
-          ...allMeasurements(provenance),
-        ]
+      ? ["This capture ran the current tree only. No codec comparison is claimed.", ""]
       : [
-          ...evidenceHeadline(headlines),
-          `The baseline is the same codec at commit ${shortHash(baselineCommit)}, built from that commit and measured in the same session. Ratio = current ÷ baseline; below 1 is faster or smaller.`,
+          `Current and baseline are the same codec at different commits, measured in the same session. Baseline commit: ${shortHash(baselineCommit)}.`,
           "",
-          "| Operation | Scenario | Time ratio | Peak memory ratio |",
-          "| --- | --- | ---: | ---: |",
-          ...evidence.comparisons.map(
-            (comparison) =>
-              `| ${comparison.operation} | ${comparison.scenario} | ${formatRatio(comparison.medianWallRatio)} | ${formatRatio(comparison.peakRssRatio)} |`,
-          ),
-          "",
-          ...allMeasurements([
-            ...provenance,
-            "| Operation | Scenario | Current median | Baseline median | Current peak RSS | Baseline peak RSS |",
-            "| --- | --- | ---: | ---: | ---: | ---: |",
-            ...evidence.comparisons.flatMap((comparison) => {
-              const current = summaryFor("current", comparison.operation, comparison.scenario);
-              const baseline = summaryFor("baseline", comparison.operation, comparison.scenario);
-              if (current === undefined || baseline === undefined) return [];
-              return [
-                `| ${comparison.operation} | ${comparison.scenario} | ${formatMs(current.durationMs.median)} | ${formatMs(baseline.durationMs.median)} | ${formatMb(current.maxRssBytes.max)} | ${formatMb(baseline.maxRssBytes.max)} |`,
-              ];
-            }),
-          ]),
         ]),
+    "#### Operation time",
+    "",
+    ...benchScaleFigure("operation", measurementGroups("time")),
+    "",
+    "#### Peak resident memory",
+    "",
+    ...benchScaleFigure("operation", measurementGroups("memory"), "memory"),
+    "",
+    ...allMeasurements(provenance),
     "Reproduce with a checkout of the baseline commit, built and passed as the comparison root:",
     "",
     '```sh verify title="XLSX codec evidence"',
@@ -2599,8 +2501,13 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "Performance and delivery evidence",
       "Freshness-gated benchmark and package-size evidence for Sheetwrite.",
     ).trimEnd(),
-    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.",
+    "Every number on this page comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing. Results come first; the capture, the regression method, and the memory API follow them.",
     "",
+    "## Render benchmark",
+    "",
+  ];
+  // Readers come for results; the method and API notes follow every benchmark.
+  const methodLines = [
     "## Release retained engine memory",
     "",
     "WebAssembly linear memory grows but does not shrink after cells or stores are cleared. When your application is idle after a large import, clear, or workbook disposal, call [`releaseEngineMemory`](/docs/api/core/release-engine-memory/) explicitly. Sheetwrite never schedules a release automatically.",
@@ -2636,8 +2543,6 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
     "A result is a regression decision only when that final baseline check passes on the declared power mode and concurrency. `bench:verify` remains a smoke and safety-ceiling check.",
     "",
     "The committed baseline at `bench/results/render-baseline.json` pins the harness source hashes, the declared sampling, and the runner (OS, CPU, Bun, Node, Chromium, power mode, concurrency). It is therefore machine- and harness-pinned: it must be re-recorded whenever a harness file, the sampling flags, the protocol version, or the runner changes, and the release capture does that as its last step by re-recording ten controlled rounds into `bench/results/render-baseline-raw.json` and promoting that artifact over the committed baseline. Until the re-recorded baseline is committed, `bench:check` fails closed on the fingerprint mismatch instead of comparing unrelated measurements.",
-    "",
-    "## Render benchmark",
     "",
   ];
   if ("evidence" in scale) {
@@ -2678,7 +2583,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
   } else {
     pending.push(scale);
   }
-  lines.push(
+  methodLines.push(
     "## Runtime resource ownership",
     "",
     "The performance showcase at `/showcases/performance#resource-ownership` renders the public [`RuntimeResourceSnapshot`](/docs/api/core/runtime-resource-snapshot/) protocol directly. It keeps exclusive-owner logical bytes, allocated capacity, WASM committed pages, and independent browser runtime observations in separate buckets; committed pages are never summed into live payload. Bulk-edit before/settled deltas use [`diffRuntimeResourcePhases`](/docs/api/core/diff-runtime-resource-phases/) and omit unchanged owners.",
@@ -2733,7 +2638,6 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
         ops.flatMap((op) =>
           [ours.stats[op], theirs.stats[op]].flatMap((s) => (s ? [s.median, s.p95] : [])),
         ),
-        formatMs,
       );
       lines.push(
         `<section class="bench-panel bench-ruled" data-size="${rows}" data-metric="speed" style="--bench-segs:${scale.segments}">`,
@@ -2973,6 +2877,7 @@ export async function renderEvidencePage(sizeHistoryOverride?: SizeHistory): Pro
       "",
     );
   }
+  lines.push(...methodLines);
   if (pending.length > 0) {
     lines.push(
       "## Pending local evidence",

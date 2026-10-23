@@ -1,5 +1,5 @@
 import apiNav from "../generated/api-nav.json";
-import { RELEASES, RELEASES_HREF, releaseHref } from "./releases.js";
+import { RELEASES, RELEASES_HREF, releaseDate, releaseHref } from "./releases.js";
 
 export interface NavigationItem {
   label: string;
@@ -75,7 +75,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     items: [
       { label: "All releases", href: RELEASES_HREF },
       ...RELEASES.map((release) => ({
-        label: `${release.version} · ${release.date}`,
+        label: `${release.version} · ${releaseDate(release)}`,
         href: releaseHref(release.version),
       })),
     ],

@@ -81,6 +81,7 @@
   --sw-state-resolved: var(--sw-accent);
   --sw-state-requested: #2563eb;
   --sw-state-pending: #b45309;
+  --sw-state-error: #b91c1c;
   --sw-state-cached: var(--sw-fg-dim);
   --sw-window-radius: 0.85rem;
   --sw-motion-fast: 120ms;
@@ -115,6 +116,7 @@
   --sw-type-number: #fbbf24;
   --sw-state-requested: #60a5fa;
   --sw-state-pending: #fbbf24;
+  --sw-state-error: #fb7185;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,27 +1,16 @@
 import { type FullEngineResult, validateFullEngineResult } from "../bench/src/full-engine-bench.js";
 import {
   type MatchedEngineResult,
-  type MatchedEngineRow,
   validateMatchedEngineResult,
 } from "../bench/src/matched-engine-bench.js";
+import { benchScaleFigure } from "./bench-figures.js";
 import {
   allMeasurements,
-  evidenceHeadline,
+  formatBytes,
   formatCaptureTime,
-  formatCount,
-  formatMs,
-  formatRatio,
-  html,
   provenanceList,
   shortHash,
 } from "./evidence-format.js";
-
-/**
- * Largest paired-ratio p10–p90 span (p90/p10) that still supports a ratio
- * claim. Identical shared work is the control: when the protocol is quiet, the
- * paired ratio stays near 1 and its spread stays narrow.
- */
-const MATCHED_SPREAD_CEILING = 1.5;
 
 export function validateFullEngineArtifact(
   value: Record<string, unknown>,
@@ -55,22 +44,15 @@ function analysisDetail(full: FullEngineResult): string[] {
     "",
     "LINEST, SORTBY, and MAP/REDUCE use 100 input rows. DSUM uses 100 database rows, a header, and the criterion `key > 0`. XIRR uses two cash flows one year apart. The text workload uses three fields. MODE.MULT uses five scalar inputs. MMULT uses two 2-by-2 matrices. Array outputs are reduced to scalar results.",
     "",
-    "| Full-only workload | Median | p95 |",
-    "| --- | ---: | ---: |",
-    ...full.analysis.map(
-      (row) => `| ${row.id} | ${formatMs(row.stat.median)} | ${formatMs(row.stat.p95)} |`,
+    ...benchScaleFigure(
+      "analysis workload",
+      full.analysis.map((row) => ({
+        label: row.id,
+        entries: [{ sizeLabel: "1,000 formulas", median: row.stat.median, p95: row.stat.p95 }],
+      })),
     ),
     "",
-    "#### WASM size and Node initialization",
-    "",
-    "| Engine | Node | WASM bytes | Brotli q11 bytes | Cold init median | Cold init p95 |",
-    "| --- | --- | ---: | ---: | ---: | ---: |",
-    ...full.engines.map(
-      (engine) =>
-        `| ${engine.engine} | ${engine.initialization.node} | ${formatCount(engine.wasm.rawBytes)} | ${formatCount(engine.wasm.brotliBytes)} | ${formatMs(engine.initialization.stat.median)} | ${formatMs(engine.initialization.stat.p95)} |`,
-    ),
-    "",
-    "Raw size is the WASM file size. Brotli size uses quality 11 on that file only. It is not the full package transfer size. Cold initialization uses five fresh Node processes. The timer surrounds `initSheetwrite` only. Imports and process startup are outside the timer. The operating system file cache is not cleared. No network download is measured. These samples do not establish that the full engine initializes faster.",
+    "Brotli size uses quality 11 on the WASM file only. It is not the full package transfer size. The raw artifacts retain cold-initialization samples; those samples do not establish that one engine initializes faster.",
     "",
     "Raw evidence: `bench/results/full-engine-matched-results.json` and `bench/results/full-engine-results.json`. They retain time samples, output checks, allocation samples, source hashes, and WASM hashes. The full workload captures are `bench/results/formula-default-results.json` and `bench/results/formula-full-results.json`. Their baseline gates stay blocked in output mode. A valid capture is not a passed timing regression gate.",
   ];
@@ -87,122 +69,45 @@ const REPRODUCE = [
   "",
 ];
 
-/**
- * The analysis capture (the shared matrix on both engines, WASM sizes, Node
- * cold init) stands on its own. The matched paired-ratio table is added when
- * that second capture is present and valid; without it the page still
- * publishes the measured analysis evidence and names the capture that is
- * missing.
- */
+/** Shared functions use the same code. Publish coverage and size, not a speed race. */
 export function renderFullEngineEvidence(
   full: FullEngineResult,
   matched?: MatchedEngineResult,
 ): string {
   validateFullEngineResult(full);
-  const lines = ["### Default and full formula engines", ""];
-  if (matched === undefined) {
-    lines.push(
-      `<div class="evidence-available"><strong>Validated evidence.</strong> Both engines ran the shared workload matrix. The paired-ratio capture is not published on this page yet, so no engine-to-engine ratio is claimed here.</div>`,
-      "",
-      "The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.",
-      "",
-      ...allMeasurements([
-        ...provenanceList([
-          ["Analysis capture", `${formatCaptureTime(full.meta.timestamp)} UTC`],
-          ["Analysis commit", `${shortHash(full.meta.commit)} clean worktree`],
-        ]),
-        ...analysisDetail(full),
-      ]),
-      ...REPRODUCE,
-    );
-    return lines.join("\n");
+  if (matched !== undefined) {
+    validateMatchedEngineResult(matched);
+    for (const engine of full.engines) {
+      const path = `packages/${engine.engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`;
+      if (engine.wasm.sha256 !== matched.sourceFiles[path]) {
+        throw new Error("Matched and analysis captures use different engine binaries");
+      }
+    }
   }
-
-  validateMatchedEngineResult(matched);
-  for (const engine of full.engines) {
-    const path = `packages/${engine.engine === "full" ? "formulas" : "wasm"}/pkg/sheetwrite_wasm_bg.wasm`;
-    if (engine.wasm.sha256 !== matched.sourceFiles[path])
-      throw new Error("Matched and analysis captures use different engine binaries");
-  }
-  const slowerCount = matched.rows.filter((row) => row.ratioStat.median > 1.05).length;
-  const sampleIterations = (row: MatchedEngineRow): { min: number; max: number } =>
-    row.samples.reduce(
-      (range, sample) => ({
-        min: Math.min(range.min, sample.iterations),
-        max: Math.max(range.max, sample.iterations),
-      }),
-      { min: Number.POSITIVE_INFINITY, max: 0 },
-    );
-  const widestSpread = matched.rows.reduce(
-    (worst, row) => Math.max(worst, row.ratioP90 / row.ratioP10),
-    0,
-  );
-  const brotliBytes = (name: string): string => {
-    const engine = full.engines.find((candidate) => candidate.engine === name);
-    return engine === undefined ? "not captured" : `${formatCount(engine.wasm.brotliBytes)} B`;
-  };
-  lines.push(
-    `<div class="evidence-available"><strong>Validated evidence.</strong> ${matched.rows.length} shared workloads have ${matched.rounds} paired rounds per engine. The full engine also has ${full.analysis.length} checked analysis workloads.</div>`,
+  const choices = full.engines.map((engine) => {
+    const isFull = engine.engine === "full";
+    return `<div class="sw-engine-choice"><span>${isFull ? "Full engine" : "Default engine"}</span><h4><code>@sheetwrite/${isFull ? "formulas" : "wasm"}</code></h4><p>${isFull ? "Default functions, plus statistics, finance, LAMBDA, grouping, and other analysis functions." : "Core spreadsheet functions, with the smaller download."}</p><strong>${formatBytes(engine.wasm.brotliBytes)}</strong><small>Brotli WASM · ${formatBytes(engine.wasm.rawBytes)} uncompressed</small></div>`;
+  });
+  return [
+    "### Choose a formula engine",
     "",
-    ...evidenceHeadline([
-      {
-        value: `${slowerCount} of ${matched.rows.length}`,
-        label: "Shared workloads more than 5% slower on the full engine",
-      },
-      {
-        value: `${formatRatio(widestSpread)} (limit ${formatRatio(MATCHED_SPREAD_CEILING)})`,
-        label: "Widest paired-ratio spread",
-      },
-      { value: brotliBytes("default"), label: "Default engine WASM, Brotli" },
-      { value: brotliBytes("full"), label: "Full engine WASM, Brotli" },
-    ]),
-    "The default engine is `@sheetwrite/wasm`. The full engine is `@sheetwrite/formulas`. Select it with `initSheetwrite(undefined, formulas)`. Each app uses one engine.",
+    "Shared functions use the same implementation in both builds. Choose by function coverage and download size, not small timing differences.",
     "",
-    slowerCount === 0
-      ? "No shared workload tested in the matched rounds had a median paired ratio more than 5% slower with the full engine. This check covers the eight flagged rows, not a new matched run of all 53 rows."
-      : `${slowerCount} shared workloads tested in the matched rounds had a median paired ratio more than 5% slower with the full engine.`,
+    '<div class="sw-engine-choices">',
+    ...choices,
+    "</div>",
     "",
-    "| Shared workload | Size | Default median | Full median | Paired ratio | Ratio p10–p90 |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
-    ...matched.rows.map((row) => {
-      const spread = row.ratioP90 / row.ratioP10;
-      const marker = spread > MATCHED_SPREAD_CEILING ? " ⚠︎" : "";
-      return `| ${row.id}${marker} | ${formatCount(row.size)} | ${formatMs(row.defaultStat.median)} | ${formatMs(row.fullStat.median)} | ${formatRatio(row.ratioStat.median)} | ${formatRatio(row.ratioP10)}–${formatRatio(row.ratioP90)} |`;
-    }),
+    "[Browse functions by engine](/docs/reference/formula-functions/) · [Use the full engine](/docs/guides/analysis-formulas/)",
     "",
     ...allMeasurements([
-      ...provenanceList([
-        ["Matched capture", `${formatCaptureTime(matched.meta.timestamp)} UTC`],
-        ["Matched commit", `${shortHash(matched.meta.commit)} clean worktree`],
-        ["Analysis capture", `${formatCaptureTime(full.meta.timestamp)} UTC`],
-        ["Analysis commit", `${shortHash(full.meta.commit)} clean worktree`],
-        [
-          "Machine",
-          `${html(matched.runner.cpu)} · Linux ${html(matched.runner.kernel)} · ${html(matched.runner.arch)} · Bun ${html(matched.runner.bun)}`,
-        ],
-      ]),
-      "#### Method",
-      "",
-      `The first capture ran all 53 shared workloads on each engine in sequence. Eight rows were more than 5% slower with the full engine. Those eight rows were checked with matched rounds. Each pair runs default, then full, in separate Bun processes. A timed sample starts with ${matched.warmupFixtures} untimed warm-up fixtures and then repeats the workload until at least ${matched.minimumSampleDurationMs} ms of measured time; the sample is the per-iteration mean, so a short operation is measured over many repetitions instead of one cold run. The runner used CPU 4 and one concurrent capture.`,
-      "",
-      `The ratio is full time divided by default time within each pair. The table shows the median of ${matched.rounds} paired ratios. The spread is the interpolated 10th to 90th percentile of those ratios. It is not a confidence interval. The time columns are the median times for each engine. A ratio below 1 means the full engine took less time.`,
-      "",
-      widestSpread <= MATCHED_SPREAD_CEILING
-        ? `Identical shared work is the control for this protocol: the widest paired-ratio p10–p90 span across the ${matched.rows.length} rows is ${formatRatio(widestSpread)} (limit ${formatRatio(MATCHED_SPREAD_CEILING)}), so each median ratio is supported by its paired samples.`
-        : `At least one row's paired-ratio p10–p90 span is ${formatRatio(widestSpread)} (limit ${formatRatio(MATCHED_SPREAD_CEILING)}). Rows above the limit are marked and their median ratio should not be read as a measured difference.`,
-      "",
-      "| Shared workload | Iterations per sample |",
-      "| --- | ---: |",
-      ...matched.rows.map((row) => {
-        const iterations = sampleIterations(row);
-        return `| ${row.id} | ${formatCount(iterations.min)}–${formatCount(iterations.max)} |`;
-      }),
-      "",
       ...analysisDetail(full),
       "",
-      "The landing-page data comes from a separate browser benchmark. The Delivery size section below records published package sizes. Neither data set has an engine comparison field. They are unchanged by this local engine capture.",
+      ...provenanceList([
+        ["Analysis capture", `${formatCaptureTime(full.meta.timestamp)} UTC`],
+        ["Analysis commit", `${shortHash(full.meta.commit)} clean worktree`],
+      ]),
+      "Shared-workload captures are validation data, not evidence that one package is faster.",
     ]),
     ...REPRODUCE,
-  );
-  return lines.join("\n");
+  ].join("\n");
 }

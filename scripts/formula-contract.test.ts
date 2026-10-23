@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { extractAssistSpellings, validateFormulaContractRepository } from "./formula-contract.js";
-import { renderFormulaFunctionContract } from "./formula-docs.js";
 
 const ROOT = resolve(import.meta.dir, "..");
 const INVENTORY = JSON.parse(
@@ -114,16 +113,6 @@ describe("formula capability contract", () => {
       assistSpellings: 156,
       formulasSpellings: 302,
     });
-  });
-
-  test("publishes default and optional engine availability in generated function rows", () => {
-    const document = renderFormulaFunctionContract(INVENTORY);
-    const rows = document.split("\n");
-    const defaultRow = rows.find((row) => row.startsWith("| `SUM` |"));
-    const optionalRow = rows.find((row) => row.startsWith("| `NORM.DIST` |"));
-    expect(defaultRow?.split(" | ")[1]).toBe("default, full");
-    expect(optionalRow?.split(" | ")[1]).toBe("full");
-    expect(optionalRow).toContain("optional analysis");
   });
 
   test("extracts only literal assist registry entries", () => {

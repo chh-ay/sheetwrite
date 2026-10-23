@@ -3,8 +3,6 @@ title: Configuration
 description: Configure data ownership, rendering, interaction, theming, protection, and toolbar behavior.
 ---
 
-[Installation](/docs/start/installation/)
-
 Everything you pass to `createGrid(host, opts)` lives in `GridOptions`. This page
 lists every field with its type and default, the optional toolbar `GridConfig`,
 and the `Grid` instance API.

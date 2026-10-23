@@ -8,12 +8,37 @@ interface Release {
   readonly version: string;
   /** Publication date on npm, `YYYY-MM-DD`. */
   readonly date: string;
+  /** One line for the sidebar card and the release list. */
+  readonly summary: string;
 }
 
 const RELEASES: readonly [Release, ...Release[]] = [
-  { version: "0.5.1", date: "2026-10-18" },
-  { version: "0.5.0", date: "2026-10-17" },
+  {
+    version: "0.5.2",
+    date: "2026-10-23",
+    summary: "Smaller packages, lower CSV import memory and shifted shortcuts.",
+  },
+  {
+    version: "0.5.1",
+    date: "2026-10-18",
+    summary: "Typed shortcuts, command feedback and faster column sums.",
+  },
+  {
+    version: "0.5.0",
+    date: "2026-10-17",
+    summary: "Full formula engine, spill references, large undo and conflict recovery.",
+  },
 ];
+
+/** Dates read as "Oct 18, 2026"; the registry keeps ISO dates for `<time>`. */
+function releaseDate(release: Release): string {
+  return new Date(`${release.date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
 
 const LATEST_RELEASE = RELEASES[0];
 
@@ -45,6 +70,7 @@ export {
   RELEASES,
   RELEASES_HREF,
   releaseContext,
+  releaseDate,
   releaseHref,
   type Release,
   type ReleaseContext,

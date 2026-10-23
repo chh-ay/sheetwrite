@@ -100,10 +100,66 @@
   color: var(--sw-fg-strong);
   background: var(--sw-surface-2);
 }
-/* Every docs page is in the Docs section, so the header marks Docs as current. */
+/* The header marks the section of the page: Releases for release notes,
+   Docs for every other docs page. */
 .sw-docs-header__links > a[aria-current="page"] {
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 12%, transparent);
+}
+/* The newest release opens the sidebar, above the section groups. */
+.sw-sidebar__nav a.sw-release-card {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
+  border-radius: 0.65rem;
+  color: var(--sw-fg-muted);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--sw-accent) 12%, transparent), transparent 70%),
+    var(--sw-surface-1);
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+.sw-sidebar__nav a.sw-release-card:hover {
+  border-color: color-mix(in srgb, var(--sw-accent) 65%, var(--sw-border));
+  color: var(--sw-fg-muted);
+  transform: translateY(-1px);
+}
+.sw-sidebar__nav a.sw-release-card[aria-current="page"] {
+  border-color: var(--sw-accent);
+  font-weight: inherit;
+}
+.sw-release-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.sw-release-card__badge {
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  color: var(--sw-accent-ink);
+  background: var(--sw-accent);
+  font: 700 0.65rem / 1.5 var(--sw-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sw-release-card strong {
+  color: var(--sw-fg-strong);
+  font: 650 0.98rem / 1.3 var(--sw-font-display);
+}
+.sw-release-card__summary {
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.sw-release-card__more {
+  margin-top: 0.15rem;
+  color: var(--sw-accent-strong);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 .sw-docs .sw-search-button {
   height: 2.6rem;
@@ -467,9 +523,6 @@
   margin: 1rem 0 1.5rem;
   font-size: 0.82rem;
 }
-.sw-docs .api-metadata div {
-  grid-template-columns: 5rem minmax(0, 1fr);
-}
 /* Member names read as a scannable index in columns, not as a wall of chips. */
 .sw-docs .api-member-index {
   display: grid;
@@ -563,10 +616,6 @@
   text-align: right;
 }
 
-/* The overview is a compact task hub, not a long sequence of marketing headings. */
-.sw-docs--overview .sw-document {
-  max-width: 76rem;
-}
 .sw-docs--overview .sw-document__header {
   margin-bottom: 1.5rem;
 }
@@ -844,6 +893,8 @@ html:has(.sw-nav-dialog[open]) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 13rem;
     gap: 0 3.5rem;
+    /* Keep the 70rem reading area; the outline gets its own 16.5rem. */
+    padding-inline: max(clamp(1.5rem, 5vw, 4.5rem), (100% - var(--sw-sidebar-width) - 86.5rem) / 2);
   }
   .sw-document > .sw-document__header,
   .sw-document > .sw-symbol-filter,
@@ -918,6 +969,7 @@ html:has(.sw-nav-dialog[open]) {
     display: none;
   }
   .sw-docs-header__links > .sw-docs-header__showcases,
+  .sw-docs-header__links > .sw-docs-header__releases,
   .sw-docs-header__links > .sw-docs-header__docs {
     display: none;
   }

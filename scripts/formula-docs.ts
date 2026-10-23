@@ -62,6 +62,14 @@ function cell(value: string): string {
   return value.replaceAll("|", "\\|").replaceAll("\n", " ").trim();
 }
 
+function html(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function anchor(value: string): string {
   return value
     .toLowerCase()
@@ -233,12 +241,20 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     "",
     "## Engine builds",
     "",
-    "- `@sheetwrite/wasm` is the default engine. In the function tables, the Engine column shows `default, full` for a function in both engines and `full` for a function in `@sheetwrite/formulas` only.",
+    "<details>",
+    "<summary>Choose and initialize an engine</summary>",
+    "",
+    "- `@sheetwrite/wasm` is the default engine. The Engine column shows `Default + full` for a function in both engines and `Full only` for a function in `@sheetwrite/formulas` only.",
     '- `@sheetwrite/formulas` is the full engine. It adds the analysis families marked below: distributions and statistics, regression, finance, dates, text and regex, database, math and matrices, reshaping, LAMBDA helpers, and grouping. Select it before creating any stores: `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`.',
     "- The active engine's registered names drive formula assist. Optional names are not suggested by the default engine and evaluate to `#NAME?` there; merely importing the optional package does not enable them.",
     "- Numeric functions use binary64 arithmetic with function-specific domains and bounded numerical algorithms. The inventory does not claim unlimited tail accuracy or complete Excel/Google Sheets/OpenFormula parity.",
     "",
+    "</details>",
+    "",
     "## Bounded evaluation contract",
+    "",
+    "<details>",
+    "<summary>Evaluation limits and numerical behavior</summary>",
     "",
     "- Parsing and dependency evaluation are each capped at 256 recursive levels. Range and matrix work is capped at 1,000,000 cells, 1,048,576 rows, 16,384 columns, and 64 MiB of value/intermediate storage; excess work returns an explicit formula error rather than truncating.",
     "- One dynamic-array recompute pass is capped at 2,000,000 cell operations. Spill installation is atomic and collision-checked; see the [formula guide](/docs/guides/formulas/#dynamic-arrays-and-spills) for admission rules.",
@@ -248,7 +264,11 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     "",
     "No formula throughput or latency number is published here because this contract has no checked final formula-performance artifact. Use the [performance evidence protocol](/docs/guides/performance-resources/) to capture and validate measurements; limits above are implementation ceilings, not benchmark results.",
     "",
+    "</details>",
+    "",
     "## Functions by family",
+    "",
+    "<FormulaReference>",
     "",
   ];
 
@@ -261,17 +281,16 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
     const sourceUrl = string(source.link, `sources.${sourceId}.link`);
     const familyFunctions = functions.filter((formula) => formula.family === familyId);
     lines.push(
+      '<section class="sw-formula-family">',
+      "",
       `### ${title}`,
       "",
       `Taxonomy/source: [${section}](${sourceUrl}).`,
       "",
-      "| Function (aliases) | Engine | Contract | Signature | Semantics | Dialect | Implementation |",
-      "| --- | --- | --- | --- | --- | --- | --- |",
+      '<table class="sw-formula-table"><thead><tr><th>Function (aliases)</th><th>Engine</th><th>Contract</th></tr></thead><tbody>',
       ...familyFunctions.map((formula) => {
-        const aliases =
-          formula.aliases.length > 0
-            ? ` (${formula.aliases.map((name) => `\`${name}\``).join(", ")})`
-            : "";
+        const names = [formula.canonical, ...formula.aliases];
+        const aliases = formula.aliases.map((name) => `<code>${html(name)}</code>`).join(", ");
         const inDefaultEngine = formula.builds.includes("@sheetwrite/wasm");
         const contractLabel =
           formula.contractStatus === "required-supported"
@@ -280,12 +299,30 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
               ? "incumbent"
               : "optional analysis";
         // The default engine's names are a subset of the full engine's names.
-        const engineLabel = inDefaultEngine ? "default, full" : "full";
-        return `| \`${formula.canonical}\`${aliases} | ${engineLabel} | ${contractLabel} | [\`${formula.signature}\`](#signature-${anchor(formula.signature)}) | [\`${formula.semantics}\`](#semantics-${anchor(formula.semantics)}) | [\`${formula.dialects}\`](#dialect-${anchor(formula.dialects)}) | [\`${formula.implementation}\`](#implementation-${anchor(formula.implementation)}) |`;
+        const engineLabel = inDefaultEngine ? "Default + full" : "Full only";
+        const profiles = (
+          [
+            ["Signature", "signature", formula.signature],
+            ["Semantics", "semantics", formula.semantics],
+            ["Dialect", "dialect", formula.dialects],
+            ["Implementation", "implementation", formula.implementation],
+          ] as const
+        )
+          .map(
+            ([label, prefix, id]) =>
+              `<a href="#${prefix}-${anchor(id)}">${label}: <code>${html(id)}</code></a>`,
+          )
+          .join("<br />");
+        return `<tr data-formula-name="${html(names.join(" "))}" data-engine="${inDefaultEngine ? "default" : "full"}"><td><code>${html(formula.canonical)}</code>${aliases ? `<small>${aliases}</small>` : ""}</td><td><span class="sw-formula-build" data-build="${inDefaultEngine ? "default" : "full"}">${engineLabel}</span></td><td><details><summary>${contractLabel}</summary>${profiles}</details></td></tr>`;
       }),
+      "</tbody></table>",
+      "",
+      "</section>",
       "",
     );
   }
+
+  lines.push("</FormulaReference>", "");
 
   lines.push(
     "## Signature profiles",
@@ -295,7 +332,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
   );
   for (const [id, signature] of Object.entries(signatures)) {
     lines.push(
-      `### Signature: ${id}`,
+      `<details id="signature-${anchor(id)}"><summary>Signature: ${id}</summary>`,
       "",
       `Return shape: \`${signature.returns}\`.`,
       "",
@@ -308,6 +345,8 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
               `| \`${argument.name}\` | ${argument.required ? "yes" : "no"} | ${cell(valueText(argument.default))} | ${argument.accepts.map((value) => `\`${value}\``).join(", ")} | \`${argument.repeat}\` |`,
           )),
       "",
+      "</details>",
+      "",
     );
   }
 
@@ -319,7 +358,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
   );
   for (const [id, profile] of Object.entries(semantics)) {
     lines.push(
-      `### Semantics: ${id}`,
+      `<details id="semantics-${anchor(id)}"><summary>Semantics: ${id}</summary>`,
       "",
       "| Dimension | Contract |",
       "| --- | --- |",
@@ -328,13 +367,15 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
           `| ${dimension} | ${cell(keyValues(value, `semanticsProfiles.${id}.${dimension}`))} |`,
       ),
       "",
+      "</details>",
+      "",
     );
   }
 
   lines.push("## Dialect profiles", "");
   for (const [id, profile] of Object.entries(dialects)) {
     lines.push(
-      `### Dialect: ${id}`,
+      `<details id="dialect-${anchor(id)}"><summary>Dialect: ${id}</summary>`,
       "",
       "| Dialect | Status |",
       "| --- | --- |",
@@ -344,13 +385,15 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
       "",
       `Limitations: ${stringArray(profile.divergences, `dialectProfiles.${id}.divergences`).join(" ")}`,
       "",
+      "</details>",
+      "",
     );
   }
 
   lines.push("## Implementation profiles", "");
   for (const [id, profile] of Object.entries(implementations)) {
     lines.push(
-      `### Implementation: ${id}`,
+      `<details id="implementation-${anchor(id)}"><summary>Implementation: ${id}</summary>`,
       "",
       "| Layer | Status and source/evidence |",
       "| --- | --- |",
@@ -358,6 +401,8 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
       `| Evaluator | ${statusPaths(profile.evaluator, `implementationProfiles.${id}.evaluator`)} |`,
       `| Formula assist | ${statusPaths(profile.assist, `implementationProfiles.${id}.assist`)} |`,
       `| Evidence | ${statusPaths(profile.evidence, `implementationProfiles.${id}.evidence`)} |`,
+      "",
+      "</details>",
       "",
     );
   }
@@ -390,7 +435,7 @@ export function renderFormulaFunctionContract(inventoryValue: unknown): string {
         .join("<br />")} |`;
     }),
     "",
-    "In particular, automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, database functions, cube/OLAP functions, and `LAMBDA`/higher-order execution are unsupported. `TODAY` and `NOW` are the documented clock-function exception; `LET` is supported and is not a `LAMBDA` fallback.",
+    "Automatic volatile functions beyond the explicit host-clock barrier, network/external-data functions, arbitrary external workbook links, and cube/OLAP functions are unsupported. `TODAY` and `NOW` are the documented clock-function exception. Database functions and `LAMBDA` helpers require the full engine; `LET` is available in both engines.",
     "",
   );
 

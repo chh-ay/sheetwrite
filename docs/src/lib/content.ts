@@ -4,15 +4,19 @@ import {
   type LazyExoticComponent,
   lazy,
 } from "react";
+import type { ReactNode } from "react";
 
 export interface DocumentFrontmatter {
   title: string;
   description: string;
 }
 
-/** Element overrides a compiled MDX document accepts. */
+/** Element overrides and build-inserted components a compiled MDX document uses. */
 export interface DocumentComponents {
   a?: ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
+  /** Install fences become this terminal at build time; see vite.config.ts. */
+  PackageCommand?: ComponentType<{ packages: string; note?: string }>;
+  FormulaReference?: ComponentType<{ children: ReactNode }>;
 }
 
 type DocumentComponent = ComponentType<{ components?: DocumentComponents }>;

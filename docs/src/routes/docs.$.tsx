@@ -3,6 +3,8 @@ import { Suspense, useEffect } from "react";
 
 import { ContentLink } from "../components/ContentLink.js";
 import { DocsShell } from "../components/DocsShell.js";
+import { FormulaReference } from "../components/FormulaReference.js";
+import { PackageCommand } from "../components/PackageCommand.js";
 import {
   type DocumentComponents,
   documentComponentForSplat,
@@ -12,7 +14,11 @@ import { revealAnchoredMember } from "../lib/reveal-anchor.ts";
 import { pageMeta } from "../lib/seo.js";
 
 /** Documentation content renders its site links through the router. */
-const DOCUMENT_COMPONENTS: DocumentComponents = { a: ContentLink };
+const DOCUMENT_COMPONENTS: DocumentComponents = {
+  a: ContentLink,
+  FormulaReference,
+  PackageCommand,
+};
 
 export const Route = createFileRoute("/docs/$")({
   loader: async ({ params }) => {

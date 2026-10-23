@@ -48,7 +48,31 @@ function entriesFor(data: PagefindResultData): SearchEntry[] {
 }
 
 interface PagefindModule {
+  options(options: { noWorker: boolean }): Promise<void>;
   search(query: string): Promise<PagefindResponse>;
+}
+
+let pagefindModule: Promise<PagefindModule> | undefined;
+
+/**
+ * Loads Pagefind once and keeps it on the main thread. Its worker resolves
+ * the index at a root-relative URL, which fails when a browser or an extension
+ * runs workers from `blob:` URLs; the docs index is small, so main-thread
+ * search costs little and works everywhere.
+ */
+function loadPagefind(): Promise<PagefindModule> {
+  pagefindModule ??= (async () => {
+    // Pagefind creates this browser module after Vite finishes, so no static import exists.
+    const pagefindPath = "/pagefind/pagefind.js";
+    const pagefind = (await import(/* @vite-ignore */ pagefindPath)) as PagefindModule;
+    await pagefind.options({ noWorker: true });
+    return pagefind;
+  })();
+  // A failed load (offline, index not built) may succeed on the next query.
+  pagefindModule.catch(() => {
+    pagefindModule = undefined;
+  });
+  return pagefindModule;
 }
 
 export function DocsSearch() {
@@ -89,9 +113,7 @@ export function DocsSearch() {
     const search = async () => {
       try {
         setStatus("Searching…");
-        // Pagefind creates this browser module after Vite finishes, so no static import exists.
-        const pagefindPath = "/pagefind/pagefind.js";
-        const pagefind = (await import(/* @vite-ignore */ pagefindPath)) as PagefindModule;
+        const pagefind = await loadPagefind();
         const response = await pagefind.search(query);
         const pages = await Promise.all(
           response.results.slice(0, 8).map((result) => result.data()),
