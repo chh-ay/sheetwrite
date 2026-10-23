@@ -65,4 +65,16 @@ describe("contributor and CI toolchain contract", () => {
       /(?:bun-version|NODE_VERSION|NPM_VERSION|RUST_VERSION|WASM_PACK_VERSION):\s*(?:latest|stable)\b/,
     );
   });
+
+  it("runs browser smoke in the Playwright image of the locked test runner", () => {
+    // A mismatched image ships browser builds the test runner cannot launch.
+    const locked = /"@playwright\/test@(\d+\.\d+\.\d+)"/.exec(
+      readFileSync(resolve(root, "bun.lock"), "utf8"),
+    )?.[1];
+    const images = [
+      ...workflow.matchAll(/mcr\.microsoft\.com\/playwright:v([\d.]+)-noble@sha256:/g),
+    ];
+    expect(locked).toBeDefined();
+    expect(images.map((match) => match[1])).toEqual([locked]);
+  });
 });

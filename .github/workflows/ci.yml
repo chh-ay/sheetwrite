@@ -457,6 +457,12 @@ jobs:
     name: Browser Smoke (${{ matrix.shard }}/3)
     needs: docs-build
     runs-on: ubuntu-latest
+    # The image ships the browsers and their system libraries. Installing them
+    # with apt on every run took up to the whole timeout on slow mirrors.
+    # Keep the tag equal to the locked @playwright/test version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --user 1001
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -474,15 +480,8 @@ jobs:
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ runner.arch }}-${{ env.BUN_VERSION }}-${{ hashFiles('bun.lock') }}
-      - name: Cache browser engines
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-all-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
-      - name: Install dependencies and browser engines
-        run: |
-          bun install --frozen-lockfile
-          bun run browser:install
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Download production docs
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
