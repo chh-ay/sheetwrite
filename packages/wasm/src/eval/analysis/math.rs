@@ -1,16 +1,15 @@
 //! Rounding, factorial, combinatorics, and sum-of-squares functions.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::calc::Ast;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, CellRange, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_NUMBER};
+use crate::types::{CellRange, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_NUMBER};
 
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
 use super::super::matrix::range_from_ast;
 use super::super::range_reader::RangeReader;
 use super::super::value::aggregate_number;
+use super::super::EvalPass;
 use crate::types::{EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &[
@@ -50,9 +49,7 @@ pub(in crate::eval) fn streamed_sum_squares(
     store: &CellStore,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Option<EvalResult> {
     let [argument] = args else {
@@ -72,13 +69,7 @@ pub(in crate::eval) fn streamed_sum_squares(
         }
         let (rows, cols) = RangeReader::new(store, range, depth)?.shape();
         let source_sheet = &store.sheets[range.sheet as usize];
-        let mut context = RangeContext {
-            store,
-            affected,
-            memo,
-            visiting,
-            depth,
-        };
+        let mut context = RangeContext { store, pass, depth };
         let mut sum = 0.0;
         for row in range.row_start as usize..range.row_start as usize + rows {
             for col in range.col_start as usize..range.col_start as usize + cols {
@@ -93,15 +84,13 @@ pub(in crate::eval) fn streamed_sum_squares(
     Some(result.map_or_else(Value::Error, Value::number))
 }
 
-struct RangeContext<'a> {
+struct RangeContext<'a, 'p> {
     store: &'a CellStore,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
 
-impl RangeContext<'_> {
+impl RangeContext<'_, '_> {
     fn number(
         &mut self,
         source: &SheetData,
@@ -123,15 +112,9 @@ impl RangeContext<'_> {
                 Ok(Some(number))
             }
             _ => aggregate_number(
-                &self.store.eval_at(
-                    sheet,
-                    row,
-                    col,
-                    self.affected,
-                    self.memo,
-                    self.visiting,
-                    self.depth + 1,
-                ),
+                &self
+                    .store
+                    .eval_at(sheet, row, col, self.pass, self.depth + 1),
                 true,
             ),
         }
@@ -160,7 +143,7 @@ impl<'a> NumberCursor<'a> {
         }
     }
 
-    fn number(&mut self, context: &mut RangeContext<'_>) -> Result<Option<f64>, FormulaError> {
+    fn number(&mut self, context: &mut RangeContext<'_, '_>) -> Result<Option<f64>, FormulaError> {
         let number = context.number(self.source, self.sheet, self.row, self.col)?;
         self.col += 1;
         if self.col > self.col_end {
@@ -177,9 +160,7 @@ pub(in crate::eval) fn streamed_paired_squares(
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Option<EvalResult> {
     let [left, right] = args else {
@@ -209,13 +190,7 @@ pub(in crate::eval) fn streamed_paired_squares(
         return None;
     }
     let result = (|| {
-        let mut context = RangeContext {
-            store,
-            affected,
-            memo,
-            visiting,
-            depth,
-        };
+        let mut context = RangeContext { store, pass, depth };
         let mut left_cursor = NumberCursor::new(store, left_range, left_cols);
         let mut right_cursor = right_shape
             .as_ref()

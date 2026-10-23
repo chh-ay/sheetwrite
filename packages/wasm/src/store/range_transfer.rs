@@ -1,5 +1,7 @@
 use super::*;
-use crate::transfer::{Reader, TransferInput, TransferResult, Writer};
+use crate::transfer::Writer;
+#[cfg(target_arch = "wasm32")]
+use crate::transfer::{Reader, TransferInput, TransferResult};
 
 const RANGE_TAG: u32 = 0x32484d53;
 
@@ -28,6 +30,7 @@ impl RangeSnapshot {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 impl CellStore {
     fn read_range_memory(
         &self,

@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 env:
-  BUN_VERSION: "1.4.3"
-  NODE_VERSION: "26.9.0"
+  BUN_VERSION: "1.4.4"
+  NODE_VERSION: "26.12.1"
   NPM_VERSION: "11.19.1"
   RUST_VERSION: "1.99.0"
   WASM_TARGET: "wasm32-unknown-unknown"
@@ -58,7 +58,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Assert clean checkout and exact toolchain
         run: |
           test -z "$(git status --porcelain --untracked-files=all)"
@@ -90,6 +90,8 @@ jobs:
       - name: Rust dependency audit
         working-directory: packages/wasm
         run: cargo audit
+      - name: Rust lint
+        run: bun run lint:rust
       - name: Lint
         run: bun run lint
 
@@ -134,7 +136,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install coverage toolchain
         run: command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version "$CARGO_LLVM_COV_VERSION" --locked
       # `bench:verify` launches Chromium only; Firefox and WebKit are exercised
@@ -224,7 +226,7 @@ jobs:
             ~/.cargo/bin/cargo-llvm-cov
           key: release-tools-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.RUST_VERSION }}-${{ env.CARGO_AUDIT_VERSION }}-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component llvm-tools-preview --target "$WASM_TARGET"
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal --component clippy --component llvm-tools-preview --target "$WASM_TARGET"
       - name: Install release verification tools
         run: |
           command -v cargo-audit >/dev/null || cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked

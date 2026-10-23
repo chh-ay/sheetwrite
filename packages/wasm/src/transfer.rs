@@ -1,14 +1,16 @@
 //! Ephemeral, same-build memory transfer. Not a persistence or document format.
 //!
 //! All payloads cross JS as packed bytes; parsed ASTs and capacity slack never do.
+//! Only WASM imports transfers; native builds read them in round-trip tests.
 use crate::types::{FormulaError, StringStorage};
 
+#[cfg(any(target_arch = "wasm32", test))]
 pub(crate) type TransferResult<T> = Result<T, String>;
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) type TransferInput<'a> = js_sys::Uint8Array;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), test))]
 pub(crate) type TransferInput<'a> = &'a [u8];
 
 pub(crate) struct Writer(pub(crate) Vec<u8>);
@@ -117,6 +119,7 @@ impl Writer {
     }
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 pub(crate) struct Reader<'a> {
     #[cfg(not(target_arch = "wasm32"))]
     bytes: &'a [u8],
@@ -130,6 +133,7 @@ pub(crate) struct Reader<'a> {
     offset: usize,
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 impl<'a> Reader<'a> {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn new(bytes: &'a [u8], tag: u32) -> TransferResult<Self> {

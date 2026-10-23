@@ -1,14 +1,13 @@
 //! Matrix product, inverse, determinant, and identity matrices. Results use
 //! the shape, byte, and spill limits of the built-in arrays.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::calc::Ast;
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 
 use super::super::matrix::{EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::number_from_value;
+use super::super::EvalPass;
 
 pub(crate) const NAMES: &[&str] = &["MDETERM", "MINVERSE", "MMULT", "MUNIT"];
 
@@ -17,37 +16,23 @@ pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
     name != "MDETERM"
 }
 
-struct Context<'a> {
+struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
 
-impl Context<'_> {
+impl Context<'_, '_> {
     fn number(&mut self, ast: &Ast) -> Result<f64, FormulaError> {
-        number_from_value(&self.store.eval_ast(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth,
-        ))
+        number_from_value(&self.store.eval_ast(ast, self.sheet, self.pass, self.depth))
     }
 
     /// Reads a matrix whose cells must all be numbers.
     fn numbers(&mut self, ast: &Ast) -> Result<(usize, usize, Vec<f64>), FormulaError> {
-        let matrix = self.store.eval_matrix_arg(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth,
-        )?;
+        let matrix = self
+            .store
+            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth)?;
         let mut numbers = Vec::new();
         numbers
             .try_reserve_exact(matrix.values.len())
@@ -68,17 +53,13 @@ pub(crate) fn evaluate_ast(
     _name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth: depth + 1,
     };
     let [argument] = args else {
@@ -145,17 +126,13 @@ pub(crate) fn evaluate_matrix(
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth: depth + 1,
     };
     let (rows, cols, numbers) = match (name, args) {

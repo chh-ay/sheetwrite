@@ -541,8 +541,11 @@ impl CellStore {
             .collect()
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(js_name = filterRowsMulti)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     pub fn filter_rows_multi(
         &self,
         sheet: usize,

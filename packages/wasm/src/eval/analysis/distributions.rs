@@ -613,7 +613,7 @@ fn f_inverse(probability: f64, numerator: f64, denominator: f64, is_right: bool)
 }
 
 fn gamma_inverse(probability: f64, shape: f64, scale: f64, is_right: bool) -> NumberResult {
-    ensure(probability >= 0.0 && probability <= 1.0)?;
+    ensure((0.0..=1.0).contains(&probability))?;
     let use_right = if is_right {
         probability <= HALF
     } else {

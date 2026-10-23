@@ -175,12 +175,16 @@ finishes before package-specific tags and GitHub Releases such as
 
 ## Development
 
-Contributor and CI tooling is pinned to Bun 1.4.3, Rust 1.99.0 with the
+Contributor and CI tooling is pinned to Bun 1.4.4, Rust 1.99.0 with the
 `wasm32-unknown-unknown` target, wasm-pack 0.15.0, and cargo-audit 0.22.2.
 The Bun engine range in `package.json` describes supported consumers; the
 `packageManager` field and `rust-toolchain.toml` define the exact contributor
-toolchain. Node 26.9.0 is the CI and development runtime. Vercel hosts the tested
+toolchain. Node 26.12.1 is the CI and development runtime. Vercel hosts the tested
 static docs output; it does not install the toolchain or run a build.
+
+Bun 1.4.4 and Node 26.12.1 include the Brotli decoder fix for
+[CVE-2026-111497](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases).
+The Node 24 consumer target is 24.22.1, which also includes the fix.
 
 ```sh
 rustup toolchain install

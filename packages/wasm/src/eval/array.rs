@@ -7,7 +7,7 @@ use std::mem::size_of;
 
 use crate::calc::{Ast, Func, RangeFlags, SheetRef};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{FormulaError, Value};
 
 use super::expand_let_ast;
 use super::lookup::integer_arg;
@@ -15,7 +15,7 @@ use super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
 };
 use super::value::{bool_from_value, compare_values, number_from_value};
-use super::with_let_slots;
+use super::{with_let_slots, EvalPass};
 
 fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
@@ -303,20 +303,18 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast) =>
             {
-                self.eval_operator_array(ast, sheet, affected, memo, visiting, depth + 1)
+                self.eval_operator_array(ast, sheet, pass, depth + 1)
             }
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, sheet);
-                return self.eval_dynamic_array(&range, sheet, affected, memo, visiting, depth);
+                return self.eval_dynamic_array(&range, sheet, pass, depth);
             }
             Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
@@ -328,16 +326,7 @@ impl CellStore {
                 if !ast_produces_array(ast) {
                     return None;
                 }
-                super::analysis::lambda::evaluate_matrix(
-                    self,
-                    name,
-                    args,
-                    sheet,
-                    affected,
-                    memo,
-                    visiting,
-                    depth + 1,
-                )
+                super::analysis::lambda::evaluate_matrix(self, name, args, sheet, pass, depth + 1)
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -346,16 +335,16 @@ impl CellStore {
                 if !(hooks.produces_array)(name, args) {
                     return None;
                 }
-                (hooks.evaluate)(self, name, args, sheet, affected, memo, visiting, depth + 1)
+                (hooks.evaluate)(self, name, args, sheet, pass, depth + 1)
             }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
-                self.eval_matrix_arg(ast, sheet, affected, memo, visiting, depth + 1)
+                self.eval_matrix_arg(ast, sheet, pass, depth + 1)
             }
             Ast::Array { values, .. } => self
                 .matrix_shape(ast, sheet)
                 .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
             Ast::LetSlot { expression, .. } => {
-                return self.eval_dynamic_array(expression, sheet, affected, memo, visiting, depth)
+                return self.eval_dynamic_array(expression, sheet, pass, depth)
             }
             Ast::Func(Func::Let, args) => {
                 let (expanded, slots) = match expand_let_ast(args) {
@@ -363,39 +352,23 @@ impl CellStore {
                     Err(error) => return Some(Err(error)),
                 };
                 return with_let_slots(slots, || {
-                    self.eval_dynamic_array(&expanded, sheet, affected, memo, visiting, depth + 1)
+                    self.eval_dynamic_array(&expanded, sheet, pass, depth + 1)
                 });
             }
-            Ast::Func(Func::Filter, args) => {
-                self.eval_filter(args, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Sort, args) => {
-                self.eval_sort(args, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Unique, args) => {
-                self.eval_unique(args, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Transpose, args) => {
-                self.eval_transpose(args, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Sequence, args) => {
-                self.eval_sequence(args, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Take, args) => {
-                self.eval_take_drop(args, false, sheet, affected, memo, visiting, depth + 1)
-            }
-            Ast::Func(Func::Drop, args) => {
-                self.eval_take_drop(args, true, sheet, affected, memo, visiting, depth + 1)
-            }
+            Ast::Func(Func::Filter, args) => self.eval_filter(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Sort, args) => self.eval_sort(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Unique, args) => self.eval_unique(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Take, args) => self.eval_take_drop(args, false, sheet, pass, depth + 1),
+            Ast::Func(Func::Drop, args) => self.eval_take_drop(args, true, sheet, pass, depth + 1),
             Ast::Func(Func::ChooseCols, args) => {
-                self.eval_choose_axis(args, false, sheet, affected, memo, visiting, depth + 1)
+                self.eval_choose_axis(args, false, sheet, pass, depth + 1)
             }
             Ast::Func(Func::ChooseRows, args) => {
-                self.eval_choose_axis(args, true, sheet, affected, memo, visiting, depth + 1)
+                self.eval_choose_axis(args, true, sheet, pass, depth + 1)
             }
-            Ast::Func(Func::Choose, args) => {
-                self.eval_choose(args, sheet, affected, memo, visiting, depth + 1)
-            }
+            Ast::Func(Func::Choose, args) => self.eval_choose(args, sheet, pass, depth + 1),
             _ => return None,
         };
         Some(result.and_then(|matrix| {
@@ -407,14 +380,10 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        if let Some(result) =
-            self.eval_dynamic_array(ast, sheet, affected, memo, visiting, depth + 1)
-        {
+        if let Some(result) = self.eval_dynamic_array(ast, sheet, pass, depth + 1) {
             result
         } else {
             Err(FormulaError::Value)
@@ -557,12 +526,10 @@ impl CellStore {
         &self,
         ast: &Ast,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Value {
-        self.eval_ast(ast, sheet, affected, memo, visiting, depth + 1)
+        self.eval_ast(ast, sheet, pass, depth + 1)
     }
 
     fn optional_bool_array_arg(
@@ -571,24 +538,20 @@ impl CellStore {
         index: usize,
         default: bool,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<bool, FormulaError> {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(default);
         };
-        bool_from_value(&self.scalar_array_arg(ast, sheet, affected, memo, visiting, depth + 1))
+        bool_from_value(&self.scalar_array_arg(ast, sheet, pass, depth + 1))
     }
 
     fn eval_filter(
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if !(2..=3).contains(&args.len()) {
@@ -612,10 +575,8 @@ impl CellStore {
         {
             return Err(FormulaError::Num);
         }
-        let array =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
-        let include =
-            self.eval_array_matrix_arg(&args[1], sheet, affected, memo, visiting, depth + 1)?;
+        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        let include = self.eval_array_matrix_arg(&args[1], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         // Value-dependent arrays can shrink from their static shape bound.
         debug_assert!(array.values.len() <= array_cells);
@@ -639,7 +600,7 @@ impl CellStore {
             return Ok(EvalMatrix::new(
                 1,
                 1,
-                vec![self.scalar_array_arg(empty, sheet, affected, memo, visiting, depth + 1)],
+                vec![self.scalar_array_arg(empty, sheet, pass, depth + 1)],
             ));
         }
 
@@ -669,24 +630,13 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.is_empty() || args.len() > 4 {
             return Err(FormulaError::Value);
         }
-        let by_col = self.optional_bool_array_arg(
-            args,
-            3,
-            false,
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
+        let by_col = self.optional_bool_array_arg(args, 3, false, sheet, pass, depth + 1)?;
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
         let item_count = if by_col { array_cols } else { array_rows };
         let extra = item_count
@@ -702,33 +652,18 @@ impl CellStore {
         if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
             return Err(FormulaError::Num);
         }
-        let array =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         let dimension = if by_col { array.rows } else { array.cols };
         let sort_index = match optional_ast(args, 1) {
-            Some(ast) => integer_arg(&self.scalar_array_arg(
-                ast,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ))?,
+            Some(ast) => integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?,
             None => 1,
         };
         if sort_index <= 0 || sort_index as usize > dimension {
             return Err(FormulaError::Value);
         }
         let order = match optional_ast(args, 2) {
-            Some(ast) => integer_arg(&self.scalar_array_arg(
-                ast,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ))?,
+            Some(ast) => integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?,
             None => 1,
         };
         if !matches!(order, -1 | 1) {
@@ -790,24 +725,13 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.is_empty() || args.len() > 3 {
             return Err(FormulaError::Value);
         }
-        let by_col = self.optional_bool_array_arg(
-            args,
-            1,
-            false,
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
+        let by_col = self.optional_bool_array_arg(args, 1, false, sheet, pass, depth + 1)?;
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet)?;
         let item_count = if by_col { array_cols } else { array_rows };
         const UNIQUE_ITEM_BYTES: usize = 64;
@@ -815,19 +739,9 @@ impl CellStore {
             .checked_mul(UNIQUE_ITEM_BYTES)
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
-        let array =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
-        let exactly_once = self.optional_bool_array_arg(
-            args,
-            2,
-            false,
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        )?;
+        let exactly_once = self.optional_bool_array_arg(args, 2, false, sheet, pass, depth + 1)?;
         debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
 
         // Store collision chains in insertion order, without an allocation per hash.
@@ -897,16 +811,13 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.len() != 1 {
             return Err(FormulaError::Value);
         }
-        let source =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         EvalMatrix::validate_shape(source.cols, source.rows, 2, 0)?;
         source.validate_copies(2)?;
         let mut values = Vec::new();
@@ -925,32 +836,27 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.is_empty() || args.len() > 4 {
             return Err(FormulaError::Value);
         }
-        let scalar = |index: usize,
-                      default: Value,
-                      memo: &mut HashMap<AbsCellKey, EvalResult>,
-                      visiting: &mut std::collections::HashSet<AbsCellKey>| {
+        let scalar = |index: usize, default: Value, pass: &mut EvalPass<'_>| {
             optional_ast(args, index).map_or(default, |ast| {
-                self.scalar_array_arg(ast, sheet, affected, memo, visiting, depth + 1)
+                self.scalar_array_arg(ast, sheet, pass, depth + 1)
             })
         };
-        let rows = integer_arg(&scalar(0, Value::Number(1.0), memo, visiting))?;
-        let cols = integer_arg(&scalar(1, Value::Number(1.0), memo, visiting))?;
+        let rows = integer_arg(&scalar(0, Value::Number(1.0), pass))?;
+        let cols = integer_arg(&scalar(1, Value::Number(1.0), pass))?;
         if rows <= 0 || cols <= 0 {
             return Err(FormulaError::Value);
         }
         let rows = usize::try_from(rows).map_err(|_| FormulaError::Num)?;
         let cols = usize::try_from(cols).map_err(|_| FormulaError::Num)?;
         let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
-        let start = number_from_value(&scalar(2, Value::Number(1.0), memo, visiting))?;
-        let step = number_from_value(&scalar(3, Value::Number(1.0), memo, visiting))?;
+        let start = number_from_value(&scalar(2, Value::Number(1.0), pass))?;
+        let step = number_from_value(&scalar(3, Value::Number(1.0), pass))?;
         let mut values = Vec::new();
         values
             .try_reserve_exact(cells)
@@ -970,38 +876,23 @@ impl CellStore {
         args: &[Ast],
         drop: bool,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if !(2..=3).contains(&args.len()) {
             return Err(FormulaError::Value);
         }
-        let rows = integer_arg(&self.scalar_array_arg(
-            &args[1],
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        ))? as i64;
+        let rows = integer_arg(&self.scalar_array_arg(&args[1], sheet, pass, depth + 1))? as i64;
         let requested_cols = match optional_ast(args, 2) {
-            Some(ast) => Some(integer_arg(&self.scalar_array_arg(
-                ast,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ))? as i64),
+            Some(ast) => {
+                Some(integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))? as i64)
+            }
             None => None,
         };
         if rows == 0 || requested_cols == Some(0) {
             return Err(FormulaError::Calc);
         }
-        let source =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         let cols = requested_cols.unwrap_or(source.cols as i64);
         let output_rows = transformed_axis_bound(source.rows, rows, drop)?;
         let output_cols = match requested_cols {
@@ -1056,9 +947,7 @@ impl CellStore {
         args: &[Ast],
         rows_axis: bool,
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.len() < 2 {
@@ -1079,21 +968,13 @@ impl CellStore {
             .try_reserve_exact(selector_count)
             .map_err(|_| FormulaError::Num)?;
         for ast in &args[1..] {
-            let index = integer_arg(&self.scalar_array_arg(
-                ast,
-                sheet,
-                affected,
-                memo,
-                visiting,
-                depth + 1,
-            ))?;
+            let index = integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?;
             if index == 0 {
                 return Err(FormulaError::Value);
             }
             indices.push(index);
         }
-        let source =
-            self.eval_array_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)?;
+        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         let dimension = if rows_axis { source.rows } else { source.cols };
         let (output_rows, output_cols) = if rows_axis {
             (selector_count, source.cols)
@@ -1140,36 +1021,25 @@ impl CellStore {
         &self,
         args: &[Ast],
         sheet: usize,
-        affected: &std::collections::HashSet<AbsCellKey>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut std::collections::HashSet<AbsCellKey>,
+        pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
         if args.len() < 2 {
             return Err(FormulaError::Value);
         }
-        let index = integer_arg(&self.scalar_array_arg(
-            &args[0],
-            sheet,
-            affected,
-            memo,
-            visiting,
-            depth + 1,
-        ))?;
+        let index = integer_arg(&self.scalar_array_arg(&args[0], sheet, pass, depth + 1))?;
         if index <= 0 || index as usize >= args.len() {
             return Err(FormulaError::Value);
         }
         let selected = &args[index as usize];
-        if let Some(result) =
-            self.eval_dynamic_array(selected, sheet, affected, memo, visiting, depth + 1)
-        {
+        if let Some(result) = self.eval_dynamic_array(selected, sheet, pass, depth + 1) {
             return result;
         }
         EvalMatrix::validate_shape(1, 1, 1, 0)?;
         Ok(EvalMatrix::new(
             1,
             1,
-            vec![self.scalar_array_arg(selected, sheet, affected, memo, visiting, depth + 1)],
+            vec![self.scalar_array_arg(selected, sheet, pass, depth + 1)],
         ))
     }
 }

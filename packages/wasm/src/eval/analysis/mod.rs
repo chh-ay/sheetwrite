@@ -14,35 +14,23 @@ mod regression;
 mod reshape;
 mod text;
 
-use std::collections::{HashMap, HashSet};
-
 use crate::calc::Ast;
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 
 use super::functions::FuncAccumulator;
 use super::matrix::EvalMatrix;
+use super::EvalPass;
 
 pub(super) type ScalarEvaluator = fn(&str, &FuncAccumulator) -> EvalResult;
-pub(super) type AstEvaluator = fn(
-    &CellStore,
-    &str,
-    &[Ast],
-    usize,
-    &HashSet<AbsCellKey>,
-    &mut HashMap<AbsCellKey, EvalResult>,
-    &mut HashSet<AbsCellKey>,
-    usize,
-) -> EvalResult;
-
+pub(super) type AstEvaluator =
+    fn(&CellStore, &str, &[Ast], usize, &mut EvalPass<'_>, usize) -> EvalResult;
 pub(super) type MatrixEvaluator = fn(
     &CellStore,
     &str,
     &[Ast],
     usize,
-    &HashSet<AbsCellKey>,
-    &mut HashMap<AbsCellKey, EvalResult>,
-    &mut HashSet<AbsCellKey>,
+    &mut EvalPass<'_>,
     usize,
 ) -> Result<EvalMatrix, FormulaError>;
 

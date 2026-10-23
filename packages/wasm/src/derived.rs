@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::{encode_num, payload_num, STR_TAG_HI};
-use crate::transfer::{Reader, TransferResult, Writer};
+use crate::transfer::Writer;
+#[cfg(any(target_arch = "wasm32", test))]
+use crate::transfer::{Reader, TransferResult};
 use crate::types::{FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING};
 
 const ERROR_TAG_PREFIX: u64 = 0xFFFB;
@@ -295,6 +297,7 @@ impl DerivedOverlay {
         }
     }
 
+    #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn read_transfer(
         input: &mut Reader<'_>,
         maximum: usize,

@@ -2,7 +2,7 @@
   "name": "sheetwrite",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "type": "module",
   "description": "Framework-agnostic, high-performance spreadsheet grid.",
   "license": "MIT",
@@ -13,8 +13,8 @@
     "bench"
   ],
   "engines": {
-    "bun": ">=1.4.0",
-    "node": "24.21.0"
+    "bun": ">=1.4.4",
+    "node": "24.22.1"
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
@@ -78,6 +78,7 @@
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",
     "lint": "oxlint && oxfmt --check",
+    "lint:rust": "cargo clippy --manifest-path packages/wasm/Cargo.toml --all-targets -- -D warnings && cargo clippy --manifest-path packages/wasm/Cargo.toml --all-targets --features analysis -- -D warnings && cargo clippy --manifest-path packages/wasm/Cargo.toml --target wasm32-unknown-unknown --lib -- -D warnings && cargo clippy --manifest-path packages/wasm/Cargo.toml --target wasm32-unknown-unknown --lib --features analysis -- -D warnings",
     "format": "oxfmt",
     "test": "bun test"
   },
@@ -102,6 +103,7 @@
     "vue": "^3.5.43"
   },
   "overrides": {
+    "launch-editor": "^2.14.2",
     "nanoid": "3.3.18",
     "postcss": "^8.5.18",
     "postcss-selector-parser": "^7.1.6",
@@ -109,6 +111,6 @@
     "shell-quote": "^1.12.0",
     "smol-toml": "^1.9.0",
     "source-map-js": "^1.2.2",
-    "toml": "^4.2.0"
+    "toml": "^5.0.1"
   }
 }

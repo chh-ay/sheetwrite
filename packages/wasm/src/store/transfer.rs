@@ -1,7 +1,10 @@
 //! Same-build instance migration; never exposed as the document persistence format.
 
 use super::*;
-use crate::transfer::{Reader, TransferInput, TransferResult, Writer};
+use crate::transfer::Writer;
+#[cfg(any(target_arch = "wasm32", test))]
+use crate::transfer::{Reader, TransferInput, TransferResult};
+#[cfg(any(target_arch = "wasm32", test))]
 use crate::types::{CellRange, ReadSet};
 
 const STORE_TAG: u32 = 0x32524d53;
@@ -14,6 +17,7 @@ fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
     }
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 fn read_names(input: &mut Reader<'_>) -> TransferResult<HashMap<String, usize>> {
     (0..input.count()?)
         .map(|_| Ok((input.text()?, input.usize()?)))
@@ -55,6 +59,7 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 impl CellStore {
     pub(super) fn read_transfer_formula(
         &self,

@@ -1,13 +1,14 @@
 //! Bounded grouping and pivot aggregation for the full engine.
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::{bool_from_value, compare_values, number_from_value};
+use super::super::EvalPass;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &["GROUPBY", "PERCENTOF", "PIVOTBY"];
 const AGGREGATORS: &[&str] = &[
@@ -28,40 +29,27 @@ const AGGREGATORS: &[&str] = &[
     "VAR.S",
 ];
 
-struct Context<'a> {
+struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
     work: usize,
     sums: HashMap<(usize, usize, usize), Value>,
 }
-impl Context<'_> {
+impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
-        self.store.eval_ast(
-            expression,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        )
+        self.store
+            .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
         if !super::super::array::ast_produces_array(expression) {
             self.charge(1)?;
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
         }
-        let matrix = self.store.eval_matrix_arg(
-            expression,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        )?;
+        let matrix =
+            self.store
+                .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)?;
         self.charge(matrix.values.len())?;
         Ok(matrix)
     }
@@ -162,7 +150,7 @@ fn compare_fields(left: &[Value], right: &[Value]) -> Ordering {
 }
 impl Axis {
     fn build(
-        context: &mut Context<'_>,
+        context: &mut Context<'_, '_>,
         fields: &EvalMatrix,
         included: &[usize],
         total_depth: i32,
@@ -259,7 +247,7 @@ impl Axis {
     }
     fn sort(
         &mut self,
-        context: &mut Context<'_>,
+        context: &mut Context<'_, '_>,
         sort: &[i32],
         totals_top: bool,
         hierarchy: bool,
@@ -401,7 +389,7 @@ impl Aggregator {
     }
     fn aggregate(
         &self,
-        context: &mut Context<'_>,
+        context: &mut Context<'_, '_>,
         values: &EvalMatrix,
         rows: &[usize],
         total_rows: &[usize],
@@ -521,31 +509,25 @@ pub(crate) fn evaluate_ast(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     if name != "PERCENTOF" || arguments.len() != 2 {
         return Value::Error(FormulaError::Value);
     }
-    let sum = |expression: &Ast,
-               memo: &mut HashMap<AbsCellKey, EvalResult>,
-               visiting: &mut HashSet<AbsCellKey>| {
+    let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
         store.eval_ast(
             &Ast::Func(Func::Sum, vec![expression.clone()]),
             sheet,
-            affected,
-            memo,
-            visiting,
+            pass,
             depth + 1,
         )
     };
-    let subset = match number_from_value(&sum(&arguments[0], memo, visiting)) {
+    let subset = match number_from_value(&sum(&arguments[0], pass)) {
         Ok(number) => number,
         Err(error) => return Value::Error(error),
     };
-    let total = match number_from_value(&sum(&arguments[1], memo, visiting)) {
+    let total = match number_from_value(&sum(&arguments[1], pass)) {
         Ok(number) => number,
         Err(error) => return Value::Error(error),
     };
@@ -557,7 +539,7 @@ pub(crate) fn evaluate_ast(
 }
 
 fn sort_codes(
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     arguments: &[Ast],
     index: usize,
     fields: usize,
@@ -589,9 +571,7 @@ pub(crate) fn evaluate_matrix(
     name: &str,
     arguments: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     let is_pivot = name == "PIVOTBY";
@@ -603,9 +583,7 @@ pub(crate) fn evaluate_matrix(
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
         work: 0,
         sums: HashMap::new(),

@@ -1,15 +1,14 @@
 //! AGGREGATE applies a built-in aggregate after it removes error values and
 //! nested SUBTOTAL or AGGREGATE results.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{EvalResult, FormulaError, Value};
 
 use super::super::functions::{apply_func, FuncAccumulator};
 use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix};
 use super::super::value::number_from_value;
+use super::super::EvalPass;
 
 pub(crate) const NAMES: &[&str] = &["AGGREGATE"];
 
@@ -69,17 +68,13 @@ pub(crate) fn evaluate_ast(
     _name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     let mut context = Context {
         store,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth: depth + 1,
     };
     match aggregate(args, &mut context) {
@@ -88,25 +83,16 @@ pub(crate) fn evaluate_ast(
     }
 }
 
-struct Context<'a> {
+struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
 
-impl Context<'_> {
+impl Context<'_, '_> {
     fn scalar(&mut self, ast: &Ast) -> Value {
-        self.store.eval_ast(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth,
-        )
+        self.store.eval_ast(ast, self.sheet, self.pass, self.depth)
     }
 
     fn code(&mut self, ast: Option<&Ast>, default: i64) -> Result<i64, FormulaError> {
@@ -117,18 +103,12 @@ impl Context<'_> {
     }
 
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        self.store.eval_matrix_arg(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth,
-        )
+        self.store
+            .eval_matrix_arg(ast, self.sheet, self.pass, self.depth)
     }
 }
 
-fn aggregate(args: &[Ast], context: &mut Context<'_>) -> Result<Value, FormulaError> {
+fn aggregate(args: &[Ast], context: &mut Context<'_, '_>) -> Result<Value, FormulaError> {
     if args.len() <= FIRST_DATA_ARGUMENT || args.len() > MAX_ARGUMENT_COUNT {
         return Err(FormulaError::Value);
     }
@@ -161,7 +141,7 @@ fn aggregate(args: &[Ast], context: &mut Context<'_>) -> Result<Value, FormulaEr
 fn push_data(
     ast: &Ast,
     options: &Options,
-    context: &mut Context<'_>,
+    context: &mut Context<'_, '_>,
     values: &mut FuncAccumulator,
 ) -> Result<(), FormulaError> {
     let range = range_from_ast(ast, context.sheet);

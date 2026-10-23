@@ -1,15 +1,13 @@
 //! Database functions keep header rows and criteria rows intact.
 
-use std::collections::{HashMap, HashSet};
-
 use crate::calc::Ast;
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, FormulaError, Value};
+use crate::types::{FormulaError, Value};
 
 use super::super::criteria::Criterion;
 use super::super::matrix::EvalMatrix;
 use super::super::value::compare_text_case_insensitive;
-use super::super::EvalResult;
+use super::super::{EvalPass, EvalResult};
 
 pub(crate) const NAMES: &[&str] = &[
     "DAVERAGE", "DCOUNT", "DCOUNTA", "DGET", "DMAX", "DMIN", "DPRODUCT", "DSTDEV", "DSTDEVP",
@@ -24,20 +22,17 @@ pub(crate) fn evaluate_ast(
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
     if args.len() != ARGUMENT_COUNT {
         return Value::Error(FormulaError::Value);
     }
-    let database = match store.eval_matrix_arg(&args[0], sheet, affected, memo, visiting, depth + 1)
-    {
+    let database = match store.eval_matrix_arg(&args[0], sheet, pass, depth + 1) {
         Ok(matrix) => matrix,
         Err(error) => return Value::Error(error),
     };
-    let field = store.eval_ast(&args[1], sheet, affected, memo, visiting, depth + 1);
+    let field = store.eval_ast(&args[1], sheet, pass, depth + 1);
     let column = if matches!(name, "DCOUNT" | "DCOUNTA")
         && (matches!(args[1], Ast::Missing)
             || matches!(&field, Value::Blank)
@@ -50,8 +45,7 @@ pub(crate) fn evaluate_ast(
             Err(error) => return Value::Error(error),
         }
     };
-    let criteria = match store.eval_matrix_arg(&args[2], sheet, affected, memo, visiting, depth + 1)
-    {
+    let criteria = match store.eval_matrix_arg(&args[2], sheet, pass, depth + 1) {
         Ok(matrix) => matrix,
         Err(error) => return Value::Error(error),
     };

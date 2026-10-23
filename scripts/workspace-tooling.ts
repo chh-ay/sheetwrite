@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export const BUN_VERSION = "1.4.3";
+export const BUN_VERSION = "1.4.4";
 export const RUST_VERSION = "1.99.0";
-export const NODE_VERSION = "26.9.0";
+export const NODE_VERSION = "26.12.1";
 export const NPM_VERSION = "11.19.1";
 export const WASM_TARGET = "wasm32-unknown-unknown";
 export const CARGO_AUDIT_VERSION = "0.22.2";
@@ -144,6 +144,10 @@ const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
     id: "test:rust:analysis",
     command: ["cargo", "test", "--features", "analysis"],
     cwd: "packages/wasm",
+  },
+  {
+    id: "lint:rust",
+    command: ["bun", "run", "lint:rust"],
   },
   {
     id: "audit:rust",

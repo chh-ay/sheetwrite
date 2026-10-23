@@ -8,7 +8,6 @@
 //! `bound` gives an upper bound of cells.
 
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
 use super::super::array::ast_produces_array;
@@ -17,9 +16,10 @@ use super::super::matrix::{
     SPILL_MAX_RECOMPUTE_CELLS, SPILL_MAX_ROWS,
 };
 use super::super::value::{bool_from_value, compare_values, number_from_value};
+use super::super::EvalPass;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
+use crate::types::{FormulaError, Value};
 
 pub(crate) const NAMES: &[&str] = &[
     "EXPAND", "HSTACK", "SORTBY", "TOCOL", "TOROW", "VSTACK", "WRAPCOLS", "WRAPROWS",
@@ -322,48 +322,31 @@ pub(super) fn bound(
     }
 }
 
-struct Evaluation<'a> {
+struct Evaluation<'a, 'p> {
     store: &'a CellStore,
     args: &'a [Ast],
     sheet: usize,
-    affected: &'a HashSet<AbsCellKey>,
-    memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &'a mut HashSet<AbsCellKey>,
+    pass: &'a mut EvalPass<'p>,
     depth: usize,
 }
 
-impl Evaluation<'_> {
+impl Evaluation<'_, '_> {
     fn scalar(&mut self, index: usize) -> Option<Value> {
         let ast = optional_ast(self.args, index)?;
-        Some(self.store.eval_ast(
-            ast,
-            self.sheet,
-            self.affected,
-            self.memo,
-            self.visiting,
-            self.depth + 1,
-        ))
+        Some(
+            self.store
+                .eval_ast(ast, self.sheet, self.pass, self.depth + 1),
+        )
     }
 
     fn source(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
         if is_array_argument(ast, self.sheet) {
-            self.store.eval_matrix_arg(
-                ast,
-                self.sheet,
-                self.affected,
-                self.memo,
-                self.visiting,
-                self.depth + 1,
-            )
+            self.store
+                .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
         } else {
-            let value = self.store.eval_ast(
-                ast,
-                self.sheet,
-                self.affected,
-                self.memo,
-                self.visiting,
-                self.depth + 1,
-            );
+            let value = self
+                .store
+                .eval_ast(ast, self.sheet, self.pass, self.depth + 1);
             Ok(EvalMatrix::new(1, 1, vec![value]))
         }
     }
@@ -382,7 +365,7 @@ struct Inputs {
 }
 
 impl Inputs {
-    fn read(evaluation: &mut Evaluation<'_>, name: &str) -> Result<Self, FormulaError> {
+    fn read(evaluation: &mut Evaluation<'_, '_>, name: &str) -> Result<Self, FormulaError> {
         let args = evaluation.args;
         let mut inputs = Inputs {
             matrices: Vec::with_capacity(sources(name, args).len()),
@@ -469,9 +452,7 @@ pub(super) fn evaluate(
     name: &str,
     args: &[Ast],
     sheet: usize,
-    affected: &HashSet<AbsCellKey>,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
-    visiting: &mut HashSet<AbsCellKey>,
+    pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
     check_arity(name, args)?;
@@ -479,9 +460,7 @@ pub(super) fn evaluate(
         store,
         args,
         sheet,
-        affected,
-        memo,
-        visiting,
+        pass,
         depth,
     };
     let inputs = Inputs::read(&mut evaluation, name)?;
@@ -495,7 +474,7 @@ pub(super) fn evaluate(
 }
 
 fn flatten(
-    evaluation: &mut Evaluation<'_>,
+    evaluation: &mut Evaluation<'_, '_>,
     name: &str,
     inputs: &Inputs,
 ) -> Result<EvalMatrix, FormulaError> {
@@ -550,7 +529,10 @@ struct SortKey {
 /// compared in order, and the sort is stable, so items with equal keys keep
 /// their order. A column key sorts rows; a row key sorts columns; every key must
 /// have one value per item and all keys must use the same orientation.
-fn sort_by(evaluation: &mut Evaluation<'_>, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
+fn sort_by(
+    evaluation: &mut Evaluation<'_, '_>,
+    inputs: &Inputs,
+) -> Result<EvalMatrix, FormulaError> {
     let source = &inputs.matrices[0];
     let args = evaluation.args;
     let mut sorts_rows = None;
@@ -626,7 +608,7 @@ fn sort_by(evaluation: &mut Evaluation<'_>, inputs: &Inputs) -> Result<EvalMatri
 }
 
 fn wrap(
-    evaluation: &mut Evaluation<'_>,
+    evaluation: &mut Evaluation<'_, '_>,
     name: &str,
     inputs: &Inputs,
 ) -> Result<EvalMatrix, FormulaError> {
@@ -682,7 +664,10 @@ fn expand_size(value: Option<Value>, source: usize) -> Result<usize, FormulaErro
     })
 }
 
-fn expand(evaluation: &mut Evaluation<'_>, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
+fn expand(
+    evaluation: &mut Evaluation<'_, '_>,
+    inputs: &Inputs,
+) -> Result<EvalMatrix, FormulaError> {
     let source = &inputs.matrices[0];
     let rows = expand_size(evaluation.scalar(1), source.rows)?;
     let cols = expand_size(evaluation.scalar(2), source.cols)?;

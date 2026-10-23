@@ -1,7 +1,9 @@
 //! Resident storage only: an unloaded clean datasource cell stays unloaded.
 
 use super::*;
-use crate::transfer::{Reader, TransferResult, Writer};
+use crate::transfer::Writer;
+#[cfg(any(target_arch = "wasm32", test))]
+use crate::transfer::{Reader, TransferResult};
 
 fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
     out.usize(keys.len());
@@ -11,6 +13,7 @@ fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
     }
 }
 
+#[cfg(any(target_arch = "wasm32", test))]
 fn read_keys(input: &mut Reader<'_>) -> TransferResult<HashSet<(usize, usize)>> {
     (0..input.count()?)
         .map(|_| Ok((input.usize()?, input.usize()?)))
@@ -132,6 +135,7 @@ impl SheetData {
         // Conditional rules contain parsed ASTs and are lazily rebuilt by the host.
     }
 
+    #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn read_transfer(input: &mut Reader<'_>) -> TransferResult<Self> {
         let n_cols = input.usize()?;
         let row_count = input.usize()?;

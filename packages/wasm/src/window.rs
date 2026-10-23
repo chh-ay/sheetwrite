@@ -34,19 +34,9 @@ impl CellStore {
         let row_end = row_end.min(s.row_count);
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
-        let Some(cells) = n_rows.checked_mul(n_cols) else {
+        let Some(mut cells) = WindowCells::new(n_rows, n_cols) else {
             return WindowView::empty(self.strings.epoch);
         };
-
-        let mut kind = vec![KIND_EMPTY; cells];
-        let mut num = vec![0.0f64; cells];
-        let mut str_local = vec![-1i32; cells];
-        let mut style_local = vec![0u32; cells];
-        let mut string_ids = vec![NO_STRING; cells];
-
-        let mut error_slots = [-1i32; FormulaError::COUNT];
-        let mut strings: Vec<String> = Vec::new();
-        let mut style_dict: Vec<u32> = Vec::new();
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
@@ -80,21 +70,7 @@ impl CellStore {
                                 }),
                         )
                     };
-                    fill_window_cell(
-                        s,
-                        run_row,
-                        col,
-                        dst,
-                        resolved,
-                        &mut kind,
-                        &mut num,
-                        &mut str_local,
-                        &mut style_local,
-                        &mut string_ids,
-                        &mut error_slots,
-                        &mut strings,
-                        &mut style_dict,
-                    );
+                    cells.fill(s, run_row, col, dst, resolved);
                 }
 
                 row = run_end;
@@ -102,32 +78,10 @@ impl CellStore {
         }
 
         let row_start_u = row_start as u32;
-        let cond_matches = cond_matches_for_window(
-            self,
-            sheet,
-            |ri| row_start_u + ri as u32,
-            n_rows,
-            cols,
-            &kind,
-            &num,
-            &string_ids,
-            &str_local,
-            &strings,
-        );
+        let cond_matches =
+            cond_matches_for_window(self, sheet, |ri| row_start_u + ri as u32, cols, &cells);
 
-        WindowView::new(
-            self.strings.epoch,
-            n_rows,
-            n_cols,
-            kind,
-            num,
-            str_local,
-            style_local,
-            string_ids,
-            strings,
-            style_dict,
-            cond_matches,
-        )
+        WindowView::new(self.strings.epoch, cells, cond_matches)
     }
 
     /// Bulk read of an explicit row list (sorted/filtered views) — same output
@@ -137,21 +91,10 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return WindowView::empty(self.strings.epoch);
         };
-        let n_rows = rows.len();
         let n_cols = cols.len();
-        let Some(cells) = n_rows.checked_mul(n_cols) else {
+        let Some(mut cells) = WindowCells::new(rows.len(), n_cols) else {
             return WindowView::empty(self.strings.epoch);
         };
-
-        let mut kind = vec![KIND_EMPTY; cells];
-        let mut num = vec![0.0f64; cells];
-        let mut str_local = vec![-1i32; cells];
-        let mut style_local = vec![0u32; cells];
-        let mut string_ids = vec![NO_STRING; cells];
-
-        let mut error_slots = [-1i32; FormulaError::COUNT];
-        let mut strings: Vec<String> = Vec::new();
-        let mut style_dict: Vec<u32> = Vec::new();
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
@@ -187,21 +130,7 @@ impl CellStore {
                             .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src))),
                     )
                 };
-                fill_window_cell(
-                    s,
-                    row,
-                    col,
-                    dst,
-                    resolved,
-                    &mut kind,
-                    &mut num,
-                    &mut str_local,
-                    &mut style_local,
-                    &mut string_ids,
-                    &mut error_slots,
-                    &mut strings,
-                    &mut style_dict,
-                );
+                cells.fill(s, row, col, dst, resolved);
             }
         }
 
@@ -209,88 +138,103 @@ impl CellStore {
             self,
             sheet,
             |ri| rows.get(ri).copied().unwrap_or(u32::MAX),
-            n_rows,
             cols,
-            &kind,
-            &num,
-            &string_ids,
-            &str_local,
-            &strings,
+            &cells,
         );
 
-        WindowView::new(
-            self.strings.epoch,
-            n_rows,
-            n_cols,
-            kind,
-            num,
-            str_local,
-            style_local,
-            string_ids,
-            strings,
-            style_dict,
-            cond_matches,
-        )
+        WindowView::new(self.strings.epoch, cells, cond_matches)
     }
 }
 
-/// `None` marks an unloaded cell; its payload must not be read before this check.
-#[inline(always)]
-pub(crate) fn fill_window_cell(
-    sheet: &SheetData,
-    row: usize,
-    col: usize,
-    dst: usize,
-    resolved: Option<(u8, u64)>,
-    kind: &mut [u8],
-    num: &mut [f64],
-    str_local: &mut [i32],
-    style_local: &mut [u32],
-    string_ids: &mut [u32],
-    error_slots: &mut [i32; FormulaError::COUNT],
-    strings: &mut Vec<String>,
-    style_dict: &mut Vec<u32>,
-) {
-    let Some((stored_kind, payload)) = resolved else {
-        kind[dst] = KIND_STRING;
-        str_local[dst] = local_error_index(FormulaError::Loading, error_slots, strings);
-        return;
-    };
+/// Cell buffers of one render window, row-major over `n_rows x n_cols`.
+struct WindowCells {
+    n_rows: usize,
+    n_cols: usize,
+    kind: Vec<u8>,
+    num: Vec<f64>,
+    str_local: Vec<i32>,
+    style_local: Vec<u32>,
+    string_ids: Vec<u32>,
+    /// Window-local formula-error sentinels, indexed by `str_local`.
+    strings: Vec<String>,
+    style_dict: Vec<u32>,
+    error_slots: [i32; FormulaError::COUNT],
+}
 
-    let src = sheet.idx(row, col);
-    kind[dst] = stored_kind;
-    style_local[dst] = local_style_index(sheet.style_at(src), style_dict);
+impl WindowCells {
+    /// `None` when the window's cell count overflows `usize`.
+    fn new(n_rows: usize, n_cols: usize) -> Option<Self> {
+        let cells = n_rows.checked_mul(n_cols)?;
+        Some(Self {
+            n_rows,
+            n_cols,
+            kind: vec![KIND_EMPTY; cells],
+            num: vec![0.0f64; cells],
+            str_local: vec![-1i32; cells],
+            style_local: vec![0u32; cells],
+            string_ids: vec![NO_STRING; cells],
+            strings: Vec::new(),
+            style_dict: Vec::new(),
+            error_slots: [-1i32; FormulaError::COUNT],
+        })
+    }
 
-    match stored_kind {
-        KIND_NUMBER | KIND_BOOL => num[dst] = payload_num(payload),
-        KIND_STRING => {
-            let pool_id = payload_str_id(payload);
-            if pool_id == NO_STRING {
-                kind[dst] = KIND_EMPTY;
-            } else {
-                string_ids[dst] = pool_id;
+    /// `None` marks an unloaded cell; its payload must not be read before this check.
+    #[inline(always)]
+    fn fill(
+        &mut self,
+        sheet: &SheetData,
+        row: usize,
+        col: usize,
+        dst: usize,
+        resolved: Option<(u8, u64)>,
+    ) {
+        let Some((stored_kind, payload)) = resolved else {
+            self.kind[dst] = KIND_STRING;
+            self.str_local[dst] = local_error_index(
+                FormulaError::Loading,
+                &mut self.error_slots,
+                &mut self.strings,
+            );
+            return;
+        };
+
+        let src = sheet.idx(row, col);
+        self.kind[dst] = stored_kind;
+        self.style_local[dst] = local_style_index(sheet.style_at(src), &mut self.style_dict);
+
+        match stored_kind {
+            KIND_NUMBER | KIND_BOOL => self.num[dst] = payload_num(payload),
+            KIND_STRING => {
+                let pool_id = payload_str_id(payload);
+                if pool_id == NO_STRING {
+                    self.kind[dst] = KIND_EMPTY;
+                } else {
+                    self.string_ids[dst] = pool_id;
+                }
             }
-        }
-        KIND_FORMULA => {
-            let key = cell_key(row, col);
-            let entry = key.and_then(|key| sheet.formulas.get(&key));
-            let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
-            if let Some(error) = error {
-                kind[dst] = KIND_STRING;
-                str_local[dst] = local_error_index(error, error_slots, strings);
-            } else {
-                kind[dst] = KIND_NUMBER;
-                num[dst] = payload_num(payload);
+            KIND_FORMULA => {
+                let key = cell_key(row, col);
+                let entry = key.and_then(|key| sheet.formulas.get(&key));
+                let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
+                if let Some(error) = error {
+                    self.kind[dst] = KIND_STRING;
+                    self.str_local[dst] =
+                        local_error_index(error, &mut self.error_slots, &mut self.strings);
+                } else {
+                    self.kind[dst] = KIND_NUMBER;
+                    self.num[dst] = payload_num(payload);
+                }
             }
+            _ => {}
         }
-        _ => {}
     }
 }
 
 /// Window-local style index: linear scan over the (tiny) per-window dict. A
 /// visible window holds a handful of distinct styles, so a scan beats a
 /// per-frame `HashMap` allocation and hashing on the 60Hz render path.
-pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32 {
+fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32 {
     if let Some(pos) = style_dict.iter().position(|&s| s == style_id) {
         return pos as u32;
     }
@@ -300,7 +244,7 @@ pub(crate) fn local_style_index(style_id: u32, style_dict: &mut Vec<u32>) -> u32
 
 /// Window-local index of a formula-error sentinel; `slots` has one entry per
 /// `FormulaError` variant and requires no allocation.
-pub(crate) fn local_error_index(
+fn local_error_index(
     error: FormulaError,
     slots: &mut [i32; FormulaError::COUNT],
     strings: &mut Vec<String>,
@@ -318,19 +262,14 @@ pub(crate) fn local_error_index(
 /// sheet has no rules, so rule-free windows pay nothing. Predicates evaluate
 /// against the window OUTPUT arrays — the same displayed values the host would
 /// otherwise re-derive in JS — including formula results and error sentinels.
-#[allow(clippy::too_many_arguments)]
 fn cond_matches_for_window<F: Fn(usize) -> u32>(
     store: &CellStore,
     sheet_index: usize,
     data_row_at: F,
-    n_rows: usize,
     cols: &[u32],
-    kind: &[u8],
-    num: &[f64],
-    string_ids: &[u32],
-    str_local: &[i32],
-    local_strings: &[String],
+    cells: &WindowCells,
 ) -> Vec<u32> {
+    let n_rows = cells.n_rows;
     let Some(sheet) = store.sheets.get(sheet_index) else {
         return Vec::new();
     };
@@ -381,13 +320,13 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                     }
                     predicate => cond_pred_matches(
                         predicate,
-                        kind[dst],
-                        num[dst],
+                        cells.kind[dst],
+                        cells.num[dst],
                         cell_text(
-                            string_ids[dst],
-                            str_local[dst],
+                            cells.string_ids[dst],
+                            cells.str_local[dst],
                             &store.strings,
-                            local_strings,
+                            &cells.strings,
                         ),
                     ),
                 };
@@ -452,88 +391,52 @@ pub struct WindowView {
 }
 
 impl WindowView {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        string_pool_epoch: u32,
-        n_rows: usize,
-        n_cols: usize,
-        kind: Vec<u8>,
-        num: Vec<f64>,
-        str_local: Vec<i32>,
-        style_local: Vec<u32>,
-        string_ids: Vec<u32>,
-        strings: Vec<String>,
-        style_dict: Vec<u32>,
-        cond_matches: Vec<u32>,
-    ) -> Self {
-        let packed = pack_window(
-            n_rows,
-            n_cols,
-            &kind,
-            &num,
-            &str_local,
-            &style_local,
-            &string_ids,
-            style_dict.as_slice(),
-            &cond_matches,
-            strings.len(),
-        )
-        .unwrap_or_default();
+    fn new(string_pool_epoch: u32, cells: WindowCells, cond_matches: Vec<u32>) -> Self {
+        let packed = pack_window(&cells, &cond_matches).unwrap_or_default();
         Self {
             string_pool_epoch,
-            n_rows: n_rows.try_into().unwrap_or_default(),
-            n_cols: n_cols.try_into().unwrap_or_default(),
+            n_rows: cells.n_rows.try_into().unwrap_or_default(),
+            n_cols: cells.n_cols.try_into().unwrap_or_default(),
             packed,
-            strings,
+            strings: cells.strings,
         }
     }
 
     pub(crate) fn empty(epoch: u32) -> Self {
-        Self::new(
-            epoch,
-            0,
-            0,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-        )
+        let cells = WindowCells::new(0, 0).expect("an empty window has no cells");
+        Self::new(epoch, cells, Vec::new())
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn pack_window(
-    n_rows: usize,
-    n_cols: usize,
-    kind: &[u8],
-    num: &[f64],
-    str_local: &[i32],
-    style_local: &[u32],
-    string_ids: &[u32],
-    style_dict: &[u32],
-    cond_matches: &[u32],
-    string_count: usize,
-) -> Option<Vec<u8>> {
-    let cells = n_rows.checked_mul(n_cols)?;
-    if kind.len() != cells
-        || num.len() != cells
-        || str_local.len() != cells
-        || style_local.len() != cells
-        || string_ids.len() != cells
-        || (!cond_matches.is_empty() && cond_matches.len() != cells)
+fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
+    let WindowCells {
+        n_rows,
+        n_cols,
+        kind,
+        num,
+        str_local,
+        style_local,
+        string_ids,
+        strings,
+        style_dict,
+        ..
+    } = cells;
+    let cell_count = n_rows.checked_mul(*n_cols)?;
+    if kind.len() != cell_count
+        || num.len() != cell_count
+        || str_local.len() != cell_count
+        || style_local.len() != cell_count
+        || string_ids.len() != cell_count
+        || (!cond_matches.is_empty() && cond_matches.len() != cell_count)
     {
         return None;
     }
 
-    let numbers_start = align_to_8(WINDOW_PACKED_HEADER_BYTES.checked_add(cells)?)?;
-    let string_ids_start = numbers_start.checked_add(cells.checked_mul(8)?)?;
-    let string_index_start = string_ids_start.checked_add(cells.checked_mul(4)?)?;
-    let style_index_start = string_index_start.checked_add(cells.checked_mul(4)?)?;
-    let style_dict_start = style_index_start.checked_add(cells.checked_mul(4)?)?;
+    let numbers_start = align_to_8(WINDOW_PACKED_HEADER_BYTES.checked_add(cell_count)?)?;
+    let string_ids_start = numbers_start.checked_add(cell_count.checked_mul(8)?)?;
+    let string_index_start = string_ids_start.checked_add(cell_count.checked_mul(4)?)?;
+    let style_index_start = string_index_start.checked_add(cell_count.checked_mul(4)?)?;
+    let style_dict_start = style_index_start.checked_add(cell_count.checked_mul(4)?)?;
     let cond_matches_start = style_dict_start.checked_add(style_dict.len().checked_mul(4)?)?;
     let total_bytes = cond_matches_start.checked_add(cond_matches.len().checked_mul(4)?)?;
 
@@ -542,12 +445,12 @@ fn pack_window(
         WINDOW_PACKED_VERSION,
         WINDOW_PACKED_HEADER_BYTES.try_into().ok()?,
         total_bytes.try_into().ok()?,
-        n_rows.try_into().ok()?,
-        n_cols.try_into().ok()?,
-        cells.try_into().ok()?,
+        (*n_rows).try_into().ok()?,
+        (*n_cols).try_into().ok()?,
+        cell_count.try_into().ok()?,
         style_dict.len().try_into().ok()?,
         cond_matches.len().try_into().ok()?,
-        string_count.try_into().ok()?,
+        strings.len().try_into().ok()?,
     ];
     let mut packed = Vec::with_capacity(total_bytes);
     for word in header {
@@ -614,11 +517,15 @@ impl WindowView {
 
 #[cfg(test)]
 mod tests {
-    use super::pack_window;
+    use super::{pack_window, WindowCells};
 
     #[test]
     fn packed_window_rejects_mismatched_cell_buffers() {
-        assert!(pack_window(1, 1, &[], &[0.0], &[0], &[0], &[0], &[], &[], 0).is_none());
-        assert!(pack_window(1, 1, &[0], &[0.0], &[0], &[0], &[0], &[], &[0, 0], 0).is_none());
+        let mut cells = WindowCells::new(1, 1).unwrap();
+        cells.kind.clear();
+        assert!(pack_window(&cells, &[]).is_none());
+
+        let cells = WindowCells::new(1, 1).unwrap();
+        assert!(pack_window(&cells, &[0, 0]).is_none());
     }
 }
