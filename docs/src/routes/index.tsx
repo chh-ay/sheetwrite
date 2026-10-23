@@ -12,6 +12,7 @@ import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
+import { LATEST_RELEASE } from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
 
 import landingStylesheet from "../styles/landing.css?url";
@@ -356,7 +357,7 @@ function Landing() {
                 <li key={note}>{note}</li>
               ))}
               <li>
-                <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
+                <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
                   Read what is new and the upgrade checklist →
                 </Link>
               </li>
@@ -431,7 +432,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
+              <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
                 What's new
               </Link>
             </div>

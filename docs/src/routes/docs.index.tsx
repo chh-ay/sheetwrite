@@ -78,36 +78,36 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.5.1</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }}>
+            <h2 id="new-in-release">New in 0.5.2</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="typed-shortcuts">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }} hash="smaller-packages">
+              <span className="sw-doc-eyebrow">Packages</span>
+              <strong>
+                Smaller downloads <span aria-hidden="true">→</span>
+              </strong>
+              <span>Downloads are 4.5% smaller and installs 13.2% smaller.</span>
+            </Link>
+            <Link
+              to="/docs/$/"
+              params={{ _splat: "releases/0.5.2" }}
+              hash="shortcuts-with-shift-or-alt"
+            >
               <span className="sw-doc-eyebrow">Keyboard bindings</span>
               <strong>
-                Set your shortcuts <span aria-hidden="true">→</span>
+                Shifted shortcuts run <span aria-hidden="true">→</span>
               </strong>
-              <span>
-                Typed key combinations share platform-aware labels across menus and toolbars.
-              </span>
+              <span>Combinations with Shift or Alt and a digit or symbol now run.</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="action-feedback">
-              <span className="sw-doc-eyebrow">Built-in buttons</span>
-              <strong>
-                See command progress <span aria-hidden="true">→</span>
-              </strong>
-              <span>
-                Busy states and visible errors for toolbar, context-menu, and find commands.
-              </span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.1" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
               </strong>
-              <span>Update shortcut hints, awaited exports, and export-error handlers.</span>
+              <span>Update every package together, and update Bun or Node for the Brotli fix.</span>
             </Link>
           </div>
         </section>
