@@ -84,7 +84,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
-    "@happy-dom/global-registrator": "^20.14.5",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@playwright/test": "^1.63.0",
     "@sheetwrite/formulas": "workspace:*",
     "@sheetwrite/wasm": "workspace:*",
@@ -111,6 +111,7 @@
     "shell-quote": "^1.12.0",
     "smol-toml": "^1.9.0",
     "source-map-js": "^1.2.2",
-    "toml": "^5.0.1"
+    "toml": "^5.0.1",
+    "zod": "^4.6.7"
   }
 }
