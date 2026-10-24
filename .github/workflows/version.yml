@@ -33,7 +33,7 @@ jobs:
       - name: Create or update package version pull request
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
-          version: bunx changeset version
+          version: bun run changeset:version
           title: Version npm packages
           commit: "chore(release): version packages"
           createGithubReleases: false

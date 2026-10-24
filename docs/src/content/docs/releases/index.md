@@ -9,8 +9,15 @@ results, and the steps to upgrade.
 
 <ol class="sw-release-list">
 <li>
+<a class="sw-release-list__card" href="/docs/releases/0.5.3/">
+<span class="sw-release-list__meta"><strong>0.5.3</strong><time datetime="2026-10-24">Oct 24, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__title">Readable package code</span>
+<span class="sw-release-list__points"><span>Published JavaScript is readable again</span><span>Install commands for npm, pnpm, Yarn, and Bun</span><span>Engine crate version matches the npm packages</span></span>
+</a>
+</li>
+<li>
 <a class="sw-release-list__card" href="/docs/releases/0.5.2/">
-<span class="sw-release-list__meta"><strong>0.5.2</strong><time datetime="2026-10-23">Oct 23, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__meta"><strong>0.5.2</strong><time datetime="2026-10-23">Oct 23, 2026</time></span>
 <span class="sw-release-list__title">Smaller packages and a security update</span>
 <span class="sw-release-list__points"><span>Downloads 4.5% and installs 13.2% smaller</span><span>21 MiB less peak memory for a 1,000,000-row CSV import</span><span>Shortcuts with Shift or Alt and a digit or symbol</span><span>Bun 1.4.4 and Node 26.12.1 for the Brotli fix</span></span>
 </a>

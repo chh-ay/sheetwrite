@@ -14,6 +14,13 @@ From 0.5.0, each release has a release post with highlights, measured
 performance, and an upgrade checklist:
 [sheetwrite.vercel.app/docs/releases](https://sheetwrite.vercel.app/docs/releases/).
 
+## 0.5.3
+
+- Publish readable JavaScript again; 0.5.2 shipped each module on one line.
+- The `sheetwrite-wasm` crate version matches `@sheetwrite/wasm` and
+  `@sheetwrite/formulas`.
+- [Release notes](https://sheetwrite.vercel.app/docs/releases/0.5.3/).
+
 ## 0.5.2
 
 - Smaller npm packages, lower CSV import memory, and shortcuts with Shift or Alt

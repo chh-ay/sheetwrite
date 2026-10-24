@@ -14,6 +14,11 @@ interface Release {
 
 const RELEASES: readonly [Release, ...Release[]] = [
   {
+    version: "0.5.3",
+    date: "2026-10-24",
+    summary: "Readable published JavaScript and package READMEs for every package manager.",
+  },
+  {
     version: "0.5.2",
     date: "2026-10-23",
     summary: "Smaller packages, lower CSV import memory and shifted shortcuts.",

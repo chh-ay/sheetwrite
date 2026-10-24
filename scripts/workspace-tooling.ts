@@ -118,7 +118,6 @@ const TOOLING_TESTS: CommandNode = {
     "scripts/dependency-audit.test.ts",
     "scripts/verify-clean-build.test.ts",
     "scripts/size-report.test.ts",
-    "scripts/minify-package.test.ts",
     "scripts/release-artifacts.test.ts",
     "scripts/consumer-lock.test.ts",
     "scripts/release-verify.test.ts",

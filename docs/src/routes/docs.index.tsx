@@ -78,36 +78,36 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.5.2</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }}>
+            <h2 id="new-in-release">New in 0.5.3</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.3" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }} hash="smaller-packages">
-              <span className="sw-doc-eyebrow">Packages</span>
-              <strong>
-                Smaller downloads <span aria-hidden="true">→</span>
-              </strong>
-              <span>Downloads are 4.5% smaller and installs 13.2% smaller.</span>
-            </Link>
             <Link
               to="/docs/$/"
-              params={{ _splat: "releases/0.5.2" }}
-              hash="shortcuts-with-shift-or-alt"
+              params={{ _splat: "releases/0.5.3" }}
+              hash="readable-published-javascript"
             >
-              <span className="sw-doc-eyebrow">Keyboard bindings</span>
+              <span className="sw-doc-eyebrow">Packages</span>
               <strong>
-                Shifted shortcuts run <span aria-hidden="true">→</span>
+                Readable package code <span aria-hidden="true">→</span>
               </strong>
-              <span>Combinations with Shift or Alt and a digit or symbol now run.</span>
+              <span>Stack traces point to real lines, and you can debug in node_modules.</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }}>
+              <span className="sw-doc-eyebrow">0.5.2</span>
+              <strong>
+                Memory, shortcuts, security <span aria-hidden="true">→</span>
+              </strong>
+              <span>Lower CSV import memory, shifted shortcuts, and the Brotli runtime fix.</span>
+            </Link>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.3" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
               </strong>
-              <span>Update every package together, and update Bun or Node for the Brotli fix.</span>
+              <span>Update every package together.</span>
             </Link>
           </div>
         </section>

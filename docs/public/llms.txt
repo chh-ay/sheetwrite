@@ -63,6 +63,7 @@ Sheetwrite packages are released together at version 0.5.2. This index is genera
 - [Sheetwrite 0.5.0](https://sheetwrite.vercel.app/docs/releases/0.5.0/): The full formula engine, spill references, large undo, in-place conflict recovery, engine memory release, bounded string storage, faster loading and import, breaking changes, every fix, and the upgrade checklist for Sheetwrite 0.5.0.
 - [Sheetwrite 0.5.1](https://sheetwrite.vercel.app/docs/releases/0.5.1/): Typed shortcuts, busy states and visible command errors, restored column sum performance, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.1.
 - [Sheetwrite 0.5.2](https://sheetwrite.vercel.app/docs/releases/0.5.2/): Smaller npm packages, lower CSV import memory, shifted keyboard shortcuts, the Brotli security update for Bun and Node, redesigned documentation, and the upgrade checklist for Sheetwrite 0.5.2.
+- [Sheetwrite 0.5.3](https://sheetwrite.vercel.app/docs/releases/0.5.3/): Readable published JavaScript again, package READMEs with install commands for every package manager, and the upgrade checklist for Sheetwrite 0.5.3.
 
 ## Public API
 

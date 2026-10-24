@@ -35,6 +35,7 @@ Packages: 0.5.2. Canonical HTML: https://sheetwrite.vercel.app/docs/
 - [Sheetwrite 0.5.0](#sheetwrite-0-5-0)
 - [Sheetwrite 0.5.1](#sheetwrite-0-5-1)
 - [Sheetwrite 0.5.2](#sheetwrite-0-5-2)
+- [Sheetwrite 0.5.3](#sheetwrite-0-5-3)
 - [Your first grid](#your-first-grid)
 - [Installation](#installation)
 - [Public API declarations](#public-api-declarations)
@@ -4311,7 +4312,11 @@ All Sheetwrite packages release together with one version number. Each release
 post lists what is new, what changed, what is fixed, the measured performance
 results, and the steps to upgrade.
 
-**0.5.2**Oct 23, 2026Latest
+**0.5.3**Oct 24, 2026Latest
+Readable package code
+Published JavaScript is readable againInstall commands for npm, pnpm, Yarn, and BunEngine crate version matches the npm packages
+
+**0.5.2**Oct 23, 2026
 Smaller packages and a security update
 Downloads 4.5% and installs 13.2% smaller21 MiB less peak memory for a 1,000,000-row CSV importShortcuts with Shift or Alt and a digit or symbolBun 1.4.4 and Node 26.12.1 for the Brotli fix
 
@@ -4880,6 +4885,50 @@ Use Bun 1.4.4, or Node 26.12.1, 24.22.1, or 22.23.4, for the Brotli decoder fix.
 If you upgrade from before 0.5.1Also do
 Complete the earlier steps first
 Read the 0.5.1 upgrade checklist (https://sheetwrite.vercel.app/docs/releases/0.5.1/#upgrade-checklist) and, before that, the 0.5.0 upgrade checklist (https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist).
+
+### Sheetwrite 0.5.3
+
+Source: https://sheetwrite.vercel.app/docs/releases/0.5.3/
+
+Sheetwrite 0.5.3 publishes readable JavaScript again. It has no API changes.
+All seven packages release as 0.5.3.
+
+## Highlights
+
+- **Readable package code.** Stack traces point to real lines, and you can read
+and debug the code in `node_modules`.
+- **Package READMEs.** npm pages show npm, pnpm, Yarn, and Bun install commands,
+and the core README explains how to select the full formula engine.
+
+## Changes
+
+### Readable published JavaScript
+
+0.5.2 removed the whitespace from the published JavaScript to make the packages
+smaller. Each module became one long line, so stack traces pointed to line 1
+and the code was hard to read when you debug an app. 0.5.3 publishes the
+compiler output again, with one statement per line.
+
+Your bundler still minifies your app build, so the code that your users
+download does not change size. Module paths, exported names, type
+documentation, and WebAssembly binaries do not change.
+
+### Engine crate version
+
+The `sheetwrite-wasm` Rust crate, which builds `@sheetwrite/wasm` and
+`@sheetwrite/formulas`, now has the same version as those packages. The release
+process keeps them together.
+
+## Upgrade checklist
+
+EveryoneRequired
+Update every package together
+Install 0.5.3 for each `@sheetwrite/*` package that you use. Packages from different versions are not supported together.
+`core``wasm``formulas``xlsx``react``vue``svelte`
+
+If you upgrade from before 0.5.2Also do
+Complete the earlier steps first
+Read the 0.5.2 upgrade checklist (https://sheetwrite.vercel.app/docs/releases/0.5.2/#upgrade-checklist), then the 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/#upgrade-checklist) and 0.5.0 (https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist) checklists.
 
 ### Your first grid
 
