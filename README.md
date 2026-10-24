@@ -1,13 +1,18 @@
 # Sheetwrite
 
-A canvas spreadsheet and data grid backed by a Rust/WASM columnar engine, with imperative core and React, Vue, and Svelte adapters.
+A canvas spreadsheet and data grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.
 
-## Framework lane
+[Documentation](https://sheetwrite.vercel.app/docs/) ·
+[Live showcases](https://sheetwrite.vercel.app/showcases/) ·
+[Release notes](https://sheetwrite.vercel.app/docs/releases/) ·
+[npm](https://www.npmjs.com/package/@sheetwrite/core)
 
-Install one adapter. Core and WASM arrive transitively.
+## Use a framework adapter
+
+Install one adapter. The core and the WASM engine install with it.
 
 ```sh
-bun add @sheetwrite/react
+npm install @sheetwrite/react   # or: pnpm add, yarn add, bun add
 ```
 
 ```tsx
@@ -37,10 +42,10 @@ durable/versioned writes use `SyncCoordinator`; do not persist only
 
 Readiness reports `{ grid, generation, reason }`, where reason is `initial`, `input-reset`, or `renderer-reset`. Grid events use collision-free names: `onGridChange`/`grid-change`, `onViewportChange`/`viewport-change`, selection, edit, search, and active-sheet variants. Native host change and scroll events remain available.
 
-## Engine lane
+## Use the core without a framework
 
 ```sh
-bun add @sheetwrite/core
+npm install @sheetwrite/core
 ```
 
 ```ts
@@ -73,7 +78,24 @@ const grid = createGrid(document.querySelector("#grid")!, {
 });
 ```
 
-Zero-argument initialization is canonical and re-entrant. Explicit WASM sources remain available for unsupported bundlers or controlled asset delivery; see [Installation](https://sheetwrite.vercel.app/docs/start/installation/).
+Call `initSheetwrite()` with no arguments; you can call it more than once. To load the WASM file yourself, for example with a bundler that cannot resolve it, see [Installation](https://sheetwrite.vercel.app/docs/start/installation/).
+
+## Choose a formula engine
+
+The default engine, `@sheetwrite/wasm`, installs with the core. It has the standard functions and the smaller download. Install the full engine when the app needs analysis functions such as `GROUPBY`, `PIVOTBY`, `LAMBDA`, statistics, regression, and finance:
+
+```sh
+npm install @sheetwrite/formulas
+```
+
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+Both engines have the same API. Select one before you create a Grid or a store. See [Analysis formulas](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/) and the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/).
 
 ## Optional XLSX backend
 
@@ -81,7 +103,7 @@ Core and every framework adapter install without a concrete XLSX codec. Add the
 optional backend only when the application chooses XLSX support:
 
 ```sh
-bun add @sheetwrite/xlsx
+npm install @sheetwrite/xlsx
 ```
 
 ```ts
@@ -139,39 +161,35 @@ presence, comments, and revisions.
 | Package | Purpose |
 |---|---|
 | `@sheetwrite/core` | Imperative grid, store, formulas, views, export, theming |
+| `@sheetwrite/wasm` | Default Rust/WASM engine; installs with the core |
+| `@sheetwrite/formulas` | Optional full formula engine with analysis functions |
 | `@sheetwrite/xlsx` | Optional concrete XLSX table/workbook backends and explicit registration |
 | `@sheetwrite/react` | React `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/vue` | Vue `Sheetwrite` and `SheetwriteGrid` |
 | `@sheetwrite/svelte` | Svelte `Sheetwrite` and `SheetwriteGrid` |
-| `@sheetwrite/wasm` | Internal Rust/WASM engine; normally transitive |
 
+## Compatibility
 
-## v0.3 roadmap status
-
-Implemented on the development branch: complete worksheet lifecycle operations,
-more portable formulas, native workbook tables and structured references, safe
-links, bounded conditional formatting, and 2,350 checked examples. Each example
-is either an original Sheetwrite test or links to the public specification it
-uses. The results show exactly what Sheetwrite does today; they do not claim
-blanket Excel or Google Sheets compatibility.
-
-The v0.3 release is still waiting on fresh test runs in Excel and Google Sheets,
-workbook save-and-open checks between apps, unchanged download-size limits, the
-measured decision on billion-cell sheets, stable row-model and executable
-onboarding work, and final browser checks for every product showcase. See the
+2,350 checked examples cover worksheet operations, formulas, workbook tables and
+structured references, links, and conditional formatting. Each example is an
+original Sheetwrite test or links to the public specification that it uses. The
+results show what Sheetwrite does; they do not claim full Excel or Google Sheets
+compatibility. See the
 [detailed compatibility results](https://sheetwrite.vercel.app/docs/reference/compatibility-results/)
-for supported features, warnings, known limits, app versions, and test evidence.
+and [compatibility limits](https://sheetwrite.vercel.app/docs/reference/compatibility-limits/).
 
 ## Releases
 
-Changesets maintain independent package versions and package-level changelogs
-linked from the root [changelog](CHANGELOG.md). Merging changes with pending
-changesets updates one version pull request. After its version commit passes CI
-on `develop`, publication downloads and rehashes that exact run's canonical
-tarballs, verifies and skips package versions already on npm, and publishes only
-unpublished versions in dependency order with provenance. Registry verification
-finishes before package-specific tags and GitHub Releases such as
-`@sheetwrite/xlsx@0.2.1` are created.
+All packages release together with one version number. The
+[release notes](https://sheetwrite.vercel.app/docs/releases/) list what is new,
+the measured performance, and the upgrade steps for each version. Each package
+also has a `CHANGELOG.md`, linked from the root [changelog](CHANGELOG.md).
+
+Merged changesets update one version pull request. After its version commit
+passes CI on `develop`, publication downloads and rehashes the canonical
+tarballs from that CI run, skips versions already on npm, and publishes the rest
+in dependency order with provenance. Each package then gets a git tag and a
+GitHub Release, such as `@sheetwrite/core@0.5.2`.
 
 ## Development
 
@@ -200,9 +218,9 @@ deletes working-tree files:
 bun run verify:clean-build
 ```
 
-For the complete local CI graph, install Chromium once, then run the ordered
-non-browser graph and browser gate. `browser:install` installs the Playwright
-browser and its operating-system dependencies.
+For the complete local CI graph, install the browsers once, then run the
+non-browser graph and the browser tests. `browser:install` installs Chromium,
+Firefox, and WebKit with their operating-system dependencies.
 
 ```sh
 bun run browser:install

@@ -10,15 +10,36 @@ Published releases and user-visible changes to Sheetwrite are recorded here. Pac
 - [`@sheetwrite/vue`](packages/vue/CHANGELOG.md)
 - [`@sheetwrite/svelte`](packages/svelte/CHANGELOG.md)
 
-## Unreleased
+From 0.5.0, each release has a release post with highlights, measured
+performance, and an upgrade checklist:
+[sheetwrite.vercel.app/docs/releases](https://sheetwrite.vercel.app/docs/releases/).
 
-- Add `@sheetwrite/formulas`, an optional full formula engine with 36 statistical
-  distribution functions. Select it with `initSheetwrite(undefined, formulas)`.
-  The default `@sheetwrite/wasm` engine does not change.
-- Build the docs once in CI, test the packaged static site, then deploy that
-  output to Vercel. Vercel no longer rebuilds packages or installs Rust tools.
-- Send IndexNow updates after a successful production deployment, not during
-  the docs build.
+## 0.5.2
+
+- Smaller npm packages, lower CSV import memory, and shortcuts with Shift or Alt
+  and a digit or symbol.
+- Bun 1.4.4 and Node 26.12.1 for development, CI, and releases, for the Brotli
+  decoder fix (CVE-2026-111497).
+- [Release notes](https://sheetwrite.vercel.app/docs/releases/0.5.2/).
+
+## 0.5.1
+
+- Typed keyboard shortcuts, busy states and visible errors for built-in
+  commands, faster column sums, and redesigned documentation.
+- [Release notes](https://sheetwrite.vercel.app/docs/releases/0.5.1/).
+
+## 0.5.0
+
+- Add `@sheetwrite/formulas`, an optional full formula engine. Select it with
+  `initSheetwrite(undefined, formulas)`. The default `@sheetwrite/wasm` engine
+  stays the smaller download.
+- Spill references, array constants, large undo, and conflict recovery without
+  a reload.
+- [Release notes](https://sheetwrite.vercel.app/docs/releases/0.5.0/).
+
+## 0.3.0 – 0.4.0
+
+See each package's `CHANGELOG.md`, linked above.
 
 ## 0.2.0
 
