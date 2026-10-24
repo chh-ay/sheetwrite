@@ -1,5 +1,14 @@
 # @sheetwrite/xlsx
 
+## 0.5.3
+
+### Patch Changes
+
+- 222a3f8: Publish readable JavaScript again. 0.5.2 removed whitespace from the published files, so stack traces pointed into one long line and the code in `node_modules` was hard to read and debug. Your bundler still minifies your app build. Module paths, exports, and type documentation do not change.
+- Updated dependencies [885b764]
+- Updated dependencies [222a3f8]
+  - @sheetwrite/core@0.5.3
+
 ## 0.5.2
 
 ### Patch Changes

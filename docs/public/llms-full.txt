@@ -4,7 +4,7 @@
 
 Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from https://sheetwrite.vercel.app/llms.txt instead of being repeated here.
 
-Packages: 0.5.2. Canonical HTML: https://sheetwrite.vercel.app/docs/
+Packages: 0.5.3. Canonical HTML: https://sheetwrite.vercel.app/docs/
 
 ## Contents
 
@@ -4909,9 +4909,23 @@ smaller. Each module became one long line, so stack traces pointed to line 1
 and the code was hard to read when you debug an app. 0.5.3 publishes the
 compiler output again, with one statement per line.
 
-Your bundler still minifies your app build, so the code that your users
-download does not change size. Module paths, exported names, type
-documentation, and WebAssembly binaries do not change.
+The npm packages are larger again, about the same as in 0.5.1. If your
+production build uses a bundler that minifies, the code that your users
+download is the same as with 0.5.2. If you load the package files directly,
+without a minifying bundler, they download more bytes. Module paths, exported
+names, type documentation, and WebAssembly binaries do not change.
+
+| Package | Download 0.5.2 | Download 0.5.3 | Install 0.5.2 | Install 0.5.3 |
+| --- | ---: | ---: | ---: | ---: |
+| `@sheetwrite/core` | 315.3 KiB | 349.3 KiB | 1.22 MiB | 1.62 MiB |
+| `@sheetwrite/wasm` | 346.3 KiB | 352.9 KiB | 963.4 KiB | 1003.2 KiB |
+| `@sheetwrite/formulas` | 464.0 KiB | 471.1 KiB | 1.22 MiB | 1.26 MiB |
+| `@sheetwrite/xlsx` | 44.8 KiB | 52.5 KiB | 165.9 KiB | 228.4 KiB |
+| `@sheetwrite/react` | 5.6 KiB | 5.9 KiB | 15.9 KiB | 18.6 KiB |
+| `@sheetwrite/vue` | 6.7 KiB | 6.9 KiB | 18.7 KiB | 21.5 KiB |
+| `@sheetwrite/svelte` | 5.9 KiB | 5.9 KiB | 16.2 KiB | 16.3 KiB |
+
+Downloads are `npm pack` tarball sizes; installs are unpacked sizes.
 
 ### Engine crate version
 

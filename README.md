@@ -189,7 +189,7 @@ Merged changesets update one version pull request. After its version commit
 passes CI on `develop`, publication downloads and rehashes the canonical
 tarballs from that CI run, skips versions already on npm, and publishes the rest
 in dependency order with provenance. Each package then gets a git tag and a
-GitHub Release, such as `@sheetwrite/core@0.5.2`.
+GitHub Release named `<package>@<version>`.
 
 ## Development
 

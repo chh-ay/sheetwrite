@@ -1,5 +1,14 @@
 # @sheetwrite/svelte
 
+## 0.5.3
+
+### Patch Changes
+
+- 885b764: Package READMEs show npm, pnpm, Yarn, and Bun install commands, and the core and WASM READMEs explain how to select the full formula engine.
+- Updated dependencies [885b764]
+- Updated dependencies [222a3f8]
+  - @sheetwrite/core@0.5.3
+
 ## 0.5.2
 
 ### Patch Changes
