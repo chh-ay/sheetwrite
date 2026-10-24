@@ -4822,7 +4822,7 @@ Node 26.12.1, which fix a Brotli decoder vulnerability.
 Published JavaScript has no comments and less whitespace. Module paths, exported
 names, type documentation, and WebAssembly binaries do not change.
 
-Download size per package All seven packages: 4.5% smaller · shared scale
+Download size per package All seven packages: 4.5% smaller · each package on its own scale
 
 **`@sheetwrite/core`**9.7% smaller
 0.5.1**348.8 KiB**
@@ -4852,7 +4852,7 @@ Download size per package All seven packages: 4.5% smaller · shared scale
 0.5.1**5.9 KiB**
 0.5.2**5.9 KiB**
 
-Install size per package All seven packages: 13.2% smaller · shared scale
+Install size per package All seven packages: 13.2% smaller · each package on its own scale
 
 **`@sheetwrite/core`**24.7% smaller
 0.5.1**1.62 MiB**
@@ -4977,7 +4977,7 @@ download is the same as with 0.5.2. If you load the package files directly,
 without a minifying bundler, they download more bytes. Module paths, exported
 names, type documentation, and WebAssembly binaries do not change.
 
-Download size per package All seven packages: 4.7% larger · shared scale
+Download size per package All seven packages: 4.7% larger · each package on its own scale
 
 **`@sheetwrite/core`**10.8% larger
 0.5.2**315.3 KiB**
@@ -5007,7 +5007,7 @@ Download size per package All seven packages: 4.7% larger · shared scale
 0.5.2**5.9 KiB**
 0.5.3**5.9 KiB**
 
-Install size per package All seven packages: 15.2% larger · shared scale
+Install size per package All seven packages: 15.2% larger · each package on its own scale
 
 **`@sheetwrite/core`**32.8% larger
 0.5.2**1.22 MiB**
