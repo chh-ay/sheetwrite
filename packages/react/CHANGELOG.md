@@ -1,5 +1,13 @@
 # @sheetwrite/react
 
+## 0.5.4
+
+### Patch Changes
+
+- cb8a609: Remove `sourceMappingURL` comments that pointed to source map files the packages do not publish. Debuggers and bundlers no longer try to load missing maps.
+- Updated dependencies [cb8a609]
+  - @sheetwrite/core@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes
