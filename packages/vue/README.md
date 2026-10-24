@@ -5,7 +5,7 @@ Vue 3 components for Sheetwrite.
 ## Install
 
 ```sh
-bun add @sheetwrite/vue
+npm install @sheetwrite/vue   # or: pnpm add, yarn add, bun add
 ```
 
 Vue 3.4 or newer is a peer dependency. Core and WASM arrive transitively.

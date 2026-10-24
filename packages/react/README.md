@@ -5,7 +5,7 @@ React components for Sheetwrite.
 ## Install
 
 ```sh
-bun add @sheetwrite/react
+npm install @sheetwrite/react   # or: pnpm add, yarn add, bun add
 ```
 
 React 18 or newer is a peer dependency. Core and WASM are runtime dependencies of the adapter.
