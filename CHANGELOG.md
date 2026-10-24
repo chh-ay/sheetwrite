@@ -14,6 +14,12 @@ From 0.5.0, each release has a release post with highlights, measured
 performance, and an upgrade checklist:
 [sheetwrite.vercel.app/docs/releases](https://sheetwrite.vercel.app/docs/releases/).
 
+## 0.5.4
+
+- Remove `sourceMappingURL` comments that pointed to source map files the
+  packages do not publish.
+- [Release notes](https://sheetwrite.vercel.app/docs/releases/0.5.4/).
+
 ## 0.5.3
 
 - Publish readable JavaScript again; 0.5.2 shipped each module on one line.

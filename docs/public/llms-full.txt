@@ -4,7 +4,7 @@
 
 Every authored guide in the Sheetwrite documentation, followed by every compiler-verified public API declaration. Generated reference tables (API pages, formula functions, compatibility results, entry-point inventory, performance evidence) are published as HTML and are linked from https://sheetwrite.vercel.app/llms.txt instead of being repeated here.
 
-Packages: 0.5.3. Canonical HTML: https://sheetwrite.vercel.app/docs/
+Packages: 0.5.4. Canonical HTML: https://sheetwrite.vercel.app/docs/
 
 ## Contents
 
@@ -36,6 +36,7 @@ Packages: 0.5.3. Canonical HTML: https://sheetwrite.vercel.app/docs/
 - [Sheetwrite 0.5.1](#sheetwrite-0-5-1)
 - [Sheetwrite 0.5.2](#sheetwrite-0-5-2)
 - [Sheetwrite 0.5.3](#sheetwrite-0-5-3)
+- [Sheetwrite 0.5.4](#sheetwrite-0-5-4)
 - [Your first grid](#your-first-grid)
 - [Installation](#installation)
 - [Public API declarations](#public-api-declarations)
@@ -4312,7 +4313,11 @@ All Sheetwrite packages release together with one version number. Each release
 post lists what is new, what changed, what is fixed, the measured performance
 results, and the steps to upgrade.
 
-**0.5.3**Oct 24, 2026Latest
+**0.5.4**Oct 24, 2026Latest
+No missing source maps
+No references to unpublished source map filesSize charts in the release notesAll packages and the engine crate at one version
+
+**0.5.3**Oct 24, 2026
 Readable package code
 Published JavaScript is readable againInstall commands for npm, pnpm, Yarn, and BunEngine crate version matches the npm packages
 
@@ -5067,6 +5072,51 @@ Install 0.5.3 for each `@sheetwrite/*` package that you use. Packages from diffe
 If you upgrade from before 0.5.2Also do
 Complete the earlier steps first
 Read the 0.5.2 upgrade checklist (https://sheetwrite.vercel.app/docs/releases/0.5.2/#upgrade-checklist), then the 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/#upgrade-checklist) and 0.5.0 (https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist) checklists.
+
+### Sheetwrite 0.5.4
+
+Source: https://sheetwrite.vercel.app/docs/releases/0.5.4/
+
+Sheetwrite 0.5.4 removes references to source map files that the packages do
+not publish. It has no API changes. All seven packages release as 0.5.4.
+
+## Highlights
+
+- **No missing source maps.** Debuggers and bundlers no longer try to load
+`.map` files that are not in the packages.
+- **Size charts in the release notes.** Package sizes show as before/after bars
+for each package, with the exact table in a collapsed section.
+
+## Changes
+
+### Source map references
+
+Since 0.5.0, the published JavaScript and type declarations of
+`@sheetwrite/core`, `@sheetwrite/xlsx`, `@sheetwrite/react`, and
+`@sheetwrite/vue` ended with a `//# sourceMappingURL=` comment, but the
+packages did not include the `.map` files. Browser developer tools and some
+bundler loaders tried to load these files and showed warnings. 0.5.4 removes
+the comments. The JavaScript stays readable, so stack traces point to real
+lines in the package files.
+
+Package sizes are almost the same as in 0.5.3: `@sheetwrite/core` downloads
+1.4 KiB less and `@sheetwrite/xlsx` 0.2 KiB less.
+
+### Engine packages
+
+`@sheetwrite/wasm` and `@sheetwrite/formulas` release as 0.5.4 so that all
+packages have one version. Their engine does not change.
+
+## Upgrade checklist
+
+EveryoneRequired
+Update every package together
+Install 0.5.4 for each `@sheetwrite/*` package that you use. Packages from different versions are not supported together.
+`core``wasm``formulas``xlsx``react``vue``svelte`
+
+If you upgrade from before 0.5.3Also do
+Complete the earlier steps first
+Read the 0.5.2 (https://sheetwrite.vercel.app/docs/releases/0.5.2/#upgrade-checklist), 0.5.1 (https://sheetwrite.vercel.app/docs/releases/0.5.1/#upgrade-checklist), and 0.5.0 (https://sheetwrite.vercel.app/docs/releases/0.5.0/#upgrade-checklist) upgrade checklists. 0.5.3 has no extra steps.
 
 ### Your first grid
 

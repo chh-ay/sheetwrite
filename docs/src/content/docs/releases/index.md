@@ -9,8 +9,15 @@ results, and the steps to upgrade.
 
 <ol class="sw-release-list">
 <li>
+<a class="sw-release-list__card" href="/docs/releases/0.5.4/">
+<span class="sw-release-list__meta"><strong>0.5.4</strong><time datetime="2026-10-24">Oct 24, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__title">No missing source maps</span>
+<span class="sw-release-list__points"><span>No references to unpublished source map files</span><span>Size charts in the release notes</span><span>All packages and the engine crate at one version</span></span>
+</a>
+</li>
+<li>
 <a class="sw-release-list__card" href="/docs/releases/0.5.3/">
-<span class="sw-release-list__meta"><strong>0.5.3</strong><time datetime="2026-10-24">Oct 24, 2026</time><span class="sw-release-list__latest">Latest</span></span>
+<span class="sw-release-list__meta"><strong>0.5.3</strong><time datetime="2026-10-24">Oct 24, 2026</time></span>
 <span class="sw-release-list__title">Readable package code</span>
 <span class="sw-release-list__points"><span>Published JavaScript is readable again</span><span>Install commands for npm, pnpm, Yarn, and Bun</span><span>Engine crate version matches the npm packages</span></span>
 </a>
