@@ -4822,7 +4822,69 @@ Node 26.12.1, which fix a Brotli decoder vulnerability.
 Published JavaScript has no comments and less whitespace. Module paths, exported
 names, type documentation, and WebAssembly binaries do not change.
 
-| Package | Download before | Download after | Install before | Install after |
+Download size per package All seven packages: 4.5% smaller · shared scale
+
+**`@sheetwrite/core`**9.7% smaller
+0.5.1**348.8 KiB**
+0.5.2**315.1 KiB**
+
+**`@sheetwrite/wasm`**1.8% smaller
+0.5.1**352.2 KiB**
+0.5.2**345.8 KiB**
+
+**`@sheetwrite/formulas`**1.5% smaller
+0.5.1**471.1 KiB**
+0.5.2**464.0 KiB**
+
+**`@sheetwrite/xlsx`**14.7% smaller
+0.5.1**52.5 KiB**
+0.5.2**44.8 KiB**
+
+**`@sheetwrite/react`**5.1% smaller
+0.5.1**5.9 KiB**
+0.5.2**5.6 KiB**
+
+**`@sheetwrite/vue`**2.9% smaller
+0.5.1**6.9 KiB**
+0.5.2**6.7 KiB**
+
+**`@sheetwrite/svelte`**No change
+0.5.1**5.9 KiB**
+0.5.2**5.9 KiB**
+
+Install size per package All seven packages: 13.2% smaller · shared scale
+
+**`@sheetwrite/core`**24.7% smaller
+0.5.1**1.62 MiB**
+0.5.2**1.22 MiB**
+
+**`@sheetwrite/wasm`**3.9% smaller
+0.5.1**1002.6 KiB**
+0.5.2**963.3 KiB**
+
+**`@sheetwrite/formulas`**3.2% smaller
+0.5.1**1.26 MiB**
+0.5.2**1.22 MiB**
+
+**`@sheetwrite/xlsx`**27.4% smaller
+0.5.1**228.4 KiB**
+0.5.2**165.9 KiB**
+
+**`@sheetwrite/react`**14.5% smaller
+0.5.1**18.6 KiB**
+0.5.2**15.9 KiB**
+
+**`@sheetwrite/vue`**13.0% smaller
+0.5.1**21.5 KiB**
+0.5.2**18.7 KiB**
+
+**`@sheetwrite/svelte`**No change
+0.5.1**16.2 KiB**
+0.5.2**16.2 KiB**
+
+All sizes as a table
+
+| Package | Download 0.5.1 | Download 0.5.2 | Install 0.5.1 | Install 0.5.2 |
 | --- | ---: | ---: | ---: | ---: |
 | `@sheetwrite/core` | 348.8 KiB | 315.1 KiB | 1.62 MiB | 1.22 MiB |
 | `@sheetwrite/wasm` | 352.2 KiB | 345.8 KiB | 1002.6 KiB | 963.3 KiB |
@@ -4914,6 +4976,68 @@ production build uses a bundler that minifies, the code that your users
 download is the same as with 0.5.2. If you load the package files directly,
 without a minifying bundler, they download more bytes. Module paths, exported
 names, type documentation, and WebAssembly binaries do not change.
+
+Download size per package All seven packages: 4.7% larger · shared scale
+
+**`@sheetwrite/core`**10.8% larger
+0.5.2**315.3 KiB**
+0.5.3**349.3 KiB**
+
+**`@sheetwrite/wasm`**1.9% larger
+0.5.2**346.3 KiB**
+0.5.3**352.9 KiB**
+
+**`@sheetwrite/formulas`**1.5% larger
+0.5.2**464.0 KiB**
+0.5.3**471.1 KiB**
+
+**`@sheetwrite/xlsx`**17.2% larger
+0.5.2**44.8 KiB**
+0.5.3**52.5 KiB**
+
+**`@sheetwrite/react`**5.4% larger
+0.5.2**5.6 KiB**
+0.5.3**5.9 KiB**
+
+**`@sheetwrite/vue`**3.0% larger
+0.5.2**6.7 KiB**
+0.5.3**6.9 KiB**
+
+**`@sheetwrite/svelte`**No change
+0.5.2**5.9 KiB**
+0.5.3**5.9 KiB**
+
+Install size per package All seven packages: 15.2% larger · shared scale
+
+**`@sheetwrite/core`**32.8% larger
+0.5.2**1.22 MiB**
+0.5.3**1.62 MiB**
+
+**`@sheetwrite/wasm`**4.1% larger
+0.5.2**963.4 KiB**
+0.5.3**1003.2 KiB**
+
+**`@sheetwrite/formulas`**3.3% larger
+0.5.2**1.22 MiB**
+0.5.3**1.26 MiB**
+
+**`@sheetwrite/xlsx`**37.7% larger
+0.5.2**165.9 KiB**
+0.5.3**228.4 KiB**
+
+**`@sheetwrite/react`**17.0% larger
+0.5.2**15.9 KiB**
+0.5.3**18.6 KiB**
+
+**`@sheetwrite/vue`**15.0% larger
+0.5.2**18.7 KiB**
+0.5.3**21.5 KiB**
+
+**`@sheetwrite/svelte`**0.6% larger
+0.5.2**16.2 KiB**
+0.5.3**16.3 KiB**
+
+All sizes as a table
 
 | Package | Download 0.5.2 | Download 0.5.3 | Install 0.5.2 | Install 0.5.3 |
 | --- | ---: | ---: | ---: | ---: |
