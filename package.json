@@ -40,6 +40,7 @@
     "build": "bun run build:packages",
     "changeset:status": "changeset status",
     "changeset:ci": "bun scripts/changeset-ci.ts",
+    "changeset:version": "changeset version && bun scripts/sync-crate-version.ts",
     "typecheck:packages": "bun scripts/workspace-tooling.ts typecheck-packages",
     "typecheck:examples": "bun scripts/workspace-tooling.ts typecheck-examples",
     "typecheck:verification": "tsc --noEmit -p tsconfig.verification.json",

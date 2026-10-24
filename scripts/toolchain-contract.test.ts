@@ -77,4 +77,18 @@ describe("contributor and CI toolchain contract", () => {
     expect(locked).toBeDefined();
     expect(images.map((match) => match[1])).toEqual([locked]);
   });
+
+  it("versions the engine crate with the npm engine packages", () => {
+    // Changesets edits only package.json; changeset:version copies the version into the crate.
+    const versionOf = (name: string): string =>
+      (
+        JSON.parse(readFileSync(resolve(root, `packages/${name}/package.json`), "utf8")) as {
+          version: string;
+        }
+      ).version;
+    const crateEntry = `name = "sheetwrite-wasm"\nversion = "${versionOf("wasm")}"`;
+    expect(versionOf("formulas")).toBe(versionOf("wasm"));
+    expect(readFileSync(resolve(root, "packages/wasm/Cargo.toml"), "utf8")).toContain(crateEntry);
+    expect(readFileSync(resolve(root, "packages/wasm/Cargo.lock"), "utf8")).toContain(crateEntry);
+  });
 });
