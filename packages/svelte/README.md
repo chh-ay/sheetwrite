@@ -5,7 +5,7 @@ Svelte 5 components for Sheetwrite.
 ## Install
 
 ```sh
-bun add @sheetwrite/svelte
+npm install @sheetwrite/svelte   # or: pnpm add, yarn add, bun add
 ```
 
 Svelte 5 is a peer dependency. Core and WASM arrive transitively.

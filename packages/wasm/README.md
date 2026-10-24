@@ -1,6 +1,6 @@
 # @sheetwrite/wasm
 
-Sheetwrite's Rust/WASM columnar store and calculation engine. Most consumers receive it transitively through `@sheetwrite/core` or a framework adapter.
+Sheetwrite's default Rust/WASM columnar store and calculation engine. Most consumers receive it transitively through `@sheetwrite/core` or a framework adapter. For analysis functions, use the full engine, [`@sheetwrite/formulas`](https://sheetwrite.vercel.app/docs/guides/analysis-formulas/), which has the same API.
 
 ```ts
 import { load } from "@sheetwrite/wasm";

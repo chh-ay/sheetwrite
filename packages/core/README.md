@@ -5,7 +5,7 @@ The imperative Sheetwrite engine for vanilla applications and advanced framework
 ## Install
 
 ```sh
-bun add @sheetwrite/core
+npm install @sheetwrite/core   # or: pnpm add, yarn add, bun add
 ```
 
 `@sheetwrite/wasm` is a runtime dependency and does not need to be installed separately.
@@ -46,6 +46,19 @@ const grid = createGrid(document.querySelector("#grid")!, {
 
 Framework users should normally install only `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte` and import that package's `styles.css`; the adapters initialize WASM automatically.
 
+## Full formula engine
+
+The default engine, `@sheetwrite/wasm`, has the standard functions and the smaller download. For analysis functions such as `GROUPBY`, `PIVOTBY`, `LAMBDA`, statistics, regression, and finance, install `@sheetwrite/formulas` and select it before you create a grid or store:
+
+```ts
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+See the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/) for the functions in each engine.
+
 ## Optional XLSX support
 
 Core includes CSV/TSV and the backend-neutral canonical XLSX contracts, but no
@@ -54,7 +67,7 @@ optional package before `grid.exportXlsx()`, a framework toolbar XLSX action,
 or any table/workbook XLSX function:
 
 ```sh
-bun add @sheetwrite/xlsx
+npm install @sheetwrite/xlsx
 ```
 
 ```ts
