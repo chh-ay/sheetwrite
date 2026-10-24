@@ -30,6 +30,7 @@ jobs:
     outputs:
       commit: ${{ steps.preflight.outputs.commit }}
       ci_run_id: ${{ steps.preflight.outputs.ci_run_id }}
+      pending_changesets: ${{ steps.pending.outputs.pending }}
     steps:
       - name: Checkout successful CI commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -48,9 +49,13 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: bun scripts/release-preflight.ts
+      - name: Wait for the version commit when package changes are pending
+        id: pending
+        run: bun scripts/pending-release-changesets.ts
 
   publish:
     needs: identity
+    if: needs.identity.outputs.pending_changesets == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm-release

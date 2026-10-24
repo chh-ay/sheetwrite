@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
+import { pendingReleasePackages } from "./pending-release-changesets.js";
 import type { ReleasePackageArtifact } from "./release-artifacts.js";
 import { parseCiRunId } from "./release-preflight.js";
 import {
@@ -20,6 +22,28 @@ async function workflow() {
   const source = await readFile(workflowPath, "utf8");
   return { parsed: parseWorkflowContract(source, "release workflow"), source };
 }
+
+describe("publication between version commits", () => {
+  it("waits only for changesets that release a package", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "sheetwrite-changesets-"));
+    try {
+      await writeFile(join(directory, "README.md"), "# Changesets\n");
+      await writeFile(join(directory, "docs-only.md"), "---\n---\n\nUpdate the docs.\n");
+      expect(await pendingReleasePackages(directory)).toEqual([]);
+
+      await writeFile(
+        join(directory, "core-fix.md"),
+        "---\n\"@sheetwrite/core\": patch\n'@sheetwrite/wasm': patch\n---\n\nFix a bug.\n",
+      );
+      expect(await pendingReleasePackages(directory)).toEqual([
+        "@sheetwrite/core",
+        "@sheetwrite/wasm",
+      ]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 function artifact(name: string, version = "0.2.0"): ReleasePackageArtifact {
   return {
