@@ -78,31 +78,31 @@ function DocsOverview() {
 
         <section aria-labelledby="new-in-release">
           <div className="sw-doc-section-head">
-            <h2 id="new-in-release">New in 0.5.3</h2>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.3" }}>
+            <h2 id="new-in-release">New in 0.5.4</h2>
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }}>
               Read the release notes →
             </Link>
           </div>
           <div className="sw-doc-destinations">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }} hash="source-map-references">
+              <span className="sw-doc-eyebrow">Packages</span>
+              <strong>
+                No missing source maps <span aria-hidden="true">→</span>
+              </strong>
+              <span>Debuggers no longer try to load map files the packages do not include.</span>
+            </Link>
             <Link
               to="/docs/$/"
               params={{ _splat: "releases/0.5.3" }}
               hash="readable-published-javascript"
             >
-              <span className="sw-doc-eyebrow">Packages</span>
+              <span className="sw-doc-eyebrow">0.5.3</span>
               <strong>
                 Readable package code <span aria-hidden="true">→</span>
               </strong>
               <span>Stack traces point to real lines, and you can debug in node_modules.</span>
             </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.2" }}>
-              <span className="sw-doc-eyebrow">0.5.2</span>
-              <strong>
-                Memory, shortcuts, security <span aria-hidden="true">→</span>
-              </strong>
-              <span>Lower CSV import memory, shifted shortcuts, and the Brotli runtime fix.</span>
-            </Link>
-            <Link to="/docs/$/" params={{ _splat: "releases/0.5.3" }} hash="upgrade-checklist">
+            <Link to="/docs/$/" params={{ _splat: "releases/0.5.4" }} hash="upgrade-checklist">
               <span className="sw-doc-eyebrow">Upgrade</span>
               <strong>
                 Upgrade checklist <span aria-hidden="true">→</span>
