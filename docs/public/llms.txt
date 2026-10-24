@@ -2,7 +2,7 @@
 
 > Sheetwrite is a framework-agnostic, high-performance spreadsheet grid: a canvas grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.
 
-Sheetwrite packages are released together at version 0.5.2. This index is generated from the repository documentation and the compiler-verified public API manifest.
+Sheetwrite packages are released together at version 0.5.3. This index is generated from the repository documentation and the compiler-verified public API manifest.
 
 ## Full text
 
