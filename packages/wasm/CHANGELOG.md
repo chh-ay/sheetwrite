@@ -1,5 +1,12 @@
 # @sheetwrite/wasm
 
+## 0.5.3
+
+### Patch Changes
+
+- 885b764: Package READMEs show npm, pnpm, Yarn, and Bun install commands, and the core and WASM READMEs explain how to select the full formula engine.
+- 222a3f8: Publish readable JavaScript again. 0.5.2 removed whitespace from the published files, so stack traces pointed into one long line and the code in `node_modules` was hard to read and debug. Your bundler still minifies your app build. Module paths, exports, and type documentation do not change.
+
 ## 0.5.2
 
 ### Patch Changes
