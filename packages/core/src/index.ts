@@ -7,6 +7,8 @@ export {
   parseCurrencyInput,
 } from "./cell-input.js";
 
+export { isCellFontFamily } from "./cell-style-fields.js";
+
 export { SHEETWRITE_CLIPBOARD_MIME } from "./clipboard-controller.js";
 
 export {
@@ -264,6 +266,7 @@ export type {
   CellScalar,
   CellStyle,
   CellValue,
+  CellVerticalAlign,
   ChangeEvent,
   Column,
   ColumnarData,

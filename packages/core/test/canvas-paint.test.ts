@@ -220,6 +220,16 @@ describe("fontFor", () => {
       'italic bold 13px "Inter Variable", sans-serif',
     );
   });
+
+  it("puts a cell font family first and keeps the theme families as fallbacks", () => {
+    const theme = makeTheme({ font: 'normal 450 13px "Inter Variable", sans-serif' });
+    expect(fontFor(theme, { fontFamily: "Calibri" })).toBe(
+      '450 13px "Calibri", "Inter Variable", sans-serif',
+    );
+    expect(fontFor(theme, { fontFamily: "Times New Roman", bold: true, fontSize: 16 })).toBe(
+      'bold 16px "Times New Roman", "Inter Variable", sans-serif',
+    );
+  });
 });
 
 describe("paintFrame number formats", () => {
@@ -241,6 +251,57 @@ describe("paintFrame number formats", () => {
     expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
       ["-$246"],
     );
+  });
+
+  it("lets a cell number format override the column, and General opt out of it", () => {
+    const layout = makeLayout([
+      { key: "amount", header: "Amount", width: 150, type: "number", numberFormat: "$#,##0" },
+    ]);
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: 3 },
+      cols: [0],
+      values: [0.5, 0.5, 0.5],
+      styleIds: Uint32Array.from([0, 1, 2]),
+      styles: [{}, { numberFormat: "0.0%" }, { numberFormat: "General" }],
+    };
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.y > HEADER_HEIGHT).map((call) => call.text)).toEqual(
+      ["$1", "50.0%", "0.5"],
+    );
+  });
+});
+
+describe("paintFrame vertical alignment", () => {
+  // Row 0 of GEOMETRY_VIEWPORT is 40px tall, so the placements differ visibly.
+  const ROW_TOP = HEADER_HEIGHT;
+  const ROW_HEIGHT_0 = 40;
+
+  function firstRowTextY(style: CellStyle): number {
+    const layout = makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]);
+    const view = makeView(Uint32Array.from([1, 0, 0]), [{}, style], [0]);
+    (view.values as string[])[1] = "";
+    (view.values as string[])[2] = "";
+    const call = render(view, layout, GEOMETRY_VIEWPORT).fillTexts.find(
+      (text) => text.y > HEADER_HEIGHT,
+    );
+    if (!call) throw new Error("Expected the first row's text");
+    return call.y;
+  }
+
+  it("keeps unset and middle text centered, and moves top and bottom to the edges", () => {
+    const center = ROW_TOP + ROW_HEIGHT_0 / 2;
+    expect(firstRowTextY({})).toBe(center);
+    expect(firstRowTextY({ verticalAlign: "middle" })).toBe(center);
+
+    const top = firstRowTextY({ verticalAlign: "top" });
+    const bottom = firstRowTextY({ verticalAlign: "bottom" });
+    expect(top).toBeLessThan(center);
+    expect(bottom).toBeGreaterThan(center);
+    // Symmetric padding: both edges sit the same distance from the center.
+    expect(center - top).toBeCloseTo(bottom - center, 6);
   });
 });
 

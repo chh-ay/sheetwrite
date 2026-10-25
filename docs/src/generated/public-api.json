@@ -150,7 +150,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L10",
+              "source": "src/types/cell.ts#L13",
               "jsDocTags": [],
               "documentation": "Visual border applied to one or more sides of a cell.",
               "memberDocs": [
@@ -167,7 +167,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L18",
+              "source": "src/types/cell.ts#L21",
               "jsDocTags": [],
               "documentation": "Per-side borders; `all` applies to any side not given its own border.",
               "memberDocs": []
@@ -251,7 +251,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L91",
+              "source": "src/types/cell.ts#L107",
               "jsDocTags": [],
               "documentation": "How a column's cells are typed, parsed, and rendered: `text` verbatim, `number`\nvia its `numberFormat`, `date` as an Excel-style serial (see `date-serial.ts`)\nrendered by a date `numberFormat`, and `currency` as a plain number rendered by\na currency `numberFormat` (e.g. `$#,##0.00`).",
               "memberDocs": []
@@ -263,7 +263,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L56",
+              "source": "src/types/cell.ts#L72",
               "jsDocTags": [],
               "documentation": "Bounded serializable hyperlink metadata applied to one cell or range.",
               "memberDocs": [
@@ -374,7 +374,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L94",
+              "source": "src/types/cell.ts#L110",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -386,7 +386,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L5",
+              "source": "src/cell-input.ts#L6",
               "jsDocTags": [],
               "documentation": "Spreadsheet display text for a resolved scalar.",
               "memberDocs": []
@@ -394,11 +394,11 @@
             {
               "name": "CellStyle",
               "kind": "interface",
-              "signature": "export interface CellStyle { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; fontSize?: number; color?: string; backgroundColor?: string; align?: CellAlign; wrap?: boolean; border?: CellBorders; }",
+              "signature": "export interface CellStyle { bold?: boolean; italic?: boolean; underline?: boolean; strikethrough?: boolean; fontSize?: number; fontFamily?: string; color?: string; backgroundColor?: string; align?: CellAlign; verticalAlign?: CellVerticalAlign; numberFormat?: string; wrap?: boolean; border?: CellBorders; }",
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L27",
+              "source": "src/types/cell.ts#L30",
               "jsDocTags": [],
               "documentation": "Serializable formatting applied to a cell or used as a column default.",
               "memberDocs": [
@@ -423,6 +423,10 @@
                   "documentation": "hex color, e.g. \"#111111\""
                 },
                 {
+                  "name": "fontFamily",
+                  "documentation": "Font family name, e.g. \"Calibri\". The theme font family stays the fallback,\nso a font the browser lacks renders in the theme font. Letters, digits,\nspaces, `.`, `_` and `-` only; at most 128 characters."
+                },
+                {
                   "name": "fontSize",
                   "documentation": "Font size in unzoomed CSS pixels; zoom is applied during painting."
                 },
@@ -431,12 +435,20 @@
                   "documentation": "Uses the italic variant of the theme font."
                 },
                 {
+                  "name": "numberFormat",
+                  "documentation": "Excel number-format code for this cell, e.g. \"0.00%\". Overrides the\ncolumn's `numberFormat`; at most 255 characters."
+                },
+                {
                   "name": "strikethrough",
                   "documentation": "Draws a line through each rendered text run."
                 },
                 {
                   "name": "underline",
                   "documentation": "Draws a line beneath each rendered text run."
+                },
+                {
+                  "name": "verticalAlign",
+                  "documentation": "Vertical placement of cell text; omitted keeps text centered."
                 },
                 {
                   "name": "wrap",
@@ -451,9 +463,21 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L101",
+              "source": "src/types/cell.ts#L117",
               "jsDocTags": [],
               "documentation": "A cell's persisted input: a literal, a cross-reference, or a formula.\nReferences resolve through the store's reference graph; formulas resolve in\nthe WASM calculation engine.",
+              "memberDocs": []
+            },
+            {
+              "name": "CellVerticalAlign",
+              "kind": "type",
+              "signature": "export type CellVerticalAlign = \"top\" | \"middle\" | \"bottom\";",
+              "owners": [
+                "src/types/cell.ts"
+              ],
+              "source": "src/types/cell.ts#L10",
+              "jsDocTags": [],
+              "documentation": "Vertical text placement within a cell's height.",
               "memberDocs": []
             },
             {
@@ -508,7 +532,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L107",
+              "source": "src/types/cell.ts#L123",
               "jsDocTags": [],
               "documentation": "Schema and default presentation for one workbook column.",
               "memberDocs": [
@@ -745,7 +769,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L68",
+              "source": "src/types/cell.ts#L84",
               "jsDocTags": [],
               "documentation": "Predicate used to decide whether a conditional format applies.",
               "memberDocs": []
@@ -757,7 +781,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L77",
+              "source": "src/types/cell.ts#L93",
               "jsDocTags": [],
               "documentation": "Ordered condition and style applied to a cell range.",
               "memberDocs": [
@@ -1145,7 +1169,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L295",
+              "source": "src/document-protocol.ts#L302",
               "jsDocTags": [],
               "documentation": "Conservative defaults that retain the million-row paged-sheet contract.",
               "memberDocs": []
@@ -1181,7 +1205,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L40",
+              "source": "src/document-protocol.ts#L47",
               "jsDocTags": [],
               "documentation": "Inclusive defaults for every atomic document transaction accepted by a\nStore or Grid. The count bounds object-heavy validation and dispatch; the\nexact UTF-8 JSON size bounds hostile or accidentally oversized payloads.",
               "memberDocs": []
@@ -1335,7 +1359,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2923",
+              "source": "src/document-protocol.ts#L2956",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -1359,7 +1383,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L342",
+              "source": "src/document-protocol.ts#L349",
               "jsDocTags": [],
               "documentation": "Path-qualified validation failure for a document operation.",
               "memberDocs": []
@@ -1371,7 +1395,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L357",
+              "source": "src/document-protocol.ts#L364",
               "jsDocTags": [],
               "documentation": "Success or structured errors returned by document validation.",
               "memberDocs": []
@@ -1432,13 +1456,13 @@
             {
               "name": "formatNumber",
               "kind": "function",
-              "signature": "(value: number | string, code?: string, locale?: string): string",
+              "signature": "(value: number | string, format?: string, locale?: string): string",
               "owners": [
                 "src/number-format.ts"
               ],
-              "source": "src/number-format.ts#L535",
+              "source": "src/number-format.ts#L539",
               "jsDocTags": [],
-              "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes.",
+              "documentation": "Deterministic Excel-style number/date formatter. Supports explicit locale\nseparators, percent/scientific notation, UTC date/time tokens, four-section\npositive/negative/zero/text codes, quoted literals, and backslash escapes.\n`General` formats exactly like an omitted code.",
               "memberDocs": []
             },
             {
@@ -2077,7 +2101,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L270",
+              "source": "src/hyperlink.ts#L281",
               "jsDocTags": [],
               "documentation": "Return the first validated hyperlink covering an address, or null when none does.",
               "memberDocs": []
@@ -2089,7 +2113,7 @@
               "owners": [
                 "src/types/cell.ts"
               ],
-              "source": "src/types/cell.ts#L51",
+              "source": "src/types/cell.ts#L67",
               "jsDocTags": [],
               "documentation": "Browser-safe external target or stable workbook-internal range target.",
               "memberDocs": []
@@ -2122,13 +2146,25 @@
               "memberDocs": []
             },
             {
+              "name": "isCellFontFamily",
+              "kind": "function",
+              "signature": "(value: string): boolean",
+              "owners": [
+                "src/cell-style-fields.ts"
+              ],
+              "source": "src/cell-style-fields.ts#L19",
+              "jsDocTags": [],
+              "documentation": "Whether `value` is a valid cell `fontFamily`: 1-128 letters, digits,\nspaces, `.`, `_` or `-`, starting with a letter or digit and not ending in a\nspace. The same rule guards snapshots, hyperlinks, clipboard and XLSX import.",
+              "memberDocs": []
+            },
+            {
               "name": "isSafeExternalHyperlink",
               "kind": "function",
               "signature": "(url: string): boolean",
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L69",
+              "source": "src/hyperlink.ts#L72",
               "jsDocTags": [],
               "documentation": "Validate, but never activate or fetch, an external hyperlink target.",
               "memberDocs": []
@@ -2164,7 +2200,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L258",
+              "source": "src/hyperlink.ts#L269",
               "jsDocTags": [],
               "documentation": "Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers.",
               "memberDocs": []
@@ -2176,7 +2212,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L99",
+              "source": "src/hyperlink.ts#L102",
               "jsDocTags": [],
               "documentation": "Whether an identifier is bounded, non-empty, trimmed, and free of control characters.",
               "memberDocs": []
@@ -2296,7 +2332,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L13",
+              "source": "src/hyperlink.ts#L14",
               "jsDocTags": [],
               "documentation": "Optional display text ceiling used by SpreadsheetML shared-string implementations.",
               "memberDocs": []
@@ -2308,7 +2344,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L9",
+              "source": "src/hyperlink.ts#L10",
               "jsDocTags": [],
               "documentation": "Serialized identifier ceiling; IDs remain stable across history and snapshots.",
               "memberDocs": []
@@ -2320,7 +2356,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L11",
+              "source": "src/hyperlink.ts#L12",
               "jsDocTags": [],
               "documentation": "External target ceiling, aligned with the bounded private clipboard payload.",
               "memberDocs": []
@@ -2332,7 +2368,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L7",
+              "source": "src/hyperlink.ts#L8",
               "jsDocTags": [],
               "documentation": "Renderer/codec ceiling for one sheet's hyperlink metadata.",
               "memberDocs": []
@@ -2467,7 +2503,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L28",
+              "source": "src/cell-input.ts#L40",
               "jsDocTags": [],
               "documentation": "Coerce raw text input into a {@link CellValue}, following spreadsheet\ninput-bar conventions:\n\n- blank (after trimming) clears the cell to a `null` literal;\n- text longer than one character beginning with `=` becomes a formula;\n- in a `number` column a finite numeric string becomes a number literal;\n- in a `date` column a recognized date string ({@link parseDateInput}) becomes\n  its serial-number literal;\n- in a `currency` column a currency string ({@link parseCurrencyInput}) becomes\n  a plain number literal;\n- anything else is stored verbatim as a text literal (the untrimmed `raw`).\n\nShared by the grid's inline editor and any host-built formula bar, so input\nparsing is identical everywhere instead of re-derived per consumer.",
               "memberDocs": []
@@ -2479,7 +2515,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L77",
+              "source": "src/cell-input.ts#L89",
               "jsDocTags": [],
               "documentation": "Parse imported text as a literal using the same boolean, number, date, and\ncurrency rules as {@link parseCellInput}. Unlike interactive entry, a leading\n`=` remains inert text. Declared date columns also accept an existing finite\ndate serial so delimited export/import preserves numeric dates.",
               "memberDocs": []
@@ -2503,7 +2539,7 @@
               "owners": [
                 "src/cell-input.ts"
               ],
-              "source": "src/cell-input.ts#L111",
+              "source": "src/cell-input.ts#L123",
               "jsDocTags": [],
               "documentation": "Parse a currency-formatted string into a plain number, or `null` when the\nremaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands\ngrouping (`,`), and whitespace, and reads accounting-style parentheses\n(`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the\nrenderer uses.",
               "memberDocs": []
@@ -2986,7 +3022,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L290",
+              "source": "src/hyperlink.ts#L301",
               "jsDocTags": [],
               "documentation": "Host-safe target resolved immediately before hyperlink activation.",
               "memberDocs": []
@@ -2998,7 +3034,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L295",
+              "source": "src/hyperlink.ts#L306",
               "jsDocTags": [],
               "documentation": "Revalidate at the final activation boundary; hosts never receive an unsafe URL.",
               "memberDocs": []
@@ -3022,7 +3058,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L67",
+              "source": "src/document-protocol.ts#L74",
               "jsDocTags": [],
               "documentation": "Validate and merge transaction ceiling overrides without retaining the\ncaller-owned object. Every ceiling is an inclusive non-negative safe integer.",
               "memberDocs": []
@@ -3543,7 +3579,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L232",
+              "source": "src/hyperlink.ts#L243",
               "jsDocTags": [],
               "documentation": "Sanitize one untrusted clipboard/snapshot value without cloning its object graph.",
               "memberDocs": []
@@ -3555,7 +3591,7 @@
               "owners": [
                 "src/hyperlink.ts"
               ],
-              "source": "src/hyperlink.ts#L170",
+              "source": "src/hyperlink.ts#L173",
               "jsDocTags": [],
               "documentation": "Convert an untrusted style into one bounded, plain renderer-safe value.",
               "memberDocs": []
@@ -3875,7 +3911,7 @@
               "owners": [
                 "src/clipboard-controller.ts"
               ],
-              "source": "src/clipboard-controller.ts#L57",
+              "source": "src/clipboard-controller.ts#L58",
               "jsDocTags": [],
               "documentation": "Private-format MIME type used for rich Sheetwrite clipboard payloads.",
               "memberDocs": []
@@ -4182,7 +4218,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L321",
+              "source": "src/document-protocol.ts#L328",
               "jsDocTags": [],
               "documentation": "Stable resource failure raised by direct workbook construction paths.",
               "memberDocs": []
@@ -4194,7 +4230,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L277",
+              "source": "src/document-protocol.ts#L284",
               "jsDocTags": [],
               "documentation": "Resource ceilings applied before snapshot normalization or store allocation.",
               "memberDocs": [
@@ -4235,7 +4271,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L274",
+              "source": "src/document-protocol.ts#L281",
               "jsDocTags": [],
               "documentation": "Allocation mode used when enforcing snapshot construction capacity.",
               "memberDocs": []
@@ -4247,7 +4283,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L362",
+              "source": "src/document-protocol.ts#L369",
               "jsDocTags": [],
               "documentation": "Path-qualified schema failure found while validating an untrusted snapshot.",
               "memberDocs": []
@@ -4259,7 +4295,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L313",
+              "source": "src/document-protocol.ts#L320",
               "jsDocTags": [],
               "documentation": "Validation and allocation policy for an untrusted workbook snapshot.",
               "memberDocs": [
@@ -5003,7 +5039,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L47",
+              "source": "src/document-protocol.ts#L54",
               "jsDocTags": [],
               "documentation": "Successful byte/count inspection or one structured transaction rejection.",
               "memberDocs": []
@@ -5039,7 +5075,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L89",
+              "source": "src/document-protocol.ts#L96",
               "jsDocTags": [],
               "documentation": "Incrementally validate the operation count and exact encoded payload size\nwithout constructing a JSON string. Compact operation ranges are measured by\ntheir serialized fields; their logical cell area is deliberately irrelevant.",
               "memberDocs": []
@@ -5051,7 +5087,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L2885",
+              "source": "src/document-protocol.ts#L2918",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -5283,7 +5319,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L33",
+              "source": "src/document-protocol.ts#L40",
               "jsDocTags": [],
               "documentation": "Current workbook snapshot schema version accepted by Sheetwrite.",
               "memberDocs": []
@@ -7502,7 +7538,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L97",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -8457,7 +8493,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L97",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -9398,7 +9434,7 @@
               "owners": [
                 "../core/dist/types/cell.d.ts"
               ],
-              "source": "../core/dist/types/cell.d.ts#L97",
+              "source": "../core/dist/types/cell.d.ts#L112",
               "jsDocTags": [],
               "documentation": "A scalar that can be displayed directly.",
               "memberDocs": []
@@ -10699,7 +10735,7 @@
               "owners": [
                 "src/table-export.ts"
               ],
-              "source": "src/table-export.ts#L188",
+              "source": "src/table-export.ts#L189",
               "jsDocTags": [],
               "documentation": "Default bounded first-sheet table export backend.",
               "memberDocs": []

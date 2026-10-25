@@ -103,7 +103,13 @@ function richSnapshot(): WorkbookSnapshot {
                 rowOffset: 1,
                 colOffset: 1,
                 value: { kind: "formula", src: "=SUM(B1:B1)" },
-                style: { bold: true, fontSize: 18 },
+                style: {
+                  bold: true,
+                  fontSize: 18,
+                  fontFamily: "Calibri Light",
+                  verticalAlign: "top",
+                  numberFormat: "0.00%",
+                },
               },
               { rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "title" } },
             ],
@@ -220,7 +226,13 @@ describe("workbook document protocol", () => {
     ]);
     expect(result.value.sheets[0]?.cells[0]?.cells[1]).toMatchObject({
       value: { kind: "formula", src: "=SUM(B1:B1)" },
-      style: { bold: true, fontSize: 18 },
+      style: {
+        bold: true,
+        fontSize: 18,
+        fontFamily: "Calibri Light",
+        verticalAlign: "top",
+        numberFormat: "0.00%",
+      },
     });
     expect(result.value).not.toHaveProperty("selection");
     expect(result.value).not.toHaveProperty("scrollTop");
@@ -312,6 +324,23 @@ describe("workbook document protocol", () => {
       {
         value: withFirstCell({ style: { bold: "yes" } }),
         path: "sheets[0].cells[0].cells[0].style.bold",
+      },
+      {
+        // Families land inside a canvas font string; quotes and separators would inject.
+        value: withFirstCell({ style: { fontFamily: 'Arial"; color: red' } }),
+        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+      },
+      {
+        value: withFirstCell({ style: { fontFamily: "Arial, serif" } }),
+        path: "sheets[0].cells[0].cells[0].style.fontFamily",
+      },
+      {
+        value: withFirstCell({ style: { verticalAlign: "center" } }),
+        path: "sheets[0].cells[0].cells[0].style.verticalAlign",
+      },
+      {
+        value: withFirstCell({ style: { numberFormat: "0".repeat(256) } }),
+        path: "sheets[0].cells[0].cells[0].style.numberFormat",
       },
       {
         value: withFirstSheet({

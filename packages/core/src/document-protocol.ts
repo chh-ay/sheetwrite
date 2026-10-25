@@ -1,4 +1,11 @@
 import {
+  isCellFontFamily,
+  isCellNumberFormat,
+  isCellVerticalAlign,
+  MAX_FONT_FAMILY_LENGTH,
+  MAX_NUMBER_FORMAT_LENGTH,
+} from "./cell-style-fields.js";
+import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
@@ -1086,6 +1093,32 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
   const align = ownValue(style, "align");
   if (align !== undefined && !["left", "center", "right"].includes(String(align))) {
     invalid(errors, `${path}.align`, "align must be left, center, or right");
+  }
+  const verticalAlign = ownValue(style, "verticalAlign");
+  if (verticalAlign !== undefined && !isCellVerticalAlign(verticalAlign)) {
+    invalid(errors, `${path}.verticalAlign`, "verticalAlign must be top, middle, or bottom");
+  }
+  const fontFamily = ownValue(style, "fontFamily");
+  if (
+    fontFamily !== undefined &&
+    (typeof fontFamily !== "string" || !isCellFontFamily(fontFamily))
+  ) {
+    invalid(
+      errors,
+      `${path}.fontFamily`,
+      `fontFamily must be 1-${MAX_FONT_FAMILY_LENGTH} letters, digits, spaces, ".", "_" or "-"`,
+    );
+  }
+  const numberFormat = ownValue(style, "numberFormat");
+  if (
+    numberFormat !== undefined &&
+    (typeof numberFormat !== "string" || !isCellNumberFormat(numberFormat))
+  ) {
+    invalid(
+      errors,
+      `${path}.numberFormat`,
+      `numberFormat must be 1-${MAX_NUMBER_FORMAT_LENGTH} characters without control characters`,
+    );
   }
   const borders = ownValue(style, "border");
   if (borders !== undefined) {

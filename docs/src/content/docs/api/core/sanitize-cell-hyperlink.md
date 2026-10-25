@@ -8,7 +8,7 @@ description: "Sanitize one untrusted clipboard/snapshot value without cloning it
 Sanitize one untrusted clipboard/snapshot value without cloning its object graph.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L232"><code>packages/core/src/hyperlink.ts#L232</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L243"><code>packages/core/src/hyperlink.ts#L243</code></a></dd></div>
 </dl>
 
 ## Declaration

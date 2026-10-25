@@ -1,4 +1,5 @@
 import { parseDateInput } from "./date-serial.js";
+import { formatNumber } from "./number-format.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
 /** Spreadsheet display text for a resolved scalar. */
@@ -6,6 +7,17 @@ export function cellScalarToText(value: CellScalar): string {
   if (value === null) return "";
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   return String(value);
+}
+
+/**
+ * The text a cell paints: numbers through the cell's effective number format
+ * (cell style, then column), everything else as {@link cellScalarToText}.
+ * Measuring code uses this so widths match what the canvas draws.
+ */
+export function cellDisplayText(value: CellScalar, numberFormat?: string, locale?: string): string {
+  return typeof value === "number"
+    ? formatNumber(value, numberFormat, locale)
+    : cellScalarToText(value);
 }
 
 /**

@@ -307,7 +307,7 @@ function cellXml(
   const mergedStyle: CellStyle = { ...column.cellStyle, ...cell.source.style };
   const styleId = styles.register(
     Object.keys(mergedStyle).length > 0 ? mergedStyle : undefined,
-    column.numberFormat,
+    mergedStyle.numberFormat ?? column.numberFormat,
   );
   const reference = `${colToA1(cell.col)}${cell.row + 1}`;
   const styleAttribute = styleId ? ` s="${styleId}"` : "";
@@ -484,7 +484,10 @@ function writeSheet(
     for (let index = 0; index < sheet.columns.length; index++) {
       const column = sheet.columns[index]!;
       const width = Math.max(1, Math.round(((column.width - 5) / 7) * 100) / 100);
-      const styleId = styles.register(column.cellStyle, column.numberFormat);
+      const styleId = styles.register(
+        column.cellStyle,
+        column.cellStyle?.numberFormat ?? column.numberFormat,
+      );
       xml.append(
         `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${styleId ? ` style="${styleId}"` : ""}/>`,
       );

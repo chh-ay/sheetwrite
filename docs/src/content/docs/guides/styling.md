@@ -214,13 +214,20 @@ interface CellStyle {
   underline?: boolean;
   strikethrough?: boolean;
   fontSize?: number;
+  fontFamily?: string;       // e.g. "Calibri"; the theme font is the fallback
   color?: string;            // hex text color, e.g. "#111111"
   backgroundColor?: string;  // hex fill, e.g. "#ffffff"
   align?: "left" | "center" | "right";
+  verticalAlign?: "top" | "middle" | "bottom"; // omitted = centered
+  numberFormat?: string;     // overrides the column's numberFormat
   wrap?: boolean;
   border?: CellBorders;
 }
 ```
+
+`fontFamily` names one family. It is drawn before the theme font's families, so
+a font the browser does not have falls back to the theme font. Names may use
+letters, digits, spaces, `.`, `_` and `-` (at most 128 characters).
 
 Apply a style to a cell via a transaction (a `set` replaces value + style, so pass
 the current value back when only restyling):
@@ -288,12 +295,25 @@ const columns: Column[] = [
 ];
 ```
 
+A cell can override its column with its own `numberFormat` in `CellStyle`. The
+code `General` opts a cell out of its column's format:
+
+```ts prelude="theming" partial="requires surrounding host state" title="Partial example"
+grid.styleRange(
+  { sheet: "sheet1", start: { row: 0, col: 2 }, end: { row: 9, col: 2 } },
+  { numberFormat: "0.0%" },
+);
+```
+
+XLSX import keeps each cell's own format, so a column that mixes formats
+round-trips cell by cell.
+
 `formatNumber(value, code?, locale?)` is exported from `@sheetwrite/core`. It is
 a cached renderer for the supported Excel-style families:
 
 | Code | Example output |
 | --- | --- |
-| _(none)_ | `1234.5` → locale-default `1,234.5` |
+| _(none)_ or `General` | `1234.5` → locale-default `1,234.5` |
 | `0` | `1234.5` → `1235` |
 | `0.00` | `1234.5` → `1234.50` |
 | `#,##0.00` | `1234.5` → `1,234.50` |

@@ -9,7 +9,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { cellScalarToText } from "./cell-input.js";
+import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
@@ -1609,7 +1609,12 @@ export class GridImpl implements Grid {
         const style = column.cellStyle ? { ...column.cellStyle, ...cellStyle } : cellStyle;
         context.font = fontFor(this.baseTheme, style);
         let width = widths[targetOffset + columnIndex]!;
-        for (const line of cellScalarToText(value).split("\n")) {
+        const text = cellDisplayText(
+          value,
+          style.numberFormat ?? column.numberFormat,
+          column.numberLocale,
+        );
+        for (const line of text.split("\n")) {
           width = Math.max(width, context.measureText(line).width + 12);
         }
         widths[targetOffset + columnIndex] = width;

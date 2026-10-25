@@ -1,5 +1,11 @@
 import { formatNumber } from "./number-format.js";
-import type { CellAlign, CellBorder, CellScalar, CellStyle } from "./types/cell.js";
+import type {
+  CellAlign,
+  CellBorder,
+  CellScalar,
+  CellStyle,
+  CellVerticalAlign,
+} from "./types/cell.js";
 import type { CellRenderer, RenderLayout, Theme, Viewport } from "./types/render.js";
 import type { VisibleWindowView } from "./types/store.js";
 
@@ -9,6 +15,9 @@ const FONT_PX_RE = /(\d+(?:\.\d+)?)px/;
 const FONT_WEIGHT_TOKEN_RE = /^(?:normal|bold|bolder|lighter|[1-9]\d{0,2}|1000)$/;
 const FONT_STYLE_TOKEN_RE = /^(?:normal|italic|oblique)$/;
 const FONT_ANGLE_TOKEN_RE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
+
+/** Gap between a top- or bottom-aligned text block and the cell edge, unzoomed. */
+const VERTICAL_TEXT_PAD = 2;
 
 /** Shared empty style; skips a per-cell `{}` allocation on the render hot path. */
 const EMPTY_STYLE: CellStyle = {};
@@ -99,19 +108,42 @@ function columnEdges(layout: RenderLayout): number[] {
   return colX;
 }
 
+/**
+ * Put `family` in front of the font string's family list. The theme families
+ * stay as fallbacks, so a family the browser lacks renders in the theme font.
+ * `family` is validated (see cell-style-fields.ts) to need only quoting.
+ */
+function withFontFamily(font: string, family: string): string {
+  const sizeMatch = FONT_PX_RE.exec(font);
+  if (!sizeMatch || sizeMatch.index === undefined) return font;
+  const fromSize = font.slice(sizeMatch.index);
+  const sizeToken = /^\S+/.exec(fromSize)?.[0] ?? fromSize;
+  const themeFamilies = fromSize.slice(sizeToken.length).trim();
+  const families = themeFamilies ? `"${family}", ${themeFamilies}` : `"${family}"`;
+  return `${font.slice(0, sizeMatch.index)}${sizeToken} ${families}`;
+}
+
 /** Resolve the canvas font from the theme and cell style. */
 export function fontFor(
   theme: Theme,
-  style: Pick<CellStyle, "bold" | "italic" | "fontSize">,
+  style: Pick<CellStyle, "bold" | "italic" | "fontSize" | "fontFamily">,
   zoom = 1,
   cache?: Map<string, string>,
 ): string {
-  if (!style.bold && !style.italic && style.fontSize === undefined) return theme.font;
+  if (
+    !style.bold &&
+    !style.italic &&
+    style.fontSize === undefined &&
+    style.fontFamily === undefined
+  ) {
+    return theme.font;
+  }
   const size = style.fontSize === undefined ? undefined : style.fontSize * zoom;
-  const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}`;
+  const key = `${style.italic ? 1 : 0}:${style.bold ? 1 : 0}:${size ?? ""}:${style.fontFamily ?? ""}`;
   const cached = cache?.get(key);
   if (cached !== undefined) return cached;
-  const base = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
+  const sized = size === undefined ? theme.font : theme.font.replace(FONT_PX_RE, `${size}px`);
+  const base = style.fontFamily === undefined ? sized : withFontFamily(sized, style.fontFamily);
   const sizeMatch = FONT_PX_RE.exec(base);
   if (!sizeMatch || sizeMatch.index === undefined) return base;
   const prefix = base.slice(0, sizeMatch.index).trim().split(/\s+/).filter(Boolean);
@@ -186,6 +218,26 @@ function layoutTextLinesInto(
 /** Full wrapped layout for callers that need every line, such as auto row height. */
 export function layoutTextLines(ctx: Ctx, text: string, width: number): string[] {
   return layoutTextLinesInto(ctx, text, width, Number.POSITIVE_INFINITY, []);
+}
+
+/**
+ * Top edge of a text block `blockHeight` tall inside a cell at `y` of height
+ * `h`. A block taller than the cell is top-anchored whatever the alignment, so
+ * its first lines stay readable.
+ */
+function textBlockTop(
+  verticalAlign: CellVerticalAlign | undefined,
+  y: number,
+  h: number,
+  blockHeight: number,
+  zoom: number,
+): number {
+  const free = h - blockHeight;
+  if (free <= 0) return y;
+  const pad = Math.min(VERTICAL_TEXT_PAD * zoom, free / 2);
+  if (verticalAlign === "top") return y + pad;
+  if (verticalAlign === "bottom") return y + free - pad;
+  return y + free / 2;
 }
 
 /**
@@ -728,7 +780,7 @@ function paintCell(
         ? "TRUE"
         : "FALSE"
       : numeric
-        ? formatNumber(value, column?.numberFormat, column?.numberLocale)
+        ? formatNumber(value, effective.numberFormat ?? column?.numberFormat, column?.numberLocale)
         : value;
   const availableTextWidth = Math.max(0, w - CELL_PAD * 2);
   if (numeric) {
@@ -751,17 +803,18 @@ function paintCell(
     effective.fontSize === undefined
       ? Number.parseFloat(FONT_PX_RE.exec(theme.font)?.[1] ?? "") || 12
       : effective.fontSize * (layout.zoom ?? 1);
+  const zoom = layout.zoom ?? 1;
+  const lineHeight = fontPx * 1.2;
   ctx.save();
   if (effective.wrap && !numeric) {
     clipCell(ctx, x, y, w, h);
-    const lineHeight = fontPx * 1.2;
     // The draw loop below never paints a line whose band starts past the cell,
     // and a block taller than the cell is top-anchored either way, so laying
     // out one line past the last drawable one changes no pixel.
     const maxLines = Math.floor(h / lineHeight) + 1;
     const lines = layoutTextLinesInto(ctx, text, availableTextWidth, maxLines, []);
     const blockHeight = lines.length * lineHeight;
-    const firstCy = y + (h - Math.min(h, blockHeight)) / 2 + lineHeight / 2;
+    const firstCy = textBlockTop(effective.verticalAlign, y, h, blockHeight, zoom) + lineHeight / 2;
     for (let line = 0; line < lines.length; line++) {
       const cy = firstCy + line * lineHeight;
       if (cy - lineHeight / 2 >= y + h) break;
@@ -787,7 +840,11 @@ function paintCell(
       }
     }
 
-    const cy = y + h / 2;
+    // Unset or "middle" keeps the exact centered baseline for existing sheets.
+    const cy =
+      effective.verticalAlign === undefined || effective.verticalAlign === "middle"
+        ? y + h / 2
+        : textBlockTop(effective.verticalAlign, y, h, lineHeight, zoom) + lineHeight / 2;
     clipCell(ctx, textClipX, y, textClipW, h);
     fillAlignedText(ctx, text, align, x, w, cy);
     if (effective.underline || effective.strikethrough) {

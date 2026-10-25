@@ -87,6 +87,7 @@ export function buildXlsxModel(
       }
       const column = sheet.columns[visibleColumns[visibleCol]!]!;
       const mergedStyle = { ...column.cellStyle, ...view.styles[view.styleIds[flat] ?? 0] };
+      const numberFormat = mergedStyle.numberFormat ?? column.numberFormat;
       const value = view.values[flat] ?? null;
       const merge = mergeByAnchor.get(flat);
       output[visibleCol] =
@@ -95,7 +96,7 @@ export function buildXlsxModel(
           : {
               value,
               ...(Object.keys(mergedStyle).length > 0 ? { style: mergedStyle } : {}),
-              ...(column.numberFormat ? { numberFormat: column.numberFormat } : {}),
+              ...(numberFormat ? { numberFormat } : {}),
               ...(merge ?? {}),
             };
     }

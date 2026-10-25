@@ -1515,12 +1515,7 @@ function metadataFromSheet(sheet: ParsedSheet, context: XlsxCodecContext): Workb
   return null;
 }
 
-function columnFromParsed(
-  sheet: ParsedSheet,
-  col: number,
-  key: string,
-  context: XlsxCodecContext,
-): Column {
+function columnFromParsed(sheet: ParsedSheet, col: number, key: string): Column {
   const definition = sheet.columns.get(col);
   const formats = new Set<string>();
   const semanticTypes = new Set<Column["type"]>();
@@ -1540,14 +1535,9 @@ function columnFromParsed(
   }
   if (definition?.type) semanticTypes.add(definition.type);
   if (definition?.numberFormat) formats.add(definition.numberFormat);
+  // A column default is chosen only when every formatted cell agrees; cells
+  // that differ keep their own format (see the snapshot cell mapping below).
   const mixed = semanticTypes.size > 1 || formats.size > 1;
-  if (mixed) {
-    emitWarning(context, {
-      code: "format-loss",
-      message: `Mixed cell number formats in column ${colToA1(col)} were reduced to a neutral numeric column default`,
-      sheet: sheet.name,
-    });
-  }
   const onlyType = semanticTypes.values().next().value as Column["type"] | undefined;
   const numberFormat = mixed
     ? undefined
@@ -1564,6 +1554,25 @@ function columnFromParsed(
     ...(definition?.cellStyle ? { cellStyle: structuredClone(definition.cellStyle) } : {}),
     ...(definition?.visible === false ? { visible: false } : {}),
   };
+}
+
+/**
+ * The number format a cell must carry itself because its column default would
+ * render it differently: its own code, or `General` for an unformatted number
+ * in a formatted column. Text literals ignore number formats, so they never
+ * need an override.
+ */
+function cellNumberFormatOverride(
+  cell: ParsedSheet["cells"][number],
+  columnFormat: string | undefined,
+): string | undefined {
+  const own = cell.styleRecord.numberFormat;
+  if (own === columnFormat) return undefined;
+  if (own !== undefined) return own;
+  const value = cell.value;
+  if (!value) return undefined;
+  if (value.kind === "literal" && typeof value.value !== "number") return undefined;
+  return "General";
 }
 
 function restoreSidecarFields(snapshot: WorkbookSnapshot, metadata: WorkbookSnapshot): void {
@@ -1963,7 +1972,7 @@ export function readWorkbook(
       let suffix = 2;
       while (keys.has(key)) key = `${preferredKey}_${suffix++}`;
       keys.add(key);
-      const nativeColumn = columnFromParsed(source, col, key, context);
+      const nativeColumn = columnFromParsed(source, col, key);
       if (!metaColumn) {
         columns.push(nativeColumn);
         continue;
@@ -1989,13 +1998,18 @@ export function readWorkbook(
       source.tables.reduce((maximum, table) => Math.max(maximum, table.range.end.row + 1), 0),
     );
     assertResource(context, "maxRowsPerSheet", rowCount);
-    const snapshotCells: SnapshotCell[] = source.cells.map((cell) => ({
-      rowOffset: cell.row,
-      colOffset: cell.col,
-      value: cell.value ?? { kind: "literal", value: null },
-      // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
-      ...(cell.style ? { style: copyStyleData(cell.style) as CellStyle } : {}),
-    }));
+    const snapshotCells: SnapshotCell[] = source.cells.map((cell) => {
+      const style = cell.style ? (copyStyleData(cell.style) as CellStyle) : undefined;
+      const numberFormat = cellNumberFormatOverride(cell, columns[cell.col]?.numberFormat);
+      const cellStyle = numberFormat ? { ...style, numberFormat } : style;
+      return {
+        rowOffset: cell.row,
+        colOffset: cell.col,
+        value: cell.value ?? { kind: "literal", value: null },
+        // Parsed styles are typed `CellStyle`, and the copy keeps their shape.
+        ...(cellStyle ? { style: cellStyle } : {}),
+      };
+    });
     const nativeValidations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
       const sameBlankDefault =
