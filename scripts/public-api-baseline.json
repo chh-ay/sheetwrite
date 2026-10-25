@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "32ce1d1f4d8778111a79670e07ab467c4f80e2723eae2749372f28888df62145",
+  "sha256": "6e5473e2b93be299f3223cb6056b285bd7d460bc8999900f74efc7d34eaaa411",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -405,12 +405,14 @@
         "FormulaBarOptions",
         "FormulaBarPiece",
         "NameBoxOptions",
+        "RibbonOptions",
         "ShellPiece",
         "SpreadsheetShell",
         "SpreadsheetShellOptions",
         "ToolbarOptions",
         "createFormulaBar",
         "createNameBox",
+        "createRibbon",
         "createSelectionStatus",
         "createSpreadsheetShell",
         "createToolbar",

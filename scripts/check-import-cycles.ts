@@ -209,6 +209,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     source: "packages/core/src/types/grid.ts",
     dependencies: ["cell", "coordinates", "data", "document", "render", "store", "transaction"],
     exports: [
+      "BorderPreset",
       "CellEditor",
       "CellEditorContext",
       "CellEditorInstance",

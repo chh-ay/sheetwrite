@@ -8,7 +8,7 @@ description: "Text, DOM node, or node factory used as toolbar icon content."
 Text, DOM node, or node factory used as toolbar icon content.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L204"><code>packages/core/src/types/grid.ts#L204</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L256"><code>packages/core/src/types/grid.ts#L256</code></a></dd></div>
 </dl>
 
 ## Declaration

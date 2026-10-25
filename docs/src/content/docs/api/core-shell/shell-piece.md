@@ -66,6 +66,7 @@ export interface ShellPiece {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core-shell/create-name-box/"><code>createNameBox</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core-shell/create-ribbon/"><code>createRibbon</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-shell/create-selection-status/"><code>createSelectionStatus</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-shell/create-toolbar/"><code>createToolbar</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>

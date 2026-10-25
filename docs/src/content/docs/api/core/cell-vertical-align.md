@@ -39,5 +39,6 @@ export type CellVerticalAlign = "top" | "middle" | "bottom";
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/cell-style/"><code>CellStyle</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/grid-actions/"><code>GridActions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

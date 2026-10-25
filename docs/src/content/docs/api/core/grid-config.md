@@ -32,7 +32,7 @@ const config: GridConfig = {
 - [ContextMenuItem](/docs/api/core/context-menu-item/)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L359"><code>packages/core/src/types/grid.ts#L359</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L411"><code>packages/core/src/types/grid.ts#L411</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -47,6 +47,7 @@ const config: GridConfig = {
 <a href="#grid-config-merge"><code>merge</code></a>
 <a href="#grid-config-sort"><code>sort</code></a>
 <a href="#grid-config-export"><code>export</code></a>
+<a href="#grid-config-ribbon"><code>ribbon</code></a>
 <a href="#grid-config-icons"><code>icons</code></a>
 <a href="#grid-config-context-menu"><code>contextMenu</code></a>
 <a href="#grid-config-undo"><code>undo</code></a>
@@ -55,7 +56,7 @@ const config: GridConfig = {
 <a href="#grid-config-keyboard"><code>keyboard</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -158,6 +159,18 @@ export?: boolean;
 
 </details>
 
+<details class="api-member" id="grid-config-ribbon" data-pagefind-weight="1">
+<summary><code>ribbon</code> <span class="api-member-summary">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert, Data and View tabs) that narrows its groups as the grid gets narrower.</span></summary>
+
+```ts generated
+ribbon?: boolean;
+```
+
+<p class="api-member-doc">Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
+Data and View tabs) that narrows its groups as the grid gets narrower.
+A custom `toolbar` item list still renders the flat toolbar instead.</p>
+</details>
+
 <details class="api-member" id="grid-config-icons" data-pagefind-weight="1">
 <summary><code>icons</code> <span class="api-member-summary">Override built-in toolbar icons by action name.</span></summary>
 
@@ -239,6 +252,7 @@ export interface GridConfig {
   merge?: boolean;
   sort?: boolean;
   export?: boolean;
+  ribbon?: boolean;
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
   contextMenu?: boolean | ContextMenuItems;
   undo?: boolean;

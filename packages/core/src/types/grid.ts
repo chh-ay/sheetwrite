@@ -16,6 +16,7 @@ import type {
   CellScalar,
   CellStyle,
   CellValue,
+  CellVerticalAlign,
   Column,
   ConditionalFormatRule,
 } from "./cell.js";
@@ -123,9 +124,45 @@ export interface GridActions {
   toggleUnderline(): void;
   toggleStrikethrough(): void;
   setAlign(align: CellAlign): void;
-  setTextColor(color: string): void;
-  setFillColor(color: string): void;
+  /** Set the selection's text color; null returns it to automatic (the theme color). */
+  setTextColor(color: string | null): void;
+  /** Set the selection's fill; null removes it (Excel's "No Fill"). */
+  setFillColor(color: string | null): void;
   toggleBorder(): void;
+  /**
+   * Apply an Excel border preset to the selection. Edge presets (`top`,
+   * `bottom`, `left`, `right`, `outside`, `thickOutside`) touch only the
+   * selection's outer cells and keep each cell's other sides.
+   */
+  setBorders(preset: BorderPreset): void;
+  /** Set the selection's font family; null returns it to the column/theme font. */
+  setFontFamily(family: string | null): void;
+  /** Set the selection's font size in CSS pixels; null returns it to the default. */
+  setFontSize(size: number | null): void;
+  /** Step the focus cell's font size to the next larger (1) or smaller (-1) standard size. */
+  stepFontSize(direction: 1 | -1): void;
+  setVerticalAlign(align: CellVerticalAlign): void;
+  toggleWrap(): void;
+  /** Set the selection's number format; null returns it to the column's format. */
+  setNumberFormat(code: string | null): void;
+  /** Show one more (1) or one fewer (-1) decimal place than the focus cell does. */
+  stepDecimals(direction: 1 | -1): void;
+  /** Merge the selection and center its text, as one undoable step. */
+  mergeAndCenter(): void;
+  /** Clear the selection's contents and formatting, as one undoable step. */
+  clearAll(): void;
+  /**
+   * Put `=SUM(...)` in the focus cell over the contiguous numbers directly
+   * above it, or to its left when there are none above.
+   */
+  autoSum(): void;
+  /** Open the built-in find bar when it is enabled. */
+  find(): void;
+  /**
+   * Freeze rows above and columns left of the focus cell in view coordinates.
+   * Does nothing without a selection; focusing A1 unfreezes both axes.
+   */
+  freezePanes(): void;
   clearFormat(): void;
   merge(): void;
   unmerge(): void;
@@ -172,6 +209,10 @@ export type ToolbarActionName =
   | "alignLeft"
   | "alignCenter"
   | "alignRight"
+  | "alignTop"
+  | "alignMiddle"
+  | "alignBottom"
+  | "wrap"
   | "textColor"
   | "fillColor"
   | "border"
@@ -199,6 +240,17 @@ export interface GridCommandState {
 export interface GridCommandStateChangeEvent {
   readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
 }
+
+/** Excel border presets accepted by {@link GridActions.setBorders}. */
+export type BorderPreset =
+  | "all"
+  | "outside"
+  | "thickOutside"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right"
+  | "none";
 
 /** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
@@ -379,6 +431,12 @@ export interface GridConfig {
   sort?: boolean;
   /** Show CSV/XLSX export controls in the default toolbar (default false). */
   export?: boolean;
+  /**
+   * Replace the built-in toolbar with an Excel-style ribbon (Home, Insert,
+   * Data and View tabs) that narrows its groups as the grid gets narrower.
+   * A custom `toolbar` item list still renders the flat toolbar instead.
+   */
+  ribbon?: boolean;
   /** Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons. */
   icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
@@ -611,6 +669,11 @@ export interface Grid {
   ): RuntimeResourceSnapshot;
   /** Query undo/redo availability and formatting active/mixed/disabled state. */
   getCommandState(command: GridCommandName): GridCommandState;
+  /**
+   * Effective style of the focus cell: its own style over its column's
+   * `cellStyle`. Empty when nothing is selected.
+   */
+  getFocusCellStyle(): CellStyle;
   setActiveSheet(id: SheetId): void;
   scrollToCell(addr: CellAddress): void;
   /**

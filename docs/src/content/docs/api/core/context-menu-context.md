@@ -8,7 +8,7 @@ description: "Cell and viewport coordinates resolved for one bundled context-men
 Cell and viewport coordinates resolved for one bundled context-menu opening.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L247"><code>packages/core/src/types/grid.ts#L247</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L299"><code>packages/core/src/types/grid.ts#L299</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

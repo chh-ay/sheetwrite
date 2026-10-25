@@ -300,6 +300,518 @@
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
+/* Ribbon (config.ribbon / createRibbon). Groups set data-size to large,
+   medium, small or collapsed as the ribbon narrows (see ribbon-fit.ts). The
+   tab row and panel heights are mirrored in ribbon.ts for the grid's layout. */
+.sheetwrite-ribbon {
+  --sheetwrite-ribbon-hover: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+  --sheetwrite-ribbon-pressed: var(--sheetwrite-widget-selection, #2563eb22);
+  --sheetwrite-ribbon-line: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-bottom: 1px solid var(--sheetwrite-ribbon-line);
+  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
+  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.sheetwrite-ribbon :focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.sheetwrite-ribbon-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 30px;
+  padding: 0 6px;
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-tab,
+.sheetwrite-ribbon-minimize {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-tab:hover,
+.sheetwrite-ribbon-minimize:hover {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-tab[aria-selected="true"] {
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font-weight: 600;
+  box-shadow: inset 0 -2px var(--sheetwrite-widget-accent, #2563eb);
+}
+
+.sheetwrite-ribbon[data-minimized="true"] .sheetwrite-ribbon-tab[aria-selected="true"] {
+  background: transparent;
+  color: inherit;
+}
+
+.sheetwrite-ribbon-minimize {
+  margin-left: auto;
+  padding: 0 8px;
+}
+
+.sheetwrite-ribbon-minimize::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+  transform: translateY(2px) rotate(45deg);
+}
+
+.sheetwrite-ribbon-minimize[aria-expanded="false"]::before {
+  transform: translateY(-2px) rotate(225deg);
+}
+
+.sheetwrite-ribbon-panel {
+  display: flex;
+  height: 92px;
+  padding: 4px 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-panel[hidden] {
+  display: none;
+}
+
+.sheetwrite-ribbon-group {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  flex: none;
+  padding: 0 6px;
+  border-right: 1px solid var(--sheetwrite-ribbon-line);
+}
+
+.sheetwrite-ribbon-group-label {
+  padding: 2px 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Flow groups: small controls stack three high; large ones span all three. */
+.sheetwrite-ribbon-group-body[data-layout="flow"] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, 24px);
+  align-content: start;
+  gap: 0 2px;
+}
+
+.sheetwrite-ribbon-group-body[data-layout="rows"] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sheetwrite-ribbon-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Qualified by the group so it outranks the later `.sheetwrite-ribbon-button`. */
+.sheetwrite-ribbon-group > .sheetwrite-ribbon-group-button,
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-body {
+  display: none;
+}
+
+.sheetwrite-ribbon-group[data-size="collapsed"] > .sheetwrite-ribbon-group-button {
+  display: inline-flex;
+}
+
+.sheetwrite-ribbon-button,
+.sheetwrite-ribbon-split-arrow,
+.sheetwrite-ribbon-combo-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow):hover:not(:disabled) {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-button[aria-pressed="true"],
+.sheetwrite-ribbon-button[aria-expanded="true"],
+.sheetwrite-ribbon-split-arrow[aria-expanded="true"] {
+  border-color: var(--sheetwrite-ribbon-line);
+  background: var(--sheetwrite-ribbon-pressed);
+}
+
+.sheetwrite-ribbon-button[aria-pressed="mixed"] {
+  border-style: dashed;
+  border-color: var(--sheetwrite-ribbon-line);
+}
+
+.sheetwrite-ribbon :disabled {
+  opacity: var(--sheetwrite-menu-disabled-opacity, 0.45);
+  cursor: default;
+}
+
+.sheetwrite-ribbon-icon > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+/* Labels show beside small buttons in flow groups, never in dense rows. */
+.sheetwrite-ribbon-row .sheetwrite-ribbon-label,
+.sheetwrite-ribbon-group[data-size="small"] .sheetwrite-ribbon-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  grid-row: span 3;
+}
+
+.sheetwrite-ribbon-button[data-large] {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  height: 72px;
+  min-width: 44px;
+  max-width: 72px;
+  padding: 4px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.sheetwrite-ribbon-button[data-large] > .sheetwrite-ribbon-icon > svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Medium: large buttons fall back to a small icon with the label beside it. */
+.sheetwrite-ribbon-group[data-size="medium"]
+  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large],
+.sheetwrite-ribbon-group[data-size="small"]
+  :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split)[data-large] {
+  grid-row: auto;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-button[data-large] {
+  flex-direction: row;
+  gap: 4px;
+  height: 24px;
+  max-width: none;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-button[data-large]
+  > .sheetwrite-ribbon-icon
+  > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sheetwrite-ribbon-caret {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 4px solid currentColor;
+  border-right: 3.5px solid transparent;
+  border-left: 3.5px solid transparent;
+}
+
+.sheetwrite-ribbon-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.sheetwrite-ribbon-split > .sheetwrite-ribbon-button {
+  position: relative;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sheetwrite-ribbon-split-arrow {
+  min-width: 14px;
+  padding: 0 2px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.sheetwrite-ribbon-split[data-large] {
+  flex-direction: column;
+}
+
+.sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-button {
+  height: 54px;
+  border-radius: 4px 4px 0 0;
+}
+
+.sheetwrite-ribbon-split[data-large] > .sheetwrite-ribbon-split-arrow {
+  justify-content: center;
+  height: 18px;
+  border-radius: 0 0 4px 4px;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-split[data-large] {
+  flex-direction: row;
+}
+
+.sheetwrite-ribbon-group:is([data-size="medium"], [data-size="small"])
+  .sheetwrite-ribbon-split[data-large]
+  > :is(.sheetwrite-ribbon-button, .sheetwrite-ribbon-split-arrow) {
+  height: 24px;
+}
+
+.sheetwrite-ribbon-color-bar {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  left: 4px;
+  height: 3px;
+}
+
+.sheetwrite-ribbon-combo {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--sheetwrite-ribbon-line);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-combo-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: inherit;
+  outline-offset: -2px;
+}
+
+.sheetwrite-ribbon-combo-input[aria-invalid="true"] {
+  outline: 2px solid var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-ribbon-combo-arrow {
+  min-width: 16px;
+  height: 100%;
+  padding: 0 4px;
+  border-radius: 0 3px 3px 0;
+}
+
+.sheetwrite-ribbon-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  grid-row: span 3;
+}
+
+.sheetwrite-ribbon-zoom-readout {
+  min-width: 44px;
+  padding: 2px 4px;
+  border: 1px solid var(--sheetwrite-ribbon-line);
+  border-radius: 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Popups live under the grid host so the widget variables reach them;
+   ribbon-popup.ts makes them position: fixed so overflow cannot clip them. */
+.sheetwrite-ribbon-popup {
+  z-index: 1001;
+  max-height: min(60vh, 420px);
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.sheetwrite-ribbon-menu,
+.sheetwrite-ribbon-listbox {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+.sheetwrite-ribbon-menu-item,
+.sheetwrite-ribbon-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sheetwrite-ribbon-option {
+  padding: 4px 10px;
+}
+
+:is(.sheetwrite-ribbon-menu-item, .sheetwrite-ribbon-option):is(:hover, :focus) {
+  outline: none;
+  background: var(--sheetwrite-menu-hover, #eeeeee);
+}
+
+.sheetwrite-ribbon-option[aria-selected="true"] {
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
+.sheetwrite-ribbon-menu-item > .sheetwrite-ribbon-icon > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sheetwrite-ribbon-palette {
+  display: grid;
+  gap: 4px;
+  width: 212px;
+}
+
+.sheetwrite-ribbon-palette-heading {
+  padding: 4px 2px 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-ribbon-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 3px;
+  padding: 0 2px;
+}
+
+.sheetwrite-ribbon-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 18%);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-swatch:is(:hover, :focus) {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.sheetwrite-ribbon-palette input[type="color"] {
+  width: 28px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.sheetwrite-ribbon-form {
+  display: grid;
+  gap: 8px;
+  width: 280px;
+  padding: 6px;
+}
+
+.sheetwrite-ribbon-form label {
+  display: grid;
+  gap: 4px;
+}
+
+.sheetwrite-ribbon-field {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+  user-select: text;
+}
+
+textarea.sheetwrite-ribbon-field {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.sheetwrite-ribbon-form-error {
+  margin: 0;
+  color: var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-ribbon-form-button {
+  justify-self: end;
+  min-width: 64px;
+  height: 28px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A collapsed group's controls, lent to the popup, render at full size. */
+.sheetwrite-ribbon-group-popup > .sheetwrite-ribbon-group-body {
+  min-height: 72px;
+}
+
 /* Context menu */
 .sheetwrite-context-menu {
   min-width: 160px;
