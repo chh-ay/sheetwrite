@@ -3,13 +3,13 @@ import { dirname, extname, join, normalize, relative, resolve, sep } from "node:
 
 export interface ImportGraphIssue {
   readonly kind:
-  | "cycle"
-  | "generic-module"
-  | "leaf-facade"
-  | "store-edge"
-  | "type-barrel"
-  | "type-edge"
-  | "type-owner";
+    | "cycle"
+    | "generic-module"
+    | "leaf-facade"
+    | "store-edge"
+    | "type-barrel"
+    | "type-edge"
+    | "type-owner";
   readonly message: string;
 }
 
