@@ -33,6 +33,7 @@ const SCENE_ORDER = [
   "interoperability",
   "formatting",
   "engine",
+  "data-tools",
 ] as const satisfies readonly CapabilityOwnerId[];
 
 type SceneOwnerId = (typeof SCENE_ORDER)[number];
@@ -47,6 +48,7 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   formatting: "A styled P&L, mixed number formats, and a live XLSX fidelity check.",
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
   engine: "A 50,000-row forecast with every public engine event traced beside it.",
+  "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -334,6 +336,17 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
       return <CollaborationScene />;
     case "engine":
       return <EngineScene />;
+    case "data-tools":
+      return (
+        <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--host-rows">
+          <span className="sw-hub-trace">
+            <code>4,800 orders → Region + Customer</code>
+            <code>Units: reject · Freight: warn</code>
+            <code>Order IDs: host protection resolver</code>
+          </span>
+          <span className="sw-hub-scene__caption">sort · filter · group · protect</span>
+        </span>
+      );
   }
 }
 

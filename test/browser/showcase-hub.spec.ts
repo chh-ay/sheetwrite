@@ -87,7 +87,7 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
     .poll(async () =>
       (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort(),
     )
-    .toEqual(["database", "host-rows", "performance"]);
+    .toEqual(["data-tools", "database", "host-rows", "performance"]);
 
   await workbookFilter.click();
   await expect(workbookFilter).toHaveAttribute("aria-pressed", "true");

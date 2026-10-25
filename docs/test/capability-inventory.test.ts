@@ -41,6 +41,7 @@ const REQUIRED_CAPABILITY_IDS = [
   "formulas.spill-references",
   "data.aggregation",
   "data.sort-filter",
+  "data.operations-workflow",
   "data.validation-rules",
   "data.protection",
   "annotations.notes",

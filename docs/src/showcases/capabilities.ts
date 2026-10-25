@@ -21,6 +21,7 @@ export type CapabilityOwnerId =
   | "formulas"
   | "performance"
   | "collaboration"
+  | "data-tools"
   | "host-rows";
 
 export type CapabilityArea =
@@ -181,6 +182,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.host-rows.tsx",
     responsibility:
       "Host entity store as the source of truth: stable row IDs across sort, filter, insert and delete, edit deltas per record, host write policy, bulk lead import.",
+    kind: "capability",
+  },
+  {
+    id: "data-tools",
+    label: "Data tools",
+    href: "/showcases/data-tools/",
+    routeFile: "docs/src/routes/showcases.data-tools.tsx",
+    responsibility:
+      "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
     kind: "capability",
   },
 ];
@@ -463,6 +473,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: VUE_SPEC,
     sharedModules: [BUSINESS_SCENARIO],
     boundary: "Protection is client UX policy, never server authorization — that is host-owned.",
+  },
+  {
+    id: "data.operations-workflow",
+    title: "Composed dispatch data tools",
+    area: "modeling",
+    primary: "data-tools",
+    interaction:
+      "Compose multi-key sort and two column filters; collapse groups, hide/unhide rows and columns, then inspect mutation receipts for reject, warn and role-gated edits.",
+    scope: "browser",
+    accessibility:
+      "Native labeled controls, visible row counts, stored-value receipts and an accessible event log.",
+    testPath: "test/browser/showcase-data-tools.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
+    boundary:
+      "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
   },
   {
     id: "annotations.notes",
