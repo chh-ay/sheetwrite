@@ -19,10 +19,12 @@ use up to four clipped windows.
 `GridImpl` is the composition root rather than the owner of every subsystem.
 `DocumentController` owns document commits and history, `DatasourceController`
 owns paged request generations and cancellation, `GeometryLayoutController`
-owns row/column indexes and frozen-window mapping, and `RenderCoordinator` is
-the sole animation-frame and paint-cache owner. Interaction-specific controllers
-remain separate. These are internal ownership boundaries; the public API stays
-the `Grid` and `Store` contracts.
+owns row/column indexes and frozen-window mapping, and `ReadWindowController` is
+the sole animation-frame and paint-cache owner. The grid's store-change path
+reconciles displayed rows, selection, and scrolling before notifying change
+listeners, including transaction, remote, and history commits. Interaction-specific
+controllers remain separate. These are internal ownership boundaries; the public
+API stays the `Grid` and `Store` contracts.
 
 ## Canvas rendering and the WASM columnar store
 

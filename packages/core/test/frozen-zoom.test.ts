@@ -6,6 +6,7 @@ import { installCanvasTestStubs } from "../src/testing.js";
 import type {
   Column,
   ColumnarData,
+  DocumentOp,
   PanePaint,
   Renderer,
   RenderLayout,
@@ -348,9 +349,7 @@ describe("zoom", () => {
 });
 
 describe("view composition", () => {
-  // Contract: the grid's view wrappers delegate to the store AND rebuild the
-  // grid's own row index (applyView), so a composed filter+hide+sort both
-  // shrinks the reported view count and bounds the painted window to it.
+  // The Grid interface owns displayed-row geometry for every commit path.
   it("composes filter, hide, and sort into a shrunken painted view", () => {
     const workbook = makeWorkbook(50);
     const store = new SheetwriteStore(workbook, makeColumnarData(50));
@@ -369,11 +368,129 @@ describe("view composition", () => {
     expect(grid.store.viewRowCount("s1")).toBe(15);
 
     // 15 view rows fit inside one render window (viewport ~14 rows + overscan),
-    // so the painted window spans the whole view: a skipped applyView would
-    // leave the 50-row index and paint a window running past row 15.
+    // so the painted window spans the whole view, rather than using the
+    // document's 50-row index and painting past row 15.
     const last = recorder.paints.at(-1)?.view;
     expect(last?.rows).toEqual({ start: 0, end: 15 });
 
+    grid.destroy();
+  });
+
+  for (const source of ["transaction", "remote", "history"] as const) {
+    it(`reconciles filtered rows before change listeners for ${source} commits`, () => {
+      const workbook = makeWorkbook(50);
+      const store = new SheetwriteStore(workbook, makeColumnarData(50));
+      const host = mountHost();
+      const grid = new GridImpl(host, { workbook }, store);
+      const recorder = makeRecorder();
+      expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+      scrollerOf(host).scrollTop = 200;
+      const observed: Array<{ start: number; end: number } | undefined> = [];
+      grid.on("change", () => {
+        grid.refresh();
+        observed.push(recorder.paints.at(-1)?.view.rows);
+        expect(grid.getSelection()).toBeNull();
+        expect(scrollerOf(host).scrollTop).toBe(0);
+      });
+      const patches: DocumentOp[] = [
+        {
+          op: "setSheetMeta" as const,
+          sheet: "s1",
+          patch: { filters: [[2, { kind: "values" as const, values: ["Tokyo"] }]] },
+        },
+      ];
+      if (source === "transaction") {
+        expect(grid.applyTransaction({ patches }).status).toBe("applied");
+      } else if (source === "remote") {
+        expect(grid.applyRemoteOperations(patches).status).toBe("applied");
+      } else {
+        grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
+        grid.undo();
+        grid.redo();
+      }
+
+      expect(store.viewRowCount("s1")).toBe(17);
+      expect(observed.at(-1)).toEqual({ start: 0, end: 17 });
+      if (source === "history") {
+        expect(observed[0]).toEqual({ start: 0, end: 17 });
+        expect(observed[1]?.end).toBeGreaterThan(17);
+      }
+      expect(recorder.paints.at(-1)?.view.rows).toEqual({ start: 0, end: 17 });
+      grid.destroy();
+    });
+  }
+
+  it("keeps filtered geometry bounded when a row height rebuilds the index", () => {
+    const workbook = makeWorkbook(50);
+    const store = new SheetwriteStore(workbook, makeColumnarData(50));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
+    const selection = { kind: "cell" as const, addr: { sheet: "s1", row: 2, col: 0 } };
+    grid.setSelection(selection);
+    const recorder = makeRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+
+    grid.setRowHeight(0, 30);
+
+    expect(recorder.paints.at(-1)?.view.rows).toEqual({ start: 0, end: 17 });
+    expect(recorder.paints.at(-1)?.rowHeights?.[0]).toBe(30);
+    expect(grid.getSelection()).toEqual(selection);
+    grid.destroy();
+  });
+
+  it("reconciles the row view before listeners when column structure clears a filter", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    grid.setColumnFilter(2, { kind: "values", values: ["Tokyo"] });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    const recorder = makeRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    let observedEnd: number | undefined;
+    grid.on("change", () => {
+      grid.refresh();
+      observedEnd = recorder.paints.at(-1)?.view.rows.end;
+      expect(grid.getSelection()).toBeNull();
+    });
+
+    expect(
+      grid.applyTransaction({
+        patches: [{ op: "removeColumns", sheet: "s1", at: 2, count: 1 }],
+      }).status,
+    ).toBe("applied");
+
+    expect(store.viewRowCount("s1")).toBe(10);
+    expect(observedEnd).toBe(10);
+    grid.destroy();
+  });
+
+  it("reconciles hidden-row replacement and collapsed groups from document operations", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const recorder = makeRecorder();
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    const commit = (patches: DocumentOp[], count: number) => {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+      expect(grid.applyTransaction({ patches }).status).toBe("applied");
+      expect(recorder.paints.at(-1)?.view.rows).toEqual({ start: 0, end: count });
+      expect(grid.getSelection()).toBeNull();
+    };
+    commit([{ op: "setRowMeta", sheet: "s1", row: 1, meta: { hidden: true } }], 9);
+    // Row metadata is replacement: omitting hidden unhides a formerly hidden row.
+    commit([{ op: "setRowMeta", sheet: "s1", row: 1, meta: { height: 30 } }], 10);
+    commit(
+      [
+        {
+          op: "setSheetMeta",
+          sheet: "s1",
+          patch: { rowGroups: [{ start: 2, end: 5, collapsed: true }] },
+        },
+      ],
+      6,
+    );
     grid.destroy();
   });
 });

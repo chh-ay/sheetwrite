@@ -425,6 +425,8 @@ export class GridImpl implements Grid {
   private readonly domOverlay: DomOverlay;
   private readonly readWindows: ReadWindowController;
   private overscan: number;
+  private displayedHiddenRows: Set<number>;
+  private displayedHasView: boolean;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
   private readOnly: boolean;
   private maxElementHeight = MAX_ELEMENT_HEIGHT_FALLBACK;
@@ -560,6 +562,8 @@ export class GridImpl implements Grid {
           workbook.sheets.find((sheet) => (sheet.visibility ?? "visible") === "visible")?.id ??
           requestedActive);
     this.sessionSheets = workbook.sheets.map(({ id, visibility }) => ({ id, visibility }));
+    this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
     this.theme = this.withAdaptiveGutter(
       this.baseTheme,
       workbook.sheets.find((sheet) => sheet.id === this.activeSheet)?.rowCount ?? 0,
@@ -897,6 +901,7 @@ export class GridImpl implements Grid {
       this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
       this.activeSheetCache = null;
       let shouldRebuildRows = false;
+      let shouldReconcileView = false;
       let shouldRebuildColumns = false;
       let shouldApplyLayout = false;
       let sheetsChanged = false;
@@ -904,6 +909,21 @@ export class GridImpl implements Grid {
       const sessionSheets = this.sessionSheets.map((sheet) => ({ ...sheet }));
       let sessionActive = this.activeSheet;
       for (const patch of event.transaction.patches) {
+        if ("sheet" in patch && patch.sheet === this.activeSheet) {
+          if (
+            patch.op === "setSheetMeta" &&
+            (patch.patch.sortKeys !== undefined ||
+              patch.patch.filters !== undefined ||
+              patch.patch.rowGroups !== undefined)
+          ) {
+            shouldReconcileView = true;
+          } else if (patch.op === "setRowMeta") {
+            const hidden = this.sheet().hiddenRows?.has(patch.row) ?? false;
+            if (hidden !== this.displayedHiddenRows.has(patch.row)) shouldReconcileView = true;
+            if (hidden) this.displayedHiddenRows.add(patch.row);
+            else this.displayedHiddenRows.delete(patch.row);
+          }
+        }
         if (
           (patch.op === "addRows" ||
             patch.op === "removeRows" ||
@@ -914,6 +934,10 @@ export class GridImpl implements Grid {
           patch.sheet === this.activeSheet
         ) {
           shouldResetDatasource = true;
+          // Structure edits can clear query state as well as shift columns/rows.
+          // Keep the previous view state: the store has already removed that query.
+          shouldReconcileView ||=
+            this.displayedHasView || (this.loadable?.hasView(this.activeSheet) ?? false);
         }
         if (
           patch.op === "addRows" ||
@@ -984,20 +1008,31 @@ export class GridImpl implements Grid {
       }
       if (sessionActive !== this.activeSheet) this.setActiveSheet(sessionActive);
       this.sessionSheets = sheets.map(({ id, visibility }) => ({ id, visibility }));
+      this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
       if (shouldResetDatasource) {
         this.datasourceController.reset(this.sheet().rowCount);
         this.mutationRevisions.clear();
+        this.displayedHiddenRows = new Set(this.sheet().hiddenRows);
       }
       this.interactions.reconcile(
         shouldResetDatasource
           ? "structure"
-          : shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
+          : shouldReconcileView || shouldRebuildRows || shouldRebuildColumns || shouldApplyLayout
             ? "view"
             : "value",
       );
-      if (shouldRebuildRows) this.rebuildIndex();
+      if (shouldRebuildRows || shouldReconcileView) this.rebuildIndex();
       if (shouldRebuildColumns) this.rebuildColumnIndex();
       if (shouldRebuildColumns || shouldApplyLayout) this.applyLayout();
+      if (shouldReconcileView) {
+        // Selection uses view-row positions: remote/history permutations must reset
+        // it and scroll just like named actions, before change listeners run.
+        this.selection.clear();
+        this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
+        this.emitSelection();
+        this.scroller.scrollTop = 0;
+        this.readWindows.invalidateData();
+      }
       if (sheetsChanged) this.renderTabs();
       this.ariaMirror.bumpVersion();
       this.scheduleRender();
@@ -1247,7 +1282,7 @@ export class GridImpl implements Grid {
       columns,
       rowHeight: this.theme.rowHeight,
       headerHeight: this.theme.headerHeight,
-      totalRows: sheet.rowCount,
+      totalRows: this.geometry.rowCount,
       zoom: this.zoom,
       merges: this.loadable?.hasView(this.activeSheet) ? [] : (sheet.merges ?? []),
 
@@ -1255,7 +1290,7 @@ export class GridImpl implements Grid {
     };
     this.renderer.setLayout(layout);
     this.domOverlay.setLayout(layout);
-    this.selection.setBounds(sheet.rowCount, this.firstCol(), this.lastCol());
+    this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.syncSizer();
   }
 
@@ -1278,8 +1313,10 @@ export class GridImpl implements Grid {
   }
 
   private rebuildIndex(): void {
-    this.geometry.rebuildRows();
-    this.datasourceController.resize(this.geometry.rowCount);
+    this.geometry.rebuildRows(
+      this.loadable?.viewRowCount(this.activeSheet) ?? this.sheet().rowCount,
+    );
+    this.datasourceController.resize(this.sheet().rowCount);
     // Row-count changes can grow the row-number gutter (e.g. crossing 1M rows).
     const adjusted = this.withAdaptiveGutter(this.theme, this.sheet().rowCount);
     if (adjusted !== this.theme) {
@@ -1879,10 +1916,12 @@ export class GridImpl implements Grid {
     this.activeSheet = id;
     this.activeSheetCache = null;
     const sheet = this.sheet();
+    this.displayedHiddenRows = new Set(sheet.hiddenRows);
+    this.displayedHasView = this.loadable?.hasView(id) ?? false;
 
     this.rebuildColumnIndex();
-    this.geometry.rebuildRows();
-    this.selection = new SelectionModel(sheet.rowCount, this.firstCol(), this.lastCol());
+    this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
+    this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController.reset(sheet.rowCount);
     this.scroller.scrollTop = 0;
     this.scroller.scrollLeft = 0;
@@ -2713,7 +2752,7 @@ export class GridImpl implements Grid {
   }
 
   clearView(): void {
-    const outcome = this.document.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2723,7 +2762,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
   }
 
   sortByMulti(keys: readonly SortKey[]): void {
@@ -2741,7 +2779,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
     return outcome;
   }
 
@@ -2749,7 +2786,7 @@ export class GridImpl implements Grid {
     const filters = new Map(this.sheet().filters ?? []);
     if (filter === null) filters.delete(col);
     else filters.set(col, structuredClone(filter));
-    const outcome = this.document.commit(
+    this.document.commit(
       [
         {
           op: "setSheetMeta",
@@ -2759,7 +2796,6 @@ export class GridImpl implements Grid {
       ],
       "structure",
     );
-    if (outcome.status === "applied") this.applyView();
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
@@ -2783,7 +2819,6 @@ export class GridImpl implements Grid {
       });
     }
     this.document.commit(patches, "structure");
-    this.applyView();
   }
 
   showRows(rows?: readonly number[]): void {
@@ -2800,7 +2835,6 @@ export class GridImpl implements Grid {
       });
     }
     this.document.commit(patches, "structure");
-    this.applyView();
   }
 
   hiddenRows(): readonly number[] {
@@ -2850,7 +2884,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   ungroupRows(start: number, end: number): void {
@@ -2859,7 +2892,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   setGroupCollapsed(start: number, collapsed: boolean): void {
@@ -2868,7 +2900,6 @@ export class GridImpl implements Grid {
       [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { rowGroups: groups } }],
       "structure",
     );
-    this.applyView();
   }
 
   rowGroups(): readonly RowGroup[] {
@@ -2926,24 +2957,6 @@ export class GridImpl implements Grid {
       filename,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-  }
-
-  private applyView(): void {
-    const count = this.loadable
-      ? this.loadable.viewRowCount(this.activeSheet)
-      : this.sheet().rowCount;
-    this.interactions.reconcile("view");
-    this.geometry.rebuildRows(count);
-    this.selection.clear();
-    this.selection.setBounds(count, this.firstCol(), this.lastCol());
-    this.emitSelection();
-    this.scroller.scrollTop = 0;
-    // The view permutation lives outside the store, so it must invalidate the
-    // data signature itself — a view change with an identical window/scroll
-    // (e.g. sorting while already at the top) would otherwise reuse stale rows.
-    this.readWindows.invalidateData();
-    this.syncSizer();
-    this.render();
   }
 
   /**
