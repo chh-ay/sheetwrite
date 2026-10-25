@@ -24,8 +24,8 @@
   --sw-demo-border-strong: var(--sw-border-strong);
   --sw-demo-danger: var(--sw-state-error);
   --sw-demo-accent: var(--sw-demo-svelte-accent);
-  /* The demo accent-strong is tuned for the dark demo surface; mixing keeps
-     accent text readable on whichever site surface is active. */
+  /* The Svelte brand accent is tuned for demo surfaces; mixing keeps accent
+     text readable on whichever site surface is active. */
   --sw-demo-accent-strong: color-mix(
     in srgb,
     var(--sw-demo-svelte-accent) 62%,
@@ -33,10 +33,6 @@
   );
   --sw-demo-shadow: var(--sw-shadow);
   --sw-demo-popup-shadow: var(--sw-shadow);
-  /* On-accent text. The shared shell sets ink to the page surface (white in the
-     light theme), which is unreadable on the amber offline and conflict states;
-     a fixed dark ink reads on the brand orange and the amber in both themes. */
-  --sw-demo-ink: #1a0d06;
   --demo-accent: var(--sw-demo-accent);
   --sw-svw-peer: var(--sw-demo-accent);
 }

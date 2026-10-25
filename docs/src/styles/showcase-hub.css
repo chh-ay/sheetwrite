@@ -257,7 +257,7 @@
 }
 
 .sw-hub-launch[data-owner="engine"] {
-  --sw-hub-accent: #a78bfa;
+  --sw-hub-accent: var(--sw-type-keyword);
 }
 
 .sw-hub-launch[data-owner="vue"] {

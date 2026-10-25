@@ -40,7 +40,7 @@
     line-height: 1.08;
   }
 
-  /* Flight deck: a dark instrument panel, like the hub previews, in both themes. */
+  /* Flight deck: an instrument panel in the demo palette, like the hub previews. */
   .sw-sp-flight {
     --sw-accent: var(--sw-demo-accent);
     --sw-border: var(--sw-demo-border-strong);
@@ -52,7 +52,11 @@
     padding: 1.5rem 1.5rem 1.25rem;
     border-bottom: 1px solid var(--sw-demo-border);
     background:
-      radial-gradient(60rem 18rem at 85% -20%, rgb(52 211 153 / 14%), transparent 70%),
+      radial-gradient(
+        60rem 18rem at 85% -20%,
+        color-mix(in srgb, var(--sw-demo-accent) 14%, transparent),
+        transparent 70%
+      ),
       var(--sw-demo-surface);
     color: var(--sw-demo-fg);
   }
@@ -203,7 +207,7 @@
   }
 
   .sw-sp-flight[data-flying="true"] .sw-sp-flight__hud-address dd:first-of-type {
-    text-shadow: 0 0 1.25rem rgb(52 211 153 / 45%);
+    text-shadow: 0 0 1.25rem color-mix(in srgb, var(--sw-demo-accent) 45%, transparent);
   }
 
   .sw-sp-flight__map {

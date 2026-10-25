@@ -98,7 +98,7 @@ export const Route = createFileRoute("/showcases/interoperability")({
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-/** Canvas colors come from the dark stage's shared demo tokens. */
+/** Canvas colors come from the stage's shared demo tokens, which follow the page theme. */
 const CANVAS_THEME: Partial<Theme> = { rowHeight: 36 };
 const COMPATIBILITY_RESULTS = compatibilityResultsData as unknown as CompatibilityResults;
 const COMPATIBILITY_PAGE_SIZE = 20;

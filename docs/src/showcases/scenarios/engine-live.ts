@@ -14,6 +14,7 @@ import { createGrid, initSheetwrite } from "@sheetwrite/core";
 
 import { errorText } from "../../lib/errors.js";
 import { formatBytes } from "../../lib/format.js";
+import { observeSiteTheme } from "../../lib/site-theme.js";
 import {
   createEngineLiveWorkbook,
   ENGINE_ACCOUNT_ROWS,
@@ -36,42 +37,17 @@ export const ENGINE_PENDING_LIMIT = 16;
 /** What the engine resolves a cell to while its page has not arrived. */
 export const ENGINE_LOADING_MARKER = "#LOADING!";
 
-const ENGINE_THEME_BASE = {
+/**
+ * Layout only. Colors come from the `--sheetwrite-*` variables on the grid host
+ * (showcase-engine.css), which follow the page theme; `replaceTheme` with this
+ * object re-resolves them after the theme changes.
+ */
+const ENGINE_LIVE_THEME: Partial<Theme> = {
   font: '500 13px "Inter Variable", Inter, system-ui, sans-serif',
   rowHeight: 30,
   headerHeight: 32,
   rowHeaderWidth: 48,
-} as const;
-
-export function engineLiveTheme(mode: "light" | "dark"): Partial<Theme> {
-  return mode === "dark"
-    ? {
-        ...ENGINE_THEME_BASE,
-        bg: "#0d1522",
-        fg: "#dce5f3",
-        gridLine: "#26364f",
-        headerBg: "#121f30",
-        headerFg: "#a8b7cd",
-        selection: "rgb(52 211 153 / 18%)",
-        selectionBorder: "#34d399",
-        searchMatch: "rgb(251 191 36 / 24%)",
-        searchActiveMatch: "#fbbf24",
-        highlight: "rgb(96 165 250 / 24%)",
-      }
-    : {
-        ...ENGINE_THEME_BASE,
-        bg: "#fbfcfe",
-        fg: "#1b2435",
-        gridLine: "#d9e0e9",
-        headerBg: "#e9eef5",
-        headerFg: "#46546a",
-        selection: "rgb(4 120 87 / 14%)",
-        selectionBorder: "#047857",
-        searchMatch: "rgb(180 83 9 / 18%)",
-        searchActiveMatch: "#a34d08",
-        highlight: "rgb(37 99 235 / 16%)",
-      };
-}
+};
 
 export type EngineRenderer = "canvas" | "worker";
 export type EngineAction = "jump" | "edit" | "undo" | "save" | "renderer";
@@ -650,6 +626,7 @@ export function createEngineScenario(
   let followController: AbortController | null = null;
   let followAnchor = 24_000;
   let jumpInput = "24001";
+  const stopObservingTheme = observeSiteTheme(() => grid?.replaceTheme(ENGINE_LIVE_THEME));
   function set<K extends keyof EngineScenarioSnapshot>(key: K, value: EngineScenarioSnapshot[K]) {
     state = { ...state, [key]: value };
     for (const listener of listeners) listener();
@@ -716,9 +693,6 @@ export function createEngineScenario(
       .then(() => {
         if (disposed || token !== generation) return;
         const renderer = state.requestedRenderer;
-        const theme = engineLiveTheme("dark");
-        host.dataset.gridTheme = "dark";
-        host.style.backgroundColor = theme.bg ?? "";
         grid = createGrid(host, {
           workbook: createEngineLiveWorkbook(),
           datasource: createEngineLiveDataSource(
@@ -735,7 +709,7 @@ export function createEngineScenario(
             },
           ),
           datasourceStorage: ENGINE_LIVE_STORAGE,
-          theme,
+          theme: ENGINE_LIVE_THEME,
           config: {
             toolbar: false,
             tabs: false,
@@ -1106,6 +1080,7 @@ export function createEngineScenario(
       if (disposed) return;
       disposed = true;
       stop();
+      stopObservingTheme();
       listeners.clear();
     },
   };
