@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import {
   blitVerticalScroll,
@@ -8,6 +8,8 @@ import {
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
 import { dateToSerial } from "../src/date-serial.js";
+import { initSheetwrite } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
 
 // jsdom/happy-dom has no 2D canvas context, so paint against a recording stub
@@ -42,6 +44,10 @@ interface LineSegment {
   x1: number;
   y1: number;
 }
+interface StrokeCall {
+  style: string;
+  segments: LineSegment[];
+}
 
 interface ClipRectCall {
   x: number;
@@ -61,6 +67,7 @@ interface RecordingCtx {
   fillTexts: FillTextCall[];
   clipRects: ClipRectCall[];
   segments: LineSegment[];
+  strokes: StrokeCall[];
   [op: string]: unknown;
 }
 
@@ -76,6 +83,7 @@ function makeRecordingCtx(): RecordingCtx {
     fillTexts: [],
     clipRects: [],
     segments: [],
+    strokes: [],
   };
 
   // Capture the live `fillStyle` at call time, since it mutates between draws.
@@ -97,6 +105,7 @@ function makeRecordingCtx(): RecordingCtx {
     });
   };
   let segmentStart: MoveToCall | undefined;
+  let pathStart = 0;
   ctx.moveTo = (x: number, y: number) => {
     segmentStart = { x, y };
   };
@@ -126,8 +135,14 @@ function makeRecordingCtx(): RecordingCtx {
   ctx.restore = () => {
     activeClips = savedClips.pop() ?? [];
   };
+  ctx.beginPath = () => {
+    pathStart = ctx.segments.length;
+  };
+  ctx.stroke = () => {
+    ctx.strokes.push({ style: ctx.strokeStyle, segments: ctx.segments.slice(pathStart) });
+  };
 
-  for (const op of ["setTransform", "beginPath", "stroke", "setLineDash"]) {
+  for (const op of ["setTransform", "setLineDash"]) {
     ctx[op] = () => {};
   }
 
@@ -137,6 +152,60 @@ function makeRecordingCtx(): RecordingCtx {
 // Custom (function) renderers are never exercised here; `paintFrame` takes a
 // `ReadonlyMap`, so an empty map (not a lookup record) is the right shape.
 const NO_RENDERERS = new Map<string, never>();
+
+beforeAll(async () => {
+  await initSheetwrite();
+});
+
+it("paints virtual columns without borrowing the first real cell's fill or borders", () => {
+  const columnWidth = 100;
+  const storedColumnCount = 5;
+  const paintedColumnCount = 7;
+  const fill = "#ffc000";
+  const border = "#123456";
+  const columns = Array.from({ length: paintedColumnCount }, (_, col) => ({
+    key: `c${col}`,
+    header: `C${col}`,
+    type: "text" as const,
+    width: columnWidth,
+  }));
+  const workbook = {
+    activeSheet: "s1",
+    sheets: [
+      { id: "s1", name: "Sheet", rowCount: 3, columns: columns.slice(0, storedColumnCount) },
+    ],
+  };
+  const store = new SheetwriteStore(workbook);
+  store.applyTransaction({
+    patches: [
+      {
+        op: "setRangeStyle",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        style: { backgroundColor: fill, border: { all: { color: border, width: 1 } } },
+      },
+    ],
+  });
+  const view = store.getVisibleWindow(
+    "s1",
+    { start: 0, end: 3 },
+    columns.map((_, col) => col),
+  );
+  const ctx = render(view, makeLayout(columns), {
+    width: paintedColumnCount * columnWidth,
+    height: HEADER_HEIGHT + 3 * ROW_HEIGHT,
+    scrollTop: 0,
+    scrollLeft: 0,
+  });
+
+  expect(ctx.fillRects.filter((rect) => rect.fillStyle === fill)).toEqual([
+    { x: 0, y: HEADER_HEIGHT, w: columnWidth, h: ROW_HEIGHT, fillStyle: fill },
+  ]);
+  const borderLines = ctx.strokes
+    .filter((stroke) => stroke.style === border)
+    .flatMap((stroke) => stroke.segments);
+  expect(borderLines).toHaveLength(4);
+  expect(borderLines.every((line) => line.x0 <= columnWidth && line.x1 <= columnWidth)).toBe(true);
+});
 
 const ROW_HEIGHT = 24;
 const HEADER_HEIGHT = 20;

@@ -14,6 +14,9 @@ use crate::types::{
     KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
+/// Global style id of a cell with no style of its own.
+const NO_STYLE_ID: u32 = 0;
+
 #[wasm_bindgen]
 impl CellStore {
     /// One bulk read of a rectangular window for the renderer. Returns
@@ -171,10 +174,12 @@ impl WindowCells {
             kind: vec![KIND_EMPTY; cells],
             num: vec![0.0f64; cells],
             str_local: vec![-1i32; cells],
+            // Slots stay 0 for cells the window skips (past the sheet's edge,
+            // or not loaded), so local slot 0 must mean "no style".
             style_local: vec![0u32; cells],
             string_ids: vec![NO_STRING; cells],
             strings: Vec::new(),
-            style_dict: Vec::new(),
+            style_dict: vec![NO_STYLE_ID],
             error_slots: [-1i32; FormulaError::COUNT],
         })
     }
