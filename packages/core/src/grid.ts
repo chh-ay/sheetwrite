@@ -2078,8 +2078,9 @@ export class GridImpl implements Grid {
   private createToolbar(config: GridConfig | undefined): void {
     if (!config || config.toolbar === false) return;
     if (config.ribbon === true && !Array.isArray(config.toolbar)) {
+      // The grid owns widget theming: seed now, reseed on every theme change.
+      seedWidgetTheme(this.host, this.baseTheme);
       this.ribbon = new Ribbon(this.host, this, {
-        theme: this.baseTheme,
         onHeightChange: (height: number) => {
           this.toolbarHeight = height;
           this.viewportEl.style.top = `${height}px`;

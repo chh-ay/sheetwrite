@@ -25,7 +25,6 @@ export function createRibbon(
   options: RibbonOptions = {},
 ): ShellPiece {
   const ribbon = new Ribbon(host, grid, {
-    theme: grid.getTheme(),
     ...(options.focusGrid === undefined ? {} : { focusGrid: options.focusGrid }),
     onHeightChange: (height) => options.onHeightChange?.(height),
   });

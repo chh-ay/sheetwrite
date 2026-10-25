@@ -6,8 +6,6 @@
 import { actionFeedbackFor } from "../action-feedback.js";
 import { COMMAND_ICONS } from "../command-icons.js";
 import type { Grid } from "../types/grid.js";
-import type { Theme } from "../types/render.js";
-import { seedWidgetTheme } from "../widget-theme.js";
 import {
   renderControl,
   type RibbonCommandStates,
@@ -29,7 +27,6 @@ const TAB_ROW_HEIGHT = 30;
 const PANEL_HEIGHT = 92;
 
 export interface RibbonOptions {
-  readonly theme: Theme;
   /** Called after the ribbon is minimized to its tab row or expanded again. */
   readonly onHeightChange: (height: number) => void;
   /** Where keyboard focus goes back to; defaults to focusing the host. */
@@ -73,7 +70,6 @@ export class Ribbon {
   private destroyed = false;
 
   constructor(host: HTMLElement, grid: Grid, options: RibbonOptions) {
-    seedWidgetTheme(host, options.theme);
     ribbonSerial += 1;
     this.id = ribbonSerial;
     this.grid = grid;
