@@ -29,6 +29,13 @@
   overflow-x: auto;
 }
 
+/* The ribbon fits its groups to its own width, so it must fill the row. If it
+   sized to its content, folded groups would keep it narrow and never unfold. */
+.sheetwrite-shell-toolbar-row > .sheetwrite-ribbon {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* The standalone toolbar reuses the built-in control classes
    (.sheetwrite-tb-button / .sheetwrite-tb-color / .sheetwrite-tb-separator)
    so it inherits their cosmetics from styles.css. */
