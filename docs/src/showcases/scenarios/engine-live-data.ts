@@ -77,12 +77,13 @@ const SUMMED_KEYS_BY_PRODUCT: Readonly<Record<number, readonly string[]>> = {
   4: ["trainingPlaces"],
 };
 
-/** A translucent accent tint (8-digit hex, ~14% alpha): canvas cell styles are
- * fixed colors, so it must read on both the light and the dark grid. Text keeps
- * the theme foreground. */
+/** A solid teal band with white text: canvas cell styles are fixed 6-digit hex
+ * colors, so the band must read on both the light and the dark grid. White on
+ * this teal is about 6:1. */
 const SUMMARY_ROW_STYLE = {
   bold: true,
-  backgroundColor: "#34d39924",
+  backgroundColor: "#1f6f5c",
+  color: "#ffffff",
 } as const;
 
 /** Twelve monthly records followed by their formula-backed annual total. */
