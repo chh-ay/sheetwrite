@@ -188,9 +188,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Desktop, all examples: three featured capability cards (a third of the row),
-   then four capability cards and four adapters (a quarter each). Filtered
-   views keep thirds. Two columns on tablets and one on small screens. */
+/* Desktop, all examples: eight capability cards and four adapters in rows of
+   four. Filtered views keep thirds. Tablets use pairs; small screens stack. */
 .sw-hub-scenes {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -208,7 +207,7 @@
 }
 
 .sw-hub-scenes > li[data-kind="framework"],
-.sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+.sw-hub-scenes[data-group="all"] > li[data-kind="capability"] {
   grid-column: span 3;
 }
 
@@ -702,26 +701,8 @@
 @media (max-width: 79.999rem) {
   .sw-hub-scenes > li,
   .sw-hub-scenes > li[data-kind="framework"],
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"] {
     grid-column: span 6;
-  }
-
-  /* Seven capability cards: the last one takes the full row on tablets. */
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) {
-    grid-column: 1 / -1;
-  }
-}
-
-/* On tablets the full-row seventh card lays its preview beside its text. */
-@media (min-width: 40rem) and (max-width: 79.999rem) {
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(12rem, auto);
-  }
-
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(7) .sw-hub-launch__body {
-    border-top: 0;
-    border-left: 1px solid color-mix(in srgb, var(--sw-hub-accent) 40%, var(--sw-border));
   }
 }
 
@@ -742,7 +723,7 @@
 
   .sw-hub-scenes > li,
   .sw-hub-scenes > li[data-kind="framework"],
-  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"]:nth-child(n + 4) {
+  .sw-hub-scenes[data-group="all"] > li[data-kind="capability"] {
     grid-column: 1 / -1;
   }
 
