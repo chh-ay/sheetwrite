@@ -15,3 +15,13 @@ _Avoid_: source row, model row
 **Displayed row**:
 A row's position after the view is applied; selection, scrolling, and painting address displayed rows.
 _Avoid_: view row, visual row
+
+## Release
+
+**Package assembly**:
+Turning built package outputs into packed tarballs under the release file and manifest policy.
+_Avoid_: staging, packing (alone)
+
+**Release artifact**:
+A packed package tarball recorded with its version, file list, and digests, which release consumers verify instead of re-packing.
+_Avoid_: build output, bundle

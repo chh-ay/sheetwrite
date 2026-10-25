@@ -12,16 +12,18 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
 import {
   assertPublishedFilePolicy,
+  packBuiltPackages,
   readReleaseManifestDigest,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
 import { bindCanonicalTarballIntegrities } from "./release-lock-integrity.mjs";
 import { captureProcess, readJson } from "./script-io.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 export const SIZE_PROTOCOL_VERSION = 2;
 export const SIZE_TOOL_NAME = "sheetwrite-delivery-size";
@@ -48,7 +50,7 @@ export interface PackResult {
   filename: string;
   size: number;
   unpackedSize: number;
-  files: PackFile[];
+  files: readonly PackFile[];
 }
 
 export interface Metric {
@@ -197,13 +199,6 @@ export interface SizeReport {
   reproduction: string;
 }
 
-interface PackageManifest {
-  name: string;
-  version: string;
-  files?: string[];
-  dependencies?: Record<string, string>;
-}
-
 interface PackedPackage {
   name: string;
   tarballPath: string;
@@ -216,15 +211,6 @@ const reportPath = join(import.meta.dir, "size-report.json");
 const historyPath = join(import.meta.dir, "size-history.json");
 /** The optional package that core and the framework adapters must not install. */
 const XLSX_PACKAGE = "@sheetwrite/xlsx";
-const packageDirectories = [
-  "packages/wasm",
-  "packages/formulas",
-  "packages/core",
-  "packages/xlsx",
-  "packages/react",
-  "packages/vue",
-  "packages/svelte",
-] as const;
 const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]> = {
   vite: [
     "core-initial",
@@ -245,53 +231,6 @@ function isNonNegativeInteger(value: unknown): value is number {
   return (
     typeof value === "number" && Number.isFinite(value) && value >= 0 && Number.isInteger(value)
   );
-}
-
-export function parsePackJson(input: string): PackResult {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(input);
-  } catch (error) {
-    throw new Error(
-      `Malformed npm pack JSON: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  if (!Array.isArray(parsed) || parsed.length !== 1) {
-    throw new Error("npm pack JSON must contain exactly one result");
-  }
-  const candidate = parsed[0] as Record<string, unknown>;
-  if (
-    typeof candidate.filename !== "string" ||
-    candidate.filename.length === 0 ||
-    !isNonNegativeInteger(candidate.size) ||
-    !isNonNegativeInteger(candidate.unpackedSize) ||
-    !Array.isArray(candidate.files)
-  ) {
-    throw new Error("npm pack JSON has invalid filename, size, unpackedSize, or files");
-  }
-  const seen = new Set<string>();
-  const files = candidate.files.map((entry, index) => {
-    if (entry === null || typeof entry !== "object") {
-      throw new Error(`npm pack JSON file ${index} is malformed`);
-    }
-    const file = entry as Record<string, unknown>;
-    if (
-      typeof file.path !== "string" ||
-      file.path.length === 0 ||
-      !isNonNegativeInteger(file.size)
-    ) {
-      throw new Error(`npm pack JSON file ${index} has invalid path or size`);
-    }
-    if (seen.has(file.path)) throw new Error(`npm pack JSON contains duplicate file ${file.path}`);
-    seen.add(file.path);
-    return { path: file.path, size: file.size };
-  });
-  return {
-    filename: candidate.filename,
-    size: candidate.size,
-    unpackedSize: candidate.unpackedSize,
-    files,
-  };
 }
 
 export function classifyPackedPath(path: string): PackedCategory {
@@ -773,91 +712,13 @@ async function runCommand(command: string[], cwd = repositoryRoot): Promise<stri
   });
 }
 
-function rewriteWorkspaceRanges(
-  dependencies: Record<string, string> | undefined,
-  versions: ReadonlyMap<string, string>,
-): Record<string, string> | undefined {
-  if (dependencies === undefined) return undefined;
-  return Object.fromEntries(
-    Object.entries(dependencies).map(([name, range]) => {
-      if (!range.startsWith("workspace:")) return [name, range];
-      const version = versions.get(name);
-      if (version === undefined) throw new Error(`No workspace version found for ${name}`);
-      return [name, version];
-    }),
-  );
-}
-
-async function copyManifestEntry(
-  sourceRoot: string,
-  packageRoot: string,
-  entry: string,
-): Promise<void> {
-  if (!/[*?[\]{}]/u.test(entry)) {
-    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
-    return;
-  }
-  const matches = Array.from(
-    new Bun.Glob(entry).scanSync({
-      cwd: sourceRoot,
-      dot: true,
-      onlyFiles: true,
-      followSymlinks: false,
-    }),
-  );
-  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
-  for (const path of matches) {
-    const target = join(packageRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await cp(join(sourceRoot, path), target);
-  }
-}
-
 async function packPackages(temporaryRoot: string): Promise<PackedPackage[]> {
-  const stageRoot = join(temporaryRoot, "stage");
-  const tarballRoot = join(temporaryRoot, "tarballs");
-  await Promise.all([
-    mkdir(stageRoot, { recursive: true }),
-    mkdir(tarballRoot, { recursive: true }),
-  ]);
-  const sourceManifests = await Promise.all(
-    packageDirectories.map((directory) =>
-      readJson<PackageManifest>(join(repositoryRoot, directory, "package.json")),
-    ),
-  );
-  const versions = new Map(sourceManifests.map((manifest) => [manifest.name, manifest.version]));
-  const packed: PackedPackage[] = [];
-
-  for (let index = 0; index < packageDirectories.length; index += 1) {
-    const directory = packageDirectories[index];
-    const sourceManifest = sourceManifests[index];
-    if (directory === undefined || sourceManifest === undefined)
-      throw new Error("Package list mismatch");
-    const sourceRoot = join(repositoryRoot, directory);
-    const packageRoot = join(stageRoot, basename(directory));
-    await mkdir(packageRoot, { recursive: true });
-    for (const path of sourceManifest.files ?? []) {
-      await copyManifestEntry(sourceRoot, packageRoot, path);
-    }
-    await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
-    await cp(join(sourceRoot, "README.md"), join(packageRoot, "README.md"));
-    const manifest: PackageManifest = {
-      ...sourceManifest,
-      dependencies: rewriteWorkspaceRanges(sourceManifest.dependencies, versions),
-    };
-    await writeFile(join(packageRoot, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-    const output = await runCommand(
-      ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-      packageRoot,
-    );
-    const result = parsePackJson(output);
-    packed.push({
-      name: manifest.name,
-      tarballPath: join(tarballRoot, result.filename),
-      report: summarizePack(manifest.name, result),
-    });
-  }
-  return packed;
+  const packages = await packBuiltPackages(join(temporaryRoot, "tarballs"));
+  return packages.map(({ artifact, tarballPath, pack }) => ({
+    name: artifact.name,
+    tarballPath,
+    report: summarizePack(artifact.name, pack),
+  }));
 }
 
 async function loadPackedArtifacts(
@@ -1376,15 +1237,12 @@ function assertReleaseVersion(version: string): void {
 export async function capturePublishedRelease(version: string): Promise<SizeReleaseSnapshot> {
   assertReleaseVersion(version);
   const metrics: SizeReleaseSnapshot["metrics"] = {};
-  for (const directory of packageDirectories) {
-    const manifest = JSON.parse(
-      await readFile(join(repositoryRoot, directory, "package.json"), "utf8"),
-    ) as PackageManifest;
+  for (const packageName of PUBLISHABLE_PACKAGE_ORDER) {
     const metadataResponse = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(manifest.name)}/${encodeURIComponent(version)}`,
+      `https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
     );
     if (!metadataResponse.ok) {
-      throw new Error(`Published package not found: ${manifest.name}@${version}`);
+      throw new Error(`Published package not found: ${packageName}@${version}`);
     }
     const metadata = (await metadataResponse.json()) as {
       dist?: { fileCount?: number; tarball?: string; unpackedSize?: number };
@@ -1396,11 +1254,11 @@ export async function capturePublishedRelease(version: string): Promise<SizeRele
       !isNonNegativeInteger(metadata.dist.fileCount) ||
       !isNonNegativeInteger(metadata.dist.unpackedSize)
     ) {
-      throw new Error(`Incomplete registry size metadata: ${manifest.name}@${version}`);
+      throw new Error(`Incomplete registry size metadata: ${packageName}@${version}`);
     }
     const tarballResponse = await fetch(metadata.dist.tarball);
-    if (!tarballResponse.ok) throw new Error(`Cannot download ${manifest.name}@${version}`);
-    const prefix = `package.${manifest.name}`;
+    if (!tarballResponse.ok) throw new Error(`Cannot download ${packageName}@${version}`);
+    const prefix = `package.${packageName}`;
     metrics[`${prefix}.tarballBytes`] = {
       actual: (await tarballResponse.arrayBuffer()).byteLength,
       unit: "bytes",

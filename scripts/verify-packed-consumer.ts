@@ -1,4 +1,4 @@
-import { access, cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -8,6 +8,7 @@ import { chromium } from "@playwright/test";
 
 import {
   assertPublishedFilePolicy,
+  packBuiltPackages,
   readReleaseManifestDigest,
   verifyReleaseArtifacts,
 } from "./release-artifacts.js";
@@ -28,7 +29,7 @@ interface PackResult {
   filename: string;
   size: number;
   unpackedSize: number;
-  files: Array<{ path: string }>;
+  files: ReadonlyArray<{ readonly path: string }>;
 }
 
 interface PackageSpec {
@@ -190,72 +191,6 @@ function collectExportTargets(value: unknown, targets: string[] = []): string[] 
 
   for (const nested of Object.values(value)) collectExportTargets(nested, targets);
   return targets;
-}
-
-function rewriteWorkspaceRanges(
-  dependencies: Record<string, string> | undefined,
-  versions: Map<string, string>,
-): Record<string, string> | undefined {
-  if (dependencies === undefined) return undefined;
-
-  return Object.fromEntries(
-    Object.entries(dependencies).map(([name, range]) => {
-      if (!range.startsWith("workspace:")) return [name, range];
-      const version = versions.get(name);
-      if (version === undefined) throw new Error(`No workspace version found for ${name}`);
-      return [name, version];
-    }),
-  );
-}
-
-async function copyManifestEntry(
-  sourceRoot: string,
-  packageRoot: string,
-  entry: string,
-): Promise<void> {
-  if (!/[*?[\]{}]/u.test(entry)) {
-    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
-    return;
-  }
-  const matches = Array.from(
-    new Bun.Glob(entry).scanSync({
-      cwd: sourceRoot,
-      dot: true,
-      onlyFiles: true,
-      followSymlinks: false,
-    }),
-  );
-  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
-  for (const path of matches) {
-    const target = join(packageRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await cp(join(sourceRoot, path), target);
-  }
-}
-
-async function stagePackage(
-  spec: PackageSpec,
-  stageRoot: string,
-  versions: Map<string, string>,
-): Promise<PackageManifest> {
-  const sourceRoot = join(repositoryRoot, spec.directory);
-  const manifest = await readJson<PackageManifest>(join(sourceRoot, "package.json"));
-  const packageRoot = join(stageRoot, basename(spec.directory));
-  await mkdir(packageRoot, { recursive: true });
-
-  for (const path of [...(manifest.files ?? []), "LICENSE", "README.md"]) {
-    await copyManifestEntry(sourceRoot, packageRoot, path);
-  }
-
-  const stagedManifest: PackageManifest = {
-    ...manifest,
-    dependencies: rewriteWorkspaceRanges(manifest.dependencies, versions),
-  };
-  await writeFile(
-    join(packageRoot, "package.json"),
-    `${JSON.stringify(stagedManifest, null, 2)}\n`,
-  );
-  return stagedManifest;
 }
 
 async function assertWorkerBundle(packageRoot: string, manifest: PackageManifest): Promise<void> {
@@ -551,6 +486,11 @@ function optionValue(name: string): string | undefined {
   return index < 0 ? undefined : process.argv[index + 1];
 }
 
+if (process.argv.includes("--help")) {
+  process.stdout.write("Usage: bun scripts/verify-packed-consumer.ts [--artifacts <directory>]\n");
+  process.exit(0);
+}
+
 const artifactDirectory = optionValue("--artifacts");
 const requiredArtifacts = process.env.SHEETWRITE_RELEASE_ARTIFACTS;
 if (process.env.SHEETWRITE_ARTIFACT_ONLY === "1" && artifactDirectory === undefined) {
@@ -565,50 +505,40 @@ if (
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), "sheetwrite-packed-consumer-"));
 try {
-  const stageRoot = join(temporaryRoot, "stage");
   const tarballRoot = join(temporaryRoot, "tarballs");
   const extractRoot = join(temporaryRoot, "extracted");
   const consumerRoot = join(temporaryRoot, "consumer");
-  await Promise.all([
-    mkdir(stageRoot, { recursive: true }),
-    mkdir(tarballRoot, { recursive: true }),
-    mkdir(extractRoot, { recursive: true }),
-  ]);
+  await mkdir(extractRoot, { recursive: true });
 
   const sourceManifests = await Promise.all(
     packageSpecs.map((spec) =>
       readJson<PackageManifest>(join(repositoryRoot, spec.directory, "package.json")),
     ),
   );
-  const versions = new Map(
-    sourceManifests.map((manifest) => [manifest.name, manifest.version] as const),
-  );
   const tarballs = new Map<string, string>();
   const packageSizes = new Map<string, { packed: number; unpacked: number }>();
   let artifactManifestDigest: string | undefined;
 
   if (artifactDirectory === undefined) {
-    for (const spec of packageSpecs) {
-      const manifest = await stagePackage(spec, stageRoot, versions);
-      const packageRoot = join(stageRoot, basename(spec.directory));
-      const output = await run(
-        ["npm", "pack", "--ignore-scripts", "--json", "--pack-destination", tarballRoot],
-        packageRoot,
-      );
-      const results = JSON.parse(output) as PackResult[];
-      const result = results[0];
-      if (result === undefined) throw new Error(`npm pack returned no result for ${manifest.name}`);
-
-      const tarballPath = join(tarballRoot, result.filename);
+    const packages = await packBuiltPackages(tarballRoot);
+    const byName = new Map(packages.map((packed) => [packed.artifact.name, packed]));
+    for (const [index, spec] of packageSpecs.entries()) {
+      const manifest = sourceManifests[index];
+      if (manifest === undefined) throw new Error(`Missing source manifest for ${spec.directory}`);
+      const packed = byName.get(manifest.name);
+      if (packed === undefined) throw new Error(`Missing packed package ${manifest.name}`);
       await assertTarball(
         spec,
         manifest,
-        result,
-        tarballPath,
+        packed.pack,
+        packed.tarballPath,
         join(extractRoot, basename(spec.directory)),
       );
-      tarballs.set(manifest.name, tarballPath);
-      packageSizes.set(manifest.name, { packed: result.size, unpacked: result.unpackedSize });
+      tarballs.set(manifest.name, packed.tarballPath);
+      packageSizes.set(manifest.name, {
+        packed: packed.pack.size,
+        unpacked: packed.pack.unpackedSize,
+      });
     }
   } else {
     const release = await verifyReleaseArtifacts(resolve(artifactDirectory));

@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, glob, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { basename, dirname, extname, join, resolve, sep } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
@@ -11,7 +11,6 @@ import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-inte
 
 const fixturesRoot = fileURLToPath(new URL(".", import.meta.url));
 const repositoryRoot = resolve(fixturesRoot, "../..");
-const stagingRoot = join(fixturesRoot, ".staging");
 const tarballRoot = join(fixturesRoot, ".packed");
 const packageDirectories = [
   "packages/wasm",
@@ -25,9 +24,6 @@ const sourceManifests = await Promise.all(
   packageDirectories.map(async (directory) =>
     JSON.parse(await readFile(join(repositoryRoot, directory, "package.json"), "utf8")),
   ),
-);
-const workspaceVersions = new Map(
-  sourceManifests.map((manifest) => [manifest.name, manifest.version]),
 );
 
 function optionValue(name) {
@@ -66,49 +62,6 @@ function run(command, args, cwd) {
         );
     });
   });
-}
-
-async function copyPublishEntry(sourceRoot, packageRoot, entry) {
-  if (!/[*?[\]{}]/u.test(entry)) {
-    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
-    return;
-  }
-  const matches = [];
-  for await (const path of glob(entry, { cwd: sourceRoot })) matches.push(path);
-  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
-  for (const path of matches) {
-    const target = join(packageRoot, path);
-    await mkdir(dirname(target), { recursive: true });
-    await cp(join(sourceRoot, path), target);
-  }
-}
-
-async function stageAndPack(packageDirectory, filename) {
-  const sourceRoot = join(repositoryRoot, packageDirectory);
-  const packageRoot = join(stagingRoot, basename(packageDirectory));
-  const manifest = JSON.parse(await readFile(join(sourceRoot, "package.json"), "utf8"));
-  const publishFiles = [...(manifest.files ?? []), "README.md"];
-  await mkdir(packageRoot, { recursive: true });
-  for (const path of publishFiles) {
-    await copyPublishEntry(sourceRoot, packageRoot, path);
-  }
-  await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
-  if (manifest.dependencies) {
-    manifest.dependencies = Object.fromEntries(
-      Object.entries(manifest.dependencies).map(([name, range]) => {
-        if (!range.startsWith("workspace:")) return [name, range];
-        const version = workspaceVersions.get(name);
-        if (!version) throw new Error(`No workspace version found for ${name}`);
-        return [name, version];
-      }),
-    );
-  }
-  await writeFile(join(packageRoot, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  await run(
-    "bun",
-    ["pm", "pack", "--ignore-scripts", "--filename", join(tarballRoot, filename)],
-    packageRoot,
-  );
 }
 
 async function withStaticServer(root, runWithOrigin) {
@@ -190,7 +143,6 @@ async function assertLifecyclePages(browser, root, pages) {
   });
 }
 
-await rm(stagingRoot, { recursive: true, force: true });
 await rm(tarballRoot, { recursive: true, force: true });
 await rm(join(repositoryRoot, "test-results/bundlers"), {
   recursive: true,
@@ -200,14 +152,14 @@ await mkdir(tarballRoot, { recursive: true });
 let artifactManifestDigest;
 const canonicalTarballs = new Map();
 if (artifactDirectory === undefined) {
-  for (const directory of packageDirectories) {
-    const manifest = sourceManifests[packageDirectories.indexOf(directory)];
-    if (manifest === undefined) throw new Error(`Missing source manifest for ${directory}`);
-    await stageAndPack(directory, `sheetwrite-${basename(directory)}-${manifest.version}.tgz`);
-    canonicalTarballs.set(
-      manifest.name,
-      join(tarballRoot, `sheetwrite-${basename(directory)}-${manifest.version}.tgz`),
-    );
+  await run(
+    "bun",
+    ["scripts/release-artifacts.ts", "pack", "--output", tarballRoot],
+    repositoryRoot,
+  );
+  for (const manifest of sourceManifests) {
+    const filename = `${manifest.name.replace(/^@/, "").replaceAll("/", "-")}-${manifest.version}.tgz`;
+    canonicalTarballs.set(manifest.name, join(tarballRoot, filename));
   }
 } else {
   const artifactRoot = resolve(repositoryRoot, artifactDirectory);
@@ -227,7 +179,6 @@ if (artifactDirectory === undefined) {
     canonicalTarballs.set(sourceManifest.name, join(tarballRoot, artifact.path));
   }
 }
-await rm(stagingRoot, { recursive: true, force: true });
 
 for (const fixture of ["vite", "webpack", "next"]) {
   const cwd = join(fixturesRoot, fixture);
