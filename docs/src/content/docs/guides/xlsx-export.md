@@ -28,7 +28,7 @@ instances and therefore also satisfy `isSheetwriteError`.
 
 ## Streaming
 
-`toCsvStream`, `toTsvStream`, `toXlsxTableStream` and `toXlsxWorkbookStream` return a `ReadableStream<Uint8Array>` that produces the file in bounded chunks, honours backpressure and stops reading the store when the reader cancels. Existing string and `Uint8Array` functions keep working. XLSX streams contain the same parts, but ZIP entry order and container bytes may differ from buffered output. `fromXlsxWorkbookFile` imports a `File` or `Blob` without first buffering it: the reader keeps the ZIP directory and one inflated part at a time. This alone does not lower the measured import peak: each worksheet is still parsed as a whole.
+`toCsvStream`, `toTsvStream`, `toXlsxTableStream` and `toXlsxWorkbookStream` return a `ReadableStream<Uint8Array>` that produces the file in bounded chunks, honours backpressure and stops reading the store when the reader cancels. Existing string and `Uint8Array` functions keep working. XLSX streams contain the same parts, but ZIP entry order and container bytes may differ from buffered output. `fromXlsxWorkbookFile` imports a `File` or `Blob` without first buffering it. Both import paths keep the ZIP directory and parse each worksheet incrementally from bounded inflated chunks, so no whole worksheet string or XML tree is held; the resulting snapshot still holds every imported cell.
 
 ## Workbook interchange
 
