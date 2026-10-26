@@ -19,6 +19,7 @@ use crate::types::{
 /// one rebuild pass does, and the queue would retain that many old read sets.
 const PATCH_FORMULA_FLOOR: usize = 256;
 const PATCH_FORMULA_DIVISOR: usize = 4;
+const READER_CAPACITY_SLACK: usize = 8;
 
 /// Which formulas read each cell exactly and each range, workbook-wide.
 ///
@@ -182,7 +183,7 @@ impl DepIndex {
         self.remove_exact_readers(&mut exact_removals);
         let emptied_group = self.remove_range_readers(&mut range_edges);
 
-        range_edges.clear();
+        let removed_range_edges = range_edges.len();
         for &formula in pending.keys() {
             let Some(entry) = formula_entry(sheets, formula) else {
                 continue;
@@ -199,9 +200,34 @@ impl DepIndex {
             range_edges.extend(entry.reads.ranges.iter().map(|&range| (range, formula)));
         }
 
-        let added_groups = self.add_range_readers(&mut range_edges);
+        let added_groups = self.add_range_readers(&mut range_edges[removed_range_edges..]);
         if emptied_group || !added_groups.is_empty() {
             self.regroup(added_groups);
+        }
+
+        // Compact only after additions: an unchanged edge is removed and
+        // re-added by this patch, so shrinking earlier would cause churn.
+        // Each touched list keeps O(live readers + fixed slack) capacity;
+        // moving one reader group across targets cannot retain its history.
+        for run in exact_removals.chunk_by(|left, right| left.0 == right.0) {
+            if let Some(readers) = self.exact_dependents.get_mut(&run[0].0) {
+                Self::compact_readers(readers);
+            }
+        }
+        for run in range_edges[..removed_range_edges].chunk_by(|left, right| left.0 == right.0) {
+            if let Ok(group) = self.find_range_group(run[0].0) {
+                Self::compact_readers(&mut self.range_groups[group].dependents);
+            }
+        }
+    }
+
+    fn compact_readers(readers: &mut Vec<AbsCellKey>) {
+        let capacity_limit = readers
+            .len()
+            .saturating_mul(2)
+            .saturating_add(READER_CAPACITY_SLACK);
+        if readers.capacity() > capacity_limit {
+            readers.shrink_to(capacity_limit);
         }
     }
 
@@ -1162,6 +1188,48 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(store.get_cell(sheet, READERS - 1, 1).num(), 5.0);
         assert_patch_matches_rebuild(&mut store);
+    }
+
+    #[test]
+    fn moving_reader_groups_release_historical_edge_capacity() {
+        const TARGETS: usize = 32;
+        const MOVING_READERS: usize = 64;
+        const RETAINED_SLACK_PER_TARGET: usize = 16;
+        for range_reads in [false, true] {
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(3, MOVING_READERS);
+            let source = |row: usize| {
+                if range_reads {
+                    format!("=SUM(A{row}:A{row})")
+                } else {
+                    format!("=A{row}")
+                }
+            };
+            for row in 0..TARGETS {
+                store.set_formula(sheet, row, 1, &source(row + 1), 0);
+            }
+            for row in 0..MOVING_READERS {
+                store.set_formula(sheet, row, 2, &source(1), 0);
+            }
+            store.recompute(sheet);
+
+            for target in 1..TARGETS {
+                let formula = source(target + 1);
+                for row in 0..MOVING_READERS {
+                    store.set_formula(sheet, row, 2, &formula, 0);
+                }
+                store.recompute(sheet);
+            }
+            let (_, edges) = store.graph.index().expect("built index").memory_stats();
+            let live_edges = TARGETS + MOVING_READERS;
+            let maximum_slots = live_edges * 2 + TARGETS * RETAINED_SLACK_PER_TARGET;
+            assert!(
+                edges.allocated_bytes <= maximum_slots * std::mem::size_of::<AbsCellKey>(),
+                "historical reader locations retained {} bytes for {live_edges} live edges",
+                edges.allocated_bytes
+            );
+            assert_eq!(store.get_cell(sheet, MOVING_READERS - 1, 2).num(), 0.0);
+        }
     }
 
     #[test]
