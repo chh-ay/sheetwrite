@@ -230,21 +230,23 @@ renderer?: "canvas" | "worker";
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-worker-url" data-pagefind-weight="1">
-<summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER — the platform Worker constructor does not consult package exports, so a bare specifier like new URL(&quot;@sheetwrite/core/worker&quot;,…</span></summary>
+<summary><code>workerUrl</code> <span class="api-member-summary">URL of the worker renderer module (renderer: &quot;worker&quot;), as served to the BROWSER.</span></summary>
 
 ```ts generated
 workerUrl?: string | URL;
 ```
 
 <p class="api-member-doc">URL of the worker renderer module (`renderer: &quot;worker&quot;`), as served to the
-BROWSER — the platform `Worker` constructor does not consult package
-exports, so a bare specifier like `new URL(&quot;@sheetwrite/core/worker&quot;,
-import.meta.url)` is NOT reliable. Either copy
-`@sheetwrite/core/dist/worker.js` to your public assets and pass its URL
-string (works everywhere), or use your bundler's dependency-worker import
-if it has one (see `/docs/guides/worker-rendering/`). If omitted or the worker
-can't be constructed, the grid falls back to the main-thread canvas
-renderer and emits `renderer-fallback` once.</p>
+BROWSER. Usually not needed: by default the grid creates its worker as
+`new Worker(new URL(&quot;./worker.js&quot;, import.meta.url))`, which bundlers such
+as Vite build together with the worker's imports. Pass a URL when there
+is no bundler, or when yours copies the file instead of building it, for
+example a copy of `@sheetwrite/core/dist/` in your public assets (see
+`/docs/guides/worker-rendering/`). A bare specifier like
+`new URL(&quot;@sheetwrite/core/worker&quot;, import.meta.url)` is NOT reliable: the
+platform `Worker` constructor does not consult package exports. If the
+worker can't be constructed or fails to load, the grid falls back to the
+main-thread canvas renderer and emits `renderer-fallback` once.</p>
 </details>
 
 <details class="api-member" id="sheetwrite-grid-props-presentation" data-pagefind-weight="1">

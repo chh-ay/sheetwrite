@@ -128,8 +128,14 @@ export class WorkerRenderer implements Renderer {
   mount(host: HTMLElement, theme: Theme): void {
     // Construct the worker first: if it throws (bundling/security), the canvas
     // is never transferred and the grid falls back to the main-thread renderer.
-    const url = this.workerUrl ?? new URL("./worker.js", import.meta.url);
-    const worker = new Worker(url, { type: "module" });
+    // Keep the default as one `new Worker(new URL(..., import.meta.url))`
+    // expression: Vite, webpack 5 and Parcel only bundle a worker (with its
+    // imports) when they see that exact shape. Split apart, they copy the
+    // file as a bare asset whose relative imports do not exist.
+    const worker =
+      this.workerUrl === undefined
+        ? new Worker(new URL("./worker.js", import.meta.url), { type: "module" })
+        : new Worker(this.workerUrl, { type: "module" });
     this.worker = worker;
     worker.addEventListener("error", this.onWorkerError);
     worker.addEventListener("message", this.onWorkerMessage);

@@ -9,8 +9,21 @@ Worker with an OffscreenCanvas — same `Renderer` contract, drop-in.
 
 ## Enabling it
 
-Set `renderer: "worker"` and point `workerUrl` at the worker module **as the
-browser will fetch it**. The worker entry ships at
+Set `renderer: "worker"`. With a bundler that understands module workers, that
+is all: Sheetwrite creates its worker as
+`new Worker(new URL("./worker.js", import.meta.url), { type: "module" })`, the
+pattern bundlers look for, so the bundler builds the worker with its imports.
+Vite does this, verified by the fixture build in `test/bundler-fixtures/vite`
+(`bun run verify:bundlers`). webpack 5 and Parcel recognize the same pattern;
+check with the steps under [Verify it actually started](#verify-it-actually-started).
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
+const grid = createGrid(host, { workbook, datasource, renderer: "worker" });
+```
+
+Pass `workerUrl` when the default cannot work: no bundler, or a bundler that
+copies the file instead of building it. It must be the worker module's URL
+**as the browser will fetch it**. The worker entry ships at
 `@sheetwrite/core/dist/worker.js` (export subpath `@sheetwrite/core/worker`),
 but the platform `Worker`/`URL` constructors do not consult package exports —
 `new URL("@sheetwrite/core/worker", import.meta.url)` treats the bare
@@ -49,14 +62,7 @@ verified by the fixture build in `test/bundler-fixtures/vite`
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 ```
 
-webpack 5 / Next.js have no equivalent URL-returning dependency-worker import
-(webpack only bundles a worker graph for a literal
-`new Worker(new URL(...))` expression, which Sheetwrite constructs internally)
-— use the public-copy recipe above there.
-
-`workerUrl` accepts a `string | URL`. If you omit it, the worker renderer
-resolves `./worker.js` relative to its own module — that only works when your
-bundler preserves module URLs (it usually does not after bundling to one file).
+`workerUrl` accepts a `string | URL`.
 
 ## Verify it actually started
 
