@@ -916,8 +916,19 @@ fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
     ends_reference && starts_reference
 }
 
-fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
+/// The tokens of one formula and what the parser may need to look for.
+struct Tokens<'a> {
+    toks: Vec<Tok<'a>>,
+    /// At least one intersection operator.
+    intersections: bool,
+    /// At least one `!`, which every 3-D reference has.
+    sheet_qualifiers: bool,
+}
+
+fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
     let mut toks = Vec::new();
+    let mut intersections = false;
+    let mut sheet_qualifiers = false;
     let bytes = src.as_bytes();
     let mut i = 0;
 
@@ -929,6 +940,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
             }
             if separates_references(toks.last(), &src[i..]) {
                 toks.push(Tok::Intersect);
+                intersections = true;
             }
         } else if c == b'"' {
             toks.push(Tok::Str(quoted_token(
@@ -1011,6 +1023,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
             toks.push(Tok::Ident(Cow::Borrowed(&src[start..i]), false));
         } else if c == b'!' {
             toks.push(Tok::Bang);
+            sheet_qualifiers = true;
             i += 1;
         } else if c == b'<' || c == b'>' || c == b'=' {
             let next = bytes.get(i + 1).copied();
@@ -1075,7 +1088,11 @@ fn tokenize(src: &str) -> Result<Vec<Tok<'_>>, String> {
         }
     }
 
-    Ok(toks)
+    Ok(Tokens {
+        toks,
+        intersections,
+        sheet_qualifiers,
+    })
 }
 
 fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
@@ -1115,6 +1132,8 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
 
 struct Parser<'a> {
     toks: std::vec::IntoIter<Tok<'a>>,
+    intersections: bool,
+    sheet_qualifiers: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -1247,25 +1266,30 @@ impl<'a> Parser<'a> {
                 Ast::Pos(inner)
             });
         }
-        self.intersection_at(depth)
-    }
-
-    /// `A1:C3 B2:D4`: intersection binds tighter than every other operator
-    /// except `:`. A chain keeps one flat operand list, since the order of
-    /// intersection does not change its cells.
-    fn intersection_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut value = self.primary_at(depth)?;
-        while self.peek() == Some(&Tok::Intersect) {
-            let _ = self.next();
-            let right = self.primary_at(depth)?;
-            match &mut value {
-                Ast::Func(Func::Intersect, operands) => operands.push(right),
-                _ => value = Ast::Func(Func::Intersect, vec![value, right]),
-            }
+        // Intersection binds tighter than every operator except `:`. A
+        // formula without the operator keeps the plain call, which the
+        // plain parse path measures faster than a call plus a peek.
+        if !self.intersections {
+            return self.primary_at(depth);
+        }
+        let value = self.primary_at(depth)?;
+        if self.peek() == Some(&Tok::Intersect) {
+            return self.intersection_at(value, depth);
         }
         Ok(value)
+    }
+
+    /// The rest of `A1:C3 B2:D4` after its first operand. A chain keeps one
+    /// flat operand list, since the order of intersection does not change
+    /// its cells.
+    #[cold]
+    fn intersection_at(&mut self, first: Ast, depth: usize) -> Result<Ast, String> {
+        let mut operands = vec![first];
+        while self.peek() == Some(&Tok::Intersect) {
+            let _ = self.next();
+            operands.push(self.primary_at(depth)?);
+        }
+        Ok(Ast::Func(Func::Intersect, operands))
     }
 
     fn primary_at(&mut self, depth: usize) -> Result<Ast, String> {
@@ -1363,7 +1387,8 @@ impl<'a> Parser<'a> {
             return parse_structured_ref(raw, Some(name.into_owned()));
         }
 
-        if self.peek() == Some(&Tok::Colon)
+        if self.sheet_qualifiers
+            && self.peek() == Some(&Tok::Colon)
             && matches!(
                 self.toks.as_slice().get(1..3),
                 Some([Tok::Ident(..), Tok::Bang])
@@ -1471,6 +1496,7 @@ impl<'a> Parser<'a> {
 
     /// The cell or range after the `!` of a 3-D reference from sheet `first`
     /// to sheet `last`.
+    #[cold]
     fn sheet_span_at(&mut self, first: String, last: String, quoted: bool) -> Result<Ast, String> {
         let Some(Tok::Ident(start, _)) = self.next() else {
             return Err("expected cell after !".into());
@@ -1551,9 +1577,11 @@ pub(crate) fn sheet_name_key(name: &str) -> String {
 /// Parse a formula source (with or without a leading `=`) into an AST.
 pub fn parse(src: &str) -> Result<Ast, String> {
     let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
-    let toks = tokenize(trimmed)?;
+    let tokens = tokenize(trimmed)?;
     let mut parser = Parser {
-        toks: toks.into_iter(),
+        toks: tokens.toks.into_iter(),
+        intersections: tokens.intersections,
+        sheet_qualifiers: tokens.sheet_qualifiers,
     };
     let ast = parser.expr()?;
     if parser.peek().is_some() {
