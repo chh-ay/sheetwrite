@@ -54,7 +54,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L420",
+              "source": "src/workbook-table.ts#L443",
               "jsDocTags": [],
               "documentation": "Reject an invalid or oversized live workbook before table arrays are copied to WASM.",
               "memberDocs": []
@@ -1363,7 +1363,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3142",
+              "source": "src/document-protocol.ts#L3149",
               "jsDocTags": [],
               "documentation": "Exhaustive stable target identity used by persistence/logging layers.",
               "memberDocs": []
@@ -5215,7 +5215,7 @@
               "owners": [
                 "src/document-protocol.ts"
               ],
-              "source": "src/document-protocol.ts#L3104",
+              "source": "src/document-protocol.ts#L3111",
               "jsDocTags": [],
               "documentation": "Validate and canonically order a schema-1 snapshot without hydrating runtime state.",
               "memberDocs": []
@@ -5251,7 +5251,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L337",
+              "source": "src/workbook-table.ts#L360",
               "jsDocTags": [],
               "documentation": "Validate one canonical table against sheet bounds and workbook-global identities.",
               "memberDocs": []
@@ -5263,7 +5263,7 @@
               "owners": [
                 "src/workbook-table.ts"
               ],
-              "source": "src/workbook-table.ts#L147",
+              "source": "src/workbook-table.ts#L170",
               "jsDocTags": [],
               "documentation": "Validate inert table-rule trees before they enter snapshots or XML output.\nA whitelist prevents this persistence seam from becoming arbitrary markup.",
               "memberDocs": []

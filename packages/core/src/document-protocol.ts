@@ -2487,13 +2487,20 @@ const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3
 const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
 const RELATIONSHIP_TYPE_PATTERN = /^https?:\/\/[^\s<>"'&]+$/;
 
+const FIRST_PRINTABLE_CHARACTER = 0x20;
+
 /** Package-relative OPC part names only; anything a writer could misinterpret is refused. */
 function safeXlsxPartName(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_XLSX_PART_NAME_LENGTH) {
+    return false;
+  }
+
+  // A char-code scan rejects control characters without a control-character regex.
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) < FIRST_PRINTABLE_CHARACTER) return false;
+  }
   return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    value.length <= MAX_XLSX_PART_NAME_LENGTH &&
-    !/[\\\0-\x1f?#%<>&"']/.test(value) &&
+    !/[\\?#%<>&"']/.test(value) &&
     !value.startsWith("/") &&
     !/^[a-z][a-z\d+.-]*:/i.test(value) &&
     value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..")

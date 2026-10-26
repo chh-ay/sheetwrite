@@ -92,7 +92,30 @@ const TABLE_RULE_MAX_DEPTH = 8;
 const TABLE_RULE_MAX_NODES = 16_384;
 const TABLE_RULE_MAX_TEXT = 1_048_576;
 const TABLE_RULE_FIELDS = new Set(["name", "attributes", "text", "children", "differentialStyle"]);
-const INVALID_XML_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u;
+const XML_TAB = 0x09;
+const XML_LINE_FEED = 0x0a;
+const XML_CARRIAGE_RETURN = 0x0d;
+const XML_FIRST_PRINTABLE = 0x20;
+const XML_NONCHARACTER_FFFE = 0xfffe;
+const XML_NONCHARACTER_FFFF = 0xffff;
+
+/** XML 1.0 forbids these code units; a char-code scan avoids a control-character regex. */
+function hasInvalidXmlCharacter(text: string): boolean {
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    if (
+      (code < XML_FIRST_PRINTABLE &&
+        code !== XML_TAB &&
+        code !== XML_LINE_FEED &&
+        code !== XML_CARRIAGE_RETURN) ||
+      code === XML_NONCHARACTER_FFFE ||
+      code === XML_NONCHARACTER_FFFF
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 const TABLE_RULE_CHILDREN: Readonly<Record<string, readonly string[]>> = {
   autoFilter: ["filterColumn", "sortState"],
   filterColumn: ["filters", "customFilters", "top10", "dynamicFilter", "colorFilter", "iconFilter"],
@@ -161,7 +184,7 @@ export function validWorkbookTableXmlElement(
     const allowedChildren = TABLE_RULE_CHILDREN[element.name];
     if (!allowedAttributes || !allowedChildren) return false;
     if (typeof element.text !== "string" || !Array.isArray(element.children)) return false;
-    if (INVALID_XML_CONTROL.test(element.text)) return false;
+    if (hasInvalidXmlCharacter(element.text)) return false;
     if (element.differentialStyle !== undefined) {
       if (
         (element.name !== "colorFilter" && element.name !== "sortCondition") ||
@@ -183,7 +206,7 @@ export function validWorkbookTableXmlElement(
       if (
         !allowedAttributes.includes(name) ||
         typeof attribute !== "string" ||
-        INVALID_XML_CONTROL.test(attribute)
+        hasInvalidXmlCharacter(attribute)
       )
         return false;
       budget.characters += name.length + attribute.length;

@@ -8,7 +8,7 @@ description: "Validate one canonical table against sheet bounds and workbook-glo
 Validate one canonical table against sheet bounds and workbook-global identities.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L337"><code>packages/core/src/workbook-table.ts#L337</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L360"><code>packages/core/src/workbook-table.ts#L360</code></a></dd></div>
 </dl>
 
 ## Declaration
