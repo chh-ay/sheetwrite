@@ -22,6 +22,8 @@ export type RecomputingCellStore = CellStore & {
 
   setSheetOrder(order: Uint32Array): boolean;
 
+  sheetSpanFormulaCells(sheet: number): Uint32Array;
+
   isSheetAlive(sheet: number): boolean;
 
   insertCols(sheet: number, at: number, count: number): void;

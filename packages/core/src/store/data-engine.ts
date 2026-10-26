@@ -1342,6 +1342,16 @@ export class StoreDataEngine {
     );
   }
 
+  /** Cells on `sheet` whose formula holds a 3-D reference, which a tab move can rewrite. */
+  sheetSpanFormulaCells(sheet: SheetId): { row: number; col: number }[] {
+    const pairs = this.wasm.sheetSpanFormulaCells(this.handleOf(sheet));
+    const cells: { row: number; col: number }[] = [];
+    for (let index = 0; index + 1 < pairs.length; index += 2) {
+      cells.push({ row: pairs[index] ?? 0, col: pairs[index + 1] ?? 0 });
+    }
+    return cells;
+  }
+
   /** Sources for a whole logical sheet, without reading every resolved cell. */
   captureSheetSources(sheet: SheetId): RangeSourceProjection | null {
     const metadata = this.sheetMeta(sheet);

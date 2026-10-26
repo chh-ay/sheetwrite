@@ -1527,6 +1527,19 @@ describe("transactional document metadata", () => {
     grid.undo();
     expect(total()).toBe(111);
 
+    // Moving the first endpoint past the last rewrites the formula, as
+    // Excel does; undo restores the original text and value.
+    const formula = () => store.getFormula({ sheet: "summary", row: 0, col: 0 });
+    grid.moveSheet("first", 2);
+    expect(formula()).toBe("=SUM(Middle:Last!A1)");
+    expect(total()).toBe(110);
+    grid.undo();
+    expect(formula()).toBe("=SUM(First:Last!A1)");
+    expect(total()).toBe(111);
+    grid.redo();
+    expect(formula()).toBe("=SUM(Middle:Last!A1)");
+    grid.undo();
+
     grid.addSheet({ id: "added", name: "Added", rowCount: 1 });
     store.applyTransaction({ patches: [literal("added", 1000)] });
     expect(total()).toBe(111);
