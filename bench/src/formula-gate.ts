@@ -19,52 +19,53 @@ export interface FormulaGatePair {
 }
 
 /**
- * The highest median paired candidate/base ratio each row may reach, measured
- * at seven pairs. Fourteen same-engine AB/BA pairs on a shared machine gave
- * each row's worst seven-pair median deviation from 1, `d`. Each limit is
- * `1 + max(0.15, 2.5 * d)`, rounded up to 0.05; bench/README.md lists `d` and
- * the smallest regression each row reliably fails.
+ * The highest median paired candidate/base ratio each row may reach at seven
+ * pairs. 56 same-engine AB/BA pairs from eight gates on a shared machine, in
+ * quiet and loaded windows, were resampled 20,000 times into seven-pair
+ * medians. Each limit is `1 + 1.2 × (q99.9 − 1)`, at least 1.15, rounded up
+ * to 0.05. bench/README.md lists the quantiles and the smallest regression
+ * each row reliably fails.
  */
 const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
-  "workload=independent-parse-load;size=1000": 1.15,
-  "workload=independent-first-recompute;size=1000": 1.45,
-  "workload=independent-parse-load;size=10000": 1.2,
-  "workload=independent-first-recompute;size=10000": 1.15,
-  "workload=independent-parse-load;size=100000": 1.15,
-  "workload=independent-first-recompute;size=100000": 1.15,
-  "workload=linear-chain;size=8": 1.3,
-  "workload=linear-chain;size=16": 1.15,
-  "workload=linear-chain;size=32": 1.15,
-  "workload=linear-chain;size=64": 1.25,
+  "workload=independent-parse-load;size=1000": 1.55,
+  "workload=independent-first-recompute;size=1000": 1.7,
+  "workload=independent-parse-load;size=10000": 1.65,
+  "workload=independent-first-recompute;size=10000": 1.3,
+  "workload=independent-parse-load;size=100000": 1.2,
+  "workload=independent-first-recompute;size=100000": 1.25,
+  "workload=linear-chain;size=8": 1.45,
+  "workload=linear-chain;size=16": 1.3,
+  "workload=linear-chain;size=32": 1.3,
+  "workload=linear-chain;size=64": 1.2,
   "workload=wide-fan-out-edit;size=1000": 1.25,
-  "workload=wide-fan-out-edit;size=100000": 1.15,
-  "workload=diamond-edit;size=32": 1.15,
-  "workload=shared-range-edit;size=1000": 1.15,
-  "workload=distinct-range-edit;size=1000": 1.15,
-  "workload=cross-sheet-range-edit;size=1000": 1.15,
+  "workload=wide-fan-out-edit;size=100000": 1.2,
+  "workload=diamond-edit;size=32": 1.25,
+  "workload=shared-range-edit;size=1000": 1.3,
+  "workload=distinct-range-edit;size=1000": 1.3,
+  "workload=cross-sheet-range-edit;size=1000": 1.3,
   "workload=scalar-edit-affects-0;size=1000": 1.35,
-  "workload=scalar-edit-affects-1;size=1": 1.15,
-  "workload=scalar-edit-affects-1000;size=1000": 1.15,
-  "workload=scalar-edit-affects-100000;size=100000": 1.15,
-  "workload=formula-constant-edit;size=100000": 1.15,
-  "workload=topology-remove-add;size=10000": 1.15,
-  "workload=cycles;size=1000": 1.15,
-  "workload=removed-sheet-ref;size=1000": 1.25,
-  "workload=error-propagation;size=1000": 1.15,
-  "workload=criteria-range-edit;size=100000": 1.15,
-  "workload=lookup-range-edit;size=100000": 1.15,
+  "workload=scalar-edit-affects-1;size=1": 1.2,
+  "workload=scalar-edit-affects-1000;size=1000": 1.25,
+  "workload=scalar-edit-affects-100000;size=100000": 1.2,
+  "workload=formula-constant-edit;size=100000": 1.25,
+  "workload=topology-remove-add;size=10000": 1.2,
+  "workload=cycles;size=1000": 1.25,
+  "workload=removed-sheet-ref;size=1000": 1.3,
+  "workload=error-propagation;size=1000": 1.2,
+  "workload=criteria-range-edit;size=100000": 1.25,
+  "workload=lookup-range-edit;size=100000": 1.2,
   "workload=vlookup-many;size=1000": 1.15,
   "workload=vlookup-many-edit;size=1000": 1.15,
   "workload=vlookup-many-sorted;size=1000": 1.15,
-  "workload=vlookup-many-sorted-edit;size=1000": 1.15,
-  "workload=xlookup-many;size=1000": 1.15,
-  "workload=xlookup-many-edit;size=1000": 1.15,
-  "workload=xlookup-many-sorted;size=1000": 1.15,
-  "workload=xlookup-many-sorted-edit;size=1000": 1.15,
-  "workload=text-lookup-many;size=1000": 1.15,
+  "workload=vlookup-many-sorted-edit;size=1000": 1.2,
+  "workload=xlookup-many;size=1000": 1.2,
+  "workload=xlookup-many-edit;size=1000": 1.25,
+  "workload=xlookup-many-sorted;size=1000": 1.2,
+  "workload=xlookup-many-sorted-edit;size=1000": 1.2,
+  "workload=text-lookup-many;size=1000": 1.2,
   "workload=text-lookup-many-edit;size=1000": 1.15,
-  "workload=text-lookup-many-sorted;size=1000": 1.15,
-  "workload=text-lookup-many-sorted-edit;size=1000": 1.15,
+  "workload=text-lookup-many-sorted;size=1000": 1.2,
+  "workload=text-lookup-many-sorted-edit;size=1000": 1.2,
   "workload=spill-filter-resize;size=100000": 1.15,
   "workload=sumproduct-vector-edit;size=100000": 1.15,
   "workload=sumproduct-matrix-edit;size=100000": 1.15,
@@ -75,10 +76,10 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=unicode-text-date-edit;size=1000": 1.15,
   "workload=percentile-covariance;size=100000": 1.15,
   "workload=let-reuse-edit;size=100000": 1.15,
-  "workload=let-repeat;size=100000": 1.15,
+  "workload=let-repeat;size=100000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
-  "workload=spill-sequence-admission;size=100000": 1.2,
+  "workload=spill-sequence-admission;size=100000": 1.15,
 };
 
 export const FORMULA_RATIO_LIMITS: ReadonlyMap<string, number> = new Map(

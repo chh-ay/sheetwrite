@@ -252,75 +252,70 @@ For each row it takes the median of the paired candidate/base ratios and
 fails when it exceeds the row's ratio limit. There is no absolute floor:
 aggregation makes microsecond rows measurable, so they are gated too.
 
-The limits come from 14 same-engine pairs on a shared 20-thread laptop, taken
-in one quiet window; heavier load may need wider limits. For each row, `d` is
-the largest deviation from 1 of any seven consecutive pairs' median ratio. The
-limit is `1 + max(0.15, 2.5 × d)`, rounded up to 0.05. Noise scales a true
-ratio `r` down to about `r × (1 − d)`, so a regression reliably fails at
-`limit / (1 − d)`, the minimum detectable ratio below; smaller slowdowns may
-pass.
+The limits come from 56 same-engine pairs from eight gates on a shared
+20-thread laptop, in quiet and loaded windows. Each row's pair ratios were
+resampled 20,000 times into seven-pair medians. The limit is
+`1 + 1.2 × (q99.9 − 1)`, at least 1.15, rounded up to 0.05. A true slowdown
+`r` can measure as low as `r × q0.1`, so a regression reliably fails only at
+`limit / q0.1`, the minimum detectable ratio below; smaller slowdowns may pass.
+The 1K and 10K load and first-recompute rows build a fresh store for every
+run, so they are the noisiest; the 100K rows are the reliable load signal.
 
-| Workload | Ratio limit | `d` | Minimum detectable ratio |
-| --- | ---: | ---: | ---: |
-| independent-parse-load/1000 | 1.15 | 5.0% | see below |
-| independent-first-recompute/1000 | 1.45 | 16.9% | 1.75 |
-| independent-parse-load/10000 | 1.20 | 7.8% | 1.35 |
-| independent-first-recompute/10000 | 1.15 | 2.7% | 1.20 |
-| independent-parse-load/100000 | 1.15 | 0.5% | 1.20 |
-| independent-first-recompute/100000 | 1.15 | 5.0% | 1.25 |
-| linear-chain/8 | 1.30 | 11.3% | 1.50 |
-| linear-chain/16 | 1.15 | 3.3% | 1.20 |
-| linear-chain/32 | 1.15 | 4.4% | 1.25 |
-| linear-chain/64 | 1.25 | 8.3% | 1.40 |
-| wide-fan-out-edit/1000 | 1.25 | 9.5% | 1.40 |
-| wide-fan-out-edit/100000 | 1.15 | 1.6% | 1.20 |
-| diamond-edit/32 | 1.15 | 2.0% | 1.20 |
-| shared-range-edit/1000 | 1.15 | 2.0% | 1.20 |
-| distinct-range-edit/1000 | 1.15 | 2.1% | 1.20 |
-| cross-sheet-range-edit/1000 | 1.15 | 1.0% | 1.20 |
-| scalar-edit-affects-0/1000 | 1.35 | 12.2% | 1.55 |
-| scalar-edit-affects-1/1 | 1.15 | 2.9% | 1.20 |
-| scalar-edit-affects-1000/1000 | 1.15 | 0.9% | 1.20 |
-| scalar-edit-affects-100000/100000 | 1.15 | 2.9% | 1.20 |
-| formula-constant-edit/100000 | 1.15 | 5.7% | 1.25 |
-| topology-remove-add/10000 | 1.15 | 0.6% | 1.20 |
-| cycles/1000 | 1.15 | 0.7% | 1.20 |
-| removed-sheet-ref/1000 | 1.25 | 9.1% | 1.40 |
-| error-propagation/1000 | 1.15 | 1.5% | 1.20 |
-| criteria-range-edit/100000 | 1.15 | 1.4% | 1.20 |
-| lookup-range-edit/100000 | 1.15 | 2.6% | 1.20 |
-| vlookup-many/1000 | 1.15 | 2.4% | 1.20 |
-| vlookup-many-edit/1000 | 1.15 | 1.1% | 1.20 |
-| vlookup-many-sorted/1000 | 1.15 | 1.7% | 1.20 |
-| vlookup-many-sorted-edit/1000 | 1.15 | 1.4% | 1.20 |
-| xlookup-many/1000 | 1.15 | 2.9% | 1.20 |
-| xlookup-many-edit/1000 | 1.15 | 4.9% | 1.25 |
-| xlookup-many-sorted/1000 | 1.15 | 4.1% | 1.20 |
-| xlookup-many-sorted-edit/1000 | 1.15 | 1.9% | 1.20 |
-| text-lookup-many/1000 | 1.15 | 1.0% | 1.20 |
-| text-lookup-many-edit/1000 | 1.15 | 0.7% | 1.20 |
-| text-lookup-many-sorted/1000 | 1.15 | 4.1% | 1.20 |
-| text-lookup-many-sorted-edit/1000 | 1.15 | 3.3% | 1.20 |
-| spill-filter-resize/100000 | 1.15 | 5.0% | 1.25 |
-| sumproduct-vector-edit/100000 | 1.15 | 5.6% | 1.25 |
-| sumproduct-matrix-edit/100000 | 1.15 | 4.3% | 1.25 |
-| criteria-multi-range-edit/100000 | 1.15 | 1.1% | 1.20 |
-| sum-multi-range/100000 | 1.15 | 2.3% | 1.20 |
-| sumifs-3-criteria/100000 | 1.15 | 1.2% | 1.20 |
-| countif-100k/100000 | 1.15 | 1.4% | 1.20 |
-| unicode-text-date-edit/1000 | 1.15 | 2.7% | 1.20 |
-| percentile-covariance/100000 | 1.15 | 0.4% | 1.20 |
-| let-reuse-edit/100000 | 1.15 | 2.4% | 1.20 |
-| let-repeat/100000 | 1.15 | 5.0% | 1.25 |
-| iterative-finance/1000 | 1.15 | 3.3% | 1.20 |
-| incremental-dependency-closure-edit/100000 | 1.15 | 4.1% | 1.20 |
-| spill-sequence-admission/100000 | 1.20 | 6.4% | 1.30 |
-
-1K parse-load is not a reliable detector of parse cost. With an engine that
-parsed every formula twice, it measured 0.82x while 10K and 100K parse-load
-measured 1.37x and 1.75x and failed. The row builds a fresh store per run, so
-its time is likely dominated by WASM memory growth, not parsing; this has not
-been verified.
+| Workload | Ratio limit | q99.9 | q0.1 | Minimum detectable ratio |
+| --- | ---: | ---: | ---: | ---: |
+| independent-parse-load/1000 | 1.55 | 1.429 | 0.740 | 2.10 |
+| independent-first-recompute/1000 | 1.70 | 1.552 | 0.710 | 2.40 |
+| independent-parse-load/10000 | 1.65 | 1.518 | 0.817 | 2.05 |
+| independent-first-recompute/10000 | 1.30 | 1.247 | 0.908 | 1.45 |
+| independent-parse-load/100000 | 1.20 | 1.166 | 0.945 | 1.30 |
+| independent-first-recompute/100000 | 1.25 | 1.169 | 0.873 | 1.45 |
+| linear-chain/8 | 1.45 | 1.358 | 0.711 | 2.05 |
+| linear-chain/16 | 1.30 | 1.218 | 0.884 | 1.50 |
+| linear-chain/32 | 1.30 | 1.225 | 0.909 | 1.45 |
+| linear-chain/64 | 1.20 | 1.147 | 0.892 | 1.35 |
+| wide-fan-out-edit/1000 | 1.25 | 1.191 | 0.905 | 1.40 |
+| wide-fan-out-edit/100000 | 1.20 | 1.156 | 0.923 | 1.30 |
+| diamond-edit/32 | 1.25 | 1.207 | 0.932 | 1.35 |
+| shared-range-edit/1000 | 1.30 | 1.234 | 0.948 | 1.40 |
+| distinct-range-edit/1000 | 1.30 | 1.244 | 0.925 | 1.45 |
+| cross-sheet-range-edit/1000 | 1.30 | 1.220 | 0.937 | 1.40 |
+| scalar-edit-affects-0/1000 | 1.35 | 1.280 | 0.857 | 1.60 |
+| scalar-edit-affects-1/1 | 1.20 | 1.146 | 0.951 | 1.30 |
+| scalar-edit-affects-1000/1000 | 1.25 | 1.170 | 0.976 | 1.30 |
+| scalar-edit-affects-100000/100000 | 1.20 | 1.130 | 0.954 | 1.30 |
+| formula-constant-edit/100000 | 1.25 | 1.180 | 0.913 | 1.40 |
+| topology-remove-add/10000 | 1.20 | 1.161 | 0.965 | 1.25 |
+| cycles/1000 | 1.25 | 1.177 | 0.977 | 1.30 |
+| removed-sheet-ref/1000 | 1.30 | 1.212 | 0.871 | 1.50 |
+| error-propagation/1000 | 1.20 | 1.146 | 0.953 | 1.30 |
+| criteria-range-edit/100000 | 1.25 | 1.185 | 0.982 | 1.30 |
+| lookup-range-edit/100000 | 1.20 | 1.140 | 0.926 | 1.30 |
+| vlookup-many/1000 | 1.15 | 1.073 | 0.946 | 1.25 |
+| vlookup-many-edit/1000 | 1.15 | 1.082 | 0.980 | 1.20 |
+| vlookup-many-sorted/1000 | 1.15 | 1.060 | 0.964 | 1.20 |
+| vlookup-many-sorted-edit/1000 | 1.20 | 1.154 | 0.926 | 1.30 |
+| xlookup-many/1000 | 1.20 | 1.158 | 0.948 | 1.30 |
+| xlookup-many-edit/1000 | 1.25 | 1.173 | 0.936 | 1.35 |
+| xlookup-many-sorted/1000 | 1.20 | 1.145 | 0.959 | 1.30 |
+| xlookup-many-sorted-edit/1000 | 1.20 | 1.158 | 0.937 | 1.30 |
+| text-lookup-many/1000 | 1.20 | 1.161 | 0.922 | 1.35 |
+| text-lookup-many-edit/1000 | 1.15 | 1.105 | 0.958 | 1.25 |
+| text-lookup-many-sorted/1000 | 1.20 | 1.153 | 0.940 | 1.30 |
+| text-lookup-many-sorted-edit/1000 | 1.20 | 1.151 | 0.949 | 1.30 |
+| spill-filter-resize/100000 | 1.15 | 1.065 | 0.946 | 1.25 |
+| sumproduct-vector-edit/100000 | 1.15 | 1.082 | 0.932 | 1.25 |
+| sumproduct-matrix-edit/100000 | 1.15 | 1.046 | 0.957 | 1.25 |
+| criteria-multi-range-edit/100000 | 1.15 | 1.063 | 0.939 | 1.25 |
+| sum-multi-range/100000 | 1.15 | 1.081 | 0.959 | 1.20 |
+| sumifs-3-criteria/100000 | 1.15 | 1.076 | 0.957 | 1.25 |
+| countif-100k/100000 | 1.15 | 1.066 | 0.943 | 1.25 |
+| unicode-text-date-edit/1000 | 1.15 | 1.050 | 0.944 | 1.25 |
+| percentile-covariance/100000 | 1.15 | 1.078 | 0.926 | 1.25 |
+| let-reuse-edit/100000 | 1.15 | 1.086 | 0.902 | 1.30 |
+| let-repeat/100000 | 1.20 | 1.158 | 0.892 | 1.35 |
+| iterative-finance/1000 | 1.15 | 1.064 | 0.910 | 1.30 |
+| incremental-dependency-closure-edit/100000 | 1.15 | 1.111 | 0.940 | 1.25 |
+| spill-sequence-admission/100000 | 1.15 | 1.110 | 0.917 | 1.30 |
 
 Recalibrate these limits when the matrix, the sampling or the default pair
 count changes, from fresh same-engine pairs that are not the acceptance runs.
