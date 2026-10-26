@@ -4501,6 +4501,32 @@ mod volatile_recalculation {
             );
         }
     }
+
+    #[test]
+    fn a_volatile_spill_that_comes_back_unchanged_does_not_recalculate_its_readers() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(6, 2);
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        store.set_number(sheet, 0, 1, 8.0, 0);
+        // C1 spills A1:B1 into C1:D1; F1 reads the spilled D1.
+        store.set_formula(sheet, 0, 2, "=OFFSET($A$1,0,0,1,2)", 0);
+        store.set_formula(sheet, 0, 5, "=D1*2", 0);
+        store.commit_sources();
+        let mut mark = store.recomputed_formulas;
+
+        // OFFSET is volatile, so an unrelated edit evaluates it again. Its
+        // spill holds the same values, so F1 is not selected.
+        store.set_number(sheet, 1, 4, 1.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+        assert_close(number(&store, sheet, 0, 5), 16.0);
+
+        // A changed spilled value still reaches its reader.
+        store.set_number(sheet, 0, 1, 9.0, 0);
+        store.commit_sources();
+        assert_close(number(&store, sheet, 0, 3), 9.0);
+        assert_close(number(&store, sheet, 0, 5), 18.0);
+    }
 }
 
 /// FORMULATEXT, ISFORMULA, HYPERLINK and CELL describe a referenced cell or

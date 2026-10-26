@@ -683,8 +683,10 @@ impl CellStore {
         }
 
         #[cfg(test)]
+        let selected_by_seeds = affected.len();
+        #[cfg(test)]
         {
-            self.recomputed_formulas += affected.len();
+            self.recomputed_formulas += selected_by_seeds;
         }
 
         if affected.is_empty() {
@@ -795,19 +797,7 @@ impl CellStore {
                 let output_sheet = key.sheet as usize;
                 let data = &mut self.sheets[output_sheet];
                 let vacated_range = data.spill.installed(local);
-                let cleared = data.spill.clear(local, &mut data.cells);
-
-                if !cleared.is_empty() {
-                    spill_changes.push(SpillChange {
-                        sheet: output_sheet,
-                        sequence,
-                        output_cells: cleared.len(),
-                        cells: cleared.clone(),
-                    });
-                    self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
-                    changed_sheets.insert(output_sheet);
-                    seeded_sheets.insert(output_sheet);
-                }
+                let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
 
                 memo.remove(&key);
                 let mut pass = EvalPass {
@@ -884,7 +874,7 @@ impl CellStore {
                     }
                 }
 
-                let changed = match evaluated {
+                let mut changed = match evaluated {
                     // A reference that resolved to one cell is a plain value,
                     // as in Excel: it owns no spill cell and spends none of
                     // the spill-owner budget.
@@ -922,6 +912,36 @@ impl CellStore {
                         affected.insert(dependent);
                         processed_arrays.remove(&dependent);
                     }
+                }
+
+                // A spill that comes back over the same cells reports only the
+                // cells whose value changed. Otherwise every vacated cell
+                // changed too, before the new spill was installed.
+                let reinstalled = installed_range == vacated_range
+                    && vacated.len() == changed.len()
+                    && vacated
+                        .iter()
+                        .zip(&changed)
+                        .all(|((vacated_cell, _), cell)| vacated_cell == cell);
+                if reinstalled {
+                    let cells = &self.sheets[output_sheet].cells;
+                    let mut previous = vacated.iter().map(|&(_, value)| value);
+                    changed.retain(|&(row, col)| {
+                        let current =
+                            cells.calculated_cell_at(cells.idx(row as usize, col as usize));
+                        previous.next().flatten() != current
+                    });
+                } else if !vacated.is_empty() {
+                    let cleared: Vec<(u32, u32)> = vacated.iter().map(|&(cell, _)| cell).collect();
+                    spill_changes.push(SpillChange {
+                        sheet: output_sheet,
+                        sequence,
+                        output_cells: cleared.len(),
+                        cells: cleared.clone(),
+                    });
+                    self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
+                    changed_sheets.insert(output_sheet);
+                    seeded_sheets.insert(output_sheet);
                 }
 
                 if installed_range != vacated_range || !changed.is_empty() {
@@ -1008,6 +1028,12 @@ impl CellStore {
             }
 
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
+        }
+
+        #[cfg(test)]
+        {
+            // Spill changes select the formulas that read them.
+            self.recomputed_formulas += affected.len() - selected_by_seeds;
         }
 
         if let Some(index) = self.graph.index() {

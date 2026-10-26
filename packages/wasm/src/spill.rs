@@ -281,14 +281,38 @@ impl SpillState {
     /// that detached from the spill remains untouched. Returns the non-anchor
     /// cells whose calculated value was removed.
     pub(crate) fn clear(&mut self, anchor: CellKey, cells: &mut CellStorage) -> Vec<CellKey> {
+        let mut changed = Vec::new();
+        self.clear_each::<false>(anchor, cells, |cell, _| changed.push(cell));
+        changed
+    }
+
+    /// [`Self::clear`], also returning the value each cell held, so a spill
+    /// that comes back over the same range can report only changed cells.
+    pub(crate) fn clear_keeping_values(
+        &mut self,
+        anchor: CellKey,
+        cells: &mut CellStorage,
+    ) -> Vec<(CellKey, Option<(u8, u64)>)> {
+        let mut changed = Vec::new();
+        self.clear_each::<true>(anchor, cells, |cell, value| changed.push((cell, value)));
+        changed
+    }
+
+    /// `KEEP_VALUES` reads each value before removing it; other clears skip
+    /// that lookup, which costs a hash probe per cell on paged sheets.
+    fn clear_each<const KEEP_VALUES: bool>(
+        &mut self,
+        anchor: CellKey,
+        cells: &mut CellStorage,
+        mut removed: impl FnMut(CellKey, Option<(u8, u64)>),
+    ) {
         if self.owner(anchor) != Some(anchor) {
-            return Vec::new();
+            return;
         }
         let Some(range) = self.attempt(anchor) else {
-            return Vec::new();
+            return;
         };
 
-        let mut changed = Vec::new();
         for row in range.anchor.0..=range.row_end {
             for col in range.anchor.1..=range.col_end {
                 let cell = (row, col);
@@ -299,11 +323,16 @@ impl SpillState {
                 if cell == anchor || !cells.contains_cell(row as usize, col as usize) {
                     continue;
                 }
-                cells.remove_calculated(cells.idx(row as usize, col as usize));
-                changed.push(cell);
+                let index = cells.idx(row as usize, col as usize);
+                let value = if KEEP_VALUES {
+                    cells.calculated_cell_at(index)
+                } else {
+                    None
+                };
+                cells.remove_calculated(index);
+                removed(cell, value);
             }
         }
-        changed
     }
 
     /// Clears every spill and forgets every attempt. Returns the cleared cells.
