@@ -5,9 +5,10 @@ use crate::cells::CellStorage;
 use crate::graph::SheetFormulas;
 use crate::memory::StoreMemoryStats;
 use crate::spill::SpillState;
+use crate::transfer::Writer;
+#[cfg(any(target_arch = "wasm32", test))]
+use crate::transfer::{Reader, TransferResult};
 use crate::types::{CellKey, FormulaEntry, FormulaError};
-
-mod transfer;
 
 pub(crate) struct SheetData {
     pub(crate) cells: CellStorage,
@@ -175,6 +176,23 @@ impl SheetData {
         self.cells.add_memory_stats(stats);
         self.formulas.add_memory_stats(stats);
         self.spill.add_memory_stats(stats);
+    }
+
+    /// Resident state only: an unloaded clean datasource cell stays unloaded.
+    /// Formula entries follow through the store's formula codec.
+    pub(crate) fn write_transfer(&self, out: &mut Writer) {
+        self.cells.write_transfer(out);
+        self.formulas.write_transfer(out);
+        self.spill.write_transfer(out);
+    }
+
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn read_transfer(input: &mut Reader<'_>) -> TransferResult<Self> {
+        Ok(Self {
+            cells: CellStorage::read_transfer(input)?,
+            formulas: SheetFormulas::read_transfer(input)?,
+            spill: SpillState::read_transfer(input)?,
+        })
     }
 }
 
