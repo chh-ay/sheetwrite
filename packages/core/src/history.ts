@@ -26,15 +26,18 @@ export interface HistoryResourceStats {
   readonly undoEntries: number;
   readonly redoEntries: number;
   readonly retainedSnapshots: number;
+  /** Engine-reported payload bytes; excludes cloned formula ASTs and JS patch history. */
   readonly retainedSnapshotBytes: number;
 }
 
 /** Retains recent transaction-level undo resources without allowing unbounded history growth. */
 const DEFAULT_HISTORY_LIMIT = 200;
 /**
- * Retained range snapshots cost about 13 bytes per captured cell, so the entry
- * count alone allows 200 million-cell clears (2.6 GB). This budget keeps about
- * twenty of them; the newest entry is always kept so the last edit stays undoable.
+ * A numeric range snapshot reports about 13 bytes per captured cell, so the
+ * entry count alone allows 200 million-cell clears (2.6 GB). This payload-byte
+ * budget keeps about twenty of them, except the newest entry is always kept.
+ * It is not a total history-memory ceiling: engine accounting excludes cloned
+ * formula ASTs, and JS patch inverses/redo payloads are only entry-count bounded.
  */
 const DEFAULT_HISTORY_SNAPSHOT_BYTES = 256 * 1024 * 1024;
 
@@ -42,7 +45,7 @@ const DEFAULT_HISTORY_SNAPSHOT_BYTES = 256 * 1024 * 1024;
  * Bounded undo/redo over document transactions. Destructive bulk edits may
  * retain opaque store-local range resources, which are materialized into a
  * serializable `setBlock` only when undo executes. History drops its oldest
- * entries when it exceeds either the entry count or the retained snapshot bytes.
+ * entries when it exceeds either the entry count or reported snapshot payload bytes.
  */
 export class UndoManager {
   private readonly undoStack: UndoEntry[] = [];

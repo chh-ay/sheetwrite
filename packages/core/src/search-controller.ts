@@ -128,21 +128,18 @@ export class SearchController {
   /**
    * Refresh without scrolling: ordinary edits must not move the user's viewport.
    *
-   * Literal edits whose own match state is unchanged skip the full scan. On a
-   * formula-free sheet that check is complete. On a sheet with formulas, a
-   * recomputed cell elsewhere can still gain or lose a match; rescanning every
-   * cell per edit cost more than the old repaint, so those cells refresh on the
-   * next search, as they always have. Until the grid knows whether the sheet
-   * holds formulas (first change after a switch), every edit rescans.
+   * A literal edit's own match state is a complete check only when the sheet
+   * has no formulas or references. Otherwise an input on any sheet can change
+   * a computed match elsewhere, so the search must rescan conservatively.
    */
   refreshAfterChange(
     patches: readonly DocumentOp[],
     activeSheet: SheetId,
-    sourcesKnown: boolean,
+    independentCells: boolean,
   ): void {
     if (!this.searchQuery) return;
     if (
-      sourcesKnown &&
+      independentCells &&
       activeSheet === this.searchMatches.sheet &&
       patches.every((patch) => this.preservesMatchMembership(patch, activeSheet))
     )

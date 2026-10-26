@@ -1084,7 +1084,7 @@ export class GridImpl implements Grid {
       this.searchController.refreshAfterChange(
         event.transaction.patches,
         this.activeSheet,
-        presenceKnown,
+        presenceKnown && !this.sheetHasSources,
       );
       if (shouldReconcileView) {
         // Selection uses view-row positions: remote/history permutations must reset

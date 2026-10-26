@@ -254,6 +254,19 @@ it("refreshes search matches for numbers whose engine text differs from JavaScri
   expect(grid.findNext().matches).toEqual([{ sheet: "s1", row: OFFSCREEN_ROW, col: 1 }]);
 });
 
+it("refreshes a formula match when its off-screen literal input changes", () => {
+  const { grid } = mount({ kind: "formula", src: '=IF(B1000=999,"before","after")' });
+  expect(grid.search("after").matches).toHaveLength(0);
+  commit(grid, [
+    {
+      op: "set",
+      addr: { sheet: "s1", row: OFFSCREEN_ROW, col: 1 },
+      value: { kind: "literal", value: 42 },
+    },
+  ]);
+  expect(grid.findNext().matches).toEqual([{ sheet: "s1", row: 0, col: 0 }]);
+});
+
 it("repaints note additions, descriptions and row geometry without using value epochs as geometry", () => {
   const { grid, host } = mount();
   commit(grid, [{ op: "setNote", addr: { sheet: "s1", row: 1, col: 0 }, text: "Review" }]);
