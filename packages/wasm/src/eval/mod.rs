@@ -146,13 +146,8 @@ impl<'a> LiteralSources<'a> {
 
     #[inline]
     fn value_at(self, strings: &StringStorage, index: usize) -> Option<Value> {
-        let (kind, payload) = self.sources.source(index);
-        match kind {
-            KIND_NUMBER | KIND_STRING | KIND_BOOL => {
-                Some(literal_cell_value(strings, kind, payload))
-            }
-            _ => None,
-        }
+        let (kind, payload) = self.sources.literal(index)?;
+        Some(literal_cell_value(strings, kind, payload))
     }
 }
 
@@ -2422,24 +2417,29 @@ impl CellStore {
                     return Value::Error(FormulaError::Loading);
                 }
                 let index = data.cells.idx(row, col);
-                let kind = data.cells.kind_at(index);
-                // A sum over formula cells or spilled output can change without a
-                // write to this range, so only plain values are cached.
-                if cacheable
-                    && (kind == KIND_FORMULA
-                        || (has_spill_cells
-                            && data.spill.owner((row as u32, col as u32)).is_some()))
-                {
-                    cacheable = false;
-                }
+                // Literal sources are never formulas or owned spill output, so
+                // only non-literal cells need the resolved kind and the
+                // cacheability checks.
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, index))
                 {
                     value
-                } else if kind == KIND_EMPTY {
-                    Value::Blank
                 } else {
-                    self.eval_at(sheet, row, col, pass, depth + 1)
+                    let kind = data.cells.kind_at(index);
+                    // A sum over formula cells or spilled output can change
+                    // without a write to this range, so only plain values are cached.
+                    if cacheable
+                        && (kind == KIND_FORMULA
+                            || (has_spill_cells
+                                && data.spill.owner((row as u32, col as u32)).is_some()))
+                    {
+                        cacheable = false;
+                    }
+                    if kind == KIND_EMPTY {
+                        Value::Blank
+                    } else {
+                        self.eval_at(sheet, row, col, pass, depth + 1)
+                    }
                 };
                 match aggregate_number(&value, true) {
                     Ok(Some(number)) => sum += number,

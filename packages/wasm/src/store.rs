@@ -2928,6 +2928,30 @@ impl CellStore {
         mut sources: HashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
+        // A literal-only dense block needs no per-cell source decision: write
+        // storage column by column, then retire any formulas the block covered.
+        // Dense sheets are capped below u32 coordinates, so keys always exist.
+        if !HAS_SOURCES {
+            let sheet_data = &mut self.sheets[sheet];
+            if sheet_data.cells.write_dense_block(start, dimensions, &cell) {
+                if !sheet_data.formulas.is_empty() {
+                    for col in start.1..start.1 + dimensions.1 {
+                        for row in start.0..start.0 + dimensions.0 {
+                            if let Some(key) = cell_key(row, col) {
+                                self.graph.replace_entry(
+                                    &mut sheet_data.formulas,
+                                    sheet,
+                                    key,
+                                    None,
+                                );
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+
         for col_offset in 0..dimensions.1 {
             let col = start.1 + col_offset;
             for row_offset in 0..dimensions.0 {

@@ -12,7 +12,9 @@ use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
 };
-use crate::types::{CellKey, FormulaError, KIND_EMPTY, KIND_FORMULA, NO_STRING};
+use crate::types::{
+    CellKey, FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
+};
 
 mod transfer;
 
@@ -1668,9 +1670,13 @@ pub(crate) struct DenseSourceRun<'a> {
 }
 
 impl DenseSourceRun<'_> {
+    /// The literal source at `index`, or `None` for empty and formula cells.
+    /// Only empty and formula sources carry the calculated bit, so a literal
+    /// kind is recognised from the raw byte without masking it first.
     #[inline]
-    pub(crate) fn source(&self, index: usize) -> (u8, u64) {
-        dense_source(self.kinds[index], self.payloads[index])
+    pub(crate) fn literal(&self, index: usize) -> Option<(u8, u64)> {
+        let kind = self.kinds[index];
+        matches!(kind, KIND_NUMBER | KIND_STRING | KIND_BOOL).then(|| (kind, self.payloads[index]))
     }
 }
 
@@ -1834,6 +1840,44 @@ impl CellStorage {
         } else if !self.derived.is_empty() {
             self.derived.remove(index);
         }
+    }
+
+    /// Writes a `rows x cols` block of dense sources at `start`, dropping any
+    /// calculated value each cell held. Returns `false` without writing for
+    /// paged storage, whose writes need per-cell residency and dirty overlays.
+    ///
+    /// Bulk ingest runs here once per column: one bounds check per column
+    /// instead of per-cell sheet lookups, and the calculated-count update is
+    /// skipped entirely while the sheet holds no calculated values.
+    pub(crate) fn write_dense_block(
+        &mut self,
+        start: (usize, usize),
+        dimensions: (usize, usize),
+        cell: impl Fn(usize, usize) -> (u8, u64, u32),
+    ) -> bool {
+        if self.paged.is_some() {
+            return false;
+        }
+
+        let (rows, cols) = dimensions;
+        let has_calculated = self.dense_calculated_cells != 0;
+        for col_offset in 0..cols {
+            let base = self.idx(start.0, start.1 + col_offset);
+            let kinds = &mut self.kind[base..base + rows];
+            let payloads = &mut self.payload[base..base + rows];
+            let styles = &mut self.style[base..base + rows];
+            for row_offset in 0..rows {
+                if has_calculated && kinds[row_offset] & CALCULATED != 0 {
+                    self.dense_calculated_cells -= 1;
+                }
+
+                let (kind, payload, style) = cell(row_offset, col_offset);
+                kinds[row_offset] = kind;
+                payloads[row_offset] = payload;
+                styles[row_offset] = style;
+            }
+        }
+        true
     }
 
     pub(crate) fn compact_calculated(&mut self) {
@@ -2057,7 +2101,7 @@ mod calculated_slot_tests {
                 let run = cells.run(index, index + 1);
                 assert_eq!(run.source(index), (kind, 0));
                 if let Some(sources) = cells.dense_sources() {
-                    assert_eq!(sources.source(index), (kind, 0));
+                    assert_eq!(sources.literal(index), None);
                 }
             }
             let mut visited = Vec::new();
