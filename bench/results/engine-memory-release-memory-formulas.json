@@ -1,6 +1,6 @@
 {
   "engine": "formulas",
-  "root": "/home/vvin/learn/sheetwrite-wt/formula-spill",
+  "root": "candidate",
   "jsHeapMeasurement": "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
   "observations": [
     {
