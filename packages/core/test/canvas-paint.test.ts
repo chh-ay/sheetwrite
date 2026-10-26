@@ -4,6 +4,7 @@ import {
   blitVerticalScroll,
   fontFor,
   getMergeIndexResourceStatsForTest,
+  layoutTextLines,
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
@@ -566,6 +567,29 @@ describe("paintFrame column styles", () => {
 
     expect(ctx.fillTexts.some((call) => call.text === "#")).toBe(true);
     expect(ctx.fillTexts.some((call) => call.text === "12345")).toBe(false);
+  });
+});
+
+describe("layoutTextLines", () => {
+  // One width unit per character, so expected breaks can be worked out by hand.
+  const monospace = {
+    measureText: (text: string) => ({ width: text.length }),
+  } as unknown as Parameters<typeof layoutTextLines>[0];
+
+  it.each([
+    ["breaks after the last whitespace", "aa bb cc", 4, ["aa ", "bb ", "cc"]],
+    ["keeps a whitespace that overflows on its line", "aa bb cc", 5, ["aa bb ", "cc"]],
+    ["breaks a word with no whitespace mid-word", "abcdef", 4, ["abcd", "ef"]],
+    ["gives a too-wide first character its own line", "ab", 0.5, ["a", "b"]],
+    ["keeps empty paragraphs", "a\n\nb", 4, ["a", "", "b"]],
+    [
+      "wraps a long paragraph line by line",
+      "word ".repeat(6).trim(),
+      12,
+      ["word word ", "word word ", "word word"],
+    ],
+  ])("%s", (_, text, width, expected) => {
+    expect(layoutTextLines(monospace, text, width)).toEqual(expected);
   });
 });
 

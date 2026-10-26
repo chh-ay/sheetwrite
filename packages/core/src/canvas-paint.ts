@@ -173,12 +173,22 @@ export function fontFor(
   return font;
 }
 
+/** First probe length for a paragraph's first line; later lines start from the previous line's length. */
+const FIRST_LINE_GUESS = 16;
+const WHITESPACE = /\s/;
+
 /**
  * Wrapped-only line layout; the ordinary single-line path never calls this.
  * `maxLines` bounds the work for cells whose block cannot fit: the caller only
  * draws lines that fit the cell height, so generating more than
  * `floor(height / lineHeight) + 1` lines cannot change the pixels. A result
  * whose length reaches `maxLines` therefore means "more lines exist".
+ *
+ * A prefix's width only grows as characters are added, so each line's break
+ * is found by search instead of measuring every prefix (which made a line of
+ * L characters cost L measurements of growing strings). The search gallops
+ * forward from the previous line's length, then bisects, so measured text
+ * stays close to one line long however long the paragraph is.
  */
 function layoutTextLinesInto(
   ctx: Ctx,
@@ -188,27 +198,63 @@ function layoutTextLinesInto(
   lines: string[],
 ): string[] {
   const limit = Math.max(1, maxLines);
+  const overflows = (paragraph: string, start: number, end: number): boolean =>
+    ctx.measureText(paragraph.slice(start, end)).width > width;
+
   for (const paragraph of text.split("\n")) {
     if (lines.length >= limit) break;
     if (paragraph === "") {
       lines.push("");
       continue;
     }
+
     let start = 0;
+    let guess = FIRST_LINE_GUESS;
     while (start < paragraph.length && lines.length < limit) {
-      let end = start;
-      let lastBreak = -1;
-      while (end < paragraph.length) {
-        const next = end + 1;
-        if (/\s/.test(paragraph[end]!)) lastBreak = next;
-        if (ctx.measureText(paragraph.slice(start, next)).width > width) {
-          if (end === start) end = next;
-          else if (lastBreak > start) end = lastBreak;
+      // Gallop: grow the probe until it overflows or the paragraph ends.
+      let fits = start;
+      let over = -1;
+      for (let step = guess; ; step *= 2) {
+        const probe = Math.min(paragraph.length, fits + step);
+        if (overflows(paragraph, start, probe)) {
+          over = probe;
           break;
         }
-        end = next;
+        fits = probe;
+        if (probe === paragraph.length) break;
       }
+      if (over === -1) {
+        lines.push(paragraph.slice(start));
+        break;
+      }
+
+      // Bisect for the shortest overflowing prefix; its last character is
+      // the first one that does not fit.
+      let low = fits + 1;
+      let high = over;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (overflows(paragraph, start, mid)) high = mid;
+        else low = mid + 1;
+      }
+      const overflowIndex = low - 1;
+
+      // A first character too wide for the cell still gets a line of its own.
+      // Otherwise break after the last whitespace up to the overflowing
+      // character (it may be that whitespace), or mid-word just before it.
+      let end = start + 1;
+      if (overflowIndex > start) {
+        end = overflowIndex;
+        for (let index = overflowIndex; index >= start; index--) {
+          if (WHITESPACE.test(paragraph[index] ?? "")) {
+            end = index + 1;
+            break;
+          }
+        }
+      }
+
       lines.push(paragraph.slice(start, end));
+      guess = end - start;
       start = end;
     }
   }
