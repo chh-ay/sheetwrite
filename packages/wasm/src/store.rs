@@ -12,10 +12,9 @@ use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
-use crate::eval::DepIndex;
+use crate::graph::FormulaGraph;
 use crate::memory::{
-    StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, SHEET_INDEXES_METADATA, STRING_INDEX,
-    STRING_POOL_SPANS, STRING_POOL_UTF8,
+    StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
 use crate::sheet::{
     formula_error_at, CondPred, CondRule, SheetData, SpillBlocker, MAX_SPILL_OWNER_CELLS,
@@ -258,8 +257,7 @@ pub struct CellStore {
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringStorage,
-    pub(crate) formula_epoch: u64,
-    pub(crate) dep_index: Option<DepIndex>,
+    pub(crate) graph: FormulaGraph,
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
     tables: HashMap<String, TableDefinition>,
@@ -331,8 +329,7 @@ impl CellStore {
             sheet_lookup: HashMap::new(),
             sheet_ids: HashMap::new(),
             strings: StringStorage::new(),
-            formula_epoch: 0,
-            dep_index: None,
+            graph: FormulaGraph::default(),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -717,14 +714,12 @@ impl CellStore {
             }
 
             let mut changed = false;
-
-            for entry in data.formulas.values_mut() {
+            data.formulas.rewrite_entries(|entry| {
                 changed |= entry.rename_sheet(sheet as u32, name, formula_sheet as u32);
-            }
+            });
 
             if changed {
-                data.clear_dirty();
-                data.all_dirty = true;
+                data.formulas.mark_all_dirty();
                 affected.push(formula_sheet);
             }
         }
@@ -732,7 +727,7 @@ impl CellStore {
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_string();
         self.sheet_lookup.insert(name_key, sheet);
-        self.bump_formula_epoch();
+        self.graph.invalidate();
 
         for formula_sheet in affected {
             self.recompute(formula_sheet);
@@ -756,14 +751,12 @@ impl CellStore {
             }
 
             let mut changed = false;
-
-            for entry in data.formulas.values_mut() {
+            data.formulas.rewrite_entries(|entry| {
                 changed |= entry.invalidate_sheet(sheet as u32, formula_sheet as u32);
-            }
+            });
 
             if changed {
-                data.clear_dirty();
-                data.all_dirty = true;
+                data.formulas.mark_all_dirty();
                 affected.push(formula_sheet);
             }
         }
@@ -790,7 +783,7 @@ impl CellStore {
         self.sheet_names[sheet].clear();
         self.sheets[sheet] = SheetData::new(0, 0);
         self.sheet_alive[sheet] = false;
-        self.bump_formula_epoch();
+        self.graph.invalidate();
 
         if removed_names || !removed_table_keys.is_empty() {
             self.refresh_named_formula_entries();
@@ -1274,16 +1267,14 @@ impl CellStore {
                 }
                 if contents {
                     if let Some(key) = cell_key(row, col) {
-                        removed_formula |= s.remove_formula(key);
-                        if !s.all_dirty {
-                            s.dirty_cells.insert(key);
-                        }
+                        removed_formula |= s.formulas.remove(key);
+                        s.formulas.mark_cell_dirty(key);
                     }
                 }
             }
         }
         if removed_formula {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
         if contents && (r1 - r0 + 1).saturating_mul(c1 - c0 + 1) > 1 {
             self.strings.request_collection();
@@ -1349,7 +1340,7 @@ impl CellStore {
 
         let mut formulas = Vec::new();
         let mut references = Vec::new();
-        for (&(row, col), entry) in &s.formulas {
+        for ((row, col), entry) in s.formulas.iter() {
             let row = row as usize;
             let col = col as usize;
             if row < r0 || row >= r0 + rows || col < c0 || col >= c0 + cols {
@@ -1424,7 +1415,7 @@ impl CellStore {
                     }
                     spill_derived[offset] = 1;
                 }
-                let Some(entry) = data.formulas.get(&cell) else {
+                let Some(entry) = data.formulas.get(cell) else {
                     continue;
                 };
                 if entry.is_formula() {
@@ -1459,7 +1450,7 @@ impl CellStore {
             return None;
         }
         let mut references = Vec::new();
-        for (&(row, col), entry) in &data.formulas {
+        for ((row, col), entry) in data.formulas.iter() {
             let Some(target) = entry.reference_target(sheet as u32) else {
                 continue;
             };
@@ -1503,7 +1494,7 @@ impl CellStore {
             if !self.sheet_alive.get(source_sheet).copied().unwrap_or(false) {
                 continue;
             }
-            for (&(row, col), entry) in &data.formulas {
+            for ((row, col), entry) in data.formulas.iter() {
                 if entry
                     .reference_target(source_sheet as u32)
                     .is_none_or(|target| target.sheet as usize != target_sheet)
@@ -1595,7 +1586,7 @@ impl CellStore {
             } else {
                 -1.0
             };
-            let source = s.formulas.get(&key);
+            let source = s.formulas.get(key);
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
@@ -1690,7 +1681,7 @@ impl CellStore {
         let formulas = s
             .formulas
             .iter()
-            .filter_map(|(&(row, col), entry)| {
+            .filter_map(|((row, col), entry)| {
                 let row = row as usize;
                 let col = col as usize;
                 (row >= r0 && row < r0 + rows && col >= c0 && col < c0 + cols)
@@ -1836,14 +1827,14 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_NUMBER, encode_num(value), style) {
                 continue;
             }
-            removed_formula |= s.remove_formula(key);
+            removed_formula |= s.formulas.remove(key);
             wrote = true;
         }
         if wrote {
-            s.all_dirty = true;
+            s.formulas.mark_all_dirty();
         }
         if removed_formula {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
     }
 
@@ -1898,14 +1889,14 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_STRING, encode_str_id(id), style) {
                 continue;
             }
-            removed_formula |= s.remove_formula(key);
+            removed_formula |= s.formulas.remove(key);
             wrote = true;
         }
         if wrote {
-            self.sheets[sheet].all_dirty = true;
+            self.sheets[sheet].formulas.mark_all_dirty();
         }
         if removed_formula {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
     }
 
@@ -1949,15 +1940,15 @@ impl CellStore {
                 ) {
                     return;
                 }
-                removed_formula |= s.remove_formula(key);
+                removed_formula |= s.formulas.remove(key);
             }
             if limit > 0 {
-                s.all_dirty = true;
+                s.formulas.mark_all_dirty();
             }
             removed_formula
         };
         if removed_formula {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
     }
 
@@ -2007,9 +1998,7 @@ impl CellStore {
         if limit > 0 {
             // The load marks the whole sheet dirty; the per-cell marks from the
             // writes above would only repeat what that flag already covers.
-            let sheet_data = &mut self.sheets[sheet];
-            sheet_data.clear_dirty();
-            sheet_data.all_dirty = true;
+            self.sheets[sheet].formulas.mark_all_dirty();
         }
     }
 
@@ -2060,13 +2049,13 @@ impl CellStore {
             ) {
                 return;
             }
-            removed_formula |= s.remove_formula(key);
+            removed_formula |= s.formulas.remove(key);
         }
         if limit > 0 {
-            self.sheets[sheet].all_dirty = true;
+            self.sheets[sheet].formulas.mark_all_dirty();
         }
         if removed_formula {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
     }
 
@@ -2083,7 +2072,7 @@ impl CellStore {
         self.sheets[sheet].cells.invalidate_derived();
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 
     #[wasm_bindgen(js_name = removeRows)]
@@ -2099,7 +2088,7 @@ impl CellStore {
         self.sheets[sheet].cells.invalidate_derived();
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 
     #[wasm_bindgen(js_name = insertCols)]
@@ -2115,7 +2104,7 @@ impl CellStore {
         self.sheets[sheet].cells.invalidate_derived();
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 
     #[wasm_bindgen(js_name = removeCols)]
@@ -2131,7 +2120,7 @@ impl CellStore {
         self.sheets[sheet].cells.invalidate_derived();
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 
     /// Single-cell read for interactions/tests — never the render hot path.
@@ -2177,7 +2166,7 @@ impl CellStore {
         }
 
         let has_formula =
-            source_kind == KIND_FORMULA && key.is_some_and(|key| s.formulas.contains_key(&key));
+            source_kind == KIND_FORMULA && key.is_some_and(|key| s.formulas.contains(key));
 
         // The scalar read contract keeps the formula kind for numeric anchors.
         let output_kind = if source_kind == KIND_FORMULA && (!has_formula || kind == KIND_NUMBER) {
@@ -2413,12 +2402,12 @@ impl CellStore {
             let volatile_cells: Vec<_> = sheet
                 .formulas
                 .iter()
-                .filter_map(|(key, entry)| entry.volatile.then_some(*key))
+                .filter_map(|(key, entry)| entry.volatile.then_some(key))
                 .collect();
             if volatile_cells.is_empty() {
                 continue;
             }
-            sheet.dirty_cells.extend(volatile_cells);
+            sheet.formulas.mark_cells_dirty(volatile_cells);
             volatile_sheets.push(sheet_index);
         }
         for sheet in volatile_sheets {
@@ -2488,7 +2477,7 @@ impl CellStore {
     #[wasm_bindgen(js_name = formulaSource)]
     pub fn formula_source(&self, sheet: usize, row: usize, col: usize) -> Option<String> {
         let key = cell_key(row, col)?;
-        let entry = self.sheets.get(sheet)?.formulas.get(&key)?;
+        let entry = self.sheets.get(sheet)?.formulas.get(key)?;
         entry.is_formula().then(|| entry.source.clone())
     }
 
@@ -2499,7 +2488,7 @@ impl CellStore {
             .sheets
             .get(sheet)?
             .formulas
-            .get(&key)?
+            .get(key)?
             .reference_target(sheet as u32)?;
         Some(vec![target.sheet, target.row, target.col])
     }
@@ -2535,8 +2524,7 @@ impl CellStore {
         let data = &mut self.sheets[sheet];
         if data.spill_blockers != blockers {
             data.spill_blockers = blockers;
-            data.clear_dirty();
-            data.all_dirty = true;
+            data.formulas.mark_all_dirty();
         }
         true
     }
@@ -3022,9 +3010,9 @@ impl CellStore {
         if !applied {
             return false;
         }
-        let sheet_data = &mut self.sheets[sheet];
-        sheet_data.clear_dirty();
-        sheet_data.all_dirty = true;
+        // Range writes clear every spill, so all anchors must materialize
+        // again; dirtying the whole sheet already covers the cells just written.
+        self.sheets[sheet].formulas.mark_all_dirty();
         true
     }
 
@@ -3235,24 +3223,14 @@ impl CellStore {
         if !written {
             return false;
         }
-        let graph_changed = match source {
-            Some(entry) => {
-                let changed = sheet_data
-                    .formulas
-                    .get(&key)
-                    .is_none_or(|previous| !DepIndex::dependency_graph_unchanged(previous, &entry));
-                sheet_data.formulas.insert(key, entry);
-                changed
-            }
-            None => sheet_data.remove_formula(key),
-        };
+        let graph_changed = sheet_data.formulas.replace(key, source);
         if hydrating {
-            sheet_data.all_dirty = true;
-        } else if !sheet_data.all_dirty {
-            sheet_data.dirty_cells.insert(key);
+            sheet_data.formulas.mark_all_dirty();
+        } else {
+            sheet_data.formulas.mark_cell_dirty(key);
         }
         if graph_changed {
-            self.bump_formula_epoch();
+            self.graph.invalidate();
         }
         true
     }
@@ -3271,11 +3249,7 @@ impl CellStore {
             .owner_mut(STRING_INDEX)
             .add(self.strings.index_memory_stats());
 
-        if let Some(index) = &self.dep_index {
-            let (nodes, edges) = index.memory_stats();
-            stats.owner_mut(DEPENDENCY_NODES).add(nodes);
-            stats.owner_mut(DEPENDENCY_EDGES).add(edges);
-        }
+        self.graph.add_memory_stats(&mut stats);
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         metadata.add_payload(
@@ -3333,12 +3307,11 @@ impl CellStore {
     fn rewrite_formula_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
             if formula_sheet as u32 != edited_sheet {
-                for entry in sheet.formulas.values_mut() {
+                sheet.formulas.rewrite_entries(|entry| {
                     entry.shift_rows(at, delta, formula_sheet as u32, edited_sheet);
-                }
+                });
             }
-            sheet.clear_dirty();
-            sheet.all_dirty = true;
+            sheet.formulas.mark_all_dirty();
         }
         self.drop_invalid_references();
         self.rebase_table_rows(edited_sheet, at, delta);
@@ -3350,12 +3323,11 @@ impl CellStore {
     fn rewrite_formula_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
             if formula_sheet as u32 != edited_sheet {
-                for entry in sheet.formulas.values_mut() {
+                sheet.formulas.rewrite_entries(|entry| {
                     entry.shift_cols(at, delta, formula_sheet as u32, edited_sheet);
-                }
+                });
             }
-            sheet.clear_dirty();
-            sheet.all_dirty = true;
+            sheet.formulas.mark_all_dirty();
         }
         self.drop_invalid_references();
         self.rebase_table_cols(edited_sheet, at, delta);
@@ -3371,11 +3343,11 @@ impl CellStore {
                 .iter()
                 .filter_map(|(key, entry)| {
                     (entry.is_reference() && entry.reference_target(sheet_index as u32).is_none())
-                        .then_some(*key)
+                        .then_some(key)
                 })
                 .collect();
             for key in invalid {
-                sheet.remove_formula(key);
+                sheet.formulas.remove(key);
                 let (row, col) = (key.0 as usize, key.1 as usize);
                 if sheet.cells.contains_cell(row, col) {
                     let style = sheet.cells.style_at(sheet.cells.idx(row, col));
@@ -3383,10 +3355,6 @@ impl CellStore {
                 }
             }
         }
-    }
-
-    pub(crate) fn bump_formula_epoch(&mut self) {
-        self.formula_epoch += 1;
     }
 }
 
@@ -3532,15 +3500,14 @@ impl CellStore {
         definition: Option<&TableDefinition>,
     ) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
-            for entry in sheet.formulas.values_mut() {
+            sheet.formulas.rewrite_entries(|entry| {
                 entry.update_table(table_id, formula_sheet as u32, &|reference| {
                     definition.and_then(|table| refresh_structured_reference(table, reference))
                 });
-            }
-            sheet.clear_dirty();
-            sheet.all_dirty = true;
+            });
+            sheet.formulas.mark_all_dirty();
         }
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 
     fn refresh_formula_entries(&mut self) {
@@ -3701,7 +3668,7 @@ impl CellStore {
                 .formulas
                 .iter()
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (*key, entry.source.clone()))
+                .map(|(key, entry)| (key, entry.source.clone()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()
@@ -3716,10 +3683,9 @@ impl CellStore {
             for (key, entry) in refreshed {
                 sheet.formulas.insert(key, entry);
             }
-            sheet.clear_dirty();
-            sheet.all_dirty = true;
+            sheet.formulas.mark_all_dirty();
         }
-        self.bump_formula_epoch();
+        self.graph.invalidate();
     }
 }
 

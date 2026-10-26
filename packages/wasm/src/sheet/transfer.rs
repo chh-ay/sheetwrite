@@ -38,14 +38,7 @@ impl SheetData {
             out.u32(blocker.col_end);
         }
 
-        out.usize(self.dirty_cells.len());
-
-        for &(row, col) in &self.dirty_cells {
-            out.u32(row);
-            out.u32(col);
-        }
-
-        out.bool(self.all_dirty);
+        self.formulas.write_transfer(out);
         // Conditional rules contain parsed ASTs and are lazily rebuilt by the host.
     }
 
@@ -54,12 +47,10 @@ impl SheetData {
         let cells = CellStorage::read_transfer(input)?;
         let mut sheet = Self {
             cells,
-            formulas: FxHashMap::default(),
+            formulas: SheetFormulas::default(),
             spill_ranges: FxHashMap::default(),
             spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: FxHashSet::default(),
-            all_dirty: false,
             cond_rules: Vec::new(),
         };
 
@@ -88,11 +79,7 @@ impl SheetData {
             });
         }
 
-        for _ in 0..input.count()? {
-            sheet.dirty_cells.insert((input.u32()?, input.u32()?));
-        }
-
-        sheet.all_dirty = input.bool()?;
+        sheet.formulas = SheetFormulas::read_transfer(input)?;
         Ok(sheet)
     }
 }

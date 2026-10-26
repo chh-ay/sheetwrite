@@ -24,6 +24,7 @@ use std::rc::Rc;
 
 use crate::calc::{Ast, Func};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
+use crate::graph::DirtySeeds;
 use crate::sheet::{
     formula_error_with_entry, spill_ownership_within_budget, SheetData, SpillRange,
 };
@@ -37,10 +38,8 @@ use crate::types::{
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
-pub(crate) use dependency::DepIndex;
-use dependency::{
-    build_dep_index, collect_affected_formulas, direct_readers, seed_dependency_depth_errors,
-};
+pub(crate) use dependency::{build_dep_index, DepIndex};
+use dependency::{collect_affected_formulas, direct_readers, seed_dependency_depth_errors};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 use lookup::{
     find_match_index_indexed, integer_arg, list_reuse, positive_index, remember_list,
@@ -408,9 +407,7 @@ impl CellStore {
             .sheets
             .iter()
             .enumerate()
-            .filter_map(|(sheet, data)| {
-                (!data.dirty_cells.is_empty() || data.all_dirty).then_some(sheet)
-            })
+            .filter_map(|(sheet, data)| data.formulas.has_dirty().then_some(sheet))
             .collect();
 
         self.recompute_seed_sheets(&seeds);
@@ -434,19 +431,7 @@ impl CellStore {
             return;
         }
 
-        let dep_index_stale = self
-            .dep_index
-            .as_ref()
-            .is_none_or(|index| index.epoch != self.formula_epoch);
-
-        if dep_index_stale {
-            self.dep_index = Some(build_dep_index(&self.sheets, self.formula_epoch));
-        }
-
-        let Some(index) = self.dep_index.as_ref() else {
-            return;
-        };
-
+        let index = self.graph.ensure_index(&self.sheets);
         let mut affected = FxHashSet::default();
 
         for &sheet in seeds {
@@ -457,14 +442,17 @@ impl CellStore {
                 continue;
             }
 
-            if data.all_dirty {
-                affected.extend(
-                    data.spill_ranges
-                        .keys()
-                        .map(|&anchor| AbsCellKey::from_local(sheet, anchor)),
-                );
-                continue;
-            }
+            let cells = match data.formulas.dirty_seeds() {
+                DirtySeeds::All => {
+                    affected.extend(
+                        data.spill_ranges
+                            .keys()
+                            .map(|&anchor| AbsCellKey::from_local(sheet, anchor)),
+                    );
+                    continue;
+                }
+                DirtySeeds::Cells(cells) => cells,
+            };
 
             // A dirty cell that lands inside a spilled range invalidates that
             // anchor, so scan the dirty cells once and mark every range they
@@ -473,7 +461,7 @@ impl CellStore {
             let mut hit = vec![false; data.spill_ranges.len()];
             let mut unhit_ranges = hit.len();
 
-            for &cell in &data.dirty_cells {
+            for &cell in cells {
                 for (range_index, (_, range)) in data.spill_ranges.iter().enumerate() {
                     if !hit[range_index] && range.contains(cell) {
                         hit[range_index] = true;
@@ -506,7 +494,7 @@ impl CellStore {
         let mut memo: FxHashMap<AbsCellKey, EvalResult> =
             FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
 
-        if let Some(index) = self.dep_index.as_ref() {
+        if let Some(index) = self.graph.index() {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
@@ -514,8 +502,8 @@ impl CellStore {
         let mut processed_arrays: FxHashSet<AbsCellKey> = FxHashSet::default();
 
         if self
-            .dep_index
-            .as_ref()
+            .graph
+            .index()
             .is_some_and(|index| !index.has_dynamic_arrays)
         {
             let mut pass = EvalPass {
@@ -562,7 +550,7 @@ impl CellStore {
                         .sheets
                         .get(key.sheet as usize)?
                         .formulas
-                        .get(&key.local())?;
+                        .get(key.local())?;
 
                     if !entry.produces_array {
                         return None;
@@ -607,7 +595,7 @@ impl CellStore {
                         sequence,
                         cells: cleared.clone(),
                     });
-                    self.sheets[output_sheet].dirty_cells.extend(cleared);
+                    self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
                 }
@@ -674,13 +662,13 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
-                    self.sheets[output_sheet].dirty_cells.extend(changed);
+                    self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
                 }
             }
 
-            let Some(index) = self.dep_index.as_ref() else {
+            let Some(index) = self.graph.index() else {
                 return;
             };
 
@@ -718,7 +706,7 @@ impl CellStore {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
-        if let Some(index) = self.dep_index.as_ref() {
+        if let Some(index) = self.graph.index() {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
@@ -783,7 +771,7 @@ impl CellStore {
 
                 let index = data.cells.idx(row as usize, col as usize);
                 if data.spill_owners.contains_key(&cell)
-                    || data.formulas.contains_key(&cell)
+                    || data.formulas.contains(cell)
                     || data.cells.source_kind_at(index) != KIND_EMPTY
                 {
                     return Err(FormulaError::Spill);
@@ -896,7 +884,7 @@ impl CellStore {
         }
 
         let index = data.cells.idx(row as usize, col as usize);
-        if !data.formulas.contains_key(&key.local()) {
+        if !data.formulas.contains(key.local()) {
             return;
         }
 
@@ -949,13 +937,13 @@ impl CellStore {
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
         if kind != KIND_FORMULA {
-            debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains_key(&key) }));
+            debug_assert!(cell_key(row, col).is_none_or(|key| { !s.formulas.contains(key) }));
             return literal_cell_value(&self.strings, kind, payload);
         }
 
         if let Some(key) = cell_key(row, col) {
             let abs_key = AbsCellKey::from_local(sheet, key);
-            if let Some(entry) = s.formulas.get(&key) {
+            if let Some(entry) = s.formulas.get(key) {
                 if pass.affected.contains(&abs_key) {
                     return self.eval_formula_cell(abs_key, pass, depth + 1);
                 }
@@ -994,7 +982,7 @@ impl CellStore {
 
         let sheet = key.sheet as usize;
         let local = key.local();
-        let result = match self.sheets.get(sheet).and_then(|s| s.formulas.get(&local)) {
+        let result = match self.sheets.get(sheet).and_then(|s| s.formulas.get(local)) {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);

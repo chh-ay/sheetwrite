@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::graph::DirtySeeds;
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
@@ -14,7 +15,7 @@ pub(crate) struct DepIndex {
     exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
     range_groups: Vec<RangeGroup>,
     range_sheets: Vec<RangeSheetIndex>,
-    pub(super) epoch: u64,
+    pub(crate) epoch: u64,
     pub(super) has_dynamic_arrays: bool,
     has_formula_dependencies: bool,
 }
@@ -160,7 +161,7 @@ impl RangeInterval {
 /// keep the cached index when none of them changed. A new dependency-relevant
 /// field must be added to that comparison too, or the epoch will not advance
 /// when it changes.
-pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
+pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
     let mut exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>> = FxHashMap::default();
     let mut range_dependents: FxHashMap<CellRange, Vec<AbsCellKey>> = FxHashMap::default();
     let mut has_dynamic_arrays = false;
@@ -170,13 +171,13 @@ pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
         .flat_map(|(sheet, data)| {
             data.formulas
                 .keys()
-                .map(move |&cell| AbsCellKey::from_local(sheet, cell))
+                .map(move |cell| AbsCellKey::from_local(sheet, cell))
         })
         .collect();
     let mut has_formula_dependencies = false;
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
-        for (&formula_cell, entry) in &sheet.formulas {
+        for (formula_cell, entry) in sheet.formulas.iter() {
             has_dynamic_arrays |= entry.produces_array;
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
@@ -275,43 +276,46 @@ pub(super) fn collect_affected_formulas(
     let mut range_marks = vec![0; index.range_groups.len()];
     let mut range_stamp = 1;
     if let Some(sheet) = sheets.get(seed_sheet) {
-        for &cell in &sheet.dirty_cells {
-            let abs = AbsCellKey::from_local(seed_sheet, cell);
-            if formula_exists(sheets, abs) {
-                affected.insert(abs);
-            }
-            queue.push_back(abs);
-        }
-        if sheet.all_dirty {
-            // A bulk load or structural rewrite touched (potentially) every
-            // cell on this sheet. Seed every formula on the sheet plus every
-            // formula registered as reading any of its cells or ranges; the
-            // BFS below grows transitive dependents as usual. This is bounded
-            // by formula/read-set counts, never by row count.
-            let seed = seed_sheet as u32;
-            for &cell in sheet.formulas.keys() {
-                let abs = AbsCellKey::from_local(seed_sheet, cell);
-                if affected.insert(abs) {
+        match sheet.formulas.dirty_seeds() {
+            DirtySeeds::Cells(cells) => {
+                for &cell in cells {
+                    let abs = AbsCellKey::from_local(seed_sheet, cell);
+                    if formula_exists(sheets, abs) {
+                        affected.insert(abs);
+                    }
                     queue.push_back(abs);
                 }
             }
-            for (&cell, dependents) in &index.exact_dependents {
-                if cell.sheet != seed {
-                    continue;
-                }
-                for &dependent in dependents {
-                    if affected.insert(dependent) {
-                        queue.push_back(dependent);
+            DirtySeeds::All => {
+                // Seed every formula on the sheet plus every formula registered as
+                // reading any of its cells or ranges; the BFS below grows
+                // transitive dependents as usual. This is bounded by
+                // formula/read-set counts, never by row count.
+                let seed = seed_sheet as u32;
+                for cell in sheet.formulas.keys() {
+                    let abs = AbsCellKey::from_local(seed_sheet, cell);
+                    if affected.insert(abs) {
+                        queue.push_back(abs);
                     }
                 }
-            }
-            for group in &index.range_groups {
-                if group.range.sheet != seed {
-                    continue;
+                for (&cell, dependents) in &index.exact_dependents {
+                    if cell.sheet != seed {
+                        continue;
+                    }
+                    for &dependent in dependents {
+                        if affected.insert(dependent) {
+                            queue.push_back(dependent);
+                        }
+                    }
                 }
-                for &dependent in &group.dependents {
-                    if affected.insert(dependent) {
-                        queue.push_back(dependent);
+                for group in &index.range_groups {
+                    if group.range.sheet != seed {
+                        continue;
+                    }
+                    for &dependent in &group.dependents {
+                        if affected.insert(dependent) {
+                            queue.push_back(dependent);
+                        }
                     }
                 }
             }
@@ -386,7 +390,7 @@ pub(super) fn direct_readers(
 fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
     sheets
         .get(key.sheet as usize)
-        .is_some_and(|sheet| sheet.formulas.contains_key(&key.local()))
+        .is_some_and(|sheet| sheet.formulas.contains(key.local()))
 }
 
 pub(super) fn seed_dependency_depth_errors(
@@ -436,7 +440,7 @@ fn collect_formula_dependencies(
     for &formula_cell in &formula_cells {
         let Some(entry) = sheets
             .get(formula_cell.sheet as usize)
-            .and_then(|sheet| sheet.formulas.get(&formula_cell.local()))
+            .and_then(|sheet| sheet.formulas.get(formula_cell.local()))
         else {
             continue;
         };
@@ -572,7 +576,7 @@ mod tests {
         let left = AbsCellKey::new(sheet, 0, 0);
         let right = AbsCellKey::new(sheet, 0, 1);
         let affected = FxHashSet::from_iter([left, right]);
-        let index = build_dep_index(&store.sheets, store.formula_epoch);
+        let index = build_dep_index(&store.sheets, store.graph.epoch());
         let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
         assert_eq!(dependencies.get(&left), Some(&vec![right]));
         assert_eq!(dependencies.get(&right), Some(&vec![left]));

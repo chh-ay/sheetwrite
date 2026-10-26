@@ -132,9 +132,12 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     dense.delete_cols(0, 0, 0);
     assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
-    dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
-    dense.clear_dirty();
-    assert!(dense.dirty_cells.is_empty());
+    dense.formulas.clear_dirty();
+    dense
+        .formulas
+        .mark_cells_dirty((0..5_000).map(|row| (row, 0)));
+    dense.formulas.clear_dirty();
+    assert!(!dense.formulas.has_dirty());
 
     let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     assert!(!paged.cells.is_fully_loaded());
@@ -3413,7 +3416,7 @@ mod formula_dependency_epoch {
         assert_close(number(&store, sheet, 0, 2), 12.0);
         assert_close(number(&store, sheet, 1, 2), 24.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         assert_eq!(
             store.set_sparse_block(
                 sheet,
@@ -3434,7 +3437,8 @@ mod formula_dependency_epoch {
             0,
         );
         assert_eq!(
-            store.formula_epoch, epoch_before,
+            store.graph.epoch(),
+            epoch_before,
             "a constant-only rewrite must keep the cached dependency index"
         );
         store.recompute(sheet);
@@ -3459,10 +3463,10 @@ mod formula_dependency_epoch {
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 1.0);
 
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=B1", 0);
         assert!(
-            store.formula_epoch > epoch_before,
+            store.graph.epoch() > epoch_before,
             "a changed read set must invalidate the dependency index"
         );
         store.recompute(sheet);
@@ -3498,9 +3502,9 @@ mod formula_dependency_epoch {
 
         // Array to a different array with the same reads and shape: the index
         // survives the rewrite and the spill is re-materialized.
-        let epoch_before = store.formula_epoch;
+        let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=SORT(A1:A3)", 0);
-        assert_eq!(store.formula_epoch, epoch_before);
+        assert_eq!(store.graph.epoch(), epoch_before);
         store.recompute(sheet);
         assert_eq!(
             [0, 1, 2].map(|row| number(&store, sheet, row, 2)),
@@ -3645,8 +3649,8 @@ mod formula_dependency_epoch {
                 let incremental = snapshot_cells(&store, sheet, ROWS, COLS);
                 // Drop every cache and dirty the whole sheet: the next pass
                 // must produce the same values from scratch.
-                store.dep_index = None;
-                store.sheets[sheet].all_dirty = true;
+                store.graph.invalidate();
+                store.sheets[sheet].formulas.mark_all_dirty();
                 store.recompute(sheet);
                 assert_eq!(
                     snapshot_cells(&store, sheet, ROWS, COLS),

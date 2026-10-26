@@ -2,11 +2,12 @@
 
 use crate::calc::Ast;
 use crate::cells::CellStorage;
+use crate::graph::SheetFormulas;
 use crate::memory::{
-    StoreMemoryStats, FORMULAS, SHEET_INDEXES_METADATA, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES,
+    StoreMemoryStats, SHEET_INDEXES_METADATA, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES,
 };
 use crate::types::{CellKey, FormulaEntry, FormulaError};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 mod transfer;
 
@@ -102,7 +103,7 @@ pub(crate) struct SpillBlocker {
 pub(crate) struct SheetData {
     pub(crate) cells: CellStorage,
     /// Formula source and dependency metadata, independent of calculated payloads.
-    pub(crate) formulas: FxHashMap<CellKey, FormulaEntry>,
+    pub(crate) formulas: SheetFormulas,
     /// Attempted spill bounds remain registered even while obstructed so clearing
     /// a blocker invalidates the owning anchor.
     pub(crate) spill_ranges: FxHashMap<CellKey, SpillRange>,
@@ -110,12 +111,6 @@ pub(crate) struct SheetData {
     pub(crate) spill_owners: FxHashMap<CellKey, CellKey>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
-    /// Cells changed since the last transaction-barrier formula recompute.
-    pub(crate) dirty_cells: FxHashSet<CellKey>,
-    /// Bulk load / structural rewrite touched (potentially) every cell; the
-    /// recompute pass seeds from the dependency index instead of enumerating
-    /// per-cell dirty keys, keeping `dirty_cells` O(interactive edits).
-    pub(crate) all_dirty: bool,
     /// Conditional-format rules, synced from the host; evaluated per window.
     pub(crate) cond_rules: Vec<CondRule>,
 }
@@ -128,12 +123,10 @@ impl SheetData {
     pub(crate) fn try_new(n_cols: usize, row_count: usize) -> Result<Self, String> {
         Ok(Self {
             cells: CellStorage::try_new(n_cols, row_count)?,
-            formulas: FxHashMap::default(),
+            formulas: SheetFormulas::default(),
             spill_ranges: FxHashMap::default(),
             spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: FxHashSet::default(),
-            all_dirty: false,
             cond_rules: Vec::new(),
         })
     }
@@ -153,19 +146,17 @@ impl SheetData {
                 byte_budget,
                 max_dirty_cells,
             ),
-            formulas: FxHashMap::default(),
+            formulas: SheetFormulas::default(),
             spill_ranges: FxHashMap::default(),
             spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: FxHashSet::default(),
-            all_dirty: false,
             cond_rules: Vec::new(),
         }
     }
 
     pub(crate) fn persisted_coordinates(&self) -> Vec<CellKey> {
         let mut coordinates = self.cells.persisted_coordinates();
-        coordinates.extend(self.formulas.keys().copied());
+        coordinates.extend(self.formulas.keys());
         coordinates.sort_unstable();
         coordinates.dedup();
         coordinates
@@ -176,8 +167,7 @@ impl SheetData {
         self.spill_ranges.clear();
         self.spill_owners = FxHashMap::default();
         self.cells.invalidate_derived();
-        self.clear_dirty();
-        self.all_dirty = true;
+        self.formulas.mark_all_dirty();
     }
 
     #[inline]
@@ -282,12 +272,6 @@ impl SheetData {
         changed
     }
 
-    /// Remove a cell's formula without hashing when the sheet has none.
-    #[inline]
-    pub(crate) fn remove_formula(&mut self, key: CellKey) -> bool {
-        !self.formulas.is_empty() && self.formulas.remove(&key).is_some()
-    }
-
     /// Detach a direct write from any spill and invalidate every attempted spill
     /// whose destination includes this cell.
     #[inline]
@@ -312,26 +296,14 @@ impl SheetData {
 
         if self.spill_ranges.contains_key(&cell) {
             let changed = self.clear_spill(cell);
-            self.dirty_cells.extend(changed);
+            self.formulas.mark_cells_dirty(changed);
             self.spill_ranges.remove(&cell);
         } else {
             self.spill_owners.remove(&cell);
         }
 
         self.compact_spill_metadata();
-        self.dirty_cells.extend(affected);
-    }
-
-    /// Reset dirty tracking after a recompute pass. Drops oversized capacity —
-    /// `FxHashSet::clear` walks every retained bucket, so a set inflated by one
-    /// giant paste must not tax every later single-cell transaction.
-    pub(crate) fn clear_dirty(&mut self) {
-        self.all_dirty = false;
-        if self.dirty_cells.capacity() > 4096 {
-            self.dirty_cells = FxHashSet::default();
-        } else {
-            self.dirty_cells.clear();
-        }
+        self.formulas.mark_cells_dirty(affected);
     }
 
     pub(crate) fn finish_recompute(&mut self) {
@@ -339,7 +311,7 @@ impl SheetData {
             self.cells.invalidate_derived();
         }
 
-        self.clear_dirty();
+        self.formulas.clear_dirty();
     }
 
     /// Shift rows `[at, row_count)` down by `count`, opening a blank gap.
@@ -351,25 +323,7 @@ impl SheetData {
 
         let at = at.min(extent);
         self.cells.insert_rows(at, count);
-        if !self.formulas.is_empty() {
-            let (at_u, count_u) = (at as u32, count as u32);
-            let moved = std::mem::take(&mut self.formulas);
-
-            for ((row, col), mut entry) in moved {
-                entry.shift_rows(at_u, i64::from(count_u), sheet, sheet);
-
-                let new_row = if row >= at_u {
-                    row.saturating_add(count_u)
-                } else {
-                    row
-                };
-
-                self.formulas.insert((new_row, col), entry);
-            }
-        }
-
-        self.clear_dirty();
-        self.all_dirty = true;
+        self.formulas.insert_rows(sheet, at as u32, count as u32);
     }
 
     /// Delete `count` rows starting at `at`, closing the gap.
@@ -381,25 +335,7 @@ impl SheetData {
 
         let count = count.min(extent - at);
         self.cells.delete_rows(at, count);
-        if !self.formulas.is_empty() {
-            let (at_u, count_u) = (at as u32, count as u32);
-            let moved = std::mem::take(&mut self.formulas);
-            for ((row, col), mut entry) in moved {
-                if row >= at_u && row < at_u.saturating_add(count_u) {
-                    continue;
-                }
-                entry.shift_rows(at_u, -i64::from(count_u), sheet, sheet);
-                let new_row = if row >= at_u.saturating_add(count_u) {
-                    row - count_u
-                } else {
-                    row
-                };
-                self.formulas.insert((new_row, col), entry);
-            }
-        }
-
-        self.clear_dirty();
-        self.all_dirty = true;
+        self.formulas.delete_rows(sheet, at as u32, count as u32);
     }
 
     /// Shift columns `[at, n_cols)` right by `count`, opening blank columns.
@@ -411,22 +347,7 @@ impl SheetData {
 
         let at = at.min(extent);
         self.cells.insert_cols(at, count);
-        if !self.formulas.is_empty() {
-            let (at_u, count_u) = (at as u32, count as u32);
-            let moved = std::mem::take(&mut self.formulas);
-            for ((row, col), mut entry) in moved {
-                entry.shift_cols(at_u, i64::from(count_u), sheet, sheet);
-                let new_col = if col >= at_u {
-                    col.saturating_add(count_u)
-                } else {
-                    col
-                };
-                self.formulas.insert((row, new_col), entry);
-            }
-        }
-
-        self.clear_dirty();
-        self.all_dirty = true;
+        self.formulas.insert_cols(sheet, at as u32, count as u32);
     }
 
     /// Delete `count` columns starting at `at`, closing the gap.
@@ -438,35 +359,12 @@ impl SheetData {
 
         let count = count.min(extent - at);
         self.cells.delete_cols(at, count);
-        if !self.formulas.is_empty() {
-            let (at_u, count_u) = (at as u32, count as u32);
-            let moved = std::mem::take(&mut self.formulas);
-            for ((row, col), mut entry) in moved {
-                if col >= at_u && col < at_u.saturating_add(count_u) {
-                    continue;
-                }
-                entry.shift_cols(at_u, -i64::from(count_u), sheet, sheet);
-                let new_col = if col >= at_u.saturating_add(count_u) {
-                    col - count_u
-                } else {
-                    col
-                };
-                self.formulas.insert((row, new_col), entry);
-            }
-        }
-
-        self.clear_dirty();
-        self.all_dirty = true;
+        self.formulas.delete_cols(sheet, at as u32, count as u32);
     }
 
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         self.cells.add_memory_stats(stats);
-        let formulas = stats.owner_mut(FORMULAS);
-        formulas
-            .add_hash_table::<CellKey, FormulaEntry>(self.formulas.len(), self.formulas.capacity());
-        for entry in self.formulas.values() {
-            entry.heap_memory_stats(formulas);
-        }
+        self.formulas.add_memory_stats(stats);
         stats
             .owner_mut(SPILL_RANGES)
             .add_hash_table::<CellKey, SpillRange>(
@@ -484,7 +382,6 @@ impl SheetData {
             .add_vec::<SpillBlocker>(self.spill_blockers.len(), self.spill_blockers.capacity());
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_hash_table::<CellKey, ()>(self.dirty_cells.len(), self.dirty_cells.capacity());
         metadata.add_vec::<CondRule>(self.cond_rules.len(), self.cond_rules.capacity());
         for rule in &self.cond_rules {
             let text = match &rule.pred {
@@ -514,5 +411,5 @@ pub(crate) fn formula_error_with_entry(
 }
 
 pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
-    formula_error_with_entry(sheet, key, sheet.formulas.get(&key))
+    formula_error_with_entry(sheet, key, sheet.formulas.get(key))
 }

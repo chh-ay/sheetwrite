@@ -195,7 +195,7 @@ impl WindowCells {
             }
             KIND_FORMULA => {
                 let key = cell_key(row, col);
-                let entry = key.and_then(|key| sheet.formulas.get(&key));
+                let entry = key.and_then(|key| sheet.formulas.get(key));
                 let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
                 if let Some(error) = error {
                     self.kind[dst] = KIND_STRING;

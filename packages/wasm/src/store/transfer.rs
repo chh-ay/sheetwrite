@@ -188,7 +188,7 @@ impl CellStore {
             store.tables.insert(key, table);
         }
 
-        store.formula_epoch = input.u64()?;
+        store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
@@ -276,7 +276,7 @@ impl CellStore {
             }
         }
 
-        out.u64(self.formula_epoch);
+        self.graph.write_transfer(&mut out);
         out.u64(self.mutation_revision);
         out.u64(self.volatile_serial.to_bits());
         out.usize(self.spill_owner_cell_limit);
@@ -284,7 +284,7 @@ impl CellStore {
         for (sheet, data) in self.sheets.iter().enumerate() {
             data.write_transfer(&mut out);
             out.usize(data.formulas.len());
-            for (&(row, col), entry) in &data.formulas {
+            for ((row, col), entry) in data.formulas.iter() {
                 out.u32(row);
                 out.u32(col);
                 write_formula(&mut out, entry, sheet as u32);

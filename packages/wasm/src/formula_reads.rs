@@ -76,14 +76,14 @@ impl<'a> ReadWalk<'a> {
     fn visit(&mut self, key: CellKey) {
         let key = self.data.spill_owner(key).unwrap_or(key);
 
-        if self.data.formulas.contains_key(&key) && self.visited.insert(key) {
+        if self.data.formulas.contains(key) && self.visited.insert(key) {
             self.pending.push(key);
         }
     }
 
     fn run(&mut self) {
         while let Some(key) = self.pending.pop() {
-            let Some(entry) = self.data.formulas.get(&key) else {
+            let Some(entry) = self.data.formulas.get(key) else {
                 continue;
             };
 
