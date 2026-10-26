@@ -2344,7 +2344,7 @@ impl CellStore {
             let volatile_cells: Vec<_> = sheet
                 .formulas
                 .iter()
-                .filter_map(|(key, entry)| entry.volatile.then_some(key))
+                .filter_map(|(key, entry)| entry.volatile().then_some(key))
                 .collect();
             if volatile_cells.is_empty() {
                 continue;
@@ -2393,7 +2393,7 @@ impl CellStore {
         }
 
         let entry = self.parse_formula_entry(src, sheet as u32, key.0, key.1);
-        let carried = if entry.error.is_some() {
+        let carried = if entry.source_error().is_some() {
             0.0
         } else {
             let sheet_data = &self.sheets[sheet];

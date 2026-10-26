@@ -199,7 +199,7 @@ pub(crate) fn formula_error_with_entry(
         .contains_cell(row, col)
         .then(|| sheet.cells.calculated_error_at(sheet.cells.idx(row, col)))
         .flatten()
-        .or_else(|| entry.and_then(|entry| entry.error))
+        .or_else(|| entry.and_then(FormulaEntry::source_error))
 }
 
 pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {

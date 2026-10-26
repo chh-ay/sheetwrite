@@ -526,14 +526,14 @@ impl CellStore {
                         .formulas
                         .get(key.local())?;
 
-                    if !entry.produces_array {
+                    if !entry.produces_array() {
                         return None;
                     }
 
                     let ast = entry.ast.as_ref()?;
                     self.dynamic_array_bound(ast, key.sheet as usize)
                         .is_some()
-                        .then(|| (key, ast.clone(), entry.has_spill_refs))
+                        .then(|| (key, ast.clone(), entry.has_spill_refs()))
                 })
                 .collect();
 
@@ -881,14 +881,14 @@ impl CellStore {
             Some(entry) => match &entry.ast {
                 Some(ast) => {
                     let _origin = FormulaOriginGuard::push(local);
-                    if entry.has_spill_refs {
+                    if entry.has_spill_refs() {
                         let resolved = self.resolve_spill_refs(ast, sheet);
                         self.eval_ast(&resolved, sheet, pass, depth + 1)
                     } else {
                         self.eval_ast(ast, sheet, pass, depth + 1)
                     }
                 }
-                None => Value::Error(entry.error.unwrap_or(FormulaError::Value)),
+                None => Value::Error(entry.source_error().unwrap_or(FormulaError::Value)),
             },
             None => Value::Number(0.0),
         };

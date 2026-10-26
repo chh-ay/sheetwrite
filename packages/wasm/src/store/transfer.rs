@@ -36,10 +36,10 @@ pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) 
     }
 
     out.bool(entry.ast.is_some());
-    out.error(entry.error);
-    out.bool(entry.volatile);
-    out.bool(entry.has_spill_refs);
-    out.bool(entry.produces_array);
+    out.error(entry.source_error());
+    out.bool(entry.volatile());
+    out.bool(entry.has_spill_refs());
+    out.bool(entry.produces_array());
     out.usize(entry.reads.cells.len());
 
     for key in &entry.reads.cells {
@@ -94,10 +94,10 @@ impl CellStore {
             entry.ast = None;
         }
 
-        entry.error = input.error()?;
-        entry.volatile = input.bool()?;
-        entry.has_spill_refs = input.bool()?;
-        entry.produces_array = input.bool()?;
+        entry.set_source_error(input.error()?);
+        entry.set_volatile(input.bool()?);
+        entry.set_has_spill_refs(input.bool()?);
+        entry.set_produces_array(input.bool()?);
 
         let cells = (0..input.count()?)
             .map(|_| {

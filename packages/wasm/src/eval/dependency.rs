@@ -108,11 +108,11 @@ impl DepIndex {
     /// cell that gains its first formula changes the formula-cell set, so the
     /// caller only compares entries when one already existed.
     pub(crate) fn dependency_graph_unchanged(previous: &FormulaEntry, next: &FormulaEntry) -> bool {
-        previous.error.is_none()
-            && next.error.is_none()
+        previous.source_error().is_none()
+            && next.source_error().is_none()
             && previous.reads.cells == next.reads.cells
             && previous.reads.ranges == next.reads.ranges
-            && previous.produces_array == next.produces_array
+            && previous.produces_array() == next.produces_array()
     }
 }
 
@@ -178,7 +178,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (formula_cell, entry) in sheet.formulas.iter() {
-            has_dynamic_arrays |= entry.produces_array;
+            has_dynamic_arrays |= entry.produces_array();
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
