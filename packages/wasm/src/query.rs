@@ -161,8 +161,7 @@ impl CellStore {
             let run = s.cells.run(start, end);
             let value_at = |index| {
                 if s.cells.is_paged() {
-                    let (kind, payload) = run.resolved(index);
-                    return (kind == KIND_NUMBER).then(|| payload_num(payload));
+                    return numeric_cell_value(s, index);
                 }
                 let (kind, payload) = run.source(index);
                 match kind {

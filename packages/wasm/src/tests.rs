@@ -1323,6 +1323,18 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
 }
 
 #[test]
+fn paged_aggregate_counts_loaded_formula_before_first_recompute() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(1, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.set_formula(sheet, 0, 0, "=7", 0);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 0.0);
+    store.recompute(sheet);
+    assert_close(store.aggregate(sheet, 0, 4), 1.0);
+    assert_close(store.aggregate(sheet, 0, 0), 7.0);
+}
+
+#[test]
 fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 6);
