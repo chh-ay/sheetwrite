@@ -160,7 +160,13 @@ impl CellStore {
                     self.matrix_shape(ast, formula_sheet)
                         .map(|shape| shape.2)
                         .or_else(|error| {
-                            if error == FormulaError::Value {
+                            // An operator over a runtime reference gets its
+                            // shape only after evaluation, which charges it.
+                            if error == FormulaError::Value
+                                && super::reference::ast_contains_runtime_ref(ast)
+                            {
+                                Ok(RUNTIME_REFERENCE_PRECHARGE)
+                            } else if error == FormulaError::Value {
                                 Ok(SPILL_MAX_CELLS)
                             } else {
                                 Err(error)

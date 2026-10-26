@@ -736,17 +736,34 @@ impl CellStore {
                         Some(total) => {
                             spill_work = total;
                             let _origin = FormulaOriginGuard::push(local);
-                            let evaluated = self
-                                .eval_dynamic_array(&ast, output_sheet, &mut pass, 0)
-                                .unwrap_or(Err(FormulaError::Value));
+                            // A LET that resolves to one cell leaves no array
+                            // expression; its scalar value is the result.
+                            let evaluated =
+                                match self.eval_dynamic_array(&ast, output_sheet, &mut pass, 0) {
+                                    Some(result) => result,
+                                    None if has_spill_refs => {
+                                        match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
+                                            Value::Error(error) => Err(error),
+                                            value => Ok(EvalMatrix::new(1, 1, vec![value])),
+                                        }
+                                    }
+                                    None => Err(FormulaError::Value),
+                                };
 
                             // A bound is an upper limit except for shapes known
                             // only after evaluation (OFFSET, INDIRECT); charge
-                            // whatever the result holds beyond it.
+                            // whatever the result holds beyond it. An overrun
+                            // spends the whole budget, so later formulas of the
+                            // pass fail before reading their ranges.
                             evaluated.and_then(|matrix| {
                                 let excess = matrix.values.len().saturating_sub(bound);
-                                spill_work = dynamic_recompute_within_limit(spill_work, excess)
-                                    .ok_or(FormulaError::Num)?;
+                                match dynamic_recompute_within_limit(spill_work, excess) {
+                                    Some(total) => spill_work = total,
+                                    None => {
+                                        spill_work = usize::MAX;
+                                        return Err(FormulaError::Num);
+                                    }
+                                }
                                 Ok(matrix)
                             })
                         }

@@ -4613,7 +4613,7 @@ mod cell_information {
 #[test]
 fn offset_indirect_values_preserve_reference_shapes_in_sums_and_spills() {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(12, 12);
+    let sheet = store.add_sheet(14, 12);
     for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
         store.set_number(sheet, row, 0, value, 0);
         store.set_number(sheet, row, 1, value * 10.0, 0);
@@ -4631,6 +4631,8 @@ fn offset_indirect_values_preserve_reference_shapes_in_sums_and_spills() {
         ("=LET(address,\"B2\",INDIRECT(address))", 20.0),
         ("=(OFFSET(A1,1,1)=20)+1", 2.0),
         ("=INDIRECT(\"B2\")+1", 21.0),
+        ("=LET(v,INDIRECT(\"B2\"),v)", 20.0),
+        ("=LET(x,1,OFFSET(A1,1,1)+x)", 21.0),
     ];
     for (col, (formula, _)) in scalar_cases.iter().enumerate() {
         store.set_formula(sheet, 8, col, formula, 0);
@@ -5065,6 +5067,7 @@ fn offset_indirect_spills_with_evaluated_shapes_share_the_spill_budget_by_size()
         "=LET(h,2,OFFSET($A$1,0,0,h,1))",
         "=LET(a,ADDRESS(1,1)&\":\"&ADDRESS(2,1),INDIRECT(a))",
         "=LET(n,COUNTA($A$1:$A$2),OFFSET($A$1,0,0,n,1))",
+        "=LET(r,OFFSET($A$1,0,0,2,1),r*1)",
     ];
     for pattern in patterns {
         for rows in [2, 3] {
