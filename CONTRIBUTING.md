@@ -29,6 +29,8 @@ Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are own
 
 After the initial 0.1.0 release, user-visible package changes require a Changeset created with `bunx changeset`. Private workspaces are excluded.
 
+Merged changesets update one version pull request. After its version commit passes CI on `develop`, publication downloads and rehashes the canonical tarballs from that CI run, skips versions already on npm, and publishes the rest in dependency order with provenance. Each package then gets a git tag and a GitHub Release named `<package>@<version>`.
+
 Benchmark baselines and delivery-size budgets are reviewed evidence, not knobs for making a regression pass. Change a baseline only in a standalone, measured review that records the reason; never weaken correctness sentinels. Coverage is gated only by aggregate per-language floors in `scripts/coverage-thresholds.json`; every runtime source file is scored unless it has a documented exclusion there.
 
 ## Code style
