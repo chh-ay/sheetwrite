@@ -82,8 +82,8 @@ list every limit, its unit, and its behavior.
 
 Formula calculation makes no network request and runs no JavaScript from the
 document. Functions that need external data, such as `WEBSERVICE` or
-`GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` read the time only when the
-host calls `store.recalculateVolatile(date)`.
+`GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` read the clock once per
+recalculation, so every formula in one recalculation sees the same time.
 
 ## Volatile functions
 

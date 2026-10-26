@@ -4380,6 +4380,61 @@ mod volatile_recalculation {
         assert_eq!(recomputed_since(&store, &mut mark), 1);
     }
 
+    const FIRST_INSTANT: f64 = 46_000.25;
+    const SECOND_INSTANT: f64 = 46_001.75;
+    const HOST_INSTANT: f64 = 40_000.5;
+
+    /// Clock reads by the fixed clocks below. Only the test that installs
+    /// them reads it, so parallel tests cannot disturb the count.
+    static CLOCK_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+    fn first_clock() -> f64 {
+        CLOCK_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        FIRST_INSTANT
+    }
+
+    fn second_clock() -> f64 {
+        CLOCK_READS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        SECOND_INSTANT
+    }
+
+    fn clock_reads() -> usize {
+        CLOCK_READS.swap(0, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    #[test]
+    fn now_and_today_read_the_clock_once_per_recalculation_pass() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(5, 1);
+        store.clock = first_clock;
+        store.set_formula(sheet, 0, 0, "=NOW()", 0);
+        store.set_formula(sheet, 0, 1, "=NOW()", 0);
+        store.set_formula(sheet, 0, 2, "=TODAY()", 0);
+        store.set_formula(sheet, 0, 3, "=A1-B1", 0);
+        store.commit_sources();
+
+        assert_eq!(clock_reads(), 1);
+        assert_close(number(&store, sheet, 0, 0), FIRST_INSTANT);
+        assert_close(number(&store, sheet, 0, 2), FIRST_INSTANT.floor());
+        assert_close(number(&store, sheet, 0, 3), 0.0);
+
+        store.clock = second_clock;
+        store.commit_sources();
+        assert_eq!(clock_reads(), 0);
+        assert_close(number(&store, sheet, 0, 0), FIRST_INSTANT);
+
+        store.set_number(sheet, 0, 4, 1.0, 0);
+        store.commit_sources();
+        assert_eq!(clock_reads(), 1);
+        assert_close(number(&store, sheet, 0, 1), SECOND_INSTANT);
+        assert_close(number(&store, sheet, 0, 2), SECOND_INSTANT.floor());
+
+        // The host barrier supplies the instant itself.
+        store.recompute_volatile(HOST_INSTANT);
+        assert_eq!(clock_reads(), 0);
+        assert_close(number(&store, sheet, 0, 0), HOST_INSTANT);
+    }
+
     #[test]
     fn moved_volatile_formulas_keep_recalculating_at_their_new_cells() {
         let mut store = CellStore::new();

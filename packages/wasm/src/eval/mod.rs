@@ -39,6 +39,7 @@ use crate::types::{
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
+pub(crate) use date::{host_clock_serial, ClockSource};
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{collect_affected_formulas, direct_readers, seed_dependency_depth_errors};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
@@ -421,7 +422,8 @@ impl CellStore {
     }
 
     /// The host clock barrier: recalculates every volatile formula and its
-    /// dependents. Pending source changes of those sheets join the same pass.
+    /// dependents at the instant the host already stored. Pending source
+    /// changes of those sheets join the same pass.
     pub(crate) fn recompute_volatile_formulas(&mut self) {
         let seeds: Vec<usize> = self
             .sheets
@@ -430,10 +432,29 @@ impl CellStore {
             .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
 
-        self.recompute_seed_sheets(&seeds);
+        self.recompute_at_volatile_serial(&seeds);
     }
 
+    /// Every other recalculation reads the clock once, as Excel does, so all
+    /// NOW and TODAY formulas of one pass see the same instant. A pass without
+    /// volatile formulas never reads it.
     fn recompute_seed_sheets(&mut self, seeds: &[usize]) {
+        let has_volatile = seeds.iter().any(|&sheet| {
+            self.sheets
+                .get(sheet)
+                .is_some_and(|data| data.formulas.has_volatile())
+        });
+        if has_volatile {
+            let serial = (self.clock)();
+            if serial.is_finite() {
+                self.volatile_serial = serial;
+            }
+        }
+
+        self.recompute_at_volatile_serial(seeds);
+    }
+
+    fn recompute_at_volatile_serial(&mut self, seeds: &[usize]) {
         if seeds.is_empty() {
             return;
         }

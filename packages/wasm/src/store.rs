@@ -12,7 +12,7 @@ use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
-use crate::eval::RandomSource;
+use crate::eval::{host_clock_serial, ClockSource, RandomSource};
 use crate::graph::{DirtyRect, FormulaGraph};
 use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
@@ -267,6 +267,8 @@ pub struct CellStore {
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
     pub(crate) random: RandomSource,
+    /// Read once per recalculation pass that holds volatile formulas.
+    pub(crate) clock: ClockSource,
     pub(crate) spill_owner_cell_limit: usize,
     /// Formulas each recompute pass selected, summed over passes. Tests read
     /// it to bound recalculation work, which no value can show.
@@ -344,6 +346,7 @@ impl CellStore {
             named_ranges: HashMap::new(),
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
+            clock: host_clock_serial,
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
             tables: HashMap::new(),
             #[cfg(test)]
@@ -2317,7 +2320,8 @@ impl CellStore {
 
     /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
     /// the 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,
-    /// RANDBETWEEN) and their dependents recalculate.
+    /// RANDBETWEEN) and their dependents recalculate, and TODAY and NOW use
+    /// `serial` instead of the clock. Later recalculations read the clock.
     #[wasm_bindgen(js_name = recomputeVolatile)]
     pub fn recompute_volatile(&mut self, serial: f64) -> bool {
         if !serial.is_finite() {

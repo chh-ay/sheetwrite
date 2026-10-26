@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "0373d6d1e62319cff82eef93dd06f15bfc02555938a03f8a25bc912ca57454ab",
+  "sha256": "170c6a4d375ba13c0229a5ccd4257092eae8c289dac412a46d73057c1c48c423",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",

@@ -151,8 +151,8 @@ export interface Store {
   /**
    * Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one
    * captured instant. The supplied Date is interpreted as an absolute UTC instant.
-   * Edits already recompute volatile formulas; `TODAY` and `NOW` read the time
-   * only from this call.
+   * Edits already recompute volatile formulas and read the clock once per
+   * recalculation; this call uses `now` instead, until the next edit.
    */
   recalculateVolatile(now?: Date): void;
   /** Bulk read of a visible window; the only read a renderer should use per frame. */

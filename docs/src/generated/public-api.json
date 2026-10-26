@@ -4198,7 +4198,7 @@
                 },
                 {
                   "name": "recalculateVolatile",
-                  "documentation": "Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one\ncaptured instant. The supplied Date is interpreted as an absolute UTC instant.\nEdits already recompute volatile formulas; `TODAY` and `NOW` read the time\nonly from this call."
+                  "documentation": "Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one\ncaptured instant. The supplied Date is interpreted as an absolute UTC instant.\nEdits already recompute volatile formulas and read the clock once per\nrecalculation; this call uses `now` instead, until the next edit."
                 },
                 {
                   "name": "setDetailedChangeCapture",
@@ -4466,7 +4466,7 @@
                 },
                 {
                   "name": "recalculateVolatile",
-                  "documentation": "Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one\ncaptured instant. The supplied Date is interpreted as an absolute UTC instant.\nEdits already recompute volatile formulas; `TODAY` and `NOW` read the time\nonly from this call."
+                  "documentation": "Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one\ncaptured instant. The supplied Date is interpreted as an absolute UTC instant.\nEdits already recompute volatile formulas and read the clock once per\nrecalculation; this call uses `now` instead, until the next edit."
                 },
                 {
                   "name": "setDetailedChangeCapture",
@@ -7509,7 +7509,7 @@
                 },
                 {
                   "name": "recomputeVolatile",
-                  "documentation": "Explicit volatile barrier. `serial` is a UTC spreadsheet serial using\nthe 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,\nRANDBETWEEN) and their dependents recalculate."
+                  "documentation": "Explicit volatile barrier. `serial` is a UTC spreadsheet serial using\nthe 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,\nRANDBETWEEN) and their dependents recalculate, and TODAY and NOW use\n`serial` instead of the clock. Later recalculations read the clock."
                 },
                 {
                   "name": "referencesTargeting",
@@ -7616,7 +7616,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L413",
+              "source": "pkg/sheetwrite_wasm.d.ts#L414",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -7653,7 +7653,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L497",
+              "source": "pkg/sheetwrite_wasm.d.ts#L498",
               "jsDocTags": [],
               "documentation": "Names accepted by the full engine, including aliases.",
               "memberDocs": []
@@ -7665,7 +7665,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L499",
+              "source": "pkg/sheetwrite_wasm.d.ts#L500",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7677,7 +7677,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L501",
+              "source": "pkg/sheetwrite_wasm.d.ts#L502",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -7689,7 +7689,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L660",
+              "source": "pkg/sheetwrite_wasm.d.ts#L661",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -7731,7 +7731,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L439",
+              "source": "pkg/sheetwrite_wasm.d.ts#L440",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -7748,7 +7748,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L461",
+              "source": "pkg/sheetwrite_wasm.d.ts#L462",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -7760,7 +7760,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L650",
+              "source": "pkg/sheetwrite_wasm.d.ts#L651",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -7772,7 +7772,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L476",
+              "source": "pkg/sheetwrite_wasm.d.ts#L477",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
@@ -10763,7 +10763,7 @@
                 },
                 {
                   "name": "recomputeVolatile",
-                  "documentation": "Explicit volatile barrier. `serial` is a UTC spreadsheet serial using\nthe 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,\nRANDBETWEEN) and their dependents recalculate."
+                  "documentation": "Explicit volatile barrier. `serial` is a UTC spreadsheet serial using\nthe 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,\nRANDBETWEEN) and their dependents recalculate, and TODAY and NOW use\n`serial` instead of the clock. Later recalculations read the clock."
                 },
                 {
                   "name": "referencesTargeting",
@@ -10870,7 +10870,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L413",
+              "source": "pkg/sheetwrite_wasm.d.ts#L414",
               "jsDocTags": [],
               "documentation": "Distinct-value scan result for one column: parallel kind/number/text\narrays whose buffers are surrendered once through the `take*` accessors.",
               "memberDocs": [
@@ -10907,7 +10907,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L494",
+              "source": "pkg/sheetwrite_wasm.d.ts#L495",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -10919,7 +10919,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L496",
+              "source": "pkg/sheetwrite_wasm.d.ts#L497",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -10931,7 +10931,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L654",
+              "source": "pkg/sheetwrite_wasm.d.ts#L655",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -10973,7 +10973,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L439",
+              "source": "pkg/sheetwrite_wasm.d.ts#L440",
               "jsDocTags": [],
               "documentation": "Opaque, store-local history payload for one dense rectangular cell block.\n\nThe host may retain this object in undo history, but it is deliberately not\npart of the serialized document protocol. A deduplicated local dictionary\nowns captured text independently of the store's pool epoch.",
               "memberDocs": [
@@ -10990,7 +10990,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L461",
+              "source": "pkg/sheetwrite_wasm.d.ts#L462",
               "jsDocTags": [],
               "documentation": "Compact serializable projection of persisted derived-cell sources and spill\nidentity in one range. Offsets are row-major and sorted; reference targets\nare packed `[sheet_handle, row, col]` triples.",
               "memberDocs": []
@@ -11002,7 +11002,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L644",
+              "source": "pkg/sheetwrite_wasm.d.ts#L645",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -11014,7 +11014,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L476",
+              "source": "pkg/sheetwrite_wasm.d.ts#L477",
               "jsDocTags": [],
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
