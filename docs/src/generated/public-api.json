@@ -891,7 +891,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L419",
+              "source": "src/grid.ts#L420",
               "jsDocTags": [
                 "example",
                 "see"
@@ -1193,7 +1193,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L293",
+              "source": "src/grid.ts#L294",
               "jsDocTags": [],
               "documentation": "Default canvas theme used before CSS and explicit theme overrides.",
               "memberDocs": []
@@ -2201,7 +2201,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L337",
+              "source": "src/grid.ts#L338",
               "jsDocTags": [
                 "example",
                 "see"
@@ -2252,7 +2252,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L349",
+              "source": "src/grid.ts#L350",
               "jsDocTags": [],
               "documentation": "Whether `initSheetwrite` has completed — the single readiness source.",
               "memberDocs": []
@@ -3110,7 +3110,7 @@
               "owners": [
                 "src/grid.ts"
               ],
-              "source": "src/grid.ts#L354",
+              "source": "src/grid.ts#L355",
               "jsDocTags": [],
               "documentation": "Read `--sheetwrite-*` CSS custom properties into a partial theme.",
               "memberDocs": []
@@ -6785,7 +6785,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L61",
+              "source": "src/shell/spreadsheet-shell.ts#L100",
               "jsDocTags": [],
               "documentation": "Mount a complete spreadsheet shell into `host`: toolbar row, formula row\n(name box + formula bar), the grid, and a bottom row with sheet tabs and a\nselection status. The host must have a real size; the shell fills it. Returns\nthe shell handle; `destroy` tears down every piece, the grid, and the shell\nDOM, and is safe to call twice.",
               "memberDocs": []
@@ -6908,7 +6908,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L36",
+              "source": "src/shell/spreadsheet-shell.ts#L75",
               "jsDocTags": [],
               "documentation": "Disposable controller for the framework-neutral spreadsheet shell.",
               "memberDocs": [
@@ -6933,7 +6933,7 @@
               "owners": [
                 "src/shell/spreadsheet-shell.ts"
               ],
-              "source": "src/shell/spreadsheet-shell.ts#L22",
+              "source": "src/shell/spreadsheet-shell.ts#L61",
               "jsDocTags": [],
               "documentation": "Host elements and feature options used to create a spreadsheet shell.",
               "memberDocs": [

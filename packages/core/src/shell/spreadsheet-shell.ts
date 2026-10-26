@@ -6,6 +6,7 @@
 
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
+import { RIBBON_EXPANDED_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -14,9 +15,47 @@ import type { Theme } from "../types/render.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
 import { createFormulaBar, createNameBox, type ShellPiece } from "./formula-controls.js";
-import { createRibbon } from "./ribbon-factory.js";
 import { createSelectionStatus } from "./selection-status.js";
 import { createToolbar } from "./toolbar-factory.js";
+
+/**
+ * The ribbon loads as its own chunk, so shells without it never download it.
+ * Its row keeps the ribbon's height meanwhile, so the grid does not move when
+ * it arrives; if the chunk fails, the flat toolbar takes its place and the
+ * error is still reported.
+ */
+function mountRibbonWhenLoaded(
+  host: HTMLElement,
+  grid: Grid,
+  focusGrid: () => void,
+  fallbackItems: readonly ToolbarItem[] | undefined,
+): ShellPiece {
+  let piece: ShellPiece | null = null;
+  let destroyed = false;
+  host.style.minHeight = `${RIBBON_EXPANDED_HEIGHT}px`;
+
+  void import("./ribbon-factory.js").then(
+    ({ createRibbon }) => {
+      if (destroyed) return;
+      host.style.minHeight = "";
+      piece = createRibbon(host, grid, { focusGrid });
+    },
+    (error: unknown) => {
+      if (destroyed) return;
+      host.style.minHeight = "";
+      piece = createToolbar(host, grid, { items: fallbackItems });
+      throw error;
+    },
+  );
+
+  return {
+    element: host,
+    destroy() {
+      destroyed = true;
+      piece?.destroy();
+    },
+  };
+}
 
 /** Host elements and feature options used to create a spreadsheet shell. */
 export interface SpreadsheetShellOptions {
@@ -119,7 +158,7 @@ export function createSpreadsheetShell(
   const pieces: ShellPiece[] = [];
   pieces.push(
     options.ribbon
-      ? createRibbon(toolbarRow, grid, { focusGrid })
+      ? mountRibbonWhenLoaded(toolbarRow, grid, focusGrid, options.toolbar)
       : createToolbar(toolbarRow, grid, { items: options.toolbar }),
   );
   pieces.push(createNameBox(formulaRow, grid, { focusGrid }));

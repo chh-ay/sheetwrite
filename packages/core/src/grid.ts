@@ -44,7 +44,8 @@ import {
   type RuntimeResourcePhase,
   type RuntimeResourceSnapshot,
 } from "./resource-accounting.js";
-import { Ribbon } from "./ribbon/ribbon.js";
+import { RIBBON_EXPANDED_HEIGHT } from "./ribbon/ribbon-metrics.js";
+import type { Ribbon } from "./ribbon/ribbon.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { sheetNameKey, validateSheetName } from "./sheet-name.js";
@@ -469,6 +470,8 @@ export class GridImpl implements Grid {
   private baseTheme: Theme;
   private toolbar: Toolbar | null = null;
   private ribbon: Ribbon | null = null;
+  /** Bumped whenever chrome is rebuilt, so a ribbon chunk that loads late is dropped. */
+  private chromeGeneration = 0;
   private findBar: FindBar | null = null;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -2083,29 +2086,59 @@ export class GridImpl implements Grid {
   }
 
   private createToolbar(config: GridConfig | undefined): void {
+    this.chromeGeneration += 1;
     if (!config || config.toolbar === false) return;
-    if (config.ribbon === true && !Array.isArray(config.toolbar)) {
-      // The grid owns widget theming: seed now, reseed on every theme change.
-      seedWidgetTheme(this.host, this.baseTheme);
-      this.ribbon = new Ribbon(this.host, this, {
-        onHeightChange: (height: number) => {
-          this.toolbarHeight = height;
-          this.viewportEl.style.top = `${height}px`;
-          this.applyLayout();
-          this.render();
-        },
-      });
-      // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
-      const el = this.ribbon.element;
-      el.style.position = "absolute";
-      el.style.top = "0";
-      el.style.left = "0";
-      el.style.right = "0";
-      this.toolbarHeight = this.ribbon.height;
-    } else {
+    if (config.ribbon !== true || Array.isArray(config.toolbar)) {
       this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
       this.toolbarHeight = Toolbar.height;
+      return;
     }
+
+    // The ribbon is opt-in and sizable, so it loads as its own chunk: grids
+    // without it never download it. Its height is reserved now, so the grid
+    // does not move when it arrives.
+    this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
+    const generation = this.chromeGeneration;
+    const current = () => generation === this.chromeGeneration && !this.destroyed;
+    void import("./ribbon/ribbon.js").then(
+      ({ Ribbon }) => {
+        if (current()) this.mountRibbon(Ribbon);
+      },
+      (error: unknown) => {
+        if (!current()) return;
+        // Keep the grid usable with the flat toolbar, and still report why.
+        this.toolbar = new Toolbar(this.host, config, this.baseTheme, this);
+        this.setToolbarHeight(Toolbar.height);
+        throw error;
+      },
+    );
+  }
+
+  private mountRibbon(RibbonClass: typeof Ribbon): void {
+    // The grid owns widget theming: seed now, reseed on every theme change.
+    seedWidgetTheme(this.host, this.baseTheme);
+    const ribbon = new RibbonClass(this.host, this, {
+      onHeightChange: (height) => this.setToolbarHeight(height),
+    });
+
+    // Grid layout offsets the viewport by the ribbon's height, so chrome must leave normal flow.
+    const el = ribbon.element;
+    el.style.position = "absolute";
+    el.style.top = "0";
+    el.style.left = "0";
+    el.style.right = "0";
+    // First in the host, as in Excel: keyboard users reach the ribbon before
+    // the grid, whatever was mounted while its chunk loaded.
+    this.host.prepend(el);
+    this.ribbon = ribbon;
+    if (ribbon.height !== this.toolbarHeight) this.setToolbarHeight(ribbon.height);
+  }
+
+  private setToolbarHeight(height: number): void {
+    this.toolbarHeight = height;
+    this.viewportEl.style.top = `${height}px`;
+    this.applyLayout();
+    this.render();
   }
 
   private emitThemeChange(): void {

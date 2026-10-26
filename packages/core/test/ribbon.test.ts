@@ -8,8 +8,12 @@ import type { Workbook } from "../src/types.js";
 let restore: () => void;
 const grids: GridImpl[] = [];
 
+const RIBBON_MODULE = "../src/ribbon/ribbon.js";
+
 beforeAll(async () => {
   await initSheetwrite();
+  // Load the ribbon chunk once, so each grid's own import resolves at once.
+  await import(RIBBON_MODULE);
 });
 beforeEach(() => {
   restore = installCanvasTestStubs();
@@ -20,7 +24,16 @@ afterEach(() => {
   restore();
 });
 
-function setup(readOnly = false) {
+/**
+ * The grid imports the ribbon lazily. Awaiting the same module after the grid
+ * asked for it runs the grid's mount callback first, so no timer is needed.
+ */
+async function ribbonMounted(host: HTMLElement): Promise<void> {
+  await import(RIBBON_MODULE);
+  if (!host.querySelector(".sheetwrite-ribbon")) throw new Error("the ribbon did not mount");
+}
+
+async function setup(readOnly = false) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -44,6 +57,7 @@ function setup(readOnly = false) {
   document.body.appendChild(host);
   const grid = new GridImpl(host, { workbook, readOnly, config: { ribbon: true } }, store);
   grids.push(grid);
+  await ribbonMounted(host);
 
   const control = <T extends HTMLElement = HTMLButtonElement>(label: string): T => {
     const element = host.querySelector<T>(`.sheetwrite-ribbon [aria-label="${label}"]`);
@@ -66,8 +80,8 @@ function setup(readOnly = false) {
   return { grid, host, control, select, cell, key, press };
 }
 
-it("shows Bold pressed, unpressed or mixed for the selection", () => {
-  const { grid, control, select } = setup();
+it("shows Bold pressed, unpressed or mixed for the selection", async () => {
+  const { grid, control, select } = await setup();
   grid.styleRange(
     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
     { bold: true },
@@ -81,8 +95,8 @@ it("shows Bold pressed, unpressed or mixed for the selection", () => {
   expect(control("Bold").getAttribute("aria-pressed")).toBe("mixed");
 });
 
-it("shows the focus cell's size in points and applies typed points as pixels", () => {
-  const { grid, host, control, select, cell, key } = setup();
+it("shows the focus cell's size in points and applies typed points as pixels", async () => {
+  const { grid, host, control, select, cell, key } = await setup();
   grid.styleRange(
     { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
     { fontSize: 16 },
@@ -102,8 +116,8 @@ it("shows the focus cell's size in points and applies typed points as pixels", (
   expect(document.activeElement).toBe(host);
 });
 
-it("runs a border preset from the keyboard and returns focus to the menu button", () => {
-  const { host, control, select, cell, key, press } = setup();
+it("runs a border preset from the keyboard and returns focus to the menu button", async () => {
+  const { host, control, select, cell, key, press } = await setup();
   select(0, 0);
   const options = control("Borders options");
 
@@ -129,8 +143,8 @@ it("runs a border preset from the keyboard and returns focus to the menu button"
   expect(document.activeElement).toBe(options);
 });
 
-it("disables editing controls while read-only but keeps view controls", () => {
-  const { grid, host, select, key, press } = setup(true);
+it("disables editing controls while read-only but keeps view controls", async () => {
+  const { grid, host, select, key, press } = await setup(true);
   select(0, 0);
   const find = (selector: string): HTMLButtonElement => {
     const element = host.querySelector<HTMLButtonElement>(selector);
@@ -164,8 +178,8 @@ it("disables editing controls while read-only but keeps view controls", () => {
   expect(grid.getZoom()).toBeCloseTo(1.1);
 });
 
-it("opens a list from a collapsed group without closing the group, then closes both", () => {
-  const { host, control, select, cell } = setup();
+it("opens a list from a collapsed group without closing the group, then closes both", async () => {
+  const { host, control, select, cell } = await setup();
   select(0, 0);
   const groupButton = host.querySelector<HTMLButtonElement>(
     '.sheetwrite-ribbon-group[aria-label="Number"] .sheetwrite-ribbon-group-button',
@@ -195,8 +209,8 @@ it("opens a list from a collapsed group without closing the group, then closes b
   expect(groupButton.parentElement?.contains(control("Number Format list"))).toBe(true);
 });
 
-it("gives the grid the panel's height back when minimized", () => {
-  const { host, key } = setup();
+it("gives the grid the panel's height back when minimized", async () => {
+  const { host, key } = await setup();
   const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
   const home = host.querySelector<HTMLElement>('[role="tab"]');
   if (viewport === null || home === null) throw new Error("grid not mounted");

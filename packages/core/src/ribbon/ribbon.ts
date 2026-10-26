@@ -18,13 +18,9 @@ import {
   type RibbonFitGroup,
   type RibbonFitStep,
 } from "./ribbon-fit.js";
+import { RIBBON_PANEL_HEIGHT, RIBBON_TAB_ROW_HEIGHT } from "./ribbon-metrics.js";
 import { RIBBON_TABS, type RibbonGroupSpec, type RibbonTabSpec } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
-
-/** Tab row height in CSS pixels. Keep in step with `.sheetwrite-ribbon-tabs`. */
-const TAB_ROW_HEIGHT = 30;
-/** Group panel height in CSS pixels. Keep in step with `.sheetwrite-ribbon-panel`. */
-const PANEL_HEIGHT = 92;
 
 export interface RibbonOptions {
   /** Called after the ribbon is minimized to its tab row or expanded again. */
@@ -123,7 +119,7 @@ export class Ribbon {
 
   /** Height the owner reserves above the grid. */
   get height(): number {
-    return TAB_ROW_HEIGHT + (this.minimized ? 0 : PANEL_HEIGHT);
+    return RIBBON_TAB_ROW_HEIGHT + (this.minimized ? 0 : RIBBON_PANEL_HEIGHT);
   }
 
   destroy(): void {
