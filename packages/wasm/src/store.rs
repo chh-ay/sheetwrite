@@ -1,7 +1,8 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
 
-use std::cell::Cell;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::mem::size_of;
 
 use wasm_bindgen::prelude::*;
 
@@ -257,13 +258,13 @@ pub struct CellStore {
     pub(crate) sheets: Vec<SheetData>,
     pub(crate) sheet_names: Vec<String>,
     pub(crate) sheet_alive: Vec<bool>,
-    /// Live sheet handles in workbook tab order. 3-D references span the tabs
-    /// between their endpoints; new sheets append until the host reorders.
-    pub(crate) sheet_order: Vec<u32>,
-    /// Set when a formula with a 3-D reference is ingested; cleared when a
-    /// tab-order refresh finds none. Workbooks without 3-D references skip
-    /// the formula scan on every tab move, insert and removal.
-    sheet_spans_present: Cell<bool>,
+    /// Live sheet handles in workbook tab order, which 3-D references span.
+    /// `None` means ascending handle order: tabs that were only ever appended
+    /// cost one pointer and no heap. The list exists once the host reorders.
+    // Boxed so the field stays one pointer: a bare `Vec` header would grow
+    // every store, and most workbooks never reorder tabs.
+    #[allow(clippy::box_collection)]
+    sheet_order: Option<Box<Vec<u32>>>,
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringStorage,
@@ -346,8 +347,7 @@ impl CellStore {
             sheets: Vec::new(),
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
-            sheet_order: Vec::new(),
-            sheet_spans_present: Cell::new(false),
+            sheet_order: None,
             sheet_lookup: HashMap::new(),
             sheet_ids: HashMap::new(),
             strings: StringStorage::new(),
@@ -446,7 +446,9 @@ impl CellStore {
         ));
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
-        self.sheet_order.push(index as u32);
+        if let Some(order) = &mut self.sheet_order {
+            order.push(index as u32);
+        }
 
         index
     }
@@ -811,7 +813,9 @@ impl CellStore {
         self.sheets[sheet] = SheetData::new(0, 0);
         self.conditional_rules.remove_sheet(sheet);
         self.sheet_alive[sheet] = false;
-        self.sheet_order.retain(|&tab| tab != sheet as u32);
+        if let Some(order) = &mut self.sheet_order {
+            order.retain(|&tab| tab != sheet as u32);
+        }
         for span_sheet in self.refresh_sheet_spans() {
             if !affected.contains(&span_sheet) {
                 affected.push(span_sheet);
@@ -839,7 +843,8 @@ impl CellStore {
     #[wasm_bindgen(js_name = setSheetOrder)]
     pub fn set_sheet_order(&mut self, order: &[u32]) -> bool {
         let mut seen = vec![false; self.sheet_alive.len()];
-        let valid = order.len() == self.sheet_order.len()
+        let current = self.tab_order();
+        let valid = order.len() == current.len()
             && order.iter().all(|&handle| {
                 let index = handle as usize;
                 let fresh = self.sheet_alive.get(index).copied().unwrap_or(false) && !seen[index];
@@ -851,17 +856,31 @@ impl CellStore {
         if !valid {
             return false;
         }
-        if order == self.sheet_order.as_slice() {
+        if order == current.as_ref() {
             return true;
         }
 
-        self.sheet_order.clear();
-        self.sheet_order.extend_from_slice(order);
+        self.sheet_order = Some(Box::new(order.to_vec()));
         let affected = self.refresh_sheet_spans();
         if !affected.is_empty() {
             self.recompute_seed_sheets(&affected);
         }
         true
+    }
+
+    /// Row and column pairs of the formulas on `sheet` that hold a 3-D
+    /// reference. A tab move can rewrite their text, so the host records
+    /// their sources before the move to undo it exactly.
+    #[wasm_bindgen(js_name = sheetSpanFormulaCells)]
+    pub fn sheet_span_formula_cells(&self, sheet: usize) -> Vec<u32> {
+        let Some(data) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        data.formulas
+            .iter()
+            .filter(|(_, entry)| entry.ast.as_ref().is_some_and(ast_contains_sheet_span))
+            .flat_map(|((row, col), _)| [row, col])
+            .collect()
     }
 
     #[wasm_bindgen(js_name = isSheetAlive)]
@@ -3261,7 +3280,10 @@ impl CellStore {
             metadata.add_payload(name.len(), name.capacity());
         }
         metadata.add_vec::<bool>(self.sheet_alive.len(), self.sheet_alive.capacity());
-        metadata.add_vec::<u32>(self.sheet_order.len(), self.sheet_order.capacity());
+        if let Some(order) = &self.sheet_order {
+            metadata.add_payload(size_of::<Vec<u32>>(), size_of::<Vec<u32>>());
+            metadata.add_vec::<u32>(order.len(), order.capacity());
+        }
         metadata.add_hash_table::<String, usize>(self.sheet_ids.len(), self.sheet_ids.capacity());
         for id in self.sheet_ids.keys() {
             metadata.add_payload(id.len(), id.capacity());
@@ -3297,7 +3319,9 @@ impl CellStore {
         self.sheets.push(sheet);
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
-        self.sheet_order.push(index as u32);
+        if let Some(order) = &mut self.sheet_order {
+            order.push(index as u32);
+        }
         Ok(index)
     }
 
@@ -3534,10 +3558,7 @@ impl CellStore {
                     .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
                     .map(|&index| index as u32)
             },
-            &|span| {
-                self.sheet_spans_present.set(true);
-                place_span(span, &self.sheet_order)
-            },
+            &|span| place_span(span, &self.tab_order()),
         ) {
             Ok(ast) => ast,
             Err(_) => return FormulaEntry::error(source, FormulaError::Ref),
@@ -3676,17 +3697,28 @@ impl CellStore {
         self.recompute_seed_sheets(&seeds);
     }
 
+    /// Live sheet handles in tab order.
+    pub(crate) fn tab_order(&self) -> Cow<'_, [u32]> {
+        match &self.sheet_order {
+            Some(order) => Cow::Borrowed(order.as_slice()),
+            None => Cow::Owned(
+                (0..self.sheet_alive.len() as u32)
+                    .filter(|&handle| self.sheet_alive[handle as usize])
+                    .collect(),
+            ),
+        }
+    }
+
     /// Re-places every 3-D reference after the tab order changed or a sheet
-    /// was removed. A changed formula is replaced through the dependency
-    /// index, which patches only that formula's reads, and is marked dirty.
-    /// Returns the sheets whose formulas changed.
+    /// was removed. Both are rare structural edits that already walk every
+    /// formula, so the scan keeps no per-store index of 3-D formulas. A
+    /// changed formula is replaced through the dependency index, which
+    /// patches only that formula's reads, and is marked dirty. Returns the
+    /// sheets whose formulas changed.
     fn refresh_sheet_spans(&mut self) -> Vec<usize> {
         let mut affected = Vec::new();
-        if !self.sheet_spans_present.get() {
-            return affected;
-        }
+        let order = self.tab_order().into_owned();
 
-        let mut spans_present = false;
         for (sheet, data) in self.sheets.iter_mut().enumerate() {
             if !self.sheet_alive[sheet] {
                 continue;
@@ -3697,14 +3729,13 @@ impl CellStore {
                 .filter(|(_, entry)| entry.ast.as_ref().is_some_and(ast_contains_sheet_span))
                 .map(|(key, _)| key)
                 .collect();
-            spans_present |= !keys.is_empty();
 
             let mut changed = false;
             for key in keys {
                 let Some(mut entry) = data.formulas.get(key).cloned() else {
                     continue;
                 };
-                if !entry.refresh_sheet_spans(&self.sheet_order, &self.sheet_names, sheet as u32) {
+                if !entry.refresh_sheet_spans(&order, &self.sheet_names, sheet as u32) {
                     continue;
                 }
                 self.graph
@@ -3717,7 +3748,6 @@ impl CellStore {
             }
         }
 
-        self.sheet_spans_present.set(spans_present);
         affected
     }
 

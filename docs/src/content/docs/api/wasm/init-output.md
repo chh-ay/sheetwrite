@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L505"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L505</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/wasm/pkg/sheetwrite_wasm.d.ts#L511"><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L511</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -118,6 +118,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-spill-blockers"><code>cellstore_setSpillBlockers</code></a>
 <a href="#init-output-cellstore-set-string"><code>cellstore_setString</code></a>
 <a href="#init-output-cellstore-set-table"><code>cellstore_setTable</code></a>
+<a href="#init-output-cellstore-sheet-span-formula-cells"><code>cellstore_sheetSpanFormulaCells</code></a>
 <a href="#init-output-cellstore-snapshot-numbers"><code>cellstore_snapshotNumbers</code></a>
 <a href="#init-output-cellstore-snapshot-texts"><code>cellstore_snapshotTexts</code></a>
 <a href="#init-output-cellstore-sort-rows"><code>cellstore_sortRows</code></a>
@@ -160,7 +161,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>146</span>
+## Members <span class="api-count" data-pagefind-ignore>147</span>
 
 <div class="api-member-list">
 
@@ -1114,6 +1115,15 @@ readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: nu
 
 ```ts generated
 readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-sheet-span-formula-cells" data-pagefind-weight="1">
+<summary><code>cellstore_sheetSpanFormulaCells</code></summary>
+
+```ts generated
+readonly cellstore_sheetSpanFormulaCells: (a: number, b: number) => [number, number];
 ```
 
 </details>
@@ -2106,6 +2116,10 @@ export interface InitOutput {
     o: number,
     p: number,
   ) => number;
+  readonly cellstore_sheetSpanFormulaCells: (
+    a: number,
+    b: number,
+  ) => [number, number];
   readonly cellstore_snapshotNumbers: (
     a: number,
     b: number,

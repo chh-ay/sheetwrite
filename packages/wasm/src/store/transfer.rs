@@ -139,10 +139,13 @@ impl CellStore {
         }
 
         // Formulas below are parsed again, and their 3-D references are
-        // placed in this order.
-        store.sheet_order = (0..input.count()?)
+        // placed in this order. Handle order stays implicit, as it was.
+        let order = (0..input.count()?)
             .map(|_| input.u32())
-            .collect::<TransferResult<_>>()?;
+            .collect::<TransferResult<Vec<_>>>()?;
+        if order != store.tab_order().as_ref() {
+            store.sheet_order = Some(Box::new(order));
+        }
 
         store.sheet_lookup = read_names(&mut input)?;
         store.sheet_ids = read_names(&mut input)?;
@@ -243,8 +246,9 @@ impl CellStore {
             out.bool(alive);
         }
 
-        out.usize(self.sheet_order.len());
-        for &handle in &self.sheet_order {
+        let order = self.tab_order();
+        out.usize(order.len());
+        for &handle in order.iter() {
             out.u32(handle);
         }
 

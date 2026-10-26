@@ -100,6 +100,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-spill-blockers"><code>setSpillBlockers</code></a>
 <a href="#cell-store-set-string"><code>setString</code></a>
 <a href="#cell-store-set-table"><code>setTable</code></a>
+<a href="#cell-store-sheet-span-formula-cells"><code>sheetSpanFormulaCells</code></a>
 <a href="#cell-store-snapshot-numbers"><code>snapshotNumbers</code></a>
 <a href="#cell-store-snapshot-texts"><code>snapshotTexts</code></a>
 <a href="#cell-store-sort-rows"><code>sortRows</code></a>
@@ -114,7 +115,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>100</span>
+## Members <span class="api-count" data-pagefind-ignore>101</span>
 
 <div class="api-member-list">
 
@@ -1041,6 +1042,18 @@ setTable: (id: string, name: string, sheet: number, row_start: number, col_start
 
 </details>
 
+<details class="api-member" id="cell-store-sheet-span-formula-cells" data-pagefind-weight="1">
+<summary><code>sheetSpanFormulaCells</code> <span class="api-member-summary">Row and column pairs of the formulas on sheet that hold a 3-D reference.</span></summary>
+
+```ts generated
+sheetSpanFormulaCells: (sheet: number) => Uint32Array;
+```
+
+<p class="api-member-doc">Row and column pairs of the formulas on `sheet` that hold a 3-D
+reference. A tab move can rewrite their text, so the host records
+their sources before the move to undo it exactly.</p>
+</details>
+
 <details class="api-member" id="cell-store-snapshot-numbers" data-pagefind-weight="1">
 <summary><code>snapshotNumbers</code></summary>
 
@@ -1544,6 +1557,7 @@ class CellStore {
     column_ids: string[],
     column_names: string[],
   ) => boolean;
+  sheetSpanFormulaCells: (sheet: number) => Uint32Array;
   snapshotNumbers: (snapshot: RangeSnapshot) => Float64Array;
   snapshotTexts: (snapshot: RangeSnapshot) => string[];
   sortRows: (sheet: number, col: number, ascending: boolean) => Uint32Array;
