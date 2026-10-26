@@ -219,10 +219,13 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
     "svelte-initial",
     "worker-async",
     "xlsx-async",
+    "chrome-async",
   ],
-  webpack: ["core-initial", "worker-async"],
+  webpack: ["core-initial", "worker-async", "chrome-async"],
   next: ["core-initial"],
 };
+/** Lazily loaded roles; an asset that also belongs to an initial entry defeats the split. */
+const ASYNC_ROLES = new Set(["worker-async", "xlsx-async", "chrome-async"]);
 const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
 const COMPARABLE_ENTRY = "core-first-paint";
 const SUBPATH_CANDIDATES = ["sync", "collaboration", "rebase", "persistence"] as const;
@@ -392,7 +395,7 @@ export function validateBundlerEvidence(value: unknown): BundlerEvidence {
   const initialRoles = new Set(["core-initial", "react-initial", "vue-initial", "svelte-initial"]);
   for (const asset of assets) {
     if (
-      (asset.roles.includes("worker-async") || asset.roles.includes("xlsx-async")) &&
+      asset.roles.some((role) => ASYNC_ROLES.has(role)) &&
       asset.roles.some((role) => initialRoles.has(role))
     ) {
       throw new Error(`${bundler} async asset ${asset.path} leaked into an initial entry`);
