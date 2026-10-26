@@ -588,6 +588,9 @@ describe("layoutTextLines", () => {
       12,
       ["word word ", "word word ", "word word"],
     ],
+    // The fake measure counts code units, so a cluster is wider than the cell.
+    ["keeps an emoji ZWJ sequence whole", "ab 👨‍👩‍👧‍👦 cd", 4, ["ab ", "👨‍👩‍👧‍👦", " cd"]],
+    ["keeps a combining mark with its letter", "cafe\u0301s", 4, ["caf", "e\u0301s"]],
   ])("%s", (_, text, width, expected) => {
     expect(layoutTextLines(monospace, text, width)).toEqual(expected);
   });
