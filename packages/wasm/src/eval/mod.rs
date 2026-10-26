@@ -456,40 +456,111 @@ struct StaleReader {
     approximate: bool,
 }
 
+/// The spill outputs changed in one round, sorted by sheet and first row,
+/// with a max tree over their last rows. A read visits only outputs whose
+/// row band meets its own, so checking n readers against m changes costs
+/// about (n + k) log m for k row-overlapping pairs instead of n * m.
+struct ChangedOutputs {
+    outputs: Vec<(CellRange, usize)>,
+    /// Node `i` holds the largest last row below it; its children are `2i`
+    /// and `2i + 1`, and leaf `leaves + k` is output `k`.
+    last_rows: Vec<u32>,
+    leaves: usize,
+    /// Tree nodes the reads visited. Tests read it to bound the check's
+    /// work, which no value can show.
+    #[cfg(test)]
+    visited: std::cell::Cell<usize>,
+}
+
+impl ChangedOutputs {
+    fn new(changes: &[SpillChange]) -> Self {
+        let mut outputs: Vec<(CellRange, usize)> = changes
+            .iter()
+            .filter_map(|change| {
+                let bounds = cells_bounds(change.sheet, &change.cells[..change.output_cells])?;
+                Some((bounds, change.sequence))
+            })
+            .collect();
+        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+
+        let leaves = outputs.len().next_power_of_two();
+        let mut last_rows = vec![0; leaves * 2];
+        for (index, (bounds, _)) in outputs.iter().enumerate() {
+            last_rows[leaves + index] = bounds.row_end;
+        }
+        for node in (1..leaves).rev() {
+            last_rows[node] = last_rows[2 * node].max(last_rows[2 * node + 1]);
+        }
+
+        Self {
+            outputs,
+            last_rows,
+            leaves,
+            #[cfg(test)]
+            visited: std::cell::Cell::new(0),
+        }
+    }
+
+    /// The latest change among the outputs that meet `read`.
+    fn latest_meeting(&self, read: CellRange) -> Option<usize> {
+        // Outputs of the read's sheet that start at or above its last row;
+        // the tree then skips those that end above its first row.
+        let first = self
+            .outputs
+            .partition_point(|(bounds, _)| bounds.sheet < read.sheet);
+        let end = self.outputs.partition_point(|(bounds, _)| {
+            (bounds.sheet, bounds.row_start) <= (read.sheet, read.row_end)
+        });
+
+        let mut latest = None;
+        if first < end {
+            self.visit(1, (0, self.leaves), (first, end), read, &mut latest);
+        }
+        latest
+    }
+
+    fn visit(
+        &self,
+        node: usize,
+        (start, stop): (usize, usize),
+        (first, end): (usize, usize),
+        read: CellRange,
+        latest: &mut Option<usize>,
+    ) {
+        if stop <= first || end <= start || self.last_rows[node] < read.row_start {
+            return;
+        }
+
+        #[cfg(test)]
+        self.visited.set(self.visited.get() + 1);
+
+        if stop - start == 1 {
+            let (bounds, sequence) = self.outputs[start];
+            if ranges_intersect(read, bounds) {
+                *latest = (*latest).max(Some(sequence));
+            }
+            return;
+        }
+
+        let middle = start + (stop - start) / 2;
+        self.visit(2 * node, (start, middle), (first, end), read, latest);
+        self.visit(2 * node + 1, (middle, stop), (first, end), read, latest);
+    }
+}
+
 /// Runtime readers whose recorded reads meet a spill output changed in this
 /// round, each with the latest such change.
 fn stale_runtime_readers(
     readers: &FxHashMap<AbsCellKey, RuntimeReads>,
-    changes: &[SpillChange],
+    outputs: &ChangedOutputs,
 ) -> Vec<StaleReader> {
-    let outputs: Vec<(CellRange, usize)> = changes
-        .iter()
-        .filter_map(|change| {
-            let bounds = cells_bounds(change.sheet, &change.cells[..change.output_cells])?;
-            Some((bounds, change.sequence))
-        })
-        .collect();
-
-    // One envelope per sheet rejects most readers in a few comparisons, so
-    // a column of OFFSETs that read beside their spills stays linear; only
-    // readers inside an envelope are tested change by change.
-    let envelopes = sheet_envelopes(outputs.iter().map(|&(bounds, _)| bounds));
-
-    let meets = |reads: &[CellRange], target: CellRange| {
-        reads.iter().any(|&read| ranges_intersect(read, target))
-    };
     readers
         .iter()
-        .filter(|(_, reads)| {
-            envelopes
-                .iter()
-                .any(|&envelope| meets(&reads.ranges, envelope))
-        })
         .filter_map(|(&reader, reads)| {
-            outputs
+            reads
+                .ranges
                 .iter()
-                .filter(|&&(bounds, _)| meets(&reads.ranges, bounds))
-                .map(|&(_, sequence)| sequence)
+                .filter_map(|&read| outputs.latest_meeting(read))
                 .max()
                 .map(|changed_at| StaleReader {
                     reader,
@@ -885,7 +956,12 @@ impl CellStore {
 
             let mut stale_readers = Vec::new();
             if !runtime_readers.is_empty() {
-                stale_readers.extend(stale_runtime_readers(&runtime_readers, &spill_changes));
+                let outputs = ChangedOutputs::new(&spill_changes);
+                stale_readers.extend(stale_runtime_readers(&runtime_readers, &outputs));
+                #[cfg(test)]
+                {
+                    self.stale_reader_visits += outputs.visited.get();
+                }
             }
             for change in spill_changes {
                 stale_readers.extend(

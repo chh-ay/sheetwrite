@@ -272,6 +272,10 @@ pub struct CellStore {
     /// it to bound recalculation work, which no value can show.
     #[cfg(test)]
     pub(crate) recomputed_formulas: usize,
+    /// Changed-spill index nodes the stale runtime-reader check visited,
+    /// summed over passes. Tests read it to bound that check's work.
+    #[cfg(test)]
+    pub(crate) stale_reader_visits: usize,
 }
 
 /// Cell order of the flat input arrays of a packed block write.
@@ -348,6 +352,8 @@ impl CellStore {
             tables: HashMap::new(),
             #[cfg(test)]
             recomputed_formulas: 0,
+            #[cfg(test)]
+            stale_reader_visits: 0,
         }
     }
 

@@ -5118,6 +5118,50 @@ fn offset_indirect_merged_reads_do_not_report_a_false_cycle() {
 }
 
 #[test]
+fn offset_indirect_stale_reader_check_grows_with_readers_not_their_product() {
+    // Volatile two-cell spills on two sheets. Each reads the row between
+    // two spills: inside the area of all changed spills, but meeting none.
+    const SPILLS: usize = 2_000;
+    const ROWS: usize = SPILLS * 2;
+    // Work per read is a few index nodes per tree level.
+    const STEPS_PER_READ_LEVEL: usize = 4;
+
+    let mut store = CellStore::new();
+    let sheets = [store.add_sheet(6, ROWS), store.add_sheet(6, ROWS)];
+    for sheet in sheets {
+        for index in 0..SPILLS {
+            store.set_formula(sheet, index * 2, 0, "=OFFSET(B2,0,0,1,2)+RAND()", 0);
+        }
+    }
+    // D1 reads the last spill of the first sheet, which is installed after
+    // it. Only its runtime read links them, so the check must find that one
+    // change among all of them.
+    let last = ROWS - 2;
+    store.set_formula(
+        sheets[0],
+        0,
+        3,
+        &format!("=INDIRECT(\"B{0}:C{0}\")", last + 1),
+        0,
+    );
+    store.commit_sources();
+
+    let before = store.stale_reader_visits;
+    store.set_number(sheets[0], 1, 5, 1.0, 0);
+    store.commit_sources();
+    let steps = store.stale_reader_visits - before;
+
+    let changes = SPILLS * sheets.len();
+    let levels = changes.next_power_of_two().trailing_zeros() as usize + 1;
+    let bound = STEPS_PER_READ_LEVEL * (changes + 1) * levels;
+    assert!(steps <= bound, "{steps} steps, bound {bound}");
+    assert_eq!(
+        number(&store, sheets[0], 0, 3),
+        number(&store, sheets[0], last, 1)
+    );
+}
+
+#[test]
 fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
     let mut store = CellStore::new();
     let data = store.add_sheet(1, 1);
