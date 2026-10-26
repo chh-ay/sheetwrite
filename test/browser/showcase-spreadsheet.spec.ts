@@ -1,6 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import type { Grid } from "../../packages/core/src/types.js";
 import { siteUrl } from "./playwright.config.js";
+
+declare global {
+  interface Window {
+    __sheetwriteSpreadsheetGrid?: Grid;
+  }
+}
 
 const ROUTE = siteUrl("/showcases/spreadsheet/");
 
