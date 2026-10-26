@@ -1,8 +1,8 @@
 //! Formula sources, the cells awaiting recompute, and the cached dependency graph.
 //!
 //! [`SheetFormulas`] owns one sheet's formula entries and its dirty state.
-//! [`FormulaGraph`] owns the workbook dependency index and the epoch that says
-//! whether the cached index still describes the current entries.
+//! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
+//! with entry replacements, dropping it for rewrites it cannot patch.
 
 use std::collections::hash_set;
 
@@ -16,7 +16,7 @@ use crate::sheet::SheetData;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
-use crate::types::{CellKey, FormulaEntry};
+use crate::types::{AbsCellKey, CellKey, FormulaEntry};
 
 /// `FxHashSet::clear` walks every retained bucket, so a dirty set inflated by
 /// one giant paste is dropped instead of cleared; otherwise it would tax every
@@ -157,34 +157,29 @@ impl SheetFormulas {
         self.entries.keys().copied()
     }
 
-    /// Stores `entry` at `key` and reports whether the dependency graph read by
-    /// [`build_dep_index`] changed. A new formula cell always changes it; a
-    /// rewrite changes it only when its reads or array shape changed.
-    pub(crate) fn insert(&mut self, key: CellKey, entry: FormulaEntry) -> bool {
-        let changed = self
-            .entries
-            .get(&key)
-            .is_none_or(|previous| !DepIndex::dependency_graph_unchanged(previous, &entry));
+    /// Stores `entry` for a bulk load or a workbook-wide refresh whose caller
+    /// invalidates the [`FormulaGraph`] itself.
+    pub(crate) fn insert(&mut self, key: CellKey, entry: FormulaEntry) {
         self.entries.insert(key, entry);
-        changed
     }
 
-    /// Removes the entry at `key`; removing an existing entry always changes the
-    /// dependency graph.
-    #[inline]
-    pub(crate) fn remove(&mut self, key: CellKey) -> bool {
-        !self.entries.is_empty() && self.entries.remove(&key).is_some()
-    }
-
-    /// Replaces or removes the entry at `key`, reporting whether the dependency
-    /// graph changed.
-    pub(crate) fn replace(&mut self, key: CellKey, entry: Option<FormulaEntry>) -> bool {
-        match entry {
-            Some(entry) => self.insert(key, entry),
-            None => self.remove(key),
+    /// [`Self::insert`]'s counterpart for structural rewrites.
+    pub(crate) fn remove(&mut self, key: CellKey) {
+        if !self.entries.is_empty() {
+            self.entries.remove(&key);
         }
     }
 
+    /// Stores `entry` at `key`, or removes the formula there for `None`, and
+    /// returns the replaced entry so the dependency index can retire its reads.
+    /// Use [`FormulaGraph::replace_entry`], which keeps the index in step.
+    fn replace(&mut self, key: CellKey, entry: Option<FormulaEntry>) -> Option<FormulaEntry> {
+        match entry {
+            Some(entry) => self.entries.insert(key, entry),
+            None if self.entries.is_empty() => None,
+            None => self.entries.remove(&key),
+        }
+    }
     /// Applies a workbook-level rewrite (rename, sheet removal, structural shift
     /// of another sheet, table change) to every entry. The caller decides which
     /// cells the rewrite dirtied.
@@ -452,41 +447,92 @@ impl SheetFormulas {
     }
 }
 
-/// The workbook dependency index, rebuilt lazily when formula entries changed
-/// what it reads.
+/// The workbook dependency index and the edits it has not absorbed yet.
 ///
-/// Editors call [`Self::invalidate`] instead of rebuilding: many edits in one
-/// transaction then cost one rebuild at the recompute barrier. A stale index is
-/// retained until that rebuild, so its memory remains accounted.
+/// Source replacements go through [`Self::replace_entry`], which queues the
+/// replaced reads on the index; the recompute barrier applies the whole queue
+/// at once, so a transaction's edits share one grouped patch. Structural and
+/// workbook-wide rewrites call [`Self::invalidate`], which drops the index at
+/// once: it no longer describes the entries, and keeping it would only retain
+/// its memory until the rebuild.
 #[derive(Default)]
 pub(crate) struct FormulaGraph {
+    /// Counts invalidations, so each value names one built index.
     epoch: u64,
     index: Option<DepIndex>,
 }
 
 impl FormulaGraph {
-    /// Marks the cached index stale after an entry changed the graph.
+    /// Drops the index after a rewrite that cannot be patched per entry.
     pub(crate) fn invalidate(&mut self) {
         self.epoch += 1;
+        self.index = None;
     }
 
-    /// The index for the current entries, rebuilding a stale one first. The
-    /// stale index is dropped before the rebuild so both never coexist.
-    pub(crate) fn ensure_index(&mut self, sheets: &[SheetData]) -> &DepIndex {
-        let epoch = self.epoch;
-        if self
-            .index
-            .as_ref()
-            .is_some_and(|index| index.epoch != epoch)
-        {
-            self.index = None;
+    /// Stores `entry` at `key` on `sheet`, or removes the formula there for
+    /// `None`, and queues the change on the index before the replaced entry is
+    /// dropped. A rewrite that keeps every read and the array shape queues
+    /// nothing; one that pushes the queue past a substantial share of the
+    /// workbook's formulas invalidates instead, since a rebuild is then cheaper.
+    pub(crate) fn replace_entry(
+        &mut self,
+        formulas: &mut SheetFormulas,
+        sheet: usize,
+        key: CellKey,
+        entry: Option<FormulaEntry>,
+    ) {
+        let stores_formula = entry.is_some();
+        let previous = formulas.replace(key, entry);
+        // A literal written over a literal is the bulk-load case: skip the
+        // lookup of an entry that cannot exist.
+        if !stores_formula && previous.is_none() {
+            return;
         }
-        self.index
-            .get_or_insert_with(|| build_dep_index(sheets, epoch))
+
+        let next = if stores_formula {
+            formulas.get(key)
+        } else {
+            None
+        };
+        self.record_replacement(AbsCellKey::from_local(sheet, key), previous, next);
     }
 
-    /// The last built index, which is current only after [`Self::ensure_index`]
-    /// with no intervening invalidation.
+    /// The index half of [`Self::replace_entry`] for callers that changed the
+    /// entries themselves; `next` is the entry now stored at `formula`.
+    pub(crate) fn record_replacement(
+        &mut self,
+        formula: AbsCellKey,
+        previous: Option<FormulaEntry>,
+        next: Option<&FormulaEntry>,
+    ) {
+        let unchanged = match (&previous, next) {
+            (None, None) => true,
+            (Some(previous), Some(next)) => DepIndex::dependency_graph_unchanged(previous, next),
+            _ => false,
+        };
+        if unchanged {
+            return;
+        }
+        let Some(index) = &mut self.index else {
+            return;
+        };
+
+        index.queue_replacement(formula, previous, next);
+        if index.needs_rebuild() {
+            self.invalidate();
+        }
+    }
+
+    /// The index for the current entries: built if missing, otherwise patched
+    /// with the queued replacements.
+    pub(crate) fn ensure_index(&mut self, sheets: &[SheetData]) -> &DepIndex {
+        let index = self.index.get_or_insert_with(|| build_dep_index(sheets));
+        index.apply_pending(sheets);
+        index
+    }
+
+    /// The index as of the last [`Self::ensure_index`]; `None` after an
+    /// invalidation.
     pub(crate) fn index(&self) -> Option<&DepIndex> {
         self.index.as_ref()
     }

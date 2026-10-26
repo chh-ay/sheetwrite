@@ -24,7 +24,7 @@ pub(crate) const RANGE_CELL_LIMIT: u64 = 1_000_000;
 
 pub(crate) type CellKey = (u32, u32);
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct AbsCellKey {
     pub(crate) sheet: u32,
     pub(crate) row: u32,
@@ -142,7 +142,7 @@ impl Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct CellRange {
     pub(crate) sheet: u32,
     pub(crate) row_start: u32,

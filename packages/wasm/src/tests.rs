@@ -3595,7 +3595,7 @@ mod formula_dependency_epoch {
     }
 
     #[test]
-    fn formula_rewrite_with_new_reads_rebuilds_dependents() {
+    fn formula_rewrite_with_new_reads_patches_the_dependency_index() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(3, 2);
         store.set_number(sheet, 0, 0, 1.0, 0);
@@ -3606,9 +3606,10 @@ mod formula_dependency_epoch {
 
         let epoch_before = store.graph.epoch();
         store.set_formula(sheet, 0, 2, "=B1", 0);
-        assert!(
-            store.graph.epoch() > epoch_before,
-            "a changed read set must invalidate the dependency index"
+        assert_eq!(
+            store.graph.epoch(),
+            epoch_before,
+            "a changed read set must patch the dependency index, not rebuild it"
         );
         store.recompute(sheet);
         assert_close(number(&store, sheet, 0, 2), 2.0);

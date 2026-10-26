@@ -478,7 +478,7 @@ impl CellStore {
         if self
             .graph
             .index()
-            .is_some_and(|index| !index.has_dynamic_arrays)
+            .is_some_and(|index| !index.has_dynamic_arrays())
         {
             let mut pass = EvalPass {
                 affected: &affected,

@@ -1149,8 +1149,6 @@ impl CellStore {
             }
         }
 
-        let mut removed_formula = false;
-
         for col in c0..=c1 {
             for row in r0..=r1 {
                 if s.cells.is_paged() && !s.cells.is_loaded(row, col) {
@@ -1186,13 +1184,10 @@ impl CellStore {
                 }
                 if contents {
                     if let Some(key) = cell_key(row, col) {
-                        removed_formula |= s.formulas.remove(key);
+                        self.graph.replace_entry(&mut s.formulas, sheet, key, None);
                     }
                 }
             }
-        }
-        if removed_formula {
-            self.graph.invalidate();
         }
         if contents && (r1 - r0 + 1).saturating_mul(c1 - c0 + 1) > 1 {
             self.strings.request_collection();
@@ -1724,7 +1719,6 @@ impl CellStore {
 
         let limit = values.len().min(existing.cells.row_count() - start_row);
         let mut protected_index = 0usize;
-        let mut removed_formula = false;
         let mut wrote = false;
         let s = &mut self.sheets[sheet];
         s.spill.clear_all(&mut s.cells);
@@ -1745,14 +1739,11 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_NUMBER, encode_num(value), style) {
                 continue;
             }
-            removed_formula |= s.formulas.remove(key);
+            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
             wrote = true;
         }
         if wrote {
             s.formulas.mark_all_dirty();
-        }
-        if removed_formula {
-            self.graph.invalidate();
         }
     }
 
@@ -1782,7 +1773,6 @@ impl CellStore {
         let limit = utf16_lens.len().min(existing.cells.row_count() - start_row);
         let slices = utf16_slices(&buf, utf16_lens, limit);
         let mut protected_index = 0usize;
-        let mut removed_formula = false;
         let mut wrote = false;
         let s = &mut self.sheets[sheet];
         s.spill.clear_all(&mut s.cells);
@@ -1808,14 +1798,11 @@ impl CellStore {
             if !s.hydrate_cell(row, col, KIND_STRING, encode_str_id(id), style) {
                 continue;
             }
-            removed_formula |= s.formulas.remove(key);
+            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
             wrote = true;
         }
         if wrote {
             self.sheets[sheet].formulas.mark_all_dirty();
-        }
-        if removed_formula {
-            self.graph.invalidate();
         }
     }
 
@@ -1830,51 +1817,44 @@ impl CellStore {
         style: u32,
     ) {
         let dirty_revision = self.local_dirty_revision();
-        let removed_formula = {
-            let Some(s) = self.sheets.get_mut(sheet) else {
-                return;
-            };
-            if col >= s.cells.n_cols() || start_row >= s.cells.row_count() {
-                return;
-            }
-
-            let limit = values.len().min(s.cells.row_count() - start_row);
-            if let Some(revision) = dirty_revision {
-                if !s
-                    .cells
-                    .prepare_dirty_rect(start_row, col, limit, 1, revision)
-                {
-                    return;
-                }
-            }
-            if limit > 0 {
-                if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
-                    prepare_rect_write(s, rect);
-                }
-            }
-
-            let mut removed_formula = false;
-            for (offset, &value) in values.iter().take(limit).enumerate() {
-                let row = start_row + offset;
-                let Some(key) = cell_key(row, col) else {
-                    continue;
-                };
-                if !s.cells.write_cell(
-                    row,
-                    col,
-                    KIND_NUMBER,
-                    encode_num(value),
-                    style,
-                    dirty_revision,
-                ) {
-                    return;
-                }
-                removed_formula |= s.formulas.remove(key);
-            }
-            removed_formula
+        let Some(s) = self.sheets.get_mut(sheet) else {
+            return;
         };
-        if removed_formula {
-            self.graph.invalidate();
+        if col >= s.cells.n_cols() || start_row >= s.cells.row_count() {
+            return;
+        }
+
+        let limit = values.len().min(s.cells.row_count() - start_row);
+        if let Some(revision) = dirty_revision {
+            if !s
+                .cells
+                .prepare_dirty_rect(start_row, col, limit, 1, revision)
+            {
+                return;
+            }
+        }
+        if limit > 0 {
+            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
+                prepare_rect_write(s, rect);
+            }
+        }
+
+        for (offset, &value) in values.iter().take(limit).enumerate() {
+            let row = start_row + offset;
+            let Some(key) = cell_key(row, col) else {
+                continue;
+            };
+            if !s.cells.write_cell(
+                row,
+                col,
+                KIND_NUMBER,
+                encode_num(value),
+                style,
+                dirty_revision,
+            ) {
+                return;
+            }
+            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
         }
     }
 
@@ -1966,13 +1946,11 @@ impl CellStore {
         }
         let slices = utf16_slices(&buf, utf16_lens, limit);
 
-        let mut removed_formula = false;
         if limit > 0 {
             if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
                 prepare_rect_write(&mut self.sheets[sheet], rect);
             }
         }
-
         for (offset, text) in slices.iter().enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1990,10 +1968,7 @@ impl CellStore {
             ) {
                 return;
             }
-            removed_formula |= s.formulas.remove(key);
-        }
-        if removed_formula {
-            self.graph.invalidate();
+            self.graph.replace_entry(&mut s.formulas, sheet, key, None);
         }
     }
 
@@ -3175,14 +3150,12 @@ impl CellStore {
         if !written {
             return false;
         }
-        let graph_changed = sheet_data.formulas.replace(key, source);
+        self.graph
+            .replace_entry(&mut sheet_data.formulas, sheet, key, source);
         if hydrating {
             sheet_data.formulas.mark_all_dirty();
         } else if !prepared_rect {
             sheet_data.formulas.mark_cell_dirty(key);
-        }
-        if graph_changed {
-            self.graph.invalidate();
         }
         true
     }

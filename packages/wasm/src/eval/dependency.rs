@@ -1,5 +1,6 @@
 //! Formula dependency indexes, affected-set growth, and depth/cycle checks.
 
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -8,15 +9,35 @@ use crate::graph::{DirtyRect, DirtySeeds};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
-    AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, EvalResult, FormulaEntry, FormulaError, ReadSet, Value,
+    FORMULA_RECURSION_LIMIT,
 };
 
+/// Queued formula changes always patch the index below this count. Above it, a
+/// batch changing more than `1 / PATCH_FORMULA_DIVISOR` of the workbook's
+/// formulas rebuilds instead: its removals and additions then cost about what
+/// one rebuild pass does, and the queue would retain that many old read sets.
+const PATCH_FORMULA_FLOOR: usize = 256;
+const PATCH_FORMULA_DIVISOR: usize = 4;
+
+/// Which formulas read each cell exactly and each range, workbook-wide.
+///
+/// Source replacements patch it through [`Self::queue_replacement`] and
+/// [`Self::apply_pending`]; [`build_dep_index`] runs only for a missing index.
 pub(crate) struct DepIndex {
     exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
+    /// Sorted by range, so a group's position is its id and a patch finds a
+    /// group by binary search instead of through a second range-keyed map.
     range_groups: Vec<RangeGroup>,
     range_sheets: Vec<RangeSheetIndex>,
-    pub(crate) epoch: u64,
-    pub(super) has_dynamic_arrays: bool,
+    /// Formulas changed since the last [`Self::apply_pending`], each with the
+    /// reads the index still records for it. Those reads move out of the
+    /// replaced entry, so queueing a change copies no read set.
+    pending: FxHashMap<AbsCellKey, ReadSet>,
+    formulas: usize,
+    dynamic_array_formulas: usize,
+    /// A patch never clears this: a stale `true` only runs the depth check,
+    /// while a wrong `false` would skip cycle detection.
     has_formula_dependencies: bool,
 }
 
@@ -92,15 +113,235 @@ impl DepIndex {
                 sheet.col_intervals.capacity(),
             );
         }
+        nodes.add_hash_table::<AbsCellKey, ReadSet>(self.pending.len(), self.pending.capacity());
+        for reads in self.pending.values() {
+            edges.add_vec::<AbsCellKey>(reads.cells.len(), reads.cells.capacity());
+            edges.add_vec::<CellRange>(reads.ranges.len(), reads.ranges.capacity());
+        }
         (nodes, edges)
+    }
+
+    pub(super) fn has_dynamic_arrays(&self) -> bool {
+        self.dynamic_array_formulas > 0
+    }
+
+    /// Queues the replacement of `formula`'s `previous` entry by `next`, the
+    /// entry now stored. Only the first change since the last
+    /// [`Self::apply_pending`] keeps `previous`'s reads, because only those are
+    /// in the index; the formula and array counts move with every change.
+    pub(crate) fn queue_replacement(
+        &mut self,
+        formula: AbsCellKey,
+        previous: Option<FormulaEntry>,
+        next: Option<&FormulaEntry>,
+    ) {
+        if let Some(previous) = &previous {
+            self.formulas -= 1;
+            self.dynamic_array_formulas -= usize::from(previous.produces_array());
+        }
+        if let Some(next) = next {
+            self.formulas += 1;
+            self.dynamic_array_formulas += usize::from(next.produces_array());
+        }
+
+        self.pending
+            .entry(formula)
+            .or_insert_with(|| previous.map(|entry| entry.reads).unwrap_or_default());
+    }
+
+    /// Whether the queue covers enough formulas that a rebuild beats a patch.
+    pub(crate) fn needs_rebuild(&self) -> bool {
+        self.pending.len() > PATCH_FORMULA_FLOOR.max(self.formulas / PATCH_FORMULA_DIVISOR)
+    }
+
+    /// Moves the queued formulas' edges from their old reads to the reads of
+    /// their current entries in `sheets`.
+    ///
+    /// Removals are grouped by target, so each touched reader list is filtered
+    /// once however many of its readers changed: O(touched list lengths +
+    /// changed reads · log changed reads), never one list scan per reader. All
+    /// removals run before any addition, so a read kept across the change is
+    /// removed and re-added without diffing old reads against new ones.
+    pub(crate) fn apply_pending(&mut self, sheets: &[SheetData]) {
+        if self.pending.is_empty() {
+            return;
+        }
+
+        let pending = std::mem::take(&mut self.pending);
+        if self.range_sheets.len() < sheets.len() {
+            self.range_sheets
+                .resize_with(sheets.len(), RangeSheetIndex::default);
+        }
+
+        let mut exact_removals = Vec::new();
+        let mut range_edges = Vec::new();
+        for (&formula, reads) in &pending {
+            exact_removals.extend(reads.cells.iter().map(|&cell| (cell, formula)));
+            range_edges.extend(reads.ranges.iter().map(|&range| (range, formula)));
+        }
+        self.remove_exact_readers(&mut exact_removals);
+        let emptied_group = self.remove_range_readers(&mut range_edges);
+
+        range_edges.clear();
+        for &formula in pending.keys() {
+            let Some(entry) = formula_entry(sheets, formula) else {
+                continue;
+            };
+
+            self.has_formula_dependencies = self.has_formula_dependencies
+                || !entry.reads.ranges.is_empty()
+                || self.exact_dependents.contains_key(&formula);
+            for &cell in &entry.reads.cells {
+                self.has_formula_dependencies =
+                    self.has_formula_dependencies || formula_exists(sheets, cell);
+                self.exact_dependents.entry(cell).or_default().push(formula);
+            }
+            range_edges.extend(entry.reads.ranges.iter().map(|&range| (range, formula)));
+        }
+
+        let added_groups = self.add_range_readers(&mut range_edges);
+        if emptied_group || !added_groups.is_empty() {
+            self.regroup(added_groups);
+        }
+    }
+
+    /// Drops every `(target, reader)` edge, filtering each target's list once.
+    fn remove_exact_readers(&mut self, removals: &mut [(AbsCellKey, AbsCellKey)]) {
+        removals.sort_unstable();
+        for run in removals.chunk_by(|a, b| a.0 == b.0) {
+            let target = run[0].0;
+            let Some(readers) = self.exact_dependents.get_mut(&target) else {
+                continue;
+            };
+
+            readers.retain(|reader| !run_removes(run, reader));
+            if readers.is_empty() {
+                self.exact_dependents.remove(&target);
+            }
+        }
+    }
+
+    /// Range counterpart of [`Self::remove_exact_readers`]. Reports whether a
+    /// group lost its last reader; [`Self::regroup`] drops such groups.
+    fn remove_range_readers(&mut self, removals: &mut [(CellRange, AbsCellKey)]) -> bool {
+        removals.sort_unstable();
+        let mut emptied = false;
+        for run in removals.chunk_by(|a, b| a.0 == b.0) {
+            let Ok(group) = self.find_range_group(run[0].0) else {
+                continue;
+            };
+
+            let readers = &mut self.range_groups[group].dependents;
+            readers.retain(|reader| !run_removes(run, reader));
+            emptied |= readers.is_empty();
+        }
+        emptied
+    }
+
+    /// Adds every `(range, reader)` edge to the group for its range and returns
+    /// the ranges no group covers yet as new groups, sorted by range.
+    fn add_range_readers(&mut self, additions: &mut [(CellRange, AbsCellKey)]) -> Vec<RangeGroup> {
+        additions.sort_unstable();
+        let mut added = Vec::new();
+        for run in additions.chunk_by(|a, b| a.0 == b.0) {
+            let range = run[0].0;
+            let readers = run.iter().map(|&(_, reader)| reader);
+            match self.find_range_group(range) {
+                Ok(group) => self.range_groups[group].dependents.extend(readers),
+                Err(_) => added.push(RangeGroup {
+                    range,
+                    dependents: readers.collect(),
+                }),
+            }
+        }
+        added
+    }
+
+    fn find_range_group(&self, range: CellRange) -> Result<usize, usize> {
+        self.range_groups
+            .binary_search_by(|group| group.range.cmp(&range))
+    }
+
+    /// Merges `added` into the sorted groups, drops groups left without
+    /// readers, and renumbers the interval lists to match. Group ids are
+    /// positions, so any insertion or removal shifts later ids; doing all of
+    /// them in one merge keeps a batch at O(groups + intervals + k log k) for k
+    /// new groups instead of one shift per changed range.
+    fn regroup(&mut self, added: Vec<RangeGroup>) {
+        let previous = std::mem::take(&mut self.range_groups);
+        let emptied = previous
+            .iter()
+            .filter(|group| group.dependents.is_empty())
+            .count();
+        let mut remap = Vec::with_capacity(previous.len());
+        let mut groups = Vec::with_capacity(previous.len() - emptied + added.len());
+        let mut added_ids = Vec::with_capacity(added.len());
+        let mut added = added.into_iter().peekable();
+        for group in previous {
+            while let Some(new) = added.next_if(|new| new.range < group.range) {
+                added_ids.push(groups.len());
+                groups.push(new);
+            }
+            if group.dependents.is_empty() {
+                remap.push(None);
+            } else {
+                remap.push(Some(groups.len()));
+                groups.push(group);
+            }
+        }
+        for new in added {
+            added_ids.push(groups.len());
+            groups.push(new);
+        }
+        self.range_groups = groups;
+
+        // Remapping is monotonic, so retained intervals stay sorted.
+        for sheet in &mut self.range_sheets {
+            for intervals in [&mut sheet.row_intervals, &mut sheet.col_intervals] {
+                intervals.retain_mut(|interval| match remap[interval.group] {
+                    Some(group) => {
+                        interval.group = group;
+                        true
+                    }
+                    None => false,
+                });
+            }
+        }
+
+        let groups = &self.range_groups;
+        for ids in added_ids.chunk_by(|&a, &b| groups[a].range.sheet == groups[b].range.sheet) {
+            let Some(sheet) = self
+                .range_sheets
+                .get_mut(groups[ids[0]].range.sheet as usize)
+            else {
+                continue;
+            };
+
+            let (rows, cols) = ids
+                .iter()
+                .map(|&group| {
+                    let range = groups[group].range;
+                    (
+                        RangeInterval::new(range.row_start, range.row_end, group),
+                        RangeInterval::new(range.col_start, range.col_end, group),
+                    )
+                })
+                .unzip();
+            merge_intervals(&mut sheet.row_intervals, rows);
+            merge_intervals(&mut sheet.col_intervals, cols);
+        }
+
+        for sheet in &mut self.range_sheets {
+            accumulate_max_end(&mut sheet.row_intervals);
+            accumulate_max_end(&mut sheet.col_intervals);
+        }
     }
 
     /// Whether rewriting one formula entry leaves every field
     /// [`build_dep_index`] reads unchanged.
     ///
-    /// When this holds, the cached index still describes the rewritten
-    /// formula, so source replacement keeps the current formula epoch and the next
-    /// recompute skips the whole-workbook rebuild. The formula cell itself is
+    /// When this holds, the index still describes the rewritten formula, so
+    /// source replacement queues no patch for it. The formula cell itself is
     /// still marked dirty, so it is always re-evaluated.
     ///
     /// An entry with a parse or resolution error carries no reads and no AST,
@@ -153,18 +394,19 @@ impl RangeInterval {
     }
 }
 
-/// Build the whole-workbook dependency index for `epoch`.
+/// Build the whole-workbook dependency index.
 ///
 /// The fields this function reads from each formula entry -- the read cells,
 /// the read ranges and whether the AST produces an array -- are also compared
 /// by [`DepIndex::dependency_graph_unchanged`], which lets a formula rewrite
-/// keep the cached index when none of them changed. A new dependency-relevant
-/// field must be added to that comparison too, or the epoch will not advance
-/// when it changes.
-pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
+/// skip the patch when none of them changed, and are what
+/// [`DepIndex::apply_pending`] and [`DepIndex::queue_replacement`] patch. A new
+/// dependency-relevant field must be added to all three, or a replacement that
+/// changes it will leave the index stale.
+pub(crate) fn build_dep_index(sheets: &[SheetData]) -> DepIndex {
     let mut exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>> = FxHashMap::default();
     let mut range_dependents: FxHashMap<CellRange, Vec<AbsCellKey>> = FxHashMap::default();
-    let mut has_dynamic_arrays = false;
+    let mut dynamic_array_formulas = 0;
     let formula_cells: FxHashSet<AbsCellKey> = sheets
         .iter()
         .enumerate()
@@ -178,7 +420,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
 
     for (sheet_index, sheet) in sheets.iter().enumerate() {
         for (formula_cell, entry) in sheet.formulas.iter() {
-            has_dynamic_arrays |= entry.produces_array();
+            dynamic_array_formulas += usize::from(entry.produces_array());
             let formula_abs = AbsCellKey::from_local(sheet_index, formula_cell);
             for &cell in &entry.reads.cells {
                 exact_dependents.entry(cell).or_default().push(formula_abs);
@@ -195,13 +437,15 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
         }
     }
 
-    let mut range_groups = Vec::with_capacity(range_dependents.len());
+    let mut range_groups: Vec<RangeGroup> = range_dependents
+        .into_iter()
+        .map(|(range, dependents)| RangeGroup { range, dependents })
+        .collect();
+    range_groups.sort_unstable_by_key(|group| group.range);
     let mut range_sheets: Vec<RangeSheetIndex> = (0..sheets.len())
         .map(|_| RangeSheetIndex::default())
         .collect();
-    for (range, dependents) in range_dependents {
-        let group = range_groups.len();
-        range_groups.push(RangeGroup { range, dependents });
+    for (group, RangeGroup { range, .. }) in range_groups.iter().enumerate() {
         if let Some(sheet) = range_sheets.get_mut(range.sheet as usize) {
             sheet
                 .row_intervals
@@ -219,24 +463,60 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
         exact_dependents,
         range_groups,
         range_sheets,
-        epoch,
-        has_dynamic_arrays,
+        pending: FxHashMap::default(),
+        formulas: formula_cells.len(),
+        dynamic_array_formulas,
         has_formula_dependencies,
     }
 }
 
 fn prepare_interval_index(intervals: &mut [RangeInterval]) {
-    intervals.sort_unstable_by(|a, b| {
-        a.start
-            .cmp(&b.start)
-            .then_with(|| a.end.cmp(&b.end))
-            .then_with(|| a.group.cmp(&b.group))
-    });
+    intervals.sort_unstable_by(interval_order);
+    accumulate_max_end(intervals);
+}
+
+fn interval_order(a: &RangeInterval, b: &RangeInterval) -> Ordering {
+    (a.start, a.end, a.group).cmp(&(b.start, b.end, b.group))
+}
+
+fn accumulate_max_end(intervals: &mut [RangeInterval]) {
     let mut max_end = 0;
     for interval in intervals {
         max_end = max_end.max(interval.end);
         interval.max_end = max_end;
     }
+}
+
+/// Inserts `added` into the sorted `intervals` by merging from the back, so
+/// the vector grows in place and the existing intervals are never copied to
+/// scratch space. `max_end` is left for [`accumulate_max_end`].
+fn merge_intervals(intervals: &mut Vec<RangeInterval>, mut added: Vec<RangeInterval>) {
+    let Some(&filler) = added.first() else {
+        return;
+    };
+
+    added.sort_unstable_by(interval_order);
+    let mut kept = intervals.len();
+    intervals.resize(kept + added.len(), filler);
+    for write in (0..intervals.len()).rev() {
+        let Some(&next) = added.last() else {
+            break;
+        };
+
+        if kept > 0 && interval_order(&intervals[kept - 1], &next).is_gt() {
+            kept -= 1;
+            intervals[write] = intervals[kept];
+        } else {
+            intervals[write] = next;
+            added.pop();
+        }
+    }
+}
+
+/// Whether the sorted `(target, reader)` run lists `reader`.
+fn run_removes<T>(run: &[(T, AbsCellKey)], reader: &AbsCellKey) -> bool {
+    run.binary_search_by(|(_, removed)| removed.cmp(reader))
+        .is_ok()
 }
 
 fn collect_interval_matches(intervals: &[RangeInterval], point: u32, out: &mut Vec<usize>) {
@@ -463,10 +743,14 @@ pub(super) fn direct_readers(
     readers
 }
 
-fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
+fn formula_entry(sheets: &[SheetData], key: AbsCellKey) -> Option<&FormulaEntry> {
     sheets
         .get(key.sheet as usize)
-        .is_some_and(|sheet| sheet.formulas.contains(key.local()))
+        .and_then(|sheet| sheet.formulas.get(key.local()))
+}
+
+fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
+    formula_entry(sheets, key).is_some()
 }
 
 pub(super) fn seed_dependency_depth_errors(
@@ -514,10 +798,7 @@ fn collect_formula_dependencies(
     }
 
     for &formula_cell in &formula_cells {
-        let Some(entry) = sheets
-            .get(formula_cell.sheet as usize)
-            .and_then(|sheet| sheet.formulas.get(formula_cell.local()))
-        else {
+        let Some(entry) = formula_entry(sheets, formula_cell) else {
             continue;
         };
 
@@ -652,7 +933,7 @@ mod tests {
         let left = AbsCellKey::new(sheet, 0, 0);
         let right = AbsCellKey::new(sheet, 0, 1);
         let affected = FxHashSet::from_iter([left, right]);
-        let index = build_dep_index(&store.sheets, store.graph.epoch());
+        let index = build_dep_index(&store.sheets);
         let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
         assert_eq!(dependencies.get(&left), Some(&vec![right]));
         assert_eq!(dependencies.get(&right), Some(&vec![left]));
@@ -667,5 +948,163 @@ mod tests {
             memo.get(&right),
             Some(Value::Error(FormulaError::Cycle))
         ));
+    }
+
+    type IntervalRow = (u32, u32, usize, u32);
+
+    /// Everything a rebuild derives from the entries. Reader order carries no
+    /// meaning, so reader lists are compared sorted.
+    #[derive(Debug, PartialEq)]
+    struct IndexContents {
+        exact: Vec<(AbsCellKey, Vec<AbsCellKey>)>,
+        ranges: Vec<(CellRange, Vec<AbsCellKey>)>,
+        intervals: Vec<[Vec<IntervalRow>; 2]>,
+        formulas: usize,
+        dynamic_array_formulas: usize,
+    }
+
+    fn sorted_readers(readers: &[AbsCellKey]) -> Vec<AbsCellKey> {
+        let mut readers = readers.to_vec();
+        readers.sort_unstable();
+        readers
+    }
+
+    fn interval_rows(intervals: &[RangeInterval]) -> Vec<IntervalRow> {
+        intervals
+            .iter()
+            .map(|interval| {
+                (
+                    interval.start,
+                    interval.end,
+                    interval.group,
+                    interval.max_end,
+                )
+            })
+            .collect()
+    }
+
+    fn index_contents(index: &DepIndex) -> IndexContents {
+        let mut exact: Vec<_> = index
+            .exact_dependents
+            .iter()
+            .map(|(&cell, readers)| (cell, sorted_readers(readers)))
+            .collect();
+        exact.sort_unstable();
+
+        IndexContents {
+            exact,
+            ranges: index
+                .range_groups
+                .iter()
+                .map(|group| (group.range, sorted_readers(&group.dependents)))
+                .collect(),
+            intervals: index
+                .range_sheets
+                .iter()
+                .map(|sheet| {
+                    [
+                        interval_rows(&sheet.row_intervals),
+                        interval_rows(&sheet.col_intervals),
+                    ]
+                })
+                .collect(),
+            formulas: index.formulas,
+            dynamic_array_formulas: index.dynamic_array_formulas,
+        }
+    }
+
+    /// Applies the queued patch and checks it against a rebuild of the same
+    /// entries. The dependency flag may stay set after a delete, never unset.
+    fn assert_patch_matches_rebuild(store: &mut CellStore) {
+        let rebuilt = build_dep_index(&store.sheets);
+        let patched = store.graph.ensure_index(&store.sheets);
+
+        assert!(patched.pending.is_empty());
+        assert_eq!(index_contents(patched), index_contents(&rebuilt));
+        assert!(patched.has_formula_dependencies || !rebuilt.has_formula_dependencies);
+    }
+
+    #[test]
+    fn one_transaction_of_mixed_rewrites_patches_the_index_to_a_rebuild() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(1, 4);
+        let report = store.add_sheet(5, 3);
+        store.set_sheet_name(data, "data", "Data");
+        for row in 0..4 {
+            store.set_number(data, row, 0, row as f64 + 1.0, 0);
+        }
+        store.set_formula(report, 0, 0, "=SUM(Data!A1:A4)", 0);
+        store.set_formula(report, 1, 0, "=SUM(Data!A1:A4)*2", 0);
+        store.set_formula(report, 2, 0, "=Data!A1", 0);
+        store.set_formula(report, 0, 2, "=Data!A1:A2", 0);
+        store.set_formula(report, 0, 3, "=MAX(Data!A3:A4)", 0);
+        store.set_formula(report, 0, 4, "=E2", 0);
+        store.recompute(report);
+        assert_patch_matches_rebuild(&mut store);
+        let epoch = store.graph.epoch();
+
+        // A2 leaves the shared Data!A1:A4 group for a new range; A3 swaps its
+        // exact read for that group plus another cell; clearing C1:D1 removes
+        // the only array formula and empties the Data!A3:A4 group; E2 becomes
+        // a formula at a cell E1 already read as a literal, closing a cycle.
+        store.set_formula(report, 1, 0, "=SUM(Data!A2:A4)", 0);
+        store.set_formula(report, 2, 0, "=SUM(Data!A1:A4)+Data!A2", 0);
+        assert!(store.clear_range(report, 0, 2, 0, 3, true, false));
+        store.set_formula(report, 1, 4, "=E1", 0);
+        store.recompute(report);
+
+        assert_eq!(
+            store.graph.epoch(),
+            epoch,
+            "a local rewrite must not rebuild"
+        );
+        assert_patch_matches_rebuild(&mut store);
+        assert!(store
+            .graph
+            .index()
+            .is_some_and(|index| !index.has_dynamic_arrays()));
+        assert_eq!(store.get_cell(report, 1, 0).num(), 9.0);
+        assert_eq!(store.get_cell(report, 2, 0).num(), 12.0);
+        assert_eq!(
+            store.get_cell(report, 0, 4).string().as_deref(),
+            Some("#CYCLE!")
+        );
+
+        store.set_number(data, 1, 0, 20.0, 0);
+        store.recompute(data);
+        assert_eq!(store.get_cell(report, 0, 0).num(), 28.0);
+        assert_eq!(store.get_cell(report, 1, 0).num(), 27.0);
+        assert_eq!(store.get_cell(report, 2, 0).num(), 48.0);
+    }
+
+    #[test]
+    fn batch_clears_patch_a_shared_group_until_a_rebuild_is_cheaper() {
+        const READERS: usize = 1_200;
+        // Within both the floor and a quarter of the formulas left after it.
+        const PATCHED_CLEAR: usize = 200;
+
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, READERS);
+        store.set_number(sheet, 0, 0, 1.0, 0);
+        for row in 0..READERS {
+            store.set_formula(sheet, row, 1, "=SUM($A$1:$A$1200)", 0);
+        }
+        store.recompute(sheet);
+        let epoch = store.graph.epoch();
+
+        assert!(store.clear_range(sheet, 0, 1, PATCHED_CLEAR - 1, 1, true, false));
+        store.recompute(sheet);
+        assert_eq!(store.graph.epoch(), epoch, "a small clear must patch");
+        assert_patch_matches_rebuild(&mut store);
+
+        assert!(store.clear_range(sheet, PATCHED_CLEAR, 1, READERS - 2, 1, true, false));
+        assert!(
+            store.graph.index().is_none(),
+            "clearing most formulas must drop the index for one rebuild"
+        );
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, READERS - 1, 1).num(), 5.0);
+        assert_patch_matches_rebuild(&mut store);
     }
 }
