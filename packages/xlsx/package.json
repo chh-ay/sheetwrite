@@ -44,7 +44,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && bun ../../scripts/package-dist.ts .",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
