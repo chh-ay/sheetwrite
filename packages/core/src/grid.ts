@@ -107,6 +107,7 @@ import type {
   ReplaceResult,
   SearchOptions,
   SearchResult,
+  SelectionSummary,
   SheetLifecycleResult,
 } from "./types/grid.js";
 import type { CellRenderer, Renderer, Theme } from "./types/render.js";
@@ -200,6 +201,12 @@ const COMMAND_STATE_ACTIVITY_COMMANDS: readonly GridCommandName[] = [
 ];
 /** Bound synchronous command-state work; larger uniform selections report mixed conservatively. */
 const COMMAND_STATE_CELL_LIMIT = 4_096;
+
+/**
+ * Cells read per store call when summarizing a selection: about a frame's
+ * work (measured ~10 ms for 64k cells), so huge selections yield between reads.
+ */
+const SUMMARY_CELLS_PER_READ = 65_536;
 
 function isFormattingCommand(command: GridCommandName): boolean {
   return (
@@ -2714,6 +2721,77 @@ export class GridImpl implements Grid {
       col: anchor.col,
     });
     return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+  }
+
+  async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
+    signal?.throwIfAborted();
+    if (this.selection.isEmpty) return null;
+
+    // The selection and the active sheet can change while chunks yield, so
+    // the whole run works from a copy of both.
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push({ ...rect }));
+    const sheet = this.activeSheet;
+    const columnCount = this.sheet().columns.length;
+
+    let count = 0;
+    let numericCount = 0;
+    let sum = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let readSinceYield = 0;
+
+    for (const rect of rects) {
+      // Whole-row selections extend past the last column; nothing lives there.
+      const lastCol = Math.min(rect.c1, columnCount - 1);
+      if (lastCol < rect.c0) continue;
+
+      const cols: number[] = [];
+      for (let col = rect.c0; col <= lastCol; col++) cols.push(col);
+      const rowsPerRead = Math.max(1, Math.floor(SUMMARY_CELLS_PER_READ / cols.length));
+
+      for (let start = rect.r0; start <= rect.r1; start += rowsPerRead) {
+        // Small selections finish in one turn. Larger ones give the page a
+        // turn after each frame's worth of reading, then stop if aborted.
+        if (readSinceYield >= SUMMARY_CELLS_PER_READ) {
+          readSinceYield = 0;
+          const pause = Promise.withResolvers<void>();
+          setTimeout(pause.resolve, 0);
+          await pause.promise;
+          signal?.throwIfAborted();
+        }
+
+        // View rows: the store maps them through sort and filter, so rows a
+        // filter hides are never read, as in Excel's status bar.
+        const end = Math.min(rect.r1 + 1, start + rowsPerRead);
+        const { values } = this.store.getVisibleWindow(sheet, { start, end }, cols);
+        readSinceYield += values.length;
+
+        // Tallied inline: a helper call per cell would cost millions of calls
+        // on a whole-sheet selection.
+        for (let index = 0; index < values.length; index++) {
+          const value = values[index];
+          if (value === null || value === undefined || value === "") continue;
+          count += 1;
+
+          if (typeof value !== "number") continue;
+          numericCount += 1;
+          sum += value;
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+      }
+    }
+
+    const hasNumbers = numericCount > 0;
+    return {
+      count,
+      numericCount,
+      sum,
+      average: hasNumbers ? sum / numericCount : null,
+      min: hasNumbers ? min : null,
+      max: hasNumbers ? max : null,
+    };
   }
 
   private autoSum(): void {

@@ -335,7 +335,7 @@ describe("createFormulaBar", () => {
 });
 
 describe("createSelectionStatus", () => {
-  it("reports geometry only and stays blank for single cells", () => {
+  it("reports geometry and stays blank for single cells", () => {
     expect(describeSelection(null)).toBe("");
     expect(describeSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } })).toBe("");
     // The status names the selection's size; the exact wording is free.
