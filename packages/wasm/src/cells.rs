@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 // Document text keys retain randomized hashing in their owning modules.
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
+use crate::derived::{decode_cell, encode_cell, DerivedOverlay};
 use crate::memory::{
     StoreMemoryStats, DENSE_KINDS, DENSE_PAYLOADS, DENSE_STYLES, FORMULAS, PAGED_DIRTY_BITMAPS,
     PAGED_INDEXES, PAGED_KINDS, PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
@@ -71,6 +71,25 @@ pub(crate) fn payload_str_id(bits: u64) -> u32 {
 
 /// Default allocation-lazy row granularity used when the host does not supply one.
 pub(crate) const DEFAULT_PAGE_CHUNK_ROWS: usize = 4096;
+// Presence is orthogonal to the source kind: calculated spill children keep
+// an empty source, and formula cells keep a formula source with payload zero.
+const CALCULATED: u8 = 0x80;
+#[inline]
+fn dense_source(kind: u8, payload: u64) -> (u8, u64) {
+    if kind & CALCULATED != 0 {
+        (kind & !CALCULATED, 0)
+    } else {
+        (kind, payload)
+    }
+}
+#[inline]
+fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
+    if kind & CALCULATED != 0 {
+        decode_cell(payload)
+    } else {
+        (kind, payload)
+    }
+}
 const BITS_PER_WORD: usize = 64;
 
 struct CellChunk {
@@ -829,8 +848,11 @@ pub(crate) struct CellStorage {
     /// Host style-dictionary id; `0` means "no explicit style".
     style: Vec<u32>,
     paged: Option<PagedStorage>,
-    /// Calculated scalars and spill output; never persisted or hydrated.
+    /// Paged calculated scalars; dense results use the payload slot with the
+    /// CALCULATED presence bit in kind. Source projections mask both back out.
     derived: DerivedOverlay,
+    /// Makes invalidation constant-time for literal-only sheets.
+    dense_calculated_cells: usize,
 }
 
 impl CellStorage {
@@ -909,7 +931,8 @@ impl CellStorage {
             payload,
             style,
             paged: None,
-            derived: DerivedOverlay::dense(),
+            derived: DerivedOverlay::default(),
+            dense_calculated_cells: 0,
         })
     }
 
@@ -927,7 +950,8 @@ impl CellStorage {
             payload: Vec::new(),
             style: Vec::new(),
             paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
-            derived: DerivedOverlay::paged(),
+            derived: DerivedOverlay::default(),
+            dense_calculated_cells: 0,
         }
     }
 
@@ -948,7 +972,7 @@ impl CellStorage {
 
         let mut coordinates = Vec::new();
         for index in 0..self.kind.len() {
-            if self.kind[index] == KIND_EMPTY && self.style[index] == 0 {
+            if self.kind[index] & !CALCULATED == KIND_EMPTY && self.style[index] == 0 {
                 continue;
             }
             let (row, col) = self.coordinates(index);
@@ -968,7 +992,12 @@ impl CellStorage {
 
             kind
         } else {
-            self.kind[index]
+            let kind = self.kind[index];
+            return if kind & !CALCULATED == KIND_FORMULA {
+                KIND_FORMULA
+            } else {
+                dense_resolved(kind, self.payload[index]).0
+            };
         };
 
         if source == KIND_EMPTY && !self.derived.is_empty() {
@@ -984,7 +1013,7 @@ impl CellStorage {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).0
         } else {
-            self.kind[index]
+            self.kind[index] & !CALCULATED
         }
     }
 
@@ -994,12 +1023,15 @@ impl CellStorage {
             let (row, col) = self.coordinates(index);
             paged.read(row, col).1
         } else {
-            self.payload[index]
+            dense_source(self.kind[index], self.payload[index]).1
         }
     }
 
     #[inline]
     pub(crate) fn resolved_payload_at(&self, index: usize) -> u64 {
+        if self.paged.is_none() {
+            return dense_resolved(self.kind[index], self.payload[index]).1;
+        }
         if self.derived.is_empty() {
             return self.source_payload_at(index);
         }
@@ -1025,15 +1057,29 @@ impl CellStorage {
 
     #[inline]
     pub(crate) fn calculated_cell_at(&self, index: usize) -> Option<(u8, u64)> {
+        if self.paged.is_none() {
+            return (self.kind[index] & CALCULATED != 0).then(|| decode_cell(self.payload[index]));
+        }
         self.derived.get(index)
     }
 
     #[inline]
     pub(crate) fn calculated_error_at(&self, index: usize) -> Option<FormulaError> {
-        self.derived.error_at(index)
+        let (kind, payload) = self.calculated_cell_at(index)?;
+        (kind == KIND_FORMULA)
+            .then(|| FormulaError::from_slot(payload))
+            .flatten()
     }
 
     pub(crate) fn set_derived(&mut self, index: usize, kind: u8, payload: u64) -> bool {
+        if self.paged.is_none() {
+            let source = self.kind[index] & !CALCULATED;
+            debug_assert!(source == KIND_EMPTY || source == KIND_FORMULA);
+            self.dense_calculated_cells += usize::from(self.kind[index] & CALCULATED == 0);
+            self.kind[index] = source | CALCULATED;
+            self.payload[index] = encode_cell(kind, payload);
+            return true;
+        }
         if self.derived.is_empty() && !self.reserve_derived(1) {
             return false;
         }
@@ -1043,13 +1089,13 @@ impl CellStorage {
     }
 
     pub(crate) fn reserve_derived(&mut self, additional: usize) -> bool {
-        self.derived.reserve(additional, self.kind.len())
+        self.paged.is_none() || self.derived.reserve(additional)
     }
 
     pub(crate) fn formula_value_kind(&self, index: usize) -> crate::types::FormulaValueKind {
         use crate::types::{FormulaValueKind, KIND_BOOL, KIND_STRING};
 
-        match self.derived.get(index).map(|cell| cell.0) {
+        match self.calculated_cell_at(index).map(|cell| cell.0) {
             Some(KIND_STRING) => FormulaValueKind::Text,
             Some(KIND_BOOL) => FormulaValueKind::Bool,
             Some(KIND_EMPTY) => FormulaValueKind::Blank,
@@ -1058,6 +1104,15 @@ impl CellStorage {
     }
 
     pub(crate) fn invalidate_derived(&mut self) {
+        if self.dense_calculated_cells != 0 {
+            for (kind, payload) in self.kind.iter_mut().zip(&mut self.payload) {
+                if *kind & CALCULATED != 0 {
+                    *kind &= !CALCULATED;
+                    *payload = 0;
+                }
+            }
+            self.dense_calculated_cells = 0;
+        }
         self.derived.clear();
     }
 
@@ -1159,14 +1214,15 @@ impl CellStorage {
             if !paged.hydrate(row, col, kind, payload, style) {
                 return false;
             }
+            self.remove_source_calculation(row, col);
         } else {
+            self.remove_source_calculation(row, col);
             let index = self.idx(row, col);
             self.kind[index] = kind;
             self.payload[index] = payload;
             self.style[index] = style;
         }
 
-        self.remove_source_calculation(row, col);
         true
     }
 
@@ -1174,9 +1230,7 @@ impl CellStorage {
     /// source replacement removes it.
     #[inline]
     fn remove_source_calculation(&mut self, row: usize, col: usize) {
-        if !self.derived.is_empty() {
-            self.derived.remove(self.idx(row, col));
-        }
+        self.remove_calculated(self.idx(row, col));
     }
 
     pub(crate) fn is_loaded(&self, row: usize, col: usize) -> bool {
@@ -1365,6 +1419,8 @@ impl CellStorage {
             return;
         }
 
+        self.invalidate_derived();
+
         if self.is_paged() {
             self.remap_paged(new_row_count, self.n_cols, |row, col| {
                 (row < new_row_count).then_some((row, col))
@@ -1404,6 +1460,8 @@ impl CellStorage {
         if count == 0 {
             return;
         }
+
+        self.invalidate_derived();
 
         let at = at.min(self.row_count);
         let old = self.row_count;
@@ -1446,6 +1504,8 @@ impl CellStorage {
             return;
         }
 
+        self.invalidate_derived();
+
         let count = count.min(self.row_count - at);
         let old = self.row_count;
 
@@ -1480,6 +1540,8 @@ impl CellStorage {
         if count == 0 {
             return;
         }
+
+        self.invalidate_derived();
 
         let at = at.min(self.n_cols);
         let old_cols = self.n_cols;
@@ -1529,6 +1591,8 @@ impl CellStorage {
         if count == 0 || at >= self.n_cols {
             return;
         }
+
+        self.invalidate_derived();
 
         let count = count.min(self.n_cols - at);
         let old_cols = self.n_cols;
@@ -1606,13 +1670,31 @@ pub(crate) struct DenseSourceRun<'a> {
 impl DenseSourceRun<'_> {
     #[inline]
     pub(crate) fn source(&self, index: usize) -> (u8, u64) {
-        (self.kinds[index], self.payloads[index])
+        dense_source(self.kinds[index], self.payloads[index])
     }
 }
 
-/// A borrowed column segment bounded by its source page and calculated chunk.
+/// One dense column, indexed by row. A calculated value lives in its cell's
+/// own slot, so the resolved view needs no second lookup.
+#[derive(Clone, Copy)]
+pub(crate) struct DenseColumn<'a> {
+    kinds: &'a [u8],
+    payloads: &'a [u64],
+    styles: &'a [u32],
+}
+
+impl DenseColumn<'_> {
+    /// Resolved kind, payload and style of `row`.
+    #[inline]
+    pub(crate) fn cell(&self, row: usize) -> (u8, u64, u32) {
+        let (kind, payload) = dense_resolved(self.kinds[row], self.payloads[row]);
+        (kind, payload, self.styles[row])
+    }
+}
+
+/// A borrowed column segment bounded by its source page or column.
 /// Indices are absolute and valid only inside `start..end`. Creating a run
-/// allocates nothing and probes each chunk directory once; paged runs still
+/// allocates nothing and probes the source page directory once; paged runs still
 /// consult the sparse dirty and calculated maps per cell.
 #[derive(Clone, Copy)]
 pub(crate) struct CellRun<'a> {
@@ -1627,7 +1709,6 @@ pub(crate) struct CellRun<'a> {
     is_dense: bool,
     dirty: Option<&'a FxHashMap<(usize, usize), DirtyCell>>,
     row_count: usize,
-    calculated: Option<&'a [u64]>,
     paged_calculated: Option<&'a DerivedOverlay>,
 }
 
@@ -1658,6 +1739,38 @@ impl CellRun<'_> {
         self.clean_loaded(index) || self.dirty_cell(index).is_some()
     }
 
+    /// Reads a paged scalar, style and residency with one dirty-map probe.
+    #[inline]
+    fn paged_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
+        debug_assert!(!self.is_dense && self.contains(index));
+        let (kind, payload, style) = match self.dirty_cell(index) {
+            Some(cell) => (cell.kind, cell.payload, cell.style),
+            None if self.clean_loaded(index) => {
+                let offset = index - self.source_base;
+                (
+                    self.kinds[offset],
+                    self.payloads[offset],
+                    self.styles[offset],
+                )
+            }
+            None => return None,
+        };
+        let (kind, payload) = self
+            .paged_calculated
+            .and_then(|overlay| overlay.get(index))
+            .unwrap_or((kind, payload));
+        Some((kind, payload, style))
+    }
+
+    /// Visits every cell of a paged run; `None` marks an unloaded cell. Dense
+    /// render loops use [`CellStorage::dense_column`] instead.
+    pub(crate) fn visit_paged(&self, mut visit: impl FnMut(usize, Option<(u8, u64, u32)>)) {
+        debug_assert!(!self.is_dense);
+        for index in self.start..self.end {
+            visit(index, self.paged_cell(index));
+        }
+    }
+
     #[inline]
     pub(crate) fn source(&self, index: usize) -> (u8, u64) {
         debug_assert!(self.contains(index));
@@ -1668,7 +1781,11 @@ impl CellRun<'_> {
             return (KIND_EMPTY, 0);
         }
         let offset = index - self.source_base;
-        (self.kinds[offset], self.payloads[offset])
+        if self.is_dense {
+            dense_source(self.kinds[offset], self.payloads[offset])
+        } else {
+            (self.kinds[offset], self.payloads[offset])
+        }
     }
 
     /// Literal sources win; a calculated slot exists only over empty or formula
@@ -1677,6 +1794,9 @@ impl CellRun<'_> {
     #[inline]
     pub(crate) fn resolved(&self, index: usize) -> (u8, u64) {
         debug_assert!(self.contains(index));
+        if self.is_dense {
+            return dense_resolved(self.kinds[index], self.payloads[index]);
+        }
         let source = match self.dirty_cell(index) {
             Some(cell) => (cell.kind, cell.payload),
             None if self.clean_loaded(index) => {
@@ -1687,23 +1807,9 @@ impl CellRun<'_> {
         };
         let calculated = match self.paged_calculated {
             Some(overlay) => overlay.get(index),
-            None => self.calculated.and_then(|values| {
-                DerivedOverlay::decode_present(values[index % DERIVED_CHUNK_CELLS])
-            }),
+            None => None,
         };
         calculated.unwrap_or(source)
-    }
-
-    #[inline]
-    pub(crate) fn style(&self, index: usize) -> u32 {
-        debug_assert!(self.contains(index));
-        if let Some(cell) = self.dirty_cell(index) {
-            return cell.style;
-        }
-        if !self.clean_loaded(index) {
-            return 0;
-        }
-        self.styles[index - self.source_base]
     }
 }
 
@@ -1719,7 +1825,15 @@ impl CellStorage {
     }
 
     pub(crate) fn remove_calculated(&mut self, index: usize) {
-        self.derived.remove(index);
+        if self.paged.is_none() {
+            if self.kind[index] & CALCULATED != 0 {
+                self.kind[index] &= !CALCULATED;
+                self.payload[index] = 0;
+                self.dense_calculated_cells -= 1;
+            }
+        } else if !self.derived.is_empty() {
+            self.derived.remove(index);
+        }
     }
 
     pub(crate) fn compact_calculated(&mut self) {
@@ -1734,16 +1848,56 @@ impl CellStorage {
         })
     }
 
+    /// One dense column's slices; `None` for paged storage or a missing column.
+    /// Render loops index rows directly: a callback per cell measured ~25%
+    /// slower on wasm32 than a plain loop over these slices.
+    pub(crate) fn dense_column(&self, col: usize) -> Option<DenseColumn<'_>> {
+        if self.paged.is_some() || col >= self.n_cols {
+            return None;
+        }
+
+        let cells = col * self.row_count..(col + 1) * self.row_count;
+        Some(DenseColumn {
+            kinds: &self.kind[cells.clone()],
+            payloads: &self.payload[cells.clone()],
+            styles: &self.style[cells],
+        })
+    }
+
+    /// Visits an explicit view-row list on paged storage, retaining a run until
+    /// view order leaves its source page. Dense storage uses [`Self::dense_column`].
+    pub(crate) fn visit_paged_rows(
+        &self,
+        rows: &[u32],
+        col: usize,
+        mut visit: impl FnMut(usize, usize, Option<(u8, u64, u32)>),
+    ) {
+        debug_assert!(self.paged.is_some());
+        let base = col * self.row_count;
+        let mut cached: Option<CellRun<'_>> = None;
+
+        for (view_row, &row) in rows.iter().enumerate() {
+            let row = row as usize;
+            if row >= self.row_count {
+                continue;
+            }
+
+            let index = base + row;
+            let run = cached.get_or_insert_with(|| self.run(index, base + self.row_count));
+            if !run.contains(index) {
+                *run = self.run(index, base + self.row_count);
+            }
+            visit(view_row, row, run.paged_cell(index));
+        }
+    }
+
     /// The run containing `start`, ending no later than `end` or the column,
-    /// source page or calculated chunk boundary.
+    /// source page boundary.
     pub(crate) fn run(&self, start: usize, end: usize) -> CellRun<'_> {
         debug_assert!(start < end && end <= self.row_count * self.n_cols);
         let row = start % self.row_count;
         let col = start / self.row_count;
-        let end = end
-            .min(start + DERIVED_CHUNK_CELLS - start % DERIVED_CHUNK_CELLS)
-            .min(start + self.row_count - row);
-        let calculated = self.derived.chunk_at(start);
+        let end = end.min(start + self.row_count - row);
 
         if let Some(paged) = &self.paged {
             let (key, _) = paged.key_offset(row, col);
@@ -1763,7 +1917,6 @@ impl CellStorage {
                 is_dense: false,
                 dirty: (!paged.dirty.is_empty()).then_some(&paged.dirty),
                 row_count: self.row_count,
-                calculated,
                 paged_calculated: (!self.derived.is_empty()).then_some(&self.derived),
             }
         } else {
@@ -1778,7 +1931,6 @@ impl CellStorage {
                 is_dense: true,
                 dirty: None,
                 row_count: self.row_count,
-                calculated,
                 paged_calculated: None,
             }
         }
@@ -1864,5 +2016,160 @@ mod paged_storage_tests {
         assert_eq!(storage.read(8, 0), (KIND_EMPTY, 0, 0, false, false));
         assert!(storage.write(0, 0, KIND_EMPTY, 4, 0, Some(2)));
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 4, 0, true, true));
+    }
+}
+
+#[cfg(test)]
+mod calculated_slot_tests {
+    use super::*;
+    use crate::transfer::{Reader, Writer};
+    use crate::types::{KIND_BOOL, KIND_NUMBER, KIND_STRING};
+
+    // Presence must distinguish a calculated zero/blank from an absent slot,
+    // and every source projection must hide calculated text from persistence.
+    #[test]
+    fn source_views_hide_calculated_slots_across_transfer_and_replacement() {
+        for paged in [false, true] {
+            let mut cells = if paged {
+                CellStorage::new_paged(1, 1536, 512, 0, 100)
+            } else {
+                CellStorage::try_new(1, 1536).unwrap()
+            };
+            for index in [0, 512, 1535] {
+                assert!(cells.hydrate_cell(index, 0, KIND_FORMULA, 0, 7));
+            }
+            // The last slot is a spill child with an empty source and a style.
+            assert!(cells.hydrate_cell(1535, 0, KIND_EMPTY, 0, 9));
+            let mut before = StoreMemoryStats::default();
+            cells.add_memory_stats(&mut before);
+            assert!(cells.reserve_derived(3));
+            assert!(cells.set_derived(0, KIND_STRING, encode_str_id(3)));
+            assert!(cells.set_derived(512, KIND_FORMULA, FormulaError::Ref.slot() as u64));
+            assert!(cells.set_derived(1535, KIND_BOOL, encode_num(1.0)));
+            if !paged {
+                let mut after = StoreMemoryStats::default();
+                cells.add_memory_stats(&mut after);
+                assert_eq!(before.allocated_bytes(), after.allocated_bytes());
+            }
+            for (index, kind) in [(0, KIND_FORMULA), (512, KIND_FORMULA), (1535, KIND_EMPTY)] {
+                assert_eq!(cells.source_kind_at(index), kind);
+                assert_eq!(cells.source_payload_at(index), 0);
+                let run = cells.run(index, index + 1);
+                assert_eq!(run.source(index), (kind, 0));
+                if let Some(sources) = cells.dense_sources() {
+                    assert_eq!(sources.source(index), (kind, 0));
+                }
+            }
+            let mut visited = Vec::new();
+            cells.visit_string_ids(|id| visited.push(id));
+            assert_eq!(visited, vec![3]);
+            cells.remap_string_ids(&[0, 1, 2, 4]);
+            let mut out = Writer::new(1);
+            cells.write_transfer(&mut out);
+            let mut input = Reader::new(&out.0, 1).unwrap();
+            let mut restored = CellStorage::read_transfer(&mut input).unwrap();
+            input.finish().unwrap();
+            assert_eq!(
+                restored.calculated_cell_at(0),
+                Some((KIND_STRING, encode_str_id(4)))
+            );
+            assert_eq!(restored.calculated_error_at(512), Some(FormulaError::Ref));
+            assert_eq!(
+                restored.calculated_cell_at(1535),
+                Some((KIND_BOOL, encode_num(1.0)))
+            );
+            assert_eq!(restored.run(0, 1).source(0), (KIND_FORMULA, 0));
+            assert_eq!(restored.run(1535, 1536).source(1535), (KIND_EMPTY, 0));
+            assert!(restored.write_style(0, 0, 12, None));
+            assert_eq!(
+                restored.calculated_cell_at(0),
+                Some((KIND_STRING, encode_str_id(4)))
+            );
+            assert!(restored.write_cell(0, 0, KIND_NUMBER, encode_num(8.0), 0, None));
+            assert_eq!(restored.calculated_cell_at(0), None);
+            assert_eq!(restored.num_at(0), 8.0);
+            restored.remove_calculated(1535);
+            assert_eq!(restored.calculated_cell_at(1535), None);
+            assert_eq!(restored.source_kind_at(1535), KIND_EMPTY);
+            assert!(restored.set_derived(1535, KIND_NUMBER, encode_num(0.0)));
+            assert_eq!(
+                restored.calculated_cell_at(1535),
+                Some((KIND_NUMBER, encode_num(0.0)))
+            );
+            restored.invalidate_derived();
+            assert_eq!(restored.calculated_cell_at(512), None);
+            assert_eq!(restored.calculated_cell_at(1535), None);
+            assert_eq!(restored.source_payload_at(512), 0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod source_history_tests {
+    use crate::store::CellStore;
+    use crate::types::KIND_FORMULA;
+
+    #[test]
+    fn history_capture_does_not_persist_calculated_text_or_numbers() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 2);
+        store.set_formula(sheet, 0, 0, "=\"computed text\"", 0);
+        store.set_formula(sheet, 1, 0, "=42", 0);
+        store.recompute(sheet);
+        let snapshot = store.capture_range(sheet, 0, 0, 2, 1).unwrap();
+        assert_eq!(snapshot.kinds(), vec![KIND_FORMULA, KIND_FORMULA]);
+        assert_eq!(store.snapshot_numbers(&snapshot), vec![0.0, 0.0]);
+        assert_eq!(store.snapshot_texts(&snapshot), vec!["", ""]);
+        assert!(store.clear_range(sheet, 0, 0, 1, 0, true, false));
+        assert!(store.restore_range(sheet, 0, 0, &snapshot));
+        store.recompute(sheet);
+        assert_eq!(
+            store.get_cell(sheet, 0, 0).string().as_deref(),
+            Some("computed text")
+        );
+        assert_eq!(store.get_cell(sheet, 1, 0).num(), 42.0);
+    }
+}
+#[cfg(test)]
+mod lifecycle_tests {
+    const TEST_ROWS: usize = 1536;
+    use crate::store::CellStore;
+
+    #[test]
+    fn shrinking_spill_clears_vacated_outputs() {
+        let mut store = CellStore::new();
+        let rows = TEST_ROWS;
+        let sheet = store.add_sheet(2, rows);
+        store.set_number(sheet, 0, 1, rows as f64, 0);
+        store.set_formula(sheet, 0, 0, "=SEQUENCE(B1)", 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, rows - 1, 0).num(), rows as f64);
+
+        store.set_number(sheet, 0, 1, 1.0, 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 0, 0).num(), 1.0);
+        assert_eq!(store.sheets[sheet].cells.calculated_cell_at(rows - 1), None);
+    }
+
+    #[test]
+    fn string_pool_sweep_keeps_calculated_text_across_distant_rows() {
+        let mut store = CellStore::new();
+        let rows = TEST_ROWS;
+        let sheet = store.add_sheet(2, rows);
+        store.set_string(sheet, 0, 1, "discarded pool entry", 0);
+        store.set_number(sheet, 0, 1, 0.0, 0);
+        let positions = [0, TEST_ROWS / 3, rows - 1];
+        for row in positions {
+            store.set_formula(sheet, row, 0, "=\"retained\"&\" text\"", 0);
+        }
+        store.recompute(sheet);
+        store.compact_string_storage();
+
+        for row in positions {
+            assert_eq!(
+                store.get_cell(sheet, row, 0).string().as_deref(),
+                Some("retained text")
+            );
+        }
     }
 }

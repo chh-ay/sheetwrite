@@ -93,7 +93,9 @@ impl CellStorage {
             out.u64(paged.evictions);
         }
 
-        self.derived.write_transfer(out);
+        if self.paged.is_some() {
+            self.derived.write_transfer(out);
+        }
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
@@ -181,7 +183,29 @@ impl CellStorage {
         let cells = n_cols
             .checked_mul(row_count)
             .ok_or("transferred dimensions overflow")?;
-        let derived = DerivedOverlay::read_transfer(input, cells, paged.is_some())?;
+        let derived = if paged.is_some() {
+            DerivedOverlay::read_transfer(input, cells)?
+        } else {
+            DerivedOverlay::default()
+        };
+        let dense_calculated_cells = if paged.is_none() {
+            let mut count = 0;
+            for (&kind, &payload) in kind.iter().zip(&payload) {
+                if kind & CALCULATED != 0 {
+                    if !matches!(kind & !CALCULATED, KIND_EMPTY | KIND_FORMULA)
+                        || payload == crate::derived::ABSENT_TAG
+                    {
+                        return Err("invalid transferred dense calculated slot".into());
+                    }
+                    count += 1;
+                } else if kind > KIND_FORMULA {
+                    return Err("invalid transferred dense source kind".into());
+                }
+            }
+            count
+        } else {
+            0
+        };
         Ok(Self {
             n_cols,
             row_count,
@@ -190,6 +214,7 @@ impl CellStorage {
             style,
             paged,
             derived,
+            dense_calculated_cells,
         })
     }
 }

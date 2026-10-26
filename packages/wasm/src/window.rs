@@ -6,7 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{translate_relative_refs, Ast};
-use crate::cells::{payload_num, payload_str_id, CellRun};
+use crate::cells::{payload_num, payload_str_id};
 use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
 use crate::sheet::{formula_error_with_entry, SheetData};
@@ -209,19 +209,23 @@ impl CellStore {
                 continue;
             }
 
+            if let Some(column) = s.cells.dense_column(col) {
+                for row in row_start..row_end {
+                    let dst = (row - row_start) * n_cols + col_index;
+                    cells.fill(s, row, col, dst, Some(column.cell(row)));
+                }
+                continue;
+            }
+
             let mut start = s.cells.idx(row_start, col);
             let end = s.cells.idx(row_end, col);
             while start < end {
                 let run = s.cells.run(start, end);
-                for src in run.start..run.end {
+                run.visit_paged(|src, resolved| {
                     let row = src - col * s.cells.row_count();
                     let dst = (row - row_start) * n_cols + col_index;
-                    let resolved = run.is_loaded(src).then(|| {
-                        let (kind, payload) = run.resolved(src);
-                        (kind, payload, run.style(src))
-                    });
                     cells.fill(s, row, col, dst, resolved);
-                }
+                });
                 start = run.end;
             }
         }
@@ -251,28 +255,22 @@ impl CellStore {
                 continue;
             }
 
-            let mut cached_run: Option<CellRun<'_>> = None;
-
-            // Explicit rows preserve view order; cache a chunk until that order leaves it.
-            for (row_index, &row_u) in rows.iter().enumerate() {
-                let row = row_u as usize;
-                if row >= s.cells.row_count() {
-                    continue;
+            if let Some(column) = s.cells.dense_column(col) {
+                for (row_index, &row) in rows.iter().enumerate() {
+                    let row = row as usize;
+                    if row < s.cells.row_count() {
+                        let dst = row_index * n_cols + col_index;
+                        cells.fill(s, row, col, dst, Some(column.cell(row)));
+                    }
                 }
-
-                let dst = row_index * n_cols + col_index;
-                let src = s.cells.idx(row, col);
-                let run = cached_run
-                    .get_or_insert_with(|| s.cells.run(src, s.cells.idx(s.cells.row_count(), col)));
-                if src < run.start || src >= run.end {
-                    *run = s.cells.run(src, s.cells.idx(s.cells.row_count(), col));
-                }
-                let resolved = run.is_loaded(src).then(|| {
-                    let (kind, payload) = run.resolved(src);
-                    (kind, payload, run.style(src))
-                });
-                cells.fill(s, row, col, dst, resolved);
+                continue;
             }
+
+            s.cells
+                .visit_paged_rows(rows, col, |row_index, row, resolved| {
+                    let dst = row_index * n_cols + col_index;
+                    cells.fill(s, row, col, dst, resolved);
+                });
         }
 
         let cond_matches = cond_matches_for_window(
