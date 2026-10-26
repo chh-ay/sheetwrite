@@ -14,6 +14,7 @@ use super::lookup::integer_arg;
 use super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS,
 };
+use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
 use super::{with_let_slots, EvalPass};
 
@@ -32,7 +33,7 @@ fn static_integer(ast: Option<&Ast>) -> Option<i64> {
 
 pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::AnchorArray, _) => true,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
         #[cfg(feature = "analysis")]
         Ast::BoundMatrix { .. } => true,
         #[cfg(feature = "analysis")]
@@ -109,10 +110,13 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
     }
 }
 
+/// Spill-budget cells charged before a runtime reference is evaluated.
+const RUNTIME_REFERENCE_PRECHARGE: usize = 1;
+
 impl CellStore {
     /// The range that the anchor of `A1#` spills into now, or `#REF!` when
     /// the anchor holds no spill.
-    fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
+    pub(super) fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
         let (sheet, row, col) = match args {
             [Ast::Cell(row, col, _)] => (formula_sheet, *row, *col),
             [Ast::AbsCell(sheet, row, col, _)] => (sheet.handle as usize, *row, *col),
@@ -140,41 +144,15 @@ impl CellStore {
         )
     }
 
-    /// A copy of `ast` in which every `A1#` is the range that its anchor
-    /// spills into now. Range functions such as SUMIF, INDEX and ROWS then
-    /// accept spill references without special handling.
-    pub(super) fn resolve_spill_refs(&self, ast: &Ast, sheet: usize) -> Ast {
-        let mut resolved = ast.clone();
-        self.replace_spill_refs(&mut resolved, sheet);
-        resolved
-    }
-
-    fn replace_spill_refs(&self, ast: &mut Ast, sheet: usize) {
-        match ast {
-            Ast::Func(Func::AnchorArray, args) => *ast = self.spill_reference(args, sheet),
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-                for arg in args {
-                    self.replace_spill_refs(arg, sheet);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.replace_spill_refs(left, sheet);
-                self.replace_spill_refs(right, sheet);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.replace_spill_refs(inner, sheet);
-            }
-            Ast::LetSlot { expression, .. } => self.replace_spill_refs(expression, sheet),
-            _ => {}
-        }
-    }
-
     pub(super) fn dynamic_array_bound(
         &self,
         ast: &Ast,
         formula_sheet: usize,
     ) -> Option<Result<usize, FormulaError>> {
         match ast {
+            // The shape is known only after evaluation, so the pending loop
+            // charges the spill budget with the evaluated size instead.
+            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(RUNTIME_REFERENCE_PRECHARGE)),
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast) =>
             {
@@ -316,6 +294,9 @@ impl CellStore {
                 let range = self.spill_reference(args, sheet);
                 return self.eval_dynamic_array(&range, sheet, pass, depth);
             }
+            Ast::Func(func @ (Func::Offset | Func::Indirect), args) => {
+                self.eval_runtime_reference_matrix(*func, args, sheet, pass, depth + 1)
+            }
             Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
             Ast::BoundMatrix { rows, cols, values } => {
@@ -352,6 +333,14 @@ impl CellStore {
                     Err(error) => return Some(Err(error)),
                 };
                 return with_let_slots(slots, || {
+                    let expanded = self.resolve_let_runtime_refs(
+                        args,
+                        expanded,
+                        sheet,
+                        pass,
+                        depth + 1,
+                        RewriteScope::Root,
+                    );
                     self.eval_dynamic_array(&expanded, sheet, pass, depth + 1)
                 });
             }

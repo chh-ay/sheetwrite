@@ -104,6 +104,7 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   "if-error": "1,0",
   ifs: "TRUE,1",
   index: "A1:B3,1,1",
+  indirect: '"A1"',
   irr: "A1:A3",
   "left-right": '"abc",1',
   let: "x,1,x",
@@ -114,6 +115,7 @@ const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   networkdays: "DATE(2020,1,1),DATE(2020,1,3)",
   npv: "0.1,A1:A3",
   "number-value": '"1.5",".",","',
+  offset: "A1,1,1",
   "optional-reference": "A1",
   "optional-variadic-values": "1,2,3",
   "pair-arrays": "A1:A3,B1:B3",
@@ -218,6 +220,22 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
   ROWS: { boundary: "ROWS(C1)=1" },
   COLUMN: { boundary: "COLUMN(C1)=3" },
   COLUMNS: { boundary: "COLUMNS(C1)=1" },
+  OFFSET: {
+    empty: "OFFSET(A1,C1,1)=1",
+    mixed: "OFFSET(A1,C1,1)=3",
+    error:
+      'AND(ISERROR(OFFSET(A1,1/0,0)),ISERROR(OFFSET(A1,-1,0)),ISERROR(OFFSET(A1,0,0,0)),ISERROR(OFFSET(1,0,0)),ISERROR(OFFSET(A1,"bad",0)))',
+    boundary: "OFFSET(A1,C1,C1)=-100",
+    "range-array": "SUM(OFFSET(C1:C2,0,0))=3",
+  },
+  INDIRECT: {
+    empty: "ISERROR(INDIRECT(C1))",
+    mixed: 'INDIRECT("B"&C1)=2',
+    error:
+      'AND(ISERROR(INDIRECT("not a reference")),ISERROR(INDIRECT("A0")),ISERROR(INDIRECT("[missing.xlsx]Sheet1!A1")),ISERROR(INDIRECT(1/0)))',
+    boundary: 'INDIRECT("R1C1",FALSE)=-100',
+    "range-array": 'SUM(INDIRECT("B1:B"&SUM(C1:C2)))=6',
+  },
   T: { "range-array": "TYPE(T(C1:C2))=16" },
   // Random results cannot equal a baseline call, so each category pins an
   // interval with one integer instead.

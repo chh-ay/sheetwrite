@@ -65,6 +65,10 @@ impl SpillRange {
             && self.col_end >= other.anchor.1
     }
 
+    pub(crate) fn is_anchor_only(self) -> bool {
+        self.row_end == self.anchor.0 && self.col_end == self.anchor.1
+    }
+
     fn cols(self) -> usize {
         (self.col_end - self.anchor.1) as usize + 1
     }

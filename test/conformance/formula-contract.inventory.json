@@ -3616,6 +3616,65 @@
       ],
       "returns": "scalar"
     },
+    "offset": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "rows",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "cols",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "height",
+          "required": false,
+          "default": "reference-height",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "width",
+          "required": false,
+          "default": "reference-width",
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "reference"
+    },
+    "indirect": {
+      "arguments": [
+        {
+          "name": "text",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "a1",
+          "required": false,
+          "default": true,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "reference"
+    },
     "required-reference": {
       "arguments": [
         {
@@ -4748,6 +4807,51 @@
         "xlsxSource": "rewrite-on-structural-edit"
       }
     },
+    "dynamic-reference": {
+      "shape": {
+        "scalar": "contextual",
+        "range": "contextual",
+        "array": "rejected",
+        "broadcast": "none",
+        "result": "reference"
+      },
+      "coercion": {
+        "blank": "function-defined",
+        "text": "function-defined",
+        "boolean": "function-defined",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "insensitive",
+        "wildcard": "literal"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "exact",
+        "domain": "bounded",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "dynamic",
+        "lazy": "function-defined",
+        "spill": "contextual",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
     "hyperlink-display": {
       "shape": {
         "scalar": "accepted",
@@ -4874,6 +4978,20 @@
       "divergences": [
         "Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported.",
         "Grouping and output use the engine spill and work limits."
+      ]
+    },
+    "excel-dynamic-reference": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "OFFSET and INDIRECT are volatile and return references. Multi-cell results spill when used as formula results; reference-taking functions consume the reference.",
+        "OFFSET requires a reference and positive height and width; omitted dimensions inherit the source shape. Row and column offsets truncate toward zero. Out-of-grid bounds return #REF!; nonpositive dimensions, nonnumeric offsets and a non-reference first argument return #VALUE!.",
+        "INDIRECT supports A1 by default and R1C1 when a1 is FALSE, including relative R1C1 coordinates, sheet-qualified references, defined names and table references. Invalid reference text and external workbook references return #REF!.",
+        "Reference text inside INDIRECT is not rewritten by fill, copy or structural edits. Ordinary reference arguments to OFFSET are rewritten.",
+        "References must stay within the Excel grid; reading beyond the loaded sheet retains the engine's #REF! behavior. Existing range, spill and work limits apply.",
+        "A reference that creates a runtime dependency cycle returns #CYCLE!.",
+        "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
       ]
     },
     "excel-reference-information": {
@@ -5176,6 +5294,24 @@
         "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
       }
     },
+    "implemented-dynamic-reference": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/reference.rs", "packages/wasm/src/eval/dependency.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/tests.rs", "scripts/conformance/formula-evidence.ts"]
+      }
+    },
     "implemented-reference-information": {
       "parser": {
         "status": "implemented",
@@ -5198,10 +5334,10 @@
   "unsupportedCategories": [
     {
       "id": "volatile",
-      "title": "Volatile references and arrays",
+      "title": "Volatile arrays",
       "status": "unsupported",
-      "scope": "OFFSET and INDIRECT build references at calculation time, and RANDARRAY returns a volatile array. These functions are outside the supported contract.",
-      "examples": ["INDIRECT", "OFFSET", "RANDARRAY"],
+      "scope": "RANDARRAY returns a volatile array and is outside the supported contract.",
+      "examples": ["RANDARRAY"],
       "source": "microsoft-excel-functions",
       "section": "Math and trigonometry functions",
       "implementation": {
@@ -7121,6 +7257,30 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "OFFSET",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "offset",
+      "semantics": "dynamic-reference",
+      "dialects": "excel-dynamic-reference",
+      "implementation": "implemented-dynamic-reference",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "INDIRECT",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "indirect",
+      "semantics": "dynamic-reference",
+      "dialects": "excel-dynamic-reference",
+      "implementation": "implemented-dynamic-reference",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },

@@ -149,8 +149,8 @@ export interface Store {
   /** Plain-reference target at `addr`, or null when the cell is not a ref. */
   getRefTarget(addr: CellAddress): CellAddress | null;
   /**
-   * Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one
-   * captured instant. The supplied Date is interpreted as an absolute UTC instant.
+   * Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
+   * `INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
    * Edits already recompute volatile formulas and read the clock once per
    * recalculation; this call uses `now` instead, until the next edit.
    */

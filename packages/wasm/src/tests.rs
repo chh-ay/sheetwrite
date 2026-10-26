@@ -4609,3 +4609,481 @@ mod cell_information {
         assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("=2+3"));
     }
 }
+
+#[test]
+fn offset_indirect_values_preserve_reference_shapes_in_sums_and_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(12, 12);
+    for (row, value) in [1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+        store.set_number(sheet, row, 1, value * 10.0, 0);
+    }
+    store.set_number(sheet, 0, 9, 2.0, 0);
+    let scalar_cases = [
+        ("=OFFSET(A1,1,1)", 20.0),
+        ("=SUM(OFFSET(A1:B2,1,0))", 55.0),
+        ("=SUM(OFFSET(A1,1,1,2,1))", 50.0),
+        ("=SUM(INDIRECT(\"A1:B3\"))", 66.0),
+        ("=SUM(OFFSET(INDIRECT(\"A1:B2\"),1,0))", 55.0),
+        ("=SUM(INDIRECT(\"$A$1:$A$3\",TRUE))", 6.0),
+        ("=SUM(OFFSET(OFFSET(A1,1,0),0,1))", 20.0),
+        ("=SUM(LET(anchor,A1,OFFSET(anchor,1,1)))", 20.0),
+        ("=LET(address,\"B2\",INDIRECT(address))", 20.0),
+        ("=(OFFSET(A1,1,1)=20)+1", 2.0),
+        ("=INDIRECT(\"B2\")+1", 21.0),
+    ];
+    for (col, (formula, _)) in scalar_cases.iter().enumerate() {
+        store.set_formula(sheet, 8, col, formula, 0);
+    }
+    store.set_formula(sheet, 0, 3, "=OFFSET(A1,0,0,J1,2)", 0);
+    store.set_formula(sheet, 0, 6, "=INDIRECT(\"A1:B3\")", 0);
+    store.set_formula(sheet, 9, 0, "=SUM(D1#)", 0);
+    store.recompute(sheet);
+    for (col, (formula, expected)) in scalar_cases.iter().enumerate() {
+        assert_eq!(number(&store, sheet, 8, col), *expected, "{formula}");
+    }
+    assert_eq!(
+        [(0, 3), (0, 4), (1, 3), (1, 4)].map(|(row, col)| number(&store, sheet, row, col)),
+        [1.0, 10.0, 2.0, 20.0]
+    );
+    assert_eq!(
+        [(0, 6), (0, 7), (1, 6), (1, 7), (2, 6), (2, 7)]
+            .map(|(row, col)| number(&store, sheet, row, col)),
+        [1.0, 10.0, 2.0, 20.0, 3.0, 30.0]
+    );
+    assert_close(number(&store, sheet, 9, 0), 33.0);
+
+    store.set_number(sheet, 0, 9, 3.0, 0);
+    store.set_number(sheet, 2, 1, 40.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 2, 4), 40.0);
+    assert_close(number(&store, sheet, 2, 7), 40.0);
+    assert_close(number(&store, sheet, 9, 0), 76.0);
+    store.set_number(sheet, 0, 9, 1.0, 0);
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 1, 3).kind(), KIND_EMPTY);
+    assert_eq!(store.get_cell(sheet, 2, 4).kind(), KIND_EMPTY);
+    assert_close(number(&store, sheet, 9, 0), 11.0);
+}
+
+#[test]
+fn offset_indirect_a1_and_r1c1_resolve_absolute_relative_and_quoted_sheet_addresses() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(4, 4);
+    let report = store.add_sheet(12, 8);
+    store.set_sheet_name(source, "source", "O'Brien Data");
+    store.set_number(source, 0, 0, 5.0, 0);
+    store.set_number(source, 1, 0, 7.0, 0);
+    store.set_number(source, 1, 1, 19.0, 0);
+    store.set_number(report, 1, 0, 17.0, 0);
+    let cases = [
+        ("=INDIRECT(\"'O''Brien Data'!$B$2\")", 19.0),
+        ("=INDIRECT(\"'O''Brien Data'!R2C2\",FALSE)", 19.0),
+        ("=SUM(INDIRECT(\"'O''Brien Data'!R1C1:R2C1\",FALSE))", 12.0),
+        ("=INDIRECT(\"R[-2]C[-3]\",FALSE)", 17.0),
+        ("=INDIRECT(\"R2C[-4]\",FALSE)", 17.0),
+        ("=INDIRECT(\"R[-2]C1\",FALSE)", 17.0),
+        ("=OFFSET('O''Brien Data'!B2,-1,-1)", 5.0),
+    ];
+    for (col, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, 3, col, formula, 0);
+    }
+    store.recompute(report);
+    for (col, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(number(&store, report, 3, col), *expected, "{formula}");
+    }
+}
+
+#[test]
+fn offset_indirect_names_and_tables_resolve_in_the_calling_sheet_scope() {
+    let mut store = CellStore::new();
+    let source = store.add_sheet(4, 6);
+    let report = store.add_sheet(8, 4);
+    store.set_sheet_name(source, "source", "Source Sheet");
+    for (row, value) in [10.0, 20.0, 30.0].into_iter().enumerate() {
+        store.set_number(source, row + 1, 0, value, 0);
+        store.set_number(source, row + 1, 1, value * 2.0, 0);
+    }
+    assert!(store.set_named_range("Values", -1, source, 1, 0, 3, 0));
+    assert!(store.set_named_range("Values", report as i32, source, 1, 1, 3, 1));
+    assert!(store.set_table(
+        "sales-id",
+        "Sales",
+        source,
+        0,
+        0,
+        3,
+        1,
+        true,
+        false,
+        vec!["amount-id".into(), "double-id".into()],
+        vec!["Amount".into(), "Double".into()],
+    ));
+    store.set_formula(source, 0, 3, "=SUM(INDIRECT(\"Values\"))", 0);
+    let cases = [
+        ("=SUM(INDIRECT(\"Values\"))", 120.0),
+        ("=SUM(OFFSET(Values,0,-1))", 60.0),
+        ("=SUM(INDIRECT(\"Sales[Amount]\"))", 60.0),
+        ("=SUM(OFFSET(Sales[Amount],0,1))", 120.0),
+        ("=SUM(INDIRECT(\"Values\",FALSE))", 120.0),
+        ("=SUM(INDIRECT(\"'Source Sheet'!Values\"))", 60.0),
+    ];
+    for (col, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, 0, col, formula, 0);
+    }
+    store.recompute(report);
+    store.recompute(source);
+    assert_close(number(&store, source, 0, 3), 60.0);
+    for (col, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(number(&store, report, 0, col), *expected, "{formula}");
+    }
+    store.set_number(source, 2, 0, 25.0, 0);
+    store.set_number(source, 2, 1, 50.0, 0);
+    store.recompute(report);
+    assert_eq!(
+        [0, 1, 2, 3, 4, 5].map(|col| number(&store, report, 0, col)),
+        [130.0, 65.0, 65.0, 130.0, 130.0, 65.0]
+    );
+}
+
+#[test]
+fn offset_indirect_errors_reject_invalid_references_and_propagate_input_errors() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 24);
+    let cases = [
+        ("=OFFSET(A1,-1,0)", "#REF!"),
+        ("=OFFSET(A1,0,-1)", "#REF!"),
+        ("=OFFSET(A1,0,0,0,1)", "#VALUE!"),
+        ("=OFFSET(A1,0,0,1,-1)", "#VALUE!"),
+        ("=OFFSET(42,0,0)", "#VALUE!"),
+        ("=OFFSET(A1,\"bad\",0)", "#VALUE!"),
+        ("=OFFSET(A1,1/0,0)", "#DIV/0!"),
+        ("=OFFSET(A1,1048576,0)", "#REF!"),
+        ("=INDIRECT(\"not a reference\")", "#REF!"),
+        ("=INDIRECT(\"Missing!A1\")", "#REF!"),
+        ("=INDIRECT(\"A0\")", "#REF!"),
+        ("=INDIRECT(\"XFE1\")", "#REF!"),
+        ("=INDIRECT(\"R0C1\",FALSE)", "#REF!"),
+        ("=INDIRECT(\"R[-99]C1\",FALSE)", "#REF!"),
+        ("=INDIRECT(\"A1+1\")", "#REF!"),
+        ("=INDIRECT(1/0)", "#DIV/0!"),
+        ("=INDIRECT(\"A1\",1/0)", "#DIV/0!"),
+        ("=INDIRECT(\"=A1\")", "#REF!"),
+        ("=INDIRECT(\" A1\")", "#REF!"),
+        ("=INDIRECT(\"((A1))\")", "#REF!"),
+        ("=ROWS(OFFSET(A1,-1,0))", "#REF!"),
+        ("=COLUMNS(INDIRECT(\"bad\"))", "#REF!"),
+        ("=ROWS(OFFSET(A1,0,0,0,1))", "#VALUE!"),
+        ("=ROW(OFFSET(A1,-1,0))", "#REF!"),
+    ];
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(sheet, row, 3, formula, 0);
+    }
+    store.recompute(sheet);
+    for (row, (formula, expected)) in cases.iter().enumerate() {
+        assert_eq!(
+            string(&store, sheet, row, 3).as_deref(),
+            Some(*expected),
+            "{formula}"
+        );
+    }
+}
+
+#[test]
+fn offset_indirect_dynamic_target_edits_refresh_values_and_downstream_dependents() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 4);
+    store.set_string(sheet, 0, 0, "B1", 0);
+    store.set_number(sheet, 1, 0, 0.0, 0);
+    store.set_number(sheet, 0, 1, 5.0, 0);
+    store.set_number(sheet, 1, 1, 11.0, 0);
+    store.set_number(sheet, 0, 2, 9.0, 0);
+    store.set_formula(sheet, 0, 3, "=INDIRECT(A1)", 0);
+    store.set_formula(sheet, 0, 4, "=OFFSET(B1,A2,0)", 0);
+    store.set_formula(sheet, 0, 5, "=D1+E1", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 10.0);
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 14.0);
+
+    store.set_string(sheet, 0, 0, "C1", 0);
+    store.set_number(sheet, 1, 0, 1.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [3, 4, 5].map(|col| number(&store, sheet, 0, col)),
+        [9.0, 11.0, 20.0]
+    );
+    store.set_number(sheet, 0, 1, 100.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 5), 20.0);
+    store.set_number(sheet, 0, 2, 13.0, 0);
+    store.set_number(sheet, 1, 1, 17.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [3, 4, 5].map(|col| number(&store, sheet, 0, col)),
+        [13.0, 17.0, 30.0]
+    );
+}
+
+#[test]
+fn offset_indirect_structural_edits_rebase_references_but_not_address_text() {
+    for edit_rows in [true, false] {
+        let mut store = CellStore::new();
+        let source = store.add_sheet(5, 5);
+        let report = store.add_sheet(2, 2);
+        store.set_sheet_name(source, "source", "Source");
+        store.set_number(source, 1, 1, 10.0, 0);
+        store.set_number(source, 2, 1, 30.0, 0);
+        store.set_number(source, 1, 2, 20.0, 0);
+        store.set_formula(report, 0, 0, "=OFFSET(Source!B2,0,0)", 0);
+        store.set_formula(report, 0, 1, "=INDIRECT(\"Source!B2\")", 0);
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.add_rows(source, 1, 1);
+        } else {
+            store.insert_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 0.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_close(number(&store, report, 0, 0), 10.0);
+        assert_close(number(&store, report, 0, 1), 10.0);
+        if edit_rows {
+            store.remove_rows(source, 1, 1);
+        } else {
+            store.remove_cols(source, 1, 1);
+        }
+        store.recompute(report);
+        assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+        assert_close(
+            number(&store, report, 0, 1),
+            if edit_rows { 30.0 } else { 20.0 },
+        );
+    }
+}
+
+#[test]
+fn offset_indirect_runtime_self_cycles_fail_and_recover_when_the_target_changes() {
+    for (formula, initial_target, recovered_target) in [
+        ("=INDIRECT(C1)", "A1", "B1"),
+        ("=SUM(INDIRECT(C1))", "A1:A2", "B1:B2"),
+    ] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_number(sheet, 0, 1, 7.0, 0);
+        store.set_string(sheet, 0, 2, initial_target, 0);
+        store.set_formula(sheet, 0, 0, formula, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+        store.set_string(sheet, 0, 2, recovered_target, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 0), 7.0);
+    }
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.set_number(sheet, 0, 2, -1.0, 0);
+    store.set_formula(sheet, 0, 0, "=OFFSET(B1,0,C1)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#CYCLE!"));
+    store.set_number(sheet, 0, 2, 0.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+}
+
+#[test]
+fn offset_indirect_runtime_mutual_cycles_propagate_and_recover() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(5, 4);
+    store.set_formula(sheet, 0, 0, "=INDIRECT(\"B1\")", 0);
+    store.set_formula(sheet, 0, 1, "=OFFSET(C1,0,-2)", 0);
+    store.set_formula(sheet, 0, 3, "=A1+1", 0);
+    store.recompute(sheet);
+    for col in [0, 1, 3] {
+        assert_eq!(string(&store, sheet, 0, col).as_deref(), Some("#CYCLE!"));
+    }
+    store.set_number(sheet, 0, 1, 7.0, 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 0), 7.0);
+    assert_close(number(&store, sheet, 0, 3), 8.0);
+}
+
+#[test]
+fn offset_indirect_spill_obstructions_preserve_sources_and_clear_on_retry() {
+    for formula in ["=OFFSET(A1,0,0,2,1)", "=INDIRECT(\"A1:A2\")"] {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 4);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, 1, 0, 9.0, 0);
+        store.set_number(sheet, 1, 2, 99.0, 0);
+        store.set_formula(sheet, 0, 2, formula, 0);
+        store.recompute(sheet);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#SPILL!"));
+        assert_close(number(&store, sheet, 1, 2), 99.0);
+        assert_close(number(&store, sheet, 1, 0), 9.0);
+        store.clear_cell(sheet, 1, 2, 0);
+        store.recompute(sheet);
+        assert_close(number(&store, sheet, 0, 2), 5.0);
+        assert_close(number(&store, sheet, 1, 2), 9.0);
+        assert_eq!(store.formula_source(sheet, 0, 2).as_deref(), Some(formula));
+    }
+}
+
+#[test]
+fn offset_indirect_runtime_cycles_across_sheets_recover_after_source_edits() {
+    let mut store = CellStore::new();
+    let first = store.add_sheet(3, 3);
+    let second = store.add_sheet(3, 3);
+    store.set_sheet_name(first, "first", "First");
+    store.set_sheet_name(second, "second", "Second");
+    store.set_formula(first, 0, 0, "=INDIRECT(\"Second!A1\")", 0);
+    store.set_formula(second, 0, 0, "=OFFSET(First!B1,0,-1)", 0);
+    store.recompute(first);
+    store.recompute(second);
+    assert_eq!(string(&store, first, 0, 0).as_deref(), Some("#CYCLE!"));
+    assert_eq!(string(&store, second, 0, 0).as_deref(), Some("#CYCLE!"));
+    store.set_number(second, 0, 0, 13.0, 0);
+    store.recompute(first);
+    assert_close(number(&store, first, 0, 0), 13.0);
+}
+
+#[test]
+fn offset_indirect_scalar_contexts_and_reference_consumers_use_resolved_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 8);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_number(sheet, 0, 1, 0.0, 0);
+    store.set_string(sheet, 0, 2, "A1", 0);
+    let numeric_cases = [
+        ("=IFERROR(INDIRECT(\"A1\"),0)", 5.0),
+        ("=LET(v,INDIRECT(\"A1\"),IF(v>0,v,0))", 5.0),
+        ("=INDIRECT(INDIRECT(\"C1\"))", 5.0),
+        ("=OFFSET(A1,INDIRECT(\"B1\"),0)", 5.0),
+        ("=ROWS(OFFSET(A1,0,0,3,2))", 3.0),
+    ];
+    for (row, (formula, _)) in numeric_cases.iter().enumerate() {
+        store.set_formula(sheet, row + 1, 4, formula, 0);
+    }
+    store.set_formula(sheet, 1, 5, "=ISERROR(OFFSET(A1,0,0))", 0);
+    store.set_formula(sheet, 2, 5, "=IF(INDIRECT(\"A1\")>0,\"y\",\"n\")", 0);
+    store.recompute(sheet);
+    for (row, (formula, expected)) in numeric_cases.iter().enumerate() {
+        assert_eq!(number(&store, sheet, row + 1, 4), *expected, "{formula}");
+    }
+    assert_eq!(store.get_cell(sheet, 1, 5).kind(), KIND_BOOL);
+    assert_close(number(&store, sheet, 1, 5), 0.0);
+    assert_eq!(string(&store, sheet, 2, 5).as_deref(), Some("y"));
+
+    #[cfg(feature = "analysis")]
+    {
+        let lambda_cases = [
+            ("=LAMBDA(r,OFFSET(A1,r,0))(0)", 5.0),
+            ("=LAMBDA(address,INDIRECT(address))(\"A1\")", 5.0),
+            ("=SUM(MAP({0;0},LAMBDA(r,OFFSET(A1,r,0))))", 10.0),
+        ];
+        for (row, (formula, _)) in lambda_cases.iter().enumerate() {
+            store.set_formula(sheet, row + 1, 6, formula, 0);
+        }
+        store.recompute(sheet);
+        for (row, (formula, expected)) in lambda_cases.iter().enumerate() {
+            assert_eq!(number(&store, sheet, row + 1, 6), *expected, "{formula}");
+        }
+    }
+}
+
+#[test]
+fn offset_indirect_let_scopes_and_runtime_spill_readers_follow_current_values() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(24, 20);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_formula(sheet, 1, 0, "=LET(x,RAND(),SUM(OFFSET(A1,0,0))+x-x)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 5.0);
+
+    store.set_number(sheet, 0, 0, 10.0, 0);
+    store.set_formula(sheet, 0, 2, "=LET(n,5,n+SUM(OFFSET(A1,0,0)))", 0);
+    store.set_formula(sheet, 0, 23, "=LET(a,1,b,C1,SEQUENCE(a+b))", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 1, 0), 10.0);
+    assert_close(number(&store, sheet, 0, 2), 15.0);
+    assert_close(number(&store, sheet, 15, 23), 16.0);
+    assert_eq!(store.get_cell(sheet, 16, 23).kind(), KIND_EMPTY);
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    store.set_formula(sheet, 0, 0, "=INDIRECT(\"C1:C3\")", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [1.0, 2.0, 3.0]
+    );
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(3,1,10)", 0);
+    store.recompute(sheet);
+    assert_eq!(
+        [0, 1, 2].map(|row| number(&store, sheet, row, 0)),
+        [10.0, 11.0, 12.0]
+    );
+}
+
+#[test]
+fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
+    let mut store = CellStore::new();
+    let data = store.add_sheet(1, 1);
+    let report = store.add_sheet(2, 1);
+    store.set_sheet_name(data, "data", "Data");
+    store.set_sheet_name(report, "report", "Report");
+    store.set_number(data, 0, 0, 7.0, 0);
+    store.set_formula(report, 0, 0, "=INDIRECT(\"Data!A1\")", 0);
+    store.set_formula(report, 0, 1, "=INDIRECT(\"New!A1\")", 0);
+    store.recompute(report);
+    assert_close(number(&store, report, 0, 0), 7.0);
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+
+    assert!(store.rename_sheet(data, "data", "New"));
+    assert_eq!(string(&store, report, 0, 0).as_deref(), Some("#REF!"));
+    assert_close(number(&store, report, 0, 1), 7.0);
+
+    assert!(store.remove_sheet(data));
+    assert_eq!(string(&store, report, 0, 1).as_deref(), Some("#REF!"));
+}
+
+#[test]
+fn offset_indirect_spills_with_evaluated_shapes_share_the_spill_budget_by_size() {
+    // Shapes known only after evaluation must not charge the whole spill
+    // budget each, or a few rows of them would turn into #NUM!.
+    let patterns = [
+        "=LET(h,2,OFFSET($A$1,0,0,h,1))",
+        "=LET(a,ADDRESS(1,1)&\":\"&ADDRESS(2,1),INDIRECT(a))",
+        "=LET(n,COUNTA($A$1:$A$2),OFFSET($A$1,0,0,n,1))",
+    ];
+    for pattern in patterns {
+        for rows in [2, 3] {
+            let mut store = CellStore::new();
+            let sheet = store.add_sheet(rows + 1, rows * 3 + 1);
+            store.set_number(sheet, 0, 0, 4.0, 0);
+            store.set_number(sheet, 1, 0, 6.0, 0);
+            let anchors: Vec<usize> = (0..rows).map(|index| 2 + index * 3).collect();
+            for (col, &row) in anchors.iter().enumerate() {
+                store.set_formula(sheet, row, col + 1, pattern, 0);
+            }
+            store.recompute(sheet);
+            for (col, &row) in anchors.iter().enumerate() {
+                assert_eq!(
+                    [row, row + 1].map(|row| number(&store, sheet, row, col + 1)),
+                    [4.0, 6.0],
+                    "{pattern} with {rows} anchors"
+                );
+            }
+        }
+    }
+}

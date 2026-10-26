@@ -200,7 +200,7 @@ Dates are numbers: whole days since the spreadsheet epoch, with a fractional day
 - `DATE` treats 1900 as a leap year for this serial boundary and normalizes month/day overflow; `DATE(2024,13,1)` is 2025-01-01
 - `DATEVALUE` is locale-neutral: it accepts the documented ISO `yyyy-mm-dd` form and fixed slash-delimited numeric forms; it never consults the host locale
 
-`RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates them and their dependents, as in Excel. A transaction without source changes recalculates nothing. `TODAY` and `NOW` read the clock once per recalculation, never during paint or a dependency read, so every formula in one recalculation sees the same time. To recalculate without an edit, or to use a fixed time, the host passes one absolute instant to a barrier:
+`OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates them and their dependents, as in Excel. A transaction without source changes recalculates nothing. `TODAY` and `NOW` read the clock once per recalculation, never during paint or a dependency read, so every formula in one recalculation sees the same time. To recalculate without an edit, or to use a fixed time, the host passes one absolute instant to a barrier:
 
 ```ts prelude="core" partial="requires surrounding host state" title="Partial example"
 store.recalculateVolatile(new Date("2026-07-13T18:00:00.000Z"));
@@ -213,6 +213,16 @@ The default uses `new Date()`. The instant is converted to a UTC serial, so a fi
 Basic `TEXT` date patterns are `yyyy-mm-dd`, `yyyy/mm/dd`, `mm/dd/yyyy`, `dd/mm/yyyy`, `m/d/yyyy`, `yyyy-mm-dd hh:mm`, `yyyy-mm-dd hh:mm:ss`, `hh:mm`, and `hh:mm:ss`.
 
 Text evaluation is host-locale neutral. Function argument separators stay commas; `VALUE` uses `.` decimal and `,` grouping, and `NUMBERVALUE(text, [decimal_separator], [group_separator])` uses those same defaults unless the separators are supplied explicitly. Case conversion uses Unicode mappings, not browser locale. `LEN`, `LEFT`, `RIGHT`, and `MID` count Unicode scalar values rather than UTF-16 code units. Generated text is capped at 16 MiB and bounded searches at 4,000,000 steps; excess work returns `#NUM!`.
+
+## Dynamic references
+
+`OFFSET(reference, rows, cols, [height], [width])` returns a reference shifted from the top-left cell of `reference`. Omitted dimensions inherit the original reference's height and width. For example, `=SUM(OFFSET(A1,0,1,3,1))` sums `B1:B3`; `=OFFSET(A1:A3,0,1)` spills those three cells. Offsets truncate toward zero. A result outside the Excel grid returns `#REF!`. Height and width must be positive; nonpositive dimensions, a non-reference first argument or a nonnumeric offset return `#VALUE!`.
+
+`INDIRECT(text, [a1])` resolves reference text at calculation time. The default `a1=TRUE` accepts A1 notation, such as `=INDIRECT("B"&A1)`. With `FALSE`, it accepts R1C1 notation: `=INDIRECT("R1C2",FALSE)` reads `B1`, and `=INDIRECT("R[-1]C",FALSE)` reads the cell one row above the formula. Sheet-qualified references, defined names and table references are supported. Invalid text, missing targets and external workbook references return `#REF!`; evaluation never opens another workbook.
+
+Both functions return references, so they can feed reference-taking functions such as `ROW`, `SUM` and `FORMULATEXT`; multi-cell formula results spill. They recalculate after each edit, even when the target is chosen at runtime. Runtime dependency cycles return `#CYCLE!`. Existing range and spill limits apply, and reading beyond the loaded sheet returns `#REF!`.
+
+Fill, copy and structural edits rewrite ordinary reference arguments to `OFFSET`. They do not rewrite text inside `INDIRECT`: `"A1"` remains `"A1"` after a row insertion.
 
 ## Cell information functions
 
@@ -301,7 +311,7 @@ The admission check happens before materialization when the shape is statically 
 
 ## Unsupported categories
 
-Formula evaluation performs no network request and runs no custom JavaScript. Volatile reference and array functions, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `INDIRECT`, `OFFSET`, `RANDARRAY`, `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
+Formula evaluation performs no network request and runs no custom JavaScript. `RANDARRAY`, network functions, external/live-data providers, arbitrary external workbook references, and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
 Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
 

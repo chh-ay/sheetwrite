@@ -204,6 +204,8 @@ pub enum Func {
     IsFormula,
     Hyperlink,
     Cell,
+    Offset,
+    Indirect,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -395,6 +397,7 @@ define_function_registry! {
         MinIfs => "MINIFS";
         Minute => "MINUTE";
         MRound => "MROUND";
+        Offset => "OFFSET";
         Proper => "PROPER";
         Search => "SEARCH";
         Second => "SECOND";
@@ -427,6 +430,7 @@ define_function_registry! {
         Workday => "WORKDAY";
         XLookup => "XLOOKUP";
         CountIfs => "COUNTIFS";
+        Indirect => "INDIRECT";
         IsNumber => "ISNUMBER";
         Quotient => "QUOTIENT";
         Sequence => "SEQUENCE";

@@ -85,14 +85,14 @@ getRefTarget(addr: CellAddress): CellAddress | null;
 </details>
 
 <details class="api-member" id="store-recalculate-volatile" data-pagefind-weight="1">
-<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY, NOW, RAND, RANDBETWEEN) from one captured instant.</span></summary>
+<summary><code>recalculateVolatile</code> <span class="api-member-summary">Recompute volatile formulas (TODAY, NOW, RAND, RANDBETWEEN, OFFSET, INDIRECT) from one captured instant.</span></summary>
 
 ```ts generated
 recalculateVolatile(now?: Date): void;
 ```
 
-<p class="api-member-doc">Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`) from one
-captured instant. The supplied Date is interpreted as an absolute UTC instant.
+<p class="api-member-doc">Recompute volatile formulas (`TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `OFFSET`,
+`INDIRECT`) from one captured instant. The supplied Date is interpreted as an absolute UTC instant.
 Edits already recompute volatile formulas and read the clock once per
 recalculation; this call uses `now` instead, until the next edit.</p>
 </details>
