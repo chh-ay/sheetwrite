@@ -191,6 +191,7 @@ impl CellStore {
         store.graph = FormulaGraph::read_transfer(&mut input)?;
         store.mutation_revision = input.u64()?;
         store.volatile_serial = f64::from_bits(input.u64()?);
+        store.random = RandomSource::from_state(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
 
         let sheets = input.count()?;
@@ -279,6 +280,7 @@ impl CellStore {
         self.graph.write_transfer(&mut out);
         out.u64(self.mutation_revision);
         out.u64(self.volatile_serial.to_bits());
+        out.u64(self.random.state());
         out.usize(self.spill_owner_cell_limit);
         out.usize(self.sheets.len());
         for (sheet, data) in self.sheets.iter().enumerate() {
@@ -330,6 +332,29 @@ mod tests {
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 1).num(), 100.0);
         assert_eq!(original.get_cell(0, 0, 1).num(), 42.0);
+    }
+
+    #[test]
+    fn memory_transfer_continues_the_random_sequence_and_volatile_set() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 1);
+        original.set_formula(0, 0, 1, "=RAND()", 0);
+        original.recompute_changed();
+        let cached_draw = original.get_cell(0, 0, 1).num();
+
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).unwrap();
+        for store in [&mut original, &mut replacement] {
+            store.set_number(0, 0, 0, 1.0, 0);
+            store.recompute_changed();
+        }
+
+        let next_draw = original.get_cell(0, 0, 1).num();
+        assert_ne!(next_draw, cached_draw);
+        assert_eq!(
+            replacement.get_cell(0, 0, 1).num().to_bits(),
+            next_draw.to_bits()
+        );
     }
 
     #[test]

@@ -12,6 +12,7 @@ use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
+use crate::eval::RandomSource;
 use crate::graph::{DirtyRect, FormulaGraph};
 use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
@@ -265,7 +266,12 @@ pub struct CellStore {
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
+    pub(crate) random: RandomSource,
     pub(crate) spill_owner_cell_limit: usize,
+    /// Formulas each recompute pass selected, summed over passes. Tests read
+    /// it to bound recalculation work, which no value can show.
+    #[cfg(test)]
+    pub(crate) recomputed_formulas: usize,
 }
 
 /// Cell order of the flat input arrays of a packed block write.
@@ -337,8 +343,11 @@ impl CellStore {
             active_mutation_revision: None,
             named_ranges: HashMap::new(),
             volatile_serial: 0.0,
+            random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
             tables: HashMap::new(),
+            #[cfg(test)]
+            recomputed_formulas: 0,
         }
     }
 
@@ -2307,29 +2316,15 @@ impl CellStore {
     }
 
     /// Explicit volatile barrier. `serial` is a UTC spreadsheet serial using
-    /// the 1899-12-30 epoch; only TODAY/NOW formulas and their dependents dirty.
+    /// the 1899-12-30 epoch; only volatile formulas (TODAY, NOW, RAND,
+    /// RANDBETWEEN) and their dependents recalculate.
     #[wasm_bindgen(js_name = recomputeVolatile)]
     pub fn recompute_volatile(&mut self, serial: f64) -> bool {
         if !serial.is_finite() {
             return false;
         }
         self.volatile_serial = serial;
-        let mut volatile_sheets = Vec::new();
-        for (sheet_index, sheet) in self.sheets.iter_mut().enumerate() {
-            let volatile_cells: Vec<_> = sheet
-                .formulas
-                .iter()
-                .filter_map(|(key, entry)| entry.volatile().then_some(key))
-                .collect();
-            if volatile_cells.is_empty() {
-                continue;
-            }
-            sheet.formulas.mark_cells_dirty(volatile_cells);
-            volatile_sheets.push(sheet_index);
-        }
-        for sheet in volatile_sheets {
-            self.recompute_sheet(sheet);
-        }
+        self.recompute_volatile_formulas();
         true
     }
 

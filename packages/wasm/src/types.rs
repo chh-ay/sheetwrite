@@ -278,7 +278,7 @@ pub(crate) enum FormulaValueKind {
 
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
-        Ast::Func(Func::Today | Func::Now, _) => true,
+        Ast::Func(Func::Today | Func::Now | Func::Rand | Func::RandBetween, _) => true,
         Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_is_volatile),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_is_volatile(left) || ast_is_volatile(right)

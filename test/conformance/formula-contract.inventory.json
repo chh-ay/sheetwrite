@@ -3596,6 +3596,75 @@
         }
       ],
       "returns": "scalar"
+    },
+    "random-between": {
+      "arguments": [
+        {
+          "name": "bottom",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "top",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "required-reference": {
+      "arguments": [
+        {
+          "name": "reference",
+          "required": true,
+          "default": null,
+          "accepts": ["range", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "hyperlink": {
+      "arguments": [
+        {
+          "name": "linkLocation",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "friendlyName",
+          "required": false,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
+    },
+    "cell-info": {
+      "arguments": [
+        {
+          "name": "infoType",
+          "required": true,
+          "default": null,
+          "accepts": ["scalar", "reference"],
+          "repeat": "once"
+        },
+        {
+          "name": "reference",
+          "required": false,
+          "default": "formula-cell",
+          "accepts": ["range", "reference"],
+          "repeat": "once"
+        }
+      ],
+      "returns": "scalar"
     }
   },
   "semanticsProfiles": {
@@ -4633,6 +4702,96 @@
         "collaboration": "formula-source",
         "xlsxSource": "rewrite-on-structural-edit"
       }
+    },
+    "volatile-random": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "rejected",
+        "array": "rejected",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "zero",
+        "text": "number-if-parseable",
+        "boolean": "number",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "function-defined",
+        "domain": "bounded",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
+    },
+    "hyperlink-display": {
+      "shape": {
+        "scalar": "accepted",
+        "range": "rejected",
+        "array": "rejected",
+        "broadcast": "none",
+        "result": "scalar"
+      },
+      "coercion": {
+        "blank": "preserved",
+        "text": "preserved",
+        "boolean": "preserved",
+        "error": "propagate"
+      },
+      "text": {
+        "case": "not-applicable",
+        "wildcard": "not-applicable"
+      },
+      "environment": {
+        "locale": "invariant",
+        "dateSystem": "not-applicable"
+      },
+      "numeric": {
+        "tolerance": "exact",
+        "domain": "all-inputs",
+        "iteration": {
+          "kind": "none",
+          "maximum": null
+        }
+      },
+      "calculation": {
+        "dependencies": "tracked",
+        "lazy": "eager",
+        "spill": "scalar",
+        "fill": "relative-reference-rewrite",
+        "copy": "relative-reference-rewrite",
+        "structuralRewrite": "ast-reference-rewrite"
+      },
+      "persistence": {
+        "snapshot": "formula-source",
+        "history": "formula-source",
+        "collaboration": "formula-source",
+        "xlsxSource": "rewrite-on-structural-edit"
+      }
     }
   },
   "dialectProfiles": {
@@ -4715,6 +4874,27 @@
       "divergences": [
         "Available only in @sheetwrite/formulas. Aggregators must be a single eta-reduced built-in or a LAMBDA with one or two parameters. Vectors of functions are not supported.",
         "Grouping and output use the engine spill and work limits."
+      ]
+    },
+    "excel-reference-information": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "CELL supports the info types address, col, contents, row and type. Other info types return #VALUE!.",
+        "CELL without a reference describes the cell of the formula, as in LibreOffice. Excel uses the last changed cell.",
+        "A formula that reads its own cell with FORMULATEXT, ISFORMULA or CELL is a #CYCLE! error.",
+        "Cells inside a spilled range and host-linked reference cells hold no formula. For them, FORMULATEXT returns #N/A and ISFORMULA returns FALSE.",
+        "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
+      ]
+    },
+    "excel-hyperlink-value": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "HYPERLINK returns its display value: the friendly name, or the link when there is no friendly name. The grid does not open the link. Use cell hyperlinks for links that open.",
+        "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
       ]
     }
   },
@@ -4977,15 +5157,51 @@
         "status": "source-linked",
         "paths": ["packages/wasm/src/eval/analysis/groupby.rs"]
       }
+    },
+    "implemented-random": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/random.rs", "packages/wasm/src/eval/dependency.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+      }
+    },
+    "implemented-reference-information": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/eval/info.rs"]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+      }
     }
   },
   "unsupportedCategories": [
     {
       "id": "volatile",
-      "title": "Volatile recalculation",
+      "title": "Volatile references and arrays",
       "status": "unsupported",
-      "scope": "Automatic volatility semantics beyond the existing clock functions are outside the supported contract.",
-      "examples": ["INDIRECT", "OFFSET", "RAND", "RANDBETWEEN", "RANDARRAY"],
+      "scope": "OFFSET and INDIRECT build references at calculation time, and RANDARRAY returns a volatile array. These functions are outside the supported contract.",
+      "examples": ["INDIRECT", "OFFSET", "RANDARRAY"],
       "source": "microsoft-excel-functions",
       "section": "Math and trigonometry functions",
       "implementation": {
@@ -5613,6 +5829,18 @@
       "version": 1
     },
     {
+      "canonical": "ISFORMULA",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "required-reference",
+      "semantics": "information",
+      "dialects": "excel-reference-information",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
       "canonical": "N",
       "aliases": [],
       "family": "information-error",
@@ -5849,6 +6077,30 @@
       "semantics": "volatile-date",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RAND",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "zero",
+      "semantics": "volatile-random",
+      "dialects": "excel-documented",
+      "implementation": "implemented-random",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "RANDBETWEEN",
+      "aliases": [],
+      "family": "math",
+      "contractStatus": "supported",
+      "signature": "random-between",
+      "semantics": "volatile-random",
+      "dialects": "excel-documented",
+      "implementation": "implemented-random",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
@@ -6869,6 +7121,42 @@
       "semantics": "lookup",
       "dialects": "excel-documented",
       "implementation": "implemented-assisted",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "FORMULATEXT",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "required-reference",
+      "semantics": "information",
+      "dialects": "excel-reference-information",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "HYPERLINK",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "hyperlink",
+      "semantics": "hyperlink-display",
+      "dialects": "excel-hyperlink-value",
+      "implementation": "implemented-reference-information",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "CELL",
+      "aliases": [],
+      "family": "information-error",
+      "contractStatus": "supported",
+      "signature": "cell-info",
+      "semantics": "information",
+      "dialects": "excel-reference-information",
+      "implementation": "implemented-reference-information",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },

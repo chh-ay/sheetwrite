@@ -198,6 +198,12 @@ pub enum Func {
     Rate,
     Ipmt,
     Ppmt,
+    Rand,
+    RandBetween,
+    FormulaText,
+    IsFormula,
+    Hyperlink,
+    Cell,
     /// `A1#`: the current spill of the anchor cell. Only `#` after a cell
     /// reference makes it; the name is not in the function table.
     AnchorArray,
@@ -325,6 +331,7 @@ define_function_registry! {
         Row => "ROW";
         Sum => "SUM";
         Xor => "XOR";
+        Cell => "CELL";
         Char => "CHAR";
         Code => "CODE";
         Date => "DATE";
@@ -338,6 +345,7 @@ define_function_registry! {
         IsNa => "ISNA";
         Left => "LEFT";
         Ppmt => "PPMT";
+        Rand => "RAND";
         Rate => "RATE";
         Rept => "REPT";
         Rows => "ROWS";
@@ -427,6 +435,8 @@ define_function_registry! {
         YearFrac => "YEARFRAC";
         AverageIf => "AVERAGEIF";
         DateValue => "DATEVALUE";
+        Hyperlink => "HYPERLINK";
+        IsFormula => "ISFORMULA";
         IsLogical => "ISLOGICAL";
         ModeSngl => "MODE.SNGL";
         RoundDown => "ROUNDDOWN";
@@ -439,8 +449,10 @@ define_function_registry! {
         Substitute => "SUBSTITUTE";
         SumProduct => "SUMPRODUCT";
         Concatenate => "CONCATENATE";
+        FormulaText => "FORMULATEXT";
         NetworkDays => "NETWORKDAYS";
         NumberValue => "NUMBERVALUE";
+        RandBetween => "RANDBETWEEN";
         CovarianceP => "COVARIANCE.P";
         CovarianceS => "COVARIANCE.S";
         QuartileInc => "QUARTILE.INC";

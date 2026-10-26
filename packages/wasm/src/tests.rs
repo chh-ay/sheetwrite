@@ -4317,3 +4317,237 @@ fn a_spill_that_reads_a_later_one_cell_spill_sees_its_new_value() {
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 2.0);
 }
+
+/// Volatile formulas (RAND, RANDBETWEEN, NOW, TODAY) recalculate with their
+/// dependents at every edit barrier, as in Excel; every other formula
+/// recalculates only when something it reads changed.
+mod volatile_recalculation {
+    use super::*;
+
+    /// Formulas the recompute passes selected since the previous call.
+    fn recomputed_since(store: &CellStore, mark: &mut usize) -> usize {
+        let selected = store.recomputed_formulas - *mark;
+        *mark = store.recomputed_formulas;
+        selected
+    }
+
+    #[test]
+    fn an_unrelated_edit_recalculates_only_volatile_formulas_and_their_dependents() {
+        const INPUT_ROWS: usize = 100;
+        let mut store = CellStore::new();
+        let report = store.add_sheet(2, 2);
+        let inputs = store.add_sheet(2, INPUT_ROWS);
+        for row in 0..INPUT_ROWS {
+            store.set_number(inputs, row, 0, row as f64, 0);
+            store.set_formula(inputs, row, 1, &format!("=A{}+1", row + 1), 0);
+        }
+        store.commit_sources();
+        let mut mark = store.recomputed_formulas;
+
+        store.set_number(inputs, 0, 0, 10.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+        assert_close(number(&store, inputs, 0, 1), 11.0);
+
+        store.set_formula(report, 0, 0, "=RAND()", 0);
+        store.set_formula(report, 0, 1, "=A1*10", 0);
+        store.set_formula(report, 1, 0, "=NOW()", 0);
+        store.set_formula(report, 1, 1, "=A2+1", 0);
+        store.commit_sources();
+        recomputed_since(&store, &mut mark);
+        let first_draw = number(&store, report, 0, 0);
+
+        // An edit on another sheet adds the four volatile cells and their
+        // dependents to its own dependent, and nothing else.
+        store.set_number(inputs, 0, 0, 20.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1 + 4);
+        let second_draw = number(&store, report, 0, 0);
+        assert_ne!(first_draw, second_draw);
+        assert_close(number(&store, report, 0, 1), second_draw * 10.0);
+        assert_close(number(&store, inputs, 0, 1), 21.0);
+
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 0);
+        assert_eq!(number(&store, report, 0, 0), second_draw);
+
+        store.set_number(report, 0, 0, 0.5, 0);
+        store.set_formula(report, 1, 0, "=1", 0);
+        store.commit_sources();
+        recomputed_since(&store, &mut mark);
+        store.set_number(inputs, 0, 0, 30.0, 0);
+        store.commit_sources();
+        assert_eq!(recomputed_since(&store, &mut mark), 1);
+    }
+
+    #[test]
+    fn moved_volatile_formulas_keep_recalculating_at_their_new_cells() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 2);
+        store.set_formula(sheet, 0, 0, "=RAND()", 0);
+        store.commit_sources();
+
+        store.insert_cols(sheet, 0, 1);
+        store.commit_sources();
+        let moved_draw = number(&store, sheet, 0, 1);
+        store.set_number(sheet, 1, 3, 1.0, 0);
+        store.commit_sources();
+
+        assert_ne!(number(&store, sheet, 0, 1), moved_draw);
+        assert_eq!(store.get_cell(sheet, 0, 0).kind(), KIND_EMPTY);
+    }
+
+    #[test]
+    fn rand_and_randbetween_draw_inside_their_bounds_and_reject_invalid_ones() {
+        const DRAWS: usize = 200;
+        const EDIT_COL: usize = 12;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(13, 1);
+        let errors = [
+            (3, "=RANDBETWEEN(-3.5,-3.2)", "#NUM!"),
+            (4, "=RANDBETWEEN(5,1)", "#NUM!"),
+            (5, "=RANDBETWEEN(\"a\",2)", "#VALUE!"),
+            (6, "=RANDBETWEEN(1)", "#VALUE!"),
+            (7, "=RAND(1)", "#VALUE!"),
+            (8, "=RANDBETWEEN(1/0,2)", "#DIV/0!"),
+            (9, "=RANDBETWEEN(1,NA())", "#N/A"),
+            (10, "=RANDBETWEEN(A1:A1,2)", "#VALUE!"),
+            (11, "=RANDBETWEEN(\"\",5)", "#VALUE!"),
+        ];
+        store.set_formula(sheet, 0, 0, "=RAND()", 0);
+        store.set_formula(sheet, 0, 1, "=RANDBETWEEN(1,6)", 0);
+        store.set_formula(sheet, 0, 2, "=RANDBETWEEN(2.2,3)", 0);
+        for (col, formula, _) in errors {
+            store.set_formula(sheet, 0, col, formula, 0);
+        }
+
+        let mut faces = [false; 6];
+        for draw in 0..DRAWS {
+            store.set_number(sheet, 0, EDIT_COL, draw as f64, 0);
+            store.commit_sources();
+
+            let unit = number(&store, sheet, 0, 0);
+            assert!((0.0..1.0).contains(&unit), "RAND() = {unit}");
+            let face = number(&store, sheet, 0, 1);
+            assert!(face.fract() == 0.0 && (1.0..=6.0).contains(&face), "{face}");
+            faces[face as usize - 1] = true;
+            assert_close(number(&store, sheet, 0, 2), 3.0);
+        }
+
+        assert_eq!(faces, [true; 6]);
+        for (col, formula, expected) in errors {
+            assert_eq!(
+                string(&store, sheet, 0, col).as_deref(),
+                Some(expected),
+                "{formula}"
+            );
+        }
+    }
+}
+
+/// FORMULATEXT, ISFORMULA, HYPERLINK and CELL describe a referenced cell or
+/// return a display value.
+mod cell_information {
+    use super::*;
+
+    fn bool_at(store: &CellStore, sheet: usize, col: usize) -> bool {
+        assert_eq!(store.get_cell(sheet, 0, col).kind(), KIND_BOOL, "col {col}");
+        number(store, sheet, 0, col) != 0.0
+    }
+
+    #[test]
+    fn information_functions_read_formula_sources_and_cell_facts() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(2, 4);
+        store.set_sheet_name(data, "data", "Data");
+        let main = store.add_sheet(32, 3);
+        store.set_sheet_name(main, "main", "Main");
+        store.set_number(data, 0, 0, 5.0, 0);
+        store.set_formula(data, 1, 0, "=A1*2", 0);
+        store.set_string(data, 2, 0, "label", 0);
+
+        let texts = [
+            (0, "=FORMULATEXT(Data!A2)", "=A1*2"),
+            (1, "=FORMULATEXT(Data!A1)", "#N/A"),
+            (2, "=FORMULATEXT(Data!A4)", "#N/A"),
+            (3, "=FORMULATEXT(1)", "#VALUE!"),
+            (4, "=FORMULATEXT(1/0)", "#DIV/0!"),
+            (5, "=FORMULATEXT(Data!A2:A3)", "=A1*2"),
+            // The reference is a dependency, so a self-reference is a cycle.
+            (6, "=FORMULATEXT(G1)", "#CYCLE!"),
+            (7, "=ISFORMULA(\"A1\")", "#VALUE!"),
+            (
+                8,
+                "=HYPERLINK(\"https://example.com\")",
+                "https://example.com",
+            ),
+            (9, "=HYPERLINK(\"https://example.com\",\"Docs\")", "Docs"),
+            (10, "=HYPERLINK(1/0,\"Docs\")", "#DIV/0!"),
+            (11, "=HYPERLINK()", "#VALUE!"),
+            (12, "=CELL(\"address\",Data!B3)", "'Data'!$B$3"),
+            (13, "=CELL(\"Address\",B3)", "$B$3"),
+            (14, "=CELL(\"type\",Data!A3)", "l"),
+            (15, "=CELL(\"type\",Data!A4)", "b"),
+            (16, "=CELL(\"type\",Data!A1)", "v"),
+            (17, "=CELL(\"format\",Data!A1)", "#VALUE!"),
+            (18, "=CELL(1,A1)", "#VALUE!"),
+            (19, "=CELL(\"bogus\",A1)", "#VALUE!"),
+            (29, "=CELL(\" row\",A1)", "#VALUE!"),
+        ];
+        let numbers = [
+            (20, "=HYPERLINK(\"https://example.com\",Data!A1)", 5.0),
+            (21, "=CELL(\"row\",Data!B3)", 3.0),
+            (22, "=CELL(\"col\",Data!B3)", 2.0),
+            (23, "=CELL(\"contents\",Data!A2)", 10.0),
+            (24, "=CELL(\"col\")", 25.0),
+        ];
+        let bools = [
+            (25, "=ISFORMULA(Data!A2)", true),
+            (26, "=ISFORMULA(Data!A1)", false),
+            (27, "=ISFORMULA(Data!A4)", false),
+            (28, "=ISFORMULA(Data!A2:A3)", true),
+        ];
+        for (col, formula, _) in texts {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in numbers {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        for (col, formula, _) in bools {
+            store.set_formula(main, 0, col, formula, 0);
+        }
+        store.commit_sources();
+
+        for (col, formula, expected) in texts {
+            assert_eq!(
+                string(&store, main, 0, col).as_deref(),
+                Some(expected),
+                "{formula}"
+            );
+        }
+        for (col, _, expected) in numbers {
+            assert_close(number(&store, main, 0, col), expected);
+        }
+        for (col, formula, expected) in bools {
+            assert_eq!(bool_at(&store, main, col), expected, "{formula}");
+        }
+    }
+
+    #[test]
+    fn formula_checks_follow_a_referenced_cell_that_becomes_a_formula() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 1);
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_formula(sheet, 0, 1, "=ISFORMULA(A1)", 0);
+        store.set_formula(sheet, 0, 2, "=FORMULATEXT(A1)", 0);
+        store.commit_sources();
+        assert!(!bool_at(&store, sheet, 1));
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#N/A"));
+
+        store.set_formula(sheet, 0, 0, "=2+3", 0);
+        store.commit_sources();
+
+        assert!(bool_at(&store, sheet, 1));
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("=2+3"));
+    }
+}

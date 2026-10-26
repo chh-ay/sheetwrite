@@ -695,6 +695,16 @@ pub(super) fn collect_affected_formulas(
                 }
             }
         }
+
+        // Volatile formulas recalculate on every pass, as in Excel. Seeding
+        // them here instead of marking them dirty keeps the dirty state exact
+        // and costs O(volatile cells); the BFS below adds their dependents.
+        for cell in sheet.formulas.volatile_keys() {
+            let abs = AbsCellKey::from_local(seed_sheet, cell);
+            if affected.insert(abs) {
+                queue.push_back(abs);
+            }
+        }
     }
 
     while let Some(cell) = queue.pop_front() {

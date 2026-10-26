@@ -8,10 +8,12 @@ mod date;
 mod dependency;
 mod financial;
 mod functions;
+mod info;
 mod lookup;
 mod math;
 mod matrix;
 mod operators;
+mod random;
 mod range_reader;
 mod statistics;
 mod text;
@@ -47,6 +49,7 @@ use lookup::{
 };
 pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use value::{
     aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
@@ -396,12 +399,35 @@ impl CellStore {
         self.recompute_seed_sheets(&[sheet]);
     }
 
+    /// The edit barrier. Any source change recalculates every volatile formula
+    /// in the workbook, so sheets that hold volatile formulas join the seeds
+    /// even when only another sheet changed. A barrier without changes does
+    /// no work, volatile formulas included.
     pub(crate) fn recompute_changed(&mut self) {
-        let seeds: Vec<usize> = self
+        let mut seeds: Vec<usize> = self
             .sheets
             .iter()
             .enumerate()
             .filter_map(|(sheet, data)| data.formulas.has_dirty().then_some(sheet))
+            .collect();
+
+        if !seeds.is_empty() {
+            seeds.extend(self.sheets.iter().enumerate().filter_map(|(sheet, data)| {
+                (data.formulas.has_volatile() && !data.formulas.has_dirty()).then_some(sheet)
+            }));
+        }
+
+        self.recompute_seed_sheets(&seeds);
+    }
+
+    /// The host clock barrier: recalculates every volatile formula and its
+    /// dependents. Pending source changes of those sheets join the same pass.
+    pub(crate) fn recompute_volatile_formulas(&mut self) {
+        let seeds: Vec<usize> = self
+            .sheets
+            .iter()
+            .enumerate()
+            .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
 
         self.recompute_seed_sheets(&seeds);
@@ -448,6 +474,11 @@ impl CellStore {
                     })
                 }
             }
+        }
+
+        #[cfg(test)]
+        {
+            self.recomputed_formulas += affected.len();
         }
 
         if affected.is_empty() {
@@ -1335,6 +1366,17 @@ impl CellStore {
             } else {
                 self.volatile_serial
             });
+        }
+
+        if matches!(func, Func::Rand | Func::RandBetween) {
+            return self.eval_random_func(func == Func::RandBetween, args, sheet, pass, depth + 1);
+        }
+
+        if matches!(
+            func,
+            Func::FormulaText | Func::IsFormula | Func::Hyperlink | Func::Cell
+        ) {
+            return self.eval_info_func(func, args, sheet, pass, depth + 1);
         }
 
         if matches!(

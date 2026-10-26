@@ -82,5 +82,12 @@ list every limit, its unit, and its behavior.
 
 Formula calculation makes no network request and runs no JavaScript from the
 document. Functions that need external data, such as `WEBSERVICE` or
-`GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` change only when the host
-calls `store.recalculateVolatile(date)`.
+`GOOGLEFINANCE`, are not supported. `TODAY` and `NOW` read the time only when the
+host calls `store.recalculateVolatile(date)`.
+
+## Volatile functions
+
+`RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile. Each edit recalculates
+them and the formulas that read them, as in Excel. Other formulas recalculate
+only when a cell they read changes. The cost of an edit grows with the number
+of volatile formulas and their dependents, not with the size of the workbook.
