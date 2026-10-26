@@ -762,161 +762,220 @@ pub(super) fn seed_dependency_depth_errors(
     if !index.has_formula_dependencies {
         return;
     }
-    let dependencies = collect_formula_dependencies(sheets, affected, index);
-    let mut depth_memo: FxHashMap<AbsCellKey, Result<usize, FormulaError>> =
-        FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
-    let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
 
+    let mut walk = DependencyDepthWalk::new(sheets, affected);
     for &key in affected {
-        if let Err(error) =
-            formula_dependency_depth(key, &dependencies, &mut depth_memo, &mut visiting)
-        {
+        if let Err(error) = walk.depth(key) {
             memo.insert(key, Value::Error(error));
         }
     }
 }
 
-const LINEAR_DEPENDENCY_DEDUP_LIMIT: usize = 8;
+/// A node of the depth/cycle graph. A range read is one node shared by all of
+/// its readers instead of an edge from every reader to every formula inside it,
+/// so the graph grows with formulas plus distinct ranges, not with readers times
+/// range members. A formula adds one level of depth; a range adds none.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+enum DependencyNode {
+    Formula(AbsCellKey),
+    Range(CellRange),
+}
 
-fn collect_formula_dependencies(
-    sheets: &[SheetData],
-    affected: &FxHashSet<AbsCellKey>,
-    index: &DepIndex,
-) -> FxHashMap<AbsCellKey, Vec<AbsCellKey>> {
-    let formula_cells: Vec<AbsCellKey> = affected
-        .iter()
-        .copied()
-        .filter(|key| formula_exists(sheets, *key))
-        .collect();
-    let formula_set: FxHashSet<AbsCellKey> = formula_cells.iter().copied().collect();
-    let mut dependencies: FxHashMap<AbsCellKey, Vec<AbsCellKey>> =
-        FxHashMap::with_capacity_and_hasher(formula_cells.len(), Default::default());
-    let mut seen_dependencies: FxHashMap<AbsCellKey, FxHashSet<AbsCellKey>> = FxHashMap::default();
+#[derive(Clone, Copy)]
+enum NodeDepth {
+    /// An affected formula the walk has not entered yet.
+    Pending,
+    /// On the walk stack: reaching it again closes a cycle.
+    Visiting,
+    Done(Result<usize, FormulaError>),
+}
 
-    for &formula_cell in &formula_cells {
-        dependencies.entry(formula_cell).or_default();
+/// One node on the explicit walk stack; formula chains can be far deeper than
+/// the native stack allows.
+struct DependencyFrame<'a> {
+    node: DependencyNode,
+    /// The formula's direct reads; empty for a range node.
+    cells: &'a [AbsCellKey],
+    /// The formula's range reads; empty for a range node.
+    ranges: &'a [CellRange],
+    /// For a formula, the index into `cells` then `ranges`; for a range, the
+    /// index into the walk's column-major formula list.
+    next: usize,
+    /// The deepest dependency so far, or the first error one reported.
+    deepest: Result<usize, FormulaError>,
+}
+
+impl DependencyFrame<'_> {
+    fn include(&mut self, dependency: Result<usize, FormulaError>) {
+        self.deepest = self
+            .deepest
+            .and_then(|deepest| dependency.map(|depth| deepest.max(depth)));
     }
 
-    for &formula_cell in &formula_cells {
-        let Some(entry) = formula_entry(sheets, formula_cell) else {
-            continue;
-        };
+    fn finish(&self) -> Result<usize, FormulaError> {
+        let own_depth = usize::from(matches!(self.node, DependencyNode::Formula(_)));
+        self.deepest.and_then(|deepest| {
+            let depth = deepest + own_depth;
+            if depth > FORMULA_RECURSION_LIMIT {
+                Err(FormulaError::Num)
+            } else {
+                Ok(depth)
+            }
+        })
+    }
 
-        for &cell in &entry.reads.cells {
-            if formula_set.contains(&cell) {
-                push_unique_dependency(
-                    &mut dependencies,
-                    &mut seen_dependencies,
-                    formula_cell,
-                    cell,
-                );
+    fn next_dependency(
+        &mut self,
+        formulas: &[AbsCellKey],
+        nodes: &FxHashMap<DependencyNode, NodeDepth>,
+    ) -> Option<DependencyNode> {
+        match self.node {
+            DependencyNode::Formula(_) => {
+                // Only affected formulas carry depth; other direct reads are
+                // values that cannot extend a chain.
+                while let Some(&cell) = self.cells.get(self.next) {
+                    self.next += 1;
+                    let dependency = DependencyNode::Formula(cell);
+                    if nodes.contains_key(&dependency) {
+                        return Some(dependency);
+                    }
+                }
+                let range = *self.ranges.get(self.next - self.cells.len())?;
+                self.next += 1;
+                Some(DependencyNode::Range(range))
+            }
+            DependencyNode::Range(range) => {
+                // Members are contiguous per column, so rows outside the range
+                // and the rest of a column are skipped by binary search rather
+                // than scanned.
+                while let Some(&key) = formulas.get(self.next) {
+                    if key.sheet != range.sheet || key.col > range.col_end {
+                        return None;
+                    }
+                    if key.row < range.row_start {
+                        self.next += formulas[self.next..].partition_point(|&cell| {
+                            column_major(cell) < (key.sheet, key.col, range.row_start)
+                        });
+                    } else if key.row > range.row_end {
+                        self.next += formulas[self.next..]
+                            .partition_point(|cell| (cell.sheet, cell.col) <= (key.sheet, key.col));
+                    } else {
+                        self.next += 1;
+                        return Some(DependencyNode::Formula(key));
+                    }
+                }
+                None
             }
         }
     }
+}
 
-    let mut range_matches: Vec<usize> = Vec::new();
-    let mut row_matches: Vec<usize> = Vec::new();
-    let mut range_marks = vec![0; index.range_groups.len()];
-    let mut range_stamp = 1;
-    for &dependency in &formula_cells {
-        index.collect_matching_range_groups(
-            dependency,
-            &mut range_matches,
-            &mut row_matches,
-            &mut range_marks,
-            &mut range_stamp,
+fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
+    (key.sheet, key.col, key.row)
+}
+
+/// Depth and cycle checks over the affected formulas. Scratch memory is one
+/// entry per affected formula and per distinct range read, plus a stack no
+/// deeper than the longest dependency path; edges are read from the formula
+/// entries in place.
+struct DependencyDepthWalk<'a> {
+    sheets: &'a [SheetData],
+    /// Affected formulas in column-major order, so a range finds its members
+    /// without probing each of its cells.
+    formulas: Vec<AbsCellKey>,
+    nodes: FxHashMap<DependencyNode, NodeDepth>,
+    stack: Vec<DependencyFrame<'a>>,
+}
+
+impl<'a> DependencyDepthWalk<'a> {
+    fn new(sheets: &'a [SheetData], affected: &FxHashSet<AbsCellKey>) -> Self {
+        let mut formulas: Vec<AbsCellKey> = affected
+            .iter()
+            .copied()
+            .filter(|&key| formula_exists(sheets, key))
+            .collect();
+        formulas.sort_unstable_by_key(|&key| column_major(key));
+
+        let mut nodes = FxHashMap::with_capacity_and_hasher(formulas.len(), Default::default());
+        nodes.extend(
+            formulas
+                .iter()
+                .map(|&key| (DependencyNode::Formula(key), NodeDepth::Pending)),
         );
-        for &group in &range_matches {
-            let range_group = &index.range_groups[group];
-            debug_assert!(range_group.range.contains(dependency));
-            for &dependent in &range_group.dependents {
-                if formula_set.contains(&dependent) {
-                    push_unique_dependency(
-                        &mut dependencies,
-                        &mut seen_dependencies,
-                        dependent,
-                        dependency,
-                    );
+        Self {
+            sheets,
+            formulas,
+            nodes,
+            stack: Vec::new(),
+        }
+    }
+
+    /// Depth of `key` counted in formulas, or the first error a dependency
+    /// reports: `Cycle` when a path returns to a node still on the stack, `Num`
+    /// past [`FORMULA_RECURSION_LIMIT`]. A path is not cut at the limit, so a
+    /// cycle beyond it still reports `Cycle`.
+    fn depth(&mut self, key: AbsCellKey) -> Result<usize, FormulaError> {
+        let root = DependencyNode::Formula(key);
+        match self.nodes.get(&root) {
+            None => return Ok(1),
+            Some(NodeDepth::Done(result)) => return *result,
+            Some(NodeDepth::Pending | NodeDepth::Visiting) => self.enter(root),
+        }
+
+        // The root is the last node to finish.
+        let mut finished = Ok(0);
+        while let Some(frame) = self.stack.last_mut() {
+            let dependency = if frame.deepest.is_ok() {
+                frame.next_dependency(&self.formulas, &self.nodes)
+            } else {
+                None
+            };
+            if let Some(dependency) = dependency {
+                match self.nodes.get(&dependency).copied() {
+                    Some(NodeDepth::Done(result)) => frame.include(result),
+                    Some(NodeDepth::Visiting) => frame.deepest = Err(FormulaError::Cycle),
+                    Some(NodeDepth::Pending) | None => self.enter(dependency),
                 }
+                continue;
+            }
+
+            finished = frame.finish();
+            let node = frame.node;
+            self.stack.pop();
+            self.nodes.insert(node, NodeDepth::Done(finished));
+            if let Some(parent) = self.stack.last_mut() {
+                parent.include(finished);
             }
         }
+        finished
     }
 
-    dependencies
-}
-
-fn push_unique_dependency(
-    dependencies: &mut FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
-    seen_dependencies: &mut FxHashMap<AbsCellKey, FxHashSet<AbsCellKey>>,
-    formula_cell: AbsCellKey,
-    dependency: AbsCellKey,
-) {
-    let formula_dependencies = dependencies.entry(formula_cell).or_default();
-    if let Some(seen) = seen_dependencies.get_mut(&formula_cell) {
-        if seen.insert(dependency) {
-            formula_dependencies.push(dependency);
-        }
-        return;
-    }
-    if formula_dependencies.contains(&dependency) {
-        return;
-    }
-    if formula_dependencies.len() < LINEAR_DEPENDENCY_DEDUP_LIMIT {
-        formula_dependencies.push(dependency);
-        return;
-    }
-
-    let mut seen =
-        FxHashSet::with_capacity_and_hasher(formula_dependencies.len() + 1, Default::default());
-    seen.extend(formula_dependencies.iter().copied());
-    let inserted = seen.insert(dependency);
-    seen_dependencies.insert(formula_cell, seen);
-    if inserted {
-        formula_dependencies.push(dependency);
-    }
-}
-
-fn formula_dependency_depth(
-    key: AbsCellKey,
-    dependencies: &FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
-    depth_memo: &mut FxHashMap<AbsCellKey, Result<usize, FormulaError>>,
-    visiting: &mut FxHashSet<AbsCellKey>,
-) -> Result<usize, FormulaError> {
-    if let Some(result) = depth_memo.get(&key) {
-        return *result;
-    }
-    if !visiting.insert(key) {
-        let result = Err(FormulaError::Cycle);
-        depth_memo.insert(key, result);
-        return result;
-    }
-
-    let mut max_dependency_depth = 0;
-    let mut result = Ok(1);
-    if let Some(deps) = dependencies.get(&key) {
-        for &dependency in deps {
-            match formula_dependency_depth(dependency, dependencies, depth_memo, visiting) {
-                Ok(depth) => max_dependency_depth = max_dependency_depth.max(depth),
-                Err(error) => {
-                    result = Err(error);
-                    break;
-                }
+    fn enter(&mut self, node: DependencyNode) {
+        let (cells, ranges, next): (&'a [AbsCellKey], &'a [CellRange], usize) = match node {
+            DependencyNode::Formula(key) => self
+                .sheets
+                .get(key.sheet as usize)
+                .and_then(|sheet| sheet.formulas.get(key.local()))
+                .map_or((&[], &[], 0), |entry| {
+                    (&entry.reads.cells, &entry.reads.ranges, 0)
+                }),
+            DependencyNode::Range(range) => {
+                let first = (range.sheet, range.col_start, range.row_start);
+                let next = self
+                    .formulas
+                    .partition_point(|&key| column_major(key) < first);
+                (&[], &[], next)
             }
-        }
-    }
-
-    if result.is_ok() {
-        let depth = max_dependency_depth + 1;
-        result = if depth > FORMULA_RECURSION_LIMIT {
-            Err(FormulaError::Num)
-        } else {
-            Ok(depth)
         };
+        self.nodes.insert(node, NodeDepth::Visiting);
+        self.stack.push(DependencyFrame {
+            node,
+            cells,
+            ranges,
+            next,
+            deepest: Ok(0),
+        });
     }
-
-    visiting.remove(&key);
-    depth_memo.insert(key, result);
-    result
 }
 
 #[cfg(test)]
@@ -934,9 +993,6 @@ mod tests {
         let right = AbsCellKey::new(sheet, 0, 1);
         let affected = FxHashSet::from_iter([left, right]);
         let index = build_dep_index(&store.sheets);
-        let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
-        assert_eq!(dependencies.get(&left), Some(&vec![right]));
-        assert_eq!(dependencies.get(&right), Some(&vec![left]));
 
         let mut memo = FxHashMap::default();
         seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
@@ -1106,5 +1162,100 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(store.get_cell(sheet, READERS - 1, 1).num(), 5.0);
         assert_patch_matches_rebuild(&mut store);
+    }
+
+    #[test]
+    fn dense_overlapping_ranges_share_one_node_per_range() {
+        const ROWS: usize = 256;
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(2, ROWS);
+        let reader = format!("=SUM(A1:A{ROWS})+SUM(A2:A{ROWS})");
+        let mut affected = FxHashSet::default();
+        for row in 0..ROWS {
+            store.set_formula(sheet, row, 0, "=1", 0);
+            store.set_formula(sheet, row, 1, &reader, 0);
+            affected.insert(AbsCellKey::new(sheet, row as u32, 0));
+            affected.insert(AbsCellKey::new(sheet, row as u32, 1));
+        }
+
+        let mut walk = DependencyDepthWalk::new(&store.sheets, &affected);
+        for row in 0..ROWS {
+            assert_eq!(walk.depth(AbsCellKey::new(sheet, row as u32, 1)), Ok(2));
+        }
+        // Every formula plus the two distinct ranges. Expanding the ranges into
+        // reader-to-member edges would instead retain ROWS * (2 * ROWS - 1).
+        assert_eq!(walk.nodes.len(), 2 * ROWS + 2);
+
+        store.set_formula(sheet, 0, 0, "=B1", 0);
+        let index = build_dep_index(&store.sheets);
+        let mut memo = FxHashMap::default();
+        seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+        assert_eq!(memo.len(), ROWS + 1);
+        assert!(matches!(
+            memo.get(&AbsCellKey::new(sheet, 0, 0)),
+            Some(Value::Error(FormulaError::Cycle))
+        ));
+        for row in 0..ROWS {
+            assert!(matches!(
+                memo.get(&AbsCellKey::new(sheet, row as u32, 1)),
+                Some(Value::Error(FormulaError::Cycle))
+            ));
+        }
+    }
+
+    #[test]
+    fn long_dependency_chains_preserve_depth_boundary_and_distant_cycles() {
+        const CHAIN_ROWS: usize = 16_384;
+        // Far below what a native recursion over CHAIN_ROWS formulas needs.
+        const NATIVE_STACK_BYTES: usize = 512 * 1024;
+        std::thread::Builder::new()
+            .stack_size(NATIVE_STACK_BYTES)
+            .spawn(|| {
+                for reads_range in [false, true] {
+                    let mut store = CellStore::new();
+                    let sheet = store.add_sheet(1, CHAIN_ROWS);
+                    let mut affected = FxHashSet::default();
+                    store.set_formula(sheet, 0, 0, "=1", 0);
+                    for row in 0..CHAIN_ROWS {
+                        if row > 0 {
+                            let source = if reads_range {
+                                format!("=SUM(A{row}:A{row})")
+                            } else {
+                                format!("=A{row}")
+                            };
+                            store.set_formula(sheet, row, 0, &source, 0);
+                        }
+                        affected.insert(AbsCellKey::new(sheet, row as u32, 0));
+                    }
+
+                    let index = build_dep_index(&store.sheets);
+                    let mut memo = FxHashMap::default();
+                    seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+                    assert_eq!(memo.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
+                    for row in 0..CHAIN_ROWS {
+                        let key = AbsCellKey::new(sheet, row as u32, 0);
+                        if row < FORMULA_RECURSION_LIMIT {
+                            assert!(!memo.contains_key(&key));
+                        } else {
+                            assert!(matches!(
+                                memo.get(&key),
+                                Some(Value::Error(FormulaError::Num))
+                            ));
+                        }
+                    }
+
+                    store.set_formula(sheet, 0, 0, &format!("=A{CHAIN_ROWS}"), 0);
+                    let index = build_dep_index(&store.sheets);
+                    memo.clear();
+                    seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
+                    assert_eq!(memo.len(), CHAIN_ROWS);
+                    assert!(memo
+                        .values()
+                        .all(|value| matches!(value, Value::Error(FormulaError::Cycle))));
+                }
+            })
+            .expect("create bounded-stack dependency test thread")
+            .join()
+            .expect("bounded-stack dependency walk must finish");
     }
 }
