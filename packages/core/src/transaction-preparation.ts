@@ -32,13 +32,23 @@ export function preparedHistoryBlock(block: PackedCellBlock): HistoryBlock | und
   return historyBlocks.get(block);
 }
 
-function scalarArrayBytes(values: readonly (string | number | boolean | null)[]): number {
+/**
+ * Exact JSON bytes of an engine-built scalar array, or undefined when a value
+ * is not JSON-safe; the caller then leaves the block to the full validating walk.
+ */
+function scalarArrayBytes(
+  values: readonly (string | number | boolean | null)[],
+): number | undefined {
   let bytes = 2 + Math.max(0, values.length - 1);
+  // Restored ranges repeat text in runs, so one cached measurement covers each run.
   let previousText: string | undefined;
   let previousTextBytes = 0;
+
   for (const value of values) {
-    if (typeof value === "number") bytes += String(value).length;
-    else if (typeof value === "string") {
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return undefined;
+      bytes += String(value).length;
+    } else if (typeof value === "string") {
       if (value !== previousText) {
         previousText = value;
         previousTextBytes = boundedJsonByteLength(value, Number.MAX_SAFE_INTEGER);
@@ -109,15 +119,18 @@ export class TransactionPreparation {
     restore: (range: Range) => boolean,
   ): void {
     const block = operation.block;
+    const valueBytes = scalarArrayBytes(block.values);
+    const styleBytes = block.styleIds === undefined ? 0 : scalarArrayBytes(block.styleIds);
+    if (valueBytes === undefined || styleBytes === undefined) return;
+
+    // Measure the small envelope once with empty arrays, then add the exact
+    // array contents minus the two `[]` bytes each empty array already counted.
     const emptyBlock = {
       ...block,
       values: [],
       ...(block.styleIds === undefined ? {} : { styleIds: [] }),
     };
-    const arrayBytes =
-      scalarArrayBytes(block.values) -
-      2 +
-      (block.styleIds === undefined ? 0 : scalarArrayBytes(block.styleIds) - 2);
+    const arrayBytes = valueBytes - 2 + (block.styleIds === undefined ? 0 : styleBytes - 2);
     const options = { omitUndefinedProperties: true };
     const blockBytes =
       boundedJsonByteLength(emptyBlock, Number.MAX_SAFE_INTEGER, options) + arrayBytes;

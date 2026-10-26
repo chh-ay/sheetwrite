@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import { measureOperationBytes } from "../src/atomic-batch.js";
+import { validateTransactionResources } from "../src/document-protocol.js";
 import { type HistoryAction, UndoManager } from "../src/history.js";
+import { TransactionPreparation } from "../src/transaction-preparation.js";
 import type { DocumentOp } from "../src/types/document.js";
 
 const setOperation: DocumentOp = {
@@ -96,5 +99,50 @@ describe("UndoManager rejection recovery", () => {
     );
     expect(history.getResourceStats().undoEntries).toBe(1);
     expect(disposals).toBe(edits);
+  });
+});
+
+describe("history restore measurement", () => {
+  it("reports the exact JSON size that a full walk measures for every scalar kind", () => {
+    const operation: DocumentOp = {
+      op: "setBlock",
+      range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 1, col: 3 } },
+      block: {
+        rowCount: 2,
+        colCount: 4,
+        values: [1.5, -0, 'quote " — 😀', 'quote " — 😀', true, false, null, 1e-7],
+        formulas: [[1, "=SUM(A1:B2)"]],
+        refs: [[2, { sheet: "sheet", row: 0, col: 0 }]],
+        styleTable: [{}, { bold: true }],
+        styleIds: [0, 1, 1, 0, 0, 0, 1, 1],
+      },
+    };
+    const exact = validateTransactionResources([operation]);
+    if (!exact.ok) throw new Error("Expected a measurable operation");
+    const preparation = new TransactionPreparation();
+    try {
+      preparation.seedHistory(operation, () => true);
+      expect(preparation.measure([operation])).toBe(exact.encodedBytes);
+      expect(measureOperationBytes([operation], Number.MAX_SAFE_INTEGER)).toEqual(
+        measureOperationBytes([structuredClone(operation)], Number.MAX_SAFE_INTEGER),
+      );
+    } finally {
+      preparation.dispose();
+    }
+  });
+
+  it("leaves non-finite numbers to the validating walk", () => {
+    const operation: DocumentOp = {
+      op: "setBlock",
+      range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      block: { rowCount: 1, colCount: 1, values: [Number.NaN] },
+    };
+    const preparation = new TransactionPreparation();
+    try {
+      preparation.seedHistory(operation, () => true);
+      expect(() => preparation.measure([operation])).toThrow("finite");
+    } finally {
+      preparation.dispose();
+    }
   });
 });
