@@ -1,13 +1,15 @@
-//! Bulk render-window assembly: one boundary crossing per visible window.
+//! Bulk render-window assembly: one boundary crossing per visible window,
+//! including the conditional-format rules evaluated against it.
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::translate_relative_refs;
+use crate::calc::{translate_relative_refs, Ast};
 use crate::cells::{payload_num, payload_str_id, CellRun};
+use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
@@ -16,6 +18,166 @@ use crate::types::{
 
 /// Global style id of a cell with no style of its own.
 const NO_STYLE_ID: u32 = 0;
+
+/// One conditional-format predicate, mirroring the host's rule kinds. String
+/// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
+/// formula ASTs are parsed once and translated from their stored anchor per cell.
+enum CondPred {
+    GtNum(f64),
+    LtNum(f64),
+    EqNum(f64),
+    EqStr(String),
+    EqEmpty,
+    Contains {
+        needle: String,
+        match_case: bool,
+    },
+    Formula {
+        ast: Ast,
+        anchor_row: u32,
+        anchor_col: u32,
+    },
+}
+
+/// One conditional-format rule: a normalized cell rectangle plus a predicate.
+/// The window read reports per-cell matches as a bitmask (rule index = bit),
+/// so the host merges styles only for matched cells; predicates evaluate here,
+/// where the cell data lives.
+struct CondRule {
+    r0: u32,
+    c0: u32,
+    r1: u32,
+    c1: u32,
+    pred: CondPred,
+    stop_if_true: bool,
+}
+
+/// Parsed conditional-format rules per sheet handle, synced from the host and
+/// evaluated per window. Not transferred on memory release: the host re-sends
+/// rules, and parsed ASTs would otherwise need their own codec.
+#[derive(Default)]
+pub(crate) struct ConditionalRules {
+    by_sheet: FxHashMap<usize, Vec<CondRule>>,
+}
+
+impl ConditionalRules {
+    fn for_sheet(&self, sheet: usize) -> &[CondRule] {
+        self.by_sheet.get(&sheet).map_or(&[], Vec::as_slice)
+    }
+
+    /// A removed sheet handle never renders again.
+    pub(crate) fn remove_sheet(&mut self, sheet: usize) {
+        self.by_sheet.remove(&sheet);
+    }
+
+    pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
+        let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
+        metadata
+            .add_hash_table::<usize, Vec<CondRule>>(self.by_sheet.len(), self.by_sheet.capacity());
+        for rules in self.by_sheet.values() {
+            metadata.add_vec::<CondRule>(rules.len(), rules.capacity());
+            for rule in rules {
+                let text = match &rule.pred {
+                    CondPred::EqStr(value) => Some(value),
+                    CondPred::Contains { needle, .. } => Some(needle),
+                    _ => None,
+                };
+                if let Some(text) = text {
+                    metadata.add_payload(text.len(), text.capacity());
+                }
+            }
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl CellStore {
+    /// Replace a sheet's conditional-format rules. Packed columnar encoding,
+    /// one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
+    /// 5 contains / 6 boolean formula; `bounds` = normalized `[r0, c0, r1, c1]`
+    /// per rule; `nums` carries the numeric operand; `strs` the text/formula
+    /// operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
+    /// Formula strings are parsed once here, never once per visible cell.
+    #[wasm_bindgen(js_name = setConditionalRules)]
+    pub fn set_conditional_rules(
+        &mut self,
+        sheet: usize,
+        kinds: &[u8],
+        bounds: &[u32],
+        nums: &[f64],
+        strs: Vec<String>,
+        flags: &[u8],
+    ) {
+        let formula_asts: Vec<Option<Ast>> = kinds
+            .iter()
+            .zip(strs.iter())
+            .take(32)
+            .map(|(&kind, source)| {
+                (kind == 6 && source.len() <= 8_192)
+                    .then(|| self.parse_formula_entry(source, sheet as u32, 0, 0).ast)
+                    .flatten()
+            })
+            .collect();
+
+        if self.sheets.get(sheet).is_none() {
+            return;
+        }
+
+        let mut rules: Vec<CondRule> = Vec::with_capacity(kinds.len().min(32));
+
+        for (i, (&kind, text)) in kinds.iter().zip(strs).take(32).enumerate() {
+            let b = i * 4;
+            let (Some(&r0), Some(&c0), Some(&r1), Some(&c1)) = (
+                bounds.get(b),
+                bounds.get(b + 1),
+                bounds.get(b + 2),
+                bounds.get(b + 3),
+            ) else {
+                break;
+            };
+
+            let num = nums.get(i).copied().unwrap_or(0.0);
+            let flag = flags.get(i).copied().unwrap_or(0);
+            let match_case = flag & 1 != 0;
+
+            let pred = match kind {
+                0 => CondPred::GtNum(num),
+                1 => CondPred::LtNum(num),
+                2 => CondPred::EqNum(num),
+                3 => CondPred::EqStr(text),
+                4 => CondPred::EqEmpty,
+                5 => CondPred::Contains {
+                    needle: if match_case {
+                        text
+                    } else {
+                        text.to_lowercase()
+                    },
+                    match_case,
+                },
+                6 => CondPred::Formula {
+                    ast: formula_asts
+                        .get(i)
+                        .and_then(Clone::clone)
+                        .unwrap_or(Ast::InvalidRef),
+                    anchor_row: r0,
+                    anchor_col: c0,
+                },
+                _ => continue,
+            };
+
+            rules.push(CondRule {
+                r0,
+                c0,
+                r1,
+                c1,
+                pred,
+                stop_if_true: flag & 2 != 0,
+            });
+        }
+
+        self.conditional_rules.by_sheet.insert(sheet, rules);
+    }
+}
 
 #[wasm_bindgen]
 impl CellStore {
@@ -250,10 +412,8 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
     cells: &WindowCells,
 ) -> Vec<u32> {
     let n_rows = cells.n_rows;
-    let Some(sheet) = store.sheets.get(sheet_index) else {
-        return Vec::new();
-    };
-    if sheet.cond_rules.is_empty() || n_rows == 0 || cols.is_empty() {
+    let rules = store.conditional_rules.for_sheet(sheet_index);
+    if rules.is_empty() || n_rows == 0 || cols.is_empty() {
         return Vec::new();
     }
 
@@ -265,7 +425,7 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
         let data_row = data_row_at(ri);
         for (cj, &col) in cols.iter().enumerate() {
             let dst = ri * n_cols + cj;
-            for (bit, rule) in sheet.cond_rules.iter().take(32).enumerate() {
+            for (bit, rule) in rules.iter().take(32).enumerate() {
                 let covered =
                     data_row >= rule.r0 && data_row <= rule.r1 && col >= rule.c0 && col <= rule.c1;
                 if !covered {

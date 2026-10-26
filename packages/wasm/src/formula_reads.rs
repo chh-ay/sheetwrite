@@ -74,7 +74,7 @@ impl<'a> ReadWalk<'a> {
     }
 
     fn visit(&mut self, key: CellKey) {
-        let key = self.data.spill_owner(key).unwrap_or(key);
+        let key = self.data.spill.owner(key).unwrap_or(key);
 
         if self.data.formulas.contains(key) && self.visited.insert(key) {
             self.pending.push(key);
@@ -102,7 +102,7 @@ impl<'a> ReadWalk<'a> {
                 }
             }
 
-            if let Some(range) = self.data.spill_ranges.get(&key) {
+            if let Some(range) = self.data.spill.attempt(key) {
                 self.read_range(CellRange::new(
                     self.handle,
                     range.anchor.0,

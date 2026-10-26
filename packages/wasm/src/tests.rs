@@ -3,6 +3,7 @@ use crate::cells::{
     checked_dense_cell_count, encode_num, payload_is_str, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     MAX_DENSE_CELLS,
 };
+use crate::memory::{StoreMemoryStats, SPILL_OWNERS};
 
 fn assert_close(actual: f64, expected: f64) {
     assert!(
@@ -320,7 +321,9 @@ fn spill_ownership_budget_is_store_wide_atomic_and_released() {
 
     store.clear_cell(first, 0, 1, 0);
     store.recompute(first);
-    assert_eq!(store.sheets[first].spill_owners.capacity(), 0);
+    let mut stats = StoreMemoryStats::default();
+    store.sheets[first].add_memory_stats(&mut stats);
+    assert_eq!(stats.owners[SPILL_OWNERS].allocated_bytes, 0);
     store.set_number(second, 0, 0, 1.0, 0);
     store.recompute(second);
     assert_eq!(

@@ -16,13 +16,13 @@ use crate::graph::FormulaGraph;
 use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
-use crate::sheet::{
-    formula_error_at, CondPred, CondRule, SheetData, SpillBlocker, MAX_SPILL_OWNER_CELLS,
-};
+use crate::sheet::{formula_error_at, SheetData};
+use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, StringStorage, KIND_BOOL,
     KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
+use crate::window::ConditionalRules;
 
 mod range_transfer;
 mod transfer;
@@ -258,6 +258,7 @@ pub struct CellStore {
     pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringStorage,
     pub(crate) graph: FormulaGraph,
+    pub(crate) conditional_rules: ConditionalRules,
     loading_page: usize,
     named_ranges: HashMap<(Option<u32>, String), NamedRangeRef>,
     tables: HashMap<String, TableDefinition>,
@@ -330,6 +331,7 @@ impl CellStore {
             sheet_ids: HashMap::new(),
             strings: StringStorage::new(),
             graph: FormulaGraph::default(),
+            conditional_rules: ConditionalRules::default(),
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
@@ -782,6 +784,7 @@ impl CellStore {
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet].clear();
         self.sheets[sheet] = SheetData::new(0, 0);
+        self.conditional_rules.remove_sheet(sheet);
         self.sheet_alive[sheet] = false;
         self.graph.invalidate();
 
@@ -860,92 +863,6 @@ impl CellStore {
             return 0;
         }
         s.cells.style_at(s.cells.idx(row, col))
-    }
-
-    /// Replace a sheet's conditional-format rules. Packed columnar encoding,
-    /// one entry per rule: `kinds` 0 gt / 1 lt / 2 eqNum / 3 eqStr / 4 eqEmpty /
-    /// 5 contains / 6 boolean formula; `bounds` = normalized `[r0, c0, r1, c1]`
-    /// per rule; `nums` carries the numeric operand; `strs` the text/formula
-    /// operand; `flags` bit 0 = match-case for `contains`, bit 1 = stop-if-true.
-    /// Formula strings are parsed once here, never once per visible cell.
-    #[wasm_bindgen(js_name = setConditionalRules)]
-    pub fn set_conditional_rules(
-        &mut self,
-        sheet: usize,
-        kinds: &[u8],
-        bounds: &[u32],
-        nums: &[f64],
-        strs: Vec<String>,
-        flags: &[u8],
-    ) {
-        let formula_asts: Vec<Option<crate::calc::Ast>> = kinds
-            .iter()
-            .zip(strs.iter())
-            .take(32)
-            .map(|(&kind, source)| {
-                (kind == 6 && source.len() <= 8_192)
-                    .then(|| self.parse_formula_entry(source, sheet as u32, 0, 0).ast)
-                    .flatten()
-            })
-            .collect();
-
-        let Some(s) = self.sheets.get_mut(sheet) else {
-            return;
-        };
-
-        let mut rules: Vec<CondRule> = Vec::with_capacity(kinds.len().min(32));
-
-        for (i, (&kind, text)) in kinds.iter().zip(strs).take(32).enumerate() {
-            let b = i * 4;
-            let (Some(&r0), Some(&c0), Some(&r1), Some(&c1)) = (
-                bounds.get(b),
-                bounds.get(b + 1),
-                bounds.get(b + 2),
-                bounds.get(b + 3),
-            ) else {
-                break;
-            };
-
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
-            let match_case = flag & 1 != 0;
-
-            let pred = match kind {
-                0 => CondPred::GtNum(num),
-                1 => CondPred::LtNum(num),
-                2 => CondPred::EqNum(num),
-                3 => CondPred::EqStr(text),
-                4 => CondPred::EqEmpty,
-                5 => CondPred::Contains {
-                    needle: if match_case {
-                        text
-                    } else {
-                        text.to_lowercase()
-                    },
-                    match_case,
-                },
-                6 => CondPred::Formula {
-                    ast: formula_asts
-                        .get(i)
-                        .and_then(Clone::clone)
-                        .unwrap_or(crate::calc::Ast::InvalidRef),
-                    anchor_row: r0,
-                    anchor_col: c0,
-                },
-                _ => continue,
-            };
-
-            rules.push(CondRule {
-                r0,
-                c0,
-                r1,
-                c1,
-                pred,
-                stop_if_true: flag & 2 != 0,
-            });
-        }
-
-        s.cond_rules = rules;
     }
 
     #[wasm_bindgen(js_name = setString)]
@@ -1409,7 +1326,7 @@ impl CellStore {
             for (col_index, &col) in cols.iter().enumerate() {
                 let offset = row_index * cols.len() + col_index;
                 let cell = (row, col);
-                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
+                if data.spill.owner(cell).is_some_and(|anchor| anchor != cell) {
                     if spill_derived.is_empty() {
                         spill_derived.resize(cell_count, 0);
                     }
@@ -1809,7 +1726,7 @@ impl CellStore {
         let mut removed_formula = false;
         let mut wrote = false;
         let s = &mut self.sheets[sheet];
-        s.clear_all_spills();
+        s.spill.clear_all(&mut s.cells);
         for (offset, &value) in values.iter().take(limit).enumerate() {
             while protected_offsets
                 .get(protected_index)
@@ -1866,7 +1783,8 @@ impl CellStore {
         let mut protected_index = 0usize;
         let mut removed_formula = false;
         let mut wrote = false;
-        self.sheets[sheet].clear_all_spills();
+        let s = &mut self.sheets[sheet];
+        s.spill.clear_all(&mut s.cells);
         for (offset, text) in slices.into_iter().enumerate() {
             while protected_offsets
                 .get(protected_index)
@@ -2068,8 +1986,9 @@ impl CellStore {
             return;
         }
         let at = at.min(row_count);
-        self.sheets[sheet].clear_all_spills();
-        self.sheets[sheet].cells.invalidate_derived();
+        let data = &mut self.sheets[sheet];
+        data.spill.clear_all(&mut data.cells);
+        data.cells.invalidate_derived();
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
@@ -2084,8 +2003,9 @@ impl CellStore {
             return;
         }
         let count = count.min(row_count - at);
-        self.sheets[sheet].clear_all_spills();
-        self.sheets[sheet].cells.invalidate_derived();
+        let data = &mut self.sheets[sheet];
+        data.spill.clear_all(&mut data.cells);
+        data.cells.invalidate_derived();
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
@@ -2100,8 +2020,9 @@ impl CellStore {
             return;
         }
         let at = at.min(col_count);
-        self.sheets[sheet].clear_all_spills();
-        self.sheets[sheet].cells.invalidate_derived();
+        let data = &mut self.sheets[sheet];
+        data.spill.clear_all(&mut data.cells);
+        data.cells.invalidate_derived();
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
@@ -2116,8 +2037,9 @@ impl CellStore {
             return;
         }
         let count = count.min(col_count - at);
-        self.sheets[sheet].clear_all_spills();
-        self.sheets[sheet].cells.invalidate_derived();
+        let data = &mut self.sheets[sheet];
+        data.spill.clear_all(&mut data.cells);
+        data.cells.invalidate_derived();
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
@@ -2522,8 +2444,7 @@ impl CellStore {
             });
         }
         let data = &mut self.sheets[sheet];
-        if data.spill_blockers != blockers {
-            data.spill_blockers = blockers;
+        if data.spill.set_blockers(blockers) {
             data.formulas.mark_all_dirty();
         }
         true
@@ -2534,14 +2455,14 @@ impl CellStore {
     #[wasm_bindgen(js_name = spillAnchorRow)]
     pub fn spill_anchor_row(&self, sheet: usize, row: usize, col: usize) -> u32 {
         cell_key(row, col)
-            .and_then(|cell| self.sheets.get(sheet)?.spill_owner(cell))
+            .and_then(|cell| self.sheets.get(sheet)?.spill.owner(cell))
             .map_or(u32::MAX, |anchor| anchor.0)
     }
 
     #[wasm_bindgen(js_name = spillAnchorCol)]
     pub fn spill_anchor_col(&self, sheet: usize, row: usize, col: usize) -> u32 {
         cell_key(row, col)
-            .and_then(|cell| self.sheets.get(sheet)?.spill_owner(cell))
+            .and_then(|cell| self.sheets.get(sheet)?.spill.owner(cell))
             .map_or(u32::MAX, |anchor| anchor.1)
     }
 
@@ -2570,7 +2491,7 @@ impl CellStore {
             }
             for row_index in 0..row_end.saturating_sub(row_start) {
                 let cell = ((row_start + row_index) as u32, col);
-                if data.spill_owner(cell).is_some_and(|anchor| anchor != cell) {
+                if data.spill.owner(cell).is_some_and(|anchor| anchor != cell) {
                     mask[row_index * cols.len() + col_index] = 1;
                 }
             }
@@ -2606,7 +2527,7 @@ impl CellStore {
             }
             for row_index in 0..row_end.saturating_sub(row_start) {
                 let cell = ((row_start + row_index) as u32, col);
-                if let Some(anchor) = data.spill_owner(cell) {
+                if let Some(anchor) = data.spill.owner(cell) {
                     let offset = (row_index * cols.len() + col_index) * 2;
                     owners[offset] = anchor.0;
                     owners[offset + 1] = anchor.1;
@@ -2674,25 +2595,7 @@ impl CellStore {
             return false;
         }
 
-        if data.spill_owners.is_empty() {
-            return true;
-        }
-
-        for col in c0..=c1 {
-            for row in r0..=r1 {
-                if let Some((owner_row, owner_col)) = data.spill_owner((row as u32, col as u32)) {
-                    if (owner_row as usize) < r0
-                        || (owner_row as usize) > r1
-                        || (owner_col as usize) < c0
-                        || (owner_col as usize) > c1
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
+        data.spill.admits_source_range(r0, c0, r1, c1)
     }
 
     /// Atomically write one row-major mixed literal/formula/reference block
@@ -3250,6 +3153,7 @@ impl CellStore {
             .add(self.strings.index_memory_stats());
 
         self.graph.add_memory_stats(&mut stats);
+        self.conditional_rules.add_memory_stats(&mut stats);
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         metadata.add_payload(
@@ -3514,7 +3418,7 @@ impl CellStore {
         self.refresh_named_formula_entries();
     }
 
-    fn parse_formula_entry(
+    pub(crate) fn parse_formula_entry(
         &self,
         source: &str,
         formula_sheet: u32,

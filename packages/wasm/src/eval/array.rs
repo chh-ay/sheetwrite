@@ -121,7 +121,7 @@ impl CellStore {
         let Some(range) = self
             .sheets
             .get(sheet)
-            .and_then(|data| data.installed_spill((row, col)))
+            .and_then(|data| data.spill.installed((row, col)))
         else {
             return Ast::InvalidRef;
         };

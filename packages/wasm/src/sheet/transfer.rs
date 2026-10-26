@@ -1,4 +1,4 @@
-//! Sheet coordinator state; physical cells transfer through `CellStorage`.
+//! Sheet coordinator state; each owned module transfers its own state.
 
 use super::*;
 use crate::transfer::Writer;
@@ -6,80 +6,25 @@ use crate::transfer::Writer;
 use crate::transfer::{Reader, TransferResult};
 
 impl SheetData {
+    /// Resident state only: an unloaded clean datasource cell stays unloaded.
+    /// Formula entries follow through the store's formula codec, and
+    /// conditional rules are re-sent by the host.
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         self.cells.write_transfer(out);
-
-        out.usize(self.spill_ranges.len());
-
-        for (&(row, col), range) in &self.spill_ranges {
-            out.u32(row);
-            out.u32(col);
-            out.u32(range.anchor.0);
-            out.u32(range.anchor.1);
-            out.u32(range.row_end);
-            out.u32(range.col_end);
-        }
-
-        out.usize(self.spill_owners.len());
-
-        for (&(row, col), &(anchor_row, anchor_col)) in &self.spill_owners {
-            out.u32(row);
-            out.u32(col);
-            out.u32(anchor_row);
-            out.u32(anchor_col);
-        }
-
-        out.usize(self.spill_blockers.len());
-
-        for blocker in &self.spill_blockers {
-            out.u32(blocker.row_start);
-            out.u32(blocker.col_start);
-            out.u32(blocker.row_end);
-            out.u32(blocker.col_end);
-        }
-
+        self.spill.write_transfer(out);
         self.formulas.write_transfer(out);
-        // Conditional rules contain parsed ASTs and are lazily rebuilt by the host.
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn read_transfer(input: &mut Reader<'_>) -> TransferResult<Self> {
         let cells = CellStorage::read_transfer(input)?;
-        let mut sheet = Self {
+        let spill = SpillState::read_transfer(input)?;
+        let formulas = SheetFormulas::read_transfer(input)?;
+
+        Ok(Self {
             cells,
-            formulas: SheetFormulas::default(),
-            spill_ranges: FxHashMap::default(),
-            spill_owners: FxHashMap::default(),
-            spill_blockers: Vec::new(),
-            cond_rules: Vec::new(),
-        };
-
-        for _ in 0..input.count()? {
-            let key = (input.u32()?, input.u32()?);
-            let range = SpillRange {
-                anchor: (input.u32()?, input.u32()?),
-                row_end: input.u32()?,
-                col_end: input.u32()?,
-            };
-            sheet.spill_ranges.insert(key, range);
-        }
-
-        for _ in 0..input.count()? {
-            sheet
-                .spill_owners
-                .insert((input.u32()?, input.u32()?), (input.u32()?, input.u32()?));
-        }
-
-        for _ in 0..input.count()? {
-            sheet.spill_blockers.push(SpillBlocker {
-                row_start: input.u32()?,
-                col_start: input.u32()?,
-                row_end: input.u32()?,
-                col_end: input.u32()?,
-            });
-        }
-
-        sheet.formulas = SheetFormulas::read_transfer(input)?;
-        Ok(sheet)
+            formulas,
+            spill,
+        })
     }
 }

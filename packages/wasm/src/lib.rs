@@ -37,6 +37,8 @@ mod query;
 #[cfg(feature = "formula-engine")]
 mod sheet;
 #[cfg(feature = "formula-engine")]
+mod spill;
+#[cfg(feature = "formula-engine")]
 mod store;
 #[cfg(feature = "formula-engine")]
 mod transfer;
