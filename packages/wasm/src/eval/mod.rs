@@ -790,7 +790,20 @@ impl CellStore {
                     }
                 }
 
-                let changed = self.install_spill_result(key, evaluated, pass.memo);
+                let changed = match evaluated {
+                    // A reference that resolved to one cell is a plain value,
+                    // as in Excel: it owns no spill cell and spends none of
+                    // the spill-owner budget.
+                    Ok(matrix) if has_spill_refs && matrix.values.len() == 1 => {
+                        let data = &mut self.sheets[output_sheet];
+                        if data.spill.attempt(local).is_some() {
+                            data.spill.forget(local, &mut data.cells);
+                        }
+                        pass.memo.insert(key, matrix.into_first());
+                        Vec::new()
+                    }
+                    evaluated => self.install_spill_result(key, evaluated, pass.memo),
+                };
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells

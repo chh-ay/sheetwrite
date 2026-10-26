@@ -5058,6 +5058,35 @@ fn offset_indirect_let_scopes_and_runtime_spill_readers_follow_current_values() 
 }
 
 #[test]
+fn offset_indirect_one_cell_results_are_values_outside_the_spill_owner_budget() {
+    const OWNER_LIMIT: usize = 2;
+    const FORMULAS: usize = 6;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, FORMULAS);
+    store.set_spill_owner_limit_for_test(OWNER_LIMIT);
+    store.set_number(sheet, 0, 0, 7.0, 0);
+    store.set_number(sheet, 1, 0, 3.0, 0);
+    for row in 0..FORMULAS {
+        let formula = if row % 2 == 0 {
+            "=OFFSET($A$1,0,0)"
+        } else {
+            "=INDIRECT(\"A1\")"
+        };
+        store.set_formula(sheet, row, 1, formula, 0);
+    }
+    // A real two-cell spill still fits the owner budget beside them.
+    store.set_formula(sheet, 0, 2, "=OFFSET($A$1,0,0,2,1)", 0);
+    store.recompute(sheet);
+
+    for row in 0..FORMULAS {
+        assert_eq!(number(&store, sheet, row, 1), 7.0, "row {row}");
+    }
+    assert_eq!(number(&store, sheet, 0, 2), 7.0);
+    assert_eq!(number(&store, sheet, 1, 2), 3.0);
+}
+
+#[test]
 fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
     let mut store = CellStore::new();
     let data = store.add_sheet(1, 1);
