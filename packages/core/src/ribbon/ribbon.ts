@@ -5,6 +5,7 @@
 
 import { actionFeedbackFor } from "../action-feedback.js";
 import { COMMAND_ICONS } from "../command-icons.js";
+import { fontShorthandParts } from "../format-presets.js";
 import type { Grid } from "../types/grid.js";
 import {
   renderControl,
@@ -19,8 +20,23 @@ import {
   type RibbonFitStep,
 } from "./ribbon-fit.js";
 import { RIBBON_PANEL_HEIGHT, RIBBON_TAB_ROW_HEIGHT } from "./ribbon-metrics.js";
-import { RIBBON_TABS, type RibbonGroupSpec, type RibbonTabSpec } from "./ribbon-model.js";
+import {
+  RIBBON_TABS,
+  type RibbonFocus,
+  type RibbonGroupSpec,
+  type RibbonTabSpec,
+} from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
+
+/** One style read and one theme-font parse, shared by every value box. */
+function readFocus(grid: Grid): RibbonFocus {
+  const themeFont = fontShorthandParts(grid.getTheme().font);
+  return {
+    style: grid.getFocusCellStyle(),
+    themeFontFamily: themeFont.family,
+    themeFontPx: themeFont.px,
+  };
+}
 
 export interface RibbonOptions {
   /** Called after the ribbon is minimized to its tab row or expanded again. */
@@ -75,6 +91,7 @@ export class Ribbon {
     this.context = {
       grid,
       popup: this.popup,
+      focus: () => readFocus(grid),
       focusGrid,
       run: (key, command, control) => {
         const feedback = actionFeedbackFor(grid);
@@ -286,8 +303,9 @@ export class Ribbon {
     if (panel !== undefined && !this.minimized) this.refreshPanel(panel, states);
   }
 
-  private refreshPanel(panel: PanelView, states: RibbonCommandStates): void {
-    for (const control of panel.controls) control.refresh(states);
+  private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
+    const snapshot = { state, focus: readFocus(this.grid) };
+    for (const control of panel.controls) control.refresh(snapshot);
   }
 
   private setMinimized(minimized: boolean): void {

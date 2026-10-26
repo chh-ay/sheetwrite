@@ -15,6 +15,7 @@ import {
   type RibbonColorSpec,
   type RibbonComboSpec,
   type RibbonControlSpec,
+  type RibbonFocus,
   type RibbonFormSpec,
   type RibbonIcon,
   type RibbonMenuSpec,
@@ -27,10 +28,21 @@ import type { RibbonPopup } from "./ribbon-popup.js";
  */
 export type RibbonCommandStates = (command: GridCommandName) => GridCommandState;
 
+/**
+ * What one refresh shows, computed once for all controls: selection changes
+ * refresh every visible control, so per-control reads would repeat the work.
+ */
+interface RibbonSnapshot {
+  readonly state: RibbonCommandStates;
+  readonly focus: RibbonFocus;
+}
+
 /** What every control needs from the ribbon that owns it. */
 export interface RibbonContext {
   readonly grid: Grid;
   readonly popup: RibbonPopup;
+  /** The focus cell's style now, for reads outside a refresh (a commit or a revert). */
+  readonly focus: () => RibbonFocus;
   /** Hand keyboard focus back to the grid, as Excel does after a pick. */
   readonly focusGrid: () => void;
   /** Run a command once at a time; a failure becomes visible feedback. */
@@ -39,7 +51,7 @@ export interface RibbonContext {
 
 export interface RibbonControlView {
   readonly element: HTMLElement;
-  refresh(states: RibbonCommandStates): void;
+  refresh(snapshot: RibbonSnapshot): void;
 }
 
 /** Mouse presses on ribbon chrome must not take focus or selection from the grid. */
@@ -87,17 +99,21 @@ function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonCon
   button.addEventListener("click", () =>
     context.run(spec.label, () => spec.run(context.grid), button),
   );
+
+  // Written only on change: every selection move refreshes every toggle.
+  let pressed: string | null = null;
   return {
     element: button,
-    refresh(states) {
-      button.disabled = isDisabled(spec.availability, states);
+    refresh({ state }) {
+      button.disabled = isDisabled(spec.availability, state);
       const pressedBy = spec.toggle ? spec.availability : "view";
       if (pressedBy === "edit" || pressedBy === "view") return;
-      const activity = states(pressedBy).activity;
-      button.setAttribute(
-        "aria-pressed",
-        activity === "mixed" ? "mixed" : String(activity === "active"),
-      );
+
+      const activity = state(pressedBy).activity;
+      const next = activity === "mixed" ? "mixed" : String(activity === "active");
+      if (next === pressed) return;
+      pressed = next;
+      button.setAttribute("aria-pressed", next);
     },
   };
 }
@@ -155,8 +171,8 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
     trigger.addEventListener("keydown", arrowKeyOpens(trigger));
     return {
       element: trigger,
-      refresh(states) {
-        trigger.disabled = isDisabled(spec.availability, states);
+      refresh({ state }) {
+        trigger.disabled = isDisabled(spec.availability, state);
       },
     };
   }
@@ -183,8 +199,8 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   split.append(face, arrow);
   return {
     element: split,
-    refresh(states) {
-      const disabled = isDisabled(spec.availability, states);
+    refresh({ state }) {
+      const disabled = isDisabled(spec.availability, state);
       face.disabled = disabled;
       arrow.disabled = disabled;
     },
@@ -219,12 +235,14 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
   arrow.appendChild(caret());
   arrow.addEventListener("mousedown", keepFocus);
 
-  const revert = (): void => {
-    input.value = spec.read(context.grid);
+  // The box shows what the focus cell has, written only on change.
+  const show = (value: string): void => {
+    if (input.value !== value) input.value = value;
   };
+  const revert = (): void => show(spec.read(context.focus()));
   const commit = (value: string): void => {
     context.popup.closeAll(false);
-    if (value !== spec.read(context.grid) && !spec.apply(context.grid, value)) {
+    if (value !== spec.read(context.focus()) && !spec.apply(context.grid, value)) {
       input.setAttribute("aria-invalid", "true");
     } else {
       input.removeAttribute("aria-invalid");
@@ -247,15 +265,25 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
       option.textContent = value;
       // `inherit` is not valid inside a family list, so fall back to a generic.
       if (spec.previewFont) option.style.fontFamily = `"${value}", system-ui, sans-serif`;
-      option.addEventListener("mousedown", keepFocus);
-      option.addEventListener("click", () => commit(value));
-      option.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        commit(value);
-      });
       list.appendChild(option);
     }
+
+    // One set of listeners for the whole list instead of one per option.
+    const optionOf = (target: EventTarget | null): HTMLElement | null =>
+      target instanceof HTMLElement ? target.closest<HTMLElement>('[role="option"]') : null;
+    list.addEventListener("mousedown", keepFocus);
+    list.addEventListener("click", (event) => {
+      const option = optionOf(event.target);
+      if (option?.textContent != null) commit(option.textContent);
+    });
+    list.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const option = optionOf(event.target);
+      if (option?.textContent == null) return;
+      event.preventDefault();
+      commit(option.textContent);
+    });
+
     context.popup.open(input, list, { role: "listbox", label: spec.label, focus });
     list.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   };
@@ -286,25 +314,23 @@ function renderCombo(spec: RibbonComboSpec, context: RibbonContext): RibbonContr
   box.append(input, arrow);
   return {
     element: box,
-    refresh(states) {
-      const disabled = isDisabled(spec.availability, states);
+    refresh({ state, focus }) {
+      const disabled = isDisabled(spec.availability, state);
       input.disabled = disabled;
       arrow.disabled = disabled;
       // Never overwrite what the user is typing.
-      if (document.activeElement !== input) revert();
+      if (document.activeElement !== input) show(spec.read(focus));
     },
   };
 }
 
-function swatch(
-  label: string,
-  color: string | null,
-  pick: (color: string | null) => void,
-): HTMLButtonElement {
+/** Swatches carry their color as data; the palette handles all picks with one listener. */
+function swatch(label: string, color: string | null): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.tabIndex = -1;
   button.title = label;
+  button.dataset.color = color ?? "";
   button.setAttribute("role", "menuitem");
   button.setAttribute("aria-label", label);
   if (color === null) {
@@ -314,8 +340,6 @@ function swatch(
     button.className = "sheetwrite-ribbon-swatch";
     button.style.backgroundColor = color;
   }
-  button.addEventListener("mousedown", keepFocus);
-  button.addEventListener("click", () => pick(color));
   return button;
 }
 
@@ -359,7 +383,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
     }
     const palette = document.createElement("div");
     palette.className = "sheetwrite-ribbon-palette";
-    palette.appendChild(swatch(spec.clearLabel, null, apply));
+    palette.appendChild(swatch(spec.clearLabel, null));
     for (const [heading, rows] of [
       ["Theme Colors", THEME_COLOR_ROWS],
       ["Standard Colors", [STANDARD_COLORS]],
@@ -369,10 +393,21 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
       title.textContent = heading;
       const grid = document.createElement("div");
       grid.className = "sheetwrite-ribbon-palette-grid";
-      for (const row of rows)
-        for (const color of row) grid.appendChild(swatch(color, color, apply));
+      for (const row of rows) for (const color of row) grid.appendChild(swatch(color, color));
       palette.append(title, grid);
     }
+
+    // One listener for every swatch; an empty color is "Automatic" / "No Fill".
+    palette.addEventListener("mousedown", (pressed) => {
+      if (pressed.target instanceof HTMLButtonElement) pressed.preventDefault();
+    });
+    palette.addEventListener("click", (picked) => {
+      const button =
+        picked.target instanceof HTMLElement
+          ? picked.target.closest<HTMLButtonElement>("button[data-color]")
+          : null;
+      if (button) apply(button.dataset.color || null);
+    });
     const more = document.createElement("label");
     more.className = "sheetwrite-ribbon-menu-item";
     more.textContent = "More Colors…";
@@ -393,8 +428,8 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
   split.append(face, arrow);
   return {
     element: split,
-    refresh(states) {
-      const disabled = isDisabled("edit", states);
+    refresh({ state }) {
+      const disabled = isDisabled("edit", state);
       face.disabled = disabled;
       arrow.disabled = disabled;
     },
@@ -443,8 +478,8 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   });
   return {
     element: trigger,
-    refresh(states) {
-      trigger.disabled = isDisabled("edit", states);
+    refresh({ state }) {
+      trigger.disabled = isDisabled("edit", state);
     },
   };
 }
@@ -455,8 +490,10 @@ function renderZoom(context: RibbonContext): RibbonControlView {
   const readout = document.createElement("output");
   readout.className = "sheetwrite-ribbon-zoom-readout";
   readout.setAttribute("aria-live", "polite");
+  // Written only on change: refreshes follow every selection move.
   const show = (): void => {
-    readout.textContent = zoomLabel(context.grid.getZoom());
+    const label = zoomLabel(context.grid.getZoom());
+    if (readout.textContent !== label) readout.textContent = label;
   };
   const step = (label: string, iconName: RibbonIcon, direction: 1 | -1): HTMLButtonElement => {
     const button = commandButton(label, iconName, false);

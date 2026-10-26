@@ -10,12 +10,12 @@ import {
   FONT_SIZES_PT,
   NUMBER_FORMAT_PRESETS,
   PERCENT_FORMAT,
-  fontShorthandParts,
   numberFormatLabel,
   pixelsToPoints,
   pointsToPixels,
 } from "../format-presets.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
+import type { CellStyle } from "../types/cell.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
 
@@ -62,6 +62,16 @@ export interface RibbonMenuSpec {
   readonly large?: boolean;
 }
 
+/**
+ * What the value boxes show, read once per refresh instead of once per box:
+ * the focus cell's effective style and the theme font unstyled cells use.
+ */
+export interface RibbonFocus {
+  readonly style: CellStyle;
+  readonly themeFontFamily: string | undefined;
+  readonly themeFontPx: number | undefined;
+}
+
 /** An editable dropdown (font, size, number format). */
 export interface RibbonComboSpec {
   readonly kind: "combo";
@@ -72,7 +82,7 @@ export interface RibbonComboSpec {
   readonly options: readonly string[];
   /** Render each option in its own typeface, as Excel's font list does. */
   readonly previewFont?: boolean;
-  readonly read: (grid: Grid) => string;
+  readonly read: (focus: RibbonFocus) => string;
   /** Apply typed or picked text; returns false when the text is not valid. */
   readonly apply: (grid: Grid, value: string) => boolean;
 }
@@ -248,8 +258,7 @@ const fontFamily: RibbonComboSpec = {
   options: FONT_FAMILIES,
   previewFont: true,
   // Unstyled cells show the theme font they paint with, as Excel shows Calibri.
-  read: (grid) =>
-    grid.getFocusCellStyle().fontFamily ?? fontShorthandParts(grid.getTheme().font).family ?? "",
+  read: (focus) => focus.style.fontFamily ?? focus.themeFontFamily ?? "",
   apply: (grid, value) => {
     const family = value.trim();
     grid.actions.setFontFamily(family === "" ? null : family);
@@ -263,8 +272,8 @@ const fontSize: RibbonComboSpec = {
   width: 48,
   availability: "edit",
   options: FONT_SIZES_PT.map(String),
-  read: (grid) => {
-    const size = grid.getFocusCellStyle().fontSize ?? fontShorthandParts(grid.getTheme().font).px;
+  read: (focus) => {
+    const size = focus.style.fontSize ?? focus.themeFontPx;
     return size === undefined ? "" : String(pixelsToPoints(size));
   },
   apply: (grid, value) => {
@@ -281,7 +290,7 @@ const numberFormat: RibbonComboSpec = {
   width: 112,
   availability: "edit",
   options: NUMBER_FORMAT_PRESETS.map((preset) => preset.label),
-  read: (grid) => numberFormatLabel(grid.getFocusCellStyle().numberFormat),
+  read: (focus) => numberFormatLabel(focus.style.numberFormat),
   apply: (grid, value) => {
     const preset = NUMBER_FORMAT_PRESETS.find((candidate) => candidate.label === value);
     if (preset === undefined) return false;

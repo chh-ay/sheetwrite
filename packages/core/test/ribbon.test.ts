@@ -209,6 +209,28 @@ it("opens a list from a collapsed group without closing the group, then closes b
   expect(groupButton.parentElement?.contains(control("Number Format list"))).toBe(true);
 });
 
+it("fills from a palette pick and clears with No Fill", async () => {
+  const { host, control, select, cell } = await setup();
+  const click = (target: Element) =>
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+  const pick = (label: string) => {
+    click(control("Fill Color options"));
+    const entry = host.querySelector(`.sheetwrite-ribbon-palette [aria-label="${label}"]`);
+    if (entry === null) throw new Error(`no palette entry "${label}"`);
+    click(entry);
+  };
+
+  select(0, 0);
+  pick("#c00000");
+  expect(cell(0, 0).style.backgroundColor).toBe("#c00000");
+  expect(host.querySelector(".sheetwrite-ribbon-popup")).toBeNull();
+  // A command ignores a second start while it runs, so let the first pick settle.
+  await Promise.resolve();
+
+  pick("No Fill");
+  expect(cell(0, 0).style.backgroundColor).toBeUndefined();
+});
+
 it("gives the grid the panel's height back when minimized", async () => {
   const { host, key } = await setup();
   const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
