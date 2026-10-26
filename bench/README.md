@@ -250,7 +250,10 @@ The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
 were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
 For each row it takes the median of the paired candidate/base ratios and
 fails when it exceeds the row's ratio limit. There is no absolute floor:
-aggregation makes microsecond rows measurable, so they are gated too.
+aggregation makes microsecond rows measurable, so they are gated too. If any
+row fails, the gate captures as many pairs again and judges every row on all
+of them: a noisy window rarely repeats, a real slowdown does. A gate that
+confirms therefore takes twice as long.
 
 The limits come from 56 same-engine pairs from eight gates on a shared
 20-thread laptop, in quiet and loaded windows. Each row's pair ratios were
@@ -321,9 +324,10 @@ Recalibrate these limits when the matrix, the sampling or the default pair
 count changes, from fresh same-engine pairs that are not the acceptance runs.
 
 Retained bytes, peak transient bytes, transient allocation counts, and the
-isolated WASM deltas are deterministic. The gate takes the highest candidate
-value from all captures and compares it with the lowest base value; one byte of
-growth fails. A reviewed trade-off may pass `--accept-bytes <file>` for that
+isolated WASM deltas are nearly deterministic: one row differed by 105 B in one
+of 14 same-engine captures. The gate compares the middle candidate capture with
+the middle base capture, so growth that appears in most captures fails even
+at one byte. A reviewed trade-off may pass `--accept-bytes <file>` for that
 exact candidate engine:
 
 ```json

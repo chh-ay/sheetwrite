@@ -57,13 +57,18 @@ it("fails a sustained slowdown just above the row's ratio limit, even on microse
   expect(verdict.timings.filter((row) => !row.passed).map((row) => row.key)).toEqual([WORKLOAD]);
 });
 
-it("rejects one byte of growth in one capture", () => {
-  const captures = pairs();
-  const first = captures[0];
+it("rejects one byte of growth in most captures and ignores one odd capture", () => {
+  const odd = pairs();
+  const first = odd[0];
   if (first === undefined) throw new Error("Missing test pair");
   first.candidate.bytes[BYTE_ROW] = BASE_BYTES + 1;
+  expect(verdictFor(odd).passed).toBe(true);
 
-  expect(verdictFor(captures).bytes.filter((row) => !row.passed)).toEqual([
+  const grown = pairs().map((pair, index) => {
+    if (index > 0) pair.candidate.bytes[BYTE_ROW] = BASE_BYTES + 1;
+    return pair;
+  });
+  expect(verdictFor(grown).bytes.filter((row) => !row.passed)).toEqual([
     expect.objectContaining({ key: BYTE_ROW, maximum: BASE_BYTES, candidate: BASE_BYTES + 1 }),
   ]);
 });

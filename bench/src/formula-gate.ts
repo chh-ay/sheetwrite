@@ -200,10 +200,15 @@ function acceptedByteRows(
   return accepted;
 }
 
+/** The middle value of an integer counter list; for an even count, the upper one. */
+function middleCounter(values: number[]): number {
+  return values.toSorted((left, right) => left - right)[Math.floor(values.length / 2)] ?? NaN;
+}
+
 /**
  * Compare paired medians: each pair is one base and one candidate capture run
  * back to back, so machine drift between pairs cancels in the ratio. Byte
- * counters are deterministic and may not grow at all.
+ * counters compare the middle capture of each side and may not grow at all.
  */
 export function compareFormulaPairs(
   pairs: readonly FormulaGatePair[],
@@ -244,10 +249,12 @@ export function compareFormulaPairs(
   });
 
   const bytes = byteKeys.map((key): FormulaByteVerdict => {
-    // Check every capture, not a statistic: growth that appears in one
-    // capture is still growth.
-    const base = Math.min(...pairs.map((pair) => pair.base.bytes[key] ?? NaN));
-    const candidate = Math.max(...pairs.map((pair) => pair.candidate.bytes[key] ?? NaN));
+    // The counters are nearly deterministic, but a row can differ by a few
+    // bytes between same-engine captures (topology-remove-add/10K, 105 B in
+    // one of 14). Real growth appears in every capture, so the middle one
+    // catches it without failing on a single odd capture.
+    const base = middleCounter(pairs.map((pair) => pair.base.bytes[key] ?? NaN));
+    const candidate = middleCounter(pairs.map((pair) => pair.candidate.bytes[key] ?? NaN));
     if (
       !Number.isSafeInteger(base) ||
       base < 0 ||
@@ -352,22 +359,31 @@ if (import.meta.main) {
       ? undefined
       : (JSON.parse(readFileSync(acceptancePath, "utf8")) as FormulaByteAcceptance);
 
-  const pairs: FormulaGatePair[] = [];
-  for (let index = 0; index < pairCount; index++) {
-    // Alternate AB and BA so neither side always runs first after the other.
-    if (index % 2 === 0) {
-      const baseCapture = captureSide(base);
-      pairs.push({ base: baseCapture, candidate: captureSide(candidate) });
-    } else {
+  const capturePairs = (count: number): FormulaGatePair[] =>
+    Array.from({ length: count }, (_, index) => {
+      // Alternate AB and BA so neither side always runs first after the other.
+      if (index % 2 === 0) {
+        const baseCapture = captureSide(base);
+        return { base: baseCapture, candidate: captureSide(candidate) };
+      }
       const candidateCapture = captureSide(candidate);
-      pairs.push({ base: captureSide(base), candidate: candidateCapture });
-    }
+      return { base: captureSide(base), candidate: candidateCapture };
+    });
+
+  let pairs = capturePairs(pairCount);
+  let verdict = compareFormulaPairs(pairs, FORMULA_RATIO_LIMITS, acceptance);
+  // A timing failure from one noisy window rarely repeats; a real slowdown
+  // does. Confirm it on twice as many pairs before reporting it.
+  const confirming = verdict.timings.some((row) => !row.passed);
+  if (confirming) {
+    pairs = [...pairs, ...capturePairs(pairCount)];
+    verdict = compareFormulaPairs(pairs, FORMULA_RATIO_LIMITS, acceptance);
   }
 
-  const verdict = compareFormulaPairs(pairs, FORMULA_RATIO_LIMITS, acceptance);
   if (outputPath !== undefined) {
     await Bun.write(outputPath, `${JSON.stringify({ pairs, verdict }, null, 2)}\n`);
   }
+  if (confirming) process.stdout.write(`Timing failures re-judged on ${pairs.length} pairs.\n`);
   process.stdout.write(report(verdict));
   process.exitCode = verdict.passed ? 0 : 1;
 }
