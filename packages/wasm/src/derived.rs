@@ -6,8 +6,8 @@
 
 use std::collections::HashMap;
 
+use crate::cells::{encode_num, payload_num, STR_TAG_HI};
 use crate::memory::MemoryOwnerStats;
-use crate::sheet::{encode_num, payload_num, STR_TAG_HI};
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
@@ -443,8 +443,8 @@ mod tests {
         let cells = DERIVED_CHUNK_CELLS * 5;
         let mut overlay = DerivedOverlay::dense();
         assert!(overlay.reserve(3, cells));
-        overlay.set(0, KIND_STRING, crate::sheet::encode_str_id(3));
-        overlay.set(cells - 1, KIND_STRING, crate::sheet::encode_str_id(9));
+        overlay.set(0, KIND_STRING, crate::cells::encode_str_id(3));
+        overlay.set(cells - 1, KIND_STRING, crate::cells::encode_str_id(9));
         overlay.set(
             DERIVED_CHUNK_CELLS,
             KIND_FORMULA,
@@ -456,7 +456,7 @@ mod tests {
         assert_eq!(visited.len(), 3);
         overlay.remap_payloads(|value| {
             if *value >> 48 == TEXT_TAG_PREFIX {
-                *value = crate::sheet::encode_str_id(crate::sheet::payload_str_id(*value) + 1);
+                *value = crate::cells::encode_str_id(crate::cells::payload_str_id(*value) + 1);
             }
         });
 
@@ -468,11 +468,11 @@ mod tests {
 
         assert_eq!(
             restored.get(0),
-            Some((KIND_STRING, crate::sheet::encode_str_id(4)))
+            Some((KIND_STRING, crate::cells::encode_str_id(4)))
         );
         assert_eq!(
             restored.get(cells - 1),
-            Some((KIND_STRING, crate::sheet::encode_str_id(10)))
+            Some((KIND_STRING, crate::cells::encode_str_id(10)))
         );
         assert_eq!(
             restored.error_at(DERIVED_CHUNK_CELLS),
@@ -510,7 +510,7 @@ mod lifecycle_tests {
         let after = store.memory_stats()[3 + FORMULAS * 3 + 1];
         assert!(before - after >= (2 * DERIVED_CHUNK_CELLS * size_of::<u64>()) as f64);
         assert_eq!(store.get_cell(sheet, 0, 0).num(), 1.0);
-        assert_eq!(store.sheets[sheet].calculated_cell_at(rows - 1), None);
+        assert_eq!(store.sheets[sheet].cells.calculated_cell_at(rows - 1), None);
     }
 
     #[test]

@@ -21,6 +21,8 @@ compile_error!(
 #[cfg(feature = "formula-engine")]
 mod calc;
 #[cfg(feature = "formula-engine")]
+mod cells;
+#[cfg(feature = "formula-engine")]
 mod derived;
 #[cfg(feature = "formula-engine")]
 mod eval;

@@ -1,4 +1,8 @@
 use super::*;
+use crate::cells::{
+    checked_dense_cell_count, encode_num, payload_is_str, DEFAULT_MAX_PAGED_DIRTY_CELLS,
+    MAX_DENSE_CELLS,
+};
 
 fn assert_close(actual: f64, expected: f64) {
     assert!(
@@ -108,7 +112,10 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
     assert!(SheetData::try_new(usize::MAX, 2).is_err());
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
-    assert_eq!(at_limit.kind.len(), MAX_DENSE_CELLS);
+    assert_eq!(
+        at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
+        KIND_EMPTY
+    );
     drop(at_limit);
 
     let mut bounded_store = CellStore::new();
@@ -116,35 +123,35 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
-    dense.resize_rows(2);
+    dense.cells.resize_rows(2);
     dense.insert_rows(0, 1, 0);
     dense.delete_rows(0, 2, 1);
     dense.delete_rows(0, 0, 0);
     dense.insert_cols(0, 1, 0);
     dense.delete_cols(0, 2, 1);
     dense.delete_cols(0, 0, 0);
-    assert_close(dense.num_at(dense.idx(1, 1)), 9.0);
+    assert_close(dense.cells.num_at(dense.cells.idx(1, 1)), 9.0);
 
     dense.dirty_cells.extend((0..5_000).map(|row| (row, 0)));
     dense.clear_dirty();
     assert!(dense.dirty_cells.is_empty());
 
     let mut paged = SheetData::new_paged(2, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    assert!(!paged.is_fully_loaded());
-    assert!(!paged.range_fully_loaded(0, 0, 1, 1));
+    assert!(!paged.cells.is_fully_loaded());
+    assert!(!paged.cells.range_fully_loaded(0, 0, 1, 1));
     for col in 0..2 {
         for row in 0..2 {
             assert!(paged.write_cell(row, col, KIND_EMPTY, 0, 0, Some(1)));
         }
     }
-    assert!(paged.is_fully_loaded());
-    assert!(paged.range_fully_loaded(0, 0, 1, 1));
-    assert!(paged.is_cell_dirty(1, 1));
-    paged.mark_range_clean(0, 2, 0, 2);
-    assert!(!paged.is_cell_dirty(1, 1));
-    paged.pin_range(1, 1, &[0]);
-    paged.pin_range(0, 2, &[0, 1]);
-    assert_eq!(paged.paged_stats().map(|stats| stats.1), Some(4));
+    assert!(paged.cells.is_fully_loaded());
+    assert!(paged.cells.range_fully_loaded(0, 0, 1, 1));
+    assert!(paged.cells.is_cell_dirty(1, 1));
+    paged.cells.mark_range_clean(0, 2, 0, 2);
+    assert!(!paged.cells.is_cell_dirty(1, 1));
+    paged.cells.pin_range(1, 1, &[0]);
+    paged.cells.pin_range(0, 2, &[0, 1]);
+    assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
 }
 
 #[test]
@@ -1234,11 +1241,12 @@ fn nan_box_canonicalizes_hostile_string_tag_patterns() {
         let value = f64::from_bits(bits);
         assert!(value.is_nan());
         put_number(&mut sheet, row, 0, value);
-        let index = sheet.idx(row, 0);
-        assert_eq!(sheet.payload[index], encode_num(f64::NAN));
-        assert!(!payload_is_str(sheet.payload[index]));
-        assert_eq!(sheet.str_id_at(index), NO_STRING);
-        assert!(sheet.num_at(index).is_nan());
+        let index = sheet.cells.idx(row, 0);
+        let payload = sheet.cells.source_payload_at(index);
+        assert_eq!(payload, encode_num(f64::NAN));
+        assert!(!payload_is_str(payload));
+        assert_eq!(sheet.cells.str_id_at(index), NO_STRING);
+        assert!(sheet.cells.num_at(index).is_nan());
     }
 }
 

@@ -38,7 +38,7 @@ impl CellStore {
             return Vec::new();
         }
         let mut walk = ReadWalk::new(data, handle, max_cells);
-        let end_row = end_row.min(data.row_count);
+        let end_row = end_row.min(data.cells.row_count());
         for &col in cols {
             for row in start_row..end_row {
                 if let Some(key) = cell_key(row, col as usize) {
@@ -118,8 +118,8 @@ impl<'a> ReadWalk<'a> {
     /// formula cells inside it. Skips the range when it exceeds the budget.
     fn read_range(&mut self, range: CellRange) {
         let (Ok(row_count), Ok(col_count)) = (
-            u32::try_from(self.data.row_count),
-            u32::try_from(self.data.n_cols),
+            u32::try_from(self.data.cells.row_count()),
+            u32::try_from(self.data.cells.n_cols()),
         ) else {
             return;
         };

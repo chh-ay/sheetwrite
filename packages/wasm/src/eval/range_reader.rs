@@ -9,15 +9,16 @@
 
 use super::{EvalPass, LiteralSources};
 
-use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
+use crate::cells::CellRun;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, RANGE_CELL_LIMIT};
+use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
 
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
     store: &'a CellStore,
     data: &'a SheetData,
+    /// Present when dense literal sources may bypass `eval_at`.
     literals: Option<LiteralSources<'a>>,
     sheet: usize,
     row: usize,
@@ -31,8 +32,8 @@ pub(crate) struct RangeReader<'a> {
     // Criteria folds require row-major scalar delivery. Per-column runs avoid
     // repeating directory reads while preserving that order, including blank runs.
     // Single-row and short-sheet walks share one run instead of a wide cache.
-    calculated_chunks: Vec<(usize, Option<&'a [u64]>)>,
-    calculated_chunk: (usize, Option<&'a [u64]>),
+    column_runs: Vec<Option<CellRun<'a>>>,
+    shared_run: Option<CellRun<'a>>,
 }
 
 impl<'a> RangeReader<'a> {
@@ -49,18 +50,18 @@ impl<'a> RangeReader<'a> {
             return Err(FormulaError::Ref);
         };
 
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
 
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
 
@@ -80,8 +81,8 @@ impl<'a> RangeReader<'a> {
             col_start,
             col_end,
             depth,
-            calculated_chunks: Vec::new(),
-            calculated_chunk: (usize::MAX, None),
+            column_runs: Vec::new(),
+            shared_run: None,
         })
     }
 
@@ -119,52 +120,36 @@ impl<'a> RangeReader<'a> {
             return Ok(None);
         }
 
-        if !self.data.is_loaded(self.row, self.col) {
+        let index = self.data.cells.idx(self.row, self.col);
+        let run = self.run_at(index);
+
+        if !run.is_loaded(index) {
             return Err(FormulaError::Loading);
         }
 
-        let index = self.data.idx(self.row, self.col);
         let value = if let Some(value) = self
             .literals
             .and_then(|sources| sources.value_at(&self.store.strings, index))
         {
             value
-        } else if !self.data.is_paged() && self.data.source_kind_at(index) == KIND_EMPTY {
-            let (chunk_index, chunk) = if self.col_start == self.col_end
-                || self.row_start == self.row_end
-                || self.data.row_count < DERIVED_CHUNK_CELLS
-            {
-                &mut self.calculated_chunk
-            } else {
-                if self.calculated_chunks.is_empty() {
-                    self.calculated_chunks
-                        .resize(self.col_end - self.col_start + 1, (usize::MAX, None));
-                }
-
-                &mut self.calculated_chunks[self.col - self.col_start]
-            };
-
-            if *chunk_index != index / DERIVED_CHUNK_CELLS {
-                *chunk_index = index / DERIVED_CHUNK_CELLS;
-                *chunk = self.data.calculated_chunk_at(index);
-            }
-
-            match chunk.and_then(|values| {
-                DerivedOverlay::decode_present(values[index % DERIVED_CHUNK_CELLS])
-            }) {
-                Some((crate::types::KIND_FORMULA, payload)) => {
-                    Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
-                }
-                Some((kind, payload)) => {
-                    super::literal_cell_value(&self.store.strings, kind, payload)
-                }
-                None => Value::Blank,
-            }
-        } else if self.data.kind_at(index) == KIND_EMPTY {
-            Value::Blank
-        } else {
+        } else if run.source(index).0 != KIND_EMPTY {
             self.store
                 .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
+        } else if self.data.cells.is_paged() {
+            if run.resolved(index).0 == KIND_EMPTY {
+                Value::Blank
+            } else {
+                self.store
+                    .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1)
+            }
+        } else {
+            // A dense calculated slot over an empty source is spill output.
+            match run.resolved(index) {
+                (KIND_FORMULA, payload) => {
+                    Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
+                }
+                (kind, payload) => super::literal_cell_value(&self.store.strings, kind, payload),
+            }
         };
 
         self.col += 1;
@@ -175,6 +160,32 @@ impl<'a> RangeReader<'a> {
         }
 
         Ok(Some(value))
+    }
+
+    fn run_at(&mut self, index: usize) -> CellRun<'a> {
+        // Runs end at column boundaries, so only a multi-row, multi-column walk
+        // needs one cached run per column.
+        let shares_run = self.col_start == self.col_end || self.row_start == self.row_end;
+        let cached = if shares_run {
+            &mut self.shared_run
+        } else {
+            if self.column_runs.is_empty() {
+                self.column_runs
+                    .resize(self.col_end - self.col_start + 1, None);
+            }
+
+            &mut self.column_runs[self.col - self.col_start]
+        };
+
+        match *cached {
+            Some(run) if run.contains(index) => run,
+            _ => {
+                let column_end = self.data.cells.idx(self.row_end, self.col) + 1;
+                let run = self.data.cells.run(index, column_end);
+                *cached = Some(run);
+                run
+            }
+        }
     }
 }
 

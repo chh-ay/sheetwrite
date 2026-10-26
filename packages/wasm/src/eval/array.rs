@@ -507,15 +507,15 @@ impl CellStore {
             .sheets
             .get(range.sheet as usize)
             .ok_or(FormulaError::Ref)?;
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - range.row_start as usize + 1;
         let cols = col_end - range.col_start as usize + 1;
         let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;

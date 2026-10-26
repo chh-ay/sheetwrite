@@ -5,9 +5,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::translate_relative_refs;
-use crate::derived::{DerivedOverlay, DERIVED_CHUNK_CELLS};
+use crate::cells::{payload_num, payload_str_id, CellRun};
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_with_entry, payload_num, payload_str_id, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, AbsCellKey, EvalResult, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY,
@@ -33,8 +33,8 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return WindowView::empty(self.strings.epoch);
         };
-        let row_start = row_start.min(s.row_count);
-        let row_end = row_end.min(s.row_count);
+        let row_start = row_start.min(s.cells.row_count());
+        let row_end = row_end.min(s.cells.row_count());
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
         let Some(mut cells) = WindowCells::new(n_rows, n_cols) else {
@@ -43,40 +43,24 @@ impl CellStore {
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
-            if col >= s.n_cols {
+            if col >= s.cells.n_cols() {
                 continue;
             }
 
-            let mut row = row_start;
-            while row < row_end {
-                let start = s.idx(row, col);
-                let chunk = s.calculated_chunk_at(start);
-                let run_end = row_end.min(row + DERIVED_CHUNK_CELLS - start % DERIVED_CHUNK_CELLS);
-
-                for run_row in row..run_end {
-                    let src = s.idx(run_row, col);
-                    let dst = (run_row - row_start) * n_cols + col_index;
-
-                    // Dense cells are resident; only paged reads need a load-state check.
-                    let resolved = if s.is_paged() {
-                        s.is_loaded(run_row, col).then(|| s.resolved_cell_at(src))
-                    } else {
-                        Some(
-                            chunk
-                                .and_then(|values| {
-                                    DerivedOverlay::decode_present(
-                                        values[src % DERIVED_CHUNK_CELLS],
-                                    )
-                                })
-                                .unwrap_or_else(|| {
-                                    (s.source_kind_at(src), s.source_payload_at(src))
-                                }),
-                        )
-                    };
-                    cells.fill(s, run_row, col, dst, resolved);
+            let mut start = s.cells.idx(row_start, col);
+            let end = s.cells.idx(row_end, col);
+            while start < end {
+                let run = s.cells.run(start, end);
+                for src in run.start..run.end {
+                    let row = src - col * s.cells.row_count();
+                    let dst = (row - row_start) * n_cols + col_index;
+                    let resolved = run.is_loaded(src).then(|| {
+                        let (kind, payload) = run.resolved(src);
+                        (kind, payload, run.style(src))
+                    });
+                    cells.fill(s, row, col, dst, resolved);
                 }
-
-                row = run_end;
+                start = run.end;
             }
         }
 
@@ -101,38 +85,30 @@ impl CellStore {
 
         for (col_index, &col_u) in cols.iter().enumerate() {
             let col = col_u as usize;
-            if col >= s.n_cols {
+            if col >= s.cells.n_cols() {
                 continue;
             }
 
-            let mut chunk_index = usize::MAX;
-            let mut chunk = None;
+            let mut cached_run: Option<CellRun<'_>> = None;
 
             // Explicit rows preserve view order; cache a chunk until that order leaves it.
             for (row_index, &row_u) in rows.iter().enumerate() {
                 let row = row_u as usize;
-                if row >= s.row_count {
+                if row >= s.cells.row_count() {
                     continue;
                 }
 
                 let dst = row_index * n_cols + col_index;
-                let src = s.idx(row, col);
-                let resolved = if s.is_paged() {
-                    s.is_loaded(row, col).then(|| s.resolved_cell_at(src))
-                } else {
-                    if src / DERIVED_CHUNK_CELLS != chunk_index {
-                        chunk_index = src / DERIVED_CHUNK_CELLS;
-                        chunk = s.calculated_chunk_at(src);
-                    }
-
-                    Some(
-                        chunk
-                            .and_then(|values| {
-                                DerivedOverlay::decode_present(values[src % DERIVED_CHUNK_CELLS])
-                            })
-                            .unwrap_or_else(|| (s.source_kind_at(src), s.source_payload_at(src))),
-                    )
-                };
+                let src = s.cells.idx(row, col);
+                let run = cached_run
+                    .get_or_insert_with(|| s.cells.run(src, s.cells.idx(s.cells.row_count(), col)));
+                if src < run.start || src >= run.end {
+                    *run = s.cells.run(src, s.cells.idx(s.cells.row_count(), col));
+                }
+                let resolved = run.is_loaded(src).then(|| {
+                    let (kind, payload) = run.resolved(src);
+                    (kind, payload, run.style(src))
+                });
                 cells.fill(s, row, col, dst, resolved);
             }
         }
@@ -192,9 +168,9 @@ impl WindowCells {
         row: usize,
         col: usize,
         dst: usize,
-        resolved: Option<(u8, u64)>,
+        resolved: Option<(u8, u64, u32)>,
     ) {
-        let Some((stored_kind, payload)) = resolved else {
+        let Some((stored_kind, payload, style)) = resolved else {
             self.kind[dst] = KIND_STRING;
             self.str_local[dst] = local_error_index(
                 FormulaError::Loading,
@@ -204,9 +180,8 @@ impl WindowCells {
             return;
         };
 
-        let src = sheet.idx(row, col);
         self.kind[dst] = stored_kind;
-        self.style_local[dst] = local_style_index(sheet.style_at(src), &mut self.style_dict);
+        self.style_local[dst] = local_style_index(style, &mut self.style_dict);
 
         match stored_kind {
             KIND_NUMBER | KIND_BOOL => self.num[dst] = payload_num(payload),

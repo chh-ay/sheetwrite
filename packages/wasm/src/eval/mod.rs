@@ -23,9 +23,9 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::calc::{Ast, Func};
+use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::sheet::{
-    encode_num, encode_str_id, formula_error_with_entry, payload_num, payload_str_id,
-    spill_ownership_within_budget, SheetData, SpillRange,
+    formula_error_with_entry, spill_ownership_within_budget, SheetData, SpillRange,
 };
 use crate::store::CellStore;
 use crate::types::{
@@ -130,26 +130,28 @@ fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value 
     }
 }
 
+/// Dense literal reads use one whole-grid source run; paged sources go through
+/// `eval_at`, which owns their load-state checks.
 #[derive(Clone, Copy)]
 struct LiteralSources<'a> {
-    kinds: &'a [u8],
-    payloads: &'a [u64],
+    sources: DenseSourceRun<'a>,
 }
 
 impl<'a> LiteralSources<'a> {
     fn new(sheet: &'a SheetData, depth: usize) -> Option<Self> {
-        (!sheet.is_paged() && depth < FORMULA_RECURSION_LIMIT).then_some(Self {
-            kinds: &sheet.kind,
-            payloads: &sheet.payload,
-        })
+        if depth >= FORMULA_RECURSION_LIMIT {
+            return None;
+        }
+
+        sheet.cells.dense_sources().map(|sources| Self { sources })
     }
 
     #[inline]
     fn value_at(self, strings: &StringStorage, index: usize) -> Option<Value> {
-        let kind = self.kinds[index];
+        let (kind, payload) = self.sources.source(index);
         match kind {
             KIND_NUMBER | KIND_STRING | KIND_BOOL => {
-                Some(literal_cell_value(strings, kind, self.payloads[index]))
+                Some(literal_cell_value(strings, kind, payload))
             }
             _ => None,
         }
@@ -745,7 +747,9 @@ impl CellStore {
             return Err(FormulaError::Ref);
         };
 
-        if range.row_end as usize >= data.row_count || range.col_end as usize >= data.n_cols {
+        if range.row_end as usize >= data.cells.row_count()
+            || range.col_end as usize >= data.cells.n_cols()
+        {
             return Err(FormulaError::Spill);
         }
 
@@ -773,14 +777,14 @@ impl CellStore {
                     continue;
                 }
 
-                if !data.is_loaded(row as usize, col as usize) {
+                if !data.cells.is_loaded(row as usize, col as usize) {
                     return Err(FormulaError::Loading);
                 }
 
-                let index = data.idx(row as usize, col as usize);
+                let index = data.cells.idx(row as usize, col as usize);
                 if data.spill_owners.contains_key(&cell)
                     || data.formulas.contains_key(&cell)
-                    || data.source_kind_at(index) != KIND_EMPTY
+                    || data.cells.source_kind_at(index) != KIND_EMPTY
                 {
                     return Err(FormulaError::Spill);
                 }
@@ -834,7 +838,7 @@ impl CellStore {
         }
         let data = &mut self.sheets[sheet];
         if data.spill_owners.try_reserve(matrix.values.len()).is_err()
-            || !data.reserve_derived(matrix.values.len())
+            || !data.cells.reserve_derived(matrix.values.len())
         {
             data.compact_spill_metadata();
             memo.insert(key, Value::Error(FormulaError::Num));
@@ -857,7 +861,7 @@ impl CellStore {
                     _ => None,
                 };
                 let data = &mut self.sheets[sheet];
-                let index = data.idx(cell.0 as usize, cell.1 as usize);
+                let index = data.cells.idx(cell.0 as usize, cell.1 as usize);
                 let (kind, payload) = match value {
                     Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
                     Value::Text(_) => (
@@ -868,7 +872,7 @@ impl CellStore {
                     Value::Blank => (KIND_EMPTY, 0),
                     Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
                 };
-                data.set_derived(index, kind, payload);
+                data.cells.set_derived(index, kind, payload);
                 changed.push(cell);
             }
         }
@@ -887,11 +891,11 @@ impl CellStore {
         };
 
         let (row, col) = key.local();
-        if !data.contains_cell(row as usize, col as usize) {
+        if !data.cells.contains_cell(row as usize, col as usize) {
             return;
         }
 
-        let index = data.idx(row as usize, col as usize);
+        let index = data.cells.idx(row as usize, col as usize);
         if !data.formulas.contains_key(&key.local()) {
             return;
         }
@@ -905,7 +909,7 @@ impl CellStore {
         };
 
         assert!(
-            data.set_derived(index, kind, payload),
+            data.cells.set_derived(index, kind, payload),
             "calculated overlay allocation failed"
         );
     }
@@ -925,22 +929,22 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return Value::Error(FormulaError::Ref);
         };
-        if !s.contains_cell(row, col) {
+        if !s.cells.contains_cell(row, col) {
             return Value::Error(FormulaError::Ref);
         }
 
-        if !s.is_loaded(row, col) {
+        if !s.cells.is_loaded(row, col) {
             return Value::Error(FormulaError::Loading);
         }
 
-        let i = s.idx(row, col);
+        let i = s.cells.idx(row, col);
         // Literal sources cannot be shadowed by calculated output. Decode their
         // payload directly instead of resolving the overlay a second time.
-        let source_kind = s.source_kind_at(i);
+        let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
-            s.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
+            s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
         } else {
-            (source_kind, s.source_payload_at(i))
+            (source_kind, s.cells.source_payload_at(i))
         };
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
@@ -963,13 +967,13 @@ impl CellStore {
                     formula_error_with_entry(s, key, Some(entry)),
                 );
             }
-            if let Some(error) = s.calculated_error_at(i) {
+            if let Some(error) = s.cells.calculated_error_at(i) {
                 return Value::Error(error);
             }
         }
 
         // A `KIND_FORMULA` cell without a formula entry keeps its last number.
-        Value::number(s.num_at(i))
+        Value::number(s.cells.num_at(i))
     }
 
     pub(crate) fn eval_formula_cell(
@@ -1654,17 +1658,17 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
         let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
@@ -1673,9 +1677,11 @@ impl CellStore {
             .ok_or(FormulaError::Num)?;
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                let index = data.idx(row, col);
-                if matches!(data.kind_at(index), KIND_STRING | KIND_FORMULA) {
-                    if let Some(text) = string_from_pool_ref(&self.strings, data.str_id_at(index)) {
+                let index = data.cells.idx(row, col);
+                if matches!(data.cells.kind_at(index), KIND_STRING | KIND_FORMULA) {
+                    if let Some(text) =
+                        string_from_pool_ref(&self.strings, data.cells.str_id_at(index))
+                    {
                         payload_bytes = payload_bytes
                             .checked_add(text.len())
                             .ok_or(FormulaError::Num)?;
@@ -1690,10 +1696,10 @@ impl CellStore {
         let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !data.is_loaded(row, col) {
+                if !data.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                let index = data.idx(row, col);
+                let index = data.cells.idx(row, col);
                 let value = literals
                     .and_then(|sources| sources.value_at(&self.strings, index))
                     .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
@@ -2261,16 +2267,16 @@ impl CellStore {
         let Some(data) = self.sheets.get(range.sheet as usize) else {
             return false;
         };
-        if data.is_paged() {
+        if data.cells.is_paged() {
             return false;
         }
         let has_spills = !data.spill_owners.is_empty();
-        let row_end = (range.row_end as usize).min(data.row_count.saturating_sub(1));
-        let col_end = (range.col_end as usize).min(data.n_cols.saturating_sub(1));
+        let row_end = (range.row_end as usize).min(data.cells.row_count().saturating_sub(1));
+        let col_end = (range.col_end as usize).min(data.cells.n_cols().saturating_sub(1));
         for col in range.col_start as usize..=col_end {
             for row in range.row_start as usize..=row_end {
-                let index = data.idx(row, col);
-                if data.kind_at(index) == KIND_FORMULA {
+                let index = data.cells.idx(row, col);
+                if data.cells.kind_at(index) == KIND_FORMULA {
                     return false;
                 }
                 if has_spills && data.spill_owner((row as u32, col as u32)).is_some() {
@@ -2504,17 +2510,17 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Value::Error(FormulaError::Ref);
         };
-        if data.row_count == 0
-            || data.n_cols == 0
-            || range.row_start as usize >= data.row_count
-            || range.col_start as usize >= data.n_cols
+        if data.cells.row_count() == 0
+            || data.cells.n_cols() == 0
+            || range.row_start as usize >= data.cells.row_count()
+            || range.col_start as usize >= data.cells.n_cols()
         {
             return Value::Error(FormulaError::Ref);
         }
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.row_count - 1);
-        let col_end = (range.col_end as usize).min(data.n_cols - 1);
+        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let total = (row_end - row_start + 1) as u64 * (col_end - col_start + 1) as u64;
         if total > RANGE_CELL_LIMIT {
             return Value::Error(FormulaError::Num);
@@ -2529,11 +2535,11 @@ impl CellStore {
         let literals = LiteralSources::new(data, depth);
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !data.is_loaded(row, col) {
+                if !data.cells.is_loaded(row, col) {
                     return Value::Error(FormulaError::Loading);
                 }
-                let index = data.idx(row, col);
-                let kind = data.kind_at(index);
+                let index = data.cells.idx(row, col);
+                let kind = data.cells.kind_at(index);
                 // A sum over formula cells or spilled output can change without a
                 // write to this range, so only plain values are cached.
                 if cacheable
@@ -2587,18 +2593,18 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
         };
-        if s.row_count == 0
-            || s.n_cols == 0
-            || range.row_start as usize >= s.row_count
-            || range.col_start as usize >= s.n_cols
+        if s.cells.row_count() == 0
+            || s.cells.n_cols() == 0
+            || range.row_start as usize >= s.cells.row_count()
+            || range.col_start as usize >= s.cells.n_cols()
         {
             return Err(FormulaError::Ref);
         }
 
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(s.row_count - 1);
-        let col_end = (range.col_end as usize).min(s.n_cols - 1);
+        let row_end = (range.row_end as usize).min(s.cells.row_count() - 1);
+        let col_end = (range.col_end as usize).min(s.cells.n_cols() - 1);
 
         let row_len = row_end - row_start + 1;
         let col_len = col_end - col_start + 1;
@@ -2612,15 +2618,15 @@ impl CellStore {
 
         for row in row_start..=row_end {
             for col in col_start..=col_end {
-                if !s.is_loaded(row, col) {
+                if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                let i = s.idx(row, col);
+                let i = s.cells.idx(row, col);
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, i))
                 {
                     value
-                } else if s.kind_at(i) == KIND_EMPTY {
+                } else if s.cells.kind_at(i) == KIND_EMPTY {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, pass, depth + 1)
