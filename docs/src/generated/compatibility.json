@@ -28,7 +28,7 @@
       "status": "partial",
       "resultMode": "evaluated",
       "semantics": "FILTER, SORT, UNIQUE, TRANSPOSE, SEQUENCE, TAKE, DROP, CHOOSECOLS, CHOOSEROWS, direct range arrays, array constants, spill references (A1#), spill ownership, resizing, obstruction, read order between spills, history, and dependency invalidation are evaluated. The full engine adds SORTBY, reshaping, and LAMBDA array helpers.",
-      "divergence": "No implicit-intersection operator or general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.",
+      "divergence": "The implicit-intersection operator (@) is not supported and returns #VALUE!. The space intersection operator between references is supported. No general Excel/Sheets dynamic-array family is claimed. Multi-key SORTBY, reshaping, and LAMBDA helpers need the full engine; the default engine returns #NAME? for them.",
       "fixtureIds": [
         "formula-engine-vectors",
         "formula-document-vectors"
@@ -82,8 +82,8 @@
       "dialect": "shared",
       "status": "supported",
       "resultMode": "evaluated",
-      "semantics": "Cross-sheet references resolve by stable sheet handle and survive rename and reorder with canonical quoting.",
-      "divergence": "External workbook links and 3-D references are unsupported.",
+      "semantics": "Cross-sheet references resolve by stable sheet handle and survive rename and reorder with canonical quoting. 3-D references such as Jan:Mar!A1 span the sheets between the endpoints in tab order and follow sheet insert, move, rename and delete.",
+      "divergence": "External workbook links are unsupported. 3-D references are accepted only by SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P; other positions return #VALUE!. Excel also accepts them in the A-suffixed aggregate functions.",
       "fixtureIds": [
         "formula-engine-vectors",
         "worksheet-xlsx-vectors"

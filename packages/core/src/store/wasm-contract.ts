@@ -20,6 +20,8 @@ export type RecomputingCellStore = CellStore & {
 
   removeSheet(sheet: number): boolean;
 
+  setSheetOrder(order: Uint32Array): boolean;
+
   isSheetAlive(sheet: number): boolean;
 
   insertCols(sheet: number, at: number, count: number): void;

@@ -14,6 +14,7 @@ const FORMULA_FUNCTIONS: readonly string[] = [
   "ABS",
   "ADDRESS",
   "AND",
+  "AREAS",
   "AVERAGE",
   "AVERAGEIF",
   "AVERAGEIFS",

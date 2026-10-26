@@ -1,10 +1,10 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, rename_sheet_refs, serialize, shift_cols, shift_rows,
-    update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    invalidate_sheet_refs, refresh_sheet_spans, rename_sheet_refs, serialize, shift_cols,
+    shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
 };
-use crate::eval::expand_let_reachable_ast;
+use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::memory::MemoryOwnerStats;
 use std::rc::Rc;
 
@@ -228,6 +228,34 @@ impl ReadSet {
                 reference.row_end,
                 reference.col,
             )),
+            Ast::SheetSpan(span) => {
+                for &sheet in &span.sheets {
+                    self.push_range(CellRange::new(
+                        sheet,
+                        span.row_start,
+                        span.col_start,
+                        span.row_end,
+                        span.col_end,
+                    ));
+                }
+            }
+            // AREAS reads the shape of its reference, never its cells, so a
+            // dependency on them would only invent cycles and wasted work.
+            // A runtime reference inside it is volatile and refreshes anyway.
+            Ast::Func(Func::Areas, _) => {}
+            // Static operands read only the shared cells; an empty
+            // intersection is a constant #NULL! and reads nothing.
+            Ast::Func(Func::Intersect, operands) => {
+                match intersection_range(operands, formula_sheet as usize) {
+                    Ok(range) => self.push_range(range),
+                    Err(FormulaError::Null) => {}
+                    Err(_) => {
+                        for operand in operands {
+                            self.collect(operand, formula_sheet);
+                        }
+                    }
+                }
+            }
             Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
                 for arg in args {
                     self.collect(arg, formula_sheet);
@@ -530,6 +558,27 @@ impl FormulaEntry {
             return false;
         };
         if !invalidate_sheet_refs(ast, handle) {
+            return false;
+        }
+        self.source = serialize(ast);
+        let (reads, volatile) = formula_metadata(ast, formula_sheet);
+        self.reads = reads;
+        self.set_volatile(volatile);
+        true
+    }
+
+    /// Re-places the entry's 3-D references in the tab `order`; `names` holds
+    /// the sheet name of each handle. Returns whether anything changed.
+    pub(crate) fn refresh_sheet_spans(
+        &mut self,
+        order: &[u32],
+        names: &[String],
+        formula_sheet: u32,
+    ) -> bool {
+        let Some(ast) = &mut self.ast else {
+            return false;
+        };
+        if !refresh_sheet_spans(ast, order, names) {
             return false;
         }
         self.source = serialize(ast);

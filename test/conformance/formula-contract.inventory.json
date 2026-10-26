@@ -4994,6 +4994,20 @@
         "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
       ]
     },
+    "excel-reference-operators": {
+      "excel": "divergent",
+      "googleSheets": "unverified",
+      "openFormula": "unverified",
+      "divergences": [
+        "A space between two references is the intersection operator. An empty intersection, or references on different sheets, return #NULL!. A non-reference operand returns #VALUE!. Spaces around other operators, after commas, before a closing parenthesis and between a function name and its parenthesis are not operators.",
+        "A comma inside parentheses that are not a function call is the union operator, as in (A1:A2,C1:C2). Aggregate functions that read their arguments as a list of values accept a union. INDEX picks area area_num of a union, and an area_num past the last area returns #REF!. A union in any other position returns #VALUE!.",
+        "AREAS counts the areas of a reference: the members of a union, or 1 for a cell, range or intersection. A non-reference argument returns #VALUE!.",
+        "A 3-D reference such as Sheet1:Sheet3!A1:B2 or 'Sheet 1:Sheet 3'!A1 spans the sheets between its endpoints in workbook tab order. SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P accept it; any other position returns #VALUE!. Excel also accepts it in the A-suffixed aggregate functions.",
+        "A sheet inserted or moved inside the span joins it; a sheet moved out leaves it. Deleting an endpoint moves the endpoint to its inner neighbour; moving an endpoint past the other endpoint drops it; renaming an endpoint rewrites the formula text. Deleting every sheet of the span gives #REF!. Row and column edits do not change a 3-D reference. Cells beyond a smaller sheet's grid read as blank.",
+        "XLSX import and export keep the Excel formula text of intersections, unions and 3-D references.",
+        "Google Sheets and OpenFormula results require producer evidence before compatibility is claimed."
+      ]
+    },
     "excel-reference-information": {
       "excel": "divergent",
       "googleSheets": "unverified",
@@ -5310,6 +5324,32 @@
       "evidence": {
         "status": "source-linked",
         "paths": ["packages/wasm/src/tests.rs", "scripts/conformance/formula-evidence.ts"]
+      }
+    },
+    "implemented-reference-operators": {
+      "parser": {
+        "status": "implemented",
+        "paths": ["packages/wasm/src/calc.rs"]
+      },
+      "evaluator": {
+        "status": "implemented",
+        "paths": [
+          "packages/wasm/src/eval/areas.rs",
+          "packages/wasm/src/eval/matrix.rs",
+          "packages/wasm/src/store.rs"
+        ]
+      },
+      "assist": {
+        "status": "implemented",
+        "paths": ["packages/core/src/formula-assist.ts"]
+      },
+      "evidence": {
+        "status": "source-linked",
+        "paths": [
+          "packages/wasm/src/tests.rs",
+          "packages/xlsx/test/formula-source-preservation.test.ts",
+          "scripts/conformance/formula-evidence.ts"
+        ]
       }
     },
     "implemented-reference-information": {
@@ -7281,6 +7321,18 @@
       "semantics": "dynamic-reference",
       "dialects": "excel-dynamic-reference",
       "implementation": "implemented-dynamic-reference",
+      "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
+      "version": 1
+    },
+    {
+      "canonical": "AREAS",
+      "aliases": [],
+      "family": "lookup-reference",
+      "contractStatus": "supported",
+      "signature": "required-reference",
+      "semantics": "information",
+      "dialects": "excel-reference-operators",
+      "implementation": "implemented-reference-operators",
       "builds": ["@sheetwrite/wasm", "@sheetwrite/formulas"],
       "version": 1
     },
@@ -9258,6 +9310,26 @@
       "contractStatus": "required-supported",
       "source": "microsoft-excel-operators",
       "section": "Arithmetic operators",
+      "version": 1
+    },
+    {
+      "canonical": "intersection",
+      "token": " ",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "supported",
+      "source": "microsoft-excel-operators",
+      "section": "Reference operators",
+      "version": 1
+    },
+    {
+      "canonical": "union",
+      "token": ",",
+      "fixity": "infix",
+      "family": "operator",
+      "contractStatus": "supported",
+      "source": "microsoft-excel-operators",
+      "section": "Reference operators",
       "version": 1
     }
   ]

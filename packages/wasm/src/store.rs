@@ -1,12 +1,14 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    parse, resolve_named_ranges, resolve_sheet_refs, resolve_structured_refs, sheet_name_key,
-    shift_range, NamedRangeRef, StructuredRef, TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, parse, place_span, resolve_named_ranges, resolve_sheet_refs,
+    resolve_structured_refs, sheet_name_key, shift_range, NamedRangeRef, StructuredRef,
+    TableSection, UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -255,6 +257,13 @@ pub struct CellStore {
     pub(crate) sheets: Vec<SheetData>,
     pub(crate) sheet_names: Vec<String>,
     pub(crate) sheet_alive: Vec<bool>,
+    /// Live sheet handles in workbook tab order. 3-D references span the tabs
+    /// between their endpoints; new sheets append until the host reorders.
+    pub(crate) sheet_order: Vec<u32>,
+    /// Set when a formula with a 3-D reference is ingested; cleared when a
+    /// tab-order refresh finds none. Workbooks without 3-D references skip
+    /// the formula scan on every tab move, insert and removal.
+    sheet_spans_present: Cell<bool>,
     pub(crate) sheet_lookup: HashMap<String, usize>,
     pub(crate) sheet_ids: HashMap<String, usize>,
     pub(crate) strings: StringStorage,
@@ -337,6 +346,8 @@ impl CellStore {
             sheets: Vec::new(),
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
+            sheet_order: Vec::new(),
+            sheet_spans_present: Cell::new(false),
             sheet_lookup: HashMap::new(),
             sheet_ids: HashMap::new(),
             strings: StringStorage::new(),
@@ -435,6 +446,7 @@ impl CellStore {
         ));
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
+        self.sheet_order.push(index as u32);
 
         index
     }
@@ -799,6 +811,12 @@ impl CellStore {
         self.sheets[sheet] = SheetData::new(0, 0);
         self.conditional_rules.remove_sheet(sheet);
         self.sheet_alive[sheet] = false;
+        self.sheet_order.retain(|&tab| tab != sheet as u32);
+        for span_sheet in self.refresh_sheet_spans() {
+            if !affected.contains(&span_sheet) {
+                affected.push(span_sheet);
+            }
+        }
         self.graph.invalidate();
 
         if removed_names || !removed_table_keys.is_empty() {
@@ -810,6 +828,39 @@ impl CellStore {
 
         self.strings.request_collection();
 
+        true
+    }
+
+    /// Set the workbook tab order: every live sheet handle exactly once.
+    /// 3-D references such as `Sheet1:Sheet3!A1` span the tabs between their
+    /// endpoints, so formulas whose span changed are re-placed, their
+    /// dependencies patched, and their results recomputed. Rejects an order
+    /// that omits, repeats or adds a handle.
+    #[wasm_bindgen(js_name = setSheetOrder)]
+    pub fn set_sheet_order(&mut self, order: &[u32]) -> bool {
+        let mut seen = vec![false; self.sheet_alive.len()];
+        let valid = order.len() == self.sheet_order.len()
+            && order.iter().all(|&handle| {
+                let index = handle as usize;
+                let fresh = self.sheet_alive.get(index).copied().unwrap_or(false) && !seen[index];
+                if fresh {
+                    seen[index] = true;
+                }
+                fresh
+            });
+        if !valid {
+            return false;
+        }
+        if order == self.sheet_order.as_slice() {
+            return true;
+        }
+
+        self.sheet_order.clear();
+        self.sheet_order.extend_from_slice(order);
+        let affected = self.refresh_sheet_spans();
+        if !affected.is_empty() {
+            self.recompute_seed_sheets(&affected);
+        }
         true
     }
 
@@ -3210,6 +3261,7 @@ impl CellStore {
             metadata.add_payload(name.len(), name.capacity());
         }
         metadata.add_vec::<bool>(self.sheet_alive.len(), self.sheet_alive.capacity());
+        metadata.add_vec::<u32>(self.sheet_order.len(), self.sheet_order.capacity());
         metadata.add_hash_table::<String, usize>(self.sheet_ids.len(), self.sheet_ids.capacity());
         for id in self.sheet_ids.keys() {
             metadata.add_payload(id.len(), id.capacity());
@@ -3245,6 +3297,7 @@ impl CellStore {
         self.sheets.push(sheet);
         self.sheet_names.push(String::new());
         self.sheet_alive.push(true);
+        self.sheet_order.push(index as u32);
         Ok(index)
     }
 
@@ -3473,12 +3526,19 @@ impl CellStore {
             Ok(ast) => ast,
             Err(_) => return FormulaEntry::parse_error(source),
         };
-        let ast = match resolve_sheet_refs(ast, &|name| {
-            self.sheet_ids
-                .get(name)
-                .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
-                .map(|&index| index as u32)
-        }) {
+        let ast = match resolve_sheet_refs(
+            ast,
+            &|name| {
+                self.sheet_ids
+                    .get(name)
+                    .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
+                    .map(|&index| index as u32)
+            },
+            &|span| {
+                self.sheet_spans_present.set(true);
+                place_span(span, &self.sheet_order)
+            },
+        ) {
             Ok(ast) => ast,
             Err(_) => return FormulaEntry::error(source, FormulaError::Ref),
         };
@@ -3614,6 +3674,51 @@ impl CellStore {
         }
 
         self.recompute_seed_sheets(&seeds);
+    }
+
+    /// Re-places every 3-D reference after the tab order changed or a sheet
+    /// was removed. A changed formula is replaced through the dependency
+    /// index, which patches only that formula's reads, and is marked dirty.
+    /// Returns the sheets whose formulas changed.
+    fn refresh_sheet_spans(&mut self) -> Vec<usize> {
+        let mut affected = Vec::new();
+        if !self.sheet_spans_present.get() {
+            return affected;
+        }
+
+        let mut spans_present = false;
+        for (sheet, data) in self.sheets.iter_mut().enumerate() {
+            if !self.sheet_alive[sheet] {
+                continue;
+            }
+            let keys: Vec<_> = data
+                .formulas
+                .iter()
+                .filter(|(_, entry)| entry.ast.as_ref().is_some_and(ast_contains_sheet_span))
+                .map(|(key, _)| key)
+                .collect();
+            spans_present |= !keys.is_empty();
+
+            let mut changed = false;
+            for key in keys {
+                let Some(mut entry) = data.formulas.get(key).cloned() else {
+                    continue;
+                };
+                if !entry.refresh_sheet_spans(&self.sheet_order, &self.sheet_names, sheet as u32) {
+                    continue;
+                }
+                self.graph
+                    .replace_entry(&mut data.formulas, sheet, key, Some(entry));
+                data.formulas.mark_cell_dirty(key);
+                changed = true;
+            }
+            if changed {
+                affected.push(sheet);
+            }
+        }
+
+        self.sheet_spans_present.set(spans_present);
+        affected
     }
 
     fn refresh_named_formula_entries(&mut self) {

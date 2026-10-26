@@ -1484,6 +1484,72 @@ describe("transactional document metadata", () => {
     store.dispose();
   });
 
+  it("recalculates a 3-D reference when tabs move, are added inside its span, or come back on undo", () => {
+    const tab = (id: string, name: string) => ({
+      id,
+      name,
+      rowCount: 1,
+      columns: [{ key: "value", header: "Value", width: 100, type: "number" as const }],
+    });
+    const workbook: Workbook = {
+      activeSheet: "summary",
+      sheets: [
+        tab("first", "First"),
+        tab("middle", "Middle"),
+        tab("last", "Last"),
+        tab("summary", "Summary"),
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    const literal = (sheet: string, value: number) => ({
+      op: "set" as const,
+      addr: { sheet, row: 0, col: 0 },
+      value: { kind: "literal" as const, value },
+    });
+    store.applyTransaction({
+      patches: [
+        literal("first", 1),
+        literal("middle", 10),
+        literal("last", 100),
+        {
+          op: "set",
+          addr: { sheet: "summary", row: 0, col: 0 },
+          value: { kind: "formula", src: "=SUM(First:Last!A1)" },
+        },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const total = () => store.getCell({ sheet: "summary", row: 0, col: 0 }).resolved;
+    expect(total()).toBe(111);
+
+    grid.moveSheet("middle", 3);
+    expect(total()).toBe(101);
+    grid.undo();
+    expect(total()).toBe(111);
+
+    grid.addSheet({ id: "added", name: "Added", rowCount: 1 });
+    store.applyTransaction({ patches: [literal("added", 1000)] });
+    expect(total()).toBe(111);
+    grid.moveSheet("added", 1);
+    expect(total()).toBe(1111);
+
+    grid.removeSheet("middle");
+    expect(total()).toBe(1101);
+    grid.undo();
+    expect(workbook.sheets.map((sheet) => sheet.id)).toEqual([
+      "first",
+      "added",
+      "middle",
+      "last",
+      "summary",
+    ]);
+    expect(total()).toBe(1111);
+    expect(store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=SUM(First:Last!A1)");
+
+    grid.destroy();
+    store.dispose();
+  });
+
   it("histories validation, protection, notes, filters, and column visibility", () => {
     const workbook = makeWorkbook(6);
     const store = new SheetwriteStore(workbook, makeColumnarData(6));

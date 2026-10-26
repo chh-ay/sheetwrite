@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L502"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L502</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L510"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L510</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -113,6 +113,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
+<a href="#init-output-cellstore-set-sheet-order"><code>cellstore_setSheetOrder</code></a>
 <a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
 <a href="#init-output-cellstore-set-spill-blockers"><code>cellstore_setSpillBlockers</code></a>
 <a href="#init-output-cellstore-set-string"><code>cellstore_setString</code></a>
@@ -160,7 +161,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>146</span>
+## Members <span class="api-count" data-pagefind-ignore>147</span>
 
 <div class="api-member-list">
 
@@ -1069,6 +1070,15 @@ readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: nu
 
 ```ts generated
 readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-set-sheet-order" data-pagefind-weight="1">
+<summary><code>cellstore_setSheetOrder</code></summary>
+
+```ts generated
+readonly cellstore_setSheetOrder: (a: number, b: number, c: number) => number;
 ```
 
 </details>
@@ -2042,6 +2052,11 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_setSheetOrder: (
+    a: number,
+    b: number,
+    c: number,
+  ) => number;
   readonly cellstore_setSparseBlock: (
     a: number,
     b: number,

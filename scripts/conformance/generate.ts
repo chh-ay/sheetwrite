@@ -84,6 +84,8 @@ const BASE_INPUTS: FormulaInputs = [
   { cell: "B2", value: 2 },
   { cell: "B3", value: 3 },
 ];
+// A probe that reads a base cell receives the base inputs.
+const BASE_INPUT_REFERENCE = /[AB][1-3](?::[AB][1-3])?/;
 
 const ARGUMENTS_BY_SIGNATURE: Record<string, string> = {
   address: "1,2",
@@ -177,6 +179,30 @@ const OPERATOR_ASSERTIONS: Readonly<Record<string, readonly [string, string]>> =
   percent: ["50%=0.5", "25%=0.25"],
   "unary-plus": ["+2=2", "+7=7"],
   "unary-minus": ["-2=-2", "-7=-7"],
+  intersection: ["SUM(A1:B2 B1:B3)=3", "A1:B3 A2=60"],
+  union: ["SUM((A1:A2,B1))=-39", "COUNT((A1,B2,B3))=3"],
+};
+
+// The generic operator probe writes `C1<token>1`, which a reference operator
+// rejects because 1 is not a reference. These operators state each category
+// with reference operands instead.
+const CATEGORY_ASSERTIONS_BY_OPERATOR: Readonly<
+  Record<string, Partial<Record<Exclude<SemanticCategory, "mutation" | "normal">, string>>>
+> = {
+  intersection: {
+    empty: "AND(ISBLANK(C1:D1 C1),SUM(C1:D2 C1:C2)=0)",
+    mixed: 'AND(COUNTA(C1:D1 C1:C2)=1,SUM(C1:D1 C1:C2)=0,C1:D1 C1="2")',
+    error: "AND(ISERR(C1:C2 D1:D2),ISERROR(SUM(C1:C2 D1:D2)),ISERROR(C1:C2 OFFSET(C1,1/0,0)))",
+    boundary: "AND(C1:XFD1 C1:C1048576=0,ROWS(C1:C1048576 A1:XFD1)=1)",
+    "range-array": "AND(SUM(C1:C2 C1:D2)=3,ROWS(C1:C2 C1:D9)=2)",
+  },
+  union: {
+    empty: "AND(COUNT((C1,C2))=0,SUM((C1,C2))=0)",
+    mixed: "AND(SUM((C1,C2))=0,COUNTA((C1,C2))=1)",
+    error: "AND(ISERROR(SUM((C1,1/0))),ISERROR((C1,C2)),ISERROR(INDEX((C1,C2),1,1,3)))",
+    boundary: "AND(AREAS((C1,C1))=2,INDEX((D1,C1),1,1,2)=0,SUM((C1,C1))=0)",
+    "range-array": "AND(SUM((C1:C2,C1))=4,AREAS((C1:C2,C1:C2))=2)",
+  },
 };
 
 const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
@@ -235,6 +261,13 @@ const CATEGORY_ASSERTIONS_BY_FUNCTION: Readonly<
       'AND(ISERROR(INDIRECT("not a reference")),ISERROR(INDIRECT("A0")),ISERROR(INDIRECT("[missing.xlsx]Sheet1!A1")),ISERROR(INDIRECT(1/0)))',
     boundary: 'INDIRECT("R1C1",FALSE)=-100',
     "range-array": 'SUM(INDIRECT("B1:B"&SUM(C1:C2)))=6',
+  },
+  AREAS: {
+    empty: "AREAS(C1)=1",
+    mixed: "AREAS((C1,C2))=2",
+    error: "AND(ISERROR(AREAS(1/0)),ISERROR(AREAS(1)))",
+    boundary: "AREAS(C1:C1048576)=1",
+    "range-array": "AREAS((C1:C2,C1:C2,C1))=3",
   },
   T: { "range-array": "TYPE(T(C1:C2))=16" },
   // Random results cannot equal a baseline call, so each category pins an
@@ -377,7 +410,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
       }),
       assertions: authoredAssertions(entry.canonical),
       argumentsSource,
-      inputs: /[AB][1-3](?::[AB][1-3])?/.test(
+      inputs: BASE_INPUT_REFERENCE.test(
         `${argumentsSource},${authoredAssertions(entry.canonical).join(",")}`,
       )
         ? BASE_INPUTS
@@ -407,7 +440,7 @@ export function supportedInventorySubjects(inventory: FormulaInventory): Invento
       assertions,
       argumentsSource: "",
       operator: entry,
-      inputs: [],
+      inputs: BASE_INPUT_REFERENCE.test(assertions.join(",")) ? BASE_INPUTS : [],
     };
   });
   return [...functions, ...operators];
@@ -488,7 +521,7 @@ function categoryFormula(
   const directOverride =
     subject.subject.kind === "function"
       ? CATEGORY_ASSERTIONS_BY_FUNCTION[subject.subject.name]?.[category]
-      : undefined;
+      : CATEGORY_ASSERTIONS_BY_OPERATOR[subject.subject.name]?.[category];
   let property = directOverride;
   if (!property && subject.subject.kind === "operator") {
     const operator = subject.operator!;

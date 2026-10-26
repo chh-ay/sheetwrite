@@ -95,6 +95,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
+<a href="#cell-store-set-sheet-order"><code>setSheetOrder</code></a>
 <a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
 <a href="#cell-store-set-spill-blockers"><code>setSpillBlockers</code></a>
 <a href="#cell-store-set-string"><code>setString</code></a>
@@ -113,7 +114,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>99</span>
+## Members <span class="api-count" data-pagefind-ignore>100</span>
 
 <div class="api-member-list">
 
@@ -984,6 +985,20 @@ setSheetName: (sheet: number, id: string, name: string) => void;
 
 </details>
 
+<details class="api-member" id="cell-store-set-sheet-order" data-pagefind-weight="1">
+<summary><code>setSheetOrder</code> <span class="api-member-summary">Set the workbook tab order: every live sheet handle exactly once.</span></summary>
+
+```ts generated
+setSheetOrder: (order: Uint32Array) => boolean;
+```
+
+<p class="api-member-doc">Set the workbook tab order: every live sheet handle exactly once.
+3-D references such as `Sheet1:Sheet3!A1` span the tabs between their
+endpoints, so formulas whose span changed are re-placed, their
+dependencies patched, and their results recomputed. Rejects an order
+that omits, repeats or adds a handle.</p>
+</details>
+
 <details class="api-member" id="cell-store-set-sparse-block" data-pagefind-weight="1">
 <summary><code>setSparseBlock</code> <span class="api-member-summary">Write one sparse mixed transaction/page/snapshot block without allocating by logical rectangle size.</span></summary>
 
@@ -1491,6 +1506,7 @@ class CellStore {
     style: number,
   ) => void;
   setSheetName: (sheet: number, id: string, name: string) => void;
+  setSheetOrder: (order: Uint32Array) => boolean;
   setSparseBlock: (
     sheet: number,
     start_row: number,

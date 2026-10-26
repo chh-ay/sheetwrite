@@ -3,9 +3,9 @@
   "testSet": {
     "version": 1,
     "libraryVersion": "0.5.4",
-    "checksum": "af88aec4fdde4a0f00b4a11be94e04d2cf16d7a22f35a128ec0367c373f7c676",
+    "checksum": "3754a28a65a2b428366c308650c603434ac85e9070cd902b7905a7759f1404c6",
     "totalTests": 2350,
-    "publishedExamples": 185,
+    "publishedExamples": 188,
     "formulaTests": 2000,
     "editSequenceTests": 250,
     "workbookTests": 100,
@@ -608,6 +608,10 @@
         "label": "Function · INDIRECT"
       },
       {
+        "value": "function:AREAS",
+        "label": "Function · AREAS"
+      },
+      {
         "value": "function:FORMULATEXT",
         "label": "Function · FORMULATEXT"
       },
@@ -730,6 +734,14 @@
       {
         "value": "operator:unary-minus",
         "label": "Operator · unary-minus"
+      },
+      {
+        "value": "operator:intersection",
+        "label": "Operator · intersection"
+      },
+      {
+        "value": "operator:union",
+        "label": "Operator · union"
       },
       {
         "value": "feature:edit-sequences",
@@ -880,6 +892,14 @@
       "license": "Spec metadata; MIT",
       "section": "Comparison operators",
       "sha256": "1d12acad7a28772c785d574e95b69f8cdc713328c0bdb1a5f008f6c331cbabed",
+      "title": "Calculation operators and precedence in Excel",
+      "url": "https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a"
+    },
+    {
+      "authorship": "spec-derived",
+      "license": "Spec metadata; MIT",
+      "section": "Reference operators",
+      "sha256": "3dacc786649ba63b65c222359510f7822936a466f5b716355a22a4ba056c854e",
       "title": "Calculation operators and precedence in Excel",
       "url": "https://support.microsoft.com/en-us/office/calculation-operators-and-precedence-in-excel-48be406d-4975-4d31-b2b8-7af9e0e2878a"
     },
@@ -6530,6 +6550,62 @@
     },
     {
       "position": 878,
+      "id": "formula.function.areas.normal.1",
+      "label": "AREAS · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "lookup-reference",
+      "behavior": "shared",
+      "featureValue": "function:AREAS",
+      "featureLabel": "Function · AREAS",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=AREAS((A1:A2,B1))=2",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 5,
+      "evidenceIndex": 7,
+      "testChecksum": "81ceeaed12931379ba1eb95bfc7eb02e2f96d4297666ecd3458f2a049fe17157",
+      "observations": []
+    },
+    {
+      "position": 884,
       "id": "formula.function.formulatext.normal.1",
       "label": "FORMULATEXT · Normal",
       "kind": "formula",
@@ -6585,7 +6661,7 @@
       "observations": []
     },
     {
-      "position": 884,
+      "position": 890,
       "id": "formula.function.hyperlink.normal.1",
       "label": "HYPERLINK · Normal",
       "kind": "formula",
@@ -6616,7 +6692,7 @@
       "observations": []
     },
     {
-      "position": 890,
+      "position": 896,
       "id": "formula.function.cell.normal.1",
       "label": "CELL · Normal",
       "kind": "formula",
@@ -6672,7 +6748,7 @@
       "observations": []
     },
     {
-      "position": 896,
+      "position": 902,
       "id": "formula.function.transpose.normal.1",
       "label": "TRANSPOSE · Normal",
       "kind": "formula",
@@ -6728,7 +6804,7 @@
       "observations": []
     },
     {
-      "position": 902,
+      "position": 908,
       "id": "formula.function.sequence.normal.1",
       "label": "SEQUENCE · Normal",
       "kind": "formula",
@@ -6759,7 +6835,7 @@
       "observations": []
     },
     {
-      "position": 908,
+      "position": 914,
       "id": "formula.function.take.normal.1",
       "label": "TAKE · Normal",
       "kind": "formula",
@@ -6815,7 +6891,7 @@
       "observations": []
     },
     {
-      "position": 914,
+      "position": 920,
       "id": "formula.function.drop.normal.1",
       "label": "DROP · Normal",
       "kind": "formula",
@@ -6871,7 +6947,7 @@
       "observations": []
     },
     {
-      "position": 920,
+      "position": 926,
       "id": "formula.function.choosecols.normal.1",
       "label": "CHOOSECOLS · Normal",
       "kind": "formula",
@@ -6927,7 +7003,7 @@
       "observations": []
     },
     {
-      "position": 926,
+      "position": 932,
       "id": "formula.function.chooserows.normal.1",
       "label": "CHOOSEROWS · Normal",
       "kind": "formula",
@@ -6983,7 +7059,7 @@
       "observations": []
     },
     {
-      "position": 932,
+      "position": 938,
       "id": "formula.function.pv.normal.1",
       "label": "PV · Normal",
       "kind": "formula",
@@ -7014,7 +7090,7 @@
       "observations": []
     },
     {
-      "position": 938,
+      "position": 944,
       "id": "formula.function.fv.normal.1",
       "label": "FV · Normal",
       "kind": "formula",
@@ -7045,7 +7121,7 @@
       "observations": []
     },
     {
-      "position": 944,
+      "position": 950,
       "id": "formula.function.pmt.normal.1",
       "label": "PMT · Normal",
       "kind": "formula",
@@ -7076,7 +7152,7 @@
       "observations": []
     },
     {
-      "position": 950,
+      "position": 956,
       "id": "formula.function.npv.normal.1",
       "label": "NPV · Normal",
       "kind": "formula",
@@ -7132,7 +7208,7 @@
       "observations": []
     },
     {
-      "position": 956,
+      "position": 962,
       "id": "formula.function.irr.normal.1",
       "label": "IRR · Normal",
       "kind": "formula",
@@ -7188,7 +7264,7 @@
       "observations": []
     },
     {
-      "position": 962,
+      "position": 968,
       "id": "formula.function.rate.normal.1",
       "label": "RATE · Normal",
       "kind": "formula",
@@ -7219,7 +7295,7 @@
       "observations": []
     },
     {
-      "position": 968,
+      "position": 974,
       "id": "formula.function.ipmt.normal.1",
       "label": "IPMT · Normal",
       "kind": "formula",
@@ -7250,7 +7326,7 @@
       "observations": []
     },
     {
-      "position": 974,
+      "position": 980,
       "id": "formula.function.ppmt.normal.1",
       "label": "PPMT · Normal",
       "kind": "formula",
@@ -7281,7 +7357,7 @@
       "observations": []
     },
     {
-      "position": 986,
+      "position": 992,
       "id": "formula.operator.subtract.normal.1",
       "label": "subtract · Normal",
       "kind": "formula",
@@ -7312,7 +7388,7 @@
       "observations": []
     },
     {
-      "position": 992,
+      "position": 998,
       "id": "formula.operator.multiply.normal.1",
       "label": "multiply · Normal",
       "kind": "formula",
@@ -7343,7 +7419,7 @@
       "observations": []
     },
     {
-      "position": 998,
+      "position": 1004,
       "id": "formula.operator.divide.normal.1",
       "label": "divide · Normal",
       "kind": "formula",
@@ -7374,7 +7450,7 @@
       "observations": []
     },
     {
-      "position": 1004,
+      "position": 1010,
       "id": "formula.operator.power.normal.1",
       "label": "power · Normal",
       "kind": "formula",
@@ -7405,7 +7481,7 @@
       "observations": []
     },
     {
-      "position": 1010,
+      "position": 1016,
       "id": "formula.operator.concatenate.normal.1",
       "label": "concatenate · Normal",
       "kind": "formula",
@@ -7436,7 +7512,7 @@
       "observations": []
     },
     {
-      "position": 1016,
+      "position": 1022,
       "id": "formula.operator.equal.normal.1",
       "label": "equal · Normal",
       "kind": "formula",
@@ -7467,7 +7543,7 @@
       "observations": []
     },
     {
-      "position": 1022,
+      "position": 1028,
       "id": "formula.operator.not-equal.normal.1",
       "label": "not-equal · Normal",
       "kind": "formula",
@@ -7498,7 +7574,7 @@
       "observations": []
     },
     {
-      "position": 1028,
+      "position": 1034,
       "id": "formula.operator.less-than.normal.1",
       "label": "less-than · Normal",
       "kind": "formula",
@@ -7529,7 +7605,7 @@
       "observations": []
     },
     {
-      "position": 1034,
+      "position": 1040,
       "id": "formula.operator.less-than-or-equal.normal.1",
       "label": "less-than-or-equal · Normal",
       "kind": "formula",
@@ -7560,7 +7636,7 @@
       "observations": []
     },
     {
-      "position": 1040,
+      "position": 1046,
       "id": "formula.operator.greater-than.normal.1",
       "label": "greater-than · Normal",
       "kind": "formula",
@@ -7591,7 +7667,7 @@
       "observations": []
     },
     {
-      "position": 1046,
+      "position": 1052,
       "id": "formula.operator.greater-than-or-equal.normal.1",
       "label": "greater-than-or-equal · Normal",
       "kind": "formula",
@@ -7622,7 +7698,7 @@
       "observations": []
     },
     {
-      "position": 1052,
+      "position": 1058,
       "id": "formula.operator.percent.normal.1",
       "label": "percent · Normal",
       "kind": "formula",
@@ -7653,7 +7729,7 @@
       "observations": []
     },
     {
-      "position": 1058,
+      "position": 1064,
       "id": "formula.operator.unary-plus.normal.1",
       "label": "unary-plus · Normal",
       "kind": "formula",
@@ -7684,7 +7760,7 @@
       "observations": []
     },
     {
-      "position": 1064,
+      "position": 1070,
       "id": "formula.operator.unary-minus.normal.1",
       "label": "unary-minus · Normal",
       "kind": "formula",
@@ -7712,6 +7788,118 @@
       "sourceIndex": 0,
       "evidenceIndex": 7,
       "testChecksum": "5aee69629a3b16dccfbd132f5cdb5c6058621d7e77667aa8699badf0791add4c",
+      "observations": []
+    },
+    {
+      "position": 1076,
+      "id": "formula.operator.intersection.normal.1",
+      "label": "intersection · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "operator",
+      "behavior": "shared",
+      "featureValue": "operator:intersection",
+      "featureLabel": "Operator · intersection",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SUM(A1:B2 B1:B3)=3",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 16,
+      "evidenceIndex": 7,
+      "testChecksum": "7e9b0d8d19e1402afb33269e1cc66c00a0dfc3a0ebe54e642db2a20412416ef7",
+      "observations": []
+    },
+    {
+      "position": 1082,
+      "id": "formula.operator.union.normal.1",
+      "label": "union · Normal",
+      "kind": "formula",
+      "area": "formula",
+      "category": "normal",
+      "family": "operator",
+      "behavior": "shared",
+      "featureValue": "operator:union",
+      "featureLabel": "Operator · union",
+      "statusTags": [
+        "local-pass",
+        "result-unavailable"
+      ],
+      "formula": "=SUM((A1:A2,B1))=-39",
+      "target": "D4",
+      "inputs": [
+        {
+          "cell": "A1",
+          "value": -100
+        },
+        {
+          "cell": "A2",
+          "value": 60
+        },
+        {
+          "cell": "A3",
+          "value": 60
+        },
+        {
+          "cell": "B1",
+          "value": 1
+        },
+        {
+          "cell": "B2",
+          "value": 2
+        },
+        {
+          "cell": "B3",
+          "value": 3
+        }
+      ],
+      "expected": {
+        "type": "boolean",
+        "value": true
+      },
+      "tolerance": {
+        "kind": "exact"
+      },
+      "unsupported": false,
+      "sourceIndex": 16,
+      "evidenceIndex": 7,
+      "testChecksum": "991c1a49d2cd81acc7b7d89a4eeae54ca0c6508b3694a4ab22a52e7b1edfc915",
       "observations": []
     },
     {
@@ -7747,7 +7935,7 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 16,
+      "sourceIndex": 17,
       "evidenceIndex": 10,
       "testChecksum": "437d4066103b7968bb47f4b57dc87c70062b1a2841d5457f024fd6fe1cc96725",
       "observations": []
@@ -7782,7 +7970,7 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 17,
+      "sourceIndex": 18,
       "evidenceIndex": 11,
       "testChecksum": "f3cc0a7b5692721e2d36f4a84d05855782e6e76c48a0f36dfaa47e7ab921a405",
       "observations": []
@@ -7818,7 +8006,7 @@
         "kind": "exact"
       },
       "unsupported": false,
-      "sourceIndex": 17,
+      "sourceIndex": 18,
       "evidenceIndex": 11,
       "testChecksum": "8477e87b2ca1ae584aeef33eda7c524ff41dc0d543bc2c5be34ea4ae41647481",
       "observations": []
