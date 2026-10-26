@@ -17,9 +17,9 @@ mod statistics;
 mod text;
 mod value;
 
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::calc::{Ast, Func};
@@ -59,8 +59,8 @@ const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
     static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
-    static RANGE_SUM_CACHE: RefCell<HashMap<CellRange, EvalResult>> =
-        RefCell::new(HashMap::new());
+    static RANGE_SUM_CACHE: RefCell<FxHashMap<CellRange, EvalResult>> =
+        RefCell::new(FxHashMap::default());
     /// Values of the LET bindings of the evaluation in progress, indexed by
     /// the slots of its expanded expression. Empty while no LET is running,
     /// which leaves a slot use to evaluate its expression directly.
@@ -114,9 +114,9 @@ fn current_formula_origin() -> Option<(u32, u32)> {
 /// pass recomputes, the results computed so far, and the formulas on the
 /// current evaluation path, which detect cycles.
 pub(crate) struct EvalPass<'a> {
-    pub(crate) affected: &'a HashSet<AbsCellKey>,
-    pub(crate) memo: &'a mut HashMap<AbsCellKey, EvalResult>,
-    pub(crate) visiting: &'a mut HashSet<AbsCellKey>,
+    pub(crate) affected: &'a FxHashSet<AbsCellKey>,
+    pub(crate) memo: &'a mut FxHashMap<AbsCellKey, EvalResult>,
+    pub(crate) visiting: &'a mut FxHashSet<AbsCellKey>,
 }
 
 fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
@@ -445,7 +445,7 @@ impl CellStore {
             return;
         };
 
-        let mut affected = HashSet::new();
+        let mut affected = FxHashSet::default();
 
         for &sheet in seeds {
             affected.extend(collect_affected_formulas(&self.sheets, sheet, index));
@@ -501,14 +501,15 @@ impl CellStore {
             return;
         }
 
-        let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::with_capacity(affected.len());
+        let mut memo: FxHashMap<AbsCellKey, EvalResult> =
+            FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
 
         if let Some(index) = self.dep_index.as_ref() {
             seed_dependency_depth_errors(&self.sheets, &affected, index, &mut memo);
         }
 
-        let mut visiting: HashSet<AbsCellKey> = HashSet::new();
-        let mut processed_arrays: HashSet<AbsCellKey> = HashSet::new();
+        let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
+        let mut processed_arrays: FxHashSet<AbsCellKey> = FxHashSet::default();
 
         if self
             .dep_index
@@ -537,7 +538,7 @@ impl CellStore {
             return;
         }
 
-        let mut seeded_sheets: HashSet<usize> = seeds.iter().copied().collect();
+        let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
         let mut spill_work = 0usize;
 
         // Spills are evaluated in cell order, so a spill can read another
@@ -546,9 +547,9 @@ impl CellStore {
         // next pass evaluates them again. A reader that keeps coming back
         // reads its own output through other spills: that is a cycle.
         let mut sequence = 0usize;
-        let mut evaluated_at: HashMap<AbsCellKey, usize> = HashMap::new();
-        let mut requeued: HashMap<AbsCellKey, usize> = HashMap::new();
-        let mut cyclic: HashSet<AbsCellKey> = HashSet::new();
+        let mut evaluated_at: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        let mut requeued: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        let mut cyclic: FxHashSet<AbsCellKey> = FxHashSet::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -578,7 +579,7 @@ impl CellStore {
 
             pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
 
-            let mut changed_sheets = HashSet::new();
+            let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
             for (key, ast, has_spill_refs) in pending {
@@ -792,7 +793,7 @@ impl CellStore {
         &mut self,
         key: AbsCellKey,
         result: Result<EvalMatrix, FormulaError>,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
+        memo: &mut FxHashMap<AbsCellKey, EvalResult>,
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
         let local = key.local();
@@ -1019,10 +1020,10 @@ impl CellStore {
         sheet: usize,
         row: u32,
         col: u32,
-        memo: &mut HashMap<AbsCellKey, EvalResult>,
-        visiting: &mut HashSet<AbsCellKey>,
+        memo: &mut FxHashMap<AbsCellKey, EvalResult>,
+        visiting: &mut FxHashSet<AbsCellKey>,
     ) -> EvalResult {
-        let affected = HashSet::new();
+        let affected = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo,

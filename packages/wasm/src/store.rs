@@ -1219,7 +1219,12 @@ impl CellStore {
             return false;
         }
 
-        if contents {
+        // Bound per-cell tracking for large clears, while preserving unrelated
+        // calculated values for interactive rectangles and all style-only edits.
+        const MAX_TRACKED_CLEAR_CELLS: usize = 4096;
+        let invalidate_sheet =
+            contents && (r1 - r0 + 1).saturating_mul(c1 - c0 + 1) > MAX_TRACKED_CLEAR_CELLS;
+        if invalidate_sheet {
             s.invalidate_calculations();
         }
 
@@ -1256,12 +1261,13 @@ impl CellStore {
                 if contents {
                     if let Some(key) = cell_key(row, col) {
                         removed_formula |= s.remove_formula(key);
+                        if !s.all_dirty {
+                            s.dirty_cells.insert(key);
+                        }
                     }
                 }
             }
         }
-        s.clear_dirty();
-        s.all_dirty = true;
         if removed_formula {
             self.bump_formula_epoch();
         }

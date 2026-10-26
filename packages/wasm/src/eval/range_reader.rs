@@ -180,7 +180,7 @@ impl<'a> RangeReader<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
+    use rustc_hash::{FxHashMap, FxHashSet};
 
     use super::RangeReader;
     use crate::eval::functions::FuncAccumulator;
@@ -190,9 +190,9 @@ mod tests {
 
     /// The list-building path's row-major values, used as the reference.
     fn listed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
@@ -209,9 +209,9 @@ mod tests {
 
     /// The streaming path's row-major values, stopping at the first error.
     fn streamed_values(store: &CellStore, range: CellRange) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,
@@ -229,9 +229,9 @@ mod tests {
         store: &CellStore,
         range: CellRange,
     ) -> Result<Vec<Value>, FormulaError> {
-        let affected = HashSet::new();
-        let mut memo = HashMap::new();
-        let mut visiting = HashSet::new();
+        let affected = FxHashSet::default();
+        let mut memo = FxHashMap::default();
+        let mut visiting = FxHashSet::default();
         let mut pass = EvalPass {
             affected: &affected,
             memo: &mut memo,

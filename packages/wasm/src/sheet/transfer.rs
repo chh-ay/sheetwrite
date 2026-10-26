@@ -5,7 +5,7 @@ use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
 
-fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
+fn write_keys(out: &mut Writer, keys: &FxHashSet<(usize, usize)>) {
     out.usize(keys.len());
     for &(a, b) in keys {
         out.usize(a);
@@ -14,7 +14,7 @@ fn write_keys(out: &mut Writer, keys: &HashSet<(usize, usize)>) {
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_keys(input: &mut Reader<'_>) -> TransferResult<HashSet<(usize, usize)>> {
+fn read_keys(input: &mut Reader<'_>) -> TransferResult<FxHashSet<(usize, usize)>> {
     (0..input.count()?)
         .map(|_| Ok((input.usize()?, input.usize()?)))
         .collect()
@@ -230,11 +230,11 @@ impl SheetData {
             style,
             paged,
             derived,
-            formulas: HashMap::new(),
-            spill_ranges: HashMap::new(),
-            spill_owners: HashMap::new(),
+            formulas: FxHashMap::default(),
+            spill_ranges: FxHashMap::default(),
+            spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: HashSet::new(),
+            dirty_cells: FxHashSet::default(),
             all_dirty: false,
             cond_rules: Vec::new(),
         };

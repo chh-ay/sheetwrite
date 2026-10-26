@@ -1,7 +1,11 @@
 //! One sheet's column-major scalar grid and its structural edits.
 
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::BTreeSet;
+
+// Only bounded cell coordinates and internal integer IDs use Fx hashing.
+// Document text keys retain randomized hashing in their owning modules.
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::calc::Ast;
 use crate::derived::DerivedOverlay;
@@ -176,14 +180,14 @@ pub(crate) struct PagedStorage {
     chunk_rows: usize,
     byte_budget: usize,
     max_dirty_cells: usize,
-    chunks: HashMap<(usize, usize), CellChunk>,
-    dirty: HashMap<(usize, usize), DirtyCell>,
-    dirty_by_revision: HashMap<u64, Vec<(usize, usize)>>,
-    pinned: HashSet<(usize, usize)>,
-    read_pinned: HashSet<(usize, usize)>,
-    pin_scratch: HashSet<(usize, usize)>,
-    viewport_pinned: HashSet<(usize, usize)>,
-    viewport_pin_scratch: HashSet<(usize, usize)>,
+    chunks: FxHashMap<(usize, usize), CellChunk>,
+    dirty: FxHashMap<(usize, usize), DirtyCell>,
+    dirty_by_revision: FxHashMap<u64, Vec<(usize, usize)>>,
+    pinned: FxHashSet<(usize, usize)>,
+    read_pinned: FxHashSet<(usize, usize)>,
+    pin_scratch: FxHashSet<(usize, usize)>,
+    viewport_pinned: FxHashSet<(usize, usize)>,
+    viewport_pin_scratch: FxHashSet<(usize, usize)>,
     evictable: RefCell<BTreeSet<(u64, usize, usize)>>,
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
@@ -196,14 +200,14 @@ impl PagedStorage {
             chunk_rows: chunk_rows.max(1).next_power_of_two(),
             byte_budget,
             max_dirty_cells,
-            chunks: HashMap::new(),
-            dirty: HashMap::new(),
-            dirty_by_revision: HashMap::new(),
-            pinned: HashSet::new(),
-            read_pinned: HashSet::new(),
-            pin_scratch: HashSet::new(),
-            viewport_pinned: HashSet::new(),
-            viewport_pin_scratch: HashSet::new(),
+            chunks: FxHashMap::default(),
+            dirty: FxHashMap::default(),
+            dirty_by_revision: FxHashMap::default(),
+            pinned: FxHashSet::default(),
+            read_pinned: FxHashSet::default(),
+            pin_scratch: FxHashSet::default(),
+            viewport_pinned: FxHashSet::default(),
+            viewport_pin_scratch: FxHashSet::default(),
             evictable: RefCell::new(BTreeSet::new()),
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
@@ -642,7 +646,7 @@ impl PagedStorage {
         self.viewport_pin_scratch = previous;
     }
 
-    fn replace_pins(&mut self, next: HashSet<(usize, usize)>, owner: PinOwner) {
+    fn replace_pins(&mut self, next: FxHashSet<(usize, usize)>, owner: PinOwner) {
         let access = self.next_access();
         let (current, other) = match owner {
             PinOwner::Explicit => (&mut self.pinned, &self.read_pinned),
@@ -915,16 +919,16 @@ pub(crate) struct SheetData {
     /// Calculated scalars and spill output; never persisted or hydrated.
     derived: DerivedOverlay,
     /// Formula source and dependency metadata, independent of calculated payloads.
-    pub(crate) formulas: HashMap<CellKey, FormulaEntry>,
+    pub(crate) formulas: FxHashMap<CellKey, FormulaEntry>,
     /// Attempted spill bounds remain registered even while obstructed so clearing
     /// a blocker invalidates the owning anchor.
-    pub(crate) spill_ranges: HashMap<CellKey, SpillRange>,
+    pub(crate) spill_ranges: FxHashMap<CellKey, SpillRange>,
     /// Every currently materialized spill cell (including its anchor) to its owner.
-    pub(crate) spill_owners: HashMap<CellKey, CellKey>,
+    pub(crate) spill_owners: FxHashMap<CellKey, CellKey>,
     /// Host-owned merge/protection cells that a spill must never overwrite.
     pub(crate) spill_blockers: Vec<SpillBlocker>,
     /// Cells changed since the last transaction-barrier formula recompute.
-    pub(crate) dirty_cells: HashSet<CellKey>,
+    pub(crate) dirty_cells: FxHashSet<CellKey>,
     /// Bulk load / structural rewrite touched (potentially) every cell; the
     /// recompute pass seeds from the dependency index instead of enumerating
     /// per-cell dirty keys, keeping `dirty_cells` O(interactive edits).
@@ -1014,11 +1018,11 @@ impl SheetData {
             style,
             paged: None,
             derived: DerivedOverlay::dense(),
-            formulas: HashMap::new(),
-            spill_ranges: HashMap::new(),
-            spill_owners: HashMap::new(),
+            formulas: FxHashMap::default(),
+            spill_ranges: FxHashMap::default(),
+            spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: HashSet::new(),
+            dirty_cells: FxHashSet::default(),
             all_dirty: false,
             cond_rules: Vec::new(),
         })
@@ -1039,11 +1043,11 @@ impl SheetData {
             style: Vec::new(),
             paged: Some(PagedStorage::new(chunk_rows, byte_budget, max_dirty_cells)),
             derived: DerivedOverlay::paged(),
-            formulas: HashMap::new(),
-            spill_ranges: HashMap::new(),
-            spill_owners: HashMap::new(),
+            formulas: FxHashMap::default(),
+            spill_ranges: FxHashMap::default(),
+            spill_owners: FxHashMap::default(),
             spill_blockers: Vec::new(),
-            dirty_cells: HashSet::new(),
+            dirty_cells: FxHashSet::default(),
             all_dirty: false,
             cond_rules: Vec::new(),
         }
@@ -1209,7 +1213,7 @@ impl SheetData {
     pub(crate) fn invalidate_calculations(&mut self) {
         // Whole-sheet recalculation makes per-output teardown unnecessary.
         self.spill_ranges.clear();
-        self.spill_owners = HashMap::new();
+        self.spill_owners = FxHashMap::default();
         self.invalidate_derived();
         self.clear_dirty();
         self.all_dirty = true;
@@ -1479,7 +1483,7 @@ impl SheetData {
 
     pub(crate) fn compact_spill_metadata(&mut self) {
         if self.spill_owners.is_empty() {
-            self.spill_owners = HashMap::new();
+            self.spill_owners = FxHashMap::default();
         } else if self.spill_owners.capacity() > self.spill_owners.len().saturating_mul(2)
             && self
                 .spill_owners
@@ -1575,12 +1579,12 @@ impl SheetData {
     }
 
     /// Reset dirty tracking after a recompute pass. Drops oversized capacity —
-    /// `HashSet::clear` walks every retained bucket, so a set inflated by one
+    /// `FxHashSet::clear` walks every retained bucket, so a set inflated by one
     /// giant paste must not tax every later single-cell transaction.
     pub(crate) fn clear_dirty(&mut self) {
         self.all_dirty = false;
         if self.dirty_cells.capacity() > 4096 {
-            self.dirty_cells = HashSet::new();
+            self.dirty_cells = FxHashSet::default();
         } else {
             self.dirty_cells.clear();
         }

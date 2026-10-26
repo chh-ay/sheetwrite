@@ -1,6 +1,6 @@
 //! Text functions for the full engine. Regex uses the bounded `regex-lite` syntax.
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::rc::Rc;
 
@@ -675,9 +675,9 @@ pub(super) fn shape(
     args: &[Ast],
     sheet: usize,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let affected = HashSet::new();
-    let mut memo = HashMap::new();
-    let mut visiting = HashSet::new();
+    let affected = FxHashSet::default();
+    let mut memo = FxHashMap::default();
+    let mut visiting = FxHashSet::default();
     let mut pass = EvalPass {
         affected: &affected,
         memo: &mut memo,

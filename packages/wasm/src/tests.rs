@@ -1442,6 +1442,30 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
 }
 
 #[test]
+fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 3);
+    store.set_number(sheet, 0, 0, 5.0, 7);
+    store.set_formula(sheet, 0, 1, "=A1+1", 9);
+    store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+    store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+    store.recompute(sheet);
+
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, false, true));
+    assert_close(number(&store, sheet, 0, 1), 6.0);
+    assert_eq!(store.style_id_at(sheet, 0, 0), 0);
+    assert!(store.clear_range(sheet, 0, 0, 0, 0, true, false));
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+    assert_close(number(&store, sheet, 2, 2), 11.0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 1.0);
+
+    assert!(store.clear_range(sheet, 1, 2, 1, 2, true, false));
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 2, 2).kind(), KIND_EMPTY);
+}
+
+#[test]
 fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 3);

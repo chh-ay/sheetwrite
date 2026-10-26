@@ -1,6 +1,8 @@
 //! Formula dependency indexes, affected-set growth, and depth/cycle checks.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
@@ -9,7 +11,7 @@ use crate::types::{
 };
 
 pub(crate) struct DepIndex {
-    exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>>,
+    exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
     range_groups: Vec<RangeGroup>,
     range_sheets: Vec<RangeSheetIndex>,
     pub(super) epoch: u64,
@@ -159,10 +161,10 @@ impl RangeInterval {
 /// field must be added to that comparison too, or the epoch will not advance
 /// when it changes.
 pub(super) fn build_dep_index(sheets: &[SheetData], epoch: u64) -> DepIndex {
-    let mut exact_dependents: HashMap<AbsCellKey, Vec<AbsCellKey>> = HashMap::new();
-    let mut range_dependents: HashMap<CellRange, Vec<AbsCellKey>> = HashMap::new();
+    let mut exact_dependents: FxHashMap<AbsCellKey, Vec<AbsCellKey>> = FxHashMap::default();
+    let mut range_dependents: FxHashMap<CellRange, Vec<AbsCellKey>> = FxHashMap::default();
     let mut has_dynamic_arrays = false;
-    let formula_cells: HashSet<AbsCellKey> = sheets
+    let formula_cells: FxHashSet<AbsCellKey> = sheets
         .iter()
         .enumerate()
         .flat_map(|(sheet, data)| {
@@ -265,8 +267,8 @@ pub(super) fn collect_affected_formulas(
     sheets: &[SheetData],
     seed_sheet: usize,
     index: &DepIndex,
-) -> HashSet<AbsCellKey> {
-    let mut affected: HashSet<AbsCellKey> = HashSet::new();
+) -> FxHashSet<AbsCellKey> {
+    let mut affected: FxHashSet<AbsCellKey> = FxHashSet::default();
     let mut queue: VecDeque<AbsCellKey> = VecDeque::new();
     let mut range_matches: Vec<usize> = Vec::new();
     let mut row_matches: Vec<usize> = Vec::new();
@@ -356,8 +358,8 @@ pub(super) fn direct_readers(
     index: &DepIndex,
     sheet: usize,
     cells: &[(u32, u32)],
-) -> HashSet<AbsCellKey> {
-    let mut readers = HashSet::new();
+) -> FxHashSet<AbsCellKey> {
+    let mut readers = FxHashSet::default();
     let mut range_matches: Vec<usize> = Vec::new();
     let mut row_matches: Vec<usize> = Vec::new();
     let mut range_marks = vec![0; index.range_groups.len()];
@@ -389,17 +391,17 @@ fn formula_exists(sheets: &[SheetData], key: AbsCellKey) -> bool {
 
 pub(super) fn seed_dependency_depth_errors(
     sheets: &[SheetData],
-    affected: &HashSet<AbsCellKey>,
+    affected: &FxHashSet<AbsCellKey>,
     index: &DepIndex,
-    memo: &mut HashMap<AbsCellKey, EvalResult>,
+    memo: &mut FxHashMap<AbsCellKey, EvalResult>,
 ) {
     if !index.has_formula_dependencies {
         return;
     }
     let dependencies = collect_formula_dependencies(sheets, affected, index);
-    let mut depth_memo: HashMap<AbsCellKey, Result<usize, FormulaError>> =
-        HashMap::with_capacity(affected.len());
-    let mut visiting: HashSet<AbsCellKey> = HashSet::new();
+    let mut depth_memo: FxHashMap<AbsCellKey, Result<usize, FormulaError>> =
+        FxHashMap::with_capacity_and_hasher(affected.len(), Default::default());
+    let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
 
     for &key in affected {
         if let Err(error) =
@@ -414,18 +416,18 @@ const LINEAR_DEPENDENCY_DEDUP_LIMIT: usize = 8;
 
 fn collect_formula_dependencies(
     sheets: &[SheetData],
-    affected: &HashSet<AbsCellKey>,
+    affected: &FxHashSet<AbsCellKey>,
     index: &DepIndex,
-) -> HashMap<AbsCellKey, Vec<AbsCellKey>> {
+) -> FxHashMap<AbsCellKey, Vec<AbsCellKey>> {
     let formula_cells: Vec<AbsCellKey> = affected
         .iter()
         .copied()
         .filter(|key| formula_exists(sheets, *key))
         .collect();
-    let formula_set: HashSet<AbsCellKey> = formula_cells.iter().copied().collect();
-    let mut dependencies: HashMap<AbsCellKey, Vec<AbsCellKey>> =
-        HashMap::with_capacity(formula_cells.len());
-    let mut seen_dependencies: HashMap<AbsCellKey, HashSet<AbsCellKey>> = HashMap::new();
+    let formula_set: FxHashSet<AbsCellKey> = formula_cells.iter().copied().collect();
+    let mut dependencies: FxHashMap<AbsCellKey, Vec<AbsCellKey>> =
+        FxHashMap::with_capacity_and_hasher(formula_cells.len(), Default::default());
+    let mut seen_dependencies: FxHashMap<AbsCellKey, FxHashSet<AbsCellKey>> = FxHashMap::default();
 
     for &formula_cell in &formula_cells {
         dependencies.entry(formula_cell).or_default();
@@ -483,8 +485,8 @@ fn collect_formula_dependencies(
 }
 
 fn push_unique_dependency(
-    dependencies: &mut HashMap<AbsCellKey, Vec<AbsCellKey>>,
-    seen_dependencies: &mut HashMap<AbsCellKey, HashSet<AbsCellKey>>,
+    dependencies: &mut FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
+    seen_dependencies: &mut FxHashMap<AbsCellKey, FxHashSet<AbsCellKey>>,
     formula_cell: AbsCellKey,
     dependency: AbsCellKey,
 ) {
@@ -503,7 +505,8 @@ fn push_unique_dependency(
         return;
     }
 
-    let mut seen = HashSet::with_capacity(formula_dependencies.len() + 1);
+    let mut seen =
+        FxHashSet::with_capacity_and_hasher(formula_dependencies.len() + 1, Default::default());
     seen.extend(formula_dependencies.iter().copied());
     let inserted = seen.insert(dependency);
     seen_dependencies.insert(formula_cell, seen);
@@ -514,9 +517,9 @@ fn push_unique_dependency(
 
 fn formula_dependency_depth(
     key: AbsCellKey,
-    dependencies: &HashMap<AbsCellKey, Vec<AbsCellKey>>,
-    depth_memo: &mut HashMap<AbsCellKey, Result<usize, FormulaError>>,
-    visiting: &mut HashSet<AbsCellKey>,
+    dependencies: &FxHashMap<AbsCellKey, Vec<AbsCellKey>>,
+    depth_memo: &mut FxHashMap<AbsCellKey, Result<usize, FormulaError>>,
+    visiting: &mut FxHashSet<AbsCellKey>,
 ) -> Result<usize, FormulaError> {
     if let Some(result) = depth_memo.get(&key) {
         return *result;
@@ -568,13 +571,13 @@ mod tests {
         store.set_formula(sheet, 0, 1, "=A1+SUM(A1:A1)", 0);
         let left = AbsCellKey::new(sheet, 0, 0);
         let right = AbsCellKey::new(sheet, 0, 1);
-        let affected = HashSet::from([left, right]);
+        let affected = FxHashSet::from_iter([left, right]);
         let index = build_dep_index(&store.sheets, store.formula_epoch);
         let dependencies = collect_formula_dependencies(&store.sheets, &affected, &index);
         assert_eq!(dependencies.get(&left), Some(&vec![right]));
         assert_eq!(dependencies.get(&right), Some(&vec![left]));
 
-        let mut memo = HashMap::new();
+        let mut memo = FxHashMap::default();
         seed_dependency_depth_errors(&store.sheets, &affected, &index, &mut memo);
         assert!(matches!(
             memo.get(&left),

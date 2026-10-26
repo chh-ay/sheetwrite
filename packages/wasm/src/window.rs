@@ -1,6 +1,6 @@
 //! Bulk render-window assembly: one boundary crossing per visible window.
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -284,8 +284,8 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
 
     let n_cols = cols.len();
     let mut matches = vec![0u32; n_rows * n_cols];
-    let mut memo: HashMap<AbsCellKey, EvalResult> = HashMap::new();
-    let mut visiting: HashSet<AbsCellKey> = HashSet::new();
+    let mut memo: FxHashMap<AbsCellKey, EvalResult> = FxHashMap::default();
+    let mut visiting: FxHashSet<AbsCellKey> = FxHashSet::default();
     for ri in 0..n_rows {
         let data_row = data_row_at(ri);
         for (cj, &col) in cols.iter().enumerate() {
