@@ -4995,9 +4995,29 @@ fn offset_indirect_scalar_contexts_and_reference_consumers_use_resolved_cells() 
         for (row, (formula, _)) in lambda_cases.iter().enumerate() {
             store.set_formula(sheet, row + 1, 6, formula, 0);
         }
+
+        // Array helpers over a runtime reference spill its evaluated shape:
+        // A1:A2 is {5;0} and A1:B2 is {5,0;0,0}.
+        let spill_cases = [
+            ("=MAP(OFFSET(A1,0,0,2),LAMBDA(x,x*2))", [10.0, 0.0]),
+            ("=BYROW(OFFSET(A1,0,0,2,2),LAMBDA(r,SUM(r)))", [5.0, 0.0]),
+        ];
+        for (index, (formula, _)) in spill_cases.iter().enumerate() {
+            store.set_formula(sheet, 1 + index * 2, 7, formula, 0);
+        }
+
         store.recompute(sheet);
         for (row, (formula, expected)) in lambda_cases.iter().enumerate() {
             assert_eq!(number(&store, sheet, row + 1, 6), *expected, "{formula}");
+        }
+        for (index, (formula, expected)) in spill_cases.iter().enumerate() {
+            let anchor = 1 + index * 2;
+            assert_eq!(number(&store, sheet, anchor, 7), expected[0], "{formula}");
+            assert_eq!(
+                number(&store, sheet, anchor + 1, 7),
+                expected[1],
+                "{formula}"
+            );
         }
     }
 }

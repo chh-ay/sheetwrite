@@ -187,8 +187,12 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                ast_produces_array(ast)
-                    .then(|| super::analysis::lambda::bound(self, name, args, formula_sheet))
+                ast_produces_array(ast).then(|| {
+                    runtime_reference_bound(
+                        ast,
+                        super::analysis::lambda::bound(self, name, args, formula_sheet),
+                    )
+                })
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
@@ -197,7 +201,10 @@ impl CellStore {
                 if !(hooks.produces_array)(name, args) {
                     return None;
                 }
-                Some((hooks.bound)(self, name, args, formula_sheet))
+                Some(runtime_reference_bound(
+                    ast,
+                    (hooks.bound)(self, name, args, formula_sheet),
+                ))
             }
             Ast::Range(..)
             | Ast::AbsRange(..)
@@ -1043,6 +1050,23 @@ pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Optio
     total
         .checked_add(next)
         .filter(|sum| *sum <= SPILL_MAX_RECOMPUTE_CELLS)
+}
+
+/// A LAMBDA body or array helper argument that calls OFFSET or INDIRECT has
+/// no shape before evaluation, so a shape query reports `#VALUE!`. Such a
+/// formula is charged like a bare runtime reference: a precharge now, and
+/// whatever its result holds beyond it once the pending loop evaluates it.
+#[cfg(feature = "analysis")]
+fn runtime_reference_bound(
+    ast: &Ast,
+    bound: Result<usize, FormulaError>,
+) -> Result<usize, FormulaError> {
+    match bound {
+        Err(FormulaError::Value) if super::reference::ast_contains_runtime_ref(ast) => {
+            Ok(RUNTIME_REFERENCE_PRECHARGE)
+        }
+        bound => bound,
+    }
 }
 
 fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
