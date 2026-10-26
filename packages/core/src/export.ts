@@ -4,12 +4,15 @@ import {
   assertDelimitedTextDimensions,
   type DelimitedTextOptions,
   encodeDelimitedText,
+  encodeDelimitedTextChunks,
   parseDelimitedText,
   resolveDelimitedTextResourceLimits,
   scanDelimitedText,
 } from "./delimited-text.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
-import { IncompleteDataError } from "./store.js";
+import { readableBytes, utf8Chunks } from "./export-stream.js";
+import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { storeEngine } from "./store/engine-registry.js";
 import { visibleColumns } from "./store/ranges.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
@@ -17,6 +20,7 @@ import type { ColumnarData } from "./types/data.js";
 import type { Sheet, Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { Store } from "./types/store.js";
+import { hasAdmittedXlsxSource, setXlsxSourceVerifier } from "./xlsx-source.js";
 
 /**
  * Neutralize a TEXT field before it is quoted: a string beginning with one of
@@ -38,17 +42,12 @@ function assertCompleteData(store: Store, sheet: string): void {
   if (capability?.status === "incomplete") throw new IncompleteDataError(sheet, capability);
 }
 
-/**
- * Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and
- * view-ordered rows surviving sort, filter, hidden-row, and group state. String
- * values beginning with `= + - @ \t \r` are prefixed with `'`. The synchronous
- * API returns one in-memory string, but fetches at most
- * `maxWriterWindowRows` view rows from the store per read.
- *
- * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
- * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
- */
-export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions = {}): string {
+/** Visible CSV view rows, read one bounded store window at a time. */
+function csvRows(
+  sheet: Sheet,
+  store: Store,
+  options: DelimitedTextOptions,
+): Iterable<readonly string[]> {
   assertCompleteData(store, sheet.id);
   const limits = resolveDelimitedTextResourceLimits(options);
   const cols = visibleColumns(sheet);
@@ -59,6 +58,16 @@ export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions 
     yield cols.map((column) => safeHeader(sheet.columns[column]!.header));
     for (let start = 0; start < viewRows; start += limits.maxWriterWindowRows) {
       const end = Math.min(viewRows, start + limits.maxWriterWindowRows);
+      if (store.viewRowCount(sheet.id) !== viewRows) {
+        throw new SheetwriteError(
+          "export-failed",
+          "delimited-export",
+          "Sheetwrite: sheet view changed during CSV export",
+          {
+            context: { sheet: sheet.id },
+          },
+        );
+      }
       const view = store.getVisibleWindow(sheet.id, { start, end }, cols);
       for (let row = 0; row < end - start; row++) {
         const fields: string[] = new Array(cols.length);
@@ -70,20 +79,48 @@ export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions 
     }
   }
 
-  return encodeDelimitedText(rows(), ",", options, { bom: true, operation: "export" });
+  return rows();
 }
 
 /**
- * Export a canonical data-space range as clipboard-compatible TSV (CRLF, no
- * BOM). Reversed corners are normalized; active sort and filter views do not
- * remap the supplied row coordinates. Values are injection-hardened. The
- * synchronous API returns one in-memory string and fetches at most
- * `maxWriterWindowRows` canonical rows per packed store read.
+ * Export the current visible CSV view (UTF-8 BOM, CRLF): visible columns and
+ * view-ordered rows surviving sort, filter, hidden-row, and group state. String
+ * values beginning with `= + - @ \t \r` are prefixed with `'`. The synchronous
+ * API returns one in-memory string, but fetches at most
+ * `maxWriterWindowRows` view rows from the store per read.
  *
  * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
  * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
  */
-export function toTsv(range: Range, store: Store, options: DelimitedTextOptions = {}): string {
+export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions = {}): string {
+  return encodeDelimitedText(csvRows(sheet, store, options), ",", options, {
+    bom: true,
+    operation: "export",
+  });
+}
+
+/** Export UTF-8 CSV on demand, retaining only one store window and one byte chunk. */
+export function toCsvStream(
+  sheet: Sheet,
+  store: Store,
+  options: DelimitedTextOptions = {},
+): ReadableStream<Uint8Array> {
+  return readableBytes(
+    utf8Chunks(
+      encodeDelimitedTextChunks(csvRows(sheet, store, options), ",", options, {
+        bom: true,
+        operation: "export",
+      }),
+    ),
+  );
+}
+
+/** Canonical data-space rows of a range, read one bounded store window at a time. */
+function tsvRows(
+  range: Range,
+  store: Store,
+  options: DelimitedTextOptions,
+): Iterable<readonly string[]> {
   assertCompleteData(store, range.sheet);
   const limits = resolveDelimitedTextResourceLimits(options);
   const startRow = Math.min(range.start.row, range.end.row);
@@ -120,7 +157,38 @@ export function toTsv(range: Range, store: Store, options: DelimitedTextOptions 
     }
   }
 
-  return encodeDelimitedText(rows(), "\t", options, { operation: "export" });
+  return rows();
+}
+
+/**
+ * Export a canonical data-space range as clipboard-compatible TSV (CRLF, no
+ * BOM). Reversed corners are normalized; active sort and filter views do not
+ * remap the supplied row coordinates. Values are injection-hardened. The
+ * synchronous API returns one in-memory string and fetches at most
+ * `maxWriterWindowRows` canonical rows per packed store read.
+ *
+ * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
+ * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
+ */
+export function toTsv(range: Range, store: Store, options: DelimitedTextOptions = {}): string {
+  return encodeDelimitedText(tsvRows(range, store, options), "\t", options, {
+    operation: "export",
+  });
+}
+
+/** Export canonical data-space TSV with pull-driven store reads and cancellation. */
+export function toTsvStream(
+  range: Range,
+  store: Store,
+  options: DelimitedTextOptions = {},
+): ReadableStream<Uint8Array> {
+  return readableBytes(
+    utf8Chunks(
+      encodeDelimitedTextChunks(tsvRows(range, store, options), "\t", options, {
+        operation: "export",
+      }),
+    ),
+  );
 }
 
 /**
@@ -241,6 +309,8 @@ export interface XlsxResourceLimits {
   maxEntryUncompressedBytes: number;
   /** Aggregate uncompressed ZIP entry bytes; defaults to 256 MiB. */
   maxTotalUncompressedBytes: number;
+  /** Retained opaque compressed payload bytes; defaults to 64 MiB. */
+  maxPreservedBytes: number;
   /** Uncompressed-to-compressed ratio for one ZIP entry; defaults to 100. */
   maxCompressionRatio: number;
   /** Workbook worksheets; defaults to 256. */
@@ -279,6 +349,7 @@ export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object
   maxArchiveEntries: 1_024,
   maxEntryUncompressedBytes: 64 * 1024 * 1024,
   maxTotalUncompressedBytes: 256 * 1024 * 1024,
+  maxPreservedBytes: 64 * 1024 * 1024,
   maxCompressionRatio: 100,
   // SpreadsheetML worksheet compatibility dimensions.
   maxSheets: 256,
@@ -321,6 +392,11 @@ export class XlsxResourceError extends SheetwriteError {
 export interface XlsxTableExportBackend {
   name: string;
   toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+  toXlsxTableStream?(
+    workbook: Workbook,
+    store: Store,
+    options?: XlsxWorkbookOptions,
+  ): AsyncIterable<Uint8Array>;
 }
 
 let tableExportBackend: XlsxTableExportBackend | null = null;
@@ -373,6 +449,22 @@ export async function toXlsxTable(
       functionName: "toXlsxTable",
     });
   }
+}
+
+/** Stream table XLSX bytes without materializing the finished archive. */
+export function toXlsxTableStream(
+  workbook: Workbook,
+  store: Store,
+  options?: XlsxWorkbookOptions,
+): ReadableStream<Uint8Array> {
+  const backend = tableExportBackend;
+  if (!backend?.toXlsxTableStream) throw missingXlsxBackend("toXlsxTableStream", "xlsx-export");
+  return readableBytes(backend.toXlsxTableStream(workbook, store, options), (error) =>
+    normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+      backend: backend.name,
+      functionName: "toXlsxTableStream",
+    }),
+  );
 }
 
 /**
@@ -459,14 +551,31 @@ export interface XlsxWorkbookOptions {
   onWarning?: (warning: XlsxWorkbookWarning) => void;
 }
 
+/** @internal Core-owned provenance for snapshots it materialized during this call. */
+interface XlsxWorkbookExportContext {
+  readonly sourceTracked?: boolean;
+}
+
 /** Optional backend contract for complete workbook XLSX interchange. */
 export interface XlsxWorkbookBackend {
   name: string;
-  toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+  toXlsxWorkbook(
+    snapshot: WorkbookSnapshot,
+    options?: XlsxWorkbookOptions,
+    context?: XlsxWorkbookExportContext,
+  ): Promise<Uint8Array>;
   fromXlsxWorkbook(
     data: ArrayBuffer | Uint8Array,
     options?: XlsxWorkbookOptions,
   ): Promise<WorkbookSnapshot>;
+  toXlsxWorkbookStream?(
+    snapshot: WorkbookSnapshot,
+    options?: XlsxWorkbookOptions,
+    context?: XlsxWorkbookExportContext,
+  ): AsyncIterable<Uint8Array>;
+  fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
+  /** @internal Verify opaque payloads at store ingress, without retaining inflated bytes. */
+  verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot["workbook"]["xlsxSource"];
 }
 
 let workbookBackend: XlsxWorkbookBackend | null = null;
@@ -474,12 +583,41 @@ let workbookBackend: XlsxWorkbookBackend | null = null;
 /** Registers the optional workbook XLSX implementation used by core. */
 export function setXlsxWorkbookBackend(next: XlsxWorkbookBackend): void {
   workbookBackend = next;
+  setXlsxSourceVerifier(next?.verifySource?.bind(next));
 }
 
-function workbookSnapshotOf(
-  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
-): WorkbookSnapshot {
-  return "schemaVersion" in input ? input : input.exportSnapshot();
+/**
+ * Only a SheetwriteStore drops stale XLSX graphs as edits commit, so the
+ * export is tracked only when core itself builds the snapshot from one, through
+ * the class method that a caller cannot replace per instance. Custom stores,
+ * look-alike objects and plain snapshots take the backend's fingerprint check.
+ */
+function workbookSnapshotOf(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">): {
+  snapshot: WorkbookSnapshot;
+  context: XlsxWorkbookExportContext;
+} {
+  if ("schemaVersion" in input) return { snapshot: input, context: {} };
+  const store = "store" in input ? input.store : input;
+  if (!(store instanceof SheetwriteStore) || storeEngine(store) === null) {
+    return { snapshot: input.exportSnapshot(), context: {} };
+  }
+
+  const snapshot = SheetwriteStore.prototype.exportSnapshot.call(store);
+  // A Grid may show a different tab than the store's stored active sheet.
+  const activeSheet: unknown =
+    "getActiveSheet" in input && typeof input.getActiveSheet === "function"
+      ? input.getActiveSheet()
+      : undefined;
+  const switched =
+    typeof activeSheet === "string" &&
+    activeSheet !== snapshot.workbook.activeSheet &&
+    snapshot.sheets.some((sheet) => sheet.id === activeSheet);
+  return {
+    snapshot: switched
+      ? { ...snapshot, workbook: { ...snapshot.workbook, activeSheet } }
+      : snapshot,
+    context: { sourceTracked: hasAdmittedXlsxSource(store) },
+  };
 }
 
 /**
@@ -505,11 +643,49 @@ export async function toXlsxWorkbook(
   const backend = workbookBackend;
   if (!backend) throw missingXlsxBackend("toXlsxWorkbook", "xlsx-export");
   try {
-    return await backend.toXlsxWorkbook(workbookSnapshotOf(input), options);
+    const source = workbookSnapshotOf(input);
+    return await backend.toXlsxWorkbook(source.snapshot, options, source.context);
   } catch (error) {
     throw normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
       backend: backend.name,
       functionName: "toXlsxWorkbook",
+    });
+  }
+}
+
+/** Stream formula-preserving workbook XLSX with backpressure and cancellation. */
+export function toXlsxWorkbookStream(
+  input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
+  options?: XlsxWorkbookOptions,
+): ReadableStream<Uint8Array> {
+  const backend = workbookBackend;
+  if (!backend?.toXlsxWorkbookStream)
+    throw missingXlsxBackend("toXlsxWorkbookStream", "xlsx-export");
+  const source = workbookSnapshotOf(input);
+  return readableBytes(
+    backend.toXlsxWorkbookStream(source.snapshot, options, source.context),
+    (error) =>
+      normalizeSheetwriteError(error, "export-failed", "xlsx-export", {
+        backend: backend.name,
+        functionName: "toXlsxWorkbookStream",
+      }),
+  );
+}
+
+/** Import a seekable File/Blob without first buffering the compressed workbook. */
+export async function fromXlsxWorkbookFile(
+  file: Blob,
+  options?: XlsxWorkbookOptions,
+): Promise<WorkbookSnapshot> {
+  const backend = workbookBackend;
+  if (!backend?.fromXlsxWorkbookFile)
+    throw missingXlsxBackend("fromXlsxWorkbookFile", "xlsx-import");
+  try {
+    return await backend.fromXlsxWorkbookFile(file, options);
+  } catch (error) {
+    throw normalizeSheetwriteError(error, "xlsx-import-failed", "xlsx-import", {
+      backend: backend.name,
+      functionName: "fromXlsxWorkbookFile",
     });
   }
 }

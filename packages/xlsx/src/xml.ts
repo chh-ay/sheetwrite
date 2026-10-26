@@ -479,12 +479,14 @@ export function escapeXml(value: string): string {
 export class XmlBuffer {
   readonly #parts: string[] = [];
   #bytes = 0;
+  #pendingBytes = 0;
 
   constructor(private readonly context: XlsxCodecContext) {}
 
   append(value: string): void {
     this.#bytes += utf8Length(value);
     assertResource(this.context, "maxEntryUncompressedBytes", this.#bytes);
+    this.#pendingBytes += utf8Length(value);
     this.#parts.push(value);
   }
 
@@ -492,6 +494,18 @@ export class XmlBuffer {
     const encoded = escapeXml(encodeXstring(value));
     assertResource(this.context, "maxXmlTextBytes", utf8Length(encoded));
     this.append(encoded);
+  }
+
+  /** Release completed writer fragments without retaining the full XML part. */
+  *drain(force = false): Generator<Uint8Array> {
+    const chunkBytes = 64 * 1024;
+    if (!force && this.#pendingBytes < chunkBytes) return;
+    const encoded = ENCODER.encode(this.#parts.join(""));
+    this.#parts.length = 0;
+    this.#pendingBytes = 0;
+    for (let offset = 0; offset < encoded.length; offset += chunkBytes) {
+      yield encoded.subarray(offset, offset + chunkBytes);
+    }
   }
 
   finish(): Uint8Array {

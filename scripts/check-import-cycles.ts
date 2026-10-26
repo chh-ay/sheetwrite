@@ -73,14 +73,16 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   table: {
     source: "packages/core/src/types/table.ts",
-    dependencies: ["coordinates"],
+    dependencies: ["cell", "coordinates"],
     exports: [
       "WorkbookTable",
       "WorkbookTableColumn",
       "WorkbookTableId",
       "WorkbookTablePatch",
       "WorkbookTableStyle",
+      "WorkbookTableTotalsFunction",
       "WorkbookTableUnsupportedFeature",
+      "WorkbookTableXmlElement",
     ],
   },
   cell: {
@@ -135,6 +137,10 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ValidationPolicy",
       "Workbook",
       "WorkbookSnapshot",
+      "XlsxSourceDependency",
+      "XlsxSourceGraph",
+      "XlsxSourcePart",
+      "XlsxSourceSnapshot",
     ],
   },
   transaction: {

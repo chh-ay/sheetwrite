@@ -3957,11 +3957,33 @@ instances and therefore also satisfy `isSheetwriteError`.
 
 ## Table interchange
 
-`toXlsxTable` and `fromXlsxTable` exchange the active rectangular table. They deliberately reduce scope and fidelity — one sheet, synthesized headers, resolved scalars instead of formula source — and, like the workbook APIs, they materialize the complete file in memory rather than streaming it. CSV output is UTF-8 with a BOM and CRLF line endings and prefixes injection-sensitive leading characters in string values.
+`toXlsxTable` and `fromXlsxTable` exchange the active rectangular table. They deliberately reduce scope and fidelity — one sheet, synthesized headers, resolved scalars instead of formula source. CSV output is UTF-8 with a BOM and CRLF line endings and prefixes injection-sensitive leading characters in string values.
+
+## Streaming
+
+`toCsvStream`, `toTsvStream`, `toXlsxTableStream` and `toXlsxWorkbookStream` return a `ReadableStream<Uint8Array>` that produces the file in bounded chunks, honours backpressure and stops reading the store when the reader cancels. Existing string and `Uint8Array` functions keep working. XLSX streams contain the same parts, but ZIP entry order and container bytes may differ from buffered output. `fromXlsxWorkbookFile` imports a `File` or `Blob` without first buffering it: the reader keeps the ZIP directory and one inflated part at a time. This alone does not lower the measured import peak: each worksheet is still parsed as a whole.
 
 ## Workbook interchange
 
-`toXlsxWorkbook` and `fromXlsxWorkbook` preserve supported worksheets, formula source, styles, merges, dimensions, frozen panes, names, HTTPS/mailto and internal range hyperlinks, ordered conditional formats, and Sheetwrite metadata. Unsupported Excel features are never silently flattened: every dropped native feature is reported through the structured `onWarning` callback (`XlsxWorkbookWarning`), and callers must surface warnings when fidelity matters. Both directions build the complete workbook representation in memory; budget accordingly for large files.
+`toXlsxWorkbook` and `fromXlsxWorkbook` preserve supported worksheets, formula source, styles, merges, dimensions, frozen panes, names, HTTPS/mailto and internal range hyperlinks, ordered conditional formats, table autofilter rules, sort state, calculated-column formulas and totals-row functions, and Sheetwrite metadata. Unsupported Excel features are never silently flattened: every dropped native feature is reported through the structured `onWarning` callback (`XlsxWorkbookWarning`), and callers must surface warnings when fidelity matters.
+
+### Parts Sheetwrite does not model
+
+Import keeps the parts Sheetwrite does not edit in `snapshot.workbook.xlsxSource`, so opening and saving a file does not remove them. Each part is kept as its original compressed ZIP payload and written back byte for byte, without recompression. Verification inflates bounded chunks and discards them; only relationships are parsed. Only opaque parts are kept — never worksheet XML. The payload is base64-encoded for JSON-safe persistence, costing about four thirds of its compressed size, plus bounded graph metadata.
+
+| Kept part graph | Kept on save when |
+| --- | --- |
+| VBA project (`.xlsm`), customXml items, XML maps, data connections, theme, core and custom document properties | Always. They do not read cells. A macro workbook keeps its macro content type. |
+| Images and other drawings without charts, single-cell XML tables | Their sheet still exists and no row or column was inserted, removed or moved, resized, hidden or merged on it. |
+| Charts and pivot tables (with their caches) | No cell on any sheet changed, no sheet was renamed or removed, and no defined name changed. |
+
+Everything else is dropped with a warning: parts reached through a relationship into a worksheet, table, styles or the workbook part (Sheetwrite rewrites those), external links, chart sheets, digital signatures, and kept parts beyond `maxPreservedBytes` (64 MiB of compressed data by default).
+
+Relationships and content types stay valid: kept parts keep their names and their own `.rels` parts unchanged, the workbook, sheets and package get new relationship ids pointing at them, pivot caches are re-listed in `workbook.xml`, and each kept part gets its content-type override. A graph whose relationships point outside the kept parts is dropped.
+
+A `SheetwriteStore` (and a `Grid` over one) drops a graph when the edit that invalidates it commits. This costs nothing per cell. Undo does not bring a dropped graph back, because the original package is not kept. A `WorkbookSnapshot` passed directly has no edit history, so the backend compares a 64-bit fingerprint of each sheet's source values with the import fingerprint; this reads every cell once (O(cells)) and drops a graph on a difference. Import and store hydration verify payload CRCs and sizes by inflating bounded chunks and discarding them. Hydration also checks that source values still match their fingerprints before enabling edit-time pruning. Verification is cached per immutable part object in process memory, never serialized. Direct external snapshots are checked on save. Corrupt payloads drop their graphs with warnings. `xlsxSource` objects are frozen and shared between snapshots of one store; clone them before changing them.
+
+Both directions keep the workbook representation in memory; use the streaming functions above for large files.
 
 Hyperlinks retain stable IDs in Sheetwrite metadata. Internal destinations use stable sheet IDs, so a sheet rename does not retarget the link; removing the destination removes inbound links atomically, and undo restores them with the sheet. Activation of any stale host-held target still fails closed. External mutation and activation accept only absolute `https://` and `mailto:` targets. `javascript:`, `data:`, `file:`, HTTP, credentials, malformed URLs, and internal OOXML relationship traversal are rejected before document mutation or host activation. Sheetwrite never calls `window.open`: Ctrl/Meta-click and `grid.activateHyperlink()` emit `hyperlink-activate` with a validated target. Set `hyperlinkActivation: "internal-navigation"` to additionally navigate internal targets, or `"disabled"` to suppress activation.
 
@@ -3974,7 +3996,7 @@ The [detailed compatibility results](https://sheetwrite.vercel.app/docs/referenc
 Every table and workbook path shares one resource contract, `XlsxWorkbookOptions`:
 
 - `maxCells` bounds logical accepted cells and defaults to `1_000_000`;
-- `resourceLimits` overrides the remaining bounded dimensions, checked before decompression and allocation: input bytes (32 MiB), output bytes (128 MiB), archive entries (1,024), per-entry uncompressed bytes (64 MiB), total uncompressed bytes (256 MiB), compression ratio (×100), sheets (256), rows per sheet (1,048,576), columns per sheet (16,384), merges (100,000), shared strings (1,000,000), style records (65,536), XML elements (2,000,000), XML depth (64), XML attributes per element (128), and XML text bytes (16 MiB);
+- `resourceLimits` overrides the remaining bounded dimensions, checked before decompression and allocation: input bytes (32 MiB), output bytes (128 MiB), archive entries (1,024), per-entry uncompressed bytes (64 MiB), total uncompressed bytes (256 MiB), kept unmodelled part bytes (64 MiB compressed), compression ratio (×100), sheets (256), rows per sheet (1,048,576), columns per sheet (16,384), merges (100,000), shared strings (1,000,000), style records (65,536), XML elements (2,000,000), XML depth (64), XML attributes per element (128), and XML text bytes (16 MiB);
 - `signal` aborts between bounded codec stages.
 
 Crossing any bound rejects with a typed `XlsxResourceError` naming the resource, limit, and observed value — before the codec allocates unsafe data. The defaults are exported as `DEFAULT_XLSX_RESOURCE_LIMITS`.
@@ -6269,13 +6291,14 @@ Phase reported by a typed delimited-text resource failure.
 ##### `DelimitedTextOptions` — interface
 
 ```ts
-export interface DelimitedTextOptions { resourceLimits?: Partial<DelimitedTextResourceLimits>; }
+export interface DelimitedTextOptions { resourceLimits?: Partial<DelimitedTextResourceLimits>; signal?: AbortSignal; }
 ```
 
 Optional resource ceilings for an in-memory delimited-text operation.
 
 Members:
 - `resourceLimits` — Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`.
+- `signal` — Abort between bounded encode chunks or store windows.
 
 ##### `DelimitedTextOptionsError` — class
 
@@ -6457,6 +6480,14 @@ async function openWorkbook(host: HTMLElement, file: File) {
 ```
 @see
 toXlsxWorkbook
+
+##### `fromXlsxWorkbookFile` — function
+
+```ts
+(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>
+```
+
+Import a seekable File/Blob without first buffering the compressed workbook.
 
 ##### `Grid` — interface
 
@@ -8729,6 +8760,14 @@ values beginning with `= + - @ \t \r` are prefixed with `'`. The synchronous
 API returns one in-memory string, but fetches at most
 `maxWriterWindowRows` view rows from the store per read.
 
+##### `toCsvStream` — function
+
+```ts
+(sheet: Sheet, store: Store, options?: DelimitedTextOptions): ReadableStream<Uint8Array>
+```
+
+Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.
+
 ##### `ToolbarActionName` — type
 
 ```ts
@@ -8772,6 +8811,14 @@ remap the supplied row coordinates. Values are injection-hardened. The
 synchronous API returns one in-memory string and fetches at most
 `maxWriterWindowRows` canonical rows per packed store read.
 
+##### `toTsvStream` — function
+
+```ts
+(range: Range, store: Store, options?: DelimitedTextOptions): ReadableStream<Uint8Array>
+```
+
+Export canonical data-space TSV with pull-driven store reads and cancellation.
+
 ##### `toXlsxTable` — function
 
 ```ts
@@ -8793,6 +8840,14 @@ async function download(workbook: Workbook, store: Store) {
 @see
 fromXlsxTable
 
+##### `toXlsxTableStream` — function
+
+```ts
+(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>
+```
+
+Stream table XLSX bytes without materializing the finished archive.
+
 ##### `toXlsxWorkbook` — function
 
 ```ts
@@ -8813,6 +8868,14 @@ async function download(grid: Grid) {
 ```
 @see
 fromXlsxWorkbook
+
+##### `toXlsxWorkbookStream` — function
+
+```ts
+(input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">, options?: XlsxWorkbookOptions): ReadableStream<Uint8Array>
+```
+
+Stream formula-preserving workbook XLSX with backpressure and cancellation.
 
 ##### `Transaction` — interface
 
@@ -8936,6 +8999,15 @@ Reject-or-warn policy attached to a data-validation rule.
 
 Validate one canonical table against sheet bounds and workbook-global identities.
 
+##### `validWorkbookTableXmlElement` — function
+
+```ts
+(value: unknown, expectedName: string, budget?: { nodes: number; characters: number; }): boolean
+```
+
+Validate inert table-rule trees before they enter snapshots or XML output.
+A whitelist prevents this persistence seam from becoming arbitrary markup.
+
 ##### `VersionBatchMember` — interface
 
 ```ts
@@ -9022,7 +9094,7 @@ One retained-memory owner reported by the WASM cell store.
 ##### `Workbook` — interface
 
 ```ts
-export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; }
+export interface Workbook { sheets: Sheet[]; activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; }
 ```
 
 Live workbook schema containing ordered sheets and the active sheet ID.
@@ -9031,6 +9103,7 @@ Members:
 - `activeSheet` — Active sheet ID and initial tab presented when the grid is created.
 - `namedRanges` — Formula names shared by the workbook or shadowed within a sheet scope.
 - `sheets` — Sheets in display/tab order.
+- `xlsxSource` — Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them.
 
 ##### `WORKBOOK_SCHEMA_VERSION` — variable
 
@@ -9043,7 +9116,7 @@ Current workbook snapshot schema version accepted by Sheetwrite.
 ##### `WorkbookSnapshot` — interface
 
 ```ts
-export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; }; sheets: SheetSnapshot[]; }
+export interface WorkbookSnapshot { schemaVersion: 1; documentId?: string; version?: number; workbook: { activeSheet: SheetId; namedRanges?: NamedRangeSnapshot[]; xlsxSource?: XlsxSourceSnapshot; }; sheets: SheetSnapshot[]; }
 ```
 
 Schema-versioned serializable workbook document.
@@ -9051,28 +9124,33 @@ Schema-versioned serializable workbook document.
 ##### `WorkbookTable` — interface
 
 ```ts
-export interface WorkbookTable { id: WorkbookTableId; name: string; range: Range; columns: WorkbookTableColumn[]; headerRow: boolean; totalsRow: boolean; style?: WorkbookTableStyle; unsupportedFeatures?: WorkbookTableUnsupportedFeature[]; }
+export interface WorkbookTable { id: WorkbookTableId; name: string; range: Range; columns: WorkbookTableColumn[]; headerRow: boolean; totalsRow: boolean; style?: WorkbookTableStyle; autoFilter?: WorkbookTableXmlElement; sortState?: WorkbookTableXmlElement; unsupportedFeatures?: WorkbookTableUnsupportedFeature[]; }
 ```
 
 Serializable canonical workbook table. Its range includes header/totals rows.
 
 Members:
+- `autoFilter` — Persisted Excel filter rules; not applied to rows by the Sheetwrite engine.
 - `columns` — Ordered stable columns; length is exactly the table rectangle width.
 - `headerRow` — Whether the first range row is the structured-reference header row.
 - `name` — Workbook-global, case-insensitively unique structured-reference name.
 - `range` — Inclusive table rectangle on one stable sheet ID.
+- `sortState` — Persisted Excel sort state; not applied to rows by the Sheetwrite engine.
 - `totalsRow` — Whether the last range row is the structured-reference totals row.
 
 ##### `WorkbookTableColumn` — interface
 
 ```ts
-export interface WorkbookTableColumn { id: string; name: string; totalsRowLabel?: string; }
+export interface WorkbookTableColumn { id: string; name: string; totalsRowLabel?: string; totalsRowFunction?: WorkbookTableTotalsFunction; totalsRowFormula?: WorkbookTableXmlElement; calculatedColumnFormula?: WorkbookTableXmlElement; }
 ```
 
 Stable identity and display metadata for one ordered table column.
 
 Members:
+- `calculatedColumnFormula` — Rule Excel fills into new rows; existing data cells remain authoritative.
 - `name` — Case-insensitively unique within the table.
+- `totalsRowFormula` — OOXML formula text (without `=`), including its optional array attribute.
+- `totalsRowFunction` — Persisted rule; existing totals-row cells remain authoritative cell sources.
 - `totalsRowLabel` — Optional text written in the totals row. Formula cells remain authoritative cell sources.
 
 ##### `WorkbookTableId` — type
@@ -9110,7 +9188,7 @@ Result of validating and NFC-normalizing a workbook table name.
 ##### `WorkbookTablePatch` — interface
 
 ```ts
-export interface WorkbookTablePatch { name?: string; range?: Range; columns?: WorkbookTableColumn[]; headerRow?: boolean; totalsRow?: boolean; style?: WorkbookTableStyle | null; unsupportedFeatures?: WorkbookTableUnsupportedFeature[]; }
+export interface WorkbookTablePatch { name?: string; range?: Range; columns?: WorkbookTableColumn[]; headerRow?: boolean; totalsRow?: boolean; style?: WorkbookTableStyle | null; autoFilter?: WorkbookTableXmlElement | null; sortState?: WorkbookTableXmlElement | null; unsupportedFeatures?: WorkbookTableUnsupportedFeature[]; }
 ```
 
 Mutable table fields accepted by the explicit update operation.
@@ -9131,14 +9209,36 @@ export interface WorkbookTableStyle { name?: string; showFirstColumn?: boolean; 
 
 Bounded native subset of ECMA-376 table style information.
 
+##### `WorkbookTableTotalsFunction` — type
+
+```ts
+export type WorkbookTableTotalsFunction = | "none" | "sum" | "min" | "max" | "average" | "count" | "countNums" | "stdDev" | "var" | "custom";
+```
+
+Aggregate Excel offers for a totals-row cell.
+
 ##### `WorkbookTableUnsupportedFeature` — type
 
 ```ts
 export type WorkbookTableUnsupportedFeature = | "auto-filter" | "sort-state" | "calculated-columns" | "totals-functions" | "query-table" | "external-data" | "extensions";
 ```
 
-OOXML table features deliberately retained as explicit loss metadata rather
-than silently flattened into an ordinary range.
+OOXML table features outside the persisted rule subset are retained as explicit
+loss metadata rather than silently flattened into an ordinary range.
+
+##### `WorkbookTableXmlElement` — interface
+
+```ts
+export interface WorkbookTableXmlElement { name: string; attributes: Record<string, string>; text: string; children: WorkbookTableXmlElement[]; differentialStyle?: CellStyle; }
+```
+
+Bounded OOXML table-rule metadata. Names are unprefixed SpreadsheetML element
+names, not markup; the XLSX writer escapes text and attribute values. Keeping
+the rule tree avoids flattening date groups, custom filters or sort options
+into Sheetwrite's independently evaluated worksheet filters.
+
+Members:
+- `differentialStyle` — Style behind a color filter/sort rule; dxfId is regenerated on export.
 
 ##### `XlsxResourceError` — class
 
@@ -9151,7 +9251,7 @@ Stable resource-limit failure surfaced before an XLSX codec allocates unsafe dat
 ##### `XlsxResourceLimits` — interface
 
 ```ts
-export interface XlsxResourceLimits { maxInputBytes: number; maxOutputBytes: number; maxArchiveEntries: number; maxEntryUncompressedBytes: number; maxTotalUncompressedBytes: number; maxCompressionRatio: number; maxSheets: number; maxRowsPerSheet: number; maxColumnsPerSheet: number; maxCells: number; maxMerges: number; maxSharedStrings: number; maxStyles: number; maxXmlElements: number; maxXmlDepth: number; maxXmlAttributesPerElement: number; maxXmlTextBytes: number; }
+export interface XlsxResourceLimits { maxInputBytes: number; maxOutputBytes: number; maxArchiveEntries: number; maxEntryUncompressedBytes: number; maxTotalUncompressedBytes: number; maxPreservedBytes: number; maxCompressionRatio: number; maxSheets: number; maxRowsPerSheet: number; maxColumnsPerSheet: number; maxCells: number; maxMerges: number; maxSharedStrings: number; maxStyles: number; maxXmlElements: number; maxXmlDepth: number; maxXmlAttributesPerElement: number; maxXmlTextBytes: number; }
 ```
 
 Resource dimensions bounded by every XLSX import and export path.
@@ -9165,6 +9265,7 @@ Members:
 - `maxInputBytes` — Compressed workbook input bytes; defaults to 32 MiB.
 - `maxMerges` — Aggregate merged ranges; defaults to 100,000.
 - `maxOutputBytes` — Encoded workbook output bytes; defaults to 128 MiB.
+- `maxPreservedBytes` — Retained opaque compressed payload bytes; defaults to 64 MiB.
 - `maxRowsPerSheet` — Rows in any worksheet; defaults to 1,048,576.
 - `maxSharedStrings` — Shared-string table entries; defaults to 1,000,000.
 - `maxSheets` — Workbook worksheets; defaults to 256.
@@ -9175,10 +9276,60 @@ Members:
 - `maxXmlElements` — Elements in any one XML part; defaults to 2,000,000.
 - `maxXmlTextBytes` — UTF-8 text bytes in one XML element or attribute; defaults to 16 MiB.
 
+##### `XlsxSourceDependency` — interface
+
+```ts
+export interface XlsxSourceDependency { readonly sheetId: SheetId; readonly name: string; readonly scope: "layout" | "values"; readonly digest: string; }
+```
+
+What an opaque graph reads; any change to it drops the graph on save.
+
+Members:
+- `digest` — 64-bit hex fingerprint of the sheet at import, for snapshots edited outside a Store.
+- `name` — Sheet name at import; OOXML formulas inside the graph refer to sheets by name.
+- `scope` — `layout` graphs (images) only follow row/column structure; `values` graphs (charts, pivots) read cells.
+
+##### `XlsxSourceGraph` — interface
+
+```ts
+export interface XlsxSourceGraph { readonly owner: "root" | "workbook" | "sheet"; readonly sheetId?: SheetId; readonly type: string; readonly target: string; readonly cacheId?: string; readonly parts: readonly string[]; readonly dependencies: readonly XlsxSourceDependency[]; }
+```
+
+One relationship from the package, workbook, or a sheet to a retained part graph.
+
+Members:
+- `cacheId` — Pivot cache id written into `<pivotCaches>`.
+- `parts` — Every retained part reached from `target`, including `.rels` parts.
+- `target` — Relationship target part.
+- `type` — OPC relationship type URI.
+
+##### `XlsxSourcePart` — interface
+
+```ts
+export interface XlsxSourcePart { readonly name: string; readonly contentType: string; readonly method: 0 | 8; readonly crc32: number; readonly uncompressedSize: number; readonly data: string; }
+```
+
+One retained OOXML part, kept as its original compressed ZIP payload so a
+save copies it without inflating or recompressing. Runtime copies are frozen.
+
+Members:
+- `data` — Base64 of the compressed payload.
+
+##### `XlsxSourceSnapshot` — interface
+
+```ts
+export interface XlsxSourceSnapshot { readonly parts: readonly XlsxSourcePart[]; readonly graphs: readonly XlsxSourceGraph[]; readonly dropped?: readonly string[]; }
+```
+
+Bounded, frozen record of the OOXML parts Sheetwrite does not model.
+
+Members:
+- `dropped` — Targets of graphs dropped by committed edits; undo does not restore them.
+
 ##### `XlsxTableExportBackend` — interface
 
 ```ts
-export interface XlsxTableExportBackend { name: string; toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>; }
+export interface XlsxTableExportBackend { name: string; toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Promise<Uint8Array>; toXlsxTableStream?( workbook: Workbook, store: Store, options?: XlsxWorkbookOptions, ): AsyncIterable<Uint8Array>; }
 ```
 
 Pluggable first-row-header, first-sheet table export backend.
@@ -9196,7 +9347,7 @@ format-agnostic.
 ##### `XlsxWorkbookBackend` — interface
 
 ```ts
-export interface XlsxWorkbookBackend { name: string; toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>; fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>; }
+export interface XlsxWorkbookBackend { name: string; toXlsxWorkbook( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): Promise<Uint8Array>; fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>; toXlsxWorkbookStream?( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): AsyncIterable<Uint8Array>; fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>; verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot["workbook"]["xlsxSource"]; }
 ```
 
 Optional backend contract for complete workbook XLSX interchange.

@@ -8,7 +8,7 @@ description: "Resource dimensions bounded by every XLSX import and export path."
 Resource dimensions bounded by every XLSX import and export path.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L233"><code>packages/core/src/export.ts#L233</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L301"><code>packages/core/src/export.ts#L301</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -17,6 +17,7 @@ Resource dimensions bounded by every XLSX import and export path.
 <a href="#xlsx-resource-limits-max-archive-entries"><code>maxArchiveEntries</code></a>
 <a href="#xlsx-resource-limits-max-entry-uncompressed-bytes"><code>maxEntryUncompressedBytes</code></a>
 <a href="#xlsx-resource-limits-max-total-uncompressed-bytes"><code>maxTotalUncompressedBytes</code></a>
+<a href="#xlsx-resource-limits-max-preserved-bytes"><code>maxPreservedBytes</code></a>
 <a href="#xlsx-resource-limits-max-compression-ratio"><code>maxCompressionRatio</code></a>
 <a href="#xlsx-resource-limits-max-sheets"><code>maxSheets</code></a>
 <a href="#xlsx-resource-limits-max-rows-per-sheet"><code>maxRowsPerSheet</code></a>
@@ -31,7 +32,7 @@ Resource dimensions bounded by every XLSX import and export path.
 <a href="#xlsx-resource-limits-max-xml-text-bytes"><code>maxXmlTextBytes</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>17</span>
+## Members <span class="api-count" data-pagefind-ignore>18</span>
 
 <div class="api-member-list">
 
@@ -76,6 +77,15 @@ maxEntryUncompressedBytes: number;
 
 ```ts generated
 maxTotalUncompressedBytes: number;
+```
+
+</details>
+
+<details class="api-member" id="xlsx-resource-limits-max-preserved-bytes" data-pagefind-weight="1">
+<summary><code>maxPreservedBytes</code> <span class="api-member-summary">Retained opaque compressed payload bytes; defaults to 64 MiB.</span></summary>
+
+```ts generated
+maxPreservedBytes: number;
 ```
 
 </details>
@@ -201,6 +211,7 @@ export interface XlsxResourceLimits {
   maxArchiveEntries: number;
   maxEntryUncompressedBytes: number;
   maxTotalUncompressedBytes: number;
+  maxPreservedBytes: number;
   maxCompressionRatio: number;
   maxSheets: number;
   maxRowsPerSheet: number;

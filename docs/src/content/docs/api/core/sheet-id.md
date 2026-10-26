@@ -50,6 +50,6 @@ export type SheetId = string;
 <li><a href="/docs/api/core/presence-overlay/"><code>PresenceOverlay</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/range/"><code>Range</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/row-bridge/"><code>RowBridge</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 26 more</li>
+<li class="api-consumer-more">and 28 more</li>
 </ul>
 </div>

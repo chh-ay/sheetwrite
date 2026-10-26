@@ -8,7 +8,7 @@ description: "Resource ceilings for canonical workbook-table metadata and identi
 Resource ceilings for canonical workbook-table metadata and identifiers.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L11"><code>packages/core/src/workbook-table.ts#L11</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L14"><code>packages/core/src/workbook-table.ts#L14</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

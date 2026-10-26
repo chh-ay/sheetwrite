@@ -12,7 +12,7 @@ Extra fields are ignored and missing fields become `null`. The returned
 columnar table is fully materialized in memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L144"><code>packages/core/src/export.ts#L144</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L212"><code>packages/core/src/export.ts#L212</code></a></dd></div>
 </dl>
 
 ## Declaration

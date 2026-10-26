@@ -598,6 +598,12 @@ export class DocumentController {
         if (patch.patch.style !== undefined) {
           previous.style = table.style ? structuredClone(table.style) : null;
         }
+        if (patch.patch.autoFilter !== undefined) {
+          previous.autoFilter = structuredClone(table.autoFilter ?? null);
+        }
+        if (patch.patch.sortState !== undefined) {
+          previous.sortState = structuredClone(table.sortState ?? null);
+        }
         if (patch.patch.unsupportedFeatures !== undefined) {
           previous.unsupportedFeatures = structuredClone(table.unsupportedFeatures ?? []);
         }

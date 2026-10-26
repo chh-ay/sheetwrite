@@ -93,6 +93,6 @@ export interface Range {
 <li><a href="/docs/api/core/presence-message/"><code>PresenceMessage</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-overlay/"><code>PresenceOverlay</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/protected-range/"><code>ProtectedRange</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 16 more</li>
+<li class="api-consumer-more">and 17 more</li>
 </ul>
 </div>

@@ -11,7 +11,7 @@ Optional resource ceilings for an in-memory delimited-text operation.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/delimited-text.ts#L21"><code>packages/core/src/delimited-text.ts#L21</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>1</span>
+## Members <span class="api-count" data-pagefind-ignore>2</span>
 
 <div class="api-member-list">
 
@@ -24,6 +24,15 @@ resourceLimits?: Partial<DelimitedTextResourceLimits>;
 
 <p class="api-member-doc">Positive safe-integer overrides merged over `DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS`.</p>
 </details>
+
+<details class="api-member" id="delimited-text-options-signal" data-pagefind-weight="1">
+<summary><code>signal</code> <span class="api-member-summary">Abort between bounded encode chunks or store windows.</span></summary>
+
+```ts generated
+signal?: AbortSignal;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -34,6 +43,7 @@ resourceLimits?: Partial<DelimitedTextResourceLimits>;
 ```ts generated
 export interface DelimitedTextOptions {
   resourceLimits?: Partial<DelimitedTextResourceLimits>;
+  signal?: AbortSignal;
 }
 ```
 
@@ -59,6 +69,8 @@ export interface DelimitedTextOptions {
 <li><a href="/docs/api/core/from-csv/"><code>fromCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/parse-csv/"><code>parseCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-csv/"><code>toCsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-csv-stream/"><code>toCsvStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-tsv/"><code>toTsv</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-tsv-stream/"><code>toTsvStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

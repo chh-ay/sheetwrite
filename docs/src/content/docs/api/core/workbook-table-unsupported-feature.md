@@ -1,15 +1,15 @@
 ---
 title: "WorkbookTableUnsupportedFeature | @sheetwrite/core"
-description: "OOXML table features deliberately retained as explicit loss metadata rather than silently flattened into an ordinary range."
+description: "OOXML table features outside the persisted rule subset are retained as explicit loss metadata rather than silently flattened into an ordinary range."
 ---
 <!-- api-export:@sheetwrite/core|.|WorkbookTableUnsupportedFeature -->
 <div class="api-pagehead"><a class="api-backlink" href="/docs/api/core/">@sheetwrite/core</a><span class="api-status" data-kind="type">type</span></div>
 
-OOXML table features deliberately retained as explicit loss metadata rather
-than silently flattened into an ordinary range.
+OOXML table features outside the persisted rule subset are retained as explicit
+loss metadata rather than silently flattened into an ordinary range.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L28"><code>packages/core/src/types/table.ts#L28</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L63"><code>packages/core/src/types/table.ts#L63</code></a></dd></div>
 </dl>
 
 ## Declaration

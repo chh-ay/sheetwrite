@@ -774,12 +774,16 @@ export class ParsedStyles {
       xmlChild(root, "fonts") ?? { attributes: {}, children: [], name: "", text: "" },
       "font",
     );
-    // Every XLSX font names a family, usually the workbook default. Only a
-    // different family becomes a cell fontFamily, so ordinary text keeps the
-    // grid's theme font.
+    // Every XLSX font names a family and size, usually the workbook default.
+    // Only a different family or size becomes a cell style, so ordinary text
+    // keeps the grid's theme font.
     const defaultNameElement = fonts[0] ? xmlChild(fonts[0], "name") : undefined;
     const defaultFontName = defaultNameElement
       ? xmlAttribute(defaultNameElement, "val")
+      : undefined;
+    const defaultSizeElement = fonts[0] ? xmlChild(fonts[0], "sz") : undefined;
+    const defaultFontSize = defaultSizeElement
+      ? Number(xmlAttribute(defaultSizeElement, "val"))
       : undefined;
     const fills = xmlChildren(
       xmlChild(root, "fills") ?? { attributes: {}, children: [], name: "", text: "" },
@@ -858,7 +862,9 @@ export class ParsedStyles {
           "val",
         ),
       );
-      if (Number.isFinite(size) && size > 0) style.fontSize = (size * 96) / 72;
+      if (Number.isFinite(size) && size > 0 && size !== defaultFontSize) {
+        style.fontSize = (size * 96) / 72;
+      }
       const fontColor = resolvedColor(xmlChild(font, "color"), theme, context, colorWarnings, part);
       if (fontColor) style.color = fontColor;
       const nameElement = xmlChild(font, "name");

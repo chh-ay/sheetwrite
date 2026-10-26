@@ -8,7 +8,7 @@ description: "Serializable canonical workbook table."
 Serializable canonical workbook table. Its range includes header/totals rows.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L38"><code>packages/core/src/types/table.ts#L38</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/table.ts#L73"><code>packages/core/src/types/table.ts#L73</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -19,10 +19,12 @@ Serializable canonical workbook table. Its range includes header/totals rows.
 <a href="#workbook-table-header-row"><code>headerRow</code></a>
 <a href="#workbook-table-totals-row"><code>totalsRow</code></a>
 <a href="#workbook-table-style"><code>style</code></a>
+<a href="#workbook-table-auto-filter"><code>autoFilter</code></a>
+<a href="#workbook-table-sort-state"><code>sortState</code></a>
 <a href="#workbook-table-unsupported-features"><code>unsupportedFeatures</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>8</span>
+## Members <span class="api-count" data-pagefind-ignore>10</span>
 
 <div class="api-member-list">
 
@@ -89,6 +91,24 @@ style?: WorkbookTableStyle;
 
 </details>
 
+<details class="api-member" id="workbook-table-auto-filter" data-pagefind-weight="1">
+<summary><code>autoFilter</code> <span class="api-member-summary">Persisted Excel filter rules; not applied to rows by the Sheetwrite engine.</span></summary>
+
+```ts generated
+autoFilter?: WorkbookTableXmlElement;
+```
+
+</details>
+
+<details class="api-member" id="workbook-table-sort-state" data-pagefind-weight="1">
+<summary><code>sortState</code> <span class="api-member-summary">Persisted Excel sort state; not applied to rows by the Sheetwrite engine.</span></summary>
+
+```ts generated
+sortState?: WorkbookTableXmlElement;
+```
+
+</details>
+
 <details class="api-member" id="workbook-table-unsupported-features" data-pagefind-weight="1">
 <summary><code>unsupportedFeatures</code></summary>
 
@@ -113,6 +133,8 @@ export interface WorkbookTable {
   headerRow: boolean;
   totalsRow: boolean;
   style?: WorkbookTableStyle;
+  autoFilter?: WorkbookTableXmlElement;
+  sortState?: WorkbookTableXmlElement;
   unsupportedFeatures?: WorkbookTableUnsupportedFeature[];
 }
 ```

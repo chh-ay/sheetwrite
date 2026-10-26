@@ -8,7 +8,7 @@ description: "Stable reason code returned when a workbook table name is rejected
 Stable reason code returned when a workbook table name is rejected.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L32"><code>packages/core/src/workbook-table.ts#L32</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/workbook-table.ts#L35"><code>packages/core/src/workbook-table.ts#L35</code></a></dd></div>
 </dl>
 
 ## Declaration

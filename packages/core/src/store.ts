@@ -28,7 +28,7 @@ import {
 import { registerStoreEngine } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
-import { decodeWorkbookSnapshot } from "./store/snapshot-codec.js";
+import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
 import { setTransactionStorageRevision } from "./transaction-admission.js";
 import { preparedRestore, TransactionPreparation } from "./transaction-preparation.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -46,6 +46,7 @@ import type {
   SortKey,
   Workbook,
   WorkbookSnapshot,
+  XlsxSourceSnapshot,
 } from "./types/document.js";
 import type {
   CellLoadState,
@@ -63,6 +64,7 @@ import type {
   TransactionApplicationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+import { admitStoreXlsxSource } from "./xlsx-source.js";
 
 export type { CompactRangeHistory, RangeMutationAllocationStats };
 export { IncompleteDataError };
@@ -88,6 +90,20 @@ const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>
   "invalid-position": "Sheet position is out of bounds",
   "last-visible-sheet": "Workbook must retain at least one visible sheet",
 };
+
+/** Edits that move or resize cells, and so the anchors of retained OOXML drawings. */
+const XLSX_LAYOUT_OPS: ReadonlySet<DocumentOp["op"]> = new Set([
+  "addRows",
+  "removeRows",
+  "moveRows",
+  "addColumns",
+  "removeColumns",
+  "moveColumns",
+  "setColumn",
+  "setRowMeta",
+  "addMerge",
+  "removeMerge",
+]);
 
 function isSnapshotAllocationFailure(error: unknown): boolean {
   if (error instanceof SnapshotResourceError || error instanceof RangeError) return true;
@@ -135,7 +151,13 @@ export class SheetwriteStore implements Store {
   private documentId?: string;
   private documentVersion?: number;
 
-  constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
+  constructor(
+    private readonly workbook: Workbook,
+    data?: ColumnarData,
+    options: SheetwriteStoreOptions = {},
+  ) {
+    // Frozen once here so exported snapshots share the payloads instead of copying them.
+    if (workbook.xlsxSource) workbook.xlsxSource = freezeXlsxSource(workbook.xlsxSource);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
       options.transactionResourceLimits,
     );
@@ -180,6 +202,13 @@ export class SheetwriteStore implements Store {
       store.documentVersion = snapshot.version;
       store.epoch = snapshot.version ?? 0;
       store.engine.hydrateSnapshot(snapshot);
+      if (workbook.xlsxSource) {
+        const admitted = admitStoreXlsxSource(store, {
+          ...snapshot,
+          workbook: { ...snapshot.workbook, xlsxSource: workbook.xlsxSource },
+        });
+        workbook.xlsxSource = admitted ? freezeXlsxSource(admitted) : undefined;
+      }
       return store;
     } catch (error) {
       store?.dispose();
@@ -598,6 +627,8 @@ export class SheetwriteStore implements Store {
         };
       }
 
+      const xlsxSource = this.workbook.xlsxSource;
+      if (xlsxSource) this.invalidateXlsxGraphs(xlsxSource, effects.appliedPatches);
       this.epoch += 1;
       const transaction =
         effects.appliedPatches.length === effectiveTx.patches.length
@@ -632,6 +663,50 @@ export class SheetwriteStore implements Store {
     } finally {
       preparation.dispose();
     }
+  }
+
+  /**
+   * Drop retained OOXML graphs that a committed edit may have made stale. Costs
+   * O(patches + graphs) and never reads cells; undo cannot restore a dropped
+   * graph because the original package is not kept.
+   */
+  private invalidateXlsxGraphs(source: XlsxSourceSnapshot, patches: readonly DocumentOp[]): void {
+    const valuesTouched = new Set<SheetId>();
+    const layoutTouched = new Set<SheetId>();
+    for (const patch of patches) {
+      if (patch.op === "setNamedRange" || patch.op === "removeNamedRange") {
+        // A chart or pivot may read through a defined name, whose target is not tracked.
+        for (const sheet of this.workbook.sheets) valuesTouched.add(sheet.id);
+        continue;
+      }
+      const sheet = patchSheetId(patch);
+      if (sheet === null) continue;
+      valuesTouched.add(sheet);
+      if (XLSX_LAYOUT_OPS.has(patch.op)) layoutTouched.add(sheet);
+    }
+
+    const live = new Map(this.workbook.sheets.map((sheet) => [sheet.id, sheet.name]));
+    const dropped = new Set(source.dropped);
+    const graphs = source.graphs.filter((graph) => {
+      const valid =
+        (graph.sheetId === undefined || live.has(graph.sheetId)) &&
+        graph.dependencies.every((dependency) =>
+          dependency.scope === "values"
+            ? live.get(dependency.sheetId) === dependency.name &&
+              !valuesTouched.has(dependency.sheetId)
+            : live.has(dependency.sheetId) && !layoutTouched.has(dependency.sheetId),
+        );
+      if (!valid) dropped.add(graph.target);
+      return valid;
+    });
+    if (graphs.length === source.graphs.length) return;
+
+    const members = new Set(graphs.flatMap((graph) => graph.parts));
+    this.workbook.xlsxSource = freezeXlsxSource({
+      parts: source.parts.filter((part) => members.has(part.name)),
+      graphs,
+      dropped: [...dropped],
+    });
   }
 
   on(_evt: "change", fn: ChangeListener): () => void {

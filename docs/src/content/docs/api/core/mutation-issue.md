@@ -8,7 +8,7 @@ description: "Structured warning or rejection produced while applying an operati
 Structured warning or rejection produced while applying an operation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L245"><code>packages/core/src/types/document.ts#L245</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L247"><code>packages/core/src/types/document.ts#L247</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>5</span>

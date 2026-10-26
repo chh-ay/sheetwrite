@@ -8,10 +8,10 @@ description: "Optional backend contract for complete workbook XLSX interchange."
 Optional backend contract for complete workbook XLSX interchange.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L463"><code>packages/core/src/export.ts#L463</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L560"><code>packages/core/src/export.ts#L560</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>6</span>
 
 <div class="api-member-list">
 
@@ -28,7 +28,7 @@ name: string;
 <summary><code>toXlsxWorkbook</code></summary>
 
 ```ts generated
-toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promise<Uint8Array>;
+toXlsxWorkbook( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): Promise<Uint8Array>;
 ```
 
 </details>
@@ -38,6 +38,33 @@ toXlsxWorkbook(snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions): Promi
 
 ```ts generated
 fromXlsxWorkbook( data: ArrayBuffer | Uint8Array, options?: XlsxWorkbookOptions, ): Promise<WorkbookSnapshot>;
+```
+
+</details>
+
+<details class="api-member" id="xlsx-workbook-backend-to-xlsx-workbook-stream" data-pagefind-weight="1">
+<summary><code>toXlsxWorkbookStream</code></summary>
+
+```ts generated
+toXlsxWorkbookStream?( snapshot: WorkbookSnapshot, options?: XlsxWorkbookOptions, context?: XlsxWorkbookExportContext, ): AsyncIterable<Uint8Array>;
+```
+
+</details>
+
+<details class="api-member" id="xlsx-workbook-backend-from-xlsx-workbook-file" data-pagefind-weight="1">
+<summary><code>fromXlsxWorkbookFile</code></summary>
+
+```ts generated
+fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
+```
+
+</details>
+
+<details class="api-member" id="xlsx-workbook-backend-verify-source" data-pagefind-weight="1">
+<summary><code>verifySource</code></summary>
+
+```ts generated
+verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot["workbook"]["xlsxSource"];
 ```
 
 </details>
@@ -54,11 +81,24 @@ export interface XlsxWorkbookBackend {
   toXlsxWorkbook(
     snapshot: WorkbookSnapshot,
     options?: XlsxWorkbookOptions,
+    context?: XlsxWorkbookExportContext,
   ): Promise<Uint8Array>;
   fromXlsxWorkbook(
     data: ArrayBuffer | Uint8Array,
     options?: XlsxWorkbookOptions,
   ): Promise<WorkbookSnapshot>;
+  toXlsxWorkbookStream?(
+    snapshot: WorkbookSnapshot,
+    options?: XlsxWorkbookOptions,
+    context?: XlsxWorkbookExportContext,
+  ): AsyncIterable<Uint8Array>;
+  fromXlsxWorkbookFile?(
+    file: Blob,
+    options?: XlsxWorkbookOptions,
+  ): Promise<WorkbookSnapshot>;
+  verifySource?(
+    snapshot: WorkbookSnapshot,
+  ): WorkbookSnapshot["workbook"]["xlsxSource"];
 }
 ```
 

@@ -19,13 +19,12 @@ const PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relations
  * Original minimal workbook authored for this test, without Sheetwrite's metadata sidecar,
  * so only the native style mapping can produce the imported styles.
  *
- * Styles: xf0 default (Calibri), xf1 `$#,##0.00`, xf2 `0.00%` in Georgia aligned top,
+ * Styles: xf0 default (11pt Calibri), xf1 `$#,##0.00`, xf2 `0.00%` in 18pt Georgia aligned top,
  * xf3 General aligned center. Column A mixes xf1 and xf2; column B uses xf1 for two
  * numbers and General (xf0) for a third.
  */
 function nativeStyledWorkbook(): Uint8Array {
-  // Fonts omit <sz>: the reader imports any size per cell, which is not under test here.
-  const styles = `<?xml version="1.0"?><styleSheet xmlns="${MAIN_NS}"><numFmts count="1"><numFmt numFmtId="164" formatCode="$#,##0.00"/></numFmts><fonts count="2"><font><name val="Calibri"/></font><font><name val="Georgia"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="1" fillId="0" borderId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs></styleSheet>`;
+  const styles = `<?xml version="1.0"?><styleSheet xmlns="${MAIN_NS}"><numFmts count="1"><numFmt numFmtId="164" formatCode="$#,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><sz val="18"/><name val="Georgia"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1"/><xf numFmtId="10" fontId="1" fillId="0" borderId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="top"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs></styleSheet>`;
   const sheet = `<?xml version="1.0"?><worksheet xmlns="${MAIN_NS}"><sheetData><row r="1"><c r="A1" s="1"><v>5</v></c><c r="B1" s="1"><v>3</v></c></row><row r="2"><c r="A2" s="2"><v>0.25</v></c><c r="B2" s="1"><v>4</v></c></row><row r="3"><c r="A3" s="3"><v>7</v></c><c r="B3"><v>9</v></c></row></sheetData></worksheet>`;
   return zipSync(
     {
@@ -71,6 +70,7 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
     expect(cellStyle(imported, 1, 0)).toEqual({
       numberFormat: "0.00%",
       fontFamily: "Georgia",
+      fontSize: 24,
       verticalAlign: "top",
     });
     // XLSX `center` is the cell style's `middle`; the default Calibri never becomes a family.
@@ -91,6 +91,8 @@ describe("XLSX cell font family, vertical alignment, and number formats", () => 
 
     expect(styles).toContain('<name val="Georgia"/>');
     expect(styles).not.toContain('<name val="Calibri"/>');
+    expect(styles).toContain('<sz val="18"/>');
+    expect(styles).not.toContain('<sz val="11"/>');
     expect(styles).toContain('vertical="top"');
     expect(styles).toContain('vertical="center"');
     expect(styles).toContain('formatCode="$#,##0.00"');

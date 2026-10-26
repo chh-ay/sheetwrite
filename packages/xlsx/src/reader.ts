@@ -14,7 +14,9 @@ import type {
   SnapshotCell,
   WorkbookSnapshot,
   WorkbookTable,
+  WorkbookTableTotalsFunction,
   WorkbookTableUnsupportedFeature,
+  WorkbookTableXmlElement,
 } from "@sheetwrite/core";
 import {
   colToA1,
@@ -29,10 +31,12 @@ import {
   sheetNameKey,
   validateSheetName,
   validateWorkbookTableName,
+  validWorkbookTableXmlElement,
 } from "@sheetwrite/core";
 
 import { formulaContainsExternalReference, spillReferencesFromXlsx } from "./formula.js";
 import { OpcPackage, type OpcRelationship, relationshipTypeMatches } from "./opc.js";
+import { capturePreserved, isRetainedRelationship } from "./preservation.js";
 import {
   assertResource,
   checkAbort,
@@ -942,12 +946,74 @@ function parseColumns(
   return columns;
 }
 
+const MAX_TABLE_RULE_DEPTH = 8;
+const MAX_TABLE_RULE_NODES = 16_384;
+const TABLE_TOTALS_FUNCTIONS: readonly WorkbookTableTotalsFunction[] = [
+  "none",
+  "sum",
+  "min",
+  "max",
+  "average",
+  "count",
+  "countNums",
+  "stdDev",
+  "var",
+  "custom",
+];
+
+/**
+ * Copy one table rule tree, resolving `dxfId` into its differential style.
+ * Returns null for a rule that cannot be kept (too deep, too large, or a
+ * missing style), so the caller drops only that rule instead of the workbook.
+ */
+function tableRuleMetadata(
+  element: XmlElement,
+  styles: ParsedStyles,
+  budget: { remaining: number },
+  depth = 0,
+): WorkbookTableXmlElement | null {
+  if (depth > MAX_TABLE_RULE_DEPTH || --budget.remaining < 0) return null;
+  const attributes: Record<string, string> = {};
+  let differentialStyle: CellStyle | undefined;
+  for (const [name, value] of Object.entries(element.attributes)) {
+    // Prefixed attributes (xmlns, xr:uid revision ids, other mc:Ignorable
+    // namespaces) carry no rule meaning and are not part of the persisted subset.
+    if (name === "xmlns" || name.includes(":")) continue;
+    if (name !== "dxfId") {
+      attributes[name] = value;
+      continue;
+    }
+    const index = Number(value);
+    if (!Number.isSafeInteger(index) || index < 0) return null;
+    try {
+      differentialStyle = styles.differentialAt(index);
+    } catch (error) {
+      if (error instanceof TypeError) return null;
+      throw error;
+    }
+  }
+  const children: WorkbookTableXmlElement[] = [];
+  for (const child of element.children) {
+    const copied = tableRuleMetadata(child, styles, budget, depth + 1);
+    if (!copied) return null;
+    children.push(copied);
+  }
+  return {
+    name: xmlLocalName(element.name),
+    attributes,
+    text: element.text,
+    children,
+    ...(differentialStyle ? { differentialStyle } : {}),
+  };
+}
+
 function parseTables(
   packageFile: OpcPackage,
   worksheetRoot: XmlElement,
   relationships: readonly OpcRelationship[],
   sheetName: string,
   context: XlsxCodecContext,
+  styles: ParsedStyles,
 ): ParsedSheet["tables"] {
   const collection = xmlChild(worksheetRoot, "tableParts");
   if (!collection) return [];
@@ -1014,19 +1080,62 @@ function parseTables(
     if (columnElements.length !== declaredCount || parsed.c1 - parsed.c0 + 1 !== declaredCount) {
       return readerFailure(`table ${nameResult.name} column count does not match its range`);
     }
+    const unsupported = new Set<WorkbookTableUnsupportedFeature>();
+    // One budget per table, matching the aggregate limit core validation applies.
+    const copyBudget = { remaining: MAX_TABLE_RULE_NODES };
+    const validationBudget = { nodes: 0, characters: 0 };
+    const readRule = (
+      element: XmlElement | undefined,
+      feature: WorkbookTableUnsupportedFeature,
+    ): WorkbookTableXmlElement | undefined => {
+      if (!element) return undefined;
+      const name = xmlLocalName(element.name);
+      const rule = tableRuleMetadata(element, styles, copyBudget);
+      if (
+        !rule ||
+        (name.endsWith("Formula") && formulaContainsExternalReference(decodeXstring(rule.text))) ||
+        !validWorkbookTableXmlElement(rule, name, validationBudget)
+      ) {
+        unsupported.add(feature);
+        emitWarning(context, {
+          code: "unsupported-feature",
+          message: `Invalid, oversized, external-data or unsupported ${name} rule on table ${nameResult.name} was dropped`,
+          sheet: sheetName,
+          part: relationship.target,
+        });
+        return undefined;
+      }
+      return rule;
+    };
     const columns = columnElements.map((column, index) => {
       const id = parseUnsigned(xmlAttribute(column, "id"), "table column id");
       const name = xmlAttribute(column, "name");
       if (id < 1 || !name) return readerFailure(`table column ${index + 1} is invalid`);
+      const totalsRowLabel = xmlAttribute(column, "totalsRowLabel");
+      const calculatedColumnFormula = readRule(
+        xmlChild(column, "calculatedColumnFormula"),
+        "calculated-columns",
+      );
+      const totalsRowFormula = readRule(xmlChild(column, "totalsRowFormula"), "totals-functions");
+      const rawTotalsFunction = xmlAttribute(column, "totalsRowFunction");
+      const totalsRowFunction = TABLE_TOTALS_FUNCTIONS.find(
+        (candidate) => candidate === rawTotalsFunction,
+      );
+      if (rawTotalsFunction !== undefined && totalsRowFunction === undefined) {
+        return readerFailure(`table column ${index + 1} has an invalid totals-row function`);
+      }
       return {
         id: `xlsx-table-${nativeId}-column-${id}`,
         name: decodeXstring(name),
-        ...(xmlAttribute(column, "totalsRowLabel") !== undefined
-          ? { totalsRowLabel: decodeXstring(xmlAttribute(column, "totalsRowLabel")!) }
+        ...(totalsRowLabel !== undefined ? { totalsRowLabel: decodeXstring(totalsRowLabel) } : {}),
+        ...(calculatedColumnFormula ? { calculatedColumnFormula } : {}),
+        ...(totalsRowFormula ? { totalsRowFormula } : {}),
+        ...(totalsRowFunction !== undefined &&
+        !(xmlChild(column, "totalsRowFormula") && !totalsRowFormula)
+          ? { totalsRowFunction }
           : {}),
       };
     });
-    const unsupported = new Set<WorkbookTableUnsupportedFeature>();
     const markUnsupported = (feature: WorkbookTableUnsupportedFeature, detail: string): void => {
       if (unsupported.has(feature)) return;
       unsupported.add(feature);
@@ -1037,28 +1146,10 @@ function parseTables(
         part: relationship.target,
       });
     };
-    const autoFilter = xmlChild(root, "autoFilter");
-    if (autoFilter) markUnsupported("auto-filter", "Excel table autoFilter");
-    if (xmlChild(autoFilter ?? root, "sortState")) {
-      markUnsupported("sort-state", "Excel table sortState");
-    }
-    if (
-      columnElements.some(
-        (column) =>
-          xmlChild(column, "calculatedColumnFormula") !== undefined ||
-          xmlChild(column, "calculatedColumnFormulaArray") !== undefined,
-      )
-    ) {
-      markUnsupported("calculated-columns", "Excel table calculated columns");
-    }
-    if (
-      columnElements.some(
-        (column) =>
-          xmlAttribute(column, "totalsRowFunction") !== undefined ||
-          xmlChild(column, "totalsRowFormula") !== undefined,
-      )
-    ) {
-      markUnsupported("totals-functions", "Excel table totals functions");
+    const autoFilter = readRule(xmlChild(root, "autoFilter"), "auto-filter");
+    const sortState = readRule(xmlChild(root, "sortState"), "sort-state");
+    if (columnElements.some((column) => xmlChild(column, "calculatedColumnFormulaArray"))) {
+      markUnsupported("calculated-columns", "Non-standard Excel table calculated-column arrays");
     }
     if (xmlAttribute(root, "connectionId") !== undefined) {
       markUnsupported("external-data", "Excel table external-data binding");
@@ -1082,6 +1173,8 @@ function parseTables(
       columns,
       headerRow,
       totalsRow,
+      ...(autoFilter ? { autoFilter } : {}),
+      ...(sortState ? { sortState } : {}),
       ...(styleElement
         ? {
             style: {
@@ -1432,12 +1525,13 @@ function parseSheet(
     relationships,
     context,
   );
-  const tables = parseTables(packageFile, root, relationships, reference.name, context);
+  const tables = parseTables(packageFile, root, relationships, reference.name, context, styles);
   for (const relationship of relationships) {
     if (
       ["comments", "vmlDrawing", "hyperlink", "table"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
-      )
+      ) ||
+      isRetainedRelationship("sheet", relationship.type)
     ) {
       continue;
     }
@@ -1793,13 +1887,16 @@ function externalNamedRanges(
 }
 
 /** Read a preflighted OOXML workbook into Sheetwrite's implementation-neutral snapshot. */
-export function readWorkbook(
-  data: ArrayBuffer | Uint8Array,
+export async function readWorkbook(
+  data: Blob | ArrayBuffer | Uint8Array,
   context: XlsxCodecContext,
-): WorkbookSnapshot {
-  const packageFile = new OpcPackage(data, context);
+  readOptions: { readonly preserveOpaqueParts?: boolean } = {},
+): Promise<WorkbookSnapshot> {
+  const packageFile = await OpcPackage.open(data, context);
   const workbookPart = packageFile.officeDocumentPart();
+  await packageFile.load([workbookPart]);
   const workbookRoot = packageFile.readXml(workbookPart);
+  packageFile.release([workbookPart]);
   assertXmlRoot(workbookRoot, "workbook", MAIN_NAMESPACES, workbookPart);
   const date1904 = xmlBoolean(
     xmlAttribute(xmlChild(workbookRoot, "workbookPr") ?? workbookRoot, "date1904"),
@@ -1818,27 +1915,25 @@ export function readWorkbook(
   )?.target;
   for (const relationship of workbookRelationships) {
     if (
-      ["worksheet", "styles", "sharedStrings", "theme", "vbaProject"].some((kind) =>
+      relationship.external ||
+      ["worksheet", "styles", "sharedStrings", "theme"].some((kind) =>
         relationshipTypeMatches(relationship.type, kind),
-      )
+      ) ||
+      isRetainedRelationship("workbook", relationship.type)
     ) {
       continue;
     }
-    if (relationshipTypeMatches(relationship.type, "externalLink")) {
-      emitWarning(context, {
-        code: "external-relationship",
-        message: "External-link workbook graph was dropped",
-        part: relationship.target,
-      });
-    } else if (!relationship.external) {
-      const kind = relationship.type.slice(relationship.type.lastIndexOf("/") + 1);
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message: `Unsupported workbook relationship ${kind} was dropped`,
-        part: relationship.target,
-      });
-    }
+    const externalLink = relationshipTypeMatches(relationship.type, "externalLink");
+    emitWarning(context, {
+      code: externalLink ? "external-relationship" : "unsupported-feature",
+      message: externalLink
+        ? "External-link workbook graph was dropped"
+        : `Unsupported workbook relationship ${relationship.type.slice(relationship.type.lastIndexOf("/") + 1)} was dropped`,
+      part: relationship.target,
+    });
   }
+  const styleParts = [stylesPart, themePart].filter((part): part is string => part !== undefined);
+  await packageFile.load(styleParts);
   const styles = new ParsedStyles(
     stylesPart ? packageFile.readXml(stylesPart) : undefined,
     context,
@@ -1846,7 +1941,10 @@ export function readWorkbook(
     stylesPart ?? "xl/styles.xml",
     themePart ?? "xl/theme/theme1.xml",
   );
+  packageFile.release(styleParts);
+  if (sharedStringsPart) await packageFile.load([sharedStringsPart]);
   const sharedStrings = parseSharedStrings(packageFile, sharedStringsPart, context);
+  if (sharedStringsPart) packageFile.release([sharedStringsPart]);
   const sheetCollection = xmlChild(workbookRoot, "sheets");
   if (!sheetCollection) return readerFailure("workbook has no sheet collection");
   const references: WorkbookSheetReference[] = [];
@@ -1885,10 +1983,30 @@ export function readWorkbook(
   ).length;
   assertResource(context, "maxSheets", references.length - Math.min(1, metadataCandidates));
   const usage: ReaderResourceUsage = { cells: 0, merges: 0 };
-  const parsedSheets = references.map((reference) => {
+  const parsedSheets: ParsedSheet[] = [];
+  for (const reference of references) {
     checkAbort(context);
-    return parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904);
-  });
+    const worksheetPart = reference.relationship.target;
+    const parts = [
+      worksheetPart,
+      ...packageFile
+        .relationships(worksheetPart)
+        .filter(
+          (relationship) =>
+            !relationship.external &&
+            ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
+        )
+        .map((relationship) => relationship.target),
+    ];
+    await packageFile.load(parts);
+    try {
+      parsedSheets.push(
+        parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
+      );
+    } finally {
+      packageFile.release(parts);
+    }
+  }
   let metadata: WorkbookSnapshot | null = null;
   let metadataIndex = -1;
   for (let index = 0; index < parsedSheets.length; index++) {
@@ -2207,11 +2325,6 @@ export function readWorkbook(
       }
     }
   }
-  if ([...packageFile.archive.entries.keys()].some((name) => /vbaProject\.bin$/i.test(name)))
-    emitWarning(context, {
-      code: "unsupported-feature",
-      message: "VBA macros are not represented by WorkbookSnapshot and were dropped",
-    });
   const workbookViews = xmlChildren(
     xmlChild(workbookRoot, "bookViews") ?? workbookRoot,
     "workbookView",
@@ -2290,6 +2403,8 @@ export function readWorkbook(
     sheets,
   };
   if (metadata) restoreSidecarFields(snapshot, metadata);
+  if (readOptions.preserveOpaqueParts !== false)
+    await capturePreserved(packageFile, snapshot, context);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(

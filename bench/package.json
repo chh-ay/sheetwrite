@@ -35,6 +35,7 @@
     "bench:render:validate": "bun run src/render-driver.ts --validate results/render-results.json --gate-mode full",
     "bench:xlsx": "bun run src/xlsx-bench.ts",
     "bench:xlsx:smoke": "bun run src/xlsx-bench.ts --smoke",
+    "bench:streaming-memory": "bun run src/streaming-memory-bench.ts",
     "bench:verify": "bun run src/verify.ts",
     "bench:check": "bun run src/check.ts",
     "bench:baseline:candidate": "bun run src/generate-baseline.ts",

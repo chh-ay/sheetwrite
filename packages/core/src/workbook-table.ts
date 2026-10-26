@@ -1,10 +1,13 @@
+import { colToA1, labelToCol } from "./a1.js";
 import { SheetwriteError } from "./errors.js";
+import { sanitizeHyperlinkStyle } from "./hyperlink.js";
 import type { Sheet } from "./types/document.js";
 import type {
   WorkbookTable,
   WorkbookTableColumn,
   WorkbookTableStyle,
   WorkbookTableUnsupportedFeature,
+  WorkbookTableXmlElement,
 } from "./types/table.js";
 
 /** Resource ceilings for canonical workbook-table metadata and identifiers. */
@@ -85,11 +88,199 @@ function validId(value: string, limits: Readonly<WorkbookTableResourceLimits>): 
   return value.length > 0 && value.length <= limits.maxIdLength;
 }
 
+const TABLE_RULE_MAX_DEPTH = 8;
+const TABLE_RULE_MAX_NODES = 16_384;
+const TABLE_RULE_MAX_TEXT = 1_048_576;
+const TABLE_RULE_FIELDS = new Set(["name", "attributes", "text", "children", "differentialStyle"]);
+const INVALID_XML_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u;
+const TABLE_RULE_CHILDREN: Readonly<Record<string, readonly string[]>> = {
+  autoFilter: ["filterColumn", "sortState"],
+  filterColumn: ["filters", "customFilters", "top10", "dynamicFilter", "colorFilter", "iconFilter"],
+  filters: ["filter", "dateGroupItem"],
+  customFilters: ["customFilter"],
+  sortState: ["sortCondition"],
+  filter: [],
+  dateGroupItem: [],
+  customFilter: [],
+  top10: [],
+  dynamicFilter: [],
+  colorFilter: [],
+  iconFilter: [],
+  sortCondition: [],
+  calculatedColumnFormula: [],
+  totalsRowFormula: [],
+};
+const TABLE_RULE_ATTRIBUTES: Readonly<Record<string, readonly string[]>> = {
+  autoFilter: ["ref"],
+  filterColumn: ["colId", "hiddenButton", "showButton"],
+  filters: ["blank", "calendarType"],
+  filter: ["val"],
+  dateGroupItem: ["year", "month", "day", "hour", "minute", "second", "dateTimeGrouping"],
+  customFilters: ["and"],
+  customFilter: ["operator", "val"],
+  top10: ["top", "percent", "val", "filterVal"],
+  dynamicFilter: ["type", "val", "maxVal", "valIso", "maxValIso"],
+  colorFilter: ["cellColor"],
+  iconFilter: ["iconSet", "iconId"],
+  sortState: ["ref", "columnSort", "caseSensitive", "sortMethod"],
+  sortCondition: ["ref", "descending", "sortBy", "iconSet", "iconId", "customList"],
+  calculatedColumnFormula: ["array"],
+  totalsRowFormula: ["array"],
+};
+const TOTALS_FUNCTIONS = new Set([
+  "none",
+  "sum",
+  "min",
+  "max",
+  "average",
+  "count",
+  "countNums",
+  "stdDev",
+  "var",
+  "custom",
+]);
+
+/**
+ * Validate inert table-rule trees before they enter snapshots or XML output.
+ * A whitelist prevents this persistence seam from becoming arbitrary markup.
+ */
+export function validWorkbookTableXmlElement(
+  value: unknown,
+  expectedName: string,
+  budget = { nodes: 0, characters: 0 },
+): boolean {
+  const visit = (candidate: unknown, allowed: readonly string[], depth: number): boolean => {
+    if (depth > TABLE_RULE_MAX_DEPTH || ++budget.nodes > TABLE_RULE_MAX_NODES) return false;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return false;
+    const element = candidate as Record<string, unknown>;
+    if (Object.keys(element).some((key) => !TABLE_RULE_FIELDS.has(key))) return false;
+    if (typeof element.name !== "string" || !allowed.includes(element.name)) return false;
+    const attributes = element.attributes;
+    if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) return false;
+    const allowedAttributes = TABLE_RULE_ATTRIBUTES[element.name];
+    const allowedChildren = TABLE_RULE_CHILDREN[element.name];
+    if (!allowedAttributes || !allowedChildren) return false;
+    if (typeof element.text !== "string" || !Array.isArray(element.children)) return false;
+    if (INVALID_XML_CONTROL.test(element.text)) return false;
+    if (element.differentialStyle !== undefined) {
+      if (
+        (element.name !== "colorFilter" && element.name !== "sortCondition") ||
+        sanitizeHyperlinkStyle(element.differentialStyle) === null
+      )
+        return false;
+    }
+    if (element.name === "colorFilter" && element.differentialStyle === undefined) return false;
+    if (element.name === "sortCondition") {
+      const sortBy = (attributes as Record<string, unknown>).sortBy;
+      if (
+        (sortBy === "cellColor" || sortBy === "fontColor") &&
+        element.differentialStyle === undefined
+      )
+        return false;
+    }
+    budget.characters += element.text.length;
+    for (const [name, attribute] of Object.entries(attributes)) {
+      if (
+        !allowedAttributes.includes(name) ||
+        typeof attribute !== "string" ||
+        INVALID_XML_CONTROL.test(attribute)
+      )
+        return false;
+      budget.characters += name.length + attribute.length;
+    }
+    if (budget.characters > TABLE_RULE_MAX_TEXT) return false;
+    for (const child of element.children) {
+      if (!visit(child, allowedChildren, depth + 1)) return false;
+    }
+    return true;
+  };
+  return visit(value, [expectedName], 0);
+}
+
+const COLUMN_SPAN_REF = /^\$?([A-Za-z]{1,3})(\$?\d*)(?::\$?([A-Za-z]{1,3})(\$?\d*))?$/u;
+
+/**
+ * Move one stored A1 span through a column remap, keeping its row parts.
+ * Returns null when the span is unreadable or either edge column was deleted.
+ */
+function remapColumnSpan(
+  ref: string | undefined,
+  remap: (col: number) => number | null,
+): string | null {
+  const match = COLUMN_SPAN_REF.exec(ref ?? "");
+  const startLabel = match?.[1];
+  if (!match || !startLabel) return null;
+  const start = remap(labelToCol(startLabel.toUpperCase()));
+  const end = remap(labelToCol((match[3] ?? startLabel).toUpperCase()));
+  if (start === null || end === null) return null;
+  const startRow = match[2] ?? "";
+  const endRow = match[3] ? (match[4] ?? "") : startRow;
+  return `${colToA1(start)}${startRow}:${colToA1(end)}${endRow}`;
+}
+
+/**
+ * Carry a table's persisted filter and sort rules through a column insert or
+ * delete. Rules on deleted columns are dropped, as Excel does; surviving
+ * filter column indexes and sort-condition columns follow their columns.
+ * `remap` maps an old absolute sheet column to its new one, or null if deleted.
+ */
+export function remapWorkbookTableRuleColumns(
+  table: WorkbookTable,
+  remap: (col: number) => number | null,
+  newStart: number,
+  newEnd: number,
+): Pick<WorkbookTable, "autoFilter" | "sortState"> {
+  const oldStart = table.range.start.col;
+  // Table-wide refs: map the old outer edges onto the new table edges.
+  const edges = (col: number): number => (col <= oldStart ? newStart : newEnd);
+  const tableRef = (rule: WorkbookTableXmlElement): Record<string, string> => {
+    const ref = remapColumnSpan(rule.attributes.ref, edges);
+    return ref === null ? rule.attributes : { ...rule.attributes, ref };
+  };
+  const sortState = (rule: WorkbookTableXmlElement): WorkbookTableXmlElement | undefined => {
+    const children: WorkbookTableXmlElement[] = [];
+    for (const condition of rule.children) {
+      const ref = remapColumnSpan(condition.attributes.ref, remap);
+      if (ref !== null) {
+        children.push({ ...condition, attributes: { ...condition.attributes, ref } });
+      }
+    }
+    return children.length > 0 ? { ...rule, attributes: tableRef(rule), children } : undefined;
+  };
+  let autoFilter: WorkbookTableXmlElement | undefined;
+  if (table.autoFilter) {
+    const children: WorkbookTableXmlElement[] = [];
+    for (const child of table.autoFilter.children) {
+      if (child.name === "sortState") {
+        const remapped = sortState(child);
+        if (remapped) children.push(remapped);
+        continue;
+      }
+      const colId = Number(child.attributes.colId);
+      // An unreadable colId cannot follow its column; drop it like a deleted one.
+      if (!Number.isSafeInteger(colId) || colId < 0) continue;
+      const moved = remap(oldStart + colId);
+      if (moved === null) continue;
+      children.push({
+        ...child,
+        attributes: { ...child.attributes, colId: `${moved - newStart}` },
+      });
+    }
+    autoFilter = { ...table.autoFilter, attributes: tableRef(table.autoFilter), children };
+  }
+  const remappedSort = table.sortState ? sortState(table.sortState) : undefined;
+  return {
+    ...(autoFilter ? { autoFilter } : {}),
+    ...(remappedSort ? { sortState: remappedSort } : {}),
+  };
+}
+
 function validColumn(
   column: WorkbookTableColumn,
   names: Set<string>,
   ids: Set<string>,
   limits: Readonly<WorkbookTableResourceLimits>,
+  budget: { nodes: number; characters: number },
 ): boolean {
   const idKey = workbookTableNameKey(column.id);
   if (!validId(column.id, limits) || column.id !== column.id.normalize("NFC") || ids.has(idKey)) {
@@ -110,6 +301,19 @@ function validColumn(
   if (column.totalsRowLabel !== undefined && column.totalsRowLabel.length > limits.maxNameLength) {
     return false;
   }
+  if (column.totalsRowFunction !== undefined && !TOTALS_FUNCTIONS.has(column.totalsRowFunction)) {
+    return false;
+  }
+  if (
+    column.totalsRowFormula !== undefined &&
+    !validWorkbookTableXmlElement(column.totalsRowFormula, "totalsRowFormula", budget)
+  )
+    return false;
+  if (
+    column.calculatedColumnFormula !== undefined &&
+    !validWorkbookTableXmlElement(column.calculatedColumnFormula, "calculatedColumnFormula", budget)
+  )
+    return false;
   ids.add(idKey);
   names.add(key);
   return true;
@@ -176,10 +380,25 @@ export function validWorkbookTable(
   if (table.headerRow && table.totalsRow && r0 === r1) return false;
   const columnNames = new Set<string>();
   const columnIds = new Set<string>();
-  if (!table.columns.every((column) => validColumn(column, columnNames, columnIds, limits))) {
+  const ruleBudget = { nodes: 0, characters: 0 };
+  if (
+    !table.columns.every((column) =>
+      validColumn(column, columnNames, columnIds, limits, ruleBudget),
+    )
+  ) {
     return false;
   }
   if (!validStyle(table.style, limits)) return false;
+  if (
+    table.autoFilter !== undefined &&
+    !validWorkbookTableXmlElement(table.autoFilter, "autoFilter", ruleBudget)
+  )
+    return false;
+  if (
+    table.sortState !== undefined &&
+    !validWorkbookTableXmlElement(table.sortState, "sortState", ruleBudget)
+  )
+    return false;
   if (
     (table.unsupportedFeatures?.length ?? 0) > limits.maxUnsupportedFeaturesPerTable ||
     new Set(table.unsupportedFeatures).size !== (table.unsupportedFeatures?.length ?? 0) ||

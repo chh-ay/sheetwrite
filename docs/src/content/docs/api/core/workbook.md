@@ -11,7 +11,7 @@ Live workbook schema containing ordered sheets and the active sheet ID.
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L107"><code>packages/core/src/types/document.ts#L107</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>3</span>
+## Members <span class="api-count" data-pagefind-ignore>4</span>
 
 <div class="api-member-list">
 
@@ -41,6 +41,15 @@ namedRanges?: NamedRangeSnapshot[];
 ```
 
 </details>
+
+<details class="api-member" id="workbook-xlsx-source" data-pagefind-weight="1">
+<summary><code>xlsxSource</code> <span class="api-member-summary">Opaque OOXML graphs from an imported file; edits drop the graphs that depend on them.</span></summary>
+
+```ts generated
+xlsxSource?: XlsxSourceSnapshot;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -53,6 +62,7 @@ export interface Workbook {
   sheets: Sheet[];
   activeSheet: SheetId;
   namedRanges?: NamedRangeSnapshot[];
+  xlsxSource?: XlsxSourceSnapshot;
 }
 ```
 
@@ -81,6 +91,7 @@ export interface Workbook {
 <li><a href="/docs/api/core/sheetwrite-store/"><code>SheetwriteStore</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/store/"><code>Store</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/to-xlsx-table/"><code>toXlsxTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/to-xlsx-table-stream/"><code>toXlsxTableStream</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/xlsx-table-export-backend/"><code>XlsxTableExportBackend</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core-adapter/simple-grid-input/"><code>SimpleGridInput</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/react/sheetwrite-grid-props/"><code>SheetwriteGridProps</code></a><span class="api-consumer-kind">@sheetwrite/react</span></li>

@@ -16,7 +16,9 @@ import {
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
   toCsv,
+  toCsvStream,
   toTsv,
+  toTsvStream,
   toXlsxTable,
   toXlsxWorkbook,
   XlsxResourceError,
@@ -498,6 +500,86 @@ describe("export", () => {
     ).toBe("a\t1\r\nb\t2\r\nc\t3");
     expect(dataWindows.length).toBeGreaterThan(0);
     expect(dataWindows.every((rows) => rows > 0 && rows <= 1)).toBe(true);
+    store.dispose();
+  });
+
+  it("streams CSV/TSV on demand with byte-identical output and lazy cancellable store reads", async () => {
+    const rowCount = 20_000;
+    const text = Array.from(
+      { length: rowCount },
+      (_unused, row) => `value-${row}-${"x".repeat(12)}`,
+    );
+    const store = new SheetwriteStore(
+      { ...workbook(), sheets: [{ ...workbook().sheets[0]!, rowCount }] },
+      {
+        rowCount,
+        columns: { a: text, b: Array.from({ length: rowCount }, (_unused, row) => row) },
+      },
+    );
+    const options = {
+      resourceLimits: {
+        maxWriterWindowRows: 128,
+        maxRows: rowCount + 1,
+        maxCells: (rowCount + 1) * 2,
+      },
+    };
+    let windowReads = 0;
+    const readWindow = store.getVisibleWindow.bind(store);
+    store.getVisibleWindow = ((sheet, rows, columns) => {
+      windowReads++;
+      return readWindow(sheet, rows, columns);
+    }) as typeof store.getVisibleWindow;
+    const sheet = store.getWorkbook().sheets[0]!;
+    const stream = toCsvStream(sheet, store, options);
+    expect(windowReads).toBe(0);
+
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(Math.max(...chunks.map((chunk) => chunk.byteLength))).toBeLessThanOrEqual(64 * 1024);
+    expect(new TextDecoder("utf-8", { ignoreBOM: true }).decode(Buffer.concat(chunks))).toBe(
+      toCsv(sheet, store, options),
+    );
+
+    windowReads = 0;
+    const reader = toCsvStream(sheet, store, options).getReader();
+    await reader.read();
+    await reader.cancel();
+    const readsAtCancel = windowReads;
+    expect(await reader.read()).toEqual({ done: true, value: undefined });
+    expect(windowReads).toBe(readsAtCancel);
+    expect(readsAtCancel).toBeLessThan(Math.ceil(rowCount / 128) / 2);
+
+    const range = { sheet: "s", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 1 } };
+    const tsv: Uint8Array[] = [];
+    for await (const chunk of toTsvStream(range, store, options)) tsv.push(chunk);
+    expect(new TextDecoder().decode(Buffer.concat(tsv))).toBe(toTsv(range, store, options));
+    store.dispose();
+  });
+
+  it("surfaces abort and output ceilings through the delimited stream", async () => {
+    const store = new SheetwriteStore(workbook(), {
+      rowCount: 3,
+      columns: { a: ["a", "b", "c"], b: [1, 2, 3] },
+    });
+    const sheet = store.getWorkbook().sheets[0]!;
+    const controller = new AbortController();
+    controller.abort();
+    const failureOf = async (stream: ReadableStream<Uint8Array>): Promise<unknown> => {
+      const reader = stream.getReader();
+      try {
+        while (!(await reader.read()).done);
+      } catch (error) {
+        return error;
+      }
+      throw new Error("expected the stream to fail");
+    };
+    expect(await failureOf(toCsvStream(sheet, store, { signal: controller.signal }))).toMatchObject(
+      { code: "aborted" },
+    );
+    expect(
+      await failureOf(toCsvStream(sheet, store, { resourceLimits: { maxOutputBytes: 8 } })),
+    ).toBeInstanceOf(DelimitedTextResourceError);
     store.dispose();
   });
 });

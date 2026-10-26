@@ -8,10 +8,10 @@ description: "Pluggable first-row-header, first-sheet table export backend."
 Pluggable first-row-header, first-sheet table export backend.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L321"><code>packages/core/src/export.ts#L321</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/export.ts#L392"><code>packages/core/src/export.ts#L392</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -32,6 +32,15 @@ toXlsxTable(workbook: Workbook, store: Store, options?: XlsxWorkbookOptions): Pr
 ```
 
 </details>
+
+<details class="api-member" id="xlsx-table-export-backend-to-xlsx-table-stream" data-pagefind-weight="1">
+<summary><code>toXlsxTableStream</code></summary>
+
+```ts generated
+toXlsxTableStream?( workbook: Workbook, store: Store, options?: XlsxWorkbookOptions, ): AsyncIterable<Uint8Array>;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -47,6 +56,11 @@ export interface XlsxTableExportBackend {
     store: Store,
     options?: XlsxWorkbookOptions,
   ): Promise<Uint8Array>;
+  toXlsxTableStream?(
+    workbook: Workbook,
+    store: Store,
+    options?: XlsxWorkbookOptions,
+  ): AsyncIterable<Uint8Array>;
 }
 ```
 
