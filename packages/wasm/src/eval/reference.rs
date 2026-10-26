@@ -93,21 +93,31 @@ fn is_single_cell(range: CellRange) -> bool {
     range.row_start == range.row_end && range.col_start == range.col_end
 }
 
+/// The ranges runtime references resolved to in one anchor evaluation.
+#[derive(Default)]
+pub(super) struct RuntimeReads {
+    pub(super) ranges: Vec<CellRange>,
+    /// Past [`RUNTIME_READ_LIMIT`] the ranges are bounding ranges that can
+    /// cover cells the anchor never read, so a change inside them does not
+    /// prove that the anchor read it.
+    pub(super) merged: bool,
+}
+
 thread_local! {
-    /// The ranges runtime references resolved to while one spill anchor is
-    /// evaluated; `None` outside such an evaluation. The spill loop uses them
-    /// to find anchors that read a spill installed after them.
-    static RUNTIME_READS: RefCell<Option<Vec<CellRange>>> = const { RefCell::new(None) };
+    /// The reads of the spill anchor being evaluated; `None` outside such an
+    /// evaluation. The spill loop uses them to find anchors that read a spill
+    /// installed after them.
+    static RUNTIME_READS: RefCell<Option<RuntimeReads>> = const { RefCell::new(None) };
 }
 
 /// Starts recording runtime reads and returns the enclosing recording, which
 /// [`finish_runtime_reads`] restores.
-pub(super) fn start_runtime_reads() -> Option<Vec<CellRange>> {
-    RUNTIME_READS.with(|reads| reads.replace(Some(Vec::new())))
+pub(super) fn start_runtime_reads() -> Option<RuntimeReads> {
+    RUNTIME_READS.with(|reads| reads.replace(Some(RuntimeReads::default())))
 }
 
-/// The ranges recorded since the matching [`start_runtime_reads`].
-pub(super) fn finish_runtime_reads(enclosing: Option<Vec<CellRange>>) -> Vec<CellRange> {
+/// The reads recorded since the matching [`start_runtime_reads`].
+pub(super) fn finish_runtime_reads(enclosing: Option<RuntimeReads>) -> RuntimeReads {
     RUNTIME_READS
         .with(|reads| reads.replace(enclosing))
         .unwrap_or_default()
@@ -118,14 +128,15 @@ pub(super) fn finish_runtime_reads(enclosing: Option<Vec<CellRange>>) -> Vec<Cel
 /// element, and a coarser range only requeues an anchor more often.
 const RUNTIME_READ_LIMIT: usize = 256;
 
-fn record_runtime_read(reads: &mut Vec<CellRange>, range: CellRange) {
-    if reads.len() < RUNTIME_READ_LIMIT {
-        reads.push(range);
+fn record_runtime_read(reads: &mut RuntimeReads, range: CellRange) {
+    if reads.ranges.len() < RUNTIME_READ_LIMIT {
+        reads.ranges.push(range);
         return;
     }
 
-    let merged = sheet_envelopes(reads.drain(..).chain(std::iter::once(range)));
-    *reads = merged;
+    let merged = sheet_envelopes(reads.ranges.drain(..).chain(std::iter::once(range)));
+    reads.ranges = merged;
+    reads.merged = true;
 }
 
 impl CellStore {

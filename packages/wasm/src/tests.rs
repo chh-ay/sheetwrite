@@ -5086,6 +5086,37 @@ fn offset_indirect_one_cell_results_are_values_outside_the_spill_owner_budget() 
     assert_eq!(number(&store, sheet, 1, 2), 3.0);
 }
 
+#[cfg(feature = "analysis")]
+#[test]
+fn offset_indirect_merged_reads_do_not_report_a_false_cycle() {
+    // More reads than one anchor keeps apart, so they merge into A2:C301,
+    // which covers column B without reading it.
+    const READS: usize = 300;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(5, READS + 2);
+    store.set_formula(
+        sheet,
+        0,
+        4,
+        "=MAP(SEQUENCE(300),LAMBDA(i,OFFSET($A$1,i,MOD(i,2)*2)+RAND()))",
+        0,
+    );
+    // Spills into column B and reads the MAP, whose values change on every
+    // evaluation: only the merged range makes the MAP look like its reader.
+    store.set_formula(sheet, 1, 1, "=E1#*1", 0);
+    store.recompute(sheet);
+
+    for row in [0, READS / 2, READS - 1] {
+        for (reader_row, col) in [(row, 4), (row + 1, 1)] {
+            assert_eq!(string(&store, sheet, reader_row, col), None);
+        }
+        let map_value = number(&store, sheet, row, 4);
+        assert!((0.0..1.0).contains(&map_value), "E{}: {map_value}", row + 1);
+        assert_eq!(number(&store, sheet, row + 1, 1), map_value, "B{}", row + 2);
+    }
+}
+
 #[test]
 fn offset_indirect_sheet_rename_and_removal_refresh_text_addresses() {
     let mut store = CellStore::new();

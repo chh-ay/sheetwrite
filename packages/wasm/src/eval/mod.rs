@@ -55,7 +55,7 @@ pub(crate) use matrix::{matrix_resource_stats, reset_matrix_resource_stats};
 use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
-use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope};
+use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use value::{
     aggregate_number, bool_from_value, cached_formula_value, compare_values, text_from_value,
 };
@@ -445,12 +445,23 @@ fn sheet_envelopes(ranges: impl IntoIterator<Item = CellRange>) -> Vec<CellRange
     envelopes
 }
 
+/// A formula that may have read a spill output changed after it was
+/// evaluated.
+struct StaleReader {
+    reader: AbsCellKey,
+    /// The sequence of the latest such change.
+    changed_at: usize,
+    /// Only merged runtime reads cover the change, so the reader may not
+    /// have read it.
+    approximate: bool,
+}
+
 /// Runtime readers whose recorded reads meet a spill output changed in this
 /// round, each with the latest such change.
 fn stale_runtime_readers(
-    readers: &FxHashMap<AbsCellKey, Vec<CellRange>>,
+    readers: &FxHashMap<AbsCellKey, RuntimeReads>,
     changes: &[SpillChange],
-) -> Vec<(AbsCellKey, usize)> {
+) -> Vec<StaleReader> {
     let outputs: Vec<(CellRange, usize)> = changes
         .iter()
         .filter_map(|change| {
@@ -469,14 +480,22 @@ fn stale_runtime_readers(
     };
     readers
         .iter()
-        .filter(|(_, reads)| envelopes.iter().any(|&envelope| meets(reads, envelope)))
+        .filter(|(_, reads)| {
+            envelopes
+                .iter()
+                .any(|&envelope| meets(&reads.ranges, envelope))
+        })
         .filter_map(|(&reader, reads)| {
             outputs
                 .iter()
-                .filter(|&&(bounds, _)| meets(reads, bounds))
+                .filter(|&&(bounds, _)| meets(&reads.ranges, bounds))
                 .map(|&(_, sequence)| sequence)
                 .max()
-                .map(|sequence| (reader, sequence))
+                .map(|changed_at| StaleReader {
+                    reader,
+                    changed_at,
+                    approximate: reads.merged,
+                })
         })
         .collect()
 }
@@ -655,11 +674,15 @@ impl CellStore {
         let mut sequence = 0usize;
         let mut evaluated_at: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
         let mut requeued: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        // Requeues caused only by merged runtime reads cannot prove a cycle;
+        // they are capped per reader instead.
+        let mut approximately_requeued: FxHashMap<AbsCellKey, usize> = FxHashMap::default();
+        let mut approximate_requeues = 0usize;
         let mut cyclic: FxHashSet<AbsCellKey> = FxHashSet::default();
         // Ranges that OFFSET and INDIRECT resolved to in each anchor's last
         // evaluation of this pass. The graph does not list them, so a spill
         // change inside one makes that anchor stale. Dropped with the pass.
-        let mut runtime_readers: FxHashMap<AbsCellKey, Vec<CellRange>> = FxHashMap::default();
+        let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -783,7 +806,7 @@ impl CellStore {
                 pass.visiting.remove(&key);
                 if let Some(enclosing) = enclosing_reads {
                     let reads = finish_runtime_reads(enclosing);
-                    if reads.is_empty() {
+                    if reads.ranges.is_empty() {
                         runtime_readers.remove(&key);
                     } else {
                         runtime_readers.insert(key, reads);
@@ -868,26 +891,41 @@ impl CellStore {
                 stale_readers.extend(
                     direct_readers(index, change.sheet, &change.cells)
                         .into_iter()
-                        .map(|reader| (reader, change.sequence)),
+                        .map(|reader| StaleReader {
+                            reader,
+                            changed_at: change.sequence,
+                            approximate: false,
+                        }),
                 );
             }
 
-            for (reader, changed_at) in stale_readers {
+            for stale in stale_readers {
+                let reader = stale.reader;
                 let is_stale = evaluated_at
                     .get(&reader)
-                    .is_some_and(|&evaluated| evaluated < changed_at);
+                    .is_some_and(|&evaluated| evaluated < stale.changed_at);
 
                 if !is_stale || cyclic.contains(&reader) || !processed_arrays.contains(&reader) {
                     continue;
                 }
 
-                let count = requeued.entry(reader).or_insert(0);
-                *count += 1;
+                if stale.approximate {
+                    let count = approximately_requeued.entry(reader).or_insert(0);
+                    if *count >= affected.len() {
+                        continue;
+                    }
+                    *count += 1;
+                    approximate_requeues += 1;
+                } else {
+                    let count = requeued.entry(reader).or_insert(0);
+                    *count += 1;
 
-                // Without a cycle, a reader comes back at most once per
-                // spill in front of it.
-                if *count > affected.len() {
-                    cyclic.insert(reader);
+                    // Without a cycle, a reader comes back at most once per
+                    // spill in front of it, plus once per approximate
+                    // requeue, whose new output it may read.
+                    if *count > affected.len() + approximate_requeues {
+                        cyclic.insert(reader);
+                    }
                 }
 
                 processed_arrays.remove(&reader);
