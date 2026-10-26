@@ -304,7 +304,16 @@ export class Ribbon {
   }
 
   private refreshPanel(panel: PanelView, state: RibbonCommandStates): void {
-    const snapshot = { state, focus: readFocus(this.grid) };
+    // Read on first use: tabs without value boxes never pay for the style read.
+    const grid = this.grid;
+    let focus: RibbonFocus | undefined;
+    const snapshot = {
+      state,
+      get focus(): RibbonFocus {
+        focus ??= readFocus(grid);
+        return focus;
+      },
+    };
     for (const control of panel.controls) control.refresh(snapshot);
   }
 
