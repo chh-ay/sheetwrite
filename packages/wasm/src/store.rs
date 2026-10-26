@@ -2955,7 +2955,35 @@ impl CellStore {
 
     /// Packed writes and history restores share source replacement so a local
     /// native undo has the same result as its serialized replay on another peer.
+    /// Readers supply source kinds directly, avoiding a second per-cell source
+    /// test after the packed reader has already selected formula or literal.
+    /// Choose the literal-only loop once per range; a numeric/text import must
+    /// not test the source map for every cell.
     fn replace_range_sources(
+        &mut self,
+        sheet: usize,
+        start: (usize, usize),
+        dimensions: (usize, usize),
+        revision: Option<u64>,
+        sources: HashMap<(u32, u32), FormulaEntry>,
+        cell: impl Fn(usize, usize) -> (u8, u64, u32),
+    ) -> bool {
+        self.sheets[sheet].invalidate_calculations();
+        let applied = if sources.is_empty() {
+            self.write_range_sources::<false>(sheet, start, dimensions, revision, sources, cell)
+        } else {
+            self.write_range_sources::<true>(sheet, start, dimensions, revision, sources, cell)
+        };
+        if !applied {
+            return false;
+        }
+        let sheet_data = &mut self.sheets[sheet];
+        sheet_data.clear_dirty();
+        sheet_data.all_dirty = true;
+        true
+    }
+
+    fn write_range_sources<const HAS_SOURCES: bool>(
         &mut self,
         sheet: usize,
         start: (usize, usize),
@@ -2964,7 +2992,6 @@ impl CellStore {
         mut sources: HashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
-        self.sheets[sheet].invalidate_calculations();
         for col_offset in 0..dimensions.1 {
             let col = start.1 + col_offset;
             for row_offset in 0..dimensions.0 {
@@ -2972,18 +2999,12 @@ impl CellStore {
                 let Some(key) = cell_key(row, col) else {
                     return false;
                 };
-                // Most packed writes carry no sources; skip the per-cell probe.
-                let source = if sources.is_empty() {
-                    None
-                } else {
+                let source = if HAS_SOURCES && !sources.is_empty() {
                     sources.remove(&key)
+                } else {
+                    None
                 };
                 let (kind, payload, style) = cell(row_offset, col_offset);
-                let (kind, payload) = if source.is_some() {
-                    (KIND_FORMULA, 0)
-                } else {
-                    (kind, payload)
-                };
                 if !self.replace_cell_source(CellSourceWrite {
                     sheet,
                     row,
@@ -2999,9 +3020,6 @@ impl CellStore {
                 }
             }
         }
-        let sheet_data = &mut self.sheets[sheet];
-        sheet_data.clear_dirty();
-        sheet_data.all_dirty = true;
         true
     }
 
