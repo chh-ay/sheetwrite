@@ -5,8 +5,9 @@ import { expectedFormulaWorkloadKeys, type FormulaGateCapture } from "./formula-
 import { validateExactMatrix } from "./gate-protocol.js";
 import { summarize } from "./stats.js";
 
-const DEFAULT_PAIRS = 7;
-const MINIMUM_PAIRS = 3;
+/** The ratio limits below were measured at seven pairs; fewer pairs would make them too tight. */
+const MINIMUM_PAIRS = 7;
+const DEFAULT_PAIRS = MINIMUM_PAIRS;
 const HARNESS_ROOT = new URL("../../", import.meta.url).pathname;
 const HARNESS = new URL("./formula-bench.ts", import.meta.url).pathname;
 const ALLOCATION_ROW = ".allocation.";

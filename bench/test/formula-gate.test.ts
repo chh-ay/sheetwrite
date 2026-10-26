@@ -13,6 +13,8 @@ const WORKLOAD = "workload=xlookup-many;size=1000";
 const BYTE_ROW = `${WORKLOAD}.allocation.retainedBytes`;
 const ENGINE_DIGEST = "a".repeat(64);
 const BASE_BYTES = 1024;
+const PAIRS = 7;
+const UNCHANGED = Array.from({ length: PAIRS }, () => 1);
 
 function capture(durationMs: number, workloadMs = durationMs): FormulaGateCapture {
   const timings: Record<string, number> = {};
@@ -25,7 +27,7 @@ function capture(durationMs: number, workloadMs = durationMs): FormulaGateCaptur
 }
 
 /** Each pair runs at a different machine speed; only the paired ratio for WORKLOAD differs. */
-function pairs(ratios = [1, 1, 1]): FormulaGatePair[] {
+function pairs(ratios = UNCHANGED): FormulaGatePair[] {
   return ratios.map((ratio, index) => {
     const speed = index + 1;
     return { base: capture(speed), candidate: capture(speed, speed * ratio) };
@@ -37,19 +39,19 @@ function verdictFor(captures: FormulaGatePair[], acceptance?: FormulaByteAccepta
 }
 
 it("passes unchanged work despite machine drift and one noisy pair", () => {
-  expect(verdictFor(pairs([1, 4, 1])).passed).toBe(true);
+  expect(verdictFor(pairs([1, 4, 1, 1, 1, 1, 1])).passed).toBe(true);
 });
 
 it("fails a sustained slowdown just above the row's ratio limit, even on microsecond rows", () => {
   const limit = FORMULA_RATIO_LIMITS.get(WORKLOAD);
   if (limit === undefined) throw new Error(`${WORKLOAD} has no limit`);
   const ratio = limit + 0.05;
-  const microsecondPairs = [1, 1, 1].map(() => ({
+  const microsecondPairs = UNCHANGED.map(() => ({
     base: capture(0.001),
     candidate: capture(0.001, 0.001 * ratio),
   }));
 
-  expect(verdictFor(pairs([limit, limit, limit])).passed).toBe(true);
+  expect(verdictFor(pairs(UNCHANGED.map(() => limit))).passed).toBe(true);
   const verdict = verdictFor(microsecondPairs);
   expect(verdict.passed).toBe(false);
   expect(verdict.timings.filter((row) => !row.passed).map((row) => row.key)).toEqual([WORKLOAD]);
@@ -115,7 +117,7 @@ it("reports rows an older base cannot run and fails rows the candidate cannot ru
 });
 
 it("fails closed for too few pairs, an incomplete matrix and an engine change", () => {
-  expect(() => verdictFor(pairs([1, 1]))).toThrow("at least 3 pairs");
+  expect(() => verdictFor(pairs(UNCHANGED.slice(1)))).toThrow("at least 7 pairs");
 
   const missing = pairs();
   const first = missing[0];

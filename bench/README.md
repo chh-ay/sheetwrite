@@ -187,7 +187,9 @@ every checked edit, an untimed restore writes the original source and
 recalculates it. The timed edit therefore always starts from the same values;
 it never becomes a same-value write or a clean recomputation. Load and first-
 recompute samples still need fresh fixtures because their operation consumes
-the state being measured.
+the state being measured. A reused fixture times a warmer edit than a fresh
+one, so absolute matched means captured before this change are not comparable
+with later ones; the default/full ratios remain comparable.
 The single-sample runner is
 `bun run src/formula-bench.ts --sample ID SIZE [--aggregate-ms 50] [--warmup-fixtures 3]`.
 It supports the matched workload set. Use the same pinned-runner command as
@@ -227,58 +229,63 @@ equivalent on other systems, or drop it.
 The harness, its fixtures and their sampling always come from the checkout
 that runs the gate. `--base` and `--candidate` (default: this checkout) only
 supply built engine packages, `packages/wasm/pkg` and its loader, so any older
-base works without this benchmark code. Build both engines first. If a fixture
-calls an export an older base lacks, that row is reported as skipped on the
-base; a row the candidate cannot run fails the gate.
+base works without this benchmark code. Build both engines first. The gate
+therefore measures the engine only: changes to TypeScript callers in
+`packages/core` are invisible to it. If a fixture calls a `CellStore` export
+that an older base lacks, that row is reported as skipped on the base; any
+other error fails the capture, and a row the candidate cannot run fails the
+gate.
 
 Each capture is a fresh process that runs every full-matrix workload once as
 an aggregated sample: three checked warm-up fixtures, then timed runs until
 they add up to at least 50 ms, reported as the per-run mean. Edit workloads
 restore their fixture, untimed, between runs; load and first-recalculation
-workloads build a fresh fixture per run. Only the last run is checked and its
-allocation recorded, because store-wide checks cost far more than a
-microsecond edit. Captures took 11 s each across four 7-pair gates (14
+workloads build a fresh fixture per run. The first and last runs are checked.
+Allocation comes from the first run, so byte counters do not depend on how many
+runs fit into 50 ms. Captures took 11 s each across four 7-pair gates (14
 captures, about 2.6 minutes per gate) on the shared laptop; one capture during
 heavier load took 60 s.
 
-The gate runs 7 pairs by default (`--pairs <n>`, minimum 3; the limits below
+The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
 were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
 For each row it takes the median of the paired candidate/base ratios and
 fails when it exceeds the row's ratio limit. There is no absolute floor:
 aggregation makes microsecond rows measurable, so they are gated too.
 
-The limits come from 14 same-engine pairs on a shared 20-thread laptop. For
-each row, `d` is the largest deviation from 1 of any seven consecutive pairs'
-median ratio. The limit is `1 + max(0.15, 2.5 × d)`, rounded up to 0.05. A
-regression is reliably caught at the limit plus `d`, the minimum detectable
-ratio below; smaller slowdowns may pass.
+The limits come from 14 same-engine pairs on a shared 20-thread laptop, taken
+in one quiet window; heavier load may need wider limits. For each row, `d` is
+the largest deviation from 1 of any seven consecutive pairs' median ratio. The
+limit is `1 + max(0.15, 2.5 × d)`, rounded up to 0.05. Noise scales a true
+ratio `r` down to about `r × (1 − d)`, so a regression reliably fails at
+`limit / (1 − d)`, the minimum detectable ratio below; smaller slowdowns may
+pass.
 
 | Workload | Ratio limit | `d` | Minimum detectable ratio |
 | --- | ---: | ---: | ---: |
-| independent-parse-load/1000 | 1.15 | 5.0% | 1.25 |
-| independent-first-recompute/1000 | 1.45 | 16.9% | 1.65 |
-| independent-parse-load/10000 | 1.20 | 7.8% | 1.30 |
+| independent-parse-load/1000 | 1.15 | 5.0% | see below |
+| independent-first-recompute/1000 | 1.45 | 16.9% | 1.75 |
+| independent-parse-load/10000 | 1.20 | 7.8% | 1.35 |
 | independent-first-recompute/10000 | 1.15 | 2.7% | 1.20 |
 | independent-parse-load/100000 | 1.15 | 0.5% | 1.20 |
-| independent-first-recompute/100000 | 1.15 | 5.0% | 1.20 |
-| linear-chain/8 | 1.30 | 11.3% | 1.45 |
+| independent-first-recompute/100000 | 1.15 | 5.0% | 1.25 |
+| linear-chain/8 | 1.30 | 11.3% | 1.50 |
 | linear-chain/16 | 1.15 | 3.3% | 1.20 |
-| linear-chain/32 | 1.15 | 4.4% | 1.20 |
-| linear-chain/64 | 1.25 | 8.3% | 1.35 |
-| wide-fan-out-edit/1000 | 1.25 | 9.5% | 1.35 |
+| linear-chain/32 | 1.15 | 4.4% | 1.25 |
+| linear-chain/64 | 1.25 | 8.3% | 1.40 |
+| wide-fan-out-edit/1000 | 1.25 | 9.5% | 1.40 |
 | wide-fan-out-edit/100000 | 1.15 | 1.6% | 1.20 |
 | diamond-edit/32 | 1.15 | 2.0% | 1.20 |
 | shared-range-edit/1000 | 1.15 | 2.0% | 1.20 |
 | distinct-range-edit/1000 | 1.15 | 2.1% | 1.20 |
 | cross-sheet-range-edit/1000 | 1.15 | 1.0% | 1.20 |
-| scalar-edit-affects-0/1000 | 1.35 | 12.2% | 1.50 |
+| scalar-edit-affects-0/1000 | 1.35 | 12.2% | 1.55 |
 | scalar-edit-affects-1/1 | 1.15 | 2.9% | 1.20 |
 | scalar-edit-affects-1000/1000 | 1.15 | 0.9% | 1.20 |
 | scalar-edit-affects-100000/100000 | 1.15 | 2.9% | 1.20 |
 | formula-constant-edit/100000 | 1.15 | 5.7% | 1.25 |
 | topology-remove-add/10000 | 1.15 | 0.6% | 1.20 |
 | cycles/1000 | 1.15 | 0.7% | 1.20 |
-| removed-sheet-ref/1000 | 1.25 | 9.1% | 1.35 |
+| removed-sheet-ref/1000 | 1.25 | 9.1% | 1.40 |
 | error-propagation/1000 | 1.15 | 1.5% | 1.20 |
 | criteria-range-edit/100000 | 1.15 | 1.4% | 1.20 |
 | lookup-range-edit/100000 | 1.15 | 2.6% | 1.20 |
@@ -287,16 +294,16 @@ ratio below; smaller slowdowns may pass.
 | vlookup-many-sorted/1000 | 1.15 | 1.7% | 1.20 |
 | vlookup-many-sorted-edit/1000 | 1.15 | 1.4% | 1.20 |
 | xlookup-many/1000 | 1.15 | 2.9% | 1.20 |
-| xlookup-many-edit/1000 | 1.15 | 4.9% | 1.20 |
+| xlookup-many-edit/1000 | 1.15 | 4.9% | 1.25 |
 | xlookup-many-sorted/1000 | 1.15 | 4.1% | 1.20 |
 | xlookup-many-sorted-edit/1000 | 1.15 | 1.9% | 1.20 |
 | text-lookup-many/1000 | 1.15 | 1.0% | 1.20 |
 | text-lookup-many-edit/1000 | 1.15 | 0.7% | 1.20 |
 | text-lookup-many-sorted/1000 | 1.15 | 4.1% | 1.20 |
 | text-lookup-many-sorted-edit/1000 | 1.15 | 3.3% | 1.20 |
-| spill-filter-resize/100000 | 1.15 | 5.0% | 1.20 |
+| spill-filter-resize/100000 | 1.15 | 5.0% | 1.25 |
 | sumproduct-vector-edit/100000 | 1.15 | 5.6% | 1.25 |
-| sumproduct-matrix-edit/100000 | 1.15 | 4.3% | 1.20 |
+| sumproduct-matrix-edit/100000 | 1.15 | 4.3% | 1.25 |
 | criteria-multi-range-edit/100000 | 1.15 | 1.1% | 1.20 |
 | sum-multi-range/100000 | 1.15 | 2.3% | 1.20 |
 | sumifs-3-criteria/100000 | 1.15 | 1.2% | 1.20 |
@@ -308,6 +315,12 @@ ratio below; smaller slowdowns may pass.
 | iterative-finance/1000 | 1.15 | 3.3% | 1.20 |
 | incremental-dependency-closure-edit/100000 | 1.15 | 4.1% | 1.20 |
 | spill-sequence-admission/100000 | 1.20 | 6.4% | 1.30 |
+
+1K parse-load is not a reliable detector of parse cost. With an engine that
+parsed every formula twice, it measured 0.82x while 10K and 100K parse-load
+measured 1.37x and 1.75x and failed. The row builds a fresh store per run, so
+its time is likely dominated by WASM memory growth, not parsing; this has not
+been verified.
 
 Recalibrate these limits when the matrix, the sampling or the default pair
 count changes, from fresh same-engine pairs that are not the acceptance runs.

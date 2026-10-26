@@ -548,9 +548,10 @@ function warmUpFixtures(
  *
  * A fixture that can restore itself is built once and restored, untimed,
  * between runs; others get a fresh fixture per run. Every run repeats the same
- * work, so only the last one is checked and its allocation recorded: the
- * store-wide checks cost far more than a microsecond edit and would otherwise
- * dominate the sample's wall time.
+ * work, so only the first and last runs are checked. The store-wide checks cost
+ * far more than a microsecond edit and would otherwise dominate the sample's
+ * wall time. Allocation comes from the first run, so the exact byte rule does
+ * not depend on how many edit/restore cycles fit into the time floor.
  */
 export function collectAggregatedSample(
   id: string,
@@ -570,12 +571,17 @@ export function collectAggregatedSample(
   forceGc();
   let totalMs = 0;
   let iterations = 0;
+  let allocation: FormulaAllocationSample | undefined;
   for (;;) {
     fixture.store.resetFormulaMatrixResourceStats();
     const started = now();
     fixture.run();
     totalMs += now() - started;
     iterations += 1;
+    if (allocation === undefined) {
+      allocation = allocationAt(fixture.store);
+      assert(outputsEqual(fixture.check(), expected), `${id} first measured output`);
+    }
     if (totalMs >= options.minimumSampleDurationMs) break;
     if (iterations >= AGGREGATED_SAMPLE_MAX_ITERATIONS) {
       throw new RangeError(
@@ -591,8 +597,8 @@ export function collectAggregatedSample(
     }
   }
 
-  const allocation = allocationAt(fixture.store);
-  assert(outputsEqual(fixture.check(), expected), `${id} measured output`);
+  assert(allocation !== undefined, `${id} first measured allocation`);
+  assert(outputsEqual(fixture.check(), expected), `${id} last measured output`);
   fixture.dispose();
   assert(Number.isFinite(totalMs), `${id} measured duration`);
 
@@ -1801,11 +1807,17 @@ export interface FormulaGateCapture {
 }
 
 /**
- * A fixture written for a newer engine may call an export an older base
- * lacks. That surfaces as a TypeError naming a missing function; anything
- * else is a real failure.
+ * A fixture written for a newer engine may call a CellStore export an older
+ * base lacks. Only a TypeError naming a method that is absent from this
+ * engine's CellStore counts as that; anything else is a real failure.
  */
-const MISSING_ENGINE_API = /is not a function/u;
+const MISSING_METHOD = /\.(\w+) is not a function/u;
+
+function missingCellStoreMethod(error: unknown): string | undefined {
+  if (!(error instanceof TypeError)) return undefined;
+  const method = MISSING_METHOD.exec(error.message)?.[1];
+  return method !== undefined && !(method in CellStore.prototype) ? method : undefined;
+}
 
 /**
  * Capture one gate side in this process. Every workload is one aggregated
@@ -1828,8 +1840,9 @@ function captureGateSide(): FormulaGateCapture {
         minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,
       });
     } catch (error) {
-      if (!(error instanceof TypeError) || !MISSING_ENGINE_API.test(error.message)) throw error;
-      capture.skipped[key] = error.message;
+      const method = missingCellStoreMethod(error);
+      if (method === undefined) throw error;
+      capture.skipped[key] = `CellStore.${method} is missing from this engine`;
       continue;
     }
 
