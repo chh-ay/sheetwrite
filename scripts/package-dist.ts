@@ -185,7 +185,15 @@ export async function assertPublishedDeclarations(
 /** Delete built declarations no type entry reaches; fail if a reached one was never built. */
 export async function pruneUnreachableDeclarations(packageRoot: string): Promise<string[]> {
   const manifest = await readJson<TypedManifest>(resolve(packageRoot, "package.json"));
-  const graph = await declarationGraph(packageRoot, typeEntryPoints(manifest));
+  const entries = typeEntryPoints(manifest);
+  // Without declaration entries the walk reaches nothing and would delete every
+  // built declaration; the packed check skips such packages, so fail here.
+  if (entries.length === 0 || !entries.every(isDeclarationFile)) {
+    throw new Error(
+      `${manifest.name ?? packageRoot} has no declaration-file types entries to prune from`,
+    );
+  }
+  const graph = await declarationGraph(packageRoot, entries);
   if (graph.missing.length > 0) {
     throw new Error(
       `${manifest.name ?? packageRoot} type entries reference declarations that were not built:\n  ${graph.missing.join("\n  ")}`,

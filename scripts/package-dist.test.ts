@@ -140,6 +140,18 @@ describe("built declaration pruning", () => {
     );
     expect(await Bun.file(join(root, "dist/internal.d.ts")).exists()).toBe(true);
   });
+
+  it("refuses to prune a package without declaration-file type entries", async () => {
+    const root = await writePackage({
+      "package.json": JSON.stringify({ name: "untyped", exports: { ".": "./dist/index.js" } }),
+      "dist/index.d.ts": "export declare const value: number;\n",
+    });
+
+    expect(await rejection(pruneUnreachableDeclarations(root))).toContain(
+      "has no declaration-file types entries",
+    );
+    expect(await Bun.file(join(root, "dist/index.d.ts")).exists()).toBe(true);
+  });
 });
 
 describe("built JavaScript formatting", () => {

@@ -119,6 +119,7 @@ const TOOLING_TESTS: CommandNode = {
     "scripts/verify-clean-build.test.ts",
     "scripts/size-report.test.ts",
     "scripts/release-artifacts.test.ts",
+    "scripts/package-dist.test.ts",
     "scripts/consumer-lock.test.ts",
     "scripts/release-verify.test.ts",
     "scripts/release-workflow.test.ts",
