@@ -447,6 +447,11 @@ impl CellStore {
                 DirtySeeds::Cells(cells) => data.spill.for_each_anchor_covering(cells, |anchor| {
                     affected.insert(AbsCellKey::from_local(sheet, anchor));
                 }),
+                DirtySeeds::Ranges(rects) => {
+                    data.spill.for_each_anchor_intersecting(rects, |anchor| {
+                        affected.insert(AbsCellKey::from_local(sheet, anchor));
+                    })
+                }
             }
         }
 

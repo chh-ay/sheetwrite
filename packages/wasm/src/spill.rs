@@ -8,7 +8,7 @@
 use rustc_hash::FxHashMap;
 
 use crate::cells::CellStorage;
-use crate::graph::SheetFormulas;
+use crate::graph::{DirtyRect, SheetFormulas};
 use crate::memory::{StoreMemoryStats, SPILL_BLOCKERS, SPILL_OWNERS, SPILL_RANGES};
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
@@ -181,6 +181,51 @@ impl SpillState {
         }
     }
 
+    pub(crate) fn for_each_anchor_intersecting(
+        &self,
+        rects: &[DirtyRect],
+        mut visit: impl FnMut(CellKey),
+    ) {
+        for (&anchor, range) in &self.ranges {
+            let attempted = DirtyRect {
+                row_start: anchor.0,
+                col_start: anchor.1,
+                row_end: range.row_end,
+                col_end: range.col_end,
+            };
+            if rects.iter().any(|rect| rect.intersects(attempted)) {
+                visit(anchor);
+            }
+        }
+    }
+
+    /// Detaching a rectangle in one pass keeps bulk writes independent of
+    /// installed-spill count per destination cell.
+    pub(crate) fn detach_rect(&mut self, rect: DirtyRect, cells: &mut CellStorage) -> Vec<CellKey> {
+        let mut dirty = Vec::new();
+        self.for_each_anchor_intersecting(&[rect], |anchor| dirty.push(anchor));
+
+        // Every owner lies inside its anchor's attempted range, so no matching
+        // attempt means the owner map has nothing in `rect` to detach.
+        if dirty.is_empty() {
+            return dirty;
+        }
+
+        let anchors_inside: Vec<_> = dirty
+            .iter()
+            .copied()
+            .filter(|&anchor| rect.contains(anchor))
+            .collect();
+        for anchor in anchors_inside {
+            dirty.extend(self.clear(anchor, cells));
+            self.ranges.remove(&anchor);
+        }
+        self.owners.retain(|&cell, _| !rect.contains(cell));
+        self.compact(cells);
+
+        dirty
+    }
+
     /// Other anchors whose attempted range intersects `vacated`, the range
     /// `anchor` just released: they may now be able to spill.
     pub(crate) fn anchors_colliding_with(
@@ -226,13 +271,6 @@ impl SpillState {
         }
         self.blockers = blockers;
         true
-    }
-
-    /// Forgets every attempt and owner for a whole-sheet recalculation, which
-    /// rebuilds them; per-output teardown would be wasted work.
-    pub(crate) fn invalidate(&mut self) {
-        self.ranges.clear();
-        self.owners = FxHashMap::default();
     }
 
     /// Removes only cells still owned by `anchor`; a user-written obstruction

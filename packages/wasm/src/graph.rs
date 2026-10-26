@@ -23,26 +23,104 @@ use crate::types::{CellKey, FormulaEntry};
 /// later single-cell transaction.
 const RETAINED_DIRTY_CAPACITY: usize = 4096;
 
-/// What one sheet contributes to the next recompute.
-pub(crate) enum DirtySeeds<'a> {
-    /// A bulk load or structural rewrite touched (potentially) every cell, so
-    /// every formula on the sheet and every reader of its cells is affected.
-    All,
-    /// Only these cells changed since the last recompute.
-    Cells(hash_set::Iter<'a, CellKey>),
+/// Bulk writes stay range-scoped without letting many disjoint edits grow
+/// per-sheet dirty metadata; overflow merges into conservative rectangles.
+const MAX_DIRTY_RECTS: usize = 64;
+
+/// Inclusive source coordinates; rectangles never enumerate logical sheet area.
+#[derive(Clone, Copy)]
+pub(crate) struct DirtyRect {
+    pub(crate) row_start: u32,
+    pub(crate) col_start: u32,
+    pub(crate) row_end: u32,
+    pub(crate) col_end: u32,
 }
 
-/// One sheet's formula and reference entries plus the cells changed since the
-/// last transaction-barrier recompute.
-///
-/// The dirty set stays empty while the whole sheet is dirty: a whole-sheet
-/// recompute already seeds every cell's readers, so recording individual cells
-/// would add nothing and keep the set O(interactive edits).
+impl DirtyRect {
+    pub(crate) fn new(
+        row_start: usize,
+        col_start: usize,
+        row_end: usize,
+        col_end: usize,
+    ) -> Option<Self> {
+        if row_start > row_end || col_start > col_end {
+            return None;
+        }
+
+        Some(Self {
+            row_start: row_start.try_into().ok()?,
+            col_start: col_start.try_into().ok()?,
+            row_end: row_end.min(u32::MAX as usize) as u32,
+            col_end: col_end.min(u32::MAX as usize) as u32,
+        })
+    }
+
+    fn cell(cell: CellKey) -> Self {
+        Self {
+            row_start: cell.0,
+            col_start: cell.1,
+            row_end: cell.0,
+            col_end: cell.1,
+        }
+    }
+
+    pub(crate) fn contains(self, cell: CellKey) -> bool {
+        self.row_start <= cell.0
+            && cell.0 <= self.row_end
+            && self.col_start <= cell.1
+            && cell.1 <= self.col_end
+    }
+
+    pub(crate) fn intersects(self, other: Self) -> bool {
+        self.row_start <= other.row_end
+            && other.row_start <= self.row_end
+            && self.col_start <= other.col_end
+            && other.col_start <= self.col_end
+    }
+
+    fn union(self, other: Self) -> Self {
+        Self {
+            row_start: self.row_start.min(other.row_start),
+            col_start: self.col_start.min(other.col_start),
+            row_end: self.row_end.max(other.row_end),
+            col_end: self.col_end.max(other.col_end),
+        }
+    }
+
+    fn area(self) -> u128 {
+        (u128::from(self.row_end - self.row_start) + 1)
+            * (u128::from(self.col_end - self.col_start) + 1)
+    }
+}
+
+/// What one sheet contributes to the next recompute.
+pub(crate) enum DirtySeeds<'a> {
+    All,
+    Cells(hash_set::Iter<'a, CellKey>),
+    Ranges(&'a [DirtyRect]),
+}
+
+/// Exactly one representation is live: scalar edits stay exact, bulk source
+/// writes store bounds, and structural/load paths stay whole-sheet. Switching
+/// from cells to ranges carries every earlier cell into the bounded list.
+enum DirtyState {
+    Cells(FxHashSet<CellKey>),
+    Ranges(Vec<DirtyRect>),
+    All,
+}
+
+impl Default for DirtyState {
+    fn default() -> Self {
+        Self::Cells(FxHashSet::default())
+    }
+}
+
+/// One sheet's formula entries plus the source cells changed since the last
+/// transaction-barrier recompute.
 #[derive(Default)]
 pub(crate) struct SheetFormulas {
     entries: FxHashMap<CellKey, FormulaEntry>,
-    dirty_cells: FxHashSet<CellKey>,
-    all_dirty: bool,
+    dirty: DirtyState,
 }
 
 impl SheetFormulas {
@@ -185,45 +263,109 @@ impl SheetFormulas {
 
     #[inline]
     pub(crate) fn has_dirty(&self) -> bool {
-        self.all_dirty || !self.dirty_cells.is_empty()
+        match &self.dirty {
+            DirtyState::Cells(cells) => !cells.is_empty(),
+            DirtyState::Ranges(ranges) => !ranges.is_empty(),
+            DirtyState::All => true,
+        }
     }
 
     #[inline]
     pub(crate) fn mark_cell_dirty(&mut self, key: CellKey) {
-        if !self.all_dirty {
-            self.dirty_cells.insert(key);
+        match &mut self.dirty {
+            DirtyState::Cells(cells) => {
+                cells.insert(key);
+            }
+            DirtyState::Ranges(ranges) => Self::add_dirty_rect(ranges, DirtyRect::cell(key)),
+            DirtyState::All => {}
         }
     }
 
     pub(crate) fn mark_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
-        if !self.all_dirty {
-            self.dirty_cells.extend(keys);
+        if matches!(self.dirty, DirtyState::All) {
+            return;
+        }
+
+        for key in keys {
+            self.mark_cell_dirty(key);
         }
     }
 
-    /// Idempotent, so per-cell loaders can call it without re-clearing the set.
-    pub(crate) fn mark_all_dirty(&mut self) {
-        if !self.all_dirty {
-            self.clear_dirty();
-            self.all_dirty = true;
+    pub(crate) fn mark_dirty_rect(&mut self, rect: DirtyRect) {
+        if matches!(self.dirty, DirtyState::All) {
+            return;
         }
-    }
+        if let DirtyState::Ranges(ranges) = &mut self.dirty {
+            Self::add_dirty_rect(ranges, rect);
+            return;
+        }
 
-    /// Resets dirty tracking after a recompute pass.
-    pub(crate) fn clear_dirty(&mut self) {
-        self.all_dirty = false;
-        if self.dirty_cells.capacity() > RETAINED_DIRTY_CAPACITY {
-            self.dirty_cells = FxHashSet::default();
+        if let DirtyState::Cells(cells) = std::mem::take(&mut self.dirty) {
+            let mut ranges = vec![rect];
+            for cell in cells {
+                Self::add_dirty_rect(&mut ranges, DirtyRect::cell(cell));
+            }
+            self.dirty = DirtyState::Ranges(ranges);
         } else {
-            self.dirty_cells.clear();
+            unreachable!("only cell state remains after handling ranges and All");
         }
+    }
+
+    fn add_dirty_rect(ranges: &mut Vec<DirtyRect>, rect: DirtyRect) {
+        if ranges.iter().any(|range| {
+            range.contains((rect.row_start, rect.col_start))
+                && range.contains((rect.row_end, rect.col_end))
+        }) {
+            return;
+        }
+
+        // Sequential writes (a formula fill down a column or across a row)
+        // extend the latest rectangle exactly. Checking only the last entry
+        // keeps each mark O(1) on that path instead of paying the bounded
+        // coalescing scan below once the buffer is full.
+        if let Some(last) = ranges.last_mut() {
+            let merged = last.union(rect);
+            if merged.area() == last.area() + rect.area() {
+                *last = merged;
+                return;
+            }
+        }
+
+        if ranges.len() < MAX_DIRTY_RECTS {
+            ranges.push(rect);
+            return;
+        }
+
+        // Bounded conservative coalescing avoids replacing local edits with All.
+        let nearest = ranges
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, range)| range.union(rect).area() - range.area())
+            .map(|(index, _)| index)
+            .expect("a full rectangle buffer is nonempty");
+        ranges[nearest] = ranges[nearest].union(rect);
+    }
+
+    pub(crate) fn mark_all_dirty(&mut self) {
+        self.dirty = DirtyState::All;
+    }
+
+    pub(crate) fn clear_dirty(&mut self) {
+        if let DirtyState::Cells(cells) = &mut self.dirty {
+            if cells.capacity() <= RETAINED_DIRTY_CAPACITY {
+                cells.clear();
+                return;
+            }
+        }
+
+        self.dirty = DirtyState::default();
     }
 
     pub(crate) fn dirty_seeds(&self) -> DirtySeeds<'_> {
-        if self.all_dirty {
-            DirtySeeds::All
-        } else {
-            DirtySeeds::Cells(self.dirty_cells.iter())
+        match &self.dirty {
+            DirtyState::All => DirtySeeds::All,
+            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.iter()),
+            DirtyState::Ranges(ranges) => DirtySeeds::Ranges(ranges),
         }
     }
 
@@ -235,30 +377,78 @@ impl SheetFormulas {
             entry.heap_memory_stats(formulas);
         }
 
-        stats
-            .owner_mut(SHEET_INDEXES_METADATA)
-            .add_hash_table::<CellKey, ()>(self.dirty_cells.len(), self.dirty_cells.capacity());
+        let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
+        match &self.dirty {
+            DirtyState::Cells(cells) => {
+                metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
+            }
+            DirtyState::Ranges(ranges) => {
+                metadata.add_vec::<DirtyRect>(ranges.len(), ranges.capacity())
+            }
+            DirtyState::All => {}
+        }
     }
 
-    /// Writes the dirty state only; entries cross through the store's formula
-    /// codec, which re-resolves names and tables in the receiving instance.
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
-        out.usize(self.dirty_cells.len());
-        for &(row, col) in &self.dirty_cells {
-            out.u32(row);
-            out.u32(col);
+        match &self.dirty {
+            DirtyState::All => out.u32(0),
+            DirtyState::Cells(cells) => {
+                out.u32(1);
+                out.usize(cells.len());
+                for &(row, col) in cells {
+                    out.u32(row);
+                    out.u32(col);
+                }
+            }
+            DirtyState::Ranges(ranges) => {
+                out.u32(2);
+                out.usize(ranges.len());
+                for rect in ranges {
+                    out.u32(rect.row_start);
+                    out.u32(rect.col_start);
+                    out.u32(rect.row_end);
+                    out.u32(rect.col_end);
+                }
+            }
         }
-        out.bool(self.all_dirty);
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn read_transfer(input: &mut Reader<'_>) -> TransferResult<Self> {
-        let mut formulas = Self::default();
-        for _ in 0..input.count()? {
-            formulas.dirty_cells.insert((input.u32()?, input.u32()?));
-        }
-        formulas.all_dirty = input.bool()?;
-        Ok(formulas)
+        let dirty = match input.u32()? {
+            0 => DirtyState::All,
+            1 => {
+                let mut cells = FxHashSet::default();
+                for _ in 0..input.count()? {
+                    cells.insert((input.u32()?, input.u32()?));
+                }
+                DirtyState::Cells(cells)
+            }
+            2 => {
+                let count = input.count()?;
+                if count > MAX_DIRTY_RECTS {
+                    return Err("too many dirty rectangles".into());
+                }
+                let mut ranges = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let rect = DirtyRect::new(
+                        input.u32()? as usize,
+                        input.u32()? as usize,
+                        input.u32()? as usize,
+                        input.u32()? as usize,
+                    )
+                    .ok_or("invalid dirty rectangle")?;
+                    ranges.push(rect);
+                }
+                DirtyState::Ranges(ranges)
+            }
+            _ => return Err("invalid dirty state".into()),
+        };
+
+        Ok(Self {
+            entries: FxHashMap::default(),
+            dirty,
+        })
     }
 }
 

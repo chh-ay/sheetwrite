@@ -12,7 +12,7 @@ use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
     DEFAULT_PAGE_CHUNK_ROWS,
 };
-use crate::graph::FormulaGraph;
+use crate::graph::{DirtyRect, FormulaGraph};
 use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
@@ -1143,13 +1143,10 @@ impl CellStore {
             return false;
         }
 
-        // Bound per-cell tracking for large clears, while preserving unrelated
-        // calculated values for interactive rectangles and all style-only edits.
-        const MAX_TRACKED_CLEAR_CELLS: usize = 4096;
-        let invalidate_sheet =
-            contents && (r1 - r0 + 1).saturating_mul(c1 - c0 + 1) > MAX_TRACKED_CLEAR_CELLS;
-        if invalidate_sheet {
-            s.invalidate_calculations();
+        if contents {
+            if let Some(rect) = DirtyRect::new(r0, c0, r1, c1) {
+                prepare_rect_write(s, rect);
+            }
         }
 
         let mut removed_formula = false;
@@ -1174,7 +1171,12 @@ impl CellStore {
 
                 let next_style = if style { 0 } else { s.cells.style_at(index) };
                 let written = if contents {
-                    s.write_cell(row, col, kind, payload, next_style, dirty_revision)
+                    // Unloaded paged cells are skipped, so reserve per written
+                    // cell instead of over-reserving the whole rectangle.
+                    dirty_revision
+                        .is_none_or(|revision| s.cells.prepare_dirty_cells(&[(row, col)], revision))
+                        && s.cells
+                            .write_cell(row, col, kind, payload, next_style, dirty_revision)
                 } else {
                     s.cells.write_style(row, col, next_style, dirty_revision)
                 };
@@ -1185,7 +1187,6 @@ impl CellStore {
                 if contents {
                     if let Some(key) = cell_key(row, col) {
                         removed_formula |= s.formulas.remove(key);
-                        s.formulas.mark_cell_dirty(key);
                     }
                 }
             }
@@ -1838,17 +1839,27 @@ impl CellStore {
             }
 
             let limit = values.len().min(s.cells.row_count() - start_row);
-            if dirty_revision.is_some() && !s.cells.can_dirty_rect(start_row, col, limit, 1) {
-                return;
+            if let Some(revision) = dirty_revision {
+                if !s
+                    .cells
+                    .prepare_dirty_rect(start_row, col, limit, 1, revision)
+                {
+                    return;
+                }
             }
-            s.invalidate_calculations();
+            if limit > 0 {
+                if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
+                    prepare_rect_write(s, rect);
+                }
+            }
+
             let mut removed_formula = false;
             for (offset, &value) in values.iter().take(limit).enumerate() {
                 let row = start_row + offset;
                 let Some(key) = cell_key(row, col) else {
                     continue;
                 };
-                if !s.write_cell(
+                if !s.cells.write_cell(
                     row,
                     col,
                     KIND_NUMBER,
@@ -1859,9 +1870,6 @@ impl CellStore {
                     return;
                 }
                 removed_formula |= s.formulas.remove(key);
-            }
-            if limit > 0 {
-                s.formulas.mark_all_dirty();
             }
             removed_formula
         };
@@ -1889,17 +1897,27 @@ impl CellStore {
         }
 
         let limit = values.len().min(existing.cells.row_count() - start_row);
-        if dirty_revision.is_some() && !existing.cells.can_dirty_rect(start_row, col, limit, 1) {
-            return;
+        if let Some(revision) = dirty_revision {
+            if !self.sheets[sheet]
+                .cells
+                .prepare_dirty_rect(start_row, col, limit, 1, revision)
+            {
+                return;
+            }
         }
-        self.sheets[sheet].invalidate_calculations();
+        if limit > 0 {
+            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
+                prepare_rect_write(&mut self.sheets[sheet], rect);
+            }
+        }
+
         for (offset, value) in values.into_iter().take(limit).enumerate() {
             let row = start_row + offset;
             if cell_key(row, col).is_none() {
                 continue;
             }
             let id = self.intern(&value);
-            if !self.replace_cell_source(CellSourceWrite {
+            if !self.replace_prepared_cell_source(CellSourceWrite {
                 sheet,
                 row,
                 col,
@@ -1912,11 +1930,6 @@ impl CellStore {
             }) {
                 return;
             }
-        }
-        if limit > 0 {
-            // The load marks the whole sheet dirty; the per-cell marks from the
-            // writes above would only repeat what that flag already covers.
-            self.sheets[sheet].formulas.mark_all_dirty();
         }
     }
 
@@ -1943,13 +1956,23 @@ impl CellStore {
         }
 
         let limit = utf16_lens.len().min(existing.cells.row_count() - start_row);
-        if dirty_revision.is_some() && !existing.cells.can_dirty_rect(start_row, col, limit, 1) {
-            return;
+        if let Some(revision) = dirty_revision {
+            if !self.sheets[sheet]
+                .cells
+                .prepare_dirty_rect(start_row, col, limit, 1, revision)
+            {
+                return;
+            }
         }
         let slices = utf16_slices(&buf, utf16_lens, limit);
 
         let mut removed_formula = false;
-        self.sheets[sheet].invalidate_calculations();
+        if limit > 0 {
+            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
+                prepare_rect_write(&mut self.sheets[sheet], rect);
+            }
+        }
+
         for (offset, text) in slices.iter().enumerate() {
             let row = start_row + offset;
             let Some(key) = cell_key(row, col) else {
@@ -1957,7 +1980,7 @@ impl CellStore {
             };
             let id = self.intern(text);
             let s = &mut self.sheets[sheet];
-            if !s.write_cell(
+            if !s.cells.write_cell(
                 row,
                 col,
                 KIND_STRING,
@@ -1968,9 +1991,6 @@ impl CellStore {
                 return;
             }
             removed_formula |= s.formulas.remove(key);
-        }
-        if limit > 0 {
-            self.sheets[sheet].formulas.mark_all_dirty();
         }
         if removed_formula {
             self.graph.invalidate();
@@ -2895,6 +2915,10 @@ impl CellStore {
     /// test after the packed reader has already selected formula or literal.
     /// Choose the literal-only loop once per range; a numeric/text import must
     /// not test the source map for every cell.
+    ///
+    /// The rectangle is dirtied and its spills detached once, so readers
+    /// outside it keep their calculated values and the per-cell writes skip
+    /// both the spill scan and the dirty mark.
     fn replace_range_sources(
         &mut self,
         sheet: usize,
@@ -2904,19 +2928,20 @@ impl CellStore {
         sources: HashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
-        self.sheets[sheet].invalidate_calculations();
-        let applied = if sources.is_empty() {
+        if let Some(rect) = DirtyRect::new(
+            start.0,
+            start.1,
+            start.0 + dimensions.0 - 1,
+            start.1 + dimensions.1 - 1,
+        ) {
+            prepare_rect_write(&mut self.sheets[sheet], rect);
+        }
+
+        if sources.is_empty() {
             self.write_range_sources::<false>(sheet, start, dimensions, revision, sources, cell)
         } else {
             self.write_range_sources::<true>(sheet, start, dimensions, revision, sources, cell)
-        };
-        if !applied {
-            return false;
         }
-        // Range writes clear every spill, so all anchors must materialize
-        // again; dirtying the whole sheet already covers the cells just written.
-        self.sheets[sheet].formulas.mark_all_dirty();
-        true
     }
 
     fn write_range_sources<const HAS_SOURCES: bool>(
@@ -2941,7 +2966,7 @@ impl CellStore {
                     None
                 };
                 let (kind, payload, style) = cell(row_offset, col_offset);
-                if !self.replace_cell_source(CellSourceWrite {
+                if !self.replace_prepared_cell_source(CellSourceWrite {
                     sheet,
                     row,
                     col,
@@ -3044,6 +3069,18 @@ impl Default for CellStore {
     }
 }
 
+/// Marks a validated bulk source rectangle once and detaches intersecting
+/// spills in one pass, so the per-cell loop that follows writes storage only.
+/// Paged callers reserve the rectangle's dirty overlay before calling.
+fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
+    sheet.formulas.mark_dirty_rect(rect);
+
+    if !sheet.spill.is_empty() {
+        let detached = sheet.spill.detach_rect(rect, &mut sheet.cells);
+        sheet.formulas.mark_cells_dirty(detached);
+    }
+}
+
 /// One destination cell plus the source that replaces whatever it held.
 ///
 /// Every writer — scalar, sparse and packed — builds this and hands it to
@@ -3098,6 +3135,14 @@ impl CellStore {
     /// epoch only when the replacement reads a different dependency graph.
     /// Rejected writes leave sources and the epoch untouched.
     fn replace_cell_source(&mut self, write: CellSourceWrite) -> bool {
+        self.replace_cell_source_inner(write, false)
+    }
+
+    fn replace_prepared_cell_source(&mut self, write: CellSourceWrite) -> bool {
+        self.replace_cell_source_inner(write, true)
+    }
+
+    fn replace_cell_source_inner(&mut self, write: CellSourceWrite, prepared_rect: bool) -> bool {
         let CellSourceWrite {
             sheet,
             row,
@@ -3120,6 +3165,10 @@ impl CellStore {
         }
         let written = if hydrating {
             sheet_data.hydrate_cell(row, col, kind, payload, style)
+        } else if prepared_rect {
+            sheet_data
+                .cells
+                .write_cell(row, col, kind, payload, style, revision)
         } else {
             sheet_data.write_cell(row, col, kind, payload, style, revision)
         };
@@ -3129,7 +3178,7 @@ impl CellStore {
         let graph_changed = sheet_data.formulas.replace(key, source);
         if hydrating {
             sheet_data.formulas.mark_all_dirty();
-        } else {
+        } else if !prepared_rect {
             sheet_data.formulas.mark_cell_dirty(key);
         }
         if graph_changed {

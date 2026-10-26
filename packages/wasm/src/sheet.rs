@@ -57,14 +57,6 @@ impl SheetData {
         coordinates
     }
 
-    /// Drops every calculated value and spill so the next recompute rebuilds
-    /// the whole sheet.
-    pub(crate) fn invalidate_calculations(&mut self) {
-        self.spill.invalidate();
-        self.cells.invalidate_derived();
-        self.formulas.mark_all_dirty();
-    }
-
     #[inline]
     pub(crate) fn write_cell(
         &mut self,

@@ -1492,6 +1492,132 @@ fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
 }
 
 #[test]
+fn rectangle_writes_preserve_unrelated_results_and_recompute_registered_readers() {
+    const EDIT_ROWS: usize = 5000;
+    for write_kind in 0..6 {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, EDIT_ROWS + 4);
+        let other = store.add_sheet(2, 2);
+        store.set_sheet_name(sheet, "source", "Source");
+        store.set_number(sheet, 0, 0, 5.0, 0);
+        store.set_number(sheet, EDIT_ROWS - 1, 0, 7.0, 0);
+        store.set_formula(sheet, 0, 1, "=A1+1", 0);
+        store.set_formula(sheet, 1, 1, "=SUM(A1:A5000)", 0);
+        store.set_formula(sheet, 0, 2, "=\"survivor\"", 0);
+        store.set_formula(sheet, 1, 2, "=SEQUENCE(2,1,10)", 0);
+        store.set_formula(other, 0, 0, "=Source!A5000+2", 0);
+        store.set_formula(other, 1, 0, "=Source!B2+3", 0);
+        store.commit_sources();
+
+        // A prior scalar edit must survive the Cells -> Ranges transition.
+        store.set_number(sheet, EDIT_ROWS + 1, 3, 8.0, 0);
+        store.set_formula(sheet, EDIT_ROWS + 1, 4, "=D5002+1", 0);
+        let expected_source = match write_kind {
+            0 => {
+                assert!(store.clear_range(sheet, 0, 0, EDIT_ROWS - 1, 0, true, false));
+                0.0
+            }
+            1 => {
+                store.set_column_numbers(sheet, 0, 0, &vec![2.0; EDIT_ROWS], 0);
+                2.0
+            }
+            2 => {
+                store.set_column_strings(sheet, 0, 0, vec!["2".into(); EDIT_ROWS], 0);
+                2.0
+            }
+            3 => {
+                store.set_column_strings_packed(
+                    sheet,
+                    0,
+                    0,
+                    "2".repeat(EDIT_ROWS),
+                    &vec![1; EDIT_ROWS],
+                    0,
+                );
+                2.0
+            }
+            4 | 5 => {
+                let kinds = vec![KIND_NUMBER; EDIT_ROWS];
+                let numbers = vec![2.0; EDIT_ROWS];
+                let styles = vec![0; EDIT_ROWS];
+                let status = if write_kind == 4 {
+                    store.set_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                } else {
+                    store.set_column_block_packed(
+                        sheet,
+                        0,
+                        0,
+                        EDIT_ROWS,
+                        1,
+                        &kinds,
+                        &numbers,
+                        b"",
+                        &[0],
+                        &styles,
+                        &[],
+                        vec![],
+                        &[],
+                        &[],
+                    )
+                };
+                assert_eq!(status, 0);
+                2.0
+            }
+            _ => unreachable!(),
+        };
+
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+        store.commit_sources();
+        assert_close(number(&store, sheet, 0, 1), expected_source + 1.0);
+        // SUM ignores strings, whereas arithmetic coerces numeric text.
+        let expected_sum = if matches!(write_kind, 2 | 3) {
+            0.0
+        } else {
+            expected_source * EDIT_ROWS as f64
+        };
+        assert_close(number(&store, sheet, 1, 1), expected_sum);
+        assert_close(number(&store, other, 0, 0), expected_source + 2.0);
+        assert_close(number(&store, other, 1, 0), expected_sum + 3.0);
+        assert_close(number(&store, sheet, EDIT_ROWS + 1, 4), 9.0);
+        assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
+        assert_close(number(&store, sheet, 2, 2), 11.0);
+    }
+}
+
+#[test]
+fn rectangle_clear_releases_attempted_spill_without_disturbing_other_spills() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 6000);
+    store.set_number(sheet, 4999, 0, 1.0, 0);
+    store.set_formula(sheet, 0, 0, "=SEQUENCE(5000)", 0);
+    store.set_formula(sheet, 0, 2, "=SEQUENCE(2,1,20)", 0);
+    store.commit_sources();
+    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#SPILL!"));
+
+    assert!(store.clear_range(sheet, 1, 0, 5000, 0, true, false));
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+    store.commit_sources();
+    assert_close(number(&store, sheet, 4999, 0), 5000.0);
+    assert_close(number(&store, sheet, 1, 2), 21.0);
+}
+
+#[test]
 fn string_collection_bounds_committed_overwrites_and_preserves_derived_text() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 3);

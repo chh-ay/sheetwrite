@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::graph::DirtySeeds;
+use crate::graph::{DirtyRect, DirtySeeds};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
 use crate::types::{
@@ -275,6 +275,7 @@ pub(super) fn collect_affected_formulas(
     let mut row_matches: Vec<usize> = Vec::new();
     let mut range_marks = vec![0; index.range_groups.len()];
     let mut range_stamp = 1;
+    let mut fired_groups = vec![false; index.range_groups.len()];
     if let Some(sheet) = sheets.get(seed_sheet) {
         match sheet.formulas.dirty_seeds() {
             DirtySeeds::Cells(cells) => {
@@ -284,6 +285,73 @@ pub(super) fn collect_affected_formulas(
                         affected.insert(abs);
                     }
                     queue.push_back(abs);
+                }
+            }
+            DirtySeeds::Ranges(rects) => {
+                // Small rectangles are cheaper to walk than every formula/read key.
+                const ENUMERATED_RECT_CELLS: u64 = 4096;
+                let is_small = |rect: &DirtyRect| {
+                    (u64::from(rect.row_end - rect.row_start) + 1)
+                        .saturating_mul(u64::from(rect.col_end - rect.col_start) + 1)
+                        <= ENUMERATED_RECT_CELLS
+                };
+                for rect in rects.iter().filter(|rect| is_small(rect)) {
+                    for row in rect.row_start..=rect.row_end {
+                        for col in rect.col_start..=rect.col_end {
+                            let abs = AbsCellKey::from_local(seed_sheet, (row, col));
+                            if formula_exists(sheets, abs) {
+                                affected.insert(abs);
+                            }
+                            queue.push_back(abs);
+                        }
+                    }
+                }
+
+                if rects.iter().any(|rect| !is_small(rect)) {
+                    // Large edits scan registered sources, never the rectangle area.
+                    let contains = |cell| {
+                        rects
+                            .iter()
+                            .filter(|rect| !is_small(rect))
+                            .any(|rect| rect.contains(cell))
+                    };
+                    for cell in sheet.formulas.keys().filter(|&cell| contains(cell)) {
+                        let abs = AbsCellKey::from_local(seed_sheet, cell);
+                        if affected.insert(abs) {
+                            queue.push_back(abs);
+                        }
+                    }
+
+                    for (&cell, dependents) in &index.exact_dependents {
+                        if cell.sheet == seed_sheet as u32 && contains(cell.local()) {
+                            for &dependent in dependents {
+                                if affected.insert(dependent) {
+                                    queue.push_back(dependent);
+                                }
+                            }
+                        }
+                    }
+
+                    for (group_index, group) in index.range_groups.iter().enumerate() {
+                        let range = group.range;
+                        if range.sheet == seed_sheet as u32
+                            && rects.iter().filter(|rect| !is_small(rect)).any(|rect| {
+                                rect.intersects(DirtyRect {
+                                    row_start: range.row_start,
+                                    col_start: range.col_start,
+                                    row_end: range.row_end,
+                                    col_end: range.col_end,
+                                })
+                            })
+                        {
+                            fired_groups[group_index] = true;
+                            for &dependent in &group.dependents {
+                                if affected.insert(dependent) {
+                                    queue.push_back(dependent);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             DirtySeeds::All => {
@@ -308,10 +376,11 @@ pub(super) fn collect_affected_formulas(
                         }
                     }
                 }
-                for group in &index.range_groups {
+                for (group_index, group) in index.range_groups.iter().enumerate() {
                     if group.range.sheet != seed {
                         continue;
                     }
+                    fired_groups[group_index] = true;
                     for &dependent in &group.dependents {
                         if affected.insert(dependent) {
                             queue.push_back(dependent);
@@ -343,6 +412,9 @@ pub(super) fn collect_affected_formulas(
             &mut range_stamp,
         );
         for &group in &range_matches {
+            if std::mem::replace(&mut fired_groups[group], true) {
+                continue;
+            }
             let range_group = &index.range_groups[group];
             debug_assert!(range_group.range.contains(cell));
             for &dependent in &range_group.dependents {
@@ -368,6 +440,7 @@ pub(super) fn direct_readers(
     let mut row_matches: Vec<usize> = Vec::new();
     let mut range_marks = vec![0; index.range_groups.len()];
     let mut range_stamp = 1;
+    let mut fired_groups = vec![false; index.range_groups.len()];
     for &cell in cells {
         let cell = AbsCellKey::from_local(sheet, cell);
         if let Some(dependents) = index.exact_dependents.get(&cell) {
@@ -381,6 +454,9 @@ pub(super) fn direct_readers(
             &mut range_stamp,
         );
         for &group in &range_matches {
+            if std::mem::replace(&mut fired_groups[group], true) {
+                continue;
+            }
             readers.extend(index.range_groups[group].dependents.iter().copied());
         }
     }

@@ -333,6 +333,31 @@ mod tests {
     }
 
     #[test]
+    fn memory_transfer_preserves_pending_rectangle_dirty_state() {
+        const EDIT_ROWS: usize = 5000;
+        let mut original = CellStore::new();
+        original.add_sheet(3, EDIT_ROWS + 1);
+        original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
+        original.set_formula(0, 0, 2, "=\"survivor\"", 0);
+        original.recompute_changed();
+        original.set_column_numbers(0, 0, 0, &vec![1.0; EDIT_ROWS], 0);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(0, 0, 1).num(), EDIT_ROWS as f64);
+        assert_eq!(
+            replacement.get_cell(0, 0, 2).string().as_deref(),
+            Some("survivor")
+        );
+    }
+
+    #[test]
     fn memory_transfer_rejects_partial_payloads() {
         let mut original = CellStore::new();
         original.add_sheet(1, 1);
