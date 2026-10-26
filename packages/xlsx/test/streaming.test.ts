@@ -9,6 +9,7 @@ import {
   toXlsxTableStream,
   toXlsxWorkbook,
   toXlsxWorkbookStream,
+  type CellValue,
   type Workbook,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -17,6 +18,7 @@ import { deflateSync, strToU8, unzipSync } from "fflate";
 import { registerXlsxBackends } from "../src/index.js";
 import { createCodecContext } from "../src/resources.js";
 import { validateStoredEntry, writeZip, ZipReader } from "../src/zip.js";
+import { rawXlsx, worksheet } from "./raw-opc.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -208,7 +210,70 @@ describe("XLSX streaming", () => {
     const fromBlob = await fromXlsxWorkbookFile(new Blob([new Uint8Array(bytes)]));
     expect(fromBlob).toEqual(await fromXlsxWorkbook(bytes));
   });
+
+  // Stored entries reach the worksheet reader in 8 KiB inflater chunks, so sweeping the padding
+  // before the rows moves that boundary across every byte of the repeated row markup.
+  it("imports worksheet rows identically wherever an inflater chunk boundary falls", async () => {
+    const rowXml = (row: number) =>
+      `<row r="${row}"><c r="A${row}" t="inlineStr"><is><t>x&amp;y&#x1F600;é€😀<![CDATA[<c&>]]>z</t></is></c><!-- é --><c r="B${row}"><f>IF(A${row}="&lt;","&amp;",1)</f></c><c r="C${row}"><v>12.5</v></c></row>`;
+    const rows = Array.from({ length: 60 }, (_unused, index) => 10 + index);
+    const unitBytes = new TextEncoder().encode(rowXml(10)).byteLength;
+    const expected: [number, number, CellValue][] = rows.flatMap(
+      (row): [number, number, CellValue][] => [
+        [row - 1, 0, { kind: "literal", value: "x&y😀é€😀<c&>z" }],
+        [row - 1, 1, { kind: "formula", src: `=IF(A${row}="<","&",1)` }],
+        [row - 1, 2, { kind: "literal", value: 12.5 }],
+      ],
+    );
+    for (let pad = 0; pad < unitBytes; pad++) {
+      const xml = worksheet(
+        `<!--${"p".repeat(pad)}--><sheetData>${rows.map(rowXml).join("")}</sheetData>`,
+      );
+      const imported = await fromXlsxWorkbookFile(storedWorkbook(xml));
+      const cells = (imported.sheets[0]?.cells ?? []).flatMap((block) =>
+        block.cells.map((cell) => [
+          block.startRow + cell.rowOffset,
+          block.startCol + cell.colOffset,
+          cell.value,
+        ]),
+      );
+      expect(cells, `padding ${pad}`).toEqual(expected);
+    }
+  });
+
+  it("rejects a DTD split across inflater chunks", async () => {
+    const chunkBytes = 8 * 1024;
+    const declaration = "<!DOCTYPE worksheet>";
+    const declarationOffset = worksheet(`<!---->${declaration}`).indexOf(declaration);
+    for (let split = 1; split < "<!DOCTYPE".length; split++) {
+      const pad = chunkBytes - split - declarationOffset;
+      const xml = worksheet(`<!--${"p".repeat(pad)}-->${declaration}<sheetData/>`);
+      expect(xml.indexOf("<!DOCTYPE")).toBe(chunkBytes - split);
+      await expect(
+        fromXlsxWorkbookFile(storedWorkbook(xml)),
+        `split ${split}`,
+      ).rejects.toMatchObject({
+        code: "xlsx-import-failed",
+        message: expect.stringMatching(/DTDs and entities are forbidden/),
+      });
+    }
+  });
+
+  it("keeps quoted '>' inside a tag that spans many inflater chunks", async () => {
+    const quoted = "a>b'".repeat(40_000);
+    const xml = worksheet(
+      `<dimension ref="A1" note="${quoted}"/><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>`,
+    );
+    const imported = await fromXlsxWorkbookFile(storedWorkbook(xml));
+    expect(imported.sheets[0]?.cells[0]?.cells.map((cell) => cell.value)).toEqual([
+      { kind: "literal", value: 7 },
+    ]);
+  });
 });
+
+function storedWorkbook(sheetXml: string): Blob {
+  return new Blob([new Uint8Array(rawXlsx({ sheets: [{ xml: sheetXml }], compressionLevel: 0 }))]);
+}
 
 describe("ZIP raw entries", () => {
   it("copies validated compressed entries without inflating into the output archive", async () => {

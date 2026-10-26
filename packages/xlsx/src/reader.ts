@@ -49,6 +49,7 @@ import {
   assertXmlRoot,
   decodeXstring,
   parseXml,
+  parseXmlChunks,
   type XmlElement,
   xmlAttribute,
   xmlBoolean,
@@ -61,18 +62,6 @@ import { normalizePartName } from "./zip.js";
 
 const META_MARKER = "sheetwrite-workbook-metadata-v1";
 const META_STEM = "__sheetwrite_meta__";
-/** Matches a `cols` start tag with an optional namespace prefix. */
-const COLUMN_STYLES_TAG = /<(?:[\w.-]+:)?cols[\s/>]/g;
-
-/**
- * True when a worksheet-level `cols` element follows the streamed sheet data.
- * The tree reader applies such styles to rows already read, so the streaming
- * path steps aside and keeps the tree for that document.
- */
-function hasColumnStylesAfter(xml: string, startOffset: number): boolean {
-  COLUMN_STYLES_TAG.lastIndex = startOffset;
-  return COLUMN_STYLES_TAG.test(xml);
-}
 const MAIN_NAMESPACES = [
   "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
   "http://purl.oclc.org/ooxml/spreadsheetml/main",
@@ -326,8 +315,7 @@ function parseSharedStrings(
   const root = parseXml(packageFile.read(name), name, context, {
     parent: "sst",
     parentIsRoot: true,
-    shouldStream: (_xml, _startOffset, rootElement) =>
-      xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
+    shouldStream: (rootElement) => xmlRootMatches(rootElement, "sst", MAIN_NAMESPACES),
     // The tree path reads only `si` children; other children are skipped alike.
     child: (item) => {
       if (xmlLocalName(item.name) === "si") processItem(item);
@@ -1192,7 +1180,12 @@ function parseTables(
   return tables;
 }
 
-function parseSheet(
+/**
+ * Rows are streamed from the inflated worksheet; only cells and the small
+ * non-row tree stay resident. `columnSource` is set for the second pass over a
+ * worksheet whose `cols` follow its rows, whose row warnings were already sent.
+ */
+async function parseSheet(
   packageFile: OpcPackage,
   reference: WorkbookSheetReference,
   styles: ParsedStyles,
@@ -1200,7 +1193,8 @@ function parseSheet(
   context: XlsxCodecContext,
   usage: ReaderResourceUsage,
   date1904: boolean,
-): ParsedSheet {
+  columnSource?: XmlElement,
+): Promise<ParsedSheet> {
   const target = reference.relationship.target;
   const cells: ParsedCell[] = [];
   const sharedMasters = new Map<
@@ -1216,11 +1210,18 @@ function parseSheet(
   let internalMetadata = false;
   const inheritedColumnStyles = new Map<number, string>();
   let columnStylesRead = false;
+  let columnsPrecedeRows = false;
+  const cellsBeforeSheet = usage.cells;
+  const rowContext: XlsxCodecContext =
+    columnSource && context.options
+      ? { ...context, options: { ...context.options, onWarning: undefined } }
+      : context;
 
   const readColumnStyles = (root: XmlElement): void => {
     if (columnStylesRead) return;
     columnStylesRead = true;
     const columnCollection = xmlChild(root, "cols");
+    columnsPrecedeRows = columnCollection !== undefined;
     for (const columnElement of columnCollection ? xmlChildren(columnCollection, "col") : []) {
       const style = xmlAttribute(columnElement, "style");
       if (style === undefined) continue;
@@ -1231,8 +1232,10 @@ function parseSheet(
       for (let index = min - 1; index < max; index++) inheritedColumnStyles.set(index, style);
     }
   };
+  if (columnSource) readColumnStyles(columnSource);
 
   const processRow = (rowElement: XmlElement, root: XmlElement): void => {
+    if (!columnStylesRead) assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
     readColumnStyles(root);
     const row =
       xmlAttribute(rowElement, "r") === undefined
@@ -1295,7 +1298,7 @@ function parseSheet(
           }
           value = null;
         } else if (formulaType !== "normal") {
-          emitWarning(context, {
+          emitWarning(rowContext, {
             code: "unsupported-feature",
             message: `Excel ${formulaType} formula was neutralized because its range semantics are unsupported`,
             sheet: reference.name,
@@ -1303,7 +1306,7 @@ function parseSheet(
           });
           value = formulaText ? { kind: "literal", value: `=${formulaText}` } : null;
         } else if (formulaContainsExternalReference(formulaText)) {
-          emitWarning(context, {
+          emitWarning(rowContext, {
             code: "external-formula",
             message: "External-data formula was neutralized as inert text",
             sheet: reference.name,
@@ -1319,7 +1322,7 @@ function parseSheet(
           xmlAttribute(cellElement, "t"),
           sharedStrings,
           styleRecord,
-          context,
+          rowContext,
           reference.name,
           addressText,
           date1904,
@@ -1353,21 +1356,35 @@ function parseSheet(
   };
 
   const part = normalizePartName(target);
-  const root = parseXml(packageFile.read(part), part, context, {
+  const root = await parseXmlChunks(packageFile.archive.chunks(part), part, context, {
     parent: "sheetData",
     parentIsRoot: false,
-    shouldStream: (xml, startOffset, rootElement) =>
-      xmlRootMatches(rootElement, "worksheet", MAIN_NAMESPACES) &&
-      !hasColumnStylesAfter(xml, startOffset),
-    // The tree path reads only `row` children; other children are skipped alike.
+    // The tree path read only `row` children; other children are skipped alike.
     child: (rowElement, rootElement) => {
       if (xmlLocalName(rowElement.name) === "row") processRow(rowElement, rootElement);
     },
   });
   assertXmlRoot(root, "worksheet", MAIN_NAMESPACES, target);
-  const sheetData = xmlChild(root, "sheetData");
-  for (const rowElement of sheetData ? xmlChildren(sheetData, "row") : []) {
-    processRow(rowElement, root);
+  const lateColumns = xmlChild(root, "cols");
+  if (
+    columnStylesRead &&
+    !columnsPrecedeRows &&
+    lateColumns &&
+    xmlChildren(lateColumns, "col").some((column) => xmlAttribute(column, "style") !== undefined)
+  ) {
+    // Column styles apply to every row, including rows already streamed; a
+    // second streamed pass is cheaper than retaining the worksheet document.
+    usage.cells = cellsBeforeSheet;
+    return parseSheet(
+      packageFile,
+      reference,
+      styles,
+      sharedStrings,
+      context,
+      usage,
+      date1904,
+      root,
+    );
   }
   readColumnStyles(root);
   for (const cell of cells) {
@@ -1987,21 +2004,19 @@ export async function readWorkbook(
   for (const reference of references) {
     checkAbort(context);
     const worksheetPart = reference.relationship.target;
-    const parts = [
-      worksheetPart,
-      ...packageFile
-        .relationships(worksheetPart)
-        .filter(
-          (relationship) =>
-            !relationship.external &&
-            ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
-        )
-        .map((relationship) => relationship.target),
-    ];
+    // The worksheet itself is streamed by parseSheet; only its small parts are loaded.
+    const parts = packageFile
+      .relationships(worksheetPart)
+      .filter(
+        (relationship) =>
+          !relationship.external &&
+          ["comments", "table"].some((kind) => relationshipTypeMatches(relationship.type, kind)),
+      )
+      .map((relationship) => relationship.target);
     await packageFile.load(parts);
     try {
       parsedSheets.push(
-        parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
+        await parseSheet(packageFile, reference, styles, sharedStrings, context, usage, date1904),
       );
     } finally {
       packageFile.release(parts);
@@ -2128,6 +2143,9 @@ export async function readWorkbook(
         ...(cellStyle ? { style: cellStyle } : {}),
       };
     });
+    // Parsed cells are not read again; releasing them before preservation capture and
+    // snapshot validation keeps one cell representation resident instead of two.
+    source.cells.length = 0;
     const nativeValidations = source.validations.map((validation, index) => {
       const sidecar = meta?.validationRules?.[index];
       const sameBlankDefault =

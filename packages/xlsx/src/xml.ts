@@ -29,11 +29,10 @@ export interface XmlChildStream {
   /** Whether the streamed parent is the document root or a direct child of it. */
   readonly parentIsRoot: boolean;
   /**
-   * Called before the streamed parent's children are parsed, with the decoded
-   * document text, the offset just after its start tag, and the root element
-   * built so far. Returning false keeps the children in the tree instead.
+   * Called before the streamed parent's children are parsed with the root
+   * element built so far. Returning false keeps the children in the tree instead.
    */
-  readonly shouldStream?: (xml: string, startOffset: number, root: XmlElement) => boolean;
+  readonly shouldStream?: (root: XmlElement) => boolean;
   /** Receives each direct child instead of retaining it, in document order. */
   readonly child: (element: XmlElement, root: XmlElement) => void;
 }
@@ -334,7 +333,7 @@ export function parseXml(
         if (
           root !== undefined &&
           !parsed.selfClosing &&
-          (childStream.shouldStream?.(xml, end + 1, root) ?? true)
+          (childStream.shouldStream?.(root) ?? true)
         ) {
           streamedParent = element;
         }
@@ -348,6 +347,263 @@ export function parseXml(
   if (roots.length !== 1 || root === undefined) {
     return xmlFailure(part, `expected one root element, found ${roots.length}`);
   }
+  return root;
+}
+
+const IGNORED_SECTIONS = {
+  comment: { terminator: "-->", label: "comment" },
+  cdata: { terminator: "]]>", label: "CDATA" },
+  instruction: { terminator: "?>", label: "processing instruction" },
+} as const;
+const MARKUP_PREFIXES = ["<!--", "<![CDATA[", "<?", "</", "<!DOCTYPE", "<!ENTITY"] as const;
+const MARKUP_PREFIX_LENGTH = 9;
+/**
+ * Longest held-back text after a trailing '&'. Every XML 1.0 character
+ * reference without padding zeros fits; anything longer is decoded right away
+ * so a stray '&' cannot make each new chunk rescan a growing buffer.
+ */
+const MAX_HELD_ENTITY_LENGTH = 32;
+
+/** A start or closing tag still waiting for its '>' in a later chunk. */
+interface OpenTag {
+  readonly parts: string[];
+  readonly closing: boolean;
+  quote: number;
+}
+
+/**
+ * Parse an inflated part without retaining its bytes or decoded document. Only
+ * the current token, open ancestors and one streamed child remain resident.
+ * The tree parser above remains the path for the small, non-worksheet parts.
+ */
+export async function parseXmlChunks(
+  chunks: AsyncIterable<Uint8Array>,
+  part: string,
+  context: XlsxCodecContext,
+  stream: Pick<XmlChildStream, "parent" | "parentIsRoot" | "child">,
+): Promise<XmlElement> {
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const roots: MutableXmlElement[] = [];
+  const stack: MutableXmlElement[] = [];
+  let pending = "";
+  let declarationTail = "";
+  let elementCount = 0;
+  let bytesRead = 0;
+  let streamedParent: MutableXmlElement | undefined;
+  let streamedChild: MutableXmlElement | undefined;
+  let firstParent: MutableXmlElement | undefined;
+  let ignored: keyof typeof IGNORED_SECTIONS | undefined;
+  let openTag: OpenTag | undefined;
+
+  const appendText = (raw: string, cdata = false): void => {
+    if (!raw) return;
+    const decoded = cdata ? raw : decodeXmlEntities(raw, part);
+    const current = stack.at(-1);
+    if (!current) {
+      if (decoded.trim()) xmlFailure(part, "text exists outside the root element");
+      return;
+    }
+    current.textBytes += utf8Length(decoded);
+    assertResource(context, "maxXmlTextBytes", current.textBytes);
+    current.text += decoded;
+  };
+  const deliver = (element: MutableXmlElement): void => {
+    const root = roots[0];
+    if (!root) return xmlFailure(part, "expected one root element, found 0");
+    if (streamedParent === firstParent) stream.child(element, root);
+  };
+  const parsePending = (final: boolean): void => {
+    let cursor = 0;
+    while (cursor < pending.length) {
+      if ((elementCount & 4_095) === 0) checkAbort(context);
+      if (ignored) {
+        const { terminator, label } = IGNORED_SECTIONS[ignored];
+        const end = pending.indexOf(terminator, cursor);
+        if (end < 0) {
+          if (final) xmlFailure(part, `${label} is unterminated`);
+          // Keep only the suffix that could start the terminator, without
+          // splitting a surrogate pair across text appends.
+          let retain = Math.max(cursor, pending.length - (terminator.length - 1));
+          const lead = pending.charCodeAt(retain - 1);
+          if (retain > cursor && lead >= 0xd800 && lead <= 0xdbff) retain -= 1;
+          if (ignored === "cdata") appendText(pending.slice(cursor, retain), true);
+          cursor = retain;
+          break;
+        }
+        if (ignored === "cdata") appendText(pending.slice(cursor, end), true);
+        cursor = end + terminator.length;
+        ignored = undefined;
+        continue;
+      }
+      if (pending[cursor] !== "<") {
+        const open = pending.indexOf("<", cursor);
+        if (open < 0 && !final) {
+          // An entity may straddle chunks. Everything before its final '&'
+          // can be decoded immediately, so long text nodes need no raw buffer.
+          const ampersand = pending.lastIndexOf("&");
+          const holdEntity =
+            ampersand >= cursor &&
+            pending.length - ampersand <= MAX_HELD_ENTITY_LENGTH &&
+            pending.indexOf(";", ampersand) < 0;
+          const end = holdEntity ? ampersand : pending.length;
+          appendText(pending.slice(cursor, end));
+          cursor = end;
+          break;
+        }
+        const end = open < 0 ? pending.length : open;
+        appendText(pending.slice(cursor, end));
+        cursor = end;
+        continue;
+      }
+      if (!final && pending.length - cursor < MARKUP_PREFIX_LENGTH) {
+        // A comment, CDATA, instruction, closing tag or forbidden declaration
+        // may be cut by the chunk boundary; wait for its distinguishing prefix.
+        const remaining = pending.slice(cursor).toUpperCase();
+        const ambiguous = MARKUP_PREFIXES.some(
+          (prefix) => prefix.length > remaining.length && prefix.startsWith(remaining),
+        );
+        if (ambiguous) break;
+      }
+      if (pending.startsWith("<!--", cursor)) {
+        ignored = "comment";
+        cursor += 4;
+        continue;
+      }
+      if (pending.startsWith("<![CDATA[", cursor)) {
+        ignored = "cdata";
+        cursor += 9;
+        continue;
+      }
+      if (pending.startsWith("<?", cursor)) {
+        ignored = "instruction";
+        cursor += 2;
+        continue;
+      }
+      if (pending.startsWith("<!", cursor)) xmlFailure(part, "unsupported declaration");
+      const closing = pending.startsWith("</", cursor);
+      let end = cursor + (closing ? 2 : 1);
+      let quote = 0;
+      for (; end < pending.length; end++) {
+        const code = pending.charCodeAt(end);
+        if (quote) {
+          if (quote === code) quote = 0;
+        } else if (!closing && (code === CODE_QUOTE || code === CODE_APOSTROPHE)) quote = code;
+        else if (code === CODE_GREATER_THAN) break;
+      }
+      if (end === pending.length) {
+        if (final) xmlFailure(part, closing ? "closing tag is unterminated" : "unterminated tag");
+        // Later chunks are scanned only for this tag's '>' and joined once,
+        // so one long tag is not rescanned from its start for every chunk.
+        openTag = { parts: [pending.slice(cursor)], closing, quote };
+        cursor = pending.length;
+        break;
+      }
+      if (closing) {
+        const name = pending.slice(cursor + 2, end).trim();
+        const current = stack.pop();
+        if (!current || current.name !== name)
+          xmlFailure(part, `closing tag ${name} does not match`);
+        if (streamedChild === current) {
+          deliver(current);
+          streamedChild = undefined;
+        }
+        if (streamedParent === current) streamedParent = undefined;
+      } else {
+        const parsed = parseStartTag(pending.slice(cursor + 1, end), part, context);
+        elementCount += 1;
+        assertResource(context, "maxXmlElements", elementCount);
+        const element: MutableXmlElement = {
+          name: parsed.name,
+          attributes: parsed.attributes,
+          children: [],
+          text: "",
+          textBytes: 0,
+        };
+        const parent = stack.at(-1);
+        const depth = stack.length + 1;
+        if (parent === streamedParent && parent !== undefined) {
+          if (parsed.selfClosing) deliver(element);
+          else streamedChild = element;
+        } else if (parent) parent.children.push(element);
+        else roots.push(element);
+        if (!parsed.selfClosing) {
+          stack.push(element);
+          assertResource(context, "maxXmlDepth", stack.length);
+        }
+        const expectedDepth = stream.parentIsRoot ? 1 : 2;
+        if (depth === expectedDepth && xmlLocalName(element.name) === stream.parent) {
+          // Later duplicate parents are ignored by semantic readers too, but
+          // their rows must still be validated without accumulating a tree.
+          firstParent ??= element;
+          if (!parsed.selfClosing) streamedParent = element;
+        }
+      }
+      cursor = end + 1;
+    }
+    pending = pending.slice(cursor);
+  };
+  const decode = (bytes?: Uint8Array): string => {
+    try {
+      return bytes ? decoder.decode(bytes, { stream: true }) : decoder.decode();
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      return xmlFailure(part, "content is not valid UTF-8");
+    }
+  };
+  const accept = (text: string, final: boolean): void => {
+    // Match the tree parser's prohibition even inside comments/CDATA and when
+    // the forbidden declaration is split between inflater output chunks.
+    const declarations = declarationTail + text;
+    if (/<!DOCTYPE|<!ENTITY/i.test(declarations))
+      xmlFailure(part, "DTDs and entities are forbidden");
+    declarationTail = declarations.slice(-8);
+    if (openTag) {
+      let end = 0;
+      let quote = openTag.quote;
+      for (; end < text.length; end++) {
+        const code = text.charCodeAt(end);
+        if (quote) {
+          if (quote === code) quote = 0;
+        } else if (!openTag.closing && (code === CODE_QUOTE || code === CODE_APOSTROPHE))
+          quote = code;
+        else if (code === CODE_GREATER_THAN) break;
+      }
+      if (end === text.length) {
+        if (final)
+          xmlFailure(part, openTag.closing ? "closing tag is unterminated" : "unterminated tag");
+        openTag.parts.push(text);
+        openTag.quote = quote;
+        return;
+      }
+      openTag.parts.push(text);
+      pending = openTag.parts.join("");
+      openTag = undefined;
+    } else pending += text;
+    parsePending(final);
+  };
+  const iterator = chunks[Symbol.asyncIterator]();
+  try {
+    for (let next = await iterator.next(); !next.done; next = await iterator.next()) {
+      checkAbort(context);
+      bytesRead += next.value.byteLength;
+      assertResource(context, "maxEntryUncompressedBytes", bytesRead);
+      accept(decode(next.value), false);
+    }
+    accept(decode(), true);
+  } catch (error) {
+    // A damaged entry must be reported as damage, not as the XML symptom its
+    // corrupt prefix produced: finish inflating so size and CRC checks run.
+    for (let next = await iterator.next(); !next.done; next = await iterator.next()) {
+      checkAbort(context);
+    }
+    throw error;
+  }
+  if (ignored) xmlFailure(part, `${IGNORED_SECTIONS[ignored].label} is unterminated`);
+  const unclosed = stack.at(-1);
+  if (unclosed) xmlFailure(part, `element ${unclosed.name} is unclosed`);
+  const root = roots[0];
+  if (roots.length !== 1 || !root)
+    xmlFailure(part, `expected one root element, found ${roots.length}`);
   return root;
 }
 
