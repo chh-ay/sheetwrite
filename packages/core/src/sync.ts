@@ -32,6 +32,7 @@ import type {
   PersistenceCommitResponse,
   RemoteOperationSource,
   SyncMutationRecord,
+  SyncMutationStatus,
   VersionBatchMember,
   VersionedOperation,
 } from "./types/transaction.js";
@@ -323,11 +324,10 @@ let nextMutation = 1;
  * @see SyncCoordinator.recoverConflict
  */
 export class SyncCoordinator {
-  private readonly records = new Map<string, SyncMutationRecord>();
+  private readonly queue = new PendingRecordQueue();
   private readonly recordStorageRevisions = new Map<string, bigint>();
   private readonly recordBytes = new Map<string, number>();
   private readonly localReservations: LocalPendingReservation[] = [];
-  private readonly order: string[] = [];
   private readonly acknowledged = new Set<string>();
   private readonly acknowledgementOrder: string[] = [];
   private readonly listeners = new Set<SyncListener>();
@@ -421,10 +421,7 @@ export class SyncCoordinator {
   }
 
   pendingCommits(): readonly SyncMutationRecord[] {
-    return this.order
-      .map((id) => this.records.get(id))
-      .filter((record): record is SyncMutationRecord => record !== undefined)
-      .map(cloneRecord);
+    return this.queue.toArray().map(cloneRecord);
   }
 
   on(listener: SyncListener): () => void {
@@ -532,7 +529,7 @@ export class SyncCoordinator {
   async sendNext(): Promise<PersistenceCommitResponse | null> {
     if (this.hydrating) await this.readyPromise;
     if (this.hydrationError !== undefined) throw this.hydrationError;
-    const record = this.order.map((id) => this.records.get(id)).find(Boolean);
+    const record = this.queue.head();
     if (!record) return null;
     if (record.status === "persisting") {
       await this.persistence.get(record.clientMutationId);
@@ -550,7 +547,7 @@ export class SyncCoordinator {
 
   async retryPersistence(clientMutationId: string): Promise<boolean> {
     await this.readyPromise;
-    const record = this.records.get(clientMutationId);
+    const record = this.queue.get(clientMutationId);
     if (!record || !this.options.pendingStorage || record.status !== "storage-error") return false;
     await this.schedulePersistence(record);
     return !this.storageErrors.has(clientMutationId);
@@ -559,17 +556,16 @@ export class SyncCoordinator {
   async send(clientMutationId: string): Promise<PersistenceCommitResponse | null> {
     if (this.destroyed || this.connection !== "online") return null;
     if (this.hydrating) await this.readyPromise;
-    const head = this.order.find((id) => this.records.has(id));
-    if (head !== clientMutationId) return null;
-    let record = this.records.get(clientMutationId);
+    if (this.queue.head()?.clientMutationId !== clientMutationId) return null;
+    let record = this.queue.get(clientMutationId);
     if (record?.status === "persisting") {
       await this.persistence.get(clientMutationId);
-      record = this.records.get(clientMutationId);
+      record = this.queue.get(clientMutationId);
     }
     const storageError = this.storageErrors.get(clientMutationId);
     if (storageError !== undefined) throw storageError;
     if (!record || record.status === "conflicted" || record.status === "sending") return null;
-    record.status = "sending";
+    this.queue.setStatus(record, "sending");
     this.emitState();
     this.emit({ type: "sending", mutation: cloneRecord(record) });
     const controller = new AbortController();
@@ -598,8 +594,8 @@ export class SyncCoordinator {
       await this.handleResponse(response, clientMutationId);
       return response;
     } catch (error) {
-      const current = this.records.get(clientMutationId);
-      if (current?.status === "sending") current.status = "pending";
+      const current = this.queue.get(clientMutationId);
+      if (current?.status === "sending") this.queue.setStatus(current, "pending");
       const failure = syncFailure(error, { action: "send", clientMutationId });
       if (!this.destroyed) {
         this.emitState();
@@ -636,7 +632,7 @@ export class SyncCoordinator {
     }
     if (response.status === "conflict") {
       const id = requestedMutationId;
-      const record = id ? this.records.get(id) : undefined;
+      const record = id ? this.queue.get(id) : undefined;
       if (!record) {
         this.emit({
           type: "error",
@@ -649,7 +645,7 @@ export class SyncCoordinator {
         return;
       }
       assertConflictRecovery(response, record.baseVersion);
-      record.status = "conflicted";
+      this.queue.setStatus(record, "conflicted");
       this.outstandingConflict = {
         response,
         appliedVersion: this.outstandingConflict?.appliedVersion ?? this.version,
@@ -668,7 +664,7 @@ export class SyncCoordinator {
     }
 
     const id = response.clientMutationId;
-    const record = this.records.get(id);
+    const record = this.queue.get(id);
     if (!record) {
       if (!this.acknowledged.has(id)) {
         this.emit({
@@ -726,7 +722,7 @@ export class SyncCoordinator {
         throw failure;
       }
     }
-    if (this.records.get(id) !== record) return;
+    if (this.queue.get(id) !== record) return;
 
     if (!this.destroyed) this.version = Math.max(this.version, response.version);
     this.dropStaleBatchAssembly();
@@ -739,9 +735,7 @@ export class SyncCoordinator {
     this.pendingEncodedByteTotal -= encodedBytes;
     this.recordBytes.delete(id);
     this.recordStorageRevisions.delete(id);
-    this.records.delete(id);
-    const index = this.order.indexOf(id);
-    if (index >= 0) this.order.splice(index, 1);
+    this.queue.remove(id);
     this.ambiguousRestores.delete(id);
     this.storageErrors.delete(id);
     this.persistence.delete(id);
@@ -829,7 +823,7 @@ export class SyncCoordinator {
     this.version = version;
     this.outstandingConflict = undefined;
     this.clearGapBuffer();
-    adoptQueueBase(queue);
+    this.adoptQueueBase(queue);
     this.emitState();
     this.emit({
       type: "reloaded",
@@ -887,10 +881,8 @@ export class SyncCoordinator {
     if (this.version !== response.currentVersion || this.batchAssembly) {
       return reload("version-advanced");
     }
-    const records = this.order
-      .map((id) => this.records.get(id))
-      .filter((record): record is SyncMutationRecord => record !== undefined);
-    if (tail.some((entry) => entry.clientMutationId && this.records.has(entry.clientMutationId))) {
+    const records = this.queue.toArray();
+    if (tail.some((entry) => entry.clientMutationId && this.queue.has(entry.clientMutationId))) {
       return reload("own-mutation");
     }
     // Acknowledged versions of this client are already in the Grid, in server order.
@@ -937,7 +929,7 @@ export class SyncCoordinator {
       }
     }
     this.outstandingConflict = undefined;
-    adoptQueueBase(queue);
+    this.adoptQueueBase(queue);
     for (const [version, input] of this.gapBuffer) {
       if (version > this.version) continue;
       this.gapBuffer.delete(version);
@@ -951,9 +943,7 @@ export class SyncCoordinator {
 
   /** Durably moves every pending commit onto `version`, in queue order. */
   private async persistQueueOnto(version: number): Promise<QueueBase> {
-    const records = this.order
-      .map((id) => this.records.get(id))
-      .filter((record): record is SyncMutationRecord => record !== undefined);
+    const records = this.queue.toArray();
     let baseVersion = version;
     const replacements = records.map((record) => {
       const replacement: PendingCommit = {
@@ -965,7 +955,7 @@ export class SyncCoordinator {
           ? { versionOperationCounts: record.versionOperationCounts }
           : {}),
       };
-      const versions = record.versionOperationCounts?.length ?? 1;
+      const versions = serverVersionsOf(record);
       for (let index = 0; index < versions; index++) baseVersion = incrementVersion(baseVersion);
       return replacement;
     });
@@ -984,6 +974,15 @@ export class SyncCoordinator {
     return { records, replacements };
   }
 
+  /** Adopts durably persisted queue bases; every record becomes sendable again. */
+  private adoptQueueBase({ records, replacements }: QueueBase): void {
+    for (let index = 0; index < records.length; index++) {
+      const record = records[index]!;
+      record.baseVersion = replacements[index]!.baseVersion;
+      this.queue.setStatus(record, "pending");
+    }
+  }
+
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -996,10 +995,9 @@ export class SyncCoordinator {
     }
     this.activeSends.clear();
     this.clearGapBuffer();
-    this.records.clear();
+    this.queue.clear();
     this.recordStorageRevisions.clear();
     this.recordBytes.clear();
-    this.order.length = 0;
     this.localReservations.length = 0;
     this.pendingCommitTotal = 0;
     this.pendingOperationTotal = 0;
@@ -1075,7 +1073,7 @@ export class SyncCoordinator {
     }
 
     const reservedVersions = this.versionOperationCounts(sizes, encodedBytes)?.length ?? 1;
-    assertVersion(this.version + this.pendingVersionCount() + reservedVersions, "pending version");
+    assertVersion(this.version + this.queue.versionCount + reservedVersions, "pending version");
     const reservation: LocalPendingReservation = {
       status: "reserved",
       clientMutationId: "",
@@ -1092,7 +1090,7 @@ export class SyncCoordinator {
         this.options.createMutationId?.() ?? `sheetwrite-${Date.now()}-${nextMutation++}`;
       assertMutationId(clientMutationId, this.limits);
       if (
-        this.records.has(clientMutationId) ||
+        this.queue.has(clientMutationId) ||
         this.acknowledged.has(clientMutationId) ||
         this.localReservations.some(
           (candidate) =>
@@ -1160,18 +1158,17 @@ export class SyncCoordinator {
       this.pendingEncodedByteTotal += encodedBytes - reservation.encodedBytes;
       const record: SyncMutationRecord = {
         documentId: this.options.documentId,
-        baseVersion: this.version + this.pendingVersionCount(),
+        baseVersion: this.version + this.queue.versionCount,
         clientMutationId: reservation.clientMutationId,
         operations,
         ...(versionOperationCounts ? { versionOperationCounts } : {}),
         status: this.options.pendingStorage ? "persisting" : "pending",
       };
-      this.records.set(record.clientMutationId, record);
+      this.queue.add(record);
       if (reservation.storageRevision !== undefined) {
         this.recordStorageRevisions.set(record.clientMutationId, reservation.storageRevision);
       }
       this.recordBytes.set(record.clientMutationId, encodedBytes);
-      this.order.push(record.clientMutationId);
 
       if (this.options.pendingStorage) {
         this.emitState();
@@ -1183,15 +1180,6 @@ export class SyncCoordinator {
         this.emit({ type: "pending", mutation: cloneRecord(record) });
       }
     }
-  }
-
-  /** Server versions that the pending commits occupy once acknowledged. */
-  private pendingVersionCount(): number {
-    let versions = 0;
-    for (const record of this.records.values()) {
-      versions += record.versionOperationCounts?.length ?? 1;
-    }
-    return versions;
   }
 
   /**
@@ -1406,9 +1394,8 @@ export class SyncCoordinator {
     if (this.destroyed) return;
 
     for (const { record, bytes } of prepared) {
-      this.records.set(record.clientMutationId, record);
+      this.queue.add(record);
       this.recordBytes.set(record.clientMutationId, bytes);
-      this.order.push(record.clientMutationId);
       if (ambiguousIds.has(record.clientMutationId)) {
         this.ambiguousRestores.add(record.clientMutationId);
       }
@@ -1458,12 +1445,12 @@ export class SyncCoordinator {
   private async persistRecord(record: SyncMutationRecord): Promise<void> {
     const storage = this.options.pendingStorage;
     if (!storage || this.destroyed) return;
-    record.status = "persisting";
+    this.queue.setStatus(record, "persisting");
     this.storageErrors.delete(record.clientMutationId);
     try {
       await storage.put(clonePendingCommit(record), this.abortController.signal);
-      if (this.destroyed || !this.records.has(record.clientMutationId)) return;
-      record.status = "pending";
+      if (this.destroyed || !this.queue.has(record.clientMutationId)) return;
+      this.queue.setStatus(record, "pending");
       this.emitState();
       this.emit({ type: "pending", mutation: cloneRecord(record) });
     } catch (error) {
@@ -1472,7 +1459,7 @@ export class SyncCoordinator {
         action: "persist-pending",
         clientMutationId: record.clientMutationId,
       });
-      record.status = "storage-error";
+      this.queue.setStatus(record, "storage-error");
       this.storageErrors.set(record.clientMutationId, failure);
       this.emitState();
       this.emit({
@@ -1495,7 +1482,7 @@ export class SyncCoordinator {
     const { operation } = input;
     const mutationId = operation.clientMutationId;
     if (operation.version <= this.version) {
-      if (mutationId && this.records.has(mutationId)) {
+      if (mutationId && this.queue.has(mutationId)) {
         // Only the last member of an own batch acknowledges the whole batch.
         if (operation.batch === undefined || operation.batch.index === operation.batch.count - 1) {
           await this.processResponse({
@@ -1566,7 +1553,7 @@ export class SyncCoordinator {
       return this.assembleBatchMember(input);
     }
     const mutationId = operation.clientMutationId;
-    if (mutationId && this.records.has(mutationId)) {
+    if (mutationId && this.queue.has(mutationId)) {
       await this.processResponse({
         status: "applied",
         version: operation.version,
@@ -1661,7 +1648,7 @@ export class SyncCoordinator {
     const last = assembly.members.at(-1);
     if (!first || !last) throw new Error("A complete atomic batch has no members");
     const mutationId = assembly.clientMutationId;
-    if (mutationId && this.records.has(mutationId)) {
+    if (mutationId && this.queue.has(mutationId)) {
       await this.processResponse({
         status: "applied",
         version: last.version,
@@ -1875,14 +1862,10 @@ export class SyncCoordinator {
     if (this.destroyed) return "destroyed";
     if (this.hydrating) return "hydrating";
     if (this.hydrationError !== undefined || this.storageErrors.size > 0) return "error";
-    let pending = false;
-    for (const record of this.records.values()) {
-      if (record.status === "conflicted") return "conflict";
-      if (record.status === "sending") return "sending";
-      if (record.status === "persisting") return "persisting";
-      if (record.status === "pending") pending = true;
-    }
-    return pending ? "pending" : "idle";
+    const busy = this.queue.firstBusyStatus();
+    if (busy === "conflicted") return "conflict";
+    if (busy !== undefined) return busy;
+    return this.queue.count("pending") > 0 ? "pending" : "idle";
   }
 
   private pendingCapacity(): SyncPendingCapacityState {
@@ -1934,12 +1917,120 @@ interface QueueBase {
   replacements: PendingCommit[];
 }
 
-/** Adopts durably persisted queue bases; every record becomes sendable again. */
-function adoptQueueBase({ records, replacements }: QueueBase): void {
-  for (let index = 0; index < records.length; index++) {
-    records[index]!.baseVersion = replacements[index]!.baseVersion;
-    records[index]!.status = "pending";
+/** Record statuses that decide the activity of a queue in queue order. */
+type BusyMutationStatus = Extract<SyncMutationStatus, "conflicted" | "sending" | "persisting">;
+
+function isBusyStatus(status: SyncMutationStatus): status is BusyMutationStatus {
+  return status === "conflicted" || status === "sending" || status === "persisting";
+}
+
+/**
+ * Pending records in queue order. Every add, removal, and status change goes
+ * through here so the running totals stay exact: a local commit, state
+ * snapshot, or send then costs the same at any queue depth.
+ */
+class PendingRecordQueue {
+  private readonly records = new Map<string, SyncMutationRecord>();
+  /**
+   * Mutation IDs in queue order, always the keys of `records`. Kept beside the
+   * map because JavaScriptCore finds the first entry of a Map by walking the
+   * slots of entries deleted from its front, which the head lookup would hit
+   * after every acknowledgement.
+   */
+  private readonly order: string[] = [];
+  private readonly statusCounts: Record<SyncMutationStatus, number> = {
+    persisting: 0,
+    pending: 0,
+    sending: 0,
+    conflicted: 0,
+    "storage-error": 0,
+  };
+  private serverVersions = 0;
+
+  /** Server versions the queued records occupy once acknowledged. */
+  get versionCount(): number {
+    return this.serverVersions;
   }
+
+  get(clientMutationId: string): SyncMutationRecord | undefined {
+    return this.records.get(clientMutationId);
+  }
+
+  has(clientMutationId: string): boolean {
+    return this.records.has(clientMutationId);
+  }
+
+  head(): SyncMutationRecord | undefined {
+    const id = this.order[0];
+    return id === undefined ? undefined : this.records.get(id);
+  }
+
+  count(status: SyncMutationStatus): number {
+    return this.statusCounts[status];
+  }
+
+  /** Records in queue order, in a new array. */
+  toArray(): SyncMutationRecord[] {
+    return Array.from(this.records.values());
+  }
+
+  /** Status of the first record in queue order that is conflicted, sending, or persisting. */
+  firstBusyStatus(): BusyMutationStatus | undefined {
+    const headStatus = this.head()?.status;
+    if (headStatus !== undefined && isBusyStatus(headStatus)) return headStatus;
+    const { conflicted, sending, persisting } = this.statusCounts;
+    const busyKinds = Number(conflicted > 0) + Number(sending > 0) + Number(persisting > 0);
+    if (busyKinds <= 1) {
+      if (conflicted > 0) return "conflicted";
+      if (sending > 0) return "sending";
+      return persisting > 0 ? "persisting" : undefined;
+    }
+    // Only the head is ever sent, but a transport may report a conflict for a
+    // later mutation through `handleResponse`. Queue order then decides.
+    for (const record of this.records.values()) {
+      if (isBusyStatus(record.status)) return record.status;
+    }
+    return undefined;
+  }
+
+  add(record: SyncMutationRecord): void {
+    this.records.set(record.clientMutationId, record);
+    this.order.push(record.clientMutationId);
+    this.statusCounts[record.status] += 1;
+    this.serverVersions += serverVersionsOf(record);
+  }
+
+  remove(clientMutationId: string): void {
+    const record = this.records.get(clientMutationId);
+    if (!record) return;
+    this.records.delete(clientMutationId);
+    // Acknowledgements arrive in queue order, so this is the head in practice.
+    this.order.splice(this.order.indexOf(clientMutationId), 1);
+    this.statusCounts[record.status] -= 1;
+    this.serverVersions -= serverVersionsOf(record);
+  }
+
+  /** Records that already left the queue change status without touching the totals. */
+  setStatus(record: SyncMutationRecord, status: SyncMutationStatus): void {
+    if (this.records.get(record.clientMutationId) === record) {
+      this.statusCounts[record.status] -= 1;
+      this.statusCounts[status] += 1;
+    }
+    record.status = status;
+  }
+
+  clear(): void {
+    this.records.clear();
+    this.order.length = 0;
+    for (const status of Object.keys(this.statusCounts) as SyncMutationStatus[]) {
+      this.statusCounts[status] = 0;
+    }
+    this.serverVersions = 0;
+  }
+}
+
+function serverVersionsOf(record: PendingCommit): number {
+  return record.versionOperationCounts?.length ?? 1;
 }
 
 /** Whether an operation inserts, deletes, or moves rows or columns. */

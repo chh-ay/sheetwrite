@@ -310,6 +310,51 @@ describe("durable offline sync", () => {
     reloadedGrid.destroy();
   });
 
+  it("chains new commits past every queued server version across restore and acknowledgement", async () => {
+    const storage = new FakePendingStorage();
+    storage.records.set("restored-batch", {
+      documentId: "offline-doc",
+      baseVersion: 4,
+      clientMutationId: "restored-batch",
+      operations: [setValue(9), { ...setValue(8), addr: { sheet: "s1", row: 1, col: 0 } }],
+      versionOperationCounts: [1, 1],
+    });
+    const grid = mountGrid();
+    const ids = ["local-m1", "local-m2"];
+    const coordinator = new SyncCoordinator(grid, new ControlledAdapter(snapshot()), {
+      documentId: "offline-doc",
+      serverVersion: 4,
+      pendingStorage: storage,
+      initialConnection: "offline",
+      createMutationId: () => ids.shift() ?? "unexpected",
+    });
+    await coordinator.ready();
+
+    grid.applyTransaction({ patches: [setValue(3)] });
+    expect(coordinator.state.activity).toBe("persisting");
+    await coordinator.ready();
+    expect(coordinator.state.activity).toBe("pending");
+    await coordinator.handleResponse({
+      status: "applied",
+      version: 6,
+      clientMutationId: "restored-batch",
+    });
+    grid.applyTransaction({ patches: [setValue(4)] });
+    await coordinator.ready();
+
+    expect(
+      coordinator.pendingCommits().map(({ clientMutationId, baseVersion }) => ({
+        clientMutationId,
+        baseVersion,
+      })),
+    ).toEqual([
+      { clientMutationId: "local-m1", baseVersion: 6 },
+      { clientMutationId: "local-m2", baseVersion: 7 },
+    ]);
+    coordinator.destroy();
+    grid.destroy();
+  });
+
   it("aborts a disconnected send and reconnects with the same ID", async () => {
     const storage = new FakePendingStorage();
     const adapter = new ControlledAdapter(snapshot());

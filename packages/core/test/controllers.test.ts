@@ -9,7 +9,7 @@ import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
 import { ReadWindowController } from "../src/read-window-controller.js";
 import { SheetwriteStore } from "../src/store.js";
-import type { Renderer, Store, Viewport, VisibleWindowView } from "../src/types.js";
+import type { DocumentOp, Renderer, Store, Viewport, VisibleWindowView } from "../src/types.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -111,6 +111,98 @@ describe("DocumentController", () => {
       expect(store.getCell(reference).resolved).toBe("replaced");
       controller.destroy();
       store.dispose();
+    },
+  );
+
+  it.each([8 * 1024 * 1024, 1200])(
+    "replays range undo identically on another peer under a %i-byte ceiling",
+    (maxEncodedBytes) => {
+      const rowCount = 128;
+      const transactionResourceLimits = { maxEncodedBytes, maxOperations: 10_000 };
+      const store = new SheetwriteStore(makeWorkbook(rowCount), undefined, {
+        transactionResourceLimits,
+      });
+      const peer = new SheetwriteStore(makeWorkbook(rowCount), undefined, {
+        transactionResourceLimits,
+      });
+      const formula = { sheet: "s1", row: 0, col: 0 };
+      const reference = { sheet: "s1", row: 0, col: 1 };
+      const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rowCount - 1, col: 2 } };
+      // Repeated text makes the plain restore exceed the small ceiling while
+      // keeping its compressed replay within one server version.
+      for (const target of [store, peer]) {
+        for (let row = 0; row < rowCount; row++) {
+          expect(
+            target.applyTransaction({
+              patches: [
+                {
+                  op: "set",
+                  addr: { sheet: "s1", row, col: 2 },
+                  value: { kind: "literal", value: 'saved "text" — 😀' },
+                  style: { italic: true },
+                },
+              ],
+            }).status,
+          ).toBe("applied");
+        }
+        expect(
+          target.applyTransaction({
+            patches: [
+              {
+                op: "set",
+                addr: formula,
+                value: { kind: "formula", src: "=SEQUENCE(3)" },
+                style: { bold: true },
+              },
+              { op: "set", addr: reference, value: { kind: "ref", target: formula } },
+            ],
+          }).status,
+        ).toBe("applied");
+      }
+      const expected = structuredClone(
+        store.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values,
+      );
+      const controller = new DocumentController({
+        store,
+        loadable: store,
+        transactionResourceLimits,
+        readOnly: () => false,
+        epoch: () => 0,
+        materializeVirtualColumns: (patches) => patches,
+        trustedResourceCallbacks: true,
+        onMutationRejected: (issues) => {
+          throw new Error(JSON.stringify(issues));
+        },
+        onHistoryApplied: () => {},
+      });
+      const replay = store.on("change", (event) => {
+        const patches: DocumentOp[] = JSON.parse(JSON.stringify(event.transaction.patches));
+        expect(peer.applyTransaction({ patches }, { source: "remote" }).status).toBe("applied");
+      });
+      try {
+        expect(controller.commit([{ op: "clearRange", range }], "api").status).toBe("applied");
+        controller.undo();
+        for (const target of [store, peer]) {
+          expect(
+            target.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values,
+          ).toEqual(expected);
+          expect(target.getFormula(formula)).toBe("=SEQUENCE(3)");
+          expect(target.getRefTarget(reference)).toEqual(formula);
+          expect(target.getCell(formula).style).toEqual({ bold: true });
+          expect(target.getCell({ sheet: "s1", row: 127, col: 2 }).style).toEqual({ italic: true });
+        }
+        controller.redo();
+        expect(peer.getCell(formula).resolved).toBeNull();
+        controller.undo();
+        expect(peer.getVisibleWindow("s1", { start: 0, end: rowCount }, [0, 1, 2]).values).toEqual(
+          expected,
+        );
+      } finally {
+        replay();
+        controller.destroy();
+        store.dispose();
+        peer.dispose();
+      }
     },
   );
 

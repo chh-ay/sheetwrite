@@ -10,8 +10,46 @@ import type { SheetId } from "./types/coordinates.js";
 import type { PanePaint, Renderer, Theme, Viewport } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 
+interface CellCoordinate {
+  readonly row: number;
+  readonly col: number;
+}
+
 const FORMULA_CLOSURE_MAX_CELLS = 32_768;
 const EMPTY_BANDS = new Uint32Array(0);
+
+/** True when a sorted array holds a value inside the inclusive span. */
+function sortedHasValueIn(values: Uint32Array, start: number, end: number): boolean {
+  let low = 0;
+  let high = values.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if ((values[middle] ?? 0) < start) low = middle + 1;
+    else high = middle;
+  }
+  return low < values.length && (values[low] ?? 0) <= end;
+}
+
+/**
+ * Backing rows and columns of the painted window, including overscan and frozen
+ * panes. Built once per transaction so each patch costs two binary searches.
+ */
+export class PaintedCells {
+  constructor(
+    private readonly sheet: SheetId,
+    private readonly rows: Uint32Array,
+    private readonly cols: Uint32Array,
+  ) {}
+
+  /** Corners are passed separately so a single-cell edit needs no range object. */
+  intersects(sheet: SheetId, start: CellCoordinate, end: CellCoordinate): boolean {
+    return (
+      sheet === this.sheet &&
+      sortedHasValueIn(this.cols, Math.min(start.col, end.col), Math.max(start.col, end.col)) &&
+      sortedHasValueIn(this.rows, Math.min(start.row, end.row), Math.max(start.row, end.row))
+    );
+  }
+}
 
 export interface ReadWindowControllerOptions {
   renderer: () => Renderer;
@@ -91,7 +129,39 @@ export class ReadWindowController {
   }
 
   get geometryVersion(): number {
-    return this.options.storeEpoch() + this.paintInvalidationEpoch + this.dataInvalidationEpoch;
+    return this.paintInvalidationEpoch + this.dataInvalidationEpoch;
+  }
+
+  /** View rows are mapped to backing rows, so reordered views compare correctly. */
+  paintedCells(): PaintedCells {
+    const { geometry } = this.options;
+    const theme = this.options.theme();
+    const window = geometry.paintWindow(
+      geometry.toContent(this.options.scrollTop()),
+      this.options.scrollLeft(),
+      Math.max(0, this.options.viewportHeight() - theme.headerHeight),
+      Math.max(0, this.options.viewportWidth() - theme.rowHeaderWidth),
+      this.options.overscan(),
+    );
+
+    const bodyColumns = window.columns.end - window.columns.start;
+    const cols = new Uint32Array(window.frozenColumns + bodyColumns);
+    for (let index = 0; index < window.frozenColumns; index++) {
+      cols[index] = geometry.columnIndices[index] ?? 0;
+    }
+    for (let offset = 0; offset < bodyColumns; offset++) {
+      cols[window.frozenColumns + offset] =
+        geometry.columnIndices[window.columns.start + offset] ?? 0;
+    }
+
+    const bodyRows = window.rows.end - window.rows.start;
+    const rows = new Uint32Array(window.frozenRows + bodyRows);
+    for (let row = 0; row < window.frozenRows; row++) rows[row] = geometry.toDataRow(row);
+    for (let offset = 0; offset < bodyRows; offset++) {
+      rows[window.frozenRows + offset] = geometry.toDataRow(window.rows.start + offset);
+    }
+
+    return new PaintedCells(this.options.activeSheet(), rows.sort(), cols.sort());
   }
 
   /** Preserve autofit's operation-owned sampling band without changing viewport protection. */
@@ -318,10 +388,10 @@ export class ReadWindowController {
     } else {
       if (refreshData) {
         this.cachedPaneViews = [];
-        this.lastPaintView = this.options.store.getVisibleWindow(
-          activeSheet,
-          rows,
-          this.windowedColumnIndices,
+        // Store windows borrow a reusable value scratch array. Unrelated reads
+        // must not overwrite a window retained across display-neutral edits.
+        this.lastPaintView = this.retainMainView(
+          this.options.store.getVisibleWindow(activeSheet, rows, this.windowedColumnIndices),
         );
       }
 
@@ -363,6 +433,7 @@ export class ReadWindowController {
     this.lastPaintFrozenWidth = frozenWidth;
     this.lastPaintZoom = zoom;
 
+    if (refreshData) this.options.ariaMirror.bumpVersion();
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);
