@@ -259,6 +259,35 @@ describe("XLSX streaming", () => {
     }
   });
 
+  it("accepts or rejects a long character reference the same way at every chunk split", async () => {
+    const chunkBytes = 8 * 1024;
+    for (const [reference, accepted] of [
+      [`&#${"0".repeat(27)}65;`, true],
+      [`&#${"0".repeat(40)}65;`, false],
+    ] as const) {
+      const cell = `<c r="A1" t="inlineStr"><is><t>${reference}</t></is></c>`;
+      const body = `<sheetData><row r="1">${cell}</row></sheetData>`;
+      const offset = worksheet(`<!---->${body}`).indexOf(reference);
+      for (const split of [0, 1, Math.floor(reference.length / 2), reference.length - 1]) {
+        const pad = chunkBytes - split - offset;
+        const xml = worksheet(`<!--${"p".repeat(pad)}-->${body}`);
+        expect(xml.indexOf(reference), `split ${split}`).toBe(chunkBytes - split);
+        const result = fromXlsxWorkbookFile(storedWorkbook(xml));
+        if (accepted) {
+          const imported = await result;
+          expect(imported.sheets[0]?.cells[0]?.cells[0]?.value, `split ${split}`).toEqual({
+            kind: "literal",
+            value: "A",
+          });
+        } else {
+          await expect(result, `split ${split}`).rejects.toMatchObject({
+            code: "xlsx-import-failed",
+          });
+        }
+      }
+    }
+  });
+
   it("keeps quoted '>' inside a tag that spans many inflater chunks", async () => {
     const quoted = "a>b'".repeat(40_000);
     const xml = worksheet(

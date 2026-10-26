@@ -6,6 +6,7 @@ import type {
   XlsxSourcePart,
   XlsxSourceSnapshot,
 } from "@sheetwrite/core";
+import { XlsxResourceError } from "@sheetwrite/core";
 import { inflateSync } from "fflate";
 
 import {
@@ -14,7 +15,7 @@ import {
   relationshipTypeMatches,
   resolveRelationshipTarget,
 } from "./opc.js";
-import { assertResource, checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
+import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
 import type { WorkbookWriteHook } from "./writer.js";
 import { decodeXstring, escapeXml, parseXml, xmlAttribute, xmlChild, xmlChildren } from "./xml.js";
 import { markStoredEntryVerified, type StoredZipEntry, validateStoredEntry } from "./zip.js";
@@ -462,8 +463,9 @@ function verifyGraph(
       try {
         validateStoredEntry(storedEntry(part), context);
       } catch (error) {
-        // Corrupt payloads drop only their graph; resource and abort errors still fail the save.
-        if (error instanceof TypeError) return error.message;
+        // Corrupt or over-limit payloads drop only their graph, so a persisted
+        // workbook still opens; abort errors still fail the whole operation.
+        if (error instanceof TypeError || error instanceof XlsxResourceError) return error.message;
         throw error;
       }
       if (Object.isFrozen(part)) verifiedParts.add(part);
@@ -495,9 +497,7 @@ export function preparePreserved(
   const sheets = new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet]));
   const digests = new Map<string, string>();
   const partsByName = new Map(source.parts.map((part) => [part.name, part]));
-  const graphs: XlsxSourceGraph[] = [];
-  let retainedBytes = 0;
-  const counted = new Set<string>();
+  const valid = new Set<XlsxSourceGraph>();
   for (const graph of source.graphs) {
     checkAbort(context);
     let reason: string | undefined;
@@ -519,18 +519,42 @@ export function preparePreserved(
       }
     }
     reason ??= verifyGraph(graph, partsByName, context);
-    if (reason) {
-      dropWarning(context, graph.target, reason);
+    if (reason) dropWarning(context, graph.target, reason);
+    else valid.add(graph);
+  }
+
+  // Graphs that share a part (a pivot table and its cache) are kept or dropped
+  // together, and whole units are dropped once the retained-byte cap is reached.
+  const graphs: XlsxSourceGraph[] = [];
+  const counted = new Set<string>();
+  let retainedBytes = 0;
+  for (const unit of sharedPartUnits(source.graphs)) {
+    if (!unit.every((graph) => valid.has(graph))) {
+      for (const graph of unit) {
+        if (valid.has(graph))
+          dropWarning(context, graph.target, "a graph sharing its parts was dropped");
+      }
       continue;
     }
-    for (const name of graph.parts) {
-      if (counted.has(name)) continue;
-      counted.add(name);
-      retainedBytes += ((partsByName.get(name)?.data.length ?? 0) * 3) / 4;
+    const unitParts = new Set(
+      unit.flatMap((graph) => graph.parts).filter((name) => !counted.has(name)),
+    );
+    let unitBytes = 0;
+    for (const name of unitParts) unitBytes += ((partsByName.get(name)?.data.length ?? 0) * 3) / 4;
+    if (retainedBytes + unitBytes > context.limits.maxPreservedBytes) {
+      for (const graph of unit) {
+        dropWarning(
+          context,
+          graph.target,
+          `retained parts would exceed maxPreservedBytes (${context.limits.maxPreservedBytes})`,
+        );
+      }
+      continue;
     }
-    graphs.push(graph);
+    retainedBytes += unitBytes;
+    for (const name of unitParts) counted.add(name);
+    graphs.push(...unit);
   }
-  assertResource(context, "maxPreservedBytes", retainedBytes);
   if (graphs.length === 0) return undefined;
 
   const parts = source.parts.filter((part) => counted.has(part.name));

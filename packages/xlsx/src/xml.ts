@@ -71,6 +71,11 @@ function decodeXmlEntities(value: string, part: string): string {
     output += value.slice(cursor, ampersand);
     const semicolon = value.indexOf(";", ampersand + 1);
     if (semicolon < 0) return xmlFailure(part, "unterminated entity reference");
+    // One bound for every parser, so acceptance never depends on where the
+    // streaming reader split its chunks (it holds back at most this many units).
+    if (semicolon - ampersand >= MAX_HELD_ENTITY_LENGTH) {
+      return xmlFailure(part, "entity reference is too long");
+    }
     const entity = value.slice(ampersand + 1, semicolon);
     if (entity === "amp") output += "&";
     else if (entity === "lt") output += "<";

@@ -470,6 +470,45 @@ describe("XLSX unmodelled-part preservation", () => {
     }
   });
 
+  it("keeps charts and images through a JSON persistence reload of a store", async () => {
+    for (const [file, part] of [
+      ["preserve-WithChart.xlsx", "xl/charts/chart1.xml"],
+      ["preserve-picture.xlsx", "xl/media/10000000000006450000032120C875D8.jpg"],
+    ] as const) {
+      const store = storeOf(await fromXlsxWorkbook(await fixture(file)));
+      const persisted = JSON.parse(JSON.stringify(store.exportSnapshot())) as WorkbookSnapshot;
+      const { warnings, onWarning } = withWarnings();
+
+      const saved = await toXlsxWorkbook(SheetwriteStore.fromSnapshot(persisted), { onWarning });
+
+      expect(unzipSync(saved)[part]).toBeDefined();
+      expect(droppedTargets(warnings)).toEqual([]);
+    }
+  });
+
+  it("drops sources over maxPreservedBytes on reload and direct export instead of failing", async () => {
+    const raised = { resourceLimits: { maxPreservedBytes: 1024 * 1024 * 1024 } };
+    const imported = await fromXlsxWorkbook(await fixture("preserve-picture.xlsx"), raised);
+    const image = "xl/media/10000000000006450000032120C875D8.jpg";
+
+    const reloaded = SheetwriteStore.fromSnapshot(JSON.parse(JSON.stringify(imported)));
+    expect(unzipSync(await toXlsxWorkbook(reloaded))[image]).toBeDefined();
+
+    const { warnings, onWarning } = withWarnings();
+    const saved = await toXlsxWorkbook(imported, {
+      onWarning,
+      resourceLimits: { maxPreservedBytes: 4096 },
+    });
+    expect(unzipSync(saved)[image]).toBeUndefined();
+    expect(warnings).toContainEqual(
+      expect.objectContaining({
+        part: "xl/drawings/drawing1.xml",
+        message: expect.stringContaining("maxPreservedBytes"),
+      }),
+    );
+    expect(packageProblems(saved)).toEqual([]);
+  });
+
   it("rejects retained part names that could escape or overwrite the package", async () => {
     const snapshot = await fromXlsxWorkbook(await fixture("preserve-SimpleMacro.xlsm"));
     const source = snapshot.workbook.xlsxSource;
