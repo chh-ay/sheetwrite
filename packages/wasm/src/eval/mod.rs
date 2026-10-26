@@ -39,7 +39,9 @@ use crate::types::{
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
-pub(crate) use date::{host_clock_serial, ClockSource};
+use date::host_clock_serial;
+#[cfg(test)]
+pub(crate) use date::set_test_clock;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{collect_affected_formulas, direct_readers, seed_dependency_depth_errors};
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
@@ -445,7 +447,7 @@ impl CellStore {
                 .is_some_and(|data| data.formulas.has_volatile())
         });
         if has_volatile {
-            let serial = (self.clock)();
+            let serial = host_clock_serial();
             if serial.is_finite() {
                 self.volatile_serial = serial;
             }

@@ -4374,6 +4374,8 @@ mod volatile_recalculation {
         store.set_number(report, 0, 0, 0.5, 0);
         store.set_formula(report, 1, 0, "=1", 0);
         store.commit_sources();
+        // Removing the last volatile formula frees the sheet's volatile set.
+        assert!(!store.sheets[report].formulas.has_volatile());
         recomputed_since(&store, &mut mark);
         store.set_number(inputs, 0, 0, 30.0, 0);
         store.commit_sources();
@@ -4384,8 +4386,8 @@ mod volatile_recalculation {
     const SECOND_INSTANT: f64 = 46_001.75;
     const HOST_INSTANT: f64 = 40_000.5;
 
-    /// Clock reads by the fixed clocks below. Only the test that installs
-    /// them reads it, so parallel tests cannot disturb the count.
+    /// Clock reads by the fixed clocks below. The override is per thread,
+    /// so parallel tests cannot disturb the count.
     static CLOCK_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
     fn first_clock() -> f64 {
@@ -4406,7 +4408,7 @@ mod volatile_recalculation {
     fn now_and_today_read_the_clock_once_per_recalculation_pass() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(5, 1);
-        store.clock = first_clock;
+        crate::eval::set_test_clock(Some(first_clock));
         store.set_formula(sheet, 0, 0, "=NOW()", 0);
         store.set_formula(sheet, 0, 1, "=NOW()", 0);
         store.set_formula(sheet, 0, 2, "=TODAY()", 0);
@@ -4418,7 +4420,7 @@ mod volatile_recalculation {
         assert_close(number(&store, sheet, 0, 2), FIRST_INSTANT.floor());
         assert_close(number(&store, sheet, 0, 3), 0.0);
 
-        store.clock = second_clock;
+        crate::eval::set_test_clock(Some(second_clock));
         store.commit_sources();
         assert_eq!(clock_reads(), 0);
         assert_close(number(&store, sheet, 0, 0), FIRST_INSTANT);
@@ -4433,6 +4435,7 @@ mod volatile_recalculation {
         store.recompute_volatile(HOST_INSTANT);
         assert_eq!(clock_reads(), 0);
         assert_close(number(&store, sheet, 0, 0), HOST_INSTANT);
+        crate::eval::set_test_clock(None);
     }
 
     #[test]

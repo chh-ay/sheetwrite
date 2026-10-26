@@ -120,12 +120,13 @@ impl Default for DirtyState {
 ///
 /// `volatile` holds exactly the keys of entries whose formula calls a volatile
 /// function. Every entry mutation keeps it in step, so a recompute can seed
-/// volatile formulas in O(volatile cells) instead of scanning every entry. A
-/// sheet without volatile formulas keeps it empty and unallocated.
+/// volatile formulas in O(volatile cells) instead of scanning every entry.
+/// The set is boxed and exists only while the sheet holds a volatile formula,
+/// so every other sheet pays one null pointer and no heap.
 #[derive(Default)]
 pub(crate) struct SheetFormulas {
     entries: FxHashMap<CellKey, FormulaEntry>,
-    volatile: FxHashSet<CellKey>,
+    volatile: Option<Box<FxHashSet<CellKey>>>,
     dirty: DirtyState,
 }
 
@@ -165,22 +166,31 @@ impl SheetFormulas {
 
     #[inline]
     pub(crate) fn has_volatile(&self) -> bool {
-        !self.volatile.is_empty()
+        self.volatile.is_some()
     }
 
     /// Keys of the volatile entries, in unspecified order.
     pub(crate) fn volatile_keys(&self) -> impl Iterator<Item = CellKey> + '_ {
-        self.volatile.iter().copied()
+        self.volatile.iter().flat_map(|keys| keys.iter().copied())
     }
 
-    /// Records whether the entry now at `key` is volatile. Removal skips the
-    /// hash probe while the set is empty, which is the common case.
+    /// Records whether the entry now at `key` is volatile. The first volatile
+    /// entry allocates the set and removing the last one frees it, so a sheet
+    /// that once held RAND returns to no heap; removal skips the probe while
+    /// there is no set, which is the common case.
     #[inline]
-    fn track_volatile(volatile_keys: &mut FxHashSet<CellKey>, key: CellKey, volatile: bool) {
+    fn track_volatile(
+        volatile_keys: &mut Option<Box<FxHashSet<CellKey>>>,
+        key: CellKey,
+        volatile: bool,
+    ) {
         if volatile {
-            volatile_keys.insert(key);
-        } else if !volatile_keys.is_empty() {
-            volatile_keys.remove(&key);
+            volatile_keys.get_or_insert_default().insert(key);
+        } else if let Some(keys) = volatile_keys {
+            keys.remove(&key);
+            if keys.is_empty() {
+                *volatile_keys = None;
+            }
         }
     }
 
@@ -288,7 +298,7 @@ impl SheetFormulas {
         if !self.entries.is_empty() {
             // Every key may move, so the volatile set is rebuilt alongside the
             // entries; this pass already visits each entry once.
-            self.volatile.clear();
+            self.volatile = None;
             for (key, mut entry) in std::mem::take(&mut self.entries) {
                 if let Some(key) = relocate(key, &mut entry) {
                     Self::track_volatile(&mut self.volatile, key, entry.volatile());
@@ -417,7 +427,13 @@ impl SheetFormulas {
         }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
-        metadata.add_hash_table::<CellKey, ()>(self.volatile.len(), self.volatile.capacity());
+        if let Some(keys) = &self.volatile {
+            metadata.add_payload(
+                std::mem::size_of::<FxHashSet<CellKey>>(),
+                std::mem::size_of::<FxHashSet<CellKey>>(),
+            );
+            metadata.add_hash_table::<CellKey, ()>(keys.len(), keys.capacity());
+        }
         match &self.dirty {
             DirtyState::Cells(cells) => {
                 metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
@@ -487,7 +503,7 @@ impl SheetFormulas {
 
         Ok(Self {
             entries: FxHashMap::default(),
-            volatile: FxHashSet::default(),
+            volatile: None,
             dirty,
         })
     }
