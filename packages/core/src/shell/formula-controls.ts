@@ -21,10 +21,14 @@ export interface NameBoxOptions {
   label?: string;
 }
 
+/** `B7` or `B2:D9`, each part optionally `$`-anchored as users paste them. */
+const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/;
+
 /**
- * A1 jump box: shows the focused cell's reference and navigates on Enter.
- * Invalid or out-of-bounds references set `aria-invalid` and make no grid
- * calls; Escape restores the displayed reference.
+ * A1 jump box, like Excel's name box: shows the focused cell's reference, and
+ * on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
+ * accepted. Invalid or out-of-bounds references set `aria-invalid` and make
+ * no grid calls; Escape restores the displayed reference.
  */
 export function createNameBox(
   host: HTMLElement,
@@ -51,7 +55,7 @@ export function createNameBox(
   };
 
   const jump = (): void => {
-    const match = /^([A-Za-z]+)(\d+)$/.exec(input.value.trim());
+    const match = A1_CELL_OR_RANGE.exec(input.value.trim());
     const sheetId = grid.getActiveSheet();
     const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheetId);
     if (!match || !sheet) {
@@ -59,15 +63,27 @@ export function createNameBox(
       return;
     }
 
-    const col = labelToCol(match[1]!.toUpperCase());
-    const row = Number(match[2]) - 1;
-    if (col < 0 || col >= sheet.columns.length || row < 0 || row >= sheet.rowCount) {
+    // A single cell is a range whose corners are the same cell.
+    const [, startCol, startRow, endCol = startCol, endRow = startRow] = match;
+    const corner = (col: string | undefined, row: string | undefined) => ({
+      row: Number(row) - 1,
+      col: labelToCol((col ?? "").toUpperCase()),
+    });
+    const start = corner(startCol, startRow);
+    const end = corner(endCol, endRow);
+    const inBounds = ({ row, col }: { row: number; col: number }) =>
+      col >= 0 && col < sheet.columns.length && row >= 0 && row < sheet.rowCount;
+    if (!inBounds(start) || !inBounds(end)) {
       input.setAttribute("aria-invalid", "true");
       return;
     }
 
-    const addr = { sheet: sheetId, row, col };
-    grid.setSelection({ kind: "cell", addr });
+    const addr = { sheet: sheetId, ...start };
+    if (start.row === end.row && start.col === end.col) {
+      grid.setSelection({ kind: "cell", addr });
+    } else {
+      grid.setSelection({ kind: "range", range: { sheet: sheetId, start, end } });
+    }
     grid.scrollToCell(addr);
     dirty = false;
     input.removeAttribute("aria-invalid");

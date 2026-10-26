@@ -227,6 +227,14 @@ describe("createNameBox", () => {
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
     expect(focused).toBe(1);
 
+    // Ranges select like Excel's name box; $ anchors are ignored.
+    input.value = "a2:$C$4";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(grid.getSelection()).toEqual({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 3, col: 2 } },
+    });
+
     piece.destroy();
     grid.destroy();
     store.dispose();
@@ -241,7 +249,7 @@ describe("createNameBox", () => {
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     const before = grid.getSelection();
 
-    for (const bad of ["", "5B", "A0", "ZZ9", "A999"]) {
+    for (const bad of ["", "5B", "A0", "ZZ9", "A999", "A1:", "A1:A999"]) {
       input.value = bad;
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
       expect(input.getAttribute("aria-invalid")).toBe("true");

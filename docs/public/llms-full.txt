@@ -9867,9 +9867,10 @@ last stable text.
 (host: HTMLElement, grid: Grid, options?: NameBoxOptions): ShellPiece
 ```
 
-A1 jump box: shows the focused cell's reference and navigates on Enter.
-Invalid or out-of-bounds references set `aria-invalid` and make no grid
-calls; Escape restores the displayed reference.
+A1 jump box, like Excel's name box: shows the focused cell's reference, and
+on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
+accepted. Invalid or out-of-bounds references set `aria-invalid` and make
+no grid calls; Escape restores the displayed reference.
 
 ##### `createRibbon` — function
 
