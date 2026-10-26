@@ -689,6 +689,93 @@
   font-style: normal;
 }
 
+/* The app showcase leads the hub at full width: preview beside the copy. */
+.sw-hub-scenes > li[data-owner="spreadsheet"] {
+  grid-column: 1 / -1;
+}
+
+.sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  /* At least the other previews' height; taller when the copy wraps. */
+  grid-template-rows: minmax(12rem, auto);
+}
+
+/* Miniature ribbon: a tab row, labeled groups, then a formula bar. */
+.sw-hub-ribbon {
+  display: grid;
+  gap: 0.4rem;
+  font: 500 0.72rem / 1.2 var(--sw-font-body);
+}
+
+.sw-hub-ribbon__tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.sw-hub-ribbon__tabs i {
+  padding-bottom: 0.2rem;
+  color: var(--sw-demo-muted);
+  font-style: normal;
+}
+
+.sw-hub-ribbon__tabs i[data-selected="true"] {
+  border-bottom: 2px solid var(--sw-hub-accent);
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.sw-hub-ribbon__groups {
+  display: flex;
+  gap: 1px;
+  padding: 0.4rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.4rem;
+  background: var(--sw-demo-surface);
+}
+
+.sw-hub-ribbon__groups > span {
+  display: grid;
+  flex: 1;
+  justify-items: center;
+  gap: 0.3rem;
+  padding-inline: 0.35rem;
+  border-right: 1px solid var(--sw-demo-border);
+}
+
+.sw-hub-ribbon__groups > span:last-child {
+  border-right: 0;
+}
+
+.sw-hub-ribbon__groups b {
+  width: 100%;
+  height: 1.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--sw-hub-accent) 16%, transparent);
+}
+
+.sw-hub-ribbon__groups small {
+  color: var(--sw-demo-muted);
+  font-size: 0.62rem;
+}
+
+.sw-hub-ribbon__formula {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sw-hub-ribbon__formula code {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--sw-demo-border);
+  border-radius: 0.25rem;
+  background: var(--sw-demo-surface);
+  color: var(--sw-demo-fg-soft);
+  font: 500 0.7rem / 1.4 var(--sw-font-mono);
+}
+
+.sw-hub-ribbon__formula code:last-child {
+  flex: 1;
+}
+
 @media (hover: hover) {
   .sw-hub-launch:hover {
     border-color: var(--sw-hub-accent);
@@ -711,6 +798,13 @@
     margin-left: 0;
     padding-left: 0;
     border-left: 0;
+  }
+}
+
+@media (max-width: 51.999rem) {
+  .sw-hub-scenes > li[data-owner="spreadsheet"] > .sw-hub-launch {
+    grid-template-columns: 1fr;
+    grid-template-rows: 12rem 1fr;
   }
 }
 

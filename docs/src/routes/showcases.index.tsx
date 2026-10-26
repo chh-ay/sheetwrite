@@ -23,8 +23,9 @@ export const Route = createFileRoute("/showcases/")({
 
 const OWNER_BY_ID = new Map(CAPABILITY_OWNERS.map((owner) => [owner.id, owner]));
 
-/** Capability launch cards followed by the four framework adapters. */
+/** The featured app card, capability launch cards, then the four framework adapters. */
 const SCENE_ORDER = [
+  "spreadsheet",
   "performance",
   "formulas",
   "collaboration",
@@ -49,6 +50,8 @@ const SCENE_SUMMARY: Readonly<Record<SceneOwnerId, string>> = {
   collaboration: "Sequencing, reconnects, conflicts, and recovery across two clients.",
   engine: "A 50,000-row forecast with every public engine event traced beside it.",
   "data-tools": "Sort, filter and organize 4,800 orders; exercise validation and protection.",
+  spreadsheet:
+    "An Excel-style ribbon, formula bar and sheet tabs around one grid. Narrow it and watch the groups fold.",
 };
 
 /** Real import and mount line per first-party adapter. */
@@ -92,7 +95,9 @@ const HUB_GROUPS: readonly { id: HubGroup; label: string }[] = [
 function ownerGroup(owner: (typeof CAPABILITY_OWNERS)[number]): Exclude<HubGroup, "all"> {
   if (owner.kind === "framework") return "framework";
   if (owner.id === "formulas" || owner.id === "engine") return "formulas";
-  if (owner.id === "interoperability" || owner.id === "formatting") return "workbook";
+  if (owner.id === "interoperability" || owner.id === "formatting" || owner.id === "spreadsheet") {
+    return "workbook";
+  }
   if (owner.id === "collaboration") return "collaboration";
   return "data";
 }
@@ -318,8 +323,50 @@ function FormattingScene() {
   );
 }
 
+const RIBBON_SCENE_TABS = ["Home", "Insert", "Data", "View"] as const;
+const RIBBON_SCENE_GROUPS = [
+  "Clipboard",
+  "Font",
+  "Alignment",
+  "Number",
+  "Cells",
+  "Editing",
+] as const;
+
+/** A miniature ribbon: tab row over labeled groups, Home selected. */
+function SpreadsheetScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--spreadsheet">
+      <span className="sw-hub-ribbon">
+        <span className="sw-hub-ribbon__tabs">
+          {RIBBON_SCENE_TABS.map((tab) => (
+            <i data-selected={tab === "Home"} key={tab}>
+              {tab}
+            </i>
+          ))}
+        </span>
+        <span className="sw-hub-ribbon__groups">
+          {RIBBON_SCENE_GROUPS.map((group) => (
+            <span key={group}>
+              <b />
+              <small>{group}</small>
+            </span>
+          ))}
+        </span>
+        <span className="sw-hub-ribbon__formula">
+          <code>G50</code>
+          <code>=SUM(G2:G49)</code>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">ribbon · formula bar · tabs · folds when narrow</span>
+    </span>
+  );
+}
+
 function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs?: number }>) {
   switch (id) {
+    case "spreadsheet":
+      return <SpreadsheetScene />;
     case "performance":
       return <PerformanceScene medianMs={medianMs} />;
     case "formulas":

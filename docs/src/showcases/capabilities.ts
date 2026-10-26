@@ -22,7 +22,8 @@ export type CapabilityOwnerId =
   | "performance"
   | "collaboration"
   | "data-tools"
-  | "host-rows";
+  | "host-rows"
+  | "spreadsheet";
 
 export type CapabilityArea =
   | "editing"
@@ -191,6 +192,15 @@ export const CAPABILITY_OWNERS: readonly CapabilityOwner[] = [
     routeFile: "docs/src/routes/showcases.data-tools.tsx",
     responsibility:
       "Dispatch operations: multi-key sort, composed column filters, validation, protected ranges, row groups and visibility with live Grid receipts.",
+    kind: "capability",
+  },
+  {
+    id: "spreadsheet",
+    label: "Spreadsheet app",
+    href: "/showcases/spreadsheet/",
+    routeFile: "docs/src/routes/showcases.spreadsheet.tsx",
+    responsibility:
+      "The composable shell as a complete app: Excel-style ribbon, name box, formula bar, sheet tabs and status around one grid, with ribbon folding at narrow widths.",
     kind: "capability",
   },
 ];
@@ -488,6 +498,21 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     sharedModules: ["docs/src/showcases/scenarios/data-tools.ts"],
     boundary:
       "In-memory client view and UX policy only; backend query execution and authorization remain host-owned.",
+  },
+  {
+    id: "workflow.ribbon",
+    title: "Excel-style ribbon",
+    area: "workflow",
+    primary: "spreadsheet",
+    interaction:
+      "Format and edit a two-sheet workbook from the ribbon's Home, Insert, Data and View tabs; narrow the window to watch groups shrink and fold into dropdowns.",
+    scope: "browser",
+    accessibility:
+      "Tab list with arrow-key navigation, labeled groups, aria-pressed toggles, keyboard menus and lists, and Escape back to the grid.",
+    testPath: "test/browser/showcase-spreadsheet.spec.ts",
+    sharedModules: ["docs/src/showcases/scenarios/spreadsheet.ts"],
+    boundary:
+      "Commands act through grid.actions; a host that wants different chrome builds its own on the same API.",
   },
   {
     id: "annotations.notes",
