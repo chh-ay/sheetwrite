@@ -1,3 +1,15 @@
+import { readdir, readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+
+import {
+  byReleaseNotesOrder,
+  changelogSection,
+  compareUrl,
+  docsReleaseUrl,
+  type PackageChangelog,
+  type ReleaseNotesLinks,
+  renderReleaseNotes,
+} from "./release-notes.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 export interface PackageReleaseIdentity {
@@ -125,7 +137,7 @@ async function queryPackageProvenance(identity: PackageReleaseIdentity): Promise
   });
 }
 
-async function defaultRunner(command: readonly [string, ...string[]]): Promise<CommandResult> {
+export async function runCommand(command: readonly [string, ...string[]]): Promise<CommandResult> {
   const child = Bun.spawn([...command], { env: process.env, stderr: "pipe", stdout: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
@@ -148,13 +160,176 @@ async function requireSuccess(
   return result.stdout;
 }
 
-export async function ensurePackageReleases(
+export type ChangelogReader = (packageName: string) => Promise<string>;
+
+export interface ReleaseServices {
+  readonly runner: CommandRunner;
+  readonly provenance: ProvenanceQuery;
+  readonly readChangelog: ChangelogReader;
+}
+
+const repositoryRoot = resolve(import.meta.dir, "..");
+
+export async function readPackageChangelog(packageName: string): Promise<string> {
+  const directories = await readdir(join(repositoryRoot, "packages"), { withFileTypes: true });
+  for (const directory of directories) {
+    if (!directory.isDirectory()) continue;
+    const packageRoot = join(repositoryRoot, "packages", directory.name);
+    const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
+      readonly name?: unknown;
+    };
+    if (manifest.name === packageName) return readFile(join(packageRoot, "CHANGELOG.md"), "utf8");
+  }
+  throw new Error(`No workspace package is named ${packageName}`);
+}
+
+const DEFAULT_SERVICES: ReleaseServices = {
+  runner: runCommand,
+  provenance: queryPackageProvenance,
+  readChangelog: readPackageChangelog,
+};
+
+export function versionReleaseTag(version: string): string {
+  return `v${version}`;
+}
+
+async function tagCommit(runner: CommandRunner, tag: string): Promise<string | undefined> {
+  const result = await runner(["git", "rev-parse", "--verify", `refs/tags/${tag}^{commit}`]);
+  return result.exitCode === 0 ? result.stdout.trim() : undefined;
+}
+
+/** Creates the tag at `commit`, or fails when an existing tag points elsewhere. */
+async function ensureTag(runner: CommandRunner, tag: string, commit: string): Promise<void> {
+  const existing = await tagCommit(runner, tag);
+  if (existing !== undefined) {
+    if (existing !== commit) throw new Error(`${tag} targets ${existing}, expected ${commit}`);
+    return;
+  }
+
+  await requireSuccess(runner, ["git", "tag", tag, commit]);
+  await requireSuccess(runner, ["git", "push", "origin", `refs/tags/${tag}`]);
+}
+
+/** Each package's CHANGELOG section for `version`, in release notes order. */
+export async function readReleaseChangelogs(
+  packages: readonly PackageReleaseIdentity[],
+  version: string,
+  readChangelog: ChangelogReader,
+): Promise<PackageChangelog[]> {
+  const changelogs: PackageChangelog[] = [];
+  for (const identity of [...packages].sort(byReleaseNotesOrder)) {
+    const changelog = await readChangelog(identity.name);
+    try {
+      changelogs.push({ name: identity.name, section: changelogSection(changelog, version) });
+    } catch (error) {
+      throw new Error(`${packageReleaseTag(identity)} release notes failed`, { cause: error });
+    }
+  }
+  return changelogs;
+}
+
+/**
+ * The docs post and the comparison with the previous version. The comparison
+ * starts at the previous `v<version>` tag; versions before 0.6.0 have only
+ * package tags, so it falls back to the lead package's tag.
+ */
+export async function releaseNotesLinks(
+  changelogs: readonly PackageChangelog[],
+  version: string,
+  runner: CommandRunner,
+): Promise<ReleaseNotesLinks> {
+  const docs = docsReleaseUrl(version);
+  const [lead] = changelogs;
+  const previousVersion = lead?.section.previousVersion;
+  if (lead === undefined || previousVersion === undefined)
+    return docs === undefined ? {} : { docs };
+
+  const previousVersionTag = versionReleaseTag(previousVersion);
+  const baseTag =
+    (await tagCommit(runner, previousVersionTag)) === undefined
+      ? packageReleaseTag({ name: lead.name, version: previousVersion })
+      : previousVersionTag;
+  return {
+    ...(docs === undefined ? {} : { docs }),
+    previous: {
+      version: previousVersion,
+      compareUrl: compareUrl(baseTag, versionReleaseTag(version)),
+    },
+  };
+}
+
+async function ensureVersionGithubRelease(
+  runner: CommandRunner,
+  version: string,
+  commit: string,
+  notes: string,
+): Promise<void> {
+  const tag = versionReleaseTag(version);
+  await ensureTag(runner, tag, commit);
+
+  const title = `Sheetwrite ${version}`;
+  const releaseResult = await runner([
+    "gh",
+    "release",
+    "view",
+    tag,
+    "--json",
+    "tagName,isDraft,isPrerelease",
+  ]);
+  if (releaseResult.exitCode !== 0) {
+    await requireSuccess(runner, [
+      "gh",
+      "release",
+      "create",
+      tag,
+      "--verify-tag",
+      "--target",
+      commit,
+      "--title",
+      title,
+      "--notes",
+      notes,
+      "--latest",
+    ]);
+    return;
+  }
+
+  const release = JSON.parse(releaseResult.stdout) as {
+    readonly tagName?: unknown;
+    readonly isDraft?: unknown;
+    readonly isPrerelease?: unknown;
+  };
+  if (release.tagName !== tag || release.isDraft !== false || release.isPrerelease !== false) {
+    throw new Error(`${tag} has an invalid GitHub release state`);
+  }
+
+  // A rerun refreshes the notes, for example after a CHANGELOG correction.
+  await requireSuccess(runner, [
+    "gh",
+    "release",
+    "edit",
+    tag,
+    "--title",
+    title,
+    "--notes",
+    notes,
+    "--latest",
+  ]);
+}
+
+/**
+ * Tags every verified package at its attested commit, then publishes one
+ * `v<version>` GitHub release for the packages published from
+ * `expectedCommit`. Returns that tag, or `undefined` when this commit
+ * published nothing. Releases of earlier versions are not changed.
+ */
+export async function ensureVersionRelease(
   packages: readonly PackageReleaseIdentity[],
   publishedPackages: readonly PackageReleaseIdentity[],
   expectedCommit: string,
-  runner: CommandRunner = defaultRunner,
-  provenance: ProvenanceQuery = queryPackageProvenance,
-): Promise<void> {
+  services: Partial<ReleaseServices> = {},
+): Promise<string | undefined> {
+  const { runner, provenance, readChangelog } = { ...DEFAULT_SERVICES, ...services };
   if (!/^[0-9a-f]{40}$/.test(expectedCommit)) {
     throw new Error("EXPECTED_SHA must be a full lowercase commit SHA");
   }
@@ -166,6 +341,8 @@ export async function ensurePackageReleases(
     published.add(tag);
   }
 
+  // npm provenance and consumers address packages by these per-package tags.
+  const releasedFromCommit: PackageReleaseIdentity[] = [];
   for (const identity of packages) {
     const tag = packageReleaseTag(identity);
     const attestedCommit = await provenance(identity);
@@ -176,49 +353,26 @@ export async function ensurePackageReleases(
       throw new Error(`${tag} provenance targets ${attestedCommit}, expected ${expectedCommit}`);
     }
 
-    const tagResult = await runner(["git", "rev-parse", "--verify", `refs/tags/${tag}^{commit}`]);
-    if (tagResult.exitCode === 0) {
-      if (tagResult.stdout.trim() !== attestedCommit) {
-        throw new Error(`${tag} targets ${tagResult.stdout.trim()}, expected ${attestedCommit}`);
-      }
-    } else {
-      await requireSuccess(runner, ["git", "tag", tag, attestedCommit]);
-      await requireSuccess(runner, ["git", "push", "origin", `refs/tags/${tag}`]);
-    }
-
-    const releaseResult = await runner([
-      "gh",
-      "release",
-      "view",
-      tag,
-      "--json",
-      "tagName,isDraft,isPrerelease",
-    ]);
-    if (releaseResult.exitCode === 0) {
-      const release = JSON.parse(releaseResult.stdout) as {
-        readonly tagName?: unknown;
-        readonly isDraft?: unknown;
-        readonly isPrerelease?: unknown;
-      };
-      if (release.tagName !== tag || release.isDraft !== false || release.isPrerelease !== false) {
-        throw new Error(`${tag} has an invalid GitHub release state`);
-      }
-      continue;
-    }
-
-    await requireSuccess(runner, [
-      "gh",
-      "release",
-      "create",
-      tag,
-      "--verify-tag",
-      "--target",
-      attestedCommit,
-      "--title",
-      `${identity.name} ${identity.version}`,
-      "--generate-notes",
-    ]);
+    await ensureTag(runner, tag, attestedCommit);
+    if (attestedCommit === expectedCommit) releasedFromCommit.push(identity);
   }
+
+  if (releasedFromCommit.length === 0) return undefined;
+
+  // The changeset fixed group keeps every package on one version.
+  const versions = [...new Set(releasedFromCommit.map((identity) => identity.version))];
+  const [version] = versions;
+  if (version === undefined || versions.length !== 1) {
+    throw new Error(
+      `Packages published from ${expectedCommit} have different versions: ${releasedFromCommit.map(packageReleaseTag).join(", ")}`,
+    );
+  }
+
+  const changelogs = await readReleaseChangelogs(releasedFromCommit, version, readChangelog);
+  const links = await releaseNotesLinks(changelogs, version, runner);
+  const notes = renderReleaseNotes(changelogs, links);
+  await ensureVersionGithubRelease(runner, version, expectedCommit, notes);
+  return versionReleaseTag(version);
 }
 
 async function main(): Promise<void> {
@@ -230,8 +384,12 @@ async function main(): Promise<void> {
   if (!expectedCommit) throw new Error("EXPECTED_SHA is required");
   const packages = parsePackageReleaseIdentities(rawPackages);
   const publishedPackages = parsePackageReleaseIdentities(rawPublished, "PUBLISHED_PACKAGES", true);
-  await ensurePackageReleases(packages, publishedPackages, expectedCommit);
-  console.log(`Verified ${packages.length} package-specific GitHub releases`);
+  const releaseTag = await ensureVersionRelease(packages, publishedPackages, expectedCommit);
+  console.log(
+    releaseTag === undefined
+      ? `Verified ${packages.length} package tags; no package was published from ${expectedCommit}`
+      : `Verified ${packages.length} package tags and the ${releaseTag} GitHub release`,
+  );
 }
 
 if (import.meta.main) await main();
