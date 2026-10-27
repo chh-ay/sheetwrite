@@ -110,14 +110,6 @@ impl SourceSnapshot {
     pub fn spill_derived(&self) -> Vec<u8> {
         self.spill_derived.clone()
     }
-
-    #[wasm_bindgen(js_name = byteLength)]
-    pub fn byte_length(&self) -> usize {
-        (self.formula_offsets.len() + self.reference_offsets.len()) * std::mem::size_of::<u32>()
-            + self.reference_targets.len() * std::mem::size_of::<u32>()
-            + self.formula_sources.iter().map(String::len).sum::<usize>()
-            + self.spill_derived.len()
-    }
 }
 
 /// Opaque, store-local history payload for one dense rectangular cell block.
