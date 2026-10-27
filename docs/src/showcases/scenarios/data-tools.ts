@@ -1,4 +1,4 @@
-import { createGrid, initSheetwrite, type Grid, type MutationIssue } from "@sheetwrite/core";
+import { createGrid, initSheetwrite, type Grid } from "@sheetwrite/core";
 
 import { observeSiteTheme } from "../../lib/site-theme.js";
 import { siteGridTheme } from "../site-grid-theme.js";
@@ -48,7 +48,8 @@ export type DataAction =
   | "group"
   | "rows"
   | "columns"
-  | "permission";
+  | "operator"
+  | "manager";
 export interface DataSnapshot {
   ready: boolean;
   error: string | null;
@@ -60,13 +61,35 @@ export interface DataSnapshot {
   hiddenRows: number;
   hiddenColumns: number;
   manager: boolean;
-  events: readonly string[];
-  probe: string;
+  events: readonly DataEvent[];
+  probes: Readonly<Record<ProbeKey, ProbeResult | null>>;
 }
 
-function issueText(issue: MutationIssue): string {
-  return `${issue.kind} ${issue.severity}: ${issue.message}`;
+/** The three guarded columns a probe can try to change. */
+export type ProbeKey = "units" | "freight" | "order";
+
+/** What the Grid did with one probe: the attempted value and what is stored now. */
+export interface ProbeResult {
+  attempted: string;
+  stored: string;
+  outcome: "saved" | "warned" | "rejected";
+  message: string | null;
 }
+
+/** One log line: a plain sentence, the public call behind it, and its tone. */
+export interface DataEvent {
+  id: number;
+  text: string;
+  api: string;
+  tone: "info" | "ok" | "warn" | "reject";
+}
+
+const PROBE_COLUMNS: Readonly<Record<ProbeKey, number>> = { order: 0, units: 4, freight: 5 };
+const PROBE_LABELS: Readonly<Record<ProbeKey, string>> = {
+  order: "Order ID",
+  units: "Units",
+  freight: "Freight",
+};
 
 /** Public Grid API only: every displayed count and event comes back from the live Grid. */
 export interface DataToolsScenario {
@@ -98,16 +121,19 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     hiddenColumns: 0,
     manager: false,
     events: [],
-    probe: "No mutation attempted yet.",
+    probes: { units: null, freight: null, order: null },
   };
   const publish = () => {
     for (const listener of listeners) listener();
   };
-  function record(message: string) {
+  // Probes report their own outcome; the Grid's rejection event for the same
+  // write would repeat it.
+  let probing = false;
+  function record(text: string, api: string, tone: DataEvent["tone"] = "info") {
     sequence += 1;
     state = {
       ...state,
-      events: [`${sequence}. ${message}`, ...state.events].slice(0, TRACE_LIMIT),
+      events: [{ id: sequence, text, api, tone }, ...state.events].slice(0, TRACE_LIMIT),
     };
   }
   function refresh() {
@@ -129,25 +155,41 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     }
     publish();
   }
-  function edit(col: number, value: string | number) {
+  function probe(key: ProbeKey, value: string | number, shown: string) {
     if (!grid) return;
+    const col = PROBE_COLUMNS[key];
+    probing = true;
     const result = grid.applyTransaction({
       patches: [
         { op: "set", addr: { sheet: DATA_SHEET, row: 0, col }, value: { kind: "literal", value } },
       ],
     });
-    record(`API result: ${result.status}`);
+    probing = false;
     const issues =
       result.status === "rejected"
         ? result.issues
         : result.status === "applied"
           ? [...(result.warnings ?? []), ...(result.rejections ?? [])]
           : [];
-    for (const issue of issues) record(issueText(issue));
-    const actual = grid.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved;
+    const message = issues[0]?.message ?? null;
+    const outcome: ProbeResult["outcome"] =
+      result.status !== "applied" ? "rejected" : issues.length > 0 ? "warned" : "saved";
+    const stored = String(grid.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved);
+    const label = PROBE_LABELS[key];
+    if (outcome === "rejected") {
+      record(`${label} ${shown} rejected. ${message ?? ""}`.trim(), "applyTransaction", "reject");
+    } else if (outcome === "warned") {
+      record(
+        `${label} ${shown} saved with a warning. ${message ?? ""}`.trim(),
+        "applyTransaction",
+        "warn",
+      );
+    } else {
+      record(`${label} changed to ${shown}.`, "applyTransaction", "ok");
+    }
     state = {
       ...state,
-      probe: `${["Order", "Region", "Customer", "Status", "Units", "Freight"][col] ?? "Cell"}: attempted ${value}; stored ${actual} (${result.status})`,
+      probes: { ...state.probes, [key]: { attempted: shown, stored, outcome, message } },
     };
   }
   const ready = initSheetwrite()
@@ -210,19 +252,33 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       grid.groupRows(0, GROUP_END);
       unsubscribes.push(
         grid.on("change", (event) => {
-          record(
-            `change: ${event.source} / ${event.commitReason}; ${event.transaction.patches.length} operation(s)`,
-          );
+          // Edits typed into the Grid; the buttons below report their own changes.
+          if (event.commitReason.startsWith("edit")) {
+            const count = event.transaction.patches.length;
+            record(
+              count === 1
+                ? "You edited a cell in the Grid."
+                : `You edited ${count} cells in the Grid.`,
+              "change event",
+              "ok",
+            );
+          }
           refresh();
         }),
         grid.on("mutation-rejected", ({ issues }) => {
-          record(`mutation-rejected: ${issues.map(issueText).join("; ")}`);
+          if (!probing) {
+            const message = issues[0]?.message ?? "A rule rejected the edit.";
+            record(`Edit rejected. ${message}`, "mutation-rejected event", "reject");
+          }
           refresh();
         }),
         observeSiteTheme(() => grid?.setTheme(siteGridTheme(host))),
       );
       state = { ...state, ready: true, regions: grid.distinctValues(1).map(String) };
-      record("Ready: validation rules, protected order IDs and first dispatch group installed.");
+      record(
+        "Rules installed: unit limits, freight review and locked order IDs.",
+        "setValidationRule, setProtectedRange",
+      );
       refresh();
     })
     .catch((cause: unknown) => {
@@ -244,8 +300,12 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       if (!grid) return;
       grid.setColumnFilter(1, region ? { kind: "values", values: [region] } : null);
       grid.setColumnFilter(2, customer ? { kind: "contains", text: customer } : null);
-      record(`getColumnFilters: ${grid.getColumnFilters().size} active column(s)`);
       refresh();
+      record(
+        `Showing ${state.visible.toLocaleString()} of ${state.total.toLocaleString()} orders.`,
+        "setColumnFilter",
+      );
+      publish();
     },
     run(action: DataAction) {
       if (!grid) return;
@@ -255,38 +315,52 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
             { col: 1, ascending: true },
             { col: 4, ascending: false },
           ]);
-          record("sortByMulti: Region ascending → Units descending");
+          record("Sorted by region, then by units, largest first.", "sortByMulti");
           break;
         case "clear":
           grid.clearView();
-          record("clearView: sort and filters cleared; hidden rows stay hidden");
+          record("Cleared sort and filters. Hidden rows and groups stay as they are.", "clearView");
           break;
         case "reject":
-          edit(4, -5);
+          probe("units", -5, "−5");
           break;
         case "warn":
-          edit(5, 350);
+          probe("freight", 350, "$350");
           break;
         case "protected":
-          edit(0, "MANAGER-REVIEW");
+          probe("order", "MANAGER-REVIEW", "MANAGER-REVIEW");
           break;
-        case "permission":
-          manager = !manager;
-          record(`Host resolver role: ${manager ? "manager" : "operator"}`);
+        case "operator":
+        case "manager":
+          manager = action === "manager";
+          record(`Now acting as ${action}.`, "setProtectionResolver");
           break;
         case "group":
           grid.setGroupCollapsed(0, !state.collapsed);
-          record(`setGroupCollapsed: ${grid.rowGroups().some((group) => group.collapsed)}`);
+          record(
+            grid.rowGroups().some((group) => group.collapsed)
+              ? "Collapsed the first dispatch batch."
+              : "Expanded the first dispatch batch.",
+            "setGroupCollapsed",
+          );
           break;
         case "rows":
           if (state.hiddenRows > 0) grid.showRows();
           else grid.hideRows([24, 25, 26]);
-          record(`Manual hidden rows: ${grid.hiddenRows().length}`);
+          record(
+            grid.hiddenRows().length > 0 ? "Hid rows 25 to 27." : "Showed all rows.",
+            grid.hiddenRows().length > 0 ? "hideRows" : "showRows",
+          );
           break;
         case "columns":
           if (grid.hiddenColumns().length > 0) grid.showColumns();
           else grid.hideColumns([5, 6]);
-          record(`Hidden columns: ${grid.hiddenColumns().length}`);
+          record(
+            grid.hiddenColumns().length > 0
+              ? "Hid the Freight and Owner columns."
+              : "Showed all columns.",
+            grid.hiddenColumns().length > 0 ? "hideColumns" : "showColumns",
+          );
           break;
       }
       refresh();

@@ -1,6 +1,5 @@
 import { type ComponentType, lazy, Suspense, useState } from "react";
 
-import { PackageCommand } from "../PackageCommand.js";
 import VanillaSnippet from "./snippets/vanilla.mdx";
 import { onTabListKey } from "./tabKeys.js";
 
@@ -23,26 +22,22 @@ const FRAMEWORKS = [
   {
     id: "vanilla",
     label: "Vanilla",
-    pkg: "@sheetwrite/core",
     Snippet: VanillaSnippet,
     preload: () => undefined,
   },
   {
     id: "react",
     label: "React",
-    pkg: "@sheetwrite/react",
     ...deferredSnippet(() => import("./snippets/react.mdx")),
   },
   {
     id: "vue",
     label: "Vue",
-    pkg: "@sheetwrite/vue",
     ...deferredSnippet(() => import("./snippets/vue.mdx")),
   },
   {
     id: "svelte",
     label: "Svelte",
-    pkg: "@sheetwrite/svelte",
     ...deferredSnippet(() => import("./snippets/svelte.mdx")),
   },
 ] as const;
@@ -96,9 +91,6 @@ export function CodeTabs() {
         <Suspense fallback={null}>
           <current.Snippet />
         </Suspense>
-      </div>
-      <div className="sw-code-tabs__install">
-        <PackageCommand packages={current.pkg} />
       </div>
     </div>
   );

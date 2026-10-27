@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>340</dd></div>
+<div><dt>Exports</dt><dd>343</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -262,7 +262,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>83</span>
+### Types <span class="api-count" data-pagefind-ignore>85</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -295,6 +295,8 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/grid-command-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridCommandName</code></span><span class="api-symbol-card__desc">Built-in command names accepted by state queries and change events.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/grid-presentation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>GridPresentation</code></span><span class="api-symbol-card__desc">Header semantics used by the retained canvas and accessibility mirror.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/hyperlink-target/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>HyperlinkTarget</code></span><span class="api-symbol-card__desc">Browser-safe external target or stable workbook-internal range target.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/icon-name/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>IconName</code></span><span class="api-symbol-card__desc">The name of one glyph on the command icon sheet; the key of IconOverrides.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/icon-overrides/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>IconOverrides</code></span><span class="api-symbol-card__desc">Per-glyph icon overrides, keyed by the names on the command icon sheet (ICONNAMES).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/keyboard-action/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>KeyboardAction</code></span><span class="api-symbol-card__desc">Built-in actions that can be rebound without replacing navigation.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/key-shortcut/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>KeyShortcut</code></span><span class="api-symbol-card__desc">A compact modified key combination or a key object.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/legacy-row-loader/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>LegacyRowLoader</code></span><span class="api-symbol-card__desc">Loads one row-only page for the full-width compatibility adapter.</span></a>
@@ -350,7 +352,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-unsupported-feature/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>WorkbookTableUnsupportedFeature</code></span><span class="api-symbol-card__desc">OOXML table features outside the persisted rule subset are retained as explicit loss metadata rather than silently flattened into an ordinary range.</span></a>
 </div>
 
-### Variables <span class="api-count" data-pagefind-ignore>25</span>
+### Variables <span class="api-count" data-pagefind-ignore>26</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/default-delimited-text-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Synchronous operations return one in-memory string, so byte/cell ceilings bound allocation while sheet-compatible dimensions remain independently valid.</span></a>
@@ -362,6 +364,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/default-transaction-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_TRANSACTION_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Inclusive defaults for every atomic document transaction accepted by a Store or Grid.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/default-workbook-table-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Independent metadata ceilings enforced before table arrays cross the WASM boundary.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/default-xlsx-resource-limits/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>DEFAULT_XLSX_RESOURCE_LIMITS</code></span><span class="api-symbol-card__desc">Codec defaults combine SpreadsheetML worksheet dimensions with independent ZIP/XML and aggregate-work ceilings for untrusted in-memory conversion.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/icon-names/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>ICON_NAMES</code></span><span class="api-symbol-card__desc">Every glyph on the command icon sheet.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/max-conditional-format-formula-length/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH</code></span><span class="api-symbol-card__desc">Maximum serialized formula predicate source; parsing/evaluation stays bounded per visible cell.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/max-conditional-format-rules/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_CONDITIONAL_FORMAT_RULES</code></span><span class="api-symbol-card__desc">Maximum ordered conditional-format rules admitted per worksheet and encoded in one u32 match mask.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/max-hyperlink-display-length/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="variable" aria-hidden="true">V</span><code>MAX_HYPERLINK_DISPLAY_LENGTH</code></span><span class="api-symbol-card__desc">Optional display text ceiling used by SpreadsheetML shared-string implementations.</span></a>

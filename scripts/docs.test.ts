@@ -7,6 +7,7 @@ import {
   adapterContractIssues,
   documentationLinkRoutes,
   landingBenchPayload,
+  landingDownloads,
   renderEntryPage,
   renderSymbolPage,
   runCompletionSummary,
@@ -260,6 +261,54 @@ describe("documentation generation", () => {
     });
     expect(JSON.parse(none).available).toBe(false);
     expect(none).not.toContain("null");
+  });
+
+  const viteFirstLoad = (javascript: number, wasm: number, css: number) => ({
+    "bundler.vite.coreInitial.javascript.brotliBytes": { actual: javascript },
+    "bundler.vite.coreInitial.wasm.brotliBytes": { actual: wasm },
+    "bundler.vite.coreInitial.css.brotliBytes": { actual: css },
+  });
+  const engineWasm = (defaultBytes: number, fullBytes: number) => [
+    { engine: "default", wasm: { brotliBytes: defaultBytes } },
+    { engine: "full", wasm: { brotliBytes: fullBytes } },
+  ];
+
+  it("reports the first-load download and both engine sizes, or nothing when one is unknown", () => {
+    expect(landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340))).toEqual({
+      coreFirstLoadBrotliBytes: 388,
+      defaultEngineBrotliBytes: 250,
+      fullEngineBrotliBytes: 340,
+    });
+
+    // A partial report would understate the download, so the landing shows none.
+    const { "bundler.vite.coreInitial.css.brotliBytes": _css, ...noCss } = viteFirstLoad(1, 1, 1);
+    expect(landingDownloads(noCss, engineWasm(250, 340))).toBeUndefined();
+    expect(landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340).slice(0, 1))).toBe(
+      undefined,
+    );
+    expect(landingDownloads(viteFirstLoad(130, Number.NaN, 2), engineWasm(250, 340))).toBe(
+      undefined,
+    );
+  });
+
+  it("publishes download sizes even when no benchmark capture is available", () => {
+    const downloads = {
+      coreFirstLoadBrotliBytes: 388,
+      defaultEngineBrotliBytes: 250,
+      fullEngineBrotliBytes: 340,
+    };
+    const missing = {
+      available: false as const,
+      reason: "not captured",
+      source: "x",
+      reproduction: "x",
+    };
+    expect(JSON.parse(landingBenchPayload(missing, downloads))).toEqual({
+      available: false,
+      reason: "not captured",
+      downloads,
+    });
+    expect(JSON.parse(landingBenchPayload(missing))).not.toHaveProperty("downloads");
   });
 });
 describe("adapter documentation contract", () => {

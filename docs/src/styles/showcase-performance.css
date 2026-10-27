@@ -51,13 +51,7 @@
     align-items: start;
     padding: 1.5rem 1.5rem 1.25rem;
     border-bottom: 1px solid var(--sw-demo-border);
-    background:
-      radial-gradient(
-        60rem 18rem at 85% -20%,
-        color-mix(in srgb, var(--sw-demo-accent) 14%, transparent),
-        transparent 70%
-      ),
-      var(--sw-demo-surface);
+    background: var(--sw-demo-surface);
     color: var(--sw-demo-fg);
   }
 

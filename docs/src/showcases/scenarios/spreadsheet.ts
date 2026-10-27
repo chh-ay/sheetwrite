@@ -53,6 +53,10 @@ const column = (key: string, header: string, width: number, type: "text" | "numb
   type,
 });
 
+/** G3: the revenue of the second order, which the note explains. */
+export const SALES_NOTE_CELL = { sheet: SALES_SHEET, row: 2, col: 6 } as const;
+export const SALES_NOTE_TEXT = "Includes a 10% volume discount, approved by Maya.";
+
 /** Workbook schema: both sheets, with Excel-like widths. Values arrive as operations. */
 export function salesWorkbook(): Workbook {
   return {
@@ -72,6 +76,8 @@ export function salesWorkbook(): Workbook {
           column("price", "Unit price", 96, "number"),
           column("revenue", "Revenue", 112, "number"),
         ],
+        // One note, so the amber corner and its hover card have something to show.
+        notes: [{ addr: SALES_NOTE_CELL, text: SALES_NOTE_TEXT }],
       },
       {
         id: SUMMARY_SHEET,

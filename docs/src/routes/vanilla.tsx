@@ -42,7 +42,7 @@ function VanillaWorkbenchRoute() {
         {
           title: "Explicit lifecycle",
           detail:
-            "createWorkbench and destroy() bound every generation — no listeners, chrome, or canvas survive teardown.",
+            "createWorkbench and destroy() bound every generation: no listeners, chrome, or canvas survive teardown.",
         },
         {
           title: "Construction-bound truth",
@@ -57,7 +57,7 @@ function VanillaWorkbenchRoute() {
         {
           title: "Honest Worker fallback",
           detail:
-            "A failed Worker boot emits renderer-fallback and keeps painting on the main thread — requested vs. active is always visible.",
+            "A failed Worker boot emits renderer-fallback and keeps painting on the main thread. Requested and active renderers are always visible.",
         },
       ]}
       prompt="Edit a Close date cell, switch Main thread to Web Worker, then destroy and create the Grid. Host state shows each ownership boundary."

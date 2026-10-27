@@ -470,7 +470,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Validation outcomes surface as visible, readable text near the edit.",
     testPath: VUE_SPEC,
     sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Rules are client UX policy — server-side enforcement is host-owned.",
+    boundary: "Rules are client UX policy. Server-side enforcement is host-owned.",
   },
   {
     id: "data.protection",
@@ -482,7 +482,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Denied edits produce visible feedback rather than silent failure.",
     testPath: VUE_SPEC,
     sharedModules: [BUSINESS_SCENARIO],
-    boundary: "Protection is client UX policy, never server authorization — that is host-owned.",
+    boundary: "Protection is client UX policy, never server authorization. That is host-owned.",
   },
   {
     id: "data.operations-workflow",
@@ -678,7 +678,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     title: "WASM boundary crossings",
     area: "scale",
     primary: "performance",
-    interaction: "Inspect crossing counts per interaction — bulk windows, not per-cell chatter.",
+    interaction: "Inspect crossing counts per interaction: bulk windows, not per-cell chatter.",
     scope: "browser",
     accessibility: "Instrumentation renders as accessible text counters.",
     testPath: PERFORMANCE_SPEC,
@@ -695,8 +695,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility: "Benchmark bars carry text equivalents; log-scale is explained in prose.",
     testPath: PERFORMANCE_SPEC,
     sharedModules: [SCALE_SCENARIO],
-    boundary:
-      "Numbers come from the checked-in benchmark protocol only — measured, never promised.",
+    boundary: "Numbers come from the checked-in benchmark protocol only: measured, never promised.",
   },
 
   {
@@ -737,7 +736,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     testPath: INTEROP_SPEC,
     sharedModules: [INTEROP_SCENARIO],
     boundary:
-      "Delimited text carries values only — styles, formulas-as-formulas, and merges do not survive.",
+      "Delimited text carries values only. Styles, formulas-as-formulas, and merges do not survive.",
   },
   {
     id: "io.fidelity-loss-warnings",

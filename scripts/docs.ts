@@ -1416,23 +1416,70 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
  * missing or invalid the landing renders a "run the protocol" placeholder.
  */
 async function renderLandingBench(): Promise<string> {
+  const sizeReport = JSON.parse(
+    await readFile(join(repositoryRoot, "scripts/size-report.json"), "utf8"),
+  ) as { metrics?: Readonly<Record<string, { actual?: unknown }>> };
+  const fullEngine = await loadEvidence(
+    "bench/results/full-engine-results.json",
+    "bun run --filter @sheetwrite/bench bench:formula:engines",
+    validateFullEngineArtifact,
+  );
   return landingBenchPayload(
     await loadEvidence(
       "bench/results/render-scale.json",
       "bun run --filter @sheetwrite/bench bench:render:scale",
       validateRenderArtifact,
     ),
+    "evidence" in fullEngine
+      ? landingDownloads(sizeReport.metrics ?? {}, fullEngine.evidence.engines)
+      : undefined,
   );
+}
+
+/** Download sizes on the landing page, Brotli-compressed as browsers fetch them. */
+export interface LandingDownloads {
+  /** JavaScript, WASM and CSS of `@sheetwrite/core` in a Vite production build. */
+  coreFirstLoadBrotliBytes: number;
+  defaultEngineBrotliBytes: number;
+  fullEngineBrotliBytes: number;
+}
+
+const CORE_FIRST_LOAD_METRICS = ["javascript", "wasm", "css"].map(
+  (kind) => `bundler.vite.coreInitial.${kind}.brotliBytes`,
+);
+
+/**
+ * Reads the landing download sizes from the size report and the engine
+ * artifact. Any missing or non-finite part yields `undefined`: a partial sum
+ * would understate the download.
+ */
+export function landingDownloads(
+  metrics: Readonly<Record<string, { actual?: unknown }>>,
+  engines: ReadonlyArray<{ engine: string; wasm: { brotliBytes: number } }>,
+): LandingDownloads | undefined {
+  const firstLoad = CORE_FIRST_LOAD_METRICS.map((key) => metrics[key]?.actual);
+  const engineBytes = (name: string) =>
+    engines.find((entry) => entry.engine === name)?.wasm.brotliBytes;
+  const downloads = {
+    coreFirstLoadBrotliBytes: firstLoad.reduce<number>(
+      (sum, value) => sum + (typeof value === "number" ? value : Number.NaN),
+      0,
+    ),
+    defaultEngineBrotliBytes: engineBytes("default") ?? Number.NaN,
+    fullEngineBrotliBytes: engineBytes("full") ?? Number.NaN,
+  };
+  return Object.values(downloads).every(Number.isFinite) ? downloads : undefined;
 }
 
 /** Pure payload builder, exported so the finite/fallback contract is testable. */
 export function landingBenchPayload(
   scale: { evidence: ValidatedRenderEvidence; source: string } | EvidenceState,
+  downloads?: LandingDownloads,
 ): string {
   const round1 = (value: number): number => Math.round(value * 10) / 10;
-  if (!("evidence" in scale)) {
-    return `${JSON.stringify({ available: false, reason: scale.reason }, null, 2)}\n`;
-  }
+  const unavailable = (reason: string): string =>
+    `${JSON.stringify({ available: false, reason, ...(downloads ? { downloads } : {}) }, null, 2)}\n`;
+  if (!("evidence" in scale)) return unavailable(scale.reason);
   const { evidence } = scale;
   const mid = (values: number[]): number => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -1503,11 +1550,7 @@ export function landingBenchPayload(
   // structurally valid artifact with no comparable pairs must fall back to
   // the "run the protocol" placeholder, not render null.
   if (sizes.length === 0 || displayed.some((value) => !Number.isFinite(value))) {
-    return `${JSON.stringify(
-      { available: false, reason: "artifact has no full-round engine pairs to compare" },
-      null,
-      2,
-    )}\n`;
+    return unavailable("artifact has no full-round engine pairs to compare");
   }
   const payload = {
     available: true,
@@ -1520,6 +1563,7 @@ export function landingBenchPayload(
     },
     heroStats,
     sizes,
+    ...(downloads ? { downloads } : {}),
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }

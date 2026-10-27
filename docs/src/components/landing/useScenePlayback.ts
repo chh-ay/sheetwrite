@@ -28,8 +28,12 @@ export function useScenePlayback<T extends HTMLElement>() {
       const play = visible && !reducedMotion.matches;
       const animations = root.getAnimations({ subtree: true });
       for (const animation of animations) {
-        if (play) animation.play();
-        else animation.pause();
+        // play() rewinds a finished animation, and so does play() on one paused
+        // at its end. Only running animations are paused, and only those are
+        // resumed, so a finished entrance never replays on scroll back;
+        // replay() restarts everything through `epoch`.
+        if (!play && animation.playState === "running") animation.pause();
+        else if (play && animation.playState === "paused") animation.play();
       }
       root.dataset.landingRunning = String(play && animations.length > 0);
     };

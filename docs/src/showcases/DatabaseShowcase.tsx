@@ -1142,7 +1142,7 @@ export default function DatabaseShowcase() {
         <summary>Failure lab &amp; storage diagnostics</summary>
         <div className="sw-dbx__diagnostics-body">
           <section className="sw-dbx__limit-proof">
-            <h3>New in 0.5.0 · oversized undo</h3>
+            <h3>Oversized undo</h3>
             <button
               className="sw-dbx__button"
               data-testid="dbx-tight-limit"

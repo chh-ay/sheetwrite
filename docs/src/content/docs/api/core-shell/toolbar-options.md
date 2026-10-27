@@ -25,10 +25,10 @@ items?: readonly ToolbarItem[];
 </details>
 
 <details class="api-member" id="toolbar-options-icons" data-pagefind-weight="1">
-<summary><code>icons</code> <span class="api-member-summary">Per-action icon overrides, exactly like GridConfig.icons.</span></summary>
+<summary><code>icons</code> <span class="api-member-summary">Per-glyph icon overrides, exactly like GridConfig.icons.</span></summary>
 
 ```ts generated
-icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+icons?: IconOverrides;
 ```
 
 </details>
@@ -51,7 +51,7 @@ label?: string;
 ```ts generated
 export interface ToolbarOptions {
   items?: readonly ToolbarItem[];
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  icons?: IconOverrides;
   label?: string;
 }
 ```

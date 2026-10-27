@@ -17,10 +17,11 @@
   --sw-rwb-strong-rule: 0.125rem;
 }
 
-/* Each row keeps its natural height; tools expand below the workspace. */
+/* Four rows: commandbar, edit row, workspace (the Grid keeps at least 32rem),
+   then the secondary tools, which take only their own height. */
 .sw-rwb__main {
   height: auto;
-  grid-template-rows: auto auto auto minmax(32rem, auto) auto;
+  grid-template-rows: auto auto minmax(32rem, auto) auto;
 }
 
 /* The stage supplies the commandbar chrome (flex strip, gradient, padding);

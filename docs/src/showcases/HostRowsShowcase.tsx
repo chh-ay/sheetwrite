@@ -257,7 +257,7 @@ export default function HostRowsShowcase() {
         <section className="host-row-stage" aria-label="Live CRM workbook">
           <header className="host-row-stage__bar">
             <div>
-              <p>New in 0.5.0 · fast row ID checks</p>
+              <p>Fast row ID checks</p>
               <h2>Import the leads. Keep every ID unique.</h2>
             </div>
             <button

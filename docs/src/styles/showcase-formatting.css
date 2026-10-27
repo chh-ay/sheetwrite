@@ -5,10 +5,11 @@
     color: var(--sw-demo-fg);
   }
 
+  /* Same page inset as every other capability showcase. */
   .sw-formatting {
-    width: min(100% - 3rem, 100rem);
-    margin: 0 auto;
-    padding: 1rem 0 4rem;
+    width: calc(100% - 2 * var(--sw-page-inset));
+    margin-inline: auto;
+    padding-block: 2rem 4rem;
   }
 
   .sw-formatting-workspace {
@@ -191,9 +192,6 @@
     }
   }
   @media (max-width: 600px) {
-    .sw-formatting {
-      width: calc(100% - 1.5rem);
-    }
     .sw-formatting-grid {
       height: 30rem;
     }

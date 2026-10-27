@@ -11,7 +11,7 @@ Options for [`createRibbon`](/docs/api/core-shell/create-ribbon/).
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/shell/ribbon-factory.ts#L9"><code>packages/core/src/shell/ribbon-factory.ts#L9</code></a></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>2</span>
+## Members <span class="api-count" data-pagefind-ignore>3</span>
 
 <div class="api-member-list">
 
@@ -32,6 +32,15 @@ onHeightChange?: (height: number) => void;
 ```
 
 </details>
+
+<details class="api-member" id="ribbon-options-icons" data-pagefind-weight="1">
+<summary><code>icons</code> <span class="api-member-summary">Replace built-in icons by glyph name, as GridConfig.icons.</span></summary>
+
+```ts generated
+icons?: IconOverrides;
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -43,6 +52,7 @@ onHeightChange?: (height: number) => void;
 export interface RibbonOptions {
   focusGrid?: () => void;
   onHeightChange?: (height: number) => void;
+  icons?: IconOverrides;
 }
 ```
 

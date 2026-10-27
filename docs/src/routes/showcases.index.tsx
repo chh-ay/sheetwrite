@@ -262,63 +262,112 @@ function FormulasScene() {
   );
 }
 
-/** Engine events streaming beside a Grid. */
+/** One change traced like a profiler waterfall: each stage starts where the last ends. */
+const ENGINE_STAGES = [
+  { label: "Page", start: 0, width: 18 },
+  { label: "Recalc", start: 18, width: 34 },
+  { label: "Paint", start: 52, width: 22 },
+  { label: "Host ack", start: 74, width: 26 },
+] as const;
+
 function EngineScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
-      <span className="sw-hub-trace">
-        <code>
-          <i>datasource</i> rows 31–45 · 0.1 ms
-        </code>
-        <code>
-          <i>formula</i> C2 810 → 900
-        </code>
-        <code>
-          <i>drawing</i> canvas · 270 cells
-        </code>
-        <code>
-          <i>host-save</i> acknowledged
-        </code>
+      <span className="sw-hub-waterfall">
+        {ENGINE_STAGES.map((stage) => (
+          <span key={stage.label}>
+            <i>{stage.label}</i>
+            <b>
+              <s style={{ marginLeft: `${stage.start}%`, width: `${stage.width}%` }} />
+            </b>
+          </span>
+        ))}
       </span>
-      <span className="sw-hub-scene__caption">public events · paged forecast</span>
+      <span className="sw-hub-scene__caption">one edit, traced from page to host</span>
     </span>
   );
 }
 
-/** Host-owned rows: the view moves, the record IDs stay. */
+/** Records sorted by ARR; every record keeps its ID, and the edited one is marked. */
+const HOST_ROWS = [
+  { id: "#003", share: 92, edited: true },
+  { id: "#005", share: 78, edited: false },
+  { id: "#001", share: 60, edited: false },
+  { id: "#004", share: 41, edited: false },
+] as const;
+
 function HostRowsScene() {
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--host-rows">
-      <span className="sw-hub-trace">
-        <code>
-          <i>sort</i> ARR desc · IDs kept
-        </code>
-        <code>
-          <i>edit</i> account-003 ARR → 225,000
-        </code>
-        <code>
-          <i>delta</i> 1 record · host store
-        </code>
-        <code>
-          <i>import</i> 10,000 leads · unique IDs
-        </code>
+      <span className="sw-hub-records">
+        {HOST_ROWS.map((row) => (
+          <span data-edited={row.edited || undefined} key={row.id}>
+            <code>{row.id}</code>
+            <b style={{ width: `${row.share}%` }} />
+          </span>
+        ))}
       </span>
-      <span className="sw-hub-scene__caption">stable row IDs · host write policy</span>
+      <span className="sw-hub-scene__caption">sorted by ARR, every ID kept</span>
     </span>
   );
 }
 
+/** A budget in miniature: header fill, currency, red negatives, a ruled total. */
+const FORMATTED_ROWS = [
+  { label: "Revenue", plan: "$84,250", delta: "6.2%", tone: undefined },
+  { label: "Cloud", plan: "($12,600)", delta: "−12.3%", tone: "negative" },
+  { label: "Profit", plan: "$28,850", delta: "14.9%", tone: "total" },
+] as const;
+
 function FormattingScene() {
   return (
-    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--interoperability">
-      <span className="sw-hub-trace">
-        <strong>Q1 operating budget</strong>
-        <span>
-          <b>$84,250.00</b> · <em>12.5%</em> · 2026-01-01
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--formatting">
+      <span className="sw-hub-budget">
+        <span data-tone="head">
+          <i>Budget line</i>
+          <i>Plan</i>
+          <i>Δ</i>
         </span>
-        <code>General → Currency → Accounting</code>
+        {FORMATTED_ROWS.map((row) => (
+          <span data-tone={row.tone} key={row.label}>
+            <i>{row.label}</i>
+            <i>{row.plan}</i>
+            <i>{row.delta}</i>
+          </span>
+        ))}
       </span>
-      <span className="sw-hub-scene__caption">typography · per-cell formats · XLSX proof</span>
+      <span className="sw-hub-scene__caption">number formats and styles that survive XLSX</span>
+    </span>
+  );
+}
+
+/** A filtered column over a mini grid: one rejected, one warned and one locked cell. */
+const DATA_TOOL_CELLS = Array.from({ length: 16 }, (_, index) => index);
+const DATA_TOOL_STATES: Readonly<Record<number, "reject" | "warn" | "lock">> = {
+  5: "reject",
+  10: "warn",
+  12: "lock",
+};
+
+function DataToolsScene() {
+  return (
+    <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--data-tools">
+      <span className="sw-hub-rules">
+        <span className="sw-hub-rules__grid">
+          {[0, 1, 2, 3].map((column) => (
+            <i data-filtered={column === 1 || undefined} key={`head-${column}`} />
+          ))}
+          {DATA_TOOL_CELLS.map((cell) => (
+            <b data-state={DATA_TOOL_STATES[cell]} key={cell} />
+          ))}
+        </span>
+        <span className="sw-hub-rules__legend">
+          <span data-state="reject">rejected</span>
+          <span data-state="warn">warned</span>
+          <span data-state="lock">locked</span>
+        </span>
+      </span>
+      <span className="sw-hub-scene__caption">rules that hold under any sort or filter</span>
     </span>
   );
 }
@@ -384,16 +433,7 @@ function CapabilityScene({ id, medianMs }: Readonly<{ id: SceneOwnerId; medianMs
     case "engine":
       return <EngineScene />;
     case "data-tools":
-      return (
-        <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--host-rows">
-          <span className="sw-hub-trace">
-            <code>4,800 orders → Region + Customer</code>
-            <code>Units: reject · Freight: warn</code>
-            <code>Order IDs: host protection resolver</code>
-          </span>
-          <span className="sw-hub-scene__caption">sort · filter · group · protect</span>
-        </span>
-      );
+      return <DataToolsScene />;
   }
 }
 

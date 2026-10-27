@@ -53,11 +53,11 @@ function CollaborationProofRoute() {
           concern: "Auth, authorization & deployment",
           owner: "host",
           detail:
-            "Who a collaborator is, what they may edit, and where the service runs are host decisions — presence identity is advisory UI state, never access control.",
+            "Who a collaborator is, what they may edit, and where the service runs are host decisions. Presence identity is advisory UI state, never access control.",
         },
       ]}
       boundaryContract="PersistenceAdapter + RemoteOperationSource"
-      boundaryLede="Everything moving on this page is the real collaboration flow running in your browser tab. The server is deliberately illustrative — the responsibilities below never move into Sheetwrite."
+      boundaryLede="Everything moving on this page is the real collaboration flow running in your browser tab. The server is deliberately illustrative: the responsibilities below never move into Sheetwrite."
       description={description}
       eyebrow="CAPABILITY / LIVE COLLABORATION"
       facts={[
@@ -76,7 +76,7 @@ function CollaborationProofRoute() {
         {
           title: "Convergence under ordering",
           detail:
-            "Every commit is sequenced once by the server and fanned out; both grids — including live formulas — converge to identical state.",
+            "Every commit is sequenced once by the server and fanned out; both grids, live formulas included, converge to identical state.",
         },
         {
           title: "Loss without double-apply",
@@ -96,7 +96,7 @@ function CollaborationProofRoute() {
         {
           title: "Atomic multi-version batches",
           detail:
-            "A restore that is larger than one server version (0.5.0) becomes one atomic batch: the server stores every version or none, and the peer applies the whole batch in a single transaction.",
+            "A restore that is larger than one server version becomes one atomic batch: the server stores every version or none, and the peer applies the whole batch in a single transaction.",
         },
       ]}
     >

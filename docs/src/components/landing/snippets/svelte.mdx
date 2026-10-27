@@ -3,7 +3,7 @@
   import { Sheetwrite, type SimpleColumn } from "@sheetwrite/svelte";
   import "@sheetwrite/svelte/styles.css";
 
-  type Row = { name: string; amount: number };
+  type Row = { product: string; amount: number };
   let { columns, rows }: { columns: SimpleColumn<Row>[]; rows: Row[] } = $props();
 </script>
 

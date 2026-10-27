@@ -59,15 +59,17 @@
   margin: 0;
   font-family: var(--sw-font-display);
   font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  font-weight: 650;
   letter-spacing: -0.015em;
   color: var(--sw-fg-strong);
   text-wrap: balance;
 }
 
+/* Three columns: the five- and six-item lists end on full or near-full rows. */
 .sw-proofs-page__points ol {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 2rem;
   margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
@@ -570,13 +572,7 @@
   gap: 0.9rem 2rem;
   align-items: center;
   padding: 1.1rem 1.35rem;
-  background:
-    radial-gradient(
-      50rem 14rem at 90% -30%,
-      color-mix(in srgb, var(--sw-demo-accent) 16%, transparent),
-      transparent 70%
-    ),
-    var(--sw-demo-surface);
+  background: var(--sw-demo-surface);
   color: var(--sw-demo-fg);
 }
 

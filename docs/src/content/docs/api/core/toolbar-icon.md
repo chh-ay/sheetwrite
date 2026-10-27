@@ -8,7 +8,7 @@ description: "Text, DOM node, or node factory used as toolbar icon content."
 Text, DOM node, or node factory used as toolbar icon content.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L273"><code>packages/core/src/types/grid.ts#L273</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L282"><code>packages/core/src/types/grid.ts#L282</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -38,8 +38,7 @@ export type ToolbarIcon = string | Node | (() => Node);
 <p class="api-consumers-label">Public exports naming <code>ToolbarIcon</code></p>
 
 <ul class="api-consumer-list">
-<li><a href="/docs/api/core/grid-config/"><code>GridConfig</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/icon-overrides/"><code>IconOverrides</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/toolbar-item/"><code>ToolbarItem</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core-shell/toolbar-options/"><code>ToolbarOptions</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

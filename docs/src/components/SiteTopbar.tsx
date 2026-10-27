@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 
+import { LATEST_RELEASE } from "../lib/releases.js";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
@@ -41,6 +42,9 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
           to="/showcases/"
         >
           Showcases
+        </Link>
+        <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
+          What's new <span className="sw-product-nav__version">v{LATEST_RELEASE.version}</span>
         </Link>
       </nav>
       <div className="sw-showcase-nav__actions">

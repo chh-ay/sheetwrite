@@ -33,7 +33,7 @@ function ReactWorkbenchRoute() {
         {
           title: "Formulas and KPIs",
           detail:
-            "Summary cards read real engine formulas — SUM over a named range, AVG, SUMIF per market — and recalculate on every edit.",
+            "Summary cards read real engine formulas (SUM over a named range, AVG, SUMIF per market) and recalculate on every edit.",
         },
         {
           title: "Reset reconciliation",

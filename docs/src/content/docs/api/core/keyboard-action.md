@@ -8,7 +8,7 @@ description: "Built-in actions that can be rebound without replacing navigation.
 Built-in actions that can be rebound without replacing navigation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L343"><code>packages/core/src/types/grid.ts#L343</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L364"><code>packages/core/src/types/grid.ts#L364</code></a></dd></div>
 </dl>
 
 ## Declaration
@@ -25,7 +25,8 @@ export type KeyboardAction =
   | "redo"
   | "find"
   | "replace"
-  | "clearContents";
+  | "clearContents"
+  | "editNote";
 ```
 
 </div>

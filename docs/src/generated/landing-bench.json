@@ -48,5 +48,10 @@
       "bestScenario": "merge-heavy.paint",
       "handsontableIncomplete": 0
     }
-  ]
+  ],
+  "downloads": {
+    "coreFirstLoadBrotliBytes": 389462,
+    "defaultEngineBrotliBytes": 256150,
+    "fullEngineBrotliBytes": 344260
+  }
 }

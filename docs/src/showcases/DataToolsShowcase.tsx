@@ -9,7 +9,50 @@ import {
   type DataAction,
   type DataSnapshot,
   type DataToolsScenario,
+  type ProbeKey,
+  type ProbeResult,
 } from "./scenarios/data-tools.js";
+import { DemoSelect } from "./ui/DemoSelect.js";
+
+/** The guarded columns, the rule each one carries, and the probe that tests it. */
+const RULES: readonly {
+  key: ProbeKey;
+  column: string;
+  rule: string;
+  action: DataAction;
+  attempt: string;
+}[] = [
+  {
+    key: "units",
+    column: "Units",
+    rule: "A whole number from 1 to 250. Anything else is rejected.",
+    action: "reject",
+    attempt: "Try units −5",
+  },
+  {
+    key: "freight",
+    column: "Freight",
+    rule: "Above $200 is saved, with a warning to review it.",
+    action: "warn",
+    attempt: "Try freight $350",
+  },
+  {
+    key: "order",
+    column: "Order ID",
+    rule: "Locked. Only a manager can change it.",
+    action: "protected",
+    attempt: "Try a new order ID",
+  },
+];
+
+const ALL_REGIONS = "";
+
+function probeText(result: ProbeResult | null): string {
+  if (result === null) return "Not tried yet.";
+  if (result.outcome === "rejected") return `Rejected. Still ${result.stored}.`;
+  if (result.outcome === "warned") return `Saved with a warning: ${result.stored}.`;
+  return `Saved: ${result.stored}.`;
+}
 
 import "@sheetwrite/core/styles.css";
 
@@ -81,30 +124,28 @@ export default function DataToolsShowcase() {
               <span className="sw-data-kicker">01 / FIND THE WORK</span>
               <h2>Dispatch queue</h2>
             </div>
+            <DemoSelect
+              className="sw-data-region"
+              disabled={disabled}
+              label="Region"
+              options={[
+                { label: "All regions", value: ALL_REGIONS },
+                ...(snapshot?.regions ?? []).map((value) => ({ label: value, value })),
+              ]}
+              value={region}
+              onValueChange={(value) => filter(value, customer)}
+            />
             <label>
-              Region · values
-              <select
-                disabled={disabled}
-                value={region}
-                onChange={(event) => filter(event.target.value, customer)}
-              >
-                <option value="">All regions</option>
-                {snapshot?.regions.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Customer · contains
+              Customer
               <input
                 disabled={disabled}
-                placeholder="Try Northstar"
+                placeholder="Name contains, e.g. Northstar"
                 value={customer}
                 onChange={(event) => filter(region, event.target.value)}
               />
             </label>
             <button disabled={disabled} onClick={() => void run("sort")}>
-              Sort region → units ↓
+              Sort by region, then units
             </button>
             <button disabled={disabled} onClick={() => void run("clear")}>
               Clear view
@@ -142,65 +183,74 @@ export default function DataToolsShowcase() {
               {snapshot?.hiddenColumns ? "Unhide columns" : "Hide freight & owner"}
             </button>
             <small>
-              Hidden: {snapshot?.hiddenRows ?? 0} rows · {snapshot?.hiddenColumns ?? 0} columns
+              Hidden: {snapshot?.hiddenRows ?? 0} rows, {snapshot?.hiddenColumns ?? 0} columns
             </small>
           </div>
         </section>
         <div className="sw-data-lower">
           <section className="sw-data-panel" aria-labelledby="data-guardrails">
-            <span className="sw-data-kicker">02 / KEEP THE RULES</span>
-            <h2 id="data-guardrails">Try an unsafe edit</h2>
+            <h2 id="data-guardrails">Rules on the data</h2>
             <p>
-              Probes target the first stored order, even while the view is sorted or filtered. You
-              can also edit cells directly in the Grid.
+              Each rule guards the stored order, so it holds while the view is sorted or filtered.
+              Try one, or type into the Grid.
             </p>
-            <div className="sw-data-probes">
-              <button disabled={disabled} onClick={() => void run("reject")}>
-                Try units −5 · reject
-              </button>
-              <button disabled={disabled} onClick={() => void run("warn")}>
-                Try freight $350 · warn
-              </button>
-              <button disabled={disabled} onClick={() => void run("protected")}>
-                Try changing order ID
+            <ul className="sw-data-rules">
+              {RULES.map((rule) => {
+                const result = snapshot?.probes[rule.key] ?? null;
+                return (
+                  <li key={rule.key}>
+                    <div className="sw-data-rule">
+                      <strong>{rule.column}</strong>
+                      <span>{rule.rule}</span>
+                    </div>
+                    <button disabled={disabled} onClick={() => void run(rule.action)}>
+                      {rule.attempt}
+                    </button>
+                    <output
+                      className="sw-data-result"
+                      data-outcome={result?.outcome ?? "idle"}
+                      data-testid={`data-probe-${rule.key}`}
+                    >
+                      {probeText(result)}
+                    </output>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="sw-data-role" role="group" aria-labelledby="data-role-label">
+              <span id="data-role-label">Acting as</span>
+              <button
+                aria-pressed={!(snapshot?.manager ?? false)}
+                disabled={disabled}
+                onClick={() => void run("operator")}
+              >
+                Operator
               </button>
               <button
                 aria-pressed={snapshot?.manager ?? false}
                 disabled={disabled}
-                onClick={() => void run("permission")}
+                onClick={() => void run("manager")}
               >
-                Role: {snapshot?.manager ? "manager" : "operator"}
+                Manager
               </button>
             </div>
-            <p className="sw-data-probe" data-testid="data-probe" role="status">
-              {snapshot?.probe}
-            </p>
             <p className="sw-data-note">
-              Units: integer 1–250, rejected otherwise. Freight: over $200 is saved with a warning.
-              Order IDs: only the manager resolver allows changes. Client protection is a UX policy,
-              not server authorization.
+              The lock is a UI policy for your users. Enforce the same rule on your server.
             </p>
           </section>
           <section className="sw-data-panel" aria-labelledby="data-events">
-            <span className="sw-data-kicker">03 / READ THE RECEIPT</span>
             <h2 id="data-events">What the Grid reported</h2>
-            <p>
-              Newest first · bounded to 24 entries. Change events and mutation issues are reported,
-              not simulated.
-            </p>
+            <p>Newest first. Every line comes from a real Grid call or event.</p>
             <ol className="sw-data-events" data-testid="data-events">
               {snapshot?.events.map((event) => (
-                <li key={event}>{event}</li>
+                <li data-tone={event.tone} key={event.id}>
+                  <span>{event.text}</span>
+                  <code>{event.api}</code>
+                </li>
               ))}
             </ol>
           </section>
         </div>
-        <p className="sw-data-note">
-          Clear view removes sort and filters, not hidden rows or collapsed groups. Sorting and
-          filtering change the view; validation and protection apply to the underlying data
-          addresses. The Region menu is populated by <code>distinctValues</code>; the filter summary
-          reads <code>getColumnFilters</code>.
-        </p>
       </main>
     </div>
   );

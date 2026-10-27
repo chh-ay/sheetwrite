@@ -1,46 +1,58 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { siteUrl } from "./playwright.config.js";
 
 const ROUTE = siteUrl("/showcases/data-tools/");
 
+const SORT = "Sort by region, then units";
+
+/** Region is a custom select: open its trigger, then pick the option. */
+async function pickRegion(page: Page, region: string) {
+  await page.locator(".sw-data-region .sw-demo-select__trigger").click();
+  await page.getByRole("option", { name: region }).click();
+}
+
 test("dispatch controls compose a view and report real policy outcomes", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(ROUTE);
-  await expect(page.getByRole("button", { name: "Sort region → units ↓" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: SORT })).toBeEnabled();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
-  await page.getByLabel("Region · values").selectOption("EMEA");
-  await page.getByLabel("Customer · contains").fill("Northstar");
+  await pickRegion(page, "EMEA");
+  await page.getByLabel("Customer").fill("Northstar");
   await expect(page.getByTestId("data-visible")).toHaveText("640 / 4,800 rows visible");
-  await page.getByRole("button", { name: "Sort region → units ↓" }).click();
+  await page.getByRole("button", { name: SORT }).click();
   await expect(page.getByTestId("data-events")).toContainText(
-    "sortByMulti: Region ascending → Units descending",
+    "Sorted by region, then by units, largest first.",
   );
   await page.getByRole("button", { name: "Clear view", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
-  await expect(page.getByLabel("Region · values")).toHaveValue("");
+  await expect(page.locator(".sw-data-region .sw-demo-select__trigger")).toHaveText("All regions");
   await page.getByRole("button", { name: "Collapse batch" }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,776 / 4,800 rows visible");
   await page.getByRole("button", { name: "Hide rows 25–27" }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,773 / 4,800 rows visible");
   await page.getByRole("button", { name: "Hide freight & owner" }).click();
-  await expect(page.getByText("Hidden: 3 rows · 2 columns")).toBeVisible();
+  await expect(page.getByText("Hidden: 3 rows, 2 columns")).toBeVisible();
   await page.getByRole("button", { name: "Expand batch" }).click();
   await page.getByRole("button", { name: "Unhide rows", exact: true }).click();
   await page.getByRole("button", { name: "Unhide columns", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
-  await page.getByRole("button", { name: "Try units −5 · reject" }).click();
-  await expect(page.getByTestId("data-probe")).toContainText("stored 1 (rejected)");
-  await expect(page.getByTestId("data-events")).toContainText("mutation-rejected");
-  await page.getByRole("button", { name: "Try freight $350 · warn" }).click();
-  await expect(page.getByTestId("data-probe")).toContainText("stored 350 (applied)");
-  await expect(page.getByTestId("data-events")).toContainText("validation warning");
-  await page.getByRole("button", { name: "Try changing order ID" }).click();
-  await expect(page.getByTestId("data-probe")).toContainText("stored ORD-10001 (rejected)");
-  await page.getByRole("button", { name: "Role: operator" }).click();
-  await page.getByRole("button", { name: "Try changing order ID" }).click();
-  await expect(page.getByTestId("data-probe")).toContainText("stored MANAGER-REVIEW (applied)");
+  await page.getByRole("button", { name: "Try units −5" }).click();
+  await expect(page.getByTestId("data-probe-units")).toHaveText("Rejected. Still 1.");
+  await expect(page.getByTestId("data-events")).toContainText("Units −5 rejected.");
+  await page.getByRole("button", { name: "Try freight $350" }).click();
+  await expect(page.getByTestId("data-probe-freight")).toHaveText("Saved with a warning: 350.");
+  await expect(page.getByTestId("data-events")).toContainText("Freight $350 saved with a warning.");
+  await page.getByRole("button", { name: "Try a new order ID" }).click();
+  await expect(page.getByTestId("data-probe-order")).toHaveText("Rejected. Still ORD-10001.");
+  await page.getByRole("button", { name: "Manager", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Manager", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Try a new order ID" }).click();
+  await expect(page.getByTestId("data-probe-order")).toHaveText("Saved: MANAGER-REVIEW.");
   expect(errors).toEqual([]);
 });
 

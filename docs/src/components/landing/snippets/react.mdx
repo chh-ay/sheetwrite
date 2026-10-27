@@ -2,7 +2,7 @@
 import { Sheetwrite, type SimpleColumn } from "@sheetwrite/react";
 import "@sheetwrite/react/styles.css";
 
-type Row = { name: string; amount: number };
+type Row = { product: string; amount: number };
 
 export function Sheet(props: { columns: SimpleColumn<Row>[]; rows: Row[] }) {
   return (

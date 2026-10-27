@@ -118,7 +118,7 @@ export default function FormattingShowcase() {
       <SiteTopbar active="formatting" />
       <main className="sw-formatting" id="main-content">
         <CapabilityHero
-          eyebrow="Formatting studio / real workbook"
+          eyebrow="CAPABILITY / FORMATTING"
           title="Formatting & number formats"
           description="An operating budget with a point of view. Shape the type, make the numbers legible, then prove the workbook keeps its formatting through XLSX."
           facts={[
@@ -285,7 +285,7 @@ export default function FormattingShowcase() {
           <output aria-live="polite" data-testid="formatting-roundtrip">
             {report
               ? `${report.differences.length === 0 ? "Verified" : "Mismatch"} · ${report.checkedCells} cells compared · ${report.byteLength.toLocaleString("en-US")} XLSX bytes · ${report.differences.length} differences · ${report.warnings.length} warnings`
-              : "Not run — the proof uses your current workbook, including live edits."}
+              : "Not run yet. The proof uses your current workbook, including live edits."}
           </output>
           {report && (
             <>
