@@ -276,6 +276,44 @@ describe("chart change events", () => {
   });
 });
 
+// Engine selection is process-wide, and only the full engine computes pivot output.
+// So each case runs the full provider in its own process.
+describe("chart change events for pivot output", () => {
+  async function runProbe(scenario: string) {
+    const probe = Bun.spawn(
+      [
+        process.execPath,
+        "--preload",
+        "./test-setup.ts",
+        "./packages/core/test/charts-live-pivot-probe.ts",
+        scenario,
+      ],
+      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      probe.exited,
+      new Response(probe.stdout).text(),
+      new Response(probe.stderr).text(),
+    ]);
+    return { exitCode, stdout, stderr };
+  }
+
+  const passed = { exitCode: 0, stdout: "", stderr: "" };
+
+  it("refreshes a chart that reads pivot output when the pivot source changes", async () => {
+    expect(await runProbe("source-edit")).toEqual(passed);
+  });
+
+  it("refreshes a chart under the output when a pivot is set or removed", async () => {
+    expect(await runProbe("set")).toEqual(passed);
+    expect(await runProbe("remove")).toEqual(passed);
+  });
+
+  it("leaves a chart on a sheet without pivots alone when another sheet's pivot changes", async () => {
+    expect(await runProbe("other-sheet")).toEqual(passed);
+  });
+});
+
 describe("resolveChartView", () => {
   it("resolves values, categories and number formats as plain data", () => {
     const { store } = setup();

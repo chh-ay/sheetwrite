@@ -1538,15 +1538,26 @@ export class StoreDataEngine {
 
   /**
    * Whether any cell in the rectangle takes its value from elsewhere: a formula,
-   * a cross-reference or a spill child. Chart tracking calls it once per series
-   * range when its index is rebuilt, never per edit: the source capture walks
-   * every formula on the sheet. Callers clip the range to the sheet first.
+   * a cross-reference, a spill child or pivot output. Chart tracking calls it
+   * once per series range when its index is rebuilt, never per edit: the source
+   * capture walks every formula on the sheet. Callers clip the range to the
+   * sheet first.
    */
   chartSourcesComputed(range: Range): boolean {
+    const bounds = normalizedRange(range);
+
+    // The engine writes pivot output with no document op on its cells. The output
+    // grows down and right from the anchor like a spill, so a pivot anchored at or
+    // above-left of the range end can reach it. This model test is cheap, so do it first.
+    const pivots = this.workbook.sheets.find((sheet) => sheet.id === bounds.sheet)?.pivots ?? [];
+    const pivotReaches = pivots.some(
+      (pivot) => pivot.anchor.row <= bounds.end.row && pivot.anchor.col <= bounds.end.col,
+    );
+    if (pivotReaches) return true;
+
     // Spill children carry no source of their own, so the source capture cannot see them.
     if (this.hasSpillChildren(range)) return true;
 
-    const bounds = normalizedRange(range);
     // Include anchors above and left: an existing spill may grow into this range
     // after a precedent changes. This conservatively follows those formulas too.
     // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
