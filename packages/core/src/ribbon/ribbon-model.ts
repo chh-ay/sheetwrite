@@ -19,8 +19,6 @@ import type { CellStyle } from "../types/cell.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
 
-export type RibbonIcon = IconName;
-
 /**
  * Where a control's disabled state comes from. `edit` borrows the state of a
  * selection-scoped edit command, which is disabled exactly when the grid is
@@ -33,7 +31,7 @@ export const EDIT_STATE_COMMAND: GridCommandName = "clearFormat";
 
 interface RibbonMenuItem {
   readonly label: string;
-  readonly icon?: RibbonIcon;
+  readonly icon?: IconName;
   readonly run: (grid: Grid) => unknown;
 }
 
@@ -41,7 +39,7 @@ interface RibbonMenuItem {
 export interface RibbonButtonSpec {
   readonly kind: "button";
   readonly label: string;
-  readonly icon: RibbonIcon;
+  readonly icon: IconName;
   readonly run: (grid: Grid) => unknown;
   readonly availability: RibbonAvailability;
   readonly toggle?: boolean;
@@ -55,7 +53,7 @@ export interface RibbonButtonSpec {
 export interface RibbonMenuSpec {
   readonly kind: "menu";
   readonly label: string;
-  readonly icon: RibbonIcon;
+  readonly icon: IconName;
   readonly availability: RibbonAvailability;
   readonly items: readonly RibbonMenuItem[];
   readonly run?: (grid: Grid) => unknown;
@@ -91,7 +89,7 @@ export interface RibbonComboSpec {
 export interface RibbonColorSpec {
   readonly kind: "color";
   readonly label: string;
-  readonly icon: RibbonIcon;
+  readonly icon: IconName;
   /** Palette entry that removes the color ("Automatic" / "No Fill"). */
   readonly clearLabel: string;
   /** Color the face applies before the user picks one, as in Excel. */
@@ -103,7 +101,7 @@ export interface RibbonColorSpec {
 export interface RibbonFormSpec {
   readonly kind: "form";
   readonly label: string;
-  readonly icon: RibbonIcon;
+  readonly icon: IconName;
   readonly field: string;
   readonly multiline: boolean;
   readonly read: (grid: Grid, cell: CellAddress) => string;
@@ -133,14 +131,14 @@ export type RibbonGroupSpec =
   | {
       readonly id: string;
       readonly label: string;
-      readonly icon: RibbonIcon;
+      readonly icon: IconName;
       readonly layout: "flow";
       readonly controls: readonly RibbonControlSpec[];
     }
   | {
       readonly id: string;
       readonly label: string;
-      readonly icon: RibbonIcon;
+      readonly icon: IconName;
       readonly layout: "rows";
       readonly rows: readonly (readonly RibbonControlSpec[])[];
     };
@@ -159,6 +157,8 @@ export interface RibbonTabSpec {
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.1;
+/** The zoom that the ribbon's percent readout resets to: 100%. */
+export const ZOOM_RESET = 1;
 
 const EXCEL_THEME_TEXT = "#c00000";
 const EXCEL_THEME_FILL = "#ffff00";
@@ -199,7 +199,7 @@ function rowSpan(a: number, b: number): [number, number] {
 
 const button = (
   label: string,
-  icon: RibbonIcon,
+  icon: IconName,
   run: (grid: Grid) => unknown,
   availability: RibbonAvailability = "edit",
   options: { toggle?: boolean; large?: boolean } = {},
@@ -207,14 +207,14 @@ const button = (
 
 const toggle = (
   label: string,
-  icon: RibbonIcon & GridCommandName,
+  icon: IconName & GridCommandName,
   run: (grid: Grid) => unknown,
 ): RibbonButtonSpec => button(label, icon, run, icon, { toggle: true });
 
-const item = (label: string, run: (grid: Grid) => unknown, icon?: RibbonIcon): RibbonMenuItem =>
+const item = (label: string, run: (grid: Grid) => unknown, icon?: IconName): RibbonMenuItem =>
   icon === undefined ? { label, run } : { label, icon, run };
 
-const BORDER_ITEMS: readonly [string, RibbonIcon, BorderPreset][] = [
+const BORDER_ITEMS: readonly [string, IconName, BorderPreset][] = [
   ["Bottom Border", "borderBottom", "bottom"],
   ["Top Border", "borderTop", "top"],
   ["Left Border", "borderLeft", "left"],

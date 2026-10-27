@@ -1,4 +1,4 @@
-import { actionFeedbackFor } from "./action-feedback.js";
+import { type ActionFeedback, actionFeedbackFor } from "./action-feedback.js";
 import type { IconName } from "./icons/icon-names.js";
 import { iconNode } from "./icons/resolve.js";
 import { boundShortcutLabel, formatShortcut, isKeyboardAction, parseShortcut } from "./keymap.js";
@@ -73,7 +73,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
     },
     { action: "separator" },
     {
-      id: "merge",
+      // Not "merge": that name belongs to the leaf action's row and feedback key.
+      id: "mergeMenu",
       label: "Merge",
       icon: "merge",
       items: [
@@ -89,7 +90,7 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
 }
 
 /** The glyph a built-in action shows when its row names no icon. */
-const ACTION_ICON: Partial<Record<ContextMenuActionName, IconName>> = {
+const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName> = {
   cut: "cut",
   copy: "copy",
   paste: "paste",
@@ -228,6 +229,14 @@ interface Submenu {
   readonly parentRow: HTMLElement;
 }
 
+/** One rendered row and the state its click handler reads. */
+interface RowBinding {
+  readonly menu: HTMLDivElement;
+  readonly row: HTMLDivElement;
+  readonly context: ContextMenuContext;
+  readonly isDisabled: boolean;
+}
+
 /**
  * Floating right-click menu with nested submenus. Dynamic rows are resolved
  * for each opening; global dismiss listeners live only while the menu is open.
@@ -242,7 +251,6 @@ export class ContextMenu {
   private readonly grid: Grid;
   /** Open submenus, outermost first; index i is menu level i + 1. */
   private submenus: Submenu[] = [];
-  private context: ContextMenuContext | null = null;
   private returnFocus: HTMLElement | null = null;
   private hoverTimer: number | undefined;
 
@@ -264,7 +272,6 @@ export class ContextMenu {
 
   open(context: ContextMenuContext): void {
     this.closeSubmenusFrom(0);
-    this.context = context;
     const active = document.activeElement;
     this.returnFocus = active instanceof HTMLElement && !this.ownsElement(active) ? active : null;
 
@@ -381,67 +388,89 @@ export class ContextMenu {
     const feedback = actionFeedbackFor(this.grid);
     const pending = feedback?.isRunning(key) ?? false;
 
-    const disabled =
+    const isDisabled =
       pending ||
       (typeof item.disabled === "function" ? item.disabled(context) : item.disabled === true);
-    if (disabled) {
+    if (isDisabled) {
       row.classList.add("sheetwrite-context-menu-item-disabled");
       row.setAttribute("aria-disabled", "true");
     }
+
+    // Separators never reach here (fill draws them); the guard narrows the type.
+    const builtIn = action === "separator" ? undefined : action;
 
     // Every row keeps the icon column, so labels line up with or without a glyph.
     const iconSlot = document.createElement("span");
     iconSlot.className = "sheetwrite-context-menu-icon";
     iconSlot.setAttribute("aria-hidden", "true");
-    const iconName = item.icon ?? (action ? ACTION_ICON[action] : undefined);
+    const iconName = item.icon ?? (builtIn ? ACTION_ICON[builtIn] : undefined);
     if (iconName) iconSlot.append(iconNode(iconName, this.config.icons));
     row.appendChild(iconSlot);
 
     const label = document.createElement("span");
     label.className = "sheetwrite-context-menu-label";
-    label.textContent =
-      item.label ?? (action && action !== "separator" ? (DEFAULT_LABEL[action] ?? action) : "");
+    label.textContent = item.label ?? (builtIn ? DEFAULT_LABEL[builtIn] : "");
     if (pending) {
       row.setAttribute("aria-busy", "true");
       label.textContent = `Running ${label.textContent}…`;
     }
     row.appendChild(label);
 
+    const binding: RowBinding = { menu, row, context, isDisabled };
     const children = item.items;
-    if (children !== undefined) {
-      row.setAttribute("aria-haspopup", "menu");
-      row.setAttribute("aria-expanded", "false");
-      const arrow = document.createElement("span");
-      arrow.className = "sheetwrite-context-menu-arrow";
-      arrow.setAttribute("aria-hidden", "true");
-      row.appendChild(arrow);
-      row.addEventListener("click", () => {
-        if (!disabled) this.openSubmenu(menu, row, children);
-      });
-    } else {
-      this.appendShortcut(row, item, action);
-      const run = item.onClick
-        ? () => item.onClick?.(this.grid, context.cell)
-        : actionHandler(action, this.actions);
-      row.addEventListener("click", () => {
-        if (disabled) return;
-        // The menu closes at once; a refused clipboard or a failed export
-        // still reaches the user through the grid's action status.
-        if (feedback) void feedback.run(key, run);
-        else run();
-        this.close();
-      });
-    }
+    if (children !== undefined) this.bindSubmenuRow(binding, children);
+    else this.bindActionRow(binding, item, key, feedback);
 
     row.addEventListener("pointerenter", () => {
-      if (!disabled) row.focus({ preventScroll: true });
+      if (!isDisabled) row.focus({ preventScroll: true });
       window.clearTimeout(this.hoverTimer);
       this.hoverTimer = window.setTimeout(() => {
-        if (children !== undefined && !disabled) this.openSubmenu(menu, row, children, false);
-        else this.closeSubmenusFrom(this.levelOf(menu));
+        if (children !== undefined && !isDisabled) {
+          this.openSubmenu(menu, row, children, context, false);
+        } else {
+          this.closeSubmenusFrom(this.levelOf(menu));
+        }
       }, SUBMENU_HOVER_MS);
     });
     return row;
+  }
+
+  /** Adds the submenu arrow; a click opens `children` beside the row. */
+  private bindSubmenuRow(binding: RowBinding, children: readonly ContextMenuItem[]): void {
+    const { menu, row, context, isDisabled } = binding;
+    row.setAttribute("aria-haspopup", "menu");
+    row.setAttribute("aria-expanded", "false");
+    const arrow = document.createElement("span");
+    arrow.className = "sheetwrite-context-menu-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    row.appendChild(arrow);
+
+    row.addEventListener("click", () => {
+      if (!isDisabled) this.openSubmenu(menu, row, children, context);
+    });
+  }
+
+  /** Adds the shortcut hint; a click runs the row's command and closes the menu. */
+  private bindActionRow(
+    binding: RowBinding,
+    item: ContextMenuItem,
+    key: string,
+    feedback: ActionFeedback | undefined,
+  ): void {
+    const { row, context, isDisabled } = binding;
+    this.appendShortcut(row, item, item.action);
+    const run = item.onClick
+      ? () => item.onClick?.(this.grid, context.cell)
+      : actionHandler(item.action, this.actions);
+
+    row.addEventListener("click", () => {
+      if (isDisabled) return;
+      // The menu closes at once; a refused clipboard or a failed export
+      // still reaches the user through the grid's action status.
+      if (feedback) void feedback.run(key, run);
+      else run();
+      this.close();
+    });
   }
 
   private appendShortcut(
@@ -476,13 +505,14 @@ export class ContextMenu {
     parent: HTMLDivElement,
     row: HTMLElement,
     items: readonly ContextMenuItem[],
+    context: ContextMenuContext,
     focusFirst = true,
   ): void {
     const level = this.levelOf(parent);
     if (this.submenus[level]?.parentRow !== row) {
       this.closeSubmenusFrom(level);
       const element = this.createMenuElement("sheetwrite-context-menu sheetwrite-context-menu-sub");
-      this.fill(element, items, this.context ?? { cell: null, clientX: 0, clientY: 0 });
+      this.fill(element, items, context);
       element.style.display = "block";
       this.place(element, parent, row);
       row.setAttribute("aria-expanded", "true");

@@ -12,7 +12,12 @@ import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
 import landingBench from "../generated/landing-bench.json";
 import { opensFreshDocument } from "../lib/navigation.js";
-import { LATEST_HIGHLIGHTS, LATEST_RELEASE } from "../lib/releases.js";
+import {
+  LATEST_HIGHLIGHTED_RELEASE,
+  LATEST_RELEASE,
+  minorVersion,
+  releaseHref,
+} from "../lib/releases.js";
 import { pageMeta } from "../lib/seo.js";
 
 import landingStylesheet from "../styles/landing.css?url";
@@ -37,22 +42,25 @@ interface LandingBenchSize {
   handsontableIncomplete: number;
 }
 
-interface LandingBenchData {
-  available: boolean;
-  capture?: {
+interface LandingEvidence {
+  capture: {
     commit: string;
     timestamp: string;
     browser: string;
     rounds: number;
     engineVersions: { sheetwrite: string; handsontable: string };
   };
-  heroStats?: {
+  heroStats: {
     millionRowScenarios: number;
     millionRowMedianMs: number;
     millionRowHeapMb: number;
   };
-  sizes?: LandingBenchSize[];
-  /** Brotli-compressed downloads; absent when any part of the size report is missing. */
+  sizes: LandingBenchSize[];
+}
+
+interface LandingBenchData extends Partial<LandingEvidence> {
+  available: boolean;
+  /** Brotli-compressed downloads; absent when the size report or engine artifact is incomplete. */
   downloads?: {
     coreFirstLoadBrotliBytes: number;
     defaultEngineBrotliBytes: number;
@@ -119,12 +127,7 @@ const FEATURES: readonly Feature[] = [
   },
 ];
 
-/** "0.5.0" → "0.5": the landing names minor releases. */
-function minorVersion(version: string): string {
-  return version.replace(/\.\d+$/, "");
-}
-
-/** The rows every landing snippet mounts, shown as the result beside the code. */
+/** The rows that the landing snippets show, beside the code. */
 const SAMPLE_ROWS = [
   ["Notebook", 12],
   ["Pen", 4],
@@ -142,9 +145,7 @@ function ratioWidth(ratio: number, scaleMax: number): string {
   return `${Math.min(100, Math.max(pct, 3)).toFixed(1)}%`;
 }
 
-function BenchmarkBars({
-  evidence,
-}: Readonly<{ evidence: Required<Omit<LandingBenchData, "downloads">> }>) {
+function BenchmarkBars({ evidence }: Readonly<{ evidence: LandingEvidence }>) {
   const { ref } = useScenePlayback<HTMLDivElement>();
   const scaleMax = Math.max(...evidence.sizes.map((entry) => entry.medianRatio)) * 1.25;
   return (
@@ -225,9 +226,9 @@ function FeatureCards() {
 
 function Landing() {
   const bench = landingBench as LandingBenchData;
-  const evidence =
+  const evidence: LandingEvidence | undefined =
     bench.available && bench.sizes && bench.heroStats && bench.capture
-      ? { available: true, sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
+      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
   const { downloads } = bench;
@@ -371,8 +372,8 @@ function Landing() {
               </tbody>
             </table>
             <figcaption>
-              What every tab renders, with these rows. Cells are editable, with undo, redo, and copy
-              and paste.
+              What every tab renders, with these rows. You can edit cells, undo, redo, copy and
+              paste.
             </figcaption>
           </figure>
         </section>
@@ -411,15 +412,15 @@ function Landing() {
               <code>await initSheetwrite(undefined, formulas);</code>
             </article>
           </div>
-          {LATEST_HIGHLIGHTS?.highlights ? (
+          {LATEST_HIGHLIGHTED_RELEASE !== undefined ? (
             <aside aria-labelledby="landing-new" className="sw-lp-new">
-              <h3 id="landing-new">New in {minorVersion(LATEST_HIGHLIGHTS.version)}</h3>
+              <h3 id="landing-new">New in {minorVersion(LATEST_HIGHLIGHTED_RELEASE.version)}</h3>
               <ul>
-                {LATEST_HIGHLIGHTS.highlights.map((highlight) => (
+                {LATEST_HIGHLIGHTED_RELEASE.highlights.map((highlight) => (
                   <li key={highlight}>{highlight}</li>
                 ))}
               </ul>
-              <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_HIGHLIGHTS.version}` }}>
+              <Link to={releaseHref(LATEST_HIGHLIGHTED_RELEASE.version)}>
                 Read what is new and the upgrade checklist →
               </Link>
             </aside>
@@ -493,9 +494,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
                 First grid
               </Link>
-              <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
-                What's new
-              </Link>
+              <Link to={releaseHref(LATEST_RELEASE.version)}>What's new</Link>
             </div>
             <div>
               <p className="sw-landing-footer__title">Frameworks</p>

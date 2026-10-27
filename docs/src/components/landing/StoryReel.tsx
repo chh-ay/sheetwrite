@@ -51,7 +51,8 @@ const STORIES: readonly Story[] = [
   },
 ];
 
-const delay = (seconds: number) => ({ animationDelay: `${seconds.toFixed(2)}s` }) as CSSProperties;
+const secs = (seconds: number) => `${seconds.toFixed(2)}s`;
+const delay = (seconds: number): CSSProperties => ({ animationDelay: secs(seconds) });
 
 /* ---- Story 1: FILTER spills, then grows ---------------------------------------- */
 
@@ -168,8 +169,6 @@ function SpillStory() {
 
 /* ---- Story 2: offline edits queue, then drain ------------------------------------ */
 
-const secs = (seconds: number) => `${seconds.toFixed(2)}s`;
-
 /**
  * One timeline per offline edit, in seconds. Bram edits while offline, the
  * outbox drains after he reconnects at 5 s (sr-online flips at 50 %), the
@@ -191,18 +190,32 @@ const OFFLINE_EDITS = [0, 1, 2].map((index) => {
   };
 });
 
+const FIRST_VERSION = 42;
+const OFFLINE_VERSIONS = [
+  FIRST_VERSION,
+  ...OFFLINE_EDITS.map((_, index) => FIRST_VERSION + index + 1),
+];
+
 const MINI_X0 = 16;
 const MINI_Y0 = 124;
 const MINI_PITCH_X = 40;
 const MINI_PITCH_Y = 26;
 const MINI_WIDTH = 36;
 const MINI_HEIGHT = 22;
+const MINI_COLUMNS = 4;
+const MINI_CELLS = MINI_COLUMNS * MINI_COLUMNS;
+
+function miniCell(gridX: number, index: number) {
+  return {
+    x: gridX + MINI_X0 + (index % MINI_COLUMNS) * MINI_PITCH_X,
+    y: MINI_Y0 + Math.floor(index / MINI_COLUMNS) * MINI_PITCH_Y,
+  };
+}
 
 function miniCentre(gridX: number, index: number) {
-  return {
-    x: gridX + MINI_X0 + (index % 4) * MINI_PITCH_X + MINI_WIDTH / 2,
-    y: MINI_Y0 + Math.floor(index / 4) * MINI_PITCH_Y + MINI_HEIGHT / 2,
-  };
+  const cell = miniCell(gridX, index);
+
+  return { x: cell.x + MINI_WIDTH / 2, y: cell.y + MINI_HEIGHT / 2 };
 }
 
 function MiniGrid({
@@ -210,7 +223,7 @@ function MiniGrid({
   marked,
 }: Readonly<{ x: number; marked: ReadonlyMap<number, CSSProperties> }>) {
   const cells = [];
-  for (let index = 0; index < 16; index++) {
+  for (let index = 0; index < MINI_CELLS; index++) {
     cells.push(
       <rect
         className="sr-mini"
@@ -220,8 +233,7 @@ function MiniGrid({
         rx={2}
         style={marked.get(index)}
         width={MINI_WIDTH}
-        x={x + MINI_X0 + (index % 4) * MINI_PITCH_X}
-        y={MINI_Y0 + Math.floor(index / 4) * MINI_PITCH_Y}
+        {...miniCell(x, index)}
       />,
     );
   }
@@ -269,7 +281,7 @@ function VersionRoll({
             key={value}
             style={
               {
-                "--in": step === 0 ? "0s" : secs(changes[step - 1] ?? 0),
+                "--in": step > 0 ? secs(changes[step - 1] ?? 0) : undefined,
                 "--out": out === undefined ? undefined : secs(out),
               } as CSSProperties
             }
@@ -297,6 +309,10 @@ const BRAM_EXIT = { x: 430, y: 165 } as const;
 const ANA_ENTRY = { x: 216, y: 165 } as const;
 const ANA_GRID_X = 20;
 const BRAM_GRID_X = 424;
+// Shift the queue near the middle of the 0.6-second chip drain.
+const QUEUE_SHIFT_DELAY = 0.35;
+const PACKET_CHAR_WIDTH = 7;
+const PACKET_PADDING = 16;
 
 const px = (value: number) => `${value}px`;
 
@@ -317,7 +333,7 @@ function Packet({
   tone: "pending" | "committed";
   style: CSSProperties;
 }>) {
-  const width = label.length * 7 + 16;
+  const width = label.length * PACKET_CHAR_WIDTH + PACKET_PADDING;
   return (
     <g className="sr-packet" data-tone={tone} style={style}>
       <rect height={20} rx={10} width={width} x={x - width / 2} y={y - 10} />
@@ -357,7 +373,7 @@ function OfflineStory() {
           className="sr-ver"
           clip={{ x: 140, y: 80, width: 60, height: 19 }}
           clipId="sr-clip-ana"
-          values={[42, 43, 44, 45]}
+          values={OFFLINE_VERSIONS}
           x={196}
           y={94}
         />
@@ -382,11 +398,12 @@ function OfflineStory() {
           Your server
         </text>
         <VersionRoll
+          center
           changes={OFFLINE_EDITS.map((edit) => edit.commit)}
           className="sr-big"
           clip={{ x: 262, y: 160, width: 116, height: 34 }}
           clipId="sr-clip-server"
-          values={[42, 43, 44, 45]}
+          values={OFFLINE_VERSIONS}
           x={320}
           y={186}
         />
@@ -418,7 +435,9 @@ function OfflineStory() {
         const slot = { x: slotX + OUTBOX_CHIP_WIDTH / 2, y: head.y };
         const cell = miniCentre(BRAM_GRID_X, edit.cell);
         // The queue moves up one slot each time a chip ahead of this one leaves.
-        const shifts = OFFLINE_EDITS.slice(0, index).map((ahead) => secs(ahead.drain + 0.35));
+        const shifts = OFFLINE_EDITS.slice(0, index).map((ahead) =>
+          secs(ahead.drain + QUEUE_SHIFT_DELAY),
+        );
         return (
           <g
             className="sr-queue"
@@ -467,7 +486,7 @@ function OfflineStory() {
         return (
           <Packet
             key={edit.cell}
-            label={`v${43 + index}`}
+            label={`v${FIRST_VERSION + index + 1}`}
             style={
               {
                 "--send": secs(edit.send),
@@ -511,6 +530,10 @@ const UNDO_CENTER_X = UNDO_SERVER.x + UNDO_SERVER.width / 2;
 /** The grid → server wire, level with the server's centre. */
 const UNDO_WIRE_Y = UNDO_SERVER.y + UNDO_SERVER.height / 2;
 const BATCH_VERSIONS = [51, 52, 53, 54, 55] as const;
+const UNDO_VERSIONS = [BATCH_VERSIONS[0] - 2, BATCH_VERSIONS[0] - 1, Math.max(...BATCH_VERSIONS)];
+const BLOCK_X = 404;
+const BLOCK_WIDTH = 100;
+const BLOCK_CENTER_X = BLOCK_X + BLOCK_WIDTH / 2;
 /** The clear packet starts just right of the grid card, on the wire. */
 const CLEAR_PACKET_X = 430;
 /** Centre of the peer's 3 × 2 cell block (rows at y 248 and 266, 14 tall). */
@@ -642,7 +665,7 @@ function UndoStory() {
           className="sr-ver"
           clip={{ x: UNDO_SERVER.x + 8, y: 71, width: UNDO_SERVER.width - 16, height: 19 }}
           clipId="sr-clip-undo-server"
-          values={[49, 50, 55]}
+          values={UNDO_VERSIONS}
           x={UNDO_CENTER_X}
           y={85}
         />
@@ -668,7 +691,7 @@ function UndoStory() {
           className="sr-ver"
           clip={{ x: UNDO_PEER.x + 8, y: 225, width: UNDO_PEER.width - 16, height: 19 }}
           clipId="sr-clip-undo-peer"
-          values={[49, 50, 55]}
+          values={UNDO_VERSIONS}
           x={UNDO_CENTER_X}
           y={239}
         />
@@ -706,12 +729,15 @@ function UndoStory() {
       />
 
       {/* One compressed restore leaves the grid on the wire and merges into the server. */}
-      <g className="sr-block" style={{ "--dx": px(UNDO_CENTER_X - 454) } as CSSProperties}>
-        <rect height={46} rx={8} width={100} x={404} y={UNDO_WIRE_Y - 23} />
-        <text x={454} y={UNDO_WIRE_Y - 3} data-center="">
+      <g
+        className="sr-block"
+        style={{ "--dx": px(UNDO_CENTER_X - BLOCK_CENTER_X) } as CSSProperties}
+      >
+        <rect height={46} rx={8} width={BLOCK_WIDTH} x={BLOCK_X} y={UNDO_WIRE_Y - 23} />
+        <text x={BLOCK_CENTER_X} y={UNDO_WIRE_Y - 3} data-center="">
           1 restore
         </text>
-        <text className="sr-block-sub" x={454} y={UNDO_WIRE_Y + 13} data-center="">
+        <text className="sr-block-sub" x={BLOCK_CENTER_X} y={UNDO_WIRE_Y + 13} data-center="">
           compressed
         </text>
       </g>
@@ -814,7 +840,7 @@ export function StoryReel() {
         id="landing-story-panel"
         role="tabpanel"
       >
-        {/* Sibling keys must differ: a shared key leaves the old copy mounted. */}
+        {/* The copy key remounts it so its fade plays on each story. Sibling keys must differ. */}
         <div className="sw-reel__copy" key={`copy-${story.id}`}>
           <h3>{story.title}</h3>
           <p>{story.detail}</p>

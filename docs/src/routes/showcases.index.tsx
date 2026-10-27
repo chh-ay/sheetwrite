@@ -264,24 +264,32 @@ function FormulasScene() {
 
 /** One change traced like a profiler waterfall: each stage starts where the last ends. */
 const ENGINE_STAGES = [
-  { label: "Page", start: 0, width: 18 },
-  { label: "Recalc", start: 18, width: 34 },
-  { label: "Paint", start: 52, width: 22 },
-  { label: "Host ack", start: 74, width: 26 },
+  { label: "Page", width: 18 },
+  { label: "Recalc", width: 34 },
+  { label: "Paint", width: 22 },
+  { label: "Host ack", width: 26 },
 ] as const;
 
 function EngineScene() {
+  let start = 0;
+
   return (
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--engine">
       <span className="sw-hub-waterfall">
-        {ENGINE_STAGES.map((stage) => (
-          <span key={stage.label}>
-            <i>{stage.label}</i>
-            <b>
-              <s style={{ marginLeft: `${stage.start}%`, width: `${stage.width}%` }} />
-            </b>
-          </span>
-        ))}
+        {ENGINE_STAGES.map((stage) => {
+          const offset = start;
+
+          start += stage.width;
+
+          return (
+            <span key={stage.label}>
+              <i>{stage.label}</i>
+              <b>
+                <s style={{ marginLeft: `${offset}%`, width: `${stage.width}%` }} />
+              </b>
+            </span>
+          );
+        })}
       </span>
       <span className="sw-hub-scene__caption">one edit, traced from page to host</span>
     </span>
@@ -342,7 +350,14 @@ function FormattingScene() {
 }
 
 /** A filtered column over a mini grid: one rejected, one warned and one locked cell. */
-const DATA_TOOL_CELLS = Array.from({ length: 16 }, (_, index) => index);
+const DATA_TOOL_ROW_COUNT = 4;
+const DATA_TOOL_COLUMN_COUNT = 4;
+const DATA_TOOL_FILTERED_COLUMN = 1;
+const DATA_TOOL_COLUMNS = Array.from({ length: DATA_TOOL_COLUMN_COUNT }, (_, index) => index);
+const DATA_TOOL_CELLS = Array.from(
+  { length: DATA_TOOL_ROW_COUNT * DATA_TOOL_COLUMN_COUNT },
+  (_, index) => index,
+);
 const DATA_TOOL_STATES: Readonly<Record<number, "reject" | "warn" | "lock">> = {
   5: "reject",
   10: "warn",
@@ -354,8 +369,11 @@ function DataToolsScene() {
     <span aria-hidden="true" className="sw-hub-scene sw-hub-scene--data-tools">
       <span className="sw-hub-rules">
         <span className="sw-hub-rules__grid">
-          {[0, 1, 2, 3].map((column) => (
-            <i data-filtered={column === 1 || undefined} key={`head-${column}`} />
+          {DATA_TOOL_COLUMNS.map((column) => (
+            <i
+              data-filtered={column === DATA_TOOL_FILTERED_COLUMN || undefined}
+              key={`head-${column}`}
+            />
           ))}
           {DATA_TOOL_CELLS.map((cell) => (
             <b data-state={DATA_TOOL_STATES[cell]} key={cell} />

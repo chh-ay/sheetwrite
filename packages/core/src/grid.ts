@@ -2941,7 +2941,7 @@ export class GridImpl implements Grid {
       },
       deleteNote: () => {
         const focus = this.selection.focusCell;
-        if (!focus) return;
+        if (this.readOnly || !focus) return;
 
         const { address } = this.noteCell(focus.row, focus.col);
         if (this.getNote(address) !== null) this.setNote(address, null);

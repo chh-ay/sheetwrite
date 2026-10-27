@@ -64,12 +64,20 @@ const LATEST_RELEASE = RELEASES[0];
  * The newest release that lists highlights. Patch releases have none, so the
  * landing keeps naming the minor release until the next one ships.
  */
-const LATEST_HIGHLIGHTS = RELEASES.find((release) => release.highlights !== undefined);
+const LATEST_HIGHLIGHTED_RELEASE = RELEASES.find(
+  (release): release is Release & { highlights: readonly string[] } =>
+    release.highlights !== undefined,
+);
 
 const RELEASES_HREF: string = "/docs/releases/";
 
 function releaseHref(version: string): string {
   return `${RELEASES_HREF}${version}/`;
+}
+
+/** The major and minor version; patch releases share the same feature set. */
+function minorVersion(version: string): string {
+  return version.replace(/\.\d+$/, "");
 }
 
 interface ReleaseContext {
@@ -90,10 +98,11 @@ function releaseContext(activeHref: string | undefined): ReleaseContext | undefi
 }
 
 export {
-  LATEST_HIGHLIGHTS,
+  LATEST_HIGHLIGHTED_RELEASE,
   LATEST_RELEASE,
   RELEASES,
   RELEASES_HREF,
+  minorVersion,
   releaseContext,
   releaseDate,
   releaseHref,

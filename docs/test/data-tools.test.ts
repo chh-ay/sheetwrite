@@ -59,19 +59,23 @@ test("mutation receipts distinguish rejected, warned and host-authorized stored 
   expect(scenario.snapshot().error).toBeNull();
   scenario.filter("APAC", "Atlas");
   scenario.run("sort");
-  scenario.run("reject");
+  scenario.probe("units");
   const cell = (col: number) =>
     scenario?.grid()?.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved;
   expect(cell(4)).toBe(1);
   expect(scenario.snapshot().probes.units).toMatchObject({ outcome: "rejected", stored: "1" });
-  scenario.run("warn");
+  scenario.probe("freight");
   expect(cell(5)).toBe(350);
   expect(scenario.snapshot().probes.freight).toMatchObject({ outcome: "warned", stored: "350" });
-  scenario.run("protected");
+  scenario.probe("order");
   expect(cell(0)).toBe("ORD-10001");
   expect(scenario.snapshot().probes.order).toMatchObject({ outcome: "rejected" });
   scenario.run("manager");
-  scenario.run("protected");
+  expect(scenario.snapshot().events[0]).toMatchObject({
+    api: "Host role state",
+    tone: "info",
+  });
+  scenario.probe("order");
   expect(cell(0)).toBe("MANAGER-REVIEW");
   expect(scenario.snapshot().probes.order).toMatchObject({
     outcome: "saved",

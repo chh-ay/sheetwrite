@@ -4,7 +4,7 @@ import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { NOTE_HOVER_DELAY_MS } from "../src/note-popover.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellAddress, Workbook } from "../src/types.js";
+import type { CellAddress } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
@@ -49,7 +49,8 @@ function scrollerOf(host: HTMLElement): HTMLDivElement {
 }
 
 /** Client point at the center of a cell; the test viewport starts at (0, 0). */
-function cellPoint(addr: CellAddress, workbook: Workbook = makeWorkbook(10)) {
+function cellPoint(addr: CellAddress) {
+  const workbook = makeWorkbook(10);
   const columns = workbook.sheets[0]?.columns ?? [];
   let x = DEFAULT_THEME.rowHeaderWidth;
   for (let c = 0; c < addr.col; c++) x += columns[c]?.width ?? 0;

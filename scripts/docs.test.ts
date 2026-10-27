@@ -283,12 +283,12 @@ describe("documentation generation", () => {
     // A partial report would understate the download, so the landing shows none.
     const { "bundler.vite.coreInitial.css.brotliBytes": _css, ...noCss } = viteFirstLoad(1, 1, 1);
     expect(landingDownloads(noCss, engineWasm(250, 340))).toBeUndefined();
-    expect(landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340).slice(0, 1))).toBe(
-      undefined,
-    );
-    expect(landingDownloads(viteFirstLoad(130, Number.NaN, 2), engineWasm(250, 340))).toBe(
-      undefined,
-    );
+    expect(
+      landingDownloads(viteFirstLoad(130, 256, 2), engineWasm(250, 340).slice(0, 1)),
+    ).toBeUndefined();
+    expect(
+      landingDownloads(viteFirstLoad(130, Number.NaN, 2), engineWasm(250, 340)),
+    ).toBeUndefined();
   });
 
   it("publishes download sizes even when no benchmark capture is available", () => {

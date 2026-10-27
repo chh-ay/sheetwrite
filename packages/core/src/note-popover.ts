@@ -11,8 +11,6 @@ const CARD_GAP = 4;
 /** Closest the card comes to a window edge. */
 const VIEWPORT_MARGIN = 8;
 
-let editorSerial = 0;
-
 /** One cell in both coordinate spaces: view for geometry, data for the note. */
 export interface NoteCell {
   readonly row: number;
@@ -62,9 +60,11 @@ export class NotePopover {
   private readonly card: HTMLDivElement;
   private readonly editor: HTMLTextAreaElement;
   private hoverTimer: number | undefined;
-  /** Cell under the pointer that has a note, shown or waiting for the delay. */
+  /**
+   * Last cell under the pointer, with or without a note; null after the card
+   * hides. A move inside this cell skips the note lookup, which scans every note.
+   */
   private hovered: NoteCell | null = null;
-  private shown = false;
   /** Cell whose note is open in the editor, with the text it had at open. */
   private editing: { readonly cell: NoteCell; readonly original: string | null } | null = null;
 
@@ -79,10 +79,8 @@ export class NotePopover {
     this.card.style.position = "fixed";
     this.card.style.pointerEvents = "none";
 
-    editorSerial += 1;
     this.editor = document.createElement("textarea");
     this.editor.className = "sheetwrite-note-editor";
-    this.editor.id = `sheetwrite-note-editor-${editorSerial}`;
     this.editor.style.position = "fixed";
     this.editor.addEventListener("keydown", this.onEditorKeyDown);
     this.editor.addEventListener("blur", this.onEditorBlur);
@@ -95,7 +93,7 @@ export class NotePopover {
   /** Open the editor on `cell` with its current note, or empty for a new note. */
   edit(cell: NoteCell): void {
     this.hideCard();
-    this.cancel();
+    this.closeEditor();
 
     const original = this.deps.noteAt(cell.address);
     this.editing = { cell, original };
@@ -116,7 +114,7 @@ export class NotePopover {
 
   /** Re-read the shown note after a note change; hide the card when it was removed. */
   refresh(): void {
-    if (!this.shown || !this.hovered) return;
+    if (!this.card.isConnected || !this.hovered) return;
 
     const text = this.deps.noteAt(this.hovered.address);
     if (text === null) {
@@ -133,14 +131,13 @@ export class NotePopover {
     window.clearTimeout(this.hoverTimer);
     this.hoverTimer = undefined;
     this.hovered = null;
-    this.shown = false;
     this.card.remove();
   }
 
   /** Hide the card and drop any unsaved editor text, e.g. on a sheet switch. */
   dismiss(): void {
     this.hideCard();
-    this.cancel();
+    this.closeEditor();
   }
 
   destroy(): void {
@@ -158,7 +155,6 @@ export class NotePopover {
 
     this.card.textContent = text;
     this.deps.host.appendChild(this.card);
-    this.shown = true;
     this.place(this.card, cell);
   }
 
@@ -166,7 +162,7 @@ export class NotePopover {
    * Close the editor first, so the blur that removing a focused element can
    * fire finds no session and commits nothing.
    */
-  private cancel(): void {
+  private closeEditor(): void {
     if (!this.editing) return;
     this.editing = null;
     this.editor.remove();
@@ -175,10 +171,11 @@ export class NotePopover {
   private commit(returnFocus: boolean): void {
     const session = this.editing;
     if (!session) return;
-    this.cancel();
+    const value = this.editor.value;
+    this.closeEditor();
 
     // Blank text has nothing to show, so it removes the note.
-    const text = this.editor.value.trim() === "" ? null : this.editor.value;
+    const text = value.trim() === "" ? null : value;
     if (text !== session.original) this.deps.commit(session.cell.address, text);
     if (returnFocus) this.deps.returnFocus();
   }
@@ -214,10 +211,10 @@ export class NotePopover {
     if (cell && sameCell(this.hovered, cell)) return;
 
     this.hideCard();
+    this.hovered = cell;
     if (!cell || this.deps.noteAt(cell.address) === null) return;
     if (this.editing && sameCell(this.editing.cell, cell)) return;
 
-    this.hovered = cell;
     this.hoverTimer = window.setTimeout(() => {
       this.hoverTimer = undefined;
       this.show(cell);
@@ -236,7 +233,7 @@ export class NotePopover {
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      this.cancel();
+      this.closeEditor();
       this.deps.returnFocus();
       return;
     }

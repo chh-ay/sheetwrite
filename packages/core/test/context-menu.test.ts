@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { ContextMenu } from "../src/context-menu.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellAddress, Grid, GridActions, Selection } from "../src/types.js";
+import type { CellAddress, Grid, GridActions, GridConfig, Selection } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
@@ -213,20 +213,31 @@ describe("ContextMenu", () => {
     expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
   });
 
-  /** Rows of one open menu, in order, as their visible labels. */
-  const labels = (menu: Element): string[] =>
-    [...menu.querySelectorAll(":scope > .sheetwrite-context-menu-item")].map(
-      (row) => row.querySelector(".sheetwrite-context-menu-label")?.textContent ?? "",
-    );
+  const rowsOf = (menu: Element): HTMLElement[] => [
+    ...menu.querySelectorAll<HTMLElement>(":scope > .sheetwrite-context-menu-item"),
+  ];
+  /** Rows of one open menu, in order, as their stable ids. */
+  const rowIds = (menu: Element): (string | undefined)[] =>
+    rowsOf(menu).map((row) => row.dataset.contextMenuItem);
   const openMenus = (host: HTMLElement): HTMLElement[] =>
     [...host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu")].filter(
       (menu) => menu.style.display !== "none",
     );
+  /** The open menu at `level` (0 is the root); throws when that menu is not open. */
+  const openMenu = (host: HTMLElement, level = 0): HTMLElement => {
+    const menu = openMenus(host)[level];
+    if (menu === undefined) throw new Error(`No context menu is open at level ${level}`);
+    return menu;
+  };
+  const focusedId = (): string | undefined => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement ? active.dataset.contextMenuItem : undefined;
+  };
   const key = (target: Element | null, name: string): void => {
     target?.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
   };
 
-  function liveMenu(config: Parameters<typeof createGrid>[1]["config"] = {}) {
+  function liveMenu(config: GridConfig = {}) {
     const host = mountHost();
     const grid = createGrid(host, {
       workbook: makeWorkbook(3),
@@ -243,35 +254,34 @@ describe("ContextMenu", () => {
     grid.setSelection({ kind: "cell", addr: cell });
     menu.open({ cell, clientX: 10, clientY: 10 });
 
-    const [root] = openMenus(host);
-    expect(labels(root ?? host)).toEqual([
-      "Cut",
-      "Copy",
-      "Paste",
-      "Insert",
-      "Delete",
-      "Clear contents",
-      "Row",
-      "Column",
-      "Merge",
-      "New note",
+    const root = openMenu(host);
+    expect(rowIds(root)).toEqual([
+      "cut",
+      "copy",
+      "paste",
+      "insert",
+      "delete",
+      "clearContents",
+      "row",
+      "column",
+      "mergeMenu",
+      "editNote",
     ]);
     // Built-in rows show the command glyph; a host override replaces it.
-    expect(root?.querySelector('.sheetwrite-icon[data-icon="cut"]')).not.toBeNull();
+    expect(root.querySelector('.sheetwrite-icon[data-icon="cut"]')).not.toBeNull();
     expect(
-      root?.querySelector('[data-context-menu-item="copy"] .sheetwrite-context-menu-icon')
+      root.querySelector('[data-context-menu-item="copy"] .sheetwrite-context-menu-icon')
         ?.textContent,
     ).toBe("C");
 
-    const insert = root?.querySelector<HTMLElement>('[data-context-menu-item="insert"]') ?? null;
+    const insert = root.querySelector<HTMLElement>('[data-context-menu-item="insert"]');
     expect(insert?.getAttribute("aria-haspopup")).toBe("menu");
     insert?.click();
-    const [, submenu] = openMenus(host);
-    expect(labels(submenu ?? host)).toEqual([
-      "Row above",
-      "Row below",
-      "Column left",
-      "Column right",
+    expect(rowIds(openMenu(host, 1))).toEqual([
+      "insertRowAbove",
+      "insertRowBelow",
+      "insertColumnLeft",
+      "insertColumnRight",
     ]);
 
     menu.destroy();
@@ -288,22 +298,26 @@ describe("ContextMenu", () => {
     menu.open({ cell, clientX: 10, clientY: 10 });
 
     // Focus moves into the menu so the keys reach it.
-    expect(document.activeElement?.textContent).toContain("Cut");
+    expect(focusedId()).toBe("cut");
     key(document.activeElement, "ArrowDown");
-    expect(document.activeElement?.textContent).toContain("Copy");
+    expect(focusedId()).toBe("copy");
     key(document.activeElement, "End");
-    expect(document.activeElement?.textContent).toContain("New note");
+    expect(focusedId()).toBe("editNote");
     key(document.activeElement, "Home");
     for (let step = 0; step < 3; step += 1) key(document.activeElement, "ArrowDown");
-    expect(document.activeElement?.textContent).toContain("Insert");
+    expect(focusedId()).toBe("insert");
 
     // Right opens the submenu on its first row; Left or Escape returns to the parent.
     key(document.activeElement, "ArrowRight");
     expect(openMenus(host)).toHaveLength(2);
-    expect(document.activeElement?.textContent).toContain("Row above");
+    expect(focusedId()).toBe("insertRowAbove");
+    key(document.activeElement, "ArrowLeft");
+    expect(openMenus(host)).toHaveLength(1);
+    expect(focusedId()).toBe("insert");
+    key(document.activeElement, "ArrowRight");
     key(document.activeElement, "Escape");
     expect(openMenus(host)).toHaveLength(1);
-    expect(document.activeElement?.textContent).toContain("Insert");
+    expect(focusedId()).toBe("insert");
 
     // Enter on a submenu row runs it, closes every menu and gives focus back.
     key(document.activeElement, "ArrowRight");
@@ -324,11 +338,11 @@ describe("ContextMenu", () => {
     grid.setNote(noted, "Checked by finance");
 
     menu.open({ cell: plain, clientX: 10, clientY: 10 });
-    expect(labels(openMenus(host)[0] ?? host).slice(-1)).toEqual(["New note"]);
+    expect(rowIds(openMenu(host)).slice(-2)).toEqual(["mergeMenu", "editNote"]);
     menu.close();
 
     menu.open({ cell: noted, clientX: 10, clientY: 10 });
-    expect(labels(openMenus(host)[0] ?? host).slice(-2)).toEqual(["Edit note", "Delete note"]);
+    expect(rowIds(openMenu(host)).slice(-2)).toEqual(["editNote", "deleteNote"]);
 
     menu.destroy();
     grid.destroy();

@@ -276,10 +276,20 @@
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
 }
 
-.sheetwrite-find-divider {
-  align-self: stretch;
+/* The divider before Close. It is drawn here, not as a DOM node, because it is
+   only cosmetic. The margin plus the row gap leaves 6px on each side of it. */
+.sheetwrite-find-close {
+  position: relative;
+  margin-left: 9px;
+}
+
+.sheetwrite-find-close::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: -7px;
   width: 1px;
-  margin: 4px 2px;
   background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
 }
 
@@ -947,6 +957,7 @@ textarea.sheetwrite-ribbon-field {
    inset with rounded highlights; hover and keyboard focus look the same. */
 .sheetwrite-context-menu {
   min-width: 200px;
+  /* Keep in sync with MENU_PADDING_PX in src/context-menu.ts. */
   padding: 4px;
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
   border-radius: 8px;

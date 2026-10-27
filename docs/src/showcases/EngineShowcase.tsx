@@ -517,7 +517,7 @@ export default function EngineShowcase() {
             </fieldset>
           </section>
 
-          <section className="sw-engine-rewrite" aria-label="Formula rewrite in Sheetwrite 0.5.0">
+          <section className="sw-engine-rewrite" aria-label="Formula rewrite">
             <div>
               <span className="sw-engine__eyebrow">SAME READS, NEW CONSTANT</span>
               <p>

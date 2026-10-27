@@ -87,7 +87,9 @@ import {
 import {
   formatMetricDelta,
   formatMetricDisplay,
+  type Metric,
   type SizeHistory,
+  type SizeReport,
   validateSizeHistory,
 } from "./size-report.js";
 
@@ -1418,7 +1420,7 @@ function captureMetaOf(value: Record<string, unknown>): CaptureMeta | undefined 
 async function renderLandingBench(): Promise<string> {
   const sizeReport = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/size-report.json"), "utf8"),
-  ) as { metrics?: Readonly<Record<string, { actual?: unknown }>> };
+  ) as Pick<SizeReport, "metrics">;
   const fullEngine = await loadEvidence(
     "bench/results/full-engine-results.json",
     "bun run --filter @sheetwrite/bench bench:formula:engines",
@@ -1431,7 +1433,7 @@ async function renderLandingBench(): Promise<string> {
       validateRenderArtifact,
     ),
     "evidence" in fullEngine
-      ? landingDownloads(sizeReport.metrics ?? {}, fullEngine.evidence.engines)
+      ? landingDownloads(sizeReport.metrics, fullEngine.evidence.engines)
       : undefined,
   );
 }
@@ -1448,27 +1450,33 @@ const CORE_FIRST_LOAD_METRICS = ["javascript", "wasm", "css"].map(
   (kind) => `bundler.vite.coreInitial.${kind}.brotliBytes`,
 );
 
+/** A size the landing can show: present and a finite number of bytes. */
+function isKnownBytes(value: number | undefined): value is number {
+  return value !== undefined && Number.isFinite(value);
+}
+
 /**
  * Reads the landing download sizes from the size report and the engine
  * artifact. Any missing or non-finite part yields `undefined`: a partial sum
  * would understate the download.
  */
 export function landingDownloads(
-  metrics: Readonly<Record<string, { actual?: unknown }>>,
+  metrics: Readonly<Record<string, Pick<Metric, "actual">>>,
   engines: ReadonlyArray<{ engine: string; wasm: { brotliBytes: number } }>,
 ): LandingDownloads | undefined {
   const firstLoad = CORE_FIRST_LOAD_METRICS.map((key) => metrics[key]?.actual);
-  const engineBytes = (name: string) =>
-    engines.find((entry) => entry.engine === name)?.wasm.brotliBytes;
-  const downloads = {
-    coreFirstLoadBrotliBytes: firstLoad.reduce<number>(
-      (sum, value) => sum + (typeof value === "number" ? value : Number.NaN),
-      0,
-    ),
-    defaultEngineBrotliBytes: engineBytes("default") ?? Number.NaN,
-    fullEngineBrotliBytes: engineBytes("full") ?? Number.NaN,
+  const defaultEngine = engines.find((entry) => entry.engine === "default")?.wasm.brotliBytes;
+  const fullEngine = engines.find((entry) => entry.engine === "full")?.wasm.brotliBytes;
+
+  if (!firstLoad.every(isKnownBytes) || !isKnownBytes(defaultEngine) || !isKnownBytes(fullEngine)) {
+    return undefined;
+  }
+
+  return {
+    coreFirstLoadBrotliBytes: firstLoad.reduce((sum, bytes) => sum + bytes, 0),
+    defaultEngineBrotliBytes: defaultEngine,
+    fullEngineBrotliBytes: fullEngine,
   };
-  return Object.values(downloads).every(Number.isFinite) ? downloads : undefined;
 }
 
 /** Pure payload builder, exported so the finite/fallback contract is testable. */
@@ -1477,8 +1485,10 @@ export function landingBenchPayload(
   downloads?: LandingDownloads,
 ): string {
   const round1 = (value: number): number => Math.round(value * 10) / 10;
+  // Download sizes do not depend on the benchmark, so both payloads carry them.
+  const downloadsField = downloads ? { downloads } : {};
   const unavailable = (reason: string): string =>
-    `${JSON.stringify({ available: false, reason, ...(downloads ? { downloads } : {}) }, null, 2)}\n`;
+    `${JSON.stringify({ available: false, reason, ...downloadsField }, null, 2)}\n`;
   if (!("evidence" in scale)) return unavailable(scale.reason);
   const { evidence } = scale;
   const mid = (values: number[]): number => {
@@ -1563,7 +1573,7 @@ export function landingBenchPayload(
     },
     heroStats,
     sizes,
-    ...(downloads ? { downloads } : {}),
+    ...downloadsField,
   };
   return `${JSON.stringify(payload, null, 2)}\n`;
 }

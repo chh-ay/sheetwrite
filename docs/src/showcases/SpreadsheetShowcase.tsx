@@ -43,17 +43,18 @@ const TRIES = [
   {
     action: "Read a note",
     how: "Point at the amber corner on Sales!G3 to read it. Select the cell and press Shift+F2 to edit.",
-    result: "The note opens beside the cell; an empty note is deleted.",
+    result: "The note opens beside the cell. Clear the note to delete it.",
   },
   {
     action: "Use the right-click menu",
     how: "Right-click a cell, then Insert › Row above. The arrow keys work too.",
-    result: "A row is inserted above, and Undo removes it.",
+    result: "Undo removes the new row.",
   },
   {
     action: "Narrow the window",
-    how: "Groups shrink, then fold into dropdowns, as in Excel.",
-    result: null,
+    how: "Use the button to switch between a wide and narrow window.",
+    result: "Groups shrink, then fold into dropdowns, as in Excel.",
+    control: "fold-ribbon",
   },
 ] as const;
 
@@ -62,7 +63,6 @@ const KEYS = [
   { keys: ["Tab"], does: "Reach the ribbon tabs" },
   { keys: ["←", "→"], does: "Move between tabs" },
   { keys: ["Esc"], does: "Return to the grid" },
-  { keys: ["Double-click"], does: "Hide or show the panel" },
 ] as const;
 
 export default function SpreadsheetShowcase() {
@@ -143,7 +143,7 @@ export default function SpreadsheetShowcase() {
                 <li key={step.action}>
                   <strong>{step.action}</strong>
                   <span>{step.how}</span>
-                  {step.result === null ? (
+                  {"control" in step && step.control === "fold-ribbon" && (
                     <button
                       disabled={!ready}
                       onClick={() => setWidth(width === "narrow" ? "wide" : "narrow")}
@@ -151,9 +151,8 @@ export default function SpreadsheetShowcase() {
                     >
                       {width === "narrow" ? "Unfold the ribbon" : "Fold the ribbon"}
                     </button>
-                  ) : (
-                    <span className="sw-spreadsheet-steps__result">{step.result}</span>
                   )}
+                  <span className="sw-spreadsheet-steps__result">{step.result}</span>
                 </li>
               ))}
             </ol>
@@ -185,6 +184,7 @@ export default function SpreadsheetShowcase() {
                 </div>
               ))}
             </dl>
+            <p>Hide or show the panel (double-click a tab).</p>
           </div>
         </section>
       </main>

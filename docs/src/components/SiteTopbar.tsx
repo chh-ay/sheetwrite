@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 
-import { LATEST_RELEASE } from "../lib/releases.js";
+import { LATEST_RELEASE, releaseHref } from "../lib/releases.js";
 import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
@@ -14,7 +14,7 @@ interface SiteTopbarProps {
 }
 
 /**
- * The one product topbar: brand, Docs, showcases, GitHub, theme.
+ * The one product topbar: brand, Docs, showcases, What's new, GitHub, theme.
  * Shared by the landing and every showcase so the site has a single chrome.
  * Framework deep links and benchmark navigation live in their dedicated surfaces.
  */
@@ -43,7 +43,7 @@ export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
         >
           Showcases
         </Link>
-        <Link to="/docs/$/" params={{ _splat: `releases/${LATEST_RELEASE.version}` }}>
+        <Link to={releaseHref(LATEST_RELEASE.version)}>
           What's new <span className="sw-product-nav__version">v{LATEST_RELEASE.version}</span>
         </Link>
       </nav>

@@ -1,3 +1,6 @@
+import { colToA1 } from "@sheetwrite/core";
+
+import "@sheetwrite/core/styles.css";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -6,6 +9,9 @@ import { ActionError, useAction } from "../lib/use-action.js";
 import { CapabilityHero } from "./CapabilityHero.js";
 import {
   createDataToolsScenario,
+  DATA_COLUMNS,
+  DATA_RULES,
+  probeValue,
   type DataAction,
   type DataSnapshot,
   type DataToolsScenario,
@@ -14,37 +20,7 @@ import {
 } from "./scenarios/data-tools.js";
 import { DemoSelect } from "./ui/DemoSelect.js";
 
-/** The guarded columns, the rule each one carries, and the probe that tests it. */
-const RULES: readonly {
-  key: ProbeKey;
-  column: string;
-  rule: string;
-  action: DataAction;
-  attempt: string;
-}[] = [
-  {
-    key: "units",
-    column: "Units",
-    rule: "A whole number from 1 to 250. Anything else is rejected.",
-    action: "reject",
-    attempt: "Try units −5",
-  },
-  {
-    key: "freight",
-    column: "Freight",
-    rule: "Above $200 is saved, with a warning to review it.",
-    action: "warn",
-    attempt: "Try freight $350",
-  },
-  {
-    key: "order",
-    column: "Order ID",
-    rule: "Locked. Only a manager can change it.",
-    action: "protected",
-    attempt: "Try a new order ID",
-  },
-];
-
+/** Empty region selects no Region filter in the scenario. */
 const ALL_REGIONS = "";
 
 function probeText(result: ProbeResult | null): string {
@@ -54,13 +30,11 @@ function probeText(result: ProbeResult | null): string {
   return `Saved: ${result.stored}.`;
 }
 
-import "@sheetwrite/core/styles.css";
-
 export default function DataToolsShowcase() {
   const host = useRef<HTMLDivElement>(null);
   const scenario = useRef<DataToolsScenario | null>(null);
   const [snapshot, setSnapshot] = useState<DataSnapshot | null>(null);
-  const [region, setRegion] = useState("");
+  const [region, setRegion] = useState(ALL_REGIONS);
   const [customer, setCustomer] = useState("");
   const action = useAction();
   useEffect(() => {
@@ -81,12 +55,19 @@ export default function DataToolsShowcase() {
       () => {
         scenario.current?.run(command);
         if (command === "clear") {
-          setRegion("");
+          setRegion(ALL_REGIONS);
           setCustomer("");
         }
       },
       (cause) => `Data action failed: ${String(cause)}`,
     );
+
+  const probe = (key: ProbeKey) =>
+    action.run(
+      () => scenario.current?.probe(key),
+      (cause) => `Probe failed: ${String(cause)}`,
+    );
+
   const filter = (nextRegion: string, nextCustomer: string) => {
     setRegion(nextRegion);
     setCustomer(nextCustomer);
@@ -121,7 +102,7 @@ export default function DataToolsShowcase() {
         <section className="sw-data-workspace" aria-label="Dispatch operations">
           <div className="sw-data-controls">
             <div>
-              <span className="sw-data-kicker">01 / FIND THE WORK</span>
+              <span className="sw-data-kicker">FIND THE WORK</span>
               <h2>Dispatch queue</h2>
             </div>
             <DemoSelect
@@ -160,7 +141,9 @@ export default function DataToolsShowcase() {
               {snapshot?.filters.length ? snapshot.filters.join(" · ") : "No active column filters"}
             </span>
             <span className="sw-data-columns" id="data-column-guide">
-              A Order ID · B Region · C Customer · D Status · E Units · F Freight $ · G Owner
+              {DATA_COLUMNS.map((column, index) => `${colToA1(index)} ${column.header}`).join(
+                " · ",
+              )}
             </span>
           </div>
           <div
@@ -195,20 +178,23 @@ export default function DataToolsShowcase() {
               Try one, or type into the Grid.
             </p>
             <ul className="sw-data-rules">
-              {RULES.map((rule) => {
+              {Object.values(DATA_RULES).map((rule) => {
                 const result = snapshot?.probes[rule.key] ?? null;
                 return (
                   <li key={rule.key}>
                     <div className="sw-data-rule">
-                      <strong>{rule.column}</strong>
+                      <strong>{rule.column.header}</strong>
                       <span>{rule.rule}</span>
                     </div>
-                    <button disabled={disabled} onClick={() => void run(rule.action)}>
-                      {rule.attempt}
+                    <button disabled={disabled} onClick={() => void probe(rule.key)}>
+                      {rule.key === "order"
+                        ? "Try a new order ID"
+                        : `Try ${rule.key} ${probeValue(rule.key)}`}
                     </button>
                     <output
                       className="sw-data-result"
                       data-outcome={result?.outcome ?? "idle"}
+                      data-stored={result?.stored}
                       data-testid={`data-probe-${rule.key}`}
                     >
                       {probeText(result)}
@@ -240,7 +226,7 @@ export default function DataToolsShowcase() {
           </section>
           <section className="sw-data-panel" aria-labelledby="data-events">
             <h2 id="data-events">What the Grid reported</h2>
-            <p>Newest first. Every line comes from a real Grid call or event.</p>
+            <p>Newest first. Grid calls and events, plus labeled host role changes.</p>
             <ol className="sw-data-events" data-testid="data-events">
               {snapshot?.events.map((event) => (
                 <li data-tone={event.tone} key={event.id}>

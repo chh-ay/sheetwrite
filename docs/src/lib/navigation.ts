@@ -1,27 +1,40 @@
 import apiNav from "../generated/api-nav.json";
-import { RELEASES, RELEASES_HREF, releaseDate, releaseHref } from "./releases.js";
+import { RELEASES, RELEASES_HREF, minorVersion, releaseDate, releaseHref } from "./releases.js";
 
-/**
- * One sidebar entry. An entry with `items` is a group and nests to any depth;
- * a group may also have its own page (`href`).
- */
-export interface NavigationItem {
+interface NavigationEntry {
   label: string;
-  href?: string;
-  items?: readonly NavigationItem[];
-  /** Release that added the page; it shows "New" while that release is the latest. */
+  /** Release that added the page; it shows "New" for each patch of that minor release. */
   added?: string;
   /** Release that changed the page substantially; it shows "Updated" likewise. */
   updated?: string;
 }
+
+/** An entry a link can point at: previous/next and cross-links need a page. */
+export interface NavigationPage extends NavigationEntry {
+  readonly href: string;
+  items?: readonly NavigationItem[];
+}
+
+/** A group that nests entries to any depth, with no page of its own. */
+interface NavigationGroup extends NavigationEntry {
+  href?: undefined;
+  items: readonly NavigationItem[];
+}
+
+/**
+ * One sidebar entry. A page may also be a group; an entry needs a page, a
+ * group or both, so a bad entry does not compile.
+ */
+export type NavigationItem = NavigationPage | NavigationGroup;
 
 export interface NavigationSection {
   label: string;
   items: readonly NavigationItem[];
 }
 
-/** An entry a link can point at: previous/next and cross-links need a page. */
-export type NavigationPage = NavigationItem & { readonly href: string };
+function isPage(item: NavigationItem): item is NavigationPage {
+  return item.href !== undefined;
+}
 
 /** The one generated section; reading order and the sidebar both name it. */
 const API_PACKAGES_LABEL = "API packages";
@@ -104,8 +117,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
 export function navigationPages(items: readonly NavigationItem[]): NavigationPage[] {
   const pages: NavigationPage[] = [];
   const visit = (item: NavigationItem): void => {
-    const { href } = item;
-    if (href !== undefined) pages.push({ ...item, href });
+    if (isPage(item)) pages.push(item);
     for (const child of item.items ?? []) visit(child);
   };
   for (const item of items) visit(item);
@@ -128,15 +140,20 @@ export type NavigationBadge = "new" | "updated";
 /**
  * Badge for an entry in the given release. A group shows the strongest badge
  * of its pages, so a collapsed group still tells the reader something inside
- * it changed. Badges compare against the latest published release, so they
- * appear when that release ships and drop off at the next one by themselves.
+ * it changed. Badges compare minor versions, so patch releases keep them and
+ * the next minor release removes them.
  */
 export function navigationBadge(
   item: NavigationItem,
   release: string,
 ): NavigationBadge | undefined {
-  if (item.added === release) return "new";
-  let badge: NavigationBadge | undefined = item.updated === release ? "updated" : undefined;
+  const minor = minorVersion(release);
+  const sameMinor = (version: string | undefined) =>
+    version !== undefined && minorVersion(version) === minor;
+
+  if (sameMinor(item.added)) return "new";
+
+  let badge: NavigationBadge | undefined = sameMinor(item.updated) ? "updated" : undefined;
   for (const child of item.items ?? []) {
     const childBadge = navigationBadge(child, release);
     if (childBadge === "new") return "new";

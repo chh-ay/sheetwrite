@@ -112,10 +112,7 @@ export class FindBar {
       }
     });
 
-    const divider = document.createElement("span");
-    divider.className = "sheetwrite-find-divider";
-    divider.setAttribute("aria-hidden", "true");
-    findRow.append(field, prev, next, divider, close);
+    findRow.append(field, prev, next, close);
     el.appendChild(findRow);
 
     let replaceInput: HTMLInputElement | null = null;

@@ -203,7 +203,10 @@ export interface GridActions {
    * nothing on a read-only grid.
    */
   editNote(): void;
-  /** Remove the focus cell's note as one undoable step. Does nothing when it has none. */
+  /**
+   * Remove the focus cell's note as one undoable step. Does nothing when it has
+   * none. Does nothing on a read-only grid.
+   */
   deleteNote(): void;
   undo(): void;
   redo(): void;
@@ -284,10 +287,10 @@ export type ToolbarIcon = string | Node | (() => Node);
 /**
  * Per-glyph icon overrides, keyed by the names on the command icon sheet
  * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
- * toolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes
- * and node factories support SVG or HTML icons. To replace every glyph at once,
- * set the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout
- * in `@sheetwrite/core/icons.json`.
+ * toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+ * as plain text; DOM nodes and node factories support SVG or HTML icons. To
+ * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
+ * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
  */
 export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 

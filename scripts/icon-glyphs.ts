@@ -17,17 +17,18 @@
 /** A stroke path, or a path with a tone. */
 export type GlyphPart = string | { d: string; tone: "tint" | "guide" | "bold" };
 
-export type Glyph = readonly [name: string, parts: readonly GlyphPart[]];
+type Glyph = readonly [name: string, parts: readonly GlyphPart[]];
 
 const tint = (d: string): GlyphPart => ({ d, tone: "tint" });
 const guide = (d: string): GlyphPart => ({ d, tone: "guide" });
 const bold = (d: string): GlyphPart => ({ d, tone: "bold" });
 
-/** Square and inner cross for the border family. */
+/** The outer square of the border family. */
 const BOX = "M4 4h16v16H4Z";
 /** The rounded left and right edges of one wide cell, for the merge family. */
 const CELL_EDGES =
   "M7 5H4.5A1.5 1.5 0 0 0 3 6.5v11A1.5 1.5 0 0 0 4.5 19H7M17 5h2.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H17";
+/** The inner cross of the border family: the lines between the four quarters. */
 const CROSS = "M12 4v16M4 12h16";
 const LENS = "M16.5 10.5a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z";
 const LENS_HANDLE = "m15 15 5.5 5.5";

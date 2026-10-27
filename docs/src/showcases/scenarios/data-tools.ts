@@ -1,4 +1,9 @@
-import { createGrid, initSheetwrite, type Grid } from "@sheetwrite/core";
+import {
+  createGrid,
+  initSheetwrite,
+  type ApplyTransactionResult,
+  type Grid,
+} from "@sheetwrite/core";
 
 import { observeSiteTheme } from "../../lib/site-theme.js";
 import { siteGridTheme } from "../site-grid-theme.js";
@@ -7,6 +12,59 @@ export const DATA_ROWS = 4800;
 export const DATA_SHEET = "operations";
 const GROUP_END = 23;
 const TRACE_LIMIT = 24;
+const HIDDEN_ROWS = [24, 25, 26] as const;
+
+const COLUMN = {
+  order: 0,
+  region: 1,
+  customer: 2,
+  status: 3,
+  units: 4,
+  freight: 5,
+  owner: 6,
+} as const;
+
+/** Ordered dispatch schema shared by the Grid and its visible labels. */
+export const DATA_COLUMNS = [
+  { key: "order", header: "Order ID", type: "text", width: 145 },
+  { key: "region", header: "Region", type: "text", width: 120 },
+  { key: "customer", header: "Customer", type: "text", width: 210 },
+  { key: "status", header: "Status", type: "text", width: 120 },
+  { key: "units", header: "Units", type: "number", width: 100 },
+  { key: "freight", header: "Freight", type: "number", width: 110 },
+  { key: "owner", header: "Owner", type: "text", width: 120 },
+] as const;
+
+const HIDDEN_COLUMNS = [COLUMN.freight, COLUMN.owner];
+
+/** Guardrails and attempted values shared by the controls and live probes. */
+export const DATA_RULES = {
+  units: {
+    key: "units",
+    column: DATA_COLUMNS[COLUMN.units],
+    rule: "A whole number from 1 to 250. The Grid rejects other values.",
+    value: -5,
+  },
+  freight: {
+    key: "freight",
+    column: DATA_COLUMNS[COLUMN.freight],
+    rule: "Above $200 is saved, with a warning to review it.",
+    value: 350,
+  },
+  order: {
+    key: "order",
+    column: DATA_COLUMNS[COLUMN.order],
+    rule: "Locked. Only a manager can change it.",
+    value: "MANAGER-REVIEW",
+  },
+} as const;
+
+/** Format a probe's actual attempted value for its button and event receipt. */
+export function probeValue(key: ProbeKey): string {
+  const { value } = DATA_RULES[key];
+  return key === "freight" ? `$${value}` : String(value).replace("-", "−");
+}
+
 const REGIONS = ["EMEA", "APAC", "Americas"] as const;
 const STATUSES = ["Open", "Packing", "Shipped", "Held"] as const;
 const CUSTOMERS = [
@@ -39,17 +97,7 @@ export function buildOperationsData() {
   return { rowCount: DATA_ROWS, columns };
 }
 
-export type DataAction =
-  | "sort"
-  | "clear"
-  | "reject"
-  | "warn"
-  | "protected"
-  | "group"
-  | "rows"
-  | "columns"
-  | "operator"
-  | "manager";
+export type DataAction = "sort" | "clear" | "group" | "rows" | "columns" | "operator" | "manager";
 export interface DataSnapshot {
   ready: boolean;
   error: string | null;
@@ -68,15 +116,13 @@ export interface DataSnapshot {
 /** The three guarded columns a probe can try to change. */
 export type ProbeKey = "units" | "freight" | "order";
 
-/** What the Grid did with one probe: the attempted value and what is stored now. */
+/** What the Grid stored and whether the guardrail rejected or warned about the probe. */
 export interface ProbeResult {
-  attempted: string;
   stored: string;
   outcome: "saved" | "warned" | "rejected";
-  message: string | null;
 }
 
-/** One log line: a plain sentence, the public call behind it, and its tone. */
+/** One line identifying its Grid call, event, or explicitly labeled host state. */
 export interface DataEvent {
   id: number;
   text: string;
@@ -84,14 +130,7 @@ export interface DataEvent {
   tone: "info" | "ok" | "warn" | "reject";
 }
 
-const PROBE_COLUMNS: Readonly<Record<ProbeKey, number>> = { order: 0, units: 4, freight: 5 };
-const PROBE_LABELS: Readonly<Record<ProbeKey, string>> = {
-  order: "Order ID",
-  units: "Units",
-  freight: "Freight",
-};
-
-/** Public Grid API only: every displayed count and event comes back from the live Grid. */
+/** Live Grid controls plus the host role state consulted by the protection resolver. */
 export interface DataToolsScenario {
   ready: Promise<void>;
   grid(): Grid | null;
@@ -99,6 +138,7 @@ export interface DataToolsScenario {
   subscribe(listener: () => void): () => void;
   filter(region: string, customer: string): void;
   run(action: DataAction): void;
+  probe(key: ProbeKey): void;
   dispose(): void;
 }
 
@@ -136,7 +176,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       events: [{ id: sequence, text, api, tone }, ...state.events].slice(0, TRACE_LIMIT),
     };
   }
-  function refresh() {
+  function readCounts() {
     if (grid) {
       state = {
         ...state,
@@ -146,25 +186,43 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
         manager,
         filters: [...grid.getColumnFilters()].map(
           ([col, filter]) =>
-            `${col === 1 ? "Region" : "Customer"}: ${filter.kind === "values" ? filter.values.join(", ") : filter.kind === "contains" ? filter.text : filter.kind}`,
+            `${DATA_COLUMNS[col]?.header ?? col}: ${filter.kind === "values" ? filter.values.join(", ") : filter.kind === "contains" ? filter.text : filter.kind}`,
         ),
         collapsed: grid.rowGroups().some((group) => group.collapsed),
         hiddenRows: grid.hiddenRows().length,
         hiddenColumns: grid.hiddenColumns().length,
       };
     }
+  }
+
+  function refresh() {
+    readCounts();
     publish();
   }
-  function probe(key: ProbeKey, value: string | number, shown: string) {
+
+  function probe(key: ProbeKey) {
     if (!grid) return;
-    const col = PROBE_COLUMNS[key];
+    const { value } = DATA_RULES[key];
+    const col = COLUMN[key];
+    const shown = probeValue(key);
+
+    // Always restore event reporting, including when a transaction throws.
     probing = true;
-    const result = grid.applyTransaction({
-      patches: [
-        { op: "set", addr: { sheet: DATA_SHEET, row: 0, col }, value: { kind: "literal", value } },
-      ],
-    });
-    probing = false;
+    let result: ApplyTransactionResult;
+    try {
+      result = grid.applyTransaction({
+        patches: [
+          {
+            op: "set",
+            addr: { sheet: DATA_SHEET, row: 0, col },
+            value: { kind: "literal", value },
+          },
+        ],
+      });
+    } finally {
+      probing = false;
+    }
+
     const issues =
       result.status === "rejected"
         ? result.issues
@@ -175,7 +233,8 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     const outcome: ProbeResult["outcome"] =
       result.status !== "applied" ? "rejected" : issues.length > 0 ? "warned" : "saved";
     const stored = String(grid.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved);
-    const label = PROBE_LABELS[key];
+    const label = DATA_COLUMNS[col].header;
+
     if (outcome === "rejected") {
       record(`${label} ${shown} rejected. ${message ?? ""}`.trim(), "applyTransaction", "reject");
     } else if (outcome === "warned") {
@@ -187,9 +246,10 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     } else {
       record(`${label} changed to ${shown}.`, "applyTransaction", "ok");
     }
+
     state = {
       ...state,
-      probes: { ...state.probes, [key]: { attempted: shown, stored, outcome, message } },
+      probes: { ...state.probes, [key]: { stored, outcome } },
     };
   }
   const ready = initSheetwrite()
@@ -203,15 +263,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
               id: DATA_SHEET,
               name: "Dispatch operations",
               rowCount: DATA_ROWS,
-              columns: [
-                { key: "order", header: "Order ID", type: "text", width: 145 },
-                { key: "region", header: "Region", type: "text", width: 120 },
-                { key: "customer", header: "Customer", type: "text", width: 210 },
-                { key: "status", header: "Status", type: "text", width: 120 },
-                { key: "units", header: "Units", type: "number", width: 100 },
-                { key: "freight", header: "Freight $", type: "number", width: 110 },
-                { key: "owner", header: "Owner", type: "text", width: 120 },
-              ],
+              columns: [...DATA_COLUMNS],
             },
           ],
         },
@@ -226,21 +278,21 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
       });
       grid.setValidationRule({
         id: "units-positive",
-        range: range(4),
+        range: range(COLUMN.units),
         condition: { kind: "number", integer: true, min: 1, max: 250 },
         policy: "reject",
         helpText: "Units must be an integer from 1 to 250.",
       });
       grid.setValidationRule({
         id: "freight-review",
-        range: range(5),
+        range: range(COLUMN.freight),
         condition: { kind: "number", min: 0, max: 200 },
         policy: "warn",
         helpText: "Freight above $200 needs review.",
       });
       grid.setProtectedRange({
         id: "order-identifiers",
-        range: range(0),
+        range: range(COLUMN.order),
         label: "Order identifiers",
         permissionKey: "dispatch-manager",
       });
@@ -274,7 +326,7 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
         }),
         observeSiteTheme(() => grid?.setTheme(siteGridTheme(host))),
       );
-      state = { ...state, ready: true, regions: grid.distinctValues(1).map(String) };
+      state = { ...state, ready: true, regions: grid.distinctValues(COLUMN.region).map(String) };
       record(
         "Rules installed: unit limits, freight review and locked order IDs.",
         "setValidationRule, setProtectedRange",
@@ -298,22 +350,26 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     },
     filter(region: string, customer: string) {
       if (!grid) return;
-      grid.setColumnFilter(1, region ? { kind: "values", values: [region] } : null);
-      grid.setColumnFilter(2, customer ? { kind: "contains", text: customer } : null);
-      refresh();
+      grid.setColumnFilter(COLUMN.region, region ? { kind: "values", values: [region] } : null);
+      grid.setColumnFilter(COLUMN.customer, customer ? { kind: "contains", text: customer } : null);
+      readCounts();
       record(
         `Showing ${state.visible.toLocaleString()} of ${state.total.toLocaleString()} orders.`,
         "setColumnFilter",
       );
       publish();
     },
+    probe(key: ProbeKey) {
+      probe(key);
+      refresh();
+    },
     run(action: DataAction) {
       if (!grid) return;
       switch (action) {
         case "sort":
           grid.sortByMulti([
-            { col: 1, ascending: true },
-            { col: 4, ascending: false },
+            { col: COLUMN.region, ascending: true },
+            { col: COLUMN.units, ascending: false },
           ]);
           record("Sorted by region, then by units, largest first.", "sortByMulti");
           break;
@@ -321,19 +377,10 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
           grid.clearView();
           record("Cleared sort and filters. Hidden rows and groups stay as they are.", "clearView");
           break;
-        case "reject":
-          probe("units", -5, "−5");
-          break;
-        case "warn":
-          probe("freight", 350, "$350");
-          break;
-        case "protected":
-          probe("order", "MANAGER-REVIEW", "MANAGER-REVIEW");
-          break;
         case "operator":
         case "manager":
           manager = action === "manager";
-          record(`Now acting as ${action}.`, "setProtectionResolver");
+          record(`Now acting as ${action}.`, "Host role state");
           break;
         case "group":
           grid.setGroupCollapsed(0, !state.collapsed);
@@ -344,24 +391,30 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
             "setGroupCollapsed",
           );
           break;
-        case "rows":
+        case "rows": {
           if (state.hiddenRows > 0) grid.showRows();
-          else grid.hideRows([24, 25, 26]);
+          else grid.hideRows([...HIDDEN_ROWS]);
+          const hiddenCount = grid.hiddenRows().length;
           record(
-            grid.hiddenRows().length > 0 ? "Hid rows 25 to 27." : "Showed all rows.",
-            grid.hiddenRows().length > 0 ? "hideRows" : "showRows",
+            hiddenCount > 0
+              ? `Hid rows ${HIDDEN_ROWS[0] + 1} to ${HIDDEN_ROWS[2] + 1}.`
+              : "Showed all rows.",
+            hiddenCount > 0 ? "hideRows" : "showRows",
           );
           break;
-        case "columns":
-          if (grid.hiddenColumns().length > 0) grid.showColumns();
-          else grid.hideColumns([5, 6]);
+        }
+        case "columns": {
+          if (state.hiddenColumns > 0) grid.showColumns();
+          else grid.hideColumns(HIDDEN_COLUMNS);
+          const hiddenCount = grid.hiddenColumns().length;
           record(
-            grid.hiddenColumns().length > 0
-              ? "Hid the Freight and Owner columns."
+            hiddenCount > 0
+              ? `Hid the ${HIDDEN_COLUMNS.map((col) => DATA_COLUMNS[col].header).join(" and ")} columns.`
               : "Showed all columns.",
-            grid.hiddenColumns().length > 0 ? "hideColumns" : "showColumns",
+            hiddenCount > 0 ? "hideColumns" : "showColumns",
           );
           break;
+        }
       }
       refresh();
     },

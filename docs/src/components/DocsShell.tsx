@@ -167,7 +167,7 @@ function LatestReleaseCard({
 const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
 
 /** New/Updated marker for the latest release; text, so screen readers announce it. */
-function NavigationBadge({ item }: Readonly<{ item: NavigationItem }>) {
+function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
   const badge = navigationBadge(item, LATEST_RELEASE.version);
   if (badge === undefined) return null;
   return (
@@ -191,7 +191,6 @@ interface NavigationEntriesProps {
 function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEntriesProps>) {
   return items.map((item) => {
     if (item.items === undefined) {
-      if (item.href === undefined) return null;
       return (
         <Link
           activeOptions={{ exact: true }}
@@ -201,22 +200,31 @@ function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEn
           to={item.href}
         >
           <span>{item.label}</span>
-          <NavigationBadge item={item} />
+          <NavigationBadgeLabel item={item} />
         </Link>
       );
     }
 
-    // A group's own page is the group itself, not one of its ancestors.
+    // A group's own page opens the group too; call its link Overview to avoid repeating the name.
     const open =
       (current?.ancestors.includes(item) ?? false) ||
       (item.href !== undefined && current?.href === item.href);
-    // A group's own page is its overview; repeating the group name under itself reads as a duplicate.
-    const ownPage = item.href === undefined ? [] : [{ label: "Overview", href: item.href }];
+    const ownPage =
+      item.href === undefined
+        ? []
+        : [
+            {
+              label: "Overview",
+              href: item.href,
+              added: item.added,
+              updated: item.updated,
+            },
+          ];
     return (
       <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
         <summary>
           <span>{item.label}</span>
-          <NavigationBadge item={item} />
+          <NavigationBadgeLabel item={item} />
         </summary>
         <div>
           <NavigationEntries
@@ -251,7 +259,7 @@ function NavigationSections({
         >
           <summary>
             <span>{section.label}</span>
-            <NavigationBadge item={section} />
+            <NavigationBadgeLabel item={section} />
           </summary>
           <div>
             <NavigationEntries current={current} items={section.items} onNavigate={onNavigate} />

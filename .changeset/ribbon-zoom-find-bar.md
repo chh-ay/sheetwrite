@@ -2,7 +2,7 @@
 "@sheetwrite/core": patch
 ---
 
-The ribbon's View › Zoom group is one stepper, Zoom Out, the zoom percent and Zoom In. Select the percent to return to 100%; at 100% it is disabled.
+The ribbon's View › Zoom group is one stepper, Zoom Out, the zoom percent and Zoom In. Select the percent to return to 100%; at 100% it is disabled. Its accessible name starts with the shown percent, for example "120%, zoom to 100%", so voice control can target it by its visible text.
 
 The find and replace bar uses one field style for both fields, with its own focus ring, and shows the match count inside the find field. The Previous, Next and Close buttons have accessible names, and the replace-all button reads "Replace all".
 
