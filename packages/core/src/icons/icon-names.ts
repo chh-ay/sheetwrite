@@ -64,6 +64,15 @@ export const ICON_NAMES = [
   "sortDesc",
   "sortFilter",
   "clearFilter",
+  "chart",
+  "chartColumn",
+  "chartBar",
+  "chartLine",
+  "chartArea",
+  "chartPie",
+  "chartDoughnut",
+  "chartScatter",
+  "pivotTable",
 ] as const;
 
 /** The name of one glyph on the command icon sheet; the key of `IconOverrides`. */

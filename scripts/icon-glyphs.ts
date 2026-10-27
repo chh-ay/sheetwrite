@@ -38,6 +38,12 @@ const DOCUMENT_FOLD = "M14 3v4.5h4.5";
 const LETTER_A = "M3 19 8 6l5 13";
 const LETTER_A_BAR = "M4.9 14.5h6.2";
 const FUNNEL = "M4 5h16l-6 7.5V19l-4 2v-8.5Z";
+/** The value and category axes every cartesian chart glyph shares. */
+const AXES = "M4 4v16h16";
+/** Three rising columns; Insert › Chart uses them as the chart family's face. */
+const COLUMNS = "M7 20v-8h2.5v8M11.5 20V7H14v13M16 20V10h2.5v10";
+const COLUMNS_FILL = "M7 12h2.5v8H7ZM11.5 7H14v13h-2.5ZM16 10h2.5v10H16Z";
+const PIE = "M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z";
 
 export const ICON_ROWS: readonly (readonly Glyph[])[] = [
   // History, clipboard and search.
@@ -306,5 +312,44 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
     ],
     ["sortFilter", [FUNNEL]],
     ["clearFilter", ["M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z", "m15.5 14.5 5 5m0-5-5 5"]],
+  ],
+  // Charts, one glyph per chart kind, and pivot tables.
+  [
+    ["chart", [AXES, tint(COLUMNS_FILL), COLUMNS]],
+    ["chartColumn", [AXES, tint(COLUMNS_FILL), COLUMNS]],
+    [
+      "chartBar",
+      [
+        AXES,
+        tint("M4 6h9v2.5H4ZM4 10.75h13v2.5H4ZM4 15.5h6V18H4Z"),
+        "M4 6h9v2.5H4M4 10.75h13v2.5H4M4 15.5h6V18H4",
+      ],
+    ],
+    ["chartLine", [AXES, "m7 15.5 4-5 3.5 3L19 7"]],
+    ["chartArea", [AXES, tint("M4 20v-5l4.5-5 4 3.5L20 8v12Z"), "m4 15 4.5-5 4 3.5L20 8"]],
+    ["chartPie", [PIE, tint("M12 4a8 8 0 0 1 8 8h-8Z"), "M12 4v8h8"]],
+    [
+      "chartDoughnut",
+      [
+        PIE,
+        "M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z",
+        tint("M12 4a8 8 0 0 1 8 8h-4.5A3.5 3.5 0 0 0 12 8.5Z"),
+        "M12 4v4.5M15.5 12H20",
+      ],
+    ],
+    // Round dots: a zero-length bold stroke draws a disc, like the decimal point.
+    ["chartScatter", [AXES, bold("M8 15.5h.01M11 11.5h.01M14 13.5h.01M16.5 8.5h.01M19 10.5h.01")]],
+    // A table whose header row and column turn: the tint marks the headers,
+    // and the bent arrow is the turn. One head stays legible at ribbon size.
+    [
+      "pivotTable",
+      [
+        tint("M9 4h11v5H9ZM4 9h5v11H4Z"),
+        "M4 4h16v16H4Z",
+        "M4 9h16M9 4v16",
+        "M17 11.5V13a4 4 0 0 1-4 4h-1.5",
+        "m13.5 15-2 2 2 2",
+      ],
+    ],
   ],
 ];

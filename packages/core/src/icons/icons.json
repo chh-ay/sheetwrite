@@ -252,6 +252,42 @@
     "clearFilter": {
       "column": 3,
       "row": 6
+    },
+    "chart": {
+      "column": 0,
+      "row": 7
+    },
+    "chartColumn": {
+      "column": 1,
+      "row": 7
+    },
+    "chartBar": {
+      "column": 2,
+      "row": 7
+    },
+    "chartLine": {
+      "column": 3,
+      "row": 7
+    },
+    "chartArea": {
+      "column": 4,
+      "row": 7
+    },
+    "chartPie": {
+      "column": 5,
+      "row": 7
+    },
+    "chartDoughnut": {
+      "column": 6,
+      "row": 7
+    },
+    "chartScatter": {
+      "column": 7,
+      "row": 7
+    },
+    "pivotTable": {
+      "column": 8,
+      "row": 7
     }
   }
 }
