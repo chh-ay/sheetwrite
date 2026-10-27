@@ -125,10 +125,11 @@ function retainedGraphKind(graph: XlsxSourceGraph): string {
 }
 
 /**
- * Retained graphs (charts, pivots, drawings, …) the original had and the
- * round trip no longer has. Counted per kind, not per part path: producers
- * may rename parts, and may add graphs of their own (a theme, document
- * properties), but a kind whose count drops lost unmodelled content.
+ * Retained graphs (charts, pivots, drawings, …) the round trip lost, as a
+ * count per kind. Producers rename parts and add graphs of their own (a
+ * theme, document properties), so no graph identity is stable across them;
+ * this proves only that no kind lost members. A dropped chart replaced by a
+ * different chart on the same owner still passes.
  */
 export function retainedGraphLosses(
   expected: WorkbookSnapshot,
