@@ -5805,3 +5805,78 @@ mod dense_reader_fast_paths {
         assert_close(store.aggregate(sheet, 0, 4), 3.0);
     }
 }
+
+/// One column aggregate must give the same result on dense and paged
+/// storage. Paged storage follows Excel: logical and blank formula results
+/// are ignored, and spilled values count.
+mod aggregate_storage_parity {
+    use super::*;
+
+    const ROWS: usize = 8;
+    const COLS: usize = 2;
+    const PAGE_ROWS: usize = 4;
+    /// Large enough that no loaded page is evicted during a test.
+    const PAGE_BYTE_BUDGET: usize = 1_000_000;
+    const OPS: std::ops::RangeInclusive<u8> = 0..=4;
+
+    /// The same column A on a dense and a paged sheet: a number literal and
+    /// one formula, recomputed.
+    fn dense_and_paged(formula: &str) -> [(CellStore, usize); 2] {
+        let mut dense = CellStore::new();
+        let dense_sheet = dense.add_sheet(COLS, ROWS);
+        let mut paged = CellStore::new();
+        let paged_sheet = paged.add_paged_sheet(
+            COLS,
+            ROWS,
+            PAGE_ROWS,
+            PAGE_BYTE_BUDGET,
+            DEFAULT_MAX_PAGED_DIRTY_CELLS,
+        );
+
+        // Load every page as blank first: an unloaded paged cell reads as
+        // #LOADING!, which would hide the spill.
+        paged.begin_page_load();
+        for col in 0..COLS {
+            for row in 0..ROWS {
+                paged.clear_cell(paged_sheet, row, col, 0);
+            }
+        }
+        paged.commit_sources();
+
+        for (store, sheet) in [(&mut dense, dense_sheet), (&mut paged, paged_sheet)] {
+            store.set_number(sheet, 0, 0, 4.0, 0);
+            store.set_formula(sheet, 1, 0, formula, 0);
+            store.recompute(sheet);
+        }
+        [(dense, dense_sheet), (paged, paged_sheet)]
+    }
+
+    fn assert_dense_matches_paged(formula: &str, expected: [f64; 5]) {
+        let [(dense, dense_sheet), (paged, paged_sheet)] = dense_and_paged(formula);
+        for (op, expected) in OPS.zip(expected) {
+            let dense_value = dense.aggregate(dense_sheet, 0, op);
+            let paged_value = paged.aggregate(paged_sheet, 0, op);
+            assert_eq!(
+                dense_value.to_bits(),
+                paged_value.to_bits(),
+                "{formula} op {op}: dense {dense_value}, paged {paged_value}"
+            );
+            assert_close(dense_value, expected);
+        }
+    }
+
+    #[test]
+    fn a_formula_returning_true_is_ignored() {
+        assert_dense_matches_paged("=TRUE", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn a_formula_returning_a_blank_is_ignored() {
+        assert_dense_matches_paged("=B1", [4.0, 4.0, 4.0, 4.0, 1.0]);
+    }
+
+    #[test]
+    fn spilled_values_count() {
+        assert_dense_matches_paged("=SEQUENCE(3)", [10.0, 2.5, 1.0, 4.0, 4.0]);
+    }
+}

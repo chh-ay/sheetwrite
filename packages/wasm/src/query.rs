@@ -6,9 +6,7 @@ use std::collections::HashSet;
 
 use wasm_bindgen::prelude::*;
 
-use crate::cells::{
-    dense_resolved, payload_is_str, payload_num, payload_str_id, source_kind, CellRun,
-};
+use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
 use crate::sheet::{formula_error_at, SheetData};
 use crate::store::CellStore;
 use crate::types::{
@@ -205,14 +203,21 @@ impl CellStore {
                 // never load their payload. A formula decodes its own slot and
                 // builds its key from the loop's row and column, without the
                 // style load and the divide that a general cell read costs.
+                // Like paged storage and Excel, logical and blank results are
+                // not numbers, and a spilled number counts.
                 let value = match source_kind(raw) {
                     KIND_NUMBER => Some(f64::from_bits(payloads[row])),
                     KIND_FORMULA => {
-                        let (_, payload) = dense_resolved(raw, payloads[row]);
-                        (!payload_is_str(payload)
+                        let (kind, payload) = dense_resolved(raw, payloads[row]);
+                        (!matches!(kind, KIND_STRING | KIND_BOOL | KIND_EMPTY)
                             && cell_key(row, col)
                                 .is_some_and(|key| formula_error_at(s, key).is_none()))
                         .then(|| payload_num(payload))
+                    }
+                    // A spilled value sits in a calculated slot with no source.
+                    KIND_EMPTY if raw != KIND_EMPTY => {
+                        let (kind, payload) = dense_resolved(raw, payloads[row]);
+                        (kind == KIND_NUMBER).then(|| f64::from_bits(payload))
                     }
                     _ => None,
                 };
