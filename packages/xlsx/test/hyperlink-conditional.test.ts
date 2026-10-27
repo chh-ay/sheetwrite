@@ -8,6 +8,7 @@ import {
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 
 import { sheetwriteWorkbookBackend } from "../src/workbook.js";
+import { rawXlsx } from "./raw-opc.js";
 
 const FIXED_ZIP_TIME = new Date(1980, 0, 1);
 const MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -131,6 +132,83 @@ function sourceSnapshot(): WorkbookSnapshot {
 }
 
 describe("XLSX hyperlink and conditional-format fidelity", () => {
+  it("exports hyperlink appearance into native cell styles without relying on metadata", async () => {
+    const source = sourceSnapshot();
+    const firstSheet = source.sheets[0];
+    if (!firstSheet) throw new Error("Missing source worksheet");
+    firstSheet.columns[0] = {
+      key: "a",
+      header: "A",
+      width: 100,
+      type: "text",
+      cellStyle: { bold: true, color: "#ABCDEF" },
+    };
+    const block = firstSheet.cells[0];
+    const internalCell = block?.cells[1];
+    if (!block || !internalCell) throw new Error("Missing hyperlink cells");
+    internalCell.style = { color: "#654321", underline: false };
+    block.cells.push({ rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "Default" } });
+    firstSheet.hyperlinks?.push({
+      id: "default-link",
+      range: { sheet: "source", start: { row: 0, col: 1 }, end: { row: 0, col: 1 } },
+      target: { kind: "external", url: "https://example.com/default" },
+    });
+    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(source));
+    // Import only the native worksheet/style parts: the metadata sheet must not
+    // be able to supply the hyperlink appearance under test.
+    const worksheet = parts["xl/worksheets/sheet1.xml"];
+    const styles = parts["xl/styles.xml"];
+    const relationships = parts["xl/worksheets/_rels/sheet1.xml.rels"];
+    if (!worksheet || !styles || !relationships) throw new Error("Missing native XLSX parts");
+    const relationshipElements = strFromU8(relationships)
+      .match(/<Relationship\b[^>]*\/>/g)
+      ?.join("");
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      rawXlsx({
+        sheets: [
+          { name: "Source", xml: strFromU8(worksheet), relationships: relationshipElements },
+          {
+            name: "Destination Sheet",
+            xml: `<worksheet xmlns="${MAIN_NS}"><sheetData/></worksheet>`,
+          },
+        ],
+        styles: strFromU8(styles),
+      }),
+    );
+    const cells = imported.sheets[0]?.cells.flatMap((block) => block.cells);
+    expect(
+      cells?.find((cell) => cell.rowOffset === 0 && cell.colOffset === 0)?.style,
+    ).toMatchObject({ bold: true, color: "#123456", underline: true });
+    const nativeInternalStyle = cells?.find(
+      (cell) => cell.rowOffset === 1 && cell.colOffset === 0,
+    )?.style;
+    expect(nativeInternalStyle).toMatchObject({ bold: true, color: "#654321" });
+    // An absent OOXML <u> is the native false value.
+    expect(nativeInternalStyle?.underline ?? false).toBe(false);
+    expect(
+      cells?.find((cell) => cell.rowOffset === 0 && cell.colOffset === 1)?.style,
+    ).toMatchObject({ color: "#0563C1", underline: true });
+  });
+
+  it.each([
+    ['ref="A1" r:id="rId1"', "Report"],
+    ['ref="A1" location="&apos;Destination Sheet&apos;!A1"', "Report"],
+    ['ref="A1" r:id="rId1" display="Explicit"', "Explicit"],
+    ['ref="A1" r:id="rId1" display=""', ""],
+  ])("uses cell text only when hyperlink display is omitted: %s", async (attributes, display) => {
+    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      originalEcmaVector({
+        hyperlinks: `<hyperlink ${attributes}/>`,
+        relationship: { target: "https://example.com/report", external: true },
+      }),
+    );
+    expect(imported.sheets[0]?.hyperlinks?.[0]?.display).toBe(display);
+    const reimported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+      await sheetwriteWorkbookBackend.toXlsxWorkbook(imported),
+    );
+    expect(reimported.sheets[0]?.hyperlinks?.[0]?.display).toBe(display);
+  });
+
   it("round-trips external relationships, stable internal targets, display/style, formula, and stop", async () => {
     const source = sourceSnapshot();
     const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source);

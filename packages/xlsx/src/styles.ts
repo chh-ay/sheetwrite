@@ -389,35 +389,54 @@ function hasAlignment(style: CellStyle): boolean {
   return style.align !== undefined || style.verticalAlign !== undefined || style.wrap !== undefined;
 }
 
-function alignmentXml(style: CellStyle): string {
-  return `<alignment${style.align ? ` horizontal="${style.align}"` : ""}${style.verticalAlign ? ` vertical="${XLSX_VERTICAL[style.verticalAlign]}"` : ""}${style.wrap ? ' wrapText="1"' : ""}/>`;
+function alignmentXml(style: CellStyle | undefined, differential = false): string {
+  // Ordinary cells default to center in Sheetwrite, but bottom in OOXML.
+  // A differential style instead leaves unspecified fields untouched.
+  const vertical = differential
+    ? style?.verticalAlign && XLSX_VERTICAL[style.verticalAlign]
+    : style?.verticalAlign === "bottom"
+      ? undefined
+      : XLSX_VERTICAL[style?.verticalAlign ?? "middle"];
+  return `<alignment${style?.align ? ` horizontal="${style.align}"` : ""}${vertical ? ` vertical="${vertical}"` : ""}${style?.wrap ? ' wrapText="1"' : ""}/>`;
 }
 
 /** Alignment fields of a cell or differential style from its `<alignment>` element. */
-function importedAlignment(alignment: XmlElement | undefined): CellStyle {
-  if (!alignment) return {};
-  const style: CellStyle = {};
+function importedAlignment(alignment: XmlElement | undefined, differential = false): CellStyle {
+  const style: CellStyle = differential ? {} : { verticalAlign: "bottom" };
+  if (!alignment) return style;
   const horizontal = xmlAttribute(alignment, "horizontal");
   if (horizontal === "left" || horizontal === "center" || horizontal === "right") {
     style.align = horizontal;
   }
   const vertical = xmlAttribute(alignment, "vertical");
   if (vertical === "top" || vertical === "bottom") style.verticalAlign = vertical;
-  else if (vertical === "center") style.verticalAlign = "middle";
+  else if (vertical === "center") {
+    if (differential) style.verticalAlign = "middle";
+    else delete style.verticalAlign;
+  }
   if (xmlBoolean(xmlAttribute(alignment, "wrapText"))) style.wrap = true;
   return style;
 }
-function fontXml(font: FontRecord): string {
+// Column widths use the seven-pixel maximum digit width of Calibri 11pt.
+// An unnamed font lets producers choose a different metric and resize columns.
+const DEFAULT_CELL_FONT: FontRecord = {
+  fontFamily: "Calibri",
+  fontSize: (11 * 96) / 72,
+};
+
+function fontXml(font: FontRecord, defaults?: FontRecord): string {
   let xml = "<font>";
   if (font.bold) xml += "<b/>";
   if (font.italic) xml += "<i/>";
   if (font.underline) xml += "<u/>";
   if (font.strikethrough) xml += "<strike/>";
-  if (font.fontSize !== undefined) xml += `<sz val="${(font.fontSize * 72) / 96}"/>`;
+  const fontSize = font.fontSize ?? defaults?.fontSize;
+  if (fontSize !== undefined) xml += `<sz val="${(fontSize * 72) / 96}"/>`;
   const color = argb(font.color);
   if (color) xml += `<color rgb="${color}"/>`;
   // Validated cell families need no escaping; XML-escape anyway as the boundary rule.
-  if (font.fontFamily !== undefined) xml += `<name val="${escapeXml(font.fontFamily)}"/>`;
+  const fontFamily = font.fontFamily ?? defaults?.fontFamily;
+  if (fontFamily !== undefined) xml += `<name val="${escapeXml(fontFamily)}"/>`;
   return `${xml}</font>`;
 }
 
@@ -461,7 +480,7 @@ function differentialXml(style: CellStyle): string {
   if (Object.keys(border).length > 0) {
     xml += `<border>${borderSideXml("left", border.left)}${borderSideXml("right", border.right)}${borderSideXml("top", border.top)}${borderSideXml("bottom", border.bottom)}</border>`;
   }
-  if (hasAlignment(style)) xml += alignmentXml(style);
+  if (hasAlignment(style)) xml += alignmentXml(style, true);
   return `${xml}</dxf>`;
 }
 
@@ -597,7 +616,7 @@ export class StylesRegistry {
       xml.append("</numFmts>");
     }
     xml.append(`<fonts count="${fonts.length}">`);
-    for (const font of fonts) xml.append(fontXml(font));
+    for (const font of fonts) xml.append(fontXml(font, DEFAULT_CELL_FONT));
     xml.append("</fonts>");
     xml.append(
       `<fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>`,
@@ -617,16 +636,16 @@ export class StylesRegistry {
     }
     xml.append("</borders>");
     xml.append(
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>',
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment vertical="center"/></xf></cellStyleXfs>',
     );
     xml.append(`<cellXfs count="${xfs.length}">`);
     for (const xf of xfs) {
       const alignment = xf.alignment;
-      const applyAlignment = alignment !== undefined && hasAlignment(alignment);
+      // Include xf0: otherwise unstyled Sheetwrite cells render bottom-aligned.
       xml.append(
-        `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""}${applyAlignment ? ' applyAlignment="1"' : ""}>`,
+        `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""} applyAlignment="1">`,
       );
-      if (applyAlignment) xml.append(alignmentXml(alignment));
+      xml.append(alignmentXml(alignment));
       xml.append("</xf>");
     }
     xml.append("</cellXfs>");
@@ -731,7 +750,7 @@ function parsedDifferentialStyle(
     }
   }
   const alignment = xmlChild(dxf, "alignment");
-  Object.assign(style, importedAlignment(alignment));
+  Object.assign(style, importedAlignment(alignment, true));
   return style;
 }
 
@@ -747,7 +766,7 @@ export class ParsedStyles {
     themePart = "xl/theme/theme1.xml",
   ) {
     if (!root) {
-      this.#styles = [{ date: false }];
+      this.#styles = [{ date: false, style: { verticalAlign: "bottom" } }];
       this.#differentials = [];
       return;
     }
@@ -952,7 +971,9 @@ export class ParsedStyles {
     this.#differentials = differentials.map((dxf) =>
       parsedDifferentialStyle(dxf, theme, context, colorWarnings, part),
     );
-    if (this.#styles.length === 0) this.#styles.push({ date: false });
+    if (this.#styles.length === 0) {
+      this.#styles.push({ date: false, style: { verticalAlign: "bottom" } });
+    }
   }
 
   at(index: number): ParsedCellStyle {

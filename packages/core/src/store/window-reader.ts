@@ -15,6 +15,7 @@ const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
 const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
+const DEFAULT_HYPERLINK_STYLE: CellStyle = { color: "#0563C1", underline: true };
 
 const WINDOW_PACKED_MAGIC = 0x3157_4e53;
 const WINDOW_PACKED_VERSION = 1;
@@ -840,12 +841,7 @@ export class StoreWindowReader {
       const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
       const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
       const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
-      const linkStyle: CellStyle = {
-        color: "#0563C1",
-        underline: true,
-        ...hyperlink.style,
-      };
-      const styleKey = JSON.stringify(linkStyle);
+      const styleKey = JSON.stringify(hyperlink.style);
       for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
         const dataRow = order?.[rows.start + rowIndex] ?? rows.start + rowIndex;
         if (dataRow < r0 || dataRow > r1) continue;
@@ -857,7 +853,13 @@ export class StoreWindowReader {
           let merged = mergedIds.get(key);
           if (merged === undefined) {
             merged = styles.length;
-            styles.push({ ...(styles[base] ?? {}), ...linkStyle });
+            // Native XLSX hyperlink fonts can live on the cell, not the link.
+            // Defaults must not erase those explicit font properties.
+            styles.push({
+              ...DEFAULT_HYPERLINK_STYLE,
+              ...styles[base],
+              ...hyperlink.style,
+            });
             mergedIds.set(key, merged);
           }
           styleIds[offset] = merged;
