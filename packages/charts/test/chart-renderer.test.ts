@@ -1,6 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { initSheetwrite, SheetwriteStore, type Workbook } from "@sheetwrite/core";
+import {
+  initSheetwrite,
+  SheetwriteStore,
+  subscribeChartChanges,
+  type Workbook,
+} from "@sheetwrite/core";
 
 import { createChartRenderer } from "../src/chart-renderer.js";
 import { chartWorkbook, SALES, setCell } from "./fixtures.js";
@@ -100,11 +105,18 @@ describe("createChartRenderer", () => {
     const host = document.createElement("div");
     renderer.mount(host, SALES, { width: 320, height: 200 });
     const first = host.querySelector("svg");
+    let changeEvents = 0;
+    const stopCounting = subscribeChartChanges(store, () => {
+      changeEvents += 1;
+    });
 
     setCell(store, 0, 0, 4);
     setCell(store, 1, 0, 5);
     setCell(store, 2, 0, 6);
+    stopCounting();
 
+    // Each edit is its own chart change, so one pending frame proves the renderer coalesced them.
+    expect(changeEvents).toBe(3);
     expect(pendingFrames.size).toBe(1);
     expect(host.querySelector("svg")).toBe(first);
     runFrames();
