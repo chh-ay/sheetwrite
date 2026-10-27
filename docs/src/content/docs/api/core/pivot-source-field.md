@@ -8,7 +8,7 @@ description: "One source field offered by the field list."
 One source field offered by the field list.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L117"><code>packages/core/src/types/pivot.ts#L117</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L124"><code>packages/core/src/types/pivot.ts#L124</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>
@@ -16,7 +16,7 @@ One source field offered by the field list.
 <div class="api-member-list">
 
 <details class="api-member" id="pivot-source-field-index" data-pagefind-weight="1">
-<summary><code>index</code></summary>
+<summary><code>index</code> <span class="api-member-summary">Source field index, as used by rows, columns, values and filters.</span></summary>
 
 ```ts generated
 index: number;
@@ -25,7 +25,7 @@ index: number;
 </details>
 
 <details class="api-member" id="pivot-source-field-header" data-pagefind-weight="1">
-<summary><code>header</code></summary>
+<summary><code>header</code> <span class="api-member-summary">Field name, from the source header row or table column.</span></summary>
 
 ```ts generated
 header: string;
@@ -34,7 +34,7 @@ header: string;
 </details>
 
 <details class="api-member" id="pivot-source-field-type" data-pagefind-weight="1">
-<summary><code>type</code></summary>
+<summary><code>type</code> <span class="api-member-summary">Type inferred from the field's data rows.</span></summary>
 
 ```ts generated
 type: PivotFieldType;

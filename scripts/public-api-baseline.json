@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "a54cd471ee0aa8c929246ba911603a1d9a7d7bc3ab0e62247886846176936590",
+  "sha256": "dda11c2d645dd7bf5d6ed3c9f56a39a1047d742d55f14b324ae67e7b0a8d916c",
   "intentionalExports": [
     {
       "package": "@sheetwrite/charts",
@@ -163,6 +163,16 @@
         "PersistenceCommitResponse",
         "PersistenceError",
         "PersistenceErrorCode",
+        "PivotAggregation",
+        "PivotDefinition",
+        "PivotFieldType",
+        "PivotFilter",
+        "PivotLayout",
+        "PivotResultView",
+        "PivotSort",
+        "PivotSource",
+        "PivotSourceField",
+        "PivotValueField",
         "PresenceActor",
         "PresenceCoordinator",
         "PresenceCoordinatorEvent",
@@ -490,6 +500,7 @@
         "EngineInstance",
         "InitInput",
         "InitOutput",
+        "PivotFields",
         "RangeSnapshot",
         "SourceSnapshot",
         "SyncInitInput",

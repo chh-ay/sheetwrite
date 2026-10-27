@@ -16,7 +16,7 @@ One aggregated value field. `name` replaces the default caption.
 <div class="api-member-list">
 
 <details class="api-member" id="pivot-value-field-field" data-pagefind-weight="1">
-<summary><code>field</code></summary>
+<summary><code>field</code> <span class="api-member-summary">Source field index that the value aggregates.</span></summary>
 
 ```ts generated
 field: number;
@@ -25,7 +25,7 @@ field: number;
 </details>
 
 <details class="api-member" id="pivot-value-field-aggregation" data-pagefind-weight="1">
-<summary><code>aggregation</code></summary>
+<summary><code>aggregation</code> <span class="api-member-summary">How the field's values in each output cell combine.</span></summary>
 
 ```ts generated
 aggregation: PivotAggregation;
@@ -34,7 +34,7 @@ aggregation: PivotAggregation;
 </details>
 
 <details class="api-member" id="pivot-value-field-name" data-pagefind-weight="1">
-<summary><code>name</code></summary>
+<summary><code>name</code> <span class="api-member-summary">Custom caption; without it the output shows the default caption.</span></summary>
 
 ```ts generated
 name?: string;

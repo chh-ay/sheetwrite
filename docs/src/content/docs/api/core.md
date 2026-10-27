@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>360</dd></div>
+<div><dt>Exports</dt><dd>370</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -112,7 +112,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/workbook-table-name-key/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>workbookTableNameKey</code></span><span class="api-symbol-card__desc">Locale-independent key used for table and table-column collision checks.</span></a>
 </div>
 
-### Interfaces <span class="api-count" data-pagefind-ignore>157</span>
+### Interfaces <span class="api-count" data-pagefind-ignore>163</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/boundary-operation-stats/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>BoundaryOperationStats</code></span><span class="api-symbol-card__desc">Fixed-cardinality boundary crossing counters for one operation.</span></a>
@@ -185,6 +185,12 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/persistence-adapter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PersistenceAdapter</code></span><span class="api-symbol-card__desc">Host load and commit contract for versioned workbook persistence.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-batch-commit-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PersistenceBatchCommitRequest</code></span><span class="api-symbol-card__desc">Cancellable commit of one atomic batch that spans several server versions.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-commit-request/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PersistenceCommitRequest</code></span><span class="api-symbol-card__desc">Cancellable pending commit submitted to a persistence adapter.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-definition/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotDefinition</code></span><span class="api-symbol-card__desc">Serializable pivot-table definition, owned by the sheet that holds its anchor.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-filter/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotFilter</code></span><span class="api-symbol-card__desc">Keep-list filter: only source rows whose field value is in values contribute.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-result-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotResultView</code></span><span class="api-symbol-card__desc">Plain-JSON view of one pivot's output, for the field list and other UI.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-sort/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSort</code></span><span class="api-symbol-card__desc">Sort of one axis field by its labels.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-source-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotSourceField</code></span><span class="api-symbol-card__desc">One source field offered by the field list.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-value-field/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PivotValueField</code></span><span class="api-symbol-card__desc">One aggregated value field.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-actor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceActor</code></span><span class="api-symbol-card__desc">Public collaborator identity attached to presence updates.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator-options/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceCoordinatorOptions</code></span><span class="api-symbol-card__desc">Identity, privacy, and timing options for presence coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-message/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>PresenceMessage</code></span><span class="api-symbol-card__desc">Ephemeral collaborator selection and activity update.</span></a>
@@ -274,7 +280,7 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-workbook-warning/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>XlsxWorkbookWarning</code></span><span class="api-symbol-card__desc">Structured fidelity warning emitted during XLSX conversion.</span></a>
 </div>
 
-### Types <span class="api-count" data-pagefind-ignore>89</span>
+### Types <span class="api-count" data-pagefind-ignore>93</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/aggregate-op/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>AggregateOp</code></span><span class="api-symbol-card__desc">Column aggregate operation for Grid.aggregate / Store data ops.</span></a>
@@ -321,6 +327,10 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/operation-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>OperationSource</code></span><span class="api-symbol-card__desc">Whether a committed change originated locally or from remote host input.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-commit-response/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PersistenceCommitResponse</code></span><span class="api-symbol-card__desc">Applied, duplicate, or conflict acknowledgement from persistence.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/persistence-error-code/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PersistenceErrorCode</code></span><span class="api-symbol-card__desc">Stable category for a persistence failure.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-aggregation/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotAggregation</code></span><span class="api-symbol-card__desc">Aggregation applied to one value field.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-field-type/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotFieldType</code></span><span class="api-symbol-card__desc">Inferred type of one source field from its data rows.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-layout/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotLayout</code></span><span class="api-symbol-card__desc">Layout of row labels: one indented label column, or one label column per row field.</span></a>
+<a class="api-symbol-card" href="/docs/api/core/pivot-source/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PivotSource</code></span><span class="api-symbol-card__desc">Data a pivot summarizes. - A range source includes its header row: the first range row names the fields, and field i is the column range.start.col + i.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/presence-coordinator-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>PresenceCoordinatorEvent</code></span><span class="api-symbol-card__desc">Connection or actor transition emitted by presence coordination.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/protection-resolver/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ProtectionResolver</code></span><span class="api-symbol-card__desc">Host-owned client UX permission callback for protected mutations.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/query-capability/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>QueryCapability</code></span><span class="api-symbol-card__desc">Whether a query is complete for the currently loaded datasource pages.</span></a>

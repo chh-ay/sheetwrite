@@ -8,7 +8,7 @@ description: "Replacement count and refreshed search state returned by replace-a
 Replacement count and refreshed search state returned by replace-all.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L620"><code>packages/core/src/types/grid.ts#L620</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/grid.ts#L621"><code>packages/core/src/types/grid.ts#L621</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

@@ -28,7 +28,7 @@ function updateTotal(grid: Grid) {
 - [Grid.applyTransaction](/docs/api/react/grid/#grid-apply-transaction)
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L574"><code>packages/core/dist/types/grid.d.ts#L574</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/dist/types/grid.d.ts#L575"><code>packages/core/dist/types/grid.d.ts#L575</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -103,6 +103,11 @@ function updateTotal(grid: Grid) {
 <a href="#grid-remove-validation-rule"><code>removeValidationRule</code></a>
 <a href="#grid-set-protected-range"><code>setProtectedRange</code></a>
 <a href="#grid-remove-protected-range"><code>removeProtectedRange</code></a>
+<a href="#grid-get-pivots"><code>getPivots</code></a>
+<a href="#grid-set-pivot"><code>setPivot</code></a>
+<a href="#grid-remove-pivot"><code>removePivot</code></a>
+<a href="#grid-get-pivot-fields"><code>getPivotFields</code></a>
+<a href="#grid-get-pivot-result"><code>getPivotResult</code></a>
 <a href="#grid-set-protection-resolver"><code>setProtectionResolver</code></a>
 <a href="#grid-set-note"><code>setNote</code></a>
 <a href="#grid-get-note"><code>getNote</code></a>
@@ -126,7 +131,7 @@ function updateTotal(grid: Grid) {
 <a href="#grid-destroy"><code>destroy</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>92</span>
+## Members <span class="api-count" data-pagefind-ignore>97</span>
 
 <div class="api-member-list">
 
@@ -923,6 +928,57 @@ removeProtectedRange(id: string): ApplyTransactionResult;
 
 </details>
 
+<details class="api-member" id="grid-get-pivots" data-pagefind-weight="1">
+<summary><code>getPivots</code> <span class="api-member-summary">Clones of the pivot definitions on sheet, or on every sheet; no engine is needed.</span></summary>
+
+```ts generated
+getPivots(sheet?: SheetId): PivotDefinition[];
+```
+
+</details>
+
+<details class="api-member" id="grid-set-pivot" data-pagefind-weight="1">
+<summary><code>setPivot</code> <span class="api-member-summary">Insert or replace a pivot as one undo entry.</span></summary>
+
+```ts generated
+setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+```
+
+<p class="api-member-doc">Insert or replace a pivot as one undo entry. `sheet` defaults to the sheet
+that holds the pivot's ID, then to the active sheet. The pivot's
+`savedOutput` is removed, because it does not match a changed definition.</p>
+</details>
+
+<details class="api-member" id="grid-remove-pivot" data-pagefind-weight="1">
+<summary><code>removePivot</code> <span class="api-member-summary">Remove a pivot from sheet (default: the sheet that holds it) as one undo entry.</span></summary>
+
+```ts generated
+removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+```
+
+</details>
+
+<details class="api-member" id="grid-get-pivot-fields" data-pagefind-weight="1">
+<summary><code>getPivotFields</code> <span class="api-member-summary">Source fields for the field list; empty on the default engine.</span></summary>
+
+```ts generated
+getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+```
+
+</details>
+
+<details class="api-member" id="grid-get-pivot-result" data-pagefind-weight="1">
+<summary><code>getPivotResult</code> <span class="api-member-summary">Plain-JSON output of one pivot.</span></summary>
+
+```ts generated
+getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
+```
+
+<p class="api-member-doc">Plain-JSON output of one pivot. The default engine reports the saved
+output (`saved`), or `unavailable` without one. Null when `sheet` holds
+no pivot with `id`.</p>
+</details>
+
 <details class="api-member" id="grid-set-protection-resolver" data-pagefind-weight="1">
 <summary><code>setProtectionResolver</code></summary>
 
@@ -1216,6 +1272,11 @@ export interface Grid {
   removeValidationRule(id: string): ApplyTransactionResult;
   setProtectedRange(protectedRange: ProtectedRange): ApplyTransactionResult;
   removeProtectedRange(id: string): ApplyTransactionResult;
+  getPivots(sheet?: SheetId): PivotDefinition[];
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult;
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult;
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[];
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null;
   setProtectionResolver(
     resolver: ProtectionResolver | undefined,
     mode?: MutationPolicyMode,

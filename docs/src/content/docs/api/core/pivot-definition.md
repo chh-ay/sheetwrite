@@ -9,7 +9,7 @@ Serializable pivot-table definition, owned by the sheet that holds its
 anchor. The output starts at `anchor` and spills right and down.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L61"><code>packages/core/src/types/pivot.ts#L61</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L64"><code>packages/core/src/types/pivot.ts#L64</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -52,7 +52,7 @@ name: string;
 </details>
 
 <details class="api-member" id="pivot-definition-source" data-pagefind-weight="1">
-<summary><code>source</code></summary>
+<summary><code>source</code> <span class="api-member-summary">Data the pivot summarizes.</span></summary>
 
 ```ts generated
 source: PivotSource;
@@ -91,7 +91,7 @@ columns: number[];
 </details>
 
 <details class="api-member" id="pivot-definition-values" data-pagefind-weight="1">
-<summary><code>values</code></summary>
+<summary><code>values</code> <span class="api-member-summary">Aggregated fields, in output order.</span></summary>
 
 ```ts generated
 values: PivotValueField[];
@@ -100,7 +100,7 @@ values: PivotValueField[];
 </details>
 
 <details class="api-member" id="pivot-definition-filters" data-pagefind-weight="1">
-<summary><code>filters</code></summary>
+<summary><code>filters</code> <span class="api-member-summary">Keep-lists that limit which source rows contribute; at most one per field.</span></summary>
 
 ```ts generated
 filters?: PivotFilter[];
@@ -109,7 +109,7 @@ filters?: PivotFilter[];
 </details>
 
 <details class="api-member" id="pivot-definition-sort" data-pagefind-weight="1">
-<summary><code>sort</code></summary>
+<summary><code>sort</code> <span class="api-member-summary">Label order of grouped fields; each key names a field that groups its axis.</span></summary>
 
 ```ts generated
 sort?: PivotSort[];

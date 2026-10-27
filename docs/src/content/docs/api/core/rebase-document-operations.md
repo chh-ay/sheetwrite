@@ -17,7 +17,7 @@ operation is therefore carried forward through the local sequence: before it
 is compared with local operation k, it is moved past local operations 0..k-1.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L58"><code>packages/core/src/rebase.ts#L58</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/rebase.ts#L59"><code>packages/core/src/rebase.ts#L59</code></a></dd></div>
 </dl>
 
 ## Declaration

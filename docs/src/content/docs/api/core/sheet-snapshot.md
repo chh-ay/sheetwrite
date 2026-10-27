@@ -221,7 +221,7 @@ charts?: ChartDefinition[];
 </details>
 
 <details class="api-member" id="sheet-snapshot-pivots" data-pagefind-weight="1">
-<summary><code>pivots</code></summary>
+<summary><code>pivots</code> <span class="api-member-summary">Pivot tables anchored on this sheet.</span></summary>
 
 ```ts generated
 pivots?: PivotDefinition[];

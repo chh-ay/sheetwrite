@@ -8,7 +8,7 @@ description: "Layout of row labels: one indented label column, or one label colu
 Layout of row labels: one indented label column, or one label column per row field.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L55"><code>packages/core/src/types/pivot.ts#L55</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/pivot.ts#L58"><code>packages/core/src/types/pivot.ts#L58</code></a></dd></div>
 </dl>
 
 ## Declaration
