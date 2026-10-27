@@ -258,6 +258,31 @@ export async function releaseNotesLinks(
   };
 }
 
+function compareStableVersions(left: readonly number[], right: readonly number[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+/**
+ * `--latest` only when no `v<version>` tag is higher. Without the explicit
+ * `--latest=false`, GitHub can pick Latest by date, so a rerun for an older
+ * version would take Latest from a newer release.
+ */
+async function latestFlag(runner: CommandRunner, version: string): Promise<string> {
+  const parts = (value: string) => value.split(".").map(Number);
+  const versionTags = await requireSuccess(runner, ["git", "tag", "--list", "v*"]);
+  const isHighest = versionTags
+    .split("\n")
+    .map((tag) => STABLE_VERSION.exec(tag.trim().slice(1))?.[0])
+    .every(
+      (other) => other === undefined || compareStableVersions(parts(other), parts(version)) <= 0,
+    );
+  return isHighest ? "--latest" : "--latest=false";
+}
+
 async function ensureVersionGithubRelease(
   runner: CommandRunner,
   version: string,
@@ -268,6 +293,7 @@ async function ensureVersionGithubRelease(
   await ensureTag(runner, tag, commit);
 
   const title = `Sheetwrite ${version}`;
+  const latest = await latestFlag(runner, version);
   const releaseResult = await runner([
     "gh",
     "release",
@@ -289,7 +315,7 @@ async function ensureVersionGithubRelease(
       title,
       "--notes",
       notes,
-      "--latest",
+      latest,
     ]);
     return;
   }
@@ -313,7 +339,7 @@ async function ensureVersionGithubRelease(
     title,
     "--notes",
     notes,
-    "--latest",
+    latest,
   ]);
 }
 

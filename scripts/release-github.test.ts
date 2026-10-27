@@ -19,77 +19,79 @@ function result(exitCode: number, stdout = "", stderr = ""): CommandResult {
   return { exitCode, stdout, stderr };
 }
 
-const changelogs: Readonly<Record<string, string>> = {
-  "@sheetwrite/core": `# @sheetwrite/core
-
-## 0.5.4
-
-### Minor Changes
-
-- [#170](https://github.com/chh-ay/sheetwrite/pull/170) [\`1111111\`](https://github.com/chh-ay/sheetwrite/commit/1111111) Thanks [@chh-ay](https://github.com/chh-ay)! - Add pivot tables.
-  
-  Pivot tables update when their source cells change.
-
-### Patch Changes
-
-- Updated dependencies [[\`2222222\`](https://github.com/chh-ay/sheetwrite/commit/2222222)]:
-  - @sheetwrite/wasm@0.5.4
-
-## 0.5.3
-
-### Patch Changes
-
-- 885b764: Older entry.
-`,
-  "@sheetwrite/wasm": `# @sheetwrite/wasm
-
-## 0.5.4
-
-### Patch Changes
-
-- [#171](https://github.com/chh-ay/sheetwrite/pull/171) [\`2222222\`](https://github.com/chh-ay/sheetwrite/commit/2222222) Thanks [@alice](https://github.com/alice)! - Fix a rounding error in \`ROUND\`.
-
-## 0.5.3
-`,
-  "@sheetwrite/formulas": `# @sheetwrite/formulas
-
-## 0.5.4
-
-## 0.5.3
-`,
-  "@sheetwrite/react": `# @sheetwrite/react
-
-## 0.5.4
-
-### Patch Changes
-
-- [#172](https://github.com/chh-ay/sheetwrite/pull/172) [\`3333333\`](https://github.com/chh-ay/sheetwrite/commit/3333333) Thanks [@bob](https://github.com/bob)! - Keep focus in the grid after paste.
-- Updated dependencies [[\`1111111\`](https://github.com/chh-ay/sheetwrite/commit/1111111)]:
-  - @sheetwrite/core@0.5.4
-
-## 0.5.3
-`,
-};
-
-/** xlsx, vue and svelte changed only because core changed. */
-function changelogFor(name: string): Promise<string> {
-  return Promise.resolve(
-    changelogs[name] ??
-      `# ${name}
-
-## 0.5.4
-
-### Patch Changes
-
-- Updated dependencies [[\`1111111\`](https://github.com/chh-ay/sheetwrite/commit/1111111)]:
-  - @sheetwrite/core@0.5.4
-
-## 0.5.3
-`,
-  );
+/** One line as `@changesets/changelog-github` writes it. */
+function entry(pull: number, author: string, summary: string): string {
+  return `- [#${pull}](https://github.com/chh-ay/sheetwrite/pull/${pull}) [\`${pull}0000\`](https://github.com/chh-ay/sheetwrite/commit/${pull}0000) Thanks [@${author}](https://github.com/${author})! - ${summary}`;
 }
 
-const expectedNotes = `## @sheetwrite/core
+const provenance = entry(173, "chh-ay", "Publish each package with npm provenance.");
+const pivots = `${entry(170, "chh-ay", "Add pivot tables.")}
+  
+  Pivot tables update when their source cells change.`;
+const engineStart = entry(176, "alice", "Make the engine start faster.");
+const dependencyUpdate = `- Updated dependencies [[\`1700000\`](https://github.com/chh-ay/sheetwrite/commit/1700000)]:
+  - @sheetwrite/core@0.5.4`;
+
+function changelog(name: string, groups: Readonly<Record<string, readonly string[]>>): string {
+  const sections = Object.entries(groups).map(
+    ([heading, entries]) => `### ${heading}\n\n${entries.join("\n")}\n`,
+  );
+  return `# ${name}\n\n## 0.5.4\n\n${sections.join("\n")}\n## 0.5.3\n\n### Patch Changes\n\n- 885b764: Older entry.\n`;
+}
+
+const changelogs: Readonly<Record<string, string>> = {
+  "@sheetwrite/core": changelog("@sheetwrite/core", {
+    "Minor Changes": [pivots],
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
+  "@sheetwrite/wasm": changelog("@sheetwrite/wasm", {
+    "Patch Changes": [
+      entry(171, "alice", "Fix a rounding error in `ROUND`."),
+      engineStart,
+      provenance,
+    ],
+  }),
+  // The same text from another changeset is another entry.
+  "@sheetwrite/formulas": changelog("@sheetwrite/formulas", {
+    "Patch Changes": [
+      entry(175, "carol", "Fix a rounding error in `ROUND`."),
+      engineStart,
+      provenance,
+    ],
+  }),
+  "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
+    "Minor Changes": [dependencyUpdate],
+    "Patch Changes": [provenance],
+  }),
+  "@sheetwrite/react": changelog("@sheetwrite/react", {
+    "Patch Changes": [
+      pivots,
+      entry(172, "bob", "Keep focus in the grid after paste."),
+      provenance,
+      dependencyUpdate,
+    ],
+  }),
+  "@sheetwrite/vue": changelog("@sheetwrite/vue", {
+    "Patch Changes": [provenance, dependencyUpdate],
+  }),
+  "@sheetwrite/svelte": changelog("@sheetwrite/svelte", {
+    "Patch Changes": [dependencyUpdate, provenance],
+  }),
+};
+
+async function changelogFor(name: string): Promise<string> {
+  const text = changelogs[name];
+  if (text === undefined) throw new Error(`No fixture CHANGELOG for ${name}`);
+  return text;
+}
+
+const expectedNotes = `## All packages
+
+### Patch Changes
+
+- Publish each package with npm provenance. (#173 by @chh-ay)
+
+## @sheetwrite/core
 
 ### Minor Changes
 
@@ -97,11 +99,20 @@ const expectedNotes = `## @sheetwrite/core
 
   Pivot tables update when their source cells change.
 
+  Also in @sheetwrite/react.
+
 ## @sheetwrite/wasm
 
 ### Patch Changes
 
 - Fix a rounding error in \`ROUND\`. (#171 by @alice)
+- Make the engine start faster. (#176 by @alice) Also in @sheetwrite/formulas.
+
+## @sheetwrite/formulas
+
+### Patch Changes
+
+- Fix a rounding error in \`ROUND\`. (#175 by @carol)
 
 ## @sheetwrite/react
 
@@ -134,6 +145,9 @@ class RepositoryState {
       const tag = /^refs\/tags\/(.+)\^\{commit\}$/.exec(rest[1] ?? "")?.[1] ?? "";
       const commit = this.tags.get(tag);
       return commit === undefined ? result(1, "", "unknown revision") : result(0, commit);
+    }
+    if (tool === "git" && action === "tag" && rest[0] === "--list") {
+      return result(0, [...this.tags.keys()].filter((tag) => tag.startsWith("v")).join("\n"));
     }
     if (tool === "git" && action === "tag") {
       this.tags.set(rest[0] ?? "", rest[1] ?? "");
@@ -238,7 +252,9 @@ describe("version GitHub release", () => {
 
     expect(state.releaseCommands("create")).toEqual([]);
     expect(
-      state.commands.filter((command) => command[1] === "tag" || command[1] === "push"),
+      state.commands.filter(
+        (command) => command[1] === "push" || (command[1] === "tag" && command[2] !== "--list"),
+      ),
     ).toEqual([]);
     const notes = expectedNotes.replace("@sheetwrite/core@0.5.3...v0.5.4", "v0.5.3...v0.5.4");
     expect(state.releaseCommands("edit")).toEqual([
@@ -255,6 +271,24 @@ describe("version GitHub release", () => {
       ],
     ]);
   });
+
+  it.each([
+    ["creating", "create", false],
+    ["updating", "edit", true],
+  ])(
+    "does not move Latest when %s the release of an older version",
+    async (_label, verb, hasRelease) => {
+      const state = new RepositoryState();
+      state.tags.set("v0.10.0", olderCommit);
+      if (hasRelease) state.releases.set("v0.5.4", { isDraft: false, isPrerelease: false });
+
+      await release(state);
+
+      const [command] = state.releaseCommands(verb);
+      expect(command?.at(-1)).toBe("--latest=false");
+      expect(command).not.toContain("--latest");
+    },
+  );
 
   it.each([
     ["a draft", { isDraft: true, isPrerelease: false }],

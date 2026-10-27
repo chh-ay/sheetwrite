@@ -189,9 +189,76 @@ function entryReference(entry: ChangelogEntry): string {
   return reference === "" ? "" : ` (${reference})`;
 }
 
-function renderEntry(entry: ChangelogEntry): string {
-  const details = entry.details.map((line) => (line === "" ? "" : `${ENTRY_CONTINUATION}${line}`));
-  return [`${ENTRY_START}${entry.summary}${entryReference(entry)}`, ...details].join("\n");
+function renderEntry(entry: ChangelogEntry, alsoIn: readonly string[]): string {
+  const lines = [
+    `${ENTRY_START}${entry.summary}${entryReference(entry)}`,
+    ...entry.details.map((line) => (line === "" ? "" : `${ENTRY_CONTINUATION}${line}`)),
+  ];
+  if (alsoIn.length > 0) {
+    const note = `Also in ${alsoIn.join(", ")}.`;
+    // A one-line entry takes the note on its line; a longer one gets a last paragraph.
+    if (entry.details.length === 0) lines[0] = `${lines[0]} ${note}`;
+    else lines.push("", `${ENTRY_CONTINUATION}${note}`);
+  }
+  return lines.join("\n");
+}
+
+/** One changeset: changesets copies the same text and pull request into every package it names. */
+function changesetIdentity(entry: ChangelogEntry): string {
+  return JSON.stringify([entry.pull ?? entry.commit ?? null, entry.summary, entry.details]);
+}
+
+const ALL_PACKAGES_HEADING = "All packages";
+
+interface PlacedEntry {
+  readonly entry: ChangelogEntry;
+  readonly packages: string[];
+}
+
+interface NotesSection {
+  readonly title: string;
+  readonly groups: Map<string, PlacedEntry[]>;
+}
+
+/**
+ * Lists each changeset once. An entry that every package in the release has
+ * goes under "All packages"; any other entry goes under the first package
+ * that has it, with the other packages named after it.
+ */
+function notesSections(packages: readonly PackageChangelog[]): NotesSection[] {
+  const ordered = [...packages].sort(byReleaseNotesOrder);
+  const placed = new Map<string, { readonly heading: string; readonly placed: PlacedEntry }>();
+  for (const { name, section } of ordered) {
+    for (const group of section.groups) {
+      for (const entry of group.entries) {
+        const identity = changesetIdentity(entry);
+        const existing = placed.get(identity);
+        if (existing === undefined) {
+          placed.set(identity, { heading: group.heading, placed: { entry, packages: [name] } });
+        } else if (!existing.placed.packages.includes(name)) {
+          existing.placed.packages.push(name);
+        }
+      }
+    }
+  }
+
+  const sections = new Map<string, NotesSection>(
+    [ALL_PACKAGES_HEADING, ...ordered.map(({ name }) => name)].map((title) => [
+      title,
+      { title, groups: new Map() },
+    ]),
+  );
+  for (const { heading, placed: entry } of placed.values()) {
+    const [firstPackage = ALL_PACKAGES_HEADING] = entry.packages;
+    const isInEveryPackage = ordered.length > 1 && entry.packages.length === ordered.length;
+    const title = isInEveryPackage ? ALL_PACKAGES_HEADING : firstPackage;
+    const groups = sections.get(title)?.groups;
+    if (groups === undefined) throw new Error(`No release notes section for ${title}`);
+    const entries = groups.get(heading) ?? [];
+    entries.push(entry);
+    groups.set(heading, entries);
+  }
+  return [...sections.values()].filter((section) => section.groups.size > 0);
 }
 
 /** Markdown body for the `v<version>` GitHub release. */
@@ -200,12 +267,13 @@ export function renderReleaseNotes(
   links: ReleaseNotesLinks,
 ): string {
   const blocks: string[] = [];
-  const ordered = [...packages].sort(byReleaseNotesOrder);
-  for (const { name, section } of ordered) {
-    if (section.groups.length === 0) continue;
-    blocks.push(`## ${name}`);
-    for (const group of section.groups) {
-      blocks.push(`### ${group.heading}`, group.entries.map(renderEntry).join("\n"));
+  for (const section of notesSections(packages)) {
+    blocks.push(`## ${section.title}`);
+    for (const [heading, entries] of section.groups) {
+      const rendered = entries.map(({ entry, packages: names }) =>
+        renderEntry(entry, section.title === ALL_PACKAGES_HEADING ? [] : names.slice(1)),
+      );
+      blocks.push(`### ${heading}`, rendered.join("\n"));
     }
   }
 
