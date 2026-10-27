@@ -338,7 +338,7 @@ mod tests {
     #[cfg(feature = "analysis")]
     #[test]
     fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
-        use crate::store::pivot_tests::{PivotPayload, SUM};
+        use crate::store::tests::{PivotPayload, SUM};
 
         const KEY: usize = 0;
         const VALUE: usize = 1;

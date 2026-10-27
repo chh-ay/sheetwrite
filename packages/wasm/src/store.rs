@@ -29,11 +29,11 @@ use crate::types::{
 use crate::window::ConditionalRules;
 
 pub(crate) mod pivot_output;
-#[cfg(all(test, feature = "analysis"))]
-mod pivot_tests;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+#[cfg(all(test, feature = "analysis"))]
+mod tests;
 mod transfer;
 
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
