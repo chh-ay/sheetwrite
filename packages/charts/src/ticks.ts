@@ -40,8 +40,8 @@ function roundedStep(span: number, maxTicks: number): { step: number; decimals: 
     exponent += 1;
   }
 
-  // 2.5 has one decimal of its own; the other mantissas are whole numbers.
-  const decimals = Math.max(0, -exponent) + (mantissa === 2.5 ? 1 : 0);
+  // 2.5 × 10^n has one more decimal than 10^n; 250 and up have none.
+  const decimals = Math.max(0, -exponent + (mantissa === 2.5 ? 1 : 0));
   return { step: mantissa * 10 ** exponent, decimals: Math.min(decimals, MAX_FRACTION_DIGITS) };
 }
 
