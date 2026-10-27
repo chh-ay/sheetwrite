@@ -2,7 +2,6 @@
 // public Grid API. The DOM side (ribbon-controls.ts) renders these specs and
 // never decides behavior itself, so Excel parity is reviewed here alone.
 
-import type { COMMAND_ICONS } from "../command-icons.js";
 import {
   ACCOUNTING_FORMAT,
   COMMA_FORMAT,
@@ -15,11 +14,12 @@ import {
   pointsToPixels,
 } from "../format-presets.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
+import type { IconName } from "../icons/icon-names.js";
 import type { CellStyle } from "../types/cell.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
 
-export type RibbonIcon = keyof typeof COMMAND_ICONS;
+export type RibbonIcon = IconName;
 
 /**
  * Where a control's disabled state comes from. `edit` borrows the state of a
@@ -238,10 +238,10 @@ const DELETE_ITEMS: readonly RibbonMenuItem[] = [
 ];
 
 const VISIBILITY_ITEMS: readonly RibbonMenuItem[] = [
-  item("Hide Rows", (grid) => grid.actions.hideRows()),
-  item("Unhide Rows", (grid) => grid.actions.showRows()),
-  item("Hide Columns", (grid) => grid.actions.hideColumns()),
-  item("Unhide Columns", (grid) => grid.actions.showColumns()),
+  item("Hide Rows", (grid) => grid.actions.hideRows(), "hideRows"),
+  item("Unhide Rows", (grid) => grid.actions.showRows(), "unhideRows"),
+  item("Hide Columns", (grid) => grid.actions.hideColumns(), "hideColumns"),
+  item("Unhide Columns", (grid) => grid.actions.showColumns(), "unhideColumns"),
 ];
 
 const SORT_ITEMS: readonly RibbonMenuItem[] = [
@@ -635,10 +635,10 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
       {
         id: "showHide",
         label: "Show/Hide",
-        icon: "format",
+        icon: "hideRows",
         layout: "flow",
         controls: VISIBILITY_ITEMS.map((visibility) =>
-          button(visibility.label, "format", visibility.run),
+          button(visibility.label, visibility.icon ?? "format", visibility.run),
         ),
       },
     ],

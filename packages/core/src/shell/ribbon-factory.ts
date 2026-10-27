@@ -2,7 +2,7 @@
 // `config.ribbon`, so the shell and the built-in chrome cannot drift.
 
 import { Ribbon } from "../ribbon/ribbon.js";
-import type { Grid } from "../types/grid.js";
+import type { Grid, IconOverrides } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 /** Options for {@link createRibbon}. */
@@ -11,6 +11,8 @@ export interface RibbonOptions {
   focusGrid?: () => void;
   /** Called with the new height after the ribbon is minimized or expanded. */
   onHeightChange?: (height: number) => void;
+  /** Replace built-in icons by glyph name, as `GridConfig.icons`. */
+  icons?: IconOverrides;
 }
 
 /**
@@ -27,6 +29,7 @@ export function createRibbon(
   const ribbon = new Ribbon(host, grid, {
     ...(options.focusGrid === undefined ? {} : { focusGrid: options.focusGrid }),
     onHeightChange: (height) => options.onHeightChange?.(height),
+    ...(options.icons === undefined ? {} : { icons: options.icons }),
   });
   return { element: ribbon.element, destroy: () => ribbon.destroy() };
 }

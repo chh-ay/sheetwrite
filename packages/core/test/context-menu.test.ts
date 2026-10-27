@@ -212,4 +212,125 @@ describe("ContextMenu", () => {
     menu.destroy();
     expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
   });
+
+  /** Rows of one open menu, in order, as their visible labels. */
+  const labels = (menu: Element): string[] =>
+    [...menu.querySelectorAll(":scope > .sheetwrite-context-menu-item")].map(
+      (row) => row.querySelector(".sheetwrite-context-menu-label")?.textContent ?? "",
+    );
+  const openMenus = (host: HTMLElement): HTMLElement[] =>
+    [...host.querySelectorAll<HTMLElement>(".sheetwrite-context-menu")].filter(
+      (menu) => menu.style.display !== "none",
+    );
+  const key = (target: Element | null, name: string): void => {
+    target?.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true }));
+  };
+
+  function liveMenu(config: Parameters<typeof createGrid>[1]["config"] = {}) {
+    const host = mountHost();
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: makeColumnarData(3),
+      config: { contextMenu: false, find: false, toolbar: false },
+    });
+    const menu = new ContextMenu(host, config, DEFAULT_THEME, grid.actions, grid);
+    return { host, grid, menu };
+  }
+
+  it("groups the default menu into short sections with submenus and icons", () => {
+    const { host, grid, menu } = liveMenu({ icons: { copy: "C" } });
+    const cell = { sheet: "s1", row: 0, col: 0 };
+    grid.setSelection({ kind: "cell", addr: cell });
+    menu.open({ cell, clientX: 10, clientY: 10 });
+
+    const [root] = openMenus(host);
+    expect(labels(root ?? host)).toEqual([
+      "Cut",
+      "Copy",
+      "Paste",
+      "Insert",
+      "Delete",
+      "Clear contents",
+      "Row",
+      "Column",
+      "Merge",
+      "New note",
+    ]);
+    // Built-in rows show the command glyph; a host override replaces it.
+    expect(root?.querySelector('.sheetwrite-icon[data-icon="cut"]')).not.toBeNull();
+    expect(
+      root?.querySelector('[data-context-menu-item="copy"] .sheetwrite-context-menu-icon')
+        ?.textContent,
+    ).toBe("C");
+
+    const insert = root?.querySelector<HTMLElement>('[data-context-menu-item="insert"]') ?? null;
+    expect(insert?.getAttribute("aria-haspopup")).toBe("menu");
+    insert?.click();
+    const [, submenu] = openMenus(host);
+    expect(labels(submenu ?? host)).toEqual([
+      "Row above",
+      "Row below",
+      "Column left",
+      "Column right",
+    ]);
+
+    menu.destroy();
+    grid.destroy();
+  });
+
+  it("moves through the menu and its submenus with the keyboard", () => {
+    const { host, grid, menu } = liveMenu();
+    const cell = { sheet: "s1", row: 0, col: 0 };
+    grid.setSelection({ kind: "cell", addr: cell });
+    const before = document.createElement("button");
+    host.append(before);
+    before.focus();
+    menu.open({ cell, clientX: 10, clientY: 10 });
+
+    // Focus moves into the menu so the keys reach it.
+    expect(document.activeElement?.textContent).toContain("Cut");
+    key(document.activeElement, "ArrowDown");
+    expect(document.activeElement?.textContent).toContain("Copy");
+    key(document.activeElement, "End");
+    expect(document.activeElement?.textContent).toContain("New note");
+    key(document.activeElement, "Home");
+    for (let step = 0; step < 3; step += 1) key(document.activeElement, "ArrowDown");
+    expect(document.activeElement?.textContent).toContain("Insert");
+
+    // Right opens the submenu on its first row; Left or Escape returns to the parent.
+    key(document.activeElement, "ArrowRight");
+    expect(openMenus(host)).toHaveLength(2);
+    expect(document.activeElement?.textContent).toContain("Row above");
+    key(document.activeElement, "Escape");
+    expect(openMenus(host)).toHaveLength(1);
+    expect(document.activeElement?.textContent).toContain("Insert");
+
+    // Enter on a submenu row runs it, closes every menu and gives focus back.
+    key(document.activeElement, "ArrowRight");
+    key(document.activeElement, "ArrowDown");
+    key(document.activeElement, "Enter");
+    expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(4);
+    expect(openMenus(host)).toHaveLength(0);
+    expect(document.activeElement).toBe(before);
+
+    menu.destroy();
+    grid.destroy();
+  });
+
+  it("offers to edit and delete a note only where the cell has one", () => {
+    const { host, grid, menu } = liveMenu();
+    const plain = { sheet: "s1", row: 0, col: 0 };
+    const noted = { sheet: "s1", row: 1, col: 0 };
+    grid.setNote(noted, "Checked by finance");
+
+    menu.open({ cell: plain, clientX: 10, clientY: 10 });
+    expect(labels(openMenus(host)[0] ?? host).slice(-1)).toEqual(["New note"]);
+    menu.close();
+
+    menu.open({ cell: noted, clientX: 10, clientY: 10 });
+    expect(labels(openMenus(host)[0] ?? host).slice(-2)).toEqual(["Edit note", "Delete note"]);
+
+    menu.destroy();
+    grid.destroy();
+  });
 });

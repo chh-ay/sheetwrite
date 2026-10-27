@@ -3,6 +3,7 @@
 
 import type { SheetwriteError } from "../errors.js";
 import type { ResolvedHyperlinkTarget } from "../hyperlink.js";
+import type { IconName } from "../icons/icon-names.js";
 import type {
   RuntimeMemoryObservation,
   RuntimeResourceOperation,
@@ -196,6 +197,14 @@ export interface GridActions {
    * rejects; a failure emits `export-error`.
    */
   exportXlsx(filename?: string): Promise<void>;
+  /**
+   * Open the note editor on the focus cell, with its note or empty for a new
+   * one. Ctrl or Cmd+Enter and leaving the editor save; Escape cancels. Does
+   * nothing on a read-only grid.
+   */
+  editNote(): void;
+  /** Remove the focus cell's note as one undoable step. Does nothing when it has none. */
+  deleteNote(): void;
   undo(): void;
   redo(): void;
 }
@@ -272,6 +281,16 @@ export type BorderPreset =
 /** Text, DOM node, or node factory used as toolbar icon content. */
 export type ToolbarIcon = string | Node | (() => Node);
 
+/**
+ * Per-glyph icon overrides, keyed by the names on the command icon sheet
+ * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
+ * toolbar, the ribbon and ribbon menus. Strings render as plain text; DOM nodes
+ * and node factories support SVG or HTML icons. To replace every glyph at once,
+ * set the `--sheetwrite-icon-sheet` CSS property to a sheet drawn on the layout
+ * in `@sheetwrite/core/icons.json`.
+ */
+export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
+
 /** Built-in, separator, or custom callback item in the grid toolbar. */
 export interface ToolbarItem {
   /** Built-in action to bind (or "separator"). Omit when supplying `onClick`. */
@@ -310,6 +329,8 @@ export type ContextMenuActionName =
   | "clearFilter"
   | "exportCsv"
   | "exportXlsx"
+  | "editNote"
+  | "deleteNote"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -349,7 +370,8 @@ export type KeyboardAction =
   | "redo"
   | "find"
   | "replace"
-  | "clearContents";
+  | "clearContents"
+  | "editNote";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
@@ -395,6 +417,10 @@ export interface ContextMenuItem {
   visible?: boolean | ((context: ContextMenuContext) => boolean);
   /** Static or context-aware disabled state. */
   disabled?: boolean | ((context: ContextMenuContext) => boolean);
+  /** Glyph shown before the label. Built-in actions have one by default; `config.icons` overrides apply. */
+  icon?: IconName;
+  /** Rows of a submenu. The row opens it on click, hover or the Right Arrow key and runs nothing itself. */
+  items?: readonly ContextMenuItem[];
 }
 
 /** Static rows or a context-aware factory evaluated each time the menu opens. */
@@ -454,8 +480,8 @@ export interface GridConfig {
    * A custom `toolbar` item list still renders the flat toolbar instead.
    */
   ribbon?: boolean;
-  /** Override built-in toolbar icons by action name. Strings render as plain text; DOM nodes/factories support SVG/HTML icons. */
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>;
+  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
+  icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;
   /** Show undo/redo controls in the built-in toolbar (default true). */

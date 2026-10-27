@@ -1,5 +1,6 @@
 import { actionFeedbackFor } from "./action-feedback.js";
 import { COMMAND_ICONS } from "./command-icons.js";
+import { isIconName } from "./icons/resolve.js";
 import { isKeyboardAction } from "./keymap.js";
 import type {
   Grid,
@@ -7,6 +8,7 @@ import type {
   GridCommandName,
   GridCommandState,
   GridConfig,
+  IconOverrides,
   ToolbarActionName,
   ToolbarIcon,
   ToolbarItem,
@@ -195,7 +197,7 @@ export function renderToolbarItems(
   bar: HTMLElement,
   items: readonly ToolbarItem[],
   grid: Grid,
-  icons?: Partial<Record<ToolbarActionName, ToolbarIcon>>,
+  icons?: IconOverrides,
 ): () => void {
   const controls = new Map<GridCommandName, HTMLButtonElement | HTMLInputElement>();
   const shortcutLabels = new Map<GridCommandName, string>();
@@ -309,7 +311,8 @@ export function renderToolbarItems(
     const shortcut = action && isKeyboardAction(action) ? grid.getShortcutLabel(action) : "";
     const title = shortcut ? `${label} (${shortcut})` : label;
     if (action && isKeyboardAction(action)) shortcutLabels.set(action, label);
-    const icon = item.icon ?? (action ? (icons?.[action] ?? COMMAND_ICONS[action] ?? "") : "");
+    const icon =
+      item.icon ?? (action && isIconName(action) ? (icons?.[action] ?? COMMAND_ICONS[action]) : "");
 
     if (item.onClick) {
       const onClick = item.onClick;

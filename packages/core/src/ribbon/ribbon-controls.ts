@@ -2,8 +2,8 @@
 // control does lives in ribbon-model.ts, and the popup rules in
 // ribbon-popup.ts.
 
-import { COMMAND_ICONS } from "../command-icons.js";
-import type { Grid, GridCommandName, GridCommandState } from "../types/grid.js";
+import { iconNode } from "../icons/resolve.js";
+import type { Grid, GridCommandName, GridCommandState, IconOverrides } from "../types/grid.js";
 import { STANDARD_COLORS, THEME_COLOR_ROWS } from "./ribbon-colors.js";
 import {
   EDIT_STATE_COMMAND,
@@ -47,6 +47,8 @@ export interface RibbonContext {
   readonly focusGrid: () => void;
   /** Run a command once at a time; a failure becomes visible feedback. */
   readonly run: (key: string, command: () => unknown, control?: HTMLButtonElement) => void;
+  /** Host glyph overrides, applied to every button and menu item. */
+  readonly icons?: IconOverrides;
 }
 
 export interface RibbonControlView {
@@ -65,10 +67,10 @@ function isDisabled(availability: RibbonAvailability, states: RibbonCommandState
   return states(availability === "edit" ? EDIT_STATE_COMMAND : availability).disabled;
 }
 
-function icon(name: RibbonIcon): HTMLSpanElement {
+function icon(name: RibbonIcon, overrides: IconOverrides | undefined): HTMLSpanElement {
   const span = document.createElement("span");
   span.className = "sheetwrite-ribbon-icon";
-  span.appendChild(COMMAND_ICONS[name]());
+  span.appendChild(iconNode(name, overrides));
   return span;
 }
 
@@ -79,7 +81,12 @@ function caret(): HTMLSpanElement {
   return span;
 }
 
-function commandButton(label: string, iconName: RibbonIcon, large: boolean): HTMLButtonElement {
+function commandButton(
+  label: string,
+  iconName: RibbonIcon,
+  large: boolean,
+  overrides: IconOverrides | undefined,
+): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "sheetwrite-ribbon-button";
@@ -89,13 +96,13 @@ function commandButton(label: string, iconName: RibbonIcon, large: boolean): HTM
   const text = document.createElement("span");
   text.className = "sheetwrite-ribbon-label";
   text.textContent = label;
-  button.append(icon(iconName), text);
+  button.append(icon(iconName, overrides), text);
   button.addEventListener("mousedown", keepFocus);
   return button;
 }
 
 function renderButton(spec: RibbonButtonSpec, context: RibbonContext): RibbonControlView {
-  const button = commandButton(spec.label, spec.icon, spec.large === true);
+  const button = commandButton(spec.label, spec.icon, spec.large === true, context.icons);
   button.addEventListener("click", () =>
     context.run(spec.label, () => spec.run(context.grid), button),
   );
@@ -128,7 +135,7 @@ function menuSurface(items: RibbonMenuSpec["items"], context: RibbonContext): HT
     item.className = "sheetwrite-ribbon-menu-item";
     item.setAttribute("role", "menuitem");
     item.tabIndex = -1;
-    if (entry.icon !== undefined) item.appendChild(icon(entry.icon));
+    if (entry.icon !== undefined) item.appendChild(icon(entry.icon, context.icons));
     item.append(entry.label);
     item.addEventListener("mousedown", keepFocus);
     item.addEventListener("click", (event) => {
@@ -163,7 +170,7 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   };
 
   if (spec.run === undefined) {
-    const trigger = commandButton(spec.label, spec.icon, large);
+    const trigger = commandButton(spec.label, spec.icon, large, context.icons);
     trigger.appendChild(caret());
     trigger.setAttribute("aria-haspopup", "menu");
     trigger.setAttribute("aria-expanded", "false");
@@ -182,7 +189,7 @@ function renderMenu(spec: RibbonMenuSpec, context: RibbonContext): RibbonControl
   const split = document.createElement("div");
   split.className = "sheetwrite-ribbon-split";
   if (large) split.dataset.large = "";
-  const face = commandButton(spec.label, spec.icon, large);
+  const face = commandButton(spec.label, spec.icon, large, context.icons);
   face.addEventListener("click", () => context.run(spec.label, () => run(context.grid), face));
   const arrow = document.createElement("button");
   arrow.type = "button";
@@ -347,7 +354,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
   let current = spec.initial;
   const split = document.createElement("div");
   split.className = "sheetwrite-ribbon-split";
-  const face = commandButton(spec.label, spec.icon, false);
+  const face = commandButton(spec.label, spec.icon, false, context.icons);
   // The bar under the icon shows the color the face applies, as in Excel.
   const bar = document.createElement("span");
   bar.className = "sheetwrite-ribbon-color-bar";
@@ -437,7 +444,7 @@ function renderColor(spec: RibbonColorSpec, context: RibbonContext): RibbonContr
 }
 
 function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControlView {
-  const trigger = commandButton(spec.label, spec.icon, true);
+  const trigger = commandButton(spec.label, spec.icon, true, context.icons);
   trigger.setAttribute("aria-haspopup", "dialog");
   trigger.setAttribute("aria-expanded", "false");
   trigger.addEventListener("click", () => {
@@ -484,37 +491,57 @@ function renderForm(spec: RibbonFormSpec, context: RibbonContext): RibbonControl
   };
 }
 
+/**
+ * One stepper, as in a status-bar zoom: [−] [percent] [+]. The percent is the
+ * reset to 100%, so the group shows one number, and it is disabled when the
+ * zoom is already 100%. The steps show icons only; their names stay as the
+ * accessible name and tooltip.
+ */
 function renderZoom(context: RibbonContext): RibbonControlView {
   const zoom = document.createElement("div");
   zoom.className = "sheetwrite-ribbon-zoom";
+  zoom.setAttribute("role", "group");
+  zoom.setAttribute("aria-label", "Zoom");
+
   const readout = document.createElement("output");
-  readout.className = "sheetwrite-ribbon-zoom-readout";
   readout.setAttribute("aria-live", "polite");
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "sheetwrite-ribbon-zoom-readout";
+  reset.title = "Zoom to 100%";
+  reset.setAttribute("aria-label", "Zoom to 100%");
+  reset.append(readout);
+  reset.addEventListener("mousedown", keepFocus);
+
   // Written only on change: refreshes follow every selection move.
   const show = (): void => {
-    const label = zoomLabel(context.grid.getZoom());
+    const zoomLevel = context.grid.getZoom();
+    const label = zoomLabel(zoomLevel);
     if (readout.textContent !== label) readout.textContent = label;
+    reset.disabled = zoomLevel === 1;
   };
+  reset.addEventListener("click", () => {
+    context.grid.setZoom(1);
+    show();
+  });
+
   const step = (label: string, iconName: RibbonIcon, direction: 1 | -1): HTMLButtonElement => {
-    const button = commandButton(label, iconName, false);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sheetwrite-ribbon-button sheetwrite-ribbon-zoom-step";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.append(icon(iconName, context.icons));
+    button.addEventListener("mousedown", keepFocus);
     button.addEventListener("click", () => {
       context.grid.setZoom(steppedZoom(context.grid.getZoom(), direction));
       show();
     });
     return button;
   };
-  const reset = document.createElement("button");
-  reset.type = "button";
-  reset.className = "sheetwrite-ribbon-button sheetwrite-ribbon-text-button";
-  reset.textContent = "100%";
-  reset.title = "Zoom to 100%";
-  reset.setAttribute("aria-label", "Zoom to 100%");
-  reset.addEventListener("mousedown", keepFocus);
-  reset.addEventListener("click", () => {
-    context.grid.setZoom(1);
-    show();
-  });
-  zoom.append(step("Zoom Out", "zoomOut", -1), readout, step("Zoom In", "zoomIn", 1), reset);
+
+  zoom.append(step("Zoom Out", "zoomOut", -1), reset, step("Zoom In", "zoomIn", 1));
+  show();
   return { element: zoom, refresh: show };
 }
 

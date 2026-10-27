@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "manifestFormatVersion": 2,
-  "sha256": "2fb399c0baea1e6b3ebc297f8570ffb80019776ba32b63873eaf98f84ea9d37a",
+  "sha256": "bb790344d413f224a6dc657f249607d57214f76dde15a25c4309f60386b7ddc0",
   "intentionalExports": [
     {
       "package": "@sheetwrite/core",
@@ -95,6 +95,9 @@
         "GridTransaction",
         "HighlightRange",
         "HyperlinkTarget",
+        "ICON_NAMES",
+        "IconName",
+        "IconOverrides",
         "IncompleteDataError",
         "KeyShortcut",
         "KeyboardAction",

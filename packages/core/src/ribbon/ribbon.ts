@@ -4,9 +4,9 @@
 // positions itself.
 
 import { actionFeedbackFor } from "../action-feedback.js";
-import { COMMAND_ICONS } from "../command-icons.js";
 import { fontShorthandParts } from "../format-presets.js";
-import type { Grid } from "../types/grid.js";
+import { iconNode } from "../icons/resolve.js";
+import type { Grid, IconOverrides } from "../types/grid.js";
 import {
   renderControl,
   type RibbonCommandStates,
@@ -43,6 +43,8 @@ export interface RibbonOptions {
   readonly onHeightChange: (height: number) => void;
   /** Where keyboard focus goes back to; defaults to focusing the host. */
   readonly focusGrid?: () => void;
+  /** Host glyph overrides, as `GridConfig.icons`. */
+  readonly icons?: IconOverrides;
 }
 
 interface GroupView {
@@ -93,6 +95,7 @@ export class Ribbon {
       popup: this.popup,
       focus: () => readFocus(grid),
       focusGrid,
+      ...(options.icons === undefined ? {} : { icons: options.icons }),
       run: (key, command, control) => {
         const feedback = actionFeedbackFor(grid);
         if (feedback) void feedback.run(`ribbon:${key}`, command, control);
@@ -254,7 +257,7 @@ export class Ribbon {
     collapsed.setAttribute("aria-expanded", "false");
     const glyph = document.createElement("span");
     glyph.className = "sheetwrite-ribbon-icon";
-    glyph.appendChild(COMMAND_ICONS[spec.icon]());
+    glyph.appendChild(iconNode(spec.icon, this.options.icons));
     const text = document.createElement("span");
     text.className = "sheetwrite-ribbon-label";
     text.textContent = spec.label;

@@ -4,6 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Workbook } from "../src/types.js";
+import type { IconOverrides } from "../src/types/grid.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -33,7 +34,7 @@ async function ribbonMounted(host: HTMLElement): Promise<void> {
   if (!host.querySelector(".sheetwrite-ribbon")) throw new Error("the ribbon did not mount");
 }
 
-async function setup(readOnly = false) {
+async function setup(readOnly = false, icons?: IconOverrides) {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -55,7 +56,8 @@ async function setup(readOnly = false) {
   const host = document.createElement("div");
   Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
   document.body.appendChild(host);
-  const grid = new GridImpl(host, { workbook, readOnly, config: { ribbon: true } }, store);
+  const config = icons === undefined ? { ribbon: true } : { ribbon: true, icons };
+  const grid = new GridImpl(host, { workbook, readOnly, config }, store);
   grids.push(grid);
   await ribbonMounted(host);
 
@@ -178,6 +180,39 @@ it("disables editing controls while read-only but keeps view controls", async ()
   expect(grid.getZoom()).toBeCloseTo(1.1);
 });
 
+it("zooms with one readout that resets to 100% and is disabled there", async () => {
+  const { grid, host, select, key, press } = await setup(true);
+  select(0, 0);
+  const find = (selector: string): HTMLButtonElement => {
+    const element = host.querySelector<HTMLButtonElement>(selector);
+    if (element === null) throw new Error(`nothing matches ${selector}`);
+    return element;
+  };
+  // End on the tab list moves from Home to the last tab, View.
+  const homeTab = [...host.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
+    (candidate) => candidate.textContent === "Home",
+  );
+  if (homeTab === undefined) throw new Error("no Home tab");
+  key(homeTab, "End");
+  const control = (label: string) =>
+    find(`.sheetwrite-ribbon-panel:not([hidden]) [aria-label="${label}"]`);
+  const group = () => find(".sheetwrite-ribbon-panel:not([hidden]) .sheetwrite-ribbon-zoom");
+
+  // The step buttons show icons only, so the percent is the group's only text.
+  expect(group().textContent).toBe("100%");
+  expect(control("Zoom to 100%").disabled).toBe(true);
+
+  press(control("Zoom In"));
+  press(control("Zoom In"));
+  expect(group().textContent).toBe("120%");
+  expect(control("Zoom to 100%").disabled).toBe(false);
+
+  press(control("Zoom to 100%"));
+  expect(grid.getZoom()).toBe(1);
+  expect(group().textContent).toBe("100%");
+  expect(control("Zoom to 100%").disabled).toBe(true);
+});
+
 it("opens a list from a collapsed group without closing the group, then closes both", async () => {
   const { host, control, select, cell } = await setup();
   select(0, 0);
@@ -248,4 +283,31 @@ it("gives the grid the panel's height back when minimized", async () => {
   home.focus();
   key(home, "Escape");
   expect(document.activeElement).toBe(host);
+});
+
+it("replaces a glyph in every ribbon control that shows it, by glyph name", async () => {
+  const custom = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  custom.setAttribute("data-icon", "custom-bold");
+  const { host, control, select, press } = await setup(false, { bold: custom, hideRows: "HR" });
+
+  // A node override is cloned into its button; untouched glyphs stay sheet crops.
+  expect(control("Bold").querySelector("svg[data-icon=custom-bold]")).not.toBeNull();
+  expect(control("Italic").querySelector(".sheetwrite-icon[data-icon=italic]")).not.toBeNull();
+
+  // Hide Rows is a ribbon-only command: the Format menu item and the Data tab
+  // button both take the override, and neither keeps the sheet glyph.
+  // Edit commands are disabled until a cell is selected, as in the other menu tests.
+  select(0, 0);
+  press(control("Format"));
+  const menuItem = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")].find(
+    (item) => item.textContent?.includes("Hide Rows"),
+  );
+  expect(menuItem?.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
+  const dataTab = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')].find(
+    (tab) => tab.textContent === "Data",
+  );
+  dataTab?.click();
+  const hideRows = control("Hide Rows");
+  expect(hideRows.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
+  expect(hideRows.querySelector(".sheetwrite-icon")).toBeNull();
 });

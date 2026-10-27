@@ -146,6 +146,8 @@ export {
   sanitizeHyperlinkStyle,
 } from "./hyperlink.js";
 
+export { ICON_NAMES, type IconName } from "./icons/icon-names.js";
+
 export {
   type LegacyRowLoader,
   type LegacyRowPage,
@@ -310,6 +312,7 @@ export type {
   GridTransaction,
   HighlightRange,
   HyperlinkTarget,
+  IconOverrides,
   KeyboardAction,
   KeyboardOptions,
   KeyShortcut,

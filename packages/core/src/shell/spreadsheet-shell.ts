@@ -10,7 +10,7 @@ import { RIBBON_EXPANDED_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { sheetNameKey } from "../sheet-name.js";
 import { SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
-import type { Grid, GridConfig, GridOptions, ToolbarItem } from "../types/grid.js";
+import type { Grid, GridConfig, GridOptions, IconOverrides, ToolbarItem } from "../types/grid.js";
 import type { Theme } from "../types/render.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import { seedWidgetTheme } from "../widget-theme.js";
@@ -29,6 +29,7 @@ function mountRibbonWhenLoaded(
   grid: Grid,
   focusGrid: () => void,
   fallbackItems: readonly ToolbarItem[] | undefined,
+  icons: IconOverrides | undefined,
 ): ShellPiece {
   let piece: ShellPiece | null = null;
   let destroyed = false;
@@ -38,12 +39,15 @@ function mountRibbonWhenLoaded(
     ({ createRibbon }) => {
       if (destroyed) return;
       host.style.minHeight = "";
-      piece = createRibbon(host, grid, { focusGrid });
+      piece = createRibbon(host, grid, { focusGrid, ...(icons === undefined ? {} : { icons }) });
     },
     (error: unknown) => {
       if (destroyed) return;
       host.style.minHeight = "";
-      piece = createToolbar(host, grid, { items: fallbackItems });
+      piece = createToolbar(host, grid, {
+        items: fallbackItems,
+        ...(icons === undefined ? {} : { icons }),
+      });
       throw error;
     },
   );
@@ -154,12 +158,17 @@ export function createSpreadsheetShell(
   }
 
   const focusGrid = (): void => gridHost.focus();
+  // The shell's own chrome honours the grid's glyph overrides, like the grid's built-in chrome.
+  const icons = options.grid.config?.icons;
 
   const pieces: ShellPiece[] = [];
   pieces.push(
     options.ribbon
-      ? mountRibbonWhenLoaded(toolbarRow, grid, focusGrid, options.toolbar)
-      : createToolbar(toolbarRow, grid, { items: options.toolbar }),
+      ? mountRibbonWhenLoaded(toolbarRow, grid, focusGrid, options.toolbar, icons)
+      : createToolbar(toolbarRow, grid, {
+          items: options.toolbar,
+          ...(icons === undefined ? {} : { icons }),
+        }),
   );
   pieces.push(createNameBox(formulaRow, grid, { focusGrid }));
   formulaRow.appendChild(fx);

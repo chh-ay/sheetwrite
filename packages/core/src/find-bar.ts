@@ -49,12 +49,19 @@ export class FindBar {
 
     const findRow = this.row("sheetwrite-find-row");
 
+    // The match count sits inside the field, on the right, as in Google Sheets.
+    const field = document.createElement("span");
+    field.className = "sheetwrite-find-field";
+
     const input = document.createElement("input");
     input.className = "sheetwrite-find-input";
     input.placeholder = "Find in sheet";
+    input.setAttribute("aria-label", "Find in sheet");
 
     const count = document.createElement("span");
     count.className = "sheetwrite-find-count";
+    count.setAttribute("aria-live", "polite");
+    field.append(input, count);
 
     const prev = this.button(
       "sheetwrite-find-prev",
@@ -105,7 +112,10 @@ export class FindBar {
       }
     });
 
-    findRow.append(input, count, prev, next, close);
+    const divider = document.createElement("span");
+    divider.className = "sheetwrite-find-divider";
+    divider.setAttribute("aria-hidden", "true");
+    findRow.append(field, prev, next, divider, close);
     el.appendChild(findRow);
 
     let replaceInput: HTMLInputElement | null = null;
@@ -116,6 +126,7 @@ export class FindBar {
       replaceInput = replacementInput;
       replaceInput.className = "sheetwrite-find-replace-input";
       replaceInput.placeholder = "Replace with";
+      replaceInput.setAttribute("aria-label", "Replace with");
 
       const replaceBtn = this.button(
         "sheetwrite-find-replace",
@@ -130,7 +141,7 @@ export class FindBar {
       const allBtn = this.button(
         "sheetwrite-find-replace-all",
         "sheetwrite-find-text-btn",
-        "All",
+        "Replace all",
         "Replace all",
         () => {
           this.update(this.grid.replaceAll(replacementInput.value).result);
@@ -223,8 +234,10 @@ export class FindBar {
 
   /**
    * A flat button that keeps grid focus (mousedown is suppressed). `typeClass`
-   * selects the icon (round nav/close) vs. text (Replace/All) sizing rule;
-   * `className` is the per-button hook. All cosmetics live in styles.css.
+   * selects the icon (square nav/close) vs. text (Replace / Replace all)
+   * sizing rule; `className` is the per-button hook. `title` is also the
+   * accessible name, so ↑, ↓ and ✕ are announced as Previous, Next and Close.
+   * All cosmetics live in styles.css.
    */
   private button(
     className: string,
@@ -238,6 +251,7 @@ export class FindBar {
     btn.className = `sheetwrite-find-btn ${typeClass} ${className}`;
     btn.textContent = label;
     btn.title = title;
+    btn.setAttribute("aria-label", title);
 
     // Keep grid focus so buttons act without observing focus oddly.
     btn.addEventListener("mousedown", (e) => e.preventDefault());

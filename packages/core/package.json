@@ -54,13 +54,17 @@
       "default": "./dist/testing.js"
     },
     "./styles.css": "./styles.css",
-    "./shell.css": "./shell.css"
+    "./shell.css": "./shell.css",
+    "./icons.svg": "./src/icons/sheet.svg",
+    "./icons.json": "./src/icons/icons.json"
   },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "styles.css",
-    "shell.css"
+    "shell.css",
+    "src/icons/sheet.svg",
+    "src/icons/icons.json"
   ],
   "publishConfig": {
     "access": "public",
