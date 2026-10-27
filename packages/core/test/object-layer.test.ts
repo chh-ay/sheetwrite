@@ -515,4 +515,37 @@ describe("side panel host", () => {
     expect(viewport.style.right).toBe("0px");
     expect(document.activeElement).toBe(hostOf(grid));
   });
+
+  it("keeps the panel host between the toolbar and the tab bar after a config change", () => {
+    const grid = mountGrid();
+    grid.setConfig({ tabs: true });
+    const viewport = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-viewport");
+    const panelHost = hostOf(grid).querySelector<HTMLElement>(".sheetwrite-panel-host");
+    if (!viewport || !panelHost) throw new Error("expected the viewport and the panel host");
+
+    expect(viewport.style.bottom).not.toBe("0px");
+    expect(panelHost.style.bottom).toBe(viewport.style.bottom);
+    expect(panelHost.style.top).toBe(viewport.style.top);
+  });
+});
+
+describe("object layer shortcuts", () => {
+  it("keeps cell shortcuts away from the cells, but lets undo through", () => {
+    const grid = mountGrid();
+    const addr = { sheet: "s1", row: 0, col: 0 };
+    grid.setSelection({ kind: "cell", addr });
+    grid.setChart("s1", chart("c1"));
+    grid.selectChart("s1", "c1");
+    const frame = frameOf(grid, "c1");
+    frame.focus();
+
+    // Ctrl+Space would select the column behind the chart, as Ctrl+X would cut it.
+    const selection = grid.getSelection();
+    frame.dispatchEvent(new KeyboardEvent("keydown", { key: " ", ctrlKey: true, bubbles: true }));
+    expect(grid.getSelection()).toEqual(selection);
+
+    press(frame, "ArrowRight");
+    frame.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }));
+    expect(anchorOf(grid, "c1")).toEqual(chart("c1").anchor);
+  });
 });

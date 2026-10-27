@@ -72,6 +72,8 @@ export interface ObjectLayerOptions {
   focusGrid: () => void;
   onSelect: (chart: ChartRef | null) => void;
   onActivate: (chart: ChartRef) => void;
+  /** Whether a key press is the grid's undo or redo shortcut, which works with an object focused. */
+  isHistoryShortcut: (event: KeyboardEvent) => boolean;
 }
 
 /** Live preview of a drag, in screen pixels, applied on top of the committed anchor. */
@@ -605,10 +607,11 @@ export class ObjectLayer {
   }
 
   private onObjectKeyDown(event: KeyboardEvent, entry: ObjectEntry): void {
-    // Shortcuts with modifiers (undo, redo) belong to the grid.
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-    // Other keys must not reach the grid, which would move the cell cursor or start an edit.
+    // Undo and redo belong to the grid. Other keys must not reach it: it would
+    // move the cell cursor, start an edit, or cut and paste the cells behind.
+    if (this.options.isHistoryShortcut(event)) return;
     event.stopPropagation();
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
 
     const isReadOnly = this.options.readOnly();
     switch (event.key) {

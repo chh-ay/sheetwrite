@@ -961,6 +961,10 @@ export class GridImpl implements Grid {
       onActivate: (chart) => {
         for (const fn of this.listeners["chart-activate"]) fn(chart);
       },
+      isHistoryShortcut: (event) => {
+        const action = this.keymap.action(event);
+        return action === "undo" || action === "redo";
+      },
     });
     this.objectLayer.sync();
 
@@ -2473,6 +2477,8 @@ export class GridImpl implements Grid {
 
     this.viewportEl.style.top = `${this.toolbarHeight}px`;
     this.viewportEl.style.bottom = `${this.tabBarHeight}px`;
+    this.panelHost.style.top = `${this.toolbarHeight}px`;
+    this.panelHost.style.bottom = `${this.tabBarHeight}px`;
     this.applyLayout();
     this.render();
     this.emitCommandStateChange();
