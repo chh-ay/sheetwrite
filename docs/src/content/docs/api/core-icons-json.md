@@ -7,7 +7,7 @@ description: "API reference for @sheetwrite/core/icons.json."
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/core/icons.json`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Declaration target</dt><dd><code>./src/icons/icons.json</code></dd></div>
+<div><dt>Declaration target</dt><dd><code>./dist/icons.json</code></dd></div>
 <div><dt>Exports</dt><dd>0</dd></div>
 </dl>
 

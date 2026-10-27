@@ -10244,12 +10244,12 @@ Database and store naming options for durable pending commits.
 
 #### `@sheetwrite/core/icons.json` — asset
 
-Declaration target: `./src/icons/icons.json`
+Declaration target: `./dist/icons.json`
 Page: https://sheetwrite.vercel.app/docs/api/core-icons-json/
 
 #### `@sheetwrite/core/icons.svg` — asset
 
-Declaration target: `./src/icons/sheet.svg`
+Declaration target: `./dist/icons.svg`
 Page: https://sheetwrite.vercel.app/docs/api/core-icons-svg/
 
 #### `@sheetwrite/core/shell` — supported

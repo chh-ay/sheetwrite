@@ -7065,14 +7065,14 @@
         },
         {
           "subpath": "./icons.json",
-          "target": "./src/icons/icons.json",
+          "target": "./dist/icons.json",
           "kind": "asset",
           "classification": "asset",
           "exports": []
         },
         {
           "subpath": "./icons.svg",
-          "target": "./src/icons/sheet.svg",
+          "target": "./dist/icons.svg",
           "kind": "asset",
           "classification": "asset",
           "exports": []

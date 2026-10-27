@@ -7,7 +7,7 @@ description: "API reference for @sheetwrite/core/icons.svg."
 **CSS or binary asset entry point.** Import this entry point as `@sheetwrite/core/icons.svg`.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Declaration target</dt><dd><code>./src/icons/sheet.svg</code></dd></div>
+<div><dt>Declaration target</dt><dd><code>./dist/icons.svg</code></dd></div>
 <div><dt>Exports</dt><dd>0</dd></div>
 </dl>
 
