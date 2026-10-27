@@ -62,7 +62,7 @@ function DatabaseProofRoute() {
         { label: "Versioning", value: "Atomic base-version compare" },
         { label: "Durability", value: "Pending queue survives reload" },
       ]}
-      guideHref="/docs/guides/persistence/"
+      guideHref="/docs/features/data/persistence/"
       guideLabel="Read the persistence guide"
       prompt="Pause autosave, hold unsaved edits, and reload the real page. Then clear 100,000 usage cells and undo them as one step."
       slug="database"

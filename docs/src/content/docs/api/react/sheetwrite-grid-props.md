@@ -242,7 +242,7 @@ BROWSER. Usually not needed: by default the grid creates its worker as
 as Vite build together with the worker's imports. Pass a URL when there
 is no bundler, or when yours copies the file instead of building it, for
 example a copy of `@sheetwrite/core/dist/` in your public assets (see
-`/docs/guides/worker-rendering/`). A bare specifier like
+`/docs/features/worker-rendering/`). A bare specifier like
 `new URL(&quot;@sheetwrite/core/worker&quot;, import.meta.url)` is NOT reliable: the
 platform `Worker` constructor does not consult package exports. If the
 worker can't be constructed or fails to load, the grid falls back to the

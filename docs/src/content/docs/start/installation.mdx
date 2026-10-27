@@ -121,7 +121,7 @@ webpack and Next.js need no `IgnorePlugin`; package export conditions keep Node 
 
 ## Full formula engine
 
-By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It uses the same engine code, with more functions and a larger download. The [analysis formulas guide](/docs/guides/analysis-formulas/) shows each family with examples. [Choose an engine](/docs/guides/performance-resources/#choose-a-formula-engine) by its functions and download size.
+By default, `@sheetwrite/core` uses `@sheetwrite/wasm`. This engine has the standard function set and the smallest download. Install `@sheetwrite/formulas` when the app needs the analysis families: distributions and statistics, regression, finance, dates, text and regex, database, matrices, reshaping, `LAMBDA` helpers, and `GROUPBY`/`PIVOTBY`. It uses the same engine code, with more functions and a larger download. The [analysis formulas guide](/docs/features/formulas/analysis-formulas/) shows each family with examples. [Choose an engine](/docs/start/choose-an-engine/) by its functions and download size; the [formula engine performance](/docs/performance/formula-engine/#choose-a-formula-engine) page compares the builds.
 
 ```sh verify
 npm install @sheetwrite/core @sheetwrite/formulas
@@ -151,5 +151,5 @@ Worker rendering and XLSX stay explicit. Import the Worker entry from `@sheetwri
 
 - [Build the first workbook](/docs/start/first-grid/)
 - [Choose lifecycle ownership](/docs/frameworks/lifecycle/)
-- [Configure Worker rendering](/docs/guides/worker-rendering/)
-- [Configure XLSX import and export](/docs/guides/xlsx-export/)
+- [Configure Worker rendering](/docs/features/worker-rendering/)
+- [Configure XLSX import and export](/docs/import-export/xlsx-export/)

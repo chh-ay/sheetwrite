@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
 const fixtureRoots: string[] = [];
@@ -42,7 +43,8 @@ afterEach(async () => {
 type OutputRoute =
   | { handle: "filesystem" }
   | { src: string; dest: string; status?: number }
-  | { src: string; headers: Record<string, string>; continue: true };
+  | { src: string; headers: Record<string, string>; continue: true }
+  | { src: string; status: 308; headers: { Location: string } };
 
 interface PackagedResponse {
   body: Buffer;
@@ -68,6 +70,14 @@ async function requestPackagedFile(
     if ("handle" in route) {
       const contents = await readStatic(pathname);
       if (contents !== null) return { body: contents, headers, status: 200 };
+    } else if ("headers" in route && !("continue" in route)) {
+      if (new RegExp(route.src).test(pathname)) {
+        return {
+          body: Buffer.alloc(0),
+          headers: { ...headers, ...route.headers },
+          status: route.status,
+        };
+      }
     } else if ("headers" in route) {
       if (new RegExp(route.src).test(pathname)) Object.assign(headers, route.headers);
     } else {
@@ -191,6 +201,22 @@ describe("prebuilt docs deployment", () => {
     ]) {
       expect(await requestPackagedFile(root, url)).not.toBeNull();
       expect(await cacheControl(url)).toBeUndefined();
+    }
+  });
+});
+
+describe("moved docs pages", () => {
+  it("redirects every old address, with or without its trailing slash, to its new page", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    const moved = Object.entries(MOVED_PAGES);
+    expect(moved.length).toBeGreaterThan(0);
+    for (const [from, page] of moved) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(page.to);
+      }
     }
   });
 });

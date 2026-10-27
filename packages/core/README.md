@@ -46,6 +46,14 @@ const grid = createGrid(document.querySelector("#grid")!, {
 
 Framework users should normally install only `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte` and import that package's `styles.css`; the adapters initialize WASM automatically.
 
+## New in 0.6.0
+
+- **Ribbon.** Set `config.ribbon: true`, or `ribbon: true` in the shell, to get an Excel-style ribbon with Home, Insert, Data and View tabs. Groups shrink, then fold into dropdowns, as the grid narrows. The ribbon loads as its own chunk, so grids without a ribbon do not download it. New `GridActions` include `setBorders`, `setFontFamily`, `setNumberFormat`, `mergeAndCenter`, `autoSum` and `freezePanes`. See [Toolbar and ribbon](https://sheetwrite.vercel.app/docs/features/grid/toolbar-and-ribbon/).
+- **Status bar.** `grid.summarizeSelection(signal?)` returns Count, Sum, Average, Min and Max for the selected cells that the user can see. It reads in bounded chunks between frames, and an `AbortSignal` cancels it. The shell status line shows Average, Count and Sum. The shell name box also accepts ranges such as `B2:D9`. See [Status bar](https://sheetwrite.vercel.app/docs/features/grid/status-bar/).
+- **Formulas.** Both engines add volatile recalculation, `RAND`, `RANDBETWEEN`, `FORMULATEXT`, `ISFORMULA`, `HYPERLINK`, `CELL`, `OFFSET`, `INDIRECT` and `AREAS`, plus intersection, union and 3-D references. The undoable `setCalculation` document operation sets `{ iterate, maxIterations, maxChange }`; snapshots store it as `workbook.calculation`. See [Volatile functions](https://sheetwrite.vercel.app/docs/features/formulas/volatile-functions/), [Operators](https://sheetwrite.vercel.app/docs/features/formulas/operators/) and [Iterative calculation](https://sheetwrite.vercel.app/docs/features/formulas/iterative-calculation/).
+- **Streaming export.** `toCsvStream` and `toTsvStream` return a `ReadableStream<Uint8Array>`. The XLSX streams need `@sheetwrite/xlsx`. See [Large files and streaming](https://sheetwrite.vercel.app/docs/import-export/large-files-and-streaming/).
+- **Undo and sync.** Large undo restores packed engine snapshots without expanding them into JavaScript arrays. History keeps at most 200 entries and 256 MiB of reported range-snapshot bytes; the newest entry always stays undoable. This is not a total memory cap. A `SyncCoordinator` commit no longer scans the pending queue. See [Editing and clipboard](https://sheetwrite.vercel.app/docs/features/grid/editing-and-clipboard/) and [Collaboration](https://sheetwrite.vercel.app/docs/features/collaboration/).
+
 ## Full formula engine
 
 The default engine, `@sheetwrite/wasm`, has the standard functions and the smaller download. For analysis functions such as `GROUPBY`, `PIVOTBY`, `LAMBDA`, statistics, regression, and finance, install `@sheetwrite/formulas` and select it before you create a grid or store:
@@ -57,7 +65,7 @@ import * as formulas from "@sheetwrite/formulas";
 await initSheetwrite(undefined, formulas);
 ```
 
-See the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/) for the functions in each engine.
+See [Choose an engine](https://sheetwrite.vercel.app/docs/start/choose-an-engine/) and the [function reference](https://sheetwrite.vercel.app/docs/reference/formula-functions/) for the functions in each engine.
 
 ## Optional XLSX support
 
@@ -85,3 +93,9 @@ workbook APIs preserve multi-sheet `WorkbookSnapshot` semantics and use an
 in-memory backend with a default 1,000,000-populated-cell limit. Without
 registration, each core XLSX function throws an error telling the caller to
 install `@sheetwrite/xlsx` and import `@sheetwrite/xlsx/register`.
+
+Workbook import and export also keep unmodeled XLSX parts within resource limits.
+Cell edits drop kept charts and pivot tables with a warning. Structural edits
+drop affected images. Streamed XLSX output and `Blob` workbook input are available.
+See [Kept parts and round trips](https://sheetwrite.vercel.app/docs/import-export/kept-parts-and-round-trips/)
+and [Large files and streaming](https://sheetwrite.vercel.app/docs/import-export/large-files-and-streaming/).

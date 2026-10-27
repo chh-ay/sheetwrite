@@ -36,7 +36,7 @@ The tables below describe the owning source definition, not generated API signat
 | `Grid.distinctValues` | 1,000 distinct values | Resource defense: bound the default filter-menu result | Returns the first 1,000 distinct resolved values in first-seen order | Pass `limit`; `0` requests an uncapped scan |
 | `UndoManager` | 200 transactions | Resource defense: bound retained undo resources | Pushing entry 201 disposes the oldest undo entry | Not configurable through the public `Grid` API |
 
-The accessibility mirror uses the same virtual window and overscan as the canvas; it has no separate full-document DOM budget. See [datasource paging and storage](/docs/guides/configuration/#datasource-pages), [data operations](/docs/guides/data-operations/), and [the visible-window accessibility limit](/docs/guides/accessibility/#limitation-the-mirror-reflects-the-visible-window).
+The accessibility mirror uses the same virtual window and overscan as the canvas; it has no separate full-document DOM budget. See [datasource paging and storage](/docs/features/data/datasources/#requests-and-pages), [data operations](/docs/features/data/data-operations/), and [the visible-window accessibility limit](/docs/features/accessibility/#limitation-the-mirror-reflects-the-visible-window).
 
 ## Formula evaluation
 
@@ -53,7 +53,7 @@ The accessibility mirror uses the same virtual window and overscan as the canvas
 | `MAX_TEXT_OUTPUT_BYTES` / `MAX_SEARCH_STEPS` | 16 MiB generated text and 4,000,000 bounded search steps | Resource defense: bound Unicode output and text search/substitution work | Excess work resolves to `#NUM!` | Not configurable |
 | Financial root solver | 14 bracket steps, 100 solve steps, fixed `1e-12` tolerances | Determinism and resource defense for `IRR`/`RATE` | Invalid domains or non-convergence resolve to `#NUM!` | Not configurable |
 
-See [formula functions, exact semantics, errors, and compatibility](/docs/guides/formulas/) and the [inventory-generated function reference](/docs/reference/formula-functions/).
+See [formula functions, exact semantics, errors, and compatibility](/docs/features/formulas/authoring-and-references/) and the [inventory-generated function reference](/docs/reference/formula-functions/).
 
 ## Transactions and snapshots
 
@@ -86,7 +86,7 @@ If the restore exceeds the batch ceilings, cannot be split, or needs an unsuppor
 | `maxLogicalCellsPerSheet` | 4,294,967,295 row-by-column cells per sheet | Resource defense: cap logical area even when paged storage defers allocation | Rejected before dense or paged allocation | Same snapshot resource-limit paths |
 | `maxDenseCells` | 5,000,000 aggregate cells per dense workbook | Resource defense: bound eager allocation | Dense construction is rejected; paged storage does not consume this budget | Same snapshot resource-limit paths; choose `storage: "paged"` for allocation-lazy data |
 
-See [persistence and recovery](/docs/guides/persistence/) and [document operations](/docs/reference/document-operations/).
+See [persistence and recovery](/docs/features/data/persistence/) and [document operations](/docs/reference/document-operations/).
 
 ## Delimited text
 
@@ -102,7 +102,7 @@ See [persistence and recovery](/docs/guides/persistence/) and [document operatio
 | `maxFieldBytes` | 1 MiB decoded UTF-8 per field | Resource defense: prevent one quoted field dominating memory | One byte above the ceiling throws | `DelimitedTextOptions.resourceLimits.maxFieldBytes` |
 | `maxWriterWindowRows` | 4,096 rows per packed store read | Resource defense: bound each synchronous store window | Export continues with the next window; this is not a total-row ceiling | `DelimitedTextOptions.resourceLimits.maxWriterWindowRows` |
 
-The override object accepts positive safe integers. CSV and TSV still return complete in-memory strings; raising byte/cell ceilings is not streaming. See [data import and export](/docs/guides/data-operations/#export).
+The override object accepts positive safe integers. CSV and TSV still return complete in-memory strings; raising byte/cell ceilings is not streaming. See [data import and export](/docs/import-export/xlsx-export/#errors-and-built-in-actions).
 
 ## Synchronization and presence
 
@@ -133,7 +133,7 @@ The override object accepts positive safe integers. CSV and TSV still return com
 | `maxActors` | 32 remote actors | Resource defense: bound overlay state | Receiving a new actor at capacity evicts the oldest actor | `PresenceCoordinatorOptions.maxActors` (minimum 1) |
 | `maxRangesPerActor` | 8 selection ranges | Resource defense: bound payload and overlay work | Additional outbound/inbound ranges are truncated | `PresenceCoordinatorOptions.maxRangesPerActor` (minimum 1) |
 
-See [durable commits, version gaps, and presence](/docs/guides/collaboration/).
+See [durable commits, version gaps, and presence](/docs/features/collaboration/).
 
 ## XLSX codec
 
@@ -159,14 +159,14 @@ See [durable commits, version gaps, and presence](/docs/guides/collaboration/).
 | `maxXmlAttributesPerElement` | 128 attributes per element | Resource defense: bound per-node parsing | Import throws | `resourceLimits.maxXmlAttributesPerElement` |
 | `maxXmlTextBytes` | 16 MiB UTF-8 text per element or attribute | Resource defense: bound XML text accumulation | Import/export throws | `resourceLimits.maxXmlTextBytes` |
 
-Table and workbook conversions account cells according to the active path (for example, table export accounts its rectangular table). Raising dimensions does not add fidelity for unsupported workbook features. See [XLSX compatibility](/docs/guides/data-operations/#xlsx-compatibility).
+Table and workbook conversions account cells according to the active path (for example, table export accounts its rectangular table). Raising dimensions does not add fidelity for unsupported workbook features. See [XLSX compatibility](/docs/import-export/xlsx-export/#workbook-interchange).
 
 ## Related guides
 
-- [Supported formulas and formula errors](/docs/guides/formulas/#supported-formulas)
-- [Datasource pages and allocation-lazy storage](/docs/guides/configuration/#datasource-pages)
-- [Data operations and export](/docs/guides/data-operations/)
-- [Accessibility limits](/docs/guides/accessibility/)
-- [Persistence and recovery](/docs/guides/persistence/)
-- [Collaboration and presence](/docs/guides/collaboration/)
-- [Worker fallback](/docs/guides/worker-rendering/)
+- [Supported formulas and formula errors](/docs/features/formulas/authoring-and-references/#supported-formulas)
+- [Datasource pages and allocation-lazy storage](/docs/features/data/datasources/#requests-and-pages)
+- [Data operations and export](/docs/features/data/data-operations/)
+- [Accessibility limits](/docs/features/accessibility/)
+- [Persistence and recovery](/docs/features/data/persistence/)
+- [Collaboration and presence](/docs/features/collaboration/)
+- [Worker fallback](/docs/features/worker-rendering/)

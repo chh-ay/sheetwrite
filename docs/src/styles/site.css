@@ -519,6 +519,13 @@ a {
   text-transform: uppercase;
 }
 
+/* Header labels are uppercase, but code names keep their case: they are
+   identifiers, and `pendingCommits` is not `PENDINGCOMMITS`. */
+.sw-prose .sw-table-frame th code {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 /* A break inside a name, value or range reads as two values. Longer cells
    (signatures, sentences) wrap at spaces so the prose column stays readable. */
 .sw-prose .sw-table-frame .sw-cell-short,

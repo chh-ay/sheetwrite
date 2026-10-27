@@ -21,7 +21,7 @@ async function open(file: File) {
 
 ### See also
 
-- [/docs/guides/xlsx-export/](/docs/guides/xlsx-export/)
+- [/docs/import-export/xlsx-export/](/docs/import-export/xlsx-export/)
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/xlsx/src/registration.ts#L26"><code>packages/xlsx/src/registration.ts#L26</code></a></dd></div>

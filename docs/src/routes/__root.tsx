@@ -9,6 +9,7 @@ import { initializeCodeEnhancements } from "../lib/code-popovers.ts";
 import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
 import { installAnchorReveal } from "../lib/reveal-anchor.ts";
 
+import docsFiguresStylesheet from "../styles/docs-figures.css?url";
 import showcaseStylesheet from "../styles/showcase.css?url";
 import siteShellStylesheet from "../styles/site-shell.css?url";
 import siteStylesheet from "../styles/site.css?url";
@@ -68,6 +69,8 @@ export const Route = createRootRoute({
         // Shell refinements layer over site.css; link order is the cascade.
         { rel: "stylesheet", href: siteShellStylesheet },
         ...(showcaseChrome ? [{ rel: "stylesheet", href: showcaseStylesheet }] : []),
+        // Result figures and section cards exist only on documentation pages.
+        ...(showcaseChrome ? [] : [{ rel: "stylesheet", href: docsFiguresStylesheet }]),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       ],

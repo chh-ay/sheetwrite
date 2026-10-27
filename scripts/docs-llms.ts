@@ -1,6 +1,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
+import { formatTokens } from "../docs/src/lib/grid-result.js";
+import {
+  DOCS_NAVIGATION,
+  type NavigationItem,
+  type NavigationSection,
+  navigationPages,
+} from "../docs/src/lib/navigation.js";
+import { sectionCardsMarkdown } from "../docs/src/lib/section-cards.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 
 /**
@@ -41,56 +49,21 @@ export interface LlmsGeneratedFile {
 const SITE_SUMMARY =
   "Sheetwrite is a framework-agnostic, high-performance spreadsheet grid: a canvas grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.";
 
-/** Curated read order for the index. `## Public API` and generated pages follow these. */
-const INDEX_SECTIONS: ReadonlyArray<{
-  readonly label: string;
-  readonly routes: readonly string[];
-}> = [
-  { label: "Start", routes: ["/docs/start/installation/", "/docs/start/first-grid/"] },
-  {
-    label: "Ownership and lifecycle",
-    routes: ["/docs/concepts/runtime-ownership/", "/docs/frameworks/lifecycle/"],
-  },
-  {
-    label: "Framework adapters",
-    routes: [
-      "/docs/frameworks/vanilla/",
-      "/docs/frameworks/react/",
-      "/docs/frameworks/vue/",
-      "/docs/frameworks/svelte/",
-    ],
-  },
-  {
-    label: "Guides",
-    routes: [
-      "/docs/guides/configuration/",
-      "/docs/guides/interaction/",
-      "/docs/guides/data-operations/",
-      "/docs/guides/formulas/",
-      "/docs/guides/styling/",
-      "/docs/guides/persistence/",
-      "/docs/guides/collaboration/",
-      "/docs/guides/worker-rendering/",
-      "/docs/guides/xlsx-export/",
-      "/docs/guides/accessibility/",
-      "/docs/guides/host-owned-rows/",
-    ],
-  },
-  {
-    label: "Contracts and reference",
-    routes: [
-      "/docs/reference/api-contract/",
-      "/docs/reference/document-operations/",
-      "/docs/reference/events-errors/",
-      "/docs/reference/compatibility-limits/",
-    ],
-  },
-];
+/** The sidebar sections whose pages are generated, not authored guides. */
+const GENERATED_SECTIONS: ReadonlySet<string> = new Set(["API packages"]);
+
+/** Authored sections of the sidebar, in reading order. */
+function authoredSections(): readonly NavigationSection[] {
+  return DOCS_NAVIGATION.filter((section) => !GENERATED_SECTIONS.has(section.label));
+}
 
 /** What an agent needs before it can pick an entry point without inventing one. */
 const AGENT_WORKFLOW: readonly string[] = [
   "Choose one base package for your framework: `@sheetwrite/core` for vanilla, or `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte`. Adapters bring core and the WebAssembly engine transitively and expose a package-local `styles.css`. Add optional feature packages, such as `@sheetwrite/xlsx`, only when the relevant guide requires them.",
   "Initialize the runtime before mounting a grid. The imperative core awaits `initSheetwrite()` once per document; framework components initialize WebAssembly automatically after client mount, so server-rendered hosts need a client-only boundary.",
+  'Choose the formula engine once, before the first Grid or store: `@sheetwrite/wasm` is the default; `@sheetwrite/formulas` is the full engine with the analysis families, selected with `import * as formulas from "@sheetwrite/formulas"; await initSheetwrite(undefined, formulas);`. A function the active engine lacks evaluates to `#NAME?`. Read Choose an engine and the Formula function contract before you use a function.',
+  "Formulas follow the documented Excel rules, not assumptions: `OFFSET`, `INDIRECT`, `RAND`, `RANDBETWEEN`, `TODAY` and `NOW` are volatile and recalculate after each edit; space is the intersection operator, a parenthesized comma list is a union, and `Jan:Mar!B2` is a 3-D reference; a circular reference shows `#CYCLE!` unless the workbook turns on iterative calculation, a document setting that snapshots and XLSX files keep.",
+  'Built-in chrome is opt-in: `config` shows the toolbar and `config: { ribbon: true }` shows the Excel-style ribbon. XLSX import and export need `@sheetwrite/xlsx` and `import "@sheetwrite/xlsx/register"`; workbook import keeps parts Sheetwrite does not model and writes them back on save.',
   "The host owns the document. Sheetwrite never mutates host rows, so read Runtime ownership and Adapter lifecycle before choosing `defaultRows` seeding or explicit `workbook` plus `data`/`datasource` ownership.",
   "Readiness is generation-scoped: adapters publish `{ grid, generation, reason }` with reason `initial`, `input-reset`, or `renderer-reset`, and replacing reset-bound inputs replaces the grid. Destroy the grid when its host element's lifetime ends.",
   "Verify every symbol, option, event, and error code against the public API declarations in `llms-full.txt` or the generated API pages before using it. Anything absent from those declarations is not public API.",
@@ -122,7 +95,7 @@ export async function expectedLlmsFiles(
   generatedFiles: readonly LlmsGeneratedFile[],
 ): Promise<LlmsFile[]> {
   const inventory = await generatedInventory(repositoryRoot, generatedFiles);
-  const documents = await authoredDocuments(repositoryRoot, generatedFiles);
+  const documents = inNavigationOrder(await authoredDocuments(repositoryRoot, generatedFiles));
   const version = await releaseVersions(manifest, repositoryRoot);
   return [
     {
@@ -223,6 +196,25 @@ async function generatedPage(
   return { route, title: data.get("title") ?? route, description: data.get("description") ?? "" };
 }
 
+/**
+ * Authored pages in sidebar reading order (depth-first); pages the sidebar
+ * does not list follow in route order.
+ */
+export function inNavigationOrder<T extends { readonly route: string }>(
+  documents: readonly T[],
+  sections: readonly NavigationSection[] = authoredSections(),
+): T[] {
+  const order = new Map(
+    navigationPages(sections.flatMap((section) => section.items)).map(
+      (page, index) => [page.href, index] as const,
+    ),
+  );
+  const rank = (document: T): number => order.get(document.route) ?? Number.POSITIVE_INFINITY;
+  return [...documents].sort(
+    (left, right) => rank(left) - rank(right) || left.route.localeCompare(right.route),
+  );
+}
+
 /** Every content page the generator does not own, in route order. */
 async function authoredDocuments(
   repositoryRoot: string,
@@ -314,14 +306,26 @@ function renderIndex(
   for (const [index, step] of AGENT_WORKFLOW.entries()) lines.push(`${index + 1}. ${step}`);
 
   const listed = new Set<string>();
-  for (const section of INDEX_SECTIONS) {
-    lines.push("", `## ${section.label}`, "");
-    for (const route of section.routes) {
-      const document = byRoute.get(route);
-      if (document === undefined) throw new Error(`index route has no authored page: ${route}`);
-      listed.add(route);
-      lines.push(indexEntry(document));
+  const entries = (items: readonly NavigationItem[]): string[] =>
+    navigationPages(items).flatMap((page) => {
+      const document = byRoute.get(page.href);
+      if (document === undefined || listed.has(page.href)) return [];
+      listed.add(page.href);
+      return [indexEntry(document)];
+    });
+  for (const section of authoredSections()) {
+    const sectionLines: string[] = [];
+    for (const item of section.items) {
+      if (item.items === undefined) {
+        sectionLines.push(...entries([item]));
+        continue;
+      }
+      // A group keeps its name so a reader sees where its pages belong.
+      const groupLines = entries([item]);
+      if (groupLines.length > 0) sectionLines.push("", `### ${item.label}`, "", ...groupLines);
     }
+    if (sectionLines[0] === "") sectionLines.shift();
+    if (sectionLines.length > 0) lines.push("", `## ${section.label}`, "", ...sectionLines);
   }
 
   const remaining = documents.filter((document) => !listed.has(document.route));
@@ -396,7 +400,14 @@ function renderFullText(
 
   for (const document of documents) {
     lines.push("", `### ${document.title}`, "", `Source: ${siteUrl(document.route)}`, "");
-    lines.push(convertDocumentBody(document.body));
+    const body = document.body.replace(/<div class="sw-section-cards"><\/div>/g, () =>
+      sectionCardsMarkdown(
+        document.route,
+        (href) => documents.find((candidate) => candidate.route === href)?.description,
+        siteUrl,
+      ),
+    );
+    lines.push(convertDocumentBody(body));
   }
 
   lines.push(
@@ -477,7 +488,7 @@ const LANGUAGE_PATTERN = /^[A-Za-z][A-Za-z0-9+#.-]*$/;
 function convertDocumentBody(body: string): string {
   const output: string[] = [];
   let fence: string | undefined;
-  for (const line of body.split("\n")) {
+  for (const line of formatTokens(body).split("\n")) {
     const match = FENCE_PATTERN.exec(line);
     if (fence === undefined) {
       if (match === null) {
@@ -538,6 +549,8 @@ function convertInlineHtml(line: string): string {
       (_match, href: string, inner: string) => `${stripTags(inner)} (${absoluteUrl(href)})`,
     )
     .replace(/<code>([\s\S]*?)<\/code>/g, "`$1`")
+    // A result legend writes one term and its definition per line.
+    .replace(/<dt>([\s\S]*?)<\/dt>\s*<dd>([\s\S]*?)<\/dd>/g, "- **$1**: $2")
     .replace(/<(?:b|strong)>([\s\S]*?)<\/(?:b|strong)>/g, "**$1**")
     .replace(/<(?:em|i)>([\s\S]*?)<\/(?:em|i)>/g, "*$1*")
     .replace(/<\/?[A-Za-z][^>]*>/g, "");

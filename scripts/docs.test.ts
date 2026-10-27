@@ -8,9 +8,13 @@ import {
   documentationLinkRoutes,
   landingBenchPayload,
   landingDownloads,
+  movedPageIssues,
+  PERFORMANCE_PAGES,
   renderEntryPage,
   renderSymbolPage,
   runCompletionSummary,
+  splitPerformancePages,
+  unresolvedSiteLinks,
 } from "./docs.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
 import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
@@ -309,6 +313,99 @@ describe("documentation generation", () => {
       downloads,
     });
     expect(JSON.parse(landingBenchPayload(missing))).not.toHaveProperty("downloads");
+  });
+});
+
+describe("moved pages and site links", () => {
+  const contentRoot = resolve(import.meta.dir, "../docs/src/content/docs");
+  const documents = [
+    { path: `${contentRoot}/features/grid/search.md`, content: "## Replace\n\nText.\n" },
+    { path: `${contentRoot}/guides/kept.md`, content: "Kept.\n" },
+  ];
+  const moved = {
+    "/docs/guides/old/": {
+      to: "/docs/features/grid/search/",
+      anchors: { replace: "/docs/features/grid/search/#replace" },
+    },
+  };
+
+  it("accepts a moved page whose targets exist", () => {
+    expect(movedPageIssues(moved, documents)).toEqual([]);
+  });
+
+  it("rejects a missing target heading and an old page that keeps its content", () => {
+    const broken = {
+      "/docs/guides/kept/": {
+        to: "/docs/features/grid/search/",
+        anchors: { gone: "/docs/features/grid/search/#gone" },
+      },
+    };
+    expect(movedPageIssues(broken, documents)).toEqual([
+      "moved page still has content: /docs/guides/kept/",
+      "moved page /docs/guides/kept/#gone forwards to a missing target: /docs/features/grid/search/#gone",
+    ]);
+  });
+
+  it("rejects a moved heading that is still on its page or forwards nowhere", () => {
+    const headings = {
+      "/docs/features/grid/search/": {
+        replace: "/docs/guides/kept/",
+        gone: "/docs/guides/kept/#missing",
+      },
+    };
+    expect(movedPageIssues({}, documents, headings)).toEqual([
+      "moved heading is still on its page: /docs/features/grid/search/#replace",
+      "moved heading /docs/features/grid/search/#gone forwards to a missing target: /docs/guides/kept/#missing",
+    ]);
+  });
+
+  it("rejects site links to moved, missing, or anchorless targets", () => {
+    const links = [
+      { source: "README.md", link: "/docs/guides/old/" },
+      { source: "README.md", link: "/docs/missing/" },
+      { source: "README.md", link: "/docs/features/grid/search/#nope" },
+      { source: "README.md", link: "/docs/features/grid/search/#replace" },
+    ];
+    expect(unresolvedSiteLinks(links, documents, moved)).toEqual([
+      "README.md links moved page /docs/guides/old/; link /docs/features/grid/search/ instead",
+      "README.md links missing page /docs/missing/",
+      "README.md links missing anchor /docs/features/grid/search/#nope",
+    ]);
+  });
+});
+
+describe("performance pages", () => {
+  const evidence = PERFORMANCE_PAGES.flatMap((page) => page.sections)
+    .map((heading) => `## ${heading}\n\n${heading} body.\n`)
+    .join("\n");
+
+  it("publishes every evidence section on the page that lists it", () => {
+    const pages = new Map(
+      splitPerformancePages(evidence).map((page) => [page.route, page.content]),
+    );
+    expect(pages.get("performance/render.md")).toContain("Render benchmark body.");
+    // A one-section page takes its heading from its title.
+    expect(pages.get("performance/render.md")).not.toContain("## Render benchmark");
+    const memory = pages.get("performance/memory.md") ?? "";
+    expect(memory).toContain("## Release retained engine memory");
+    expect(memory).toContain("## Runtime resource ownership");
+    expect(pages.get("performance/index.md")).toContain("](/docs/performance/memory/)");
+  });
+
+  it("rejects a section that no page lists", () => {
+    expect(() => splitPerformancePages(`${evidence}\n## New benchmark\n\nBody.\n`)).toThrow(
+      "performance section has no page: New benchmark",
+    );
+  });
+
+  it("tells the reader when a page has no evidence yet", () => {
+    const pages = new Map(
+      splitPerformancePages("## Delivery size\n\nSizes.\n").map((page) => [
+        page.route,
+        page.content,
+      ]),
+    );
+    expect(pages.get("performance/xlsx-codec.md")).toContain("no validated evidence yet");
   });
 });
 describe("adapter documentation contract", () => {

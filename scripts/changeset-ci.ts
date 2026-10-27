@@ -8,7 +8,7 @@ const REPOSITORY_ROOT = resolve(import.meta.dir, "..");
 const PACKAGE_SIZE_HISTORY_PREFIX = "automation/package-size-history-";
 const RELEASE_VERSION_PREFIX = "release/version-";
 const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set([
-  "docs/src/content/docs/guides/performance-resources.md",
+  "docs/src/content/docs/performance/delivery-size.md",
   "scripts/size-history.json",
 ]);
 const ALLOWED_PACKAGE_SIZE_HISTORY_FILES = new Set([

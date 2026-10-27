@@ -19,7 +19,7 @@ await initSheetwrite(undefined, formulas);
 
 ### See also
 
-- [/docs/guides/formulas/](/docs/guides/formulas/)
+- [/docs/start/choose-an-engine/](/docs/start/choose-an-engine/)
 - [createGrid](/docs/api/core/create-grid/)
 
 <dl class="api-metadata" data-pagefind-ignore>

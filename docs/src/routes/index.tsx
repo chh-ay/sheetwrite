@@ -447,11 +447,7 @@ function Landing() {
               <code>bun run docs:generate</code> to publish measured numbers here.
             </p>
           )}
-          <Link
-            className="sw-lp-more"
-            to="/docs/$/"
-            params={{ _splat: "guides/performance-resources" }}
-          >
+          <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "performance" }}>
             See the full method and every result →
           </Link>
         </section>
@@ -509,7 +505,7 @@ function Landing() {
               <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
                 Formula functions
               </Link>
-              <Link to="/docs/$/" params={{ _splat: "guides/performance-resources" }}>
+              <Link to="/docs/$/" params={{ _splat: "performance" }}>
                 Benchmarks
               </Link>
             </div>

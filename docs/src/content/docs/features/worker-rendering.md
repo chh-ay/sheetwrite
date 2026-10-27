@@ -1,0 +1,133 @@
+---
+title: Worker rendering
+description: Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
+---
+
+By default Sheetwrite paints on the main thread (`renderer: "canvas"`). For sheets
+where a busy main thread could stall scrolling, you can move painting onto a Web
+Worker with an OffscreenCanvas — same `Renderer` contract, drop-in.
+
+## Enabling it
+
+Set `renderer: "worker"`. With a bundler that understands module workers, that
+is all: Sheetwrite creates its worker as
+`new Worker(new URL("./worker.js", import.meta.url), { type: "module" })`, the
+pattern bundlers look for, so the bundler builds the worker with its imports.
+Vite does this, verified by the fixture build in `test/bundler-fixtures/vite`
+(`bun run verify:bundlers`). webpack 5 and Parcel recognize the same pattern;
+check with the steps under [Verify it actually started](#verify-it-actually-started).
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
+const grid = createGrid(host, { workbook, datasource, renderer: "worker" });
+```
+
+Pass `workerUrl` when the default cannot work: no bundler, or a bundler that
+copies the file instead of building it. It must be the worker module's URL
+**as the browser will fetch it**. The worker entry ships at
+`@sheetwrite/core/dist/worker.js` (export subpath `@sheetwrite/core/worker`),
+but the platform `Worker`/`URL` constructors do not consult package exports —
+`new URL("@sheetwrite/core/worker", import.meta.url)` treats the bare
+specifier as a relative path and produces a 404 URL unless your bundler
+happens to rewrite that exact form. Two reliable recipes:
+
+**Universal (any bundler, no bundler):** the worker entry is an ES module with
+relative imports (`./canvas-paint.js`, …), so a single-file copy breaks — copy
+the package's whole `dist/` directory into your public/static assets and pass
+the served `worker.js` URL (a module worker fetches its sibling imports over
+HTTP):
+
+```sh verify title="Verified command"
+cp -r node_modules/@sheetwrite/core/dist public/sheetwrite
+```
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+
+await initSheetwrite();
+
+const grid = createGrid(host, {
+  workbook,
+  datasource,
+  renderer: "worker",
+  workerUrl: "/sheetwrite/worker.js",
+});
+```
+
+**Vite dependency-worker import (machine-verified):** Vite bundles the whole
+worker graph into one chunk and returns its URL via the `?worker&url` query —
+verified by the fixture build in `test/bundler-fixtures/vite`
+(`bun run verify:bundlers`):
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
+import workerUrl from "@sheetwrite/core/worker?worker&url";
+```
+
+`workerUrl` accepts a `string | URL`.
+
+## Verify it actually started
+
+A worker that fails to construct falls back to the main-thread canvas renderer
+(see below) — verify instead of assuming:
+
+```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
+grid.on("renderer-fallback", ({ error }) => {
+  console.warn("Sheetwrite worker renderer unavailable, using canvas:", error);
+});
+
+if (grid.rendererKind() !== "worker") {
+  // main-thread rendering is active
+}
+```
+
+
+## How it works
+
+- On mount the renderer constructs the `Worker`, creates a `<canvas>`, and
+  transfers control of it to the worker with `transferControlToOffscreen()`. The
+  worker paints into that `OffscreenCanvas` off the main thread.
+- Layout, theme, viewport, and each painted window are posted to the worker as
+  messages. The window snapshot is the same typed-array-backed `VisibleWindowView`
+  the store produces, so it is cheap to transfer.
+- Painting therefore continues smoothly even when the main thread is busy.
+
+### Raw string IDs and epochs
+
+Every `VisibleWindowView` carries a store-wide `stringPoolEpoch` (a u32 exposed
+as a JavaScript number). Its `stringPoolIds` and `stringPoolUpdateIds` are valid
+only in that epoch. Committed string collection can remap IDs: the same numeric
+ID may name different text afterward. Never persist raw pool IDs as document
+values or retain an ID-to-text cache across an epoch change.
+
+Both transferable and shared-memory frames, including frozen panes, carry the
+issuing epoch. The host reader and paint worker invalidate their own caches
+before resolving IDs or applying that epoch's string updates. Resolved `values`
+and window-local error strings do not require pool lookup; the view still has
+its normal lifetime until the next store mutation or window refresh.
+
+Direct WASM readers must compare `WindowView.stringPoolEpoch()` with
+`CellStore.stringPoolEpoch()` before passing IDs to `poolStrings`. For raw
+`persistedCellData` projections, capture the store epoch alongside the read and
+resolve those IDs before any operation that can collect strings. If the epoch
+has changed, discard the raw projection and read it again.
+
+## Automatic fallback
+
+The worker is constructed **first**, before the canvas is transferred. If
+construction throws — no `OffscreenCanvas` support, or a bundler/security
+restriction on the worker URL — the grid switches to the main-thread
+`CanvasRenderer` and emits one `renderer-fallback` event with a
+`SheetwriteError`. You still get a working grid; worker rendering is an
+enhancement, never a hard requirement.
+
+## Limitation: no custom renderers
+
+Custom cell renderers are functions, and functions can not cross the worker
+boundary. Under `renderer: "worker"` the `renderers` option (and
+`defineCellRenderer`) have no effect — the worker's renderer registry is always
+empty. If you rely on custom [`CellRenderer`](/docs/features/grid/options-and-presentation/#gridoptions)s,
+use the main-thread `canvas` renderer.
+
+## See also
+
+- [Configuration](/docs/features/grid/options-and-presentation/#gridoptions) for `renderer` and `workerUrl`.
+- [Concepts](/docs/concepts/runtime-ownership/#canvas-rendering-and-the-wasm-columnar-store) for the transferable window snapshot.

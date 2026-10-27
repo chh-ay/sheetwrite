@@ -542,7 +542,7 @@ export interface GridOptions {
    * as Vite build together with the worker's imports. Pass a URL when there
    * is no bundler, or when yours copies the file instead of building it, for
    * example a copy of `@sheetwrite/core/dist/` in your public assets (see
-   * `/docs/guides/worker-rendering/`). A bare specifier like
+   * `/docs/features/worker-rendering/`). A bare specifier like
    * `new URL("@sheetwrite/core/worker", import.meta.url)` is NOT reliable: the
    * platform `Worker` constructor does not consult package exports. If the
    * worker can't be constructed or fails to load, the grid falls back to the

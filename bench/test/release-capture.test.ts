@@ -1,19 +1,21 @@
 import { expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { RELEASE_ARTIFACTS, RELEASE_SMOKE_COMMANDS } from "../src/release-capture.js";
 
-function evidencePage(): string {
-  return readFileSync(
-    new URL("../../docs/src/content/docs/guides/performance-resources.md", import.meta.url),
-    "utf8",
-  );
+/** The Performance section publishes the evidence over several pages. */
+function evidencePages(): string {
+  const directory = new URL("../../docs/src/content/docs/performance/", import.meta.url);
+  return readdirSync(directory)
+    .filter((name) => name.endsWith(".md"))
+    .map((name) => readFileSync(new URL(name, directory), "utf8"))
+    .join("\n");
 }
 
-it("captures every artifact the evidence page publishes", () => {
-  const page = evidencePage();
+it("captures every artifact the evidence pages publish", () => {
+  const pages = evidencePages();
   for (const artifact of RELEASE_ARTIFACTS) {
-    expect(page).toContain(`bench/results/${artifact}`);
+    expect(pages).toContain(`bench/results/${artifact}`);
   }
 });
 

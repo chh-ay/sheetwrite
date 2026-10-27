@@ -27,6 +27,8 @@ A change to the engine (the Rust source in `packages/wasm`, which also builds `@
 
 Generated API pages, `docs/src/generated/*`, and `docs/public/llms*.txt` are owned by `bun run docs:generate`. Do not hand-edit generated files. `bun run docs:check` rejects stale output, including the AI-readable endpoints. Build output, benchmark evidence, and release artifacts remain uncommitted.
 
+The docs tree lives in `docs/src/lib/navigation.ts`. Add new pages there so the sidebar, reading order, overview cards, and AI-readable text use the same order. Formula-family reference pages and Performance pages are also generated; change their renderers in `scripts/formula-docs.ts` and `scripts/docs.ts`, then regenerate. When a page moves, add its old address and heading targets to `docs/src/lib/moved-pages.ts`. The deployment and local preview server keep old addresses working with permanent redirects.
+
 After the initial 0.1.0 release, user-visible package changes require a Changeset created with `bunx changeset`. Private workspaces are excluded.
 
 Merged changesets update one version pull request. After its version commit passes CI on `develop`, publication downloads and rehashes the canonical tarballs from that CI run, skips versions already on npm, and publishes the rest in dependency order with provenance. Each package then gets a git tag and a GitHub Release named `<package>@<version>`.

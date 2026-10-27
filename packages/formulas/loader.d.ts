@@ -25,7 +25,7 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  *
  * await initSheetwrite(undefined, formulas);
  * ```
- * @see /docs/guides/formulas/
+ * @see /docs/start/choose-an-engine/
  */
 export declare function load(
  source?: BufferSource | URL | string | Request | WebAssembly.Module,
@@ -36,14 +36,14 @@ export declare function isLoaded(): boolean;
 
 /** Engine objects and caches owned by one independently collectible WASM instance. */
 export type EngineInstance = Omit<typeof WasmExports, "default"> & {
-  getModule(): WebAssembly.Module;
+ getModule(): WebAssembly.Module;
 
-  getMemory(): WebAssembly.Memory;
+ getMemory(): WebAssembly.Memory;
 
-  /** Drop all glue roots after releasing owned resources. This instance is then unusable. */
-  retire(): void;
+ /** Drop all glue roots after releasing owned resources. This instance is then unusable. */
+ retire(): void;
 
-  functionNames?: () => string[];
+ functionNames?: () => string[];
 };
 
 /** Initialize a fresh engine; a compiled module can be reused without retaining its memory. */

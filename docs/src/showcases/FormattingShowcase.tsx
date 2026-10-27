@@ -325,7 +325,7 @@ export default function FormattingShowcase() {
               The controls are host UI calling GridActions and styleRange. Font availability remains
               a browser concern. For independent file fixtures and broader fidelity boundaries, open{" "}
               <Link to="/showcases/interoperability/">spreadsheet interoperability</Link> or the{" "}
-              <a href="/docs/guides/styling/">styling guide</a>.
+              <a href="/docs/features/formatting/styles/">styling guide</a>.
             </p>
           </article>
         </section>

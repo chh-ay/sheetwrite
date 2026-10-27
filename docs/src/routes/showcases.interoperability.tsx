@@ -958,7 +958,7 @@ function InteroperabilityRoute() {
             <>
               A real editable Grid sits in the exchange path: load source bytes, make a change, then
               export, re-import, and inspect the fidelity result beside the workbook.{" "}
-              <Link to="/docs/$/" params={{ _splat: "guides/xlsx-export" }}>
+              <Link to="/docs/$/" params={{ _splat: "import-export/xlsx-export" }}>
                 XLSX interchange guide →
               </Link>
             </>
