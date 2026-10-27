@@ -32,6 +32,7 @@ export const BUNDLER_SOURCE_MAP_MODE = "hidden-external";
 
 export type MetricUnit = "bytes" | "count";
 export type PackedCategory =
+  | "assets"
   | "css"
   | "declarations"
   | "maps"
@@ -236,10 +237,18 @@ function isNonNegativeInteger(value: unknown): value is number {
   );
 }
 
+/**
+ * Opt-in static files a host fetches or reads by URL: the icon sheet for
+ * strict-CSP pages and its layout manifest for replacement sheets. The JSON is
+ * listed by name so that any other JSON in a package still fails closed.
+ */
+const STATIC_ASSET_PATHS = new Set(["dist/icons.json"]);
+
 export function classifyPackedPath(path: string): PackedCategory {
   const lower = path.toLowerCase();
   if (lower.endsWith(".wasm")) return "wasm";
   if (lower.endsWith(".css")) return "css";
+  if (lower.endsWith(".svg") || STATIC_ASSET_PATHS.has(lower)) return "assets";
   if (lower.endsWith(".map")) return "maps";
   if (/\.d\.(?:c|m)?ts$/.test(lower)) return "declarations";
   if (/\.(?:c|m)?js$/.test(lower)) return "runtime-js";
@@ -260,6 +269,7 @@ export function summarizePack(name: string, result: PackResult): PackageReport {
     result.files.map((file) => file.path),
   );
   const categories: Record<PackedCategory, number> = {
+    assets: 0,
     css: 0,
     declarations: 0,
     maps: 0,
