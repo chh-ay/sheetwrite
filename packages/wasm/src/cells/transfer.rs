@@ -70,7 +70,6 @@ impl CellStorage {
             }
 
             for keys in [
-                &paged.pinned,
                 &paged.read_pinned,
                 &paged.pin_scratch,
                 &paged.viewport_pinned,
@@ -155,7 +154,6 @@ impl CellStorage {
                 paged.dirty_by_revision.insert(revision, keys);
             }
 
-            paged.pinned = read_keys(input)?;
             paged.read_pinned = read_keys(input)?;
             paged.pin_scratch = read_keys(input)?;
             paged.viewport_pinned = read_keys(input)?;

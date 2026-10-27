@@ -157,11 +157,6 @@ struct StorageEntry {
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 
-enum PinOwner {
-    Explicit,
-    Read,
-}
-
 struct PagedStorage {
     chunk_rows: usize,
     byte_budget: usize,
@@ -169,7 +164,6 @@ struct PagedStorage {
     chunks: FxHashMap<(usize, usize), CellChunk>,
     dirty: FxHashMap<(usize, usize), DirtyCell>,
     dirty_by_revision: FxHashMap<u64, Vec<(usize, usize)>>,
-    pinned: FxHashSet<(usize, usize)>,
     read_pinned: FxHashSet<(usize, usize)>,
     pin_scratch: FxHashSet<(usize, usize)>,
     viewport_pinned: FxHashSet<(usize, usize)>,
@@ -189,7 +183,6 @@ impl PagedStorage {
             chunks: FxHashMap::default(),
             dirty: FxHashMap::default(),
             dirty_by_revision: FxHashMap::default(),
-            pinned: FxHashSet::default(),
             read_pinned: FxHashSet::default(),
             pin_scratch: FxHashSet::default(),
             viewport_pinned: FxHashSet::default(),
@@ -223,9 +216,7 @@ impl PagedStorage {
             return;
         };
 
-        let eligible = !self.read_pinned.contains(&key)
-            && !self.viewport_pinned.contains(&key)
-            && !self.pinned.contains(&key);
+        let eligible = !self.read_pinned.contains(&key) && !self.viewport_pinned.contains(&key);
         let previous = chunk.last_access.get();
         let mut evictable = self.evictable.borrow_mut();
 
@@ -268,10 +259,7 @@ impl PagedStorage {
             self.chunks
                 .insert(key, CellChunk::new(self.chunk_rows, access));
 
-            if !self.read_pinned.contains(&key)
-                && !self.viewport_pinned.contains(&key)
-                && !self.pinned.contains(&key)
-            {
+            if !self.read_pinned.contains(&key) && !self.viewport_pinned.contains(&key) {
                 self.evictable.get_mut().insert((access, key.0, key.1));
             }
         } else {
@@ -532,18 +520,11 @@ impl PagedStorage {
         true
     }
 
-    fn dirty_revision(&self, row: usize, col: usize) -> Option<u64> {
-        self.dirty.get(&(row, col)).map(|cell| cell.revision)
-    }
-
-    fn mark_clean(&mut self, row: usize, col: usize, revision: Option<u64>) -> bool {
+    fn mark_clean(&mut self, row: usize, col: usize) -> bool {
         let key = (row, col);
         let Some(cell) = self.dirty.get(&key).copied() else {
             return false;
         };
-        if revision.is_some_and(|expected| expected != cell.revision) {
-            return false;
-        }
         self.remove_revision_slot(cell.revision, cell.revision_index);
         self.dirty.remove(&key);
         self.write_clean(row, col, cell.kind, cell.payload, cell.style);
@@ -567,18 +548,6 @@ impl PagedStorage {
         }
     }
 
-    fn pin_range(&mut self, r0: usize, r1: usize, cols: &[u32]) {
-        let mut next = std::mem::take(&mut self.pin_scratch);
-        if r0 < r1 {
-            for &col in cols {
-                for chunk in r0 / self.chunk_rows..=(r1 - 1) / self.chunk_rows {
-                    next.insert((col as usize, chunk));
-                }
-            }
-        }
-        self.replace_pins(next, PinOwner::Explicit);
-    }
-
     fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
         let mut next = std::mem::take(&mut self.pin_scratch);
         for &col in cols {
@@ -594,7 +563,7 @@ impl PagedStorage {
                 }
             }
         }
-        self.replace_pins(next, PinOwner::Read);
+        self.replace_read_pins(next);
     }
 
     fn pin_viewport_bands(&mut self, bands: &[u32]) {
@@ -611,7 +580,7 @@ impl PagedStorage {
             }
         }
         for key in self.viewport_pinned.difference(&next) {
-            if self.pinned.contains(key) || self.read_pinned.contains(key) {
+            if self.read_pinned.contains(key) {
                 continue;
             }
             if let Some(chunk) = self.chunks.get(key) {
@@ -632,14 +601,11 @@ impl PagedStorage {
         self.viewport_pin_scratch = previous;
     }
 
-    fn replace_pins(&mut self, next: FxHashSet<(usize, usize)>, owner: PinOwner) {
+    fn replace_read_pins(&mut self, next: FxHashSet<(usize, usize)>) {
         let access = self.next_access();
-        let (current, other) = match owner {
-            PinOwner::Explicit => (&mut self.pinned, &self.read_pinned),
-            PinOwner::Read => (&mut self.read_pinned, &self.pinned),
-        };
+        let current = &mut self.read_pinned;
         for key in current.difference(&next) {
-            if self.viewport_pinned.contains(key) || other.contains(key) {
+            if self.viewport_pinned.contains(key) {
                 continue;
             }
             if let Some(chunk) = self.chunks.get(key) {
@@ -780,7 +746,6 @@ impl PagedStorage {
         let indexes = stats.owner_mut(PAGED_INDEXES);
         indexes
             .add_hash_table::<(usize, usize), CellChunk>(self.chunks.len(), self.chunks.capacity());
-        indexes.add_hash_table::<(usize, usize), ()>(self.pinned.len(), self.pinned.capacity());
         indexes.add_hash_table::<(usize, usize), ()>(
             self.read_pinned.len(),
             self.read_pinned.capacity(),
@@ -1247,12 +1212,6 @@ impl CellStorage {
             .is_some_and(|paged| paged.read(row, col).4)
     }
 
-    pub(crate) fn dirty_revision(&self, row: usize, col: usize) -> Option<u64> {
-        self.paged
-            .as_ref()
-            .and_then(|paged| paged.dirty_revision(row, col))
-    }
-
     pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
         self.paged
             .as_ref()
@@ -1269,34 +1228,15 @@ impl CellStorage {
         if let Some(paged) = &mut self.paged {
             for col in start_col..end_col {
                 for row in start_row..end_row {
-                    paged.mark_clean(row, col, None);
+                    paged.mark_clean(row, col);
                 }
             }
         }
     }
 
-    pub(crate) fn mark_cell_clean_revision(
-        &mut self,
-        row: usize,
-        col: usize,
-        revision: u64,
-    ) -> bool {
-        self.paged
-            .as_mut()
-            .is_some_and(|paged| paged.mark_clean(row, col, Some(revision)))
-    }
-
     pub(crate) fn acknowledge_revision(&mut self, revision: u64) {
         if let Some(paged) = &mut self.paged {
             paged.acknowledge_revision(revision);
-        }
-    }
-
-    pub(crate) fn pin_range(&mut self, start_row: usize, end_row: usize, cols: &[u32]) {
-        if let Some(paged) = &mut self.paged {
-            if start_row < end_row {
-                paged.pin_range(start_row, end_row, cols);
-            }
         }
     }
 
@@ -2043,9 +1983,9 @@ mod paged_storage_tests {
         assert!(storage.write(4, 0, KIND_EMPTY, 40, 4, None));
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, true));
         assert_eq!(storage.chunks.len(), 1);
-        assert!(!storage.mark_clean(0, 0, Some(6)));
+        storage.acknowledge_revision(6);
         assert_eq!(storage.dirty_cells(), 1);
-        assert!(storage.mark_clean(0, 0, Some(7)));
+        storage.acknowledge_revision(7);
         assert_eq!(storage.read(0, 0), (KIND_EMPTY, 20, 2, true, false));
         assert_eq!(storage.dirty_cells(), 0);
     }

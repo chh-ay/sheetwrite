@@ -222,59 +222,6 @@ impl CellStore {
         }
     }
 
-    /// Stable row order sorted by a column. Returns a data-row permutation.
-    #[wasm_bindgen(js_name = sortRows)]
-    pub fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
-        let Some(s) = self.sheets.get(sheet) else {
-            return Vec::new();
-        };
-        if col >= s.cells.n_cols() {
-            return Vec::new();
-        }
-
-        let base = col * s.cells.row_count();
-
-        if let Some(order) = if s.cells.row_count() >= MIN_RADIX_SORT_ROWS {
-            sort_finite_number_column_radix(s, base, ascending)
-        } else {
-            sort_finite_number_column_comparison(s, base, ascending)
-        } {
-            return order;
-        }
-
-        // Decorate-sort-undecorate: materialize each row's comparison key ONCE
-        // (one pool deref per row) instead of rebuilding both operands inside
-        // the comparator — a comparison sort would otherwise reconstruct keys
-        // ~2·n·log2(n) times, each a scattered heap deref for text cells.
-        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
-        let mut start = base;
-        let end = base + s.cells.row_count();
-        while start < end {
-            let run = s.cells.run(start, end);
-            for index in run.start..run.end {
-                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
-            }
-            start = run.end;
-        }
-
-        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
-        order.sort_unstable_by(|&a, &b| {
-            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
-            // has exactly `row_count` entries.
-            let ka = unsafe { keys.get_unchecked(a as usize) };
-            // SAFETY: as above.
-            let kb = unsafe { keys.get_unchecked(b as usize) };
-            let ord = ka.cmp(kb);
-            let ord = if ascending { ord } else { ord.reverse() };
-            if ord == Ordering::Equal {
-                a.cmp(&b)
-            } else {
-                ord
-            }
-        });
-        order
-    }
-
     /// Data-row indices whose column text contains `needle` (case-insensitive).
     #[wasm_bindgen(js_name = filterRows)]
     pub fn filter_rows(&self, sheet: usize, col: usize, needle: &str) -> Vec<u32> {
@@ -442,6 +389,63 @@ impl CellStore {
         }
         out
     }
+}
+
+/// Single-key sort stays a crate helper: JS sorts through `sortRowsMulti`,
+/// which delegates here for one key without a survivor list.
+impl CellStore {
+    /// Stable row order sorted by a column. Returns a data-row permutation.
+    pub(crate) fn sort_rows(&self, sheet: usize, col: usize, ascending: bool) -> Vec<u32> {
+        let Some(s) = self.sheets.get(sheet) else {
+            return Vec::new();
+        };
+        if col >= s.cells.n_cols() {
+            return Vec::new();
+        }
+
+        let base = col * s.cells.row_count();
+
+        if let Some(order) = if s.cells.row_count() >= MIN_RADIX_SORT_ROWS {
+            sort_finite_number_column_radix(s, base, ascending)
+        } else {
+            sort_finite_number_column_comparison(s, base, ascending)
+        } {
+            return order;
+        }
+
+        // Decorate-sort-undecorate: materialize each row's comparison key ONCE
+        // (one pool deref per row) instead of rebuilding both operands inside
+        // the comparator — a comparison sort would otherwise reconstruct keys
+        // ~2·n·log2(n) times, each a scattered heap deref for text cells.
+        let mut keys: Vec<ComparableCell> = Vec::with_capacity(s.cells.row_count());
+        let mut start = base;
+        let end = base + s.cells.row_count();
+        while start < end {
+            let run = s.cells.run(start, end);
+            for index in run.start..run.end {
+                keys.push(ComparableCell::from_run(s, &self.strings, &run, index));
+            }
+            start = run.end;
+        }
+
+        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
+        order.sort_unstable_by(|&a, &b| {
+            // SAFETY: `order` holds only rows from `0..row_count` and `keys`
+            // has exactly `row_count` entries.
+            let ka = unsafe { keys.get_unchecked(a as usize) };
+            // SAFETY: as above.
+            let kb = unsafe { keys.get_unchecked(b as usize) };
+            let ord = ka.cmp(kb);
+            let ord = if ascending { ord } else { ord.reverse() };
+            if ord == Ordering::Equal {
+                a.cmp(&b)
+            } else {
+                ord
+            }
+        });
+        order
+    }
+
 }
 
 #[wasm_bindgen]

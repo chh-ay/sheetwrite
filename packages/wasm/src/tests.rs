@@ -153,8 +153,6 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     assert!(paged.cells.is_cell_dirty(1, 1));
     paged.cells.mark_range_clean(0, 2, 0, 2);
     assert!(!paged.cells.is_cell_dirty(1, 1));
-    paged.cells.pin_range(1, 1, &[0]);
-    paged.cells.pin_range(0, 2, &[0, 1]);
     assert_eq!(paged.cells.paged_stats().map(|stats| stats.1), Some(4));
 }
 
@@ -806,8 +804,8 @@ fn rename_sheet_rewrites_canonical_sources_and_quoting_without_changing_handles(
         store.formula_source(summary, 0, 0).as_deref(),
         Some("=('O''Brien'!A1+1)")
     );
-    assert!(store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
 }
 
 #[test]
@@ -832,8 +830,8 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 0).as_deref(), Some("#REF!"));
     assert_eq!(string(&store, summary, 0, 1).as_deref(), Some("#REF!"));
-    assert!(!store.is_sheet_alive(source));
-    assert!(store.is_sheet_alive(summary));
+    assert!(!store.sheet_alive[source]);
+    assert!(store.sheet_alive[summary]);
     assert_eq!(store.row_count(source), 0);
 
     let replacement = store.add_sheet(1, 1);
@@ -843,7 +841,7 @@ fn remove_sheet_tombstones_handle_and_invalidates_transitive_formula_dependencie
     );
     assert_eq!(string(&store, summary, 0, 2).as_deref(), Some("#REF!"));
     assert_eq!(replacement, 2);
-    assert!(store.is_sheet_alive(replacement));
+    assert!(store.sheet_alive[replacement]);
     assert!(!store.remove_sheet(source));
 }
 
@@ -898,7 +896,6 @@ fn public_api_bounds_checks_do_not_panic() {
         store.remove_cols(99, 0, 1);
         store.set_sheet_name(99, "missing", "Missing");
         store.mark_range_clean(99, 0, 1, 0, 1);
-        store.pin_range(99, 0, 1, &[0]);
         store.set_bool(99, 0, 0, true, 0);
         store.set_conditional_rules(99, &[], &[], &[], Vec::new(), &[]);
         store.commit_sources();
@@ -913,8 +910,6 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(!store.range_fully_loaded(99, 0, 0, 0, 0));
         assert_eq!(store.row_count(99), 0);
         assert_eq!(store.col_count(99), 0);
-        assert_eq!(store.style_id_at(99, 0, 0), 0);
-        assert_eq!(store.style_id_at(sheet, 9, 9), 0);
         assert_ne!(
             store.set_block_packed(
                 99,
@@ -1413,9 +1408,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
         .expect("formula source should be available before capture");
     let text_before = string(&store, sheet, 2, 1);
     let styles_before = [
-        store.style_id_at(sheet, 0, 0),
-        store.style_id_at(sheet, 1, 0),
-        store.style_id_at(sheet, 2, 1),
+        store.get_cell(sheet, 0, 0).style(),
+        store.get_cell(sheet, 1, 0).style(),
+        store.get_cell(sheet, 2, 1).style(),
     ];
 
     let snapshot = store.capture_range(sheet, 0, 0, 3, 2).unwrap();
@@ -1454,9 +1449,9 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     assert_eq!(string(&store, sheet, 2, 1), text_before);
     assert_eq!(
         [
-            store.style_id_at(sheet, 0, 0),
-            store.style_id_at(sheet, 1, 0),
-            store.style_id_at(sheet, 2, 1),
+            store.get_cell(sheet, 0, 0).style(),
+            store.get_cell(sheet, 1, 0).style(),
+            store.get_cell(sheet, 2, 1).style(),
         ],
         styles_before
     );
@@ -1464,7 +1459,7 @@ fn opaque_range_snapshot_round_trip_preserves_cell_behavior() {
     store.set_number(sheet, 0, 0, 8.0, styles_before[0]);
     store.recompute(sheet);
     assert_close(number(&store, sheet, 1, 0), 9.0);
-    assert_eq!(store.style_id_at(sheet, 1, 0), styles_before[1]);
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), styles_before[1]);
 }
 
 #[test]
@@ -1479,7 +1474,7 @@ fn scoped_clear_preserves_unrelated_calculated_values_and_recomputes_readers() {
 
     assert!(store.clear_range(sheet, 0, 0, 0, 0, false, true));
     assert_close(number(&store, sheet, 0, 1), 6.0);
-    assert_eq!(store.style_id_at(sheet, 0, 0), 0);
+    assert_eq!(store.get_cell(sheet, 0, 0).style(), 0);
     assert!(store.clear_range(sheet, 0, 0, 0, 0, true, false));
     assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("survivor"));
     assert_close(number(&store, sheet, 2, 2), 11.0);
@@ -1806,14 +1801,13 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
 }
 
 #[test]
-fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
+fn viewport_and_mapped_read_pins_have_independent_lifetimes() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 32, 4, 64, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-    store.pin_range(sheet, 0, 1, &[0]);
     store.pin_viewport_bands(sheet, &[4, 5, 0, 1]);
     store.pin_read_window(sheet, 0, 1, &[8], &[0]);
     store.begin_page_load();
-    for row in [0, 4, 8] {
+    for row in [4, 8] {
         store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
     }
     store.commit_sources();
@@ -1822,23 +1816,14 @@ fn explicit_viewport_and_mapped_read_pins_have_independent_lifetimes() {
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_close(number(&store, sheet, 4, 0), 5.0);
     assert_eq!(store.cell_state(sheet, 8, 0), 0);
 
     store.pin_viewport_bands(sheet, &[]);
-    store.pin_range(sheet, 0, 0, &[]);
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
     store.commit_sources();
-    assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_eq!(store.cell_state(sheet, 4, 0), 0);
-
-    store.pin_range(sheet, 0, 1, &[]);
-    store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 20, &[21.0], 0);
-    store.commit_sources();
-    assert_eq!(store.cell_state(sheet, 0, 0), 0);
 }
 
 #[test]

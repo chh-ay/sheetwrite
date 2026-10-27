@@ -1,11 +1,11 @@
-import type { SourceSnapshot } from "@sheetwrite/wasm";
+import type { SourceSnapshot, WindowView } from "@sheetwrite/wasm";
 
 import type { StyleDictionary } from "../style-dictionary.js";
 import type { CellScalar, CellStyle, ConditionalFormatRule } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
-import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.js";
+import type { RecomputingCellStore } from "./wasm-contract.js";
 import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
 const EMPTY_COND_MATCHES = new Uint32Array(0);
@@ -397,17 +397,17 @@ export class StoreWindowReader {
       );
     }
 
-    let view: ConsumingWindowView;
+    let view: WindowView;
     let expectedRows: number;
 
     if (dataRows) {
       expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
-      view = this.wasm.getWindowRows(handle, dataRows, colsU32) as ConsumingWindowView;
+      view = this.wasm.getWindowRows(handle, dataRows, colsU32);
     } else {
       expectedRows = Math.max(0, rows.end - rows.start);
-      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
+      view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32);
     }
 
     ffiCalls += 1;
@@ -593,7 +593,7 @@ export class StoreWindowReader {
       startRow,
       startRow + rows,
       this.colsU32For(cols),
-    ) as ConsumingWindowView;
+    );
     let decoded: DecodedPackedWindow;
     let strings: string[];
     let stringPoolEpoch: number;
