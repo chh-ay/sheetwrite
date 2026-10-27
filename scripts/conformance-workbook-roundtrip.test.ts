@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 
+import type { WorkbookSnapshot } from "../packages/core/src/types/document.js";
 import { sheetwriteWorkbookBackend } from "../packages/xlsx/src/workbook.js";
 import {
   retainedGraphLosses,
@@ -18,7 +19,81 @@ const IDENTITY_RESAVER: WorkbookRoundtripResaver = {
   },
 };
 
+function linkedSnapshot(): WorkbookSnapshot {
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: "links" },
+    sheets: [
+      {
+        id: "links",
+        name: "Links",
+        order: 0,
+        rowCount: 1,
+        columns: [{ key: "link", header: "Link", width: 100, type: "text" }],
+        hyperlinks: [
+          {
+            id: "original",
+            range: { sheet: "links", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+            target: { kind: "external", url: "https://example.com" },
+            style: { color: "#123456", underline: true },
+          },
+        ],
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: 1,
+            colCount: 1,
+            cells: [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: "Report" } }],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe("workbook producer roundtrip evidence", () => {
+  it("compares generated hyperlink ids and cell-carried presentation semantically", () => {
+    const original = linkedSnapshot();
+    const rewritten = structuredClone(original);
+    const sheet = rewritten.sheets[0];
+    const link = sheet?.hyperlinks?.[0];
+    const cell = sheet?.cells[0]?.cells[0];
+    if (!link || !cell) throw new Error("missing linked cell");
+
+    link.id = "xlsx-hyperlink-1-1";
+    cell.style = link.style;
+    delete link.style;
+    expect(
+      structuralDifferences(workbookFeatureState(original), workbookFeatureState(rewritten)),
+    ).toEqual([]);
+
+    cell.style = { color: "#0000FF", underline: true };
+    expect(
+      structuralDifferences(workbookFeatureState(original), workbookFeatureState(rewritten)),
+    ).not.toEqual([]);
+  });
+
+  it("records LibreOffice dropping stopIfTrue as a known producer difference", async () => {
+    const resaver: WorkbookRoundtripResaver = {
+      producer: "libreoffice",
+      producerVersion: "test-stop-if-true",
+      async resave(bytes) {
+        const snapshot = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+        for (const sheet of snapshot.sheets) {
+          for (const rule of sheet.conditionalFormats ?? []) delete rule.stopIfTrue;
+        }
+        return sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot);
+      },
+    };
+    const artifact = await runWorkbookRoundtrips(resaver);
+    expect(artifact.chains[0]).toMatchObject({
+      status: "pass",
+      differences: [],
+      knownProducerDifferences: [expect.stringContaining(".stopIfTrue: true != undefined")],
+    });
+  });
+
   it("binds both required local chain directions and preserves exact normalized semantics", async () => {
     const artifact = await runWorkbookRoundtrips(IDENTITY_RESAVER, {
       capturedAt: new Date("2026-07-22T12:00:00.000Z"),
