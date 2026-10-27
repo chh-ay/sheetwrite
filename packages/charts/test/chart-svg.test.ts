@@ -294,6 +294,16 @@ describe("tick steps", () => {
     expect(tickScale(0.1, 0.3, 4, false).ticks).toEqual([0.1, 0.15, 0.2, 0.25, 0.3]);
   });
 
+  it("keeps distinct ticks for very small values", () => {
+    expect(tickScale(1e-10, 5e-10, 4, false).ticks).toEqual([1e-10, 2e-10, 3e-10, 4e-10, 5e-10]);
+  });
+
+  it("adds no tick past data that ends on a tick", () => {
+    // In floating point, 0.7 / 0.1 is 6.999999999999999 and 1.1 / 0.1 is 11.000000000000002.
+    expect(tickScale(0.7, 1, 4, false).min).toBe(0.7);
+    expect(tickScale(0.5, 1.1, 10, false).max).toBe(1.1);
+  });
+
   it("starts at zero unless the data is far from zero", () => {
     expect(tickScale(20, 100, 5, true).min).toBe(0);
     expect(tickScale(95, 100, 5, true).min).toBeGreaterThan(0);

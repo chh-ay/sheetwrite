@@ -16,34 +16,33 @@ export interface TickScale {
   ticks: number[];
 }
 
-/** The smallest rounded step (1, 2, 2.5 or 5 × 10^n) that covers `span` in at most `maxTicks` steps. */
-function roundedStep(span: number, maxTicks: number): number {
-  const rawStep = span / Math.max(1, maxTicks);
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  // The last mantissa, 10, always covers the raw step, so the fallback never applies.
-  const mantissa = STEP_MANTISSAS.find((candidate) => candidate * magnitude >= rawStep) ?? 10;
-
-  return mantissa * magnitude;
-}
-
 /** `toFixed` accepts at most this many digits. */
-const MAX_FRACTION_DIGITS = 20;
+const MAX_FRACTION_DIGITS = 100;
 
-/** Float error below this is noise from the multiplication, not a real digit. */
-const DIGIT_TOLERANCE = 1e-9;
+/**
+ * Division drift in tick units, such as 0.7 / 0.1 = 6.999999999999999. It is
+ * relative to the step, so it holds for steps of any size.
+ */
+const TICK_INDEX_TOLERANCE = 1e-9;
 
-/** Decimal places that show every multiple of `step` exactly. */
-function stepDecimals(step: number): number {
-  let decimals = 0;
-
-  // A float step like 0.25 or 2.5e-7 needs its exact decimal count, not a log estimate.
-  while (decimals < MAX_FRACTION_DIGITS) {
-    const scaled = step * 10 ** decimals;
-    if (Math.abs(Math.round(scaled) - scaled) <= DIGIT_TOLERANCE) break;
-    decimals += 1;
+/**
+ * The smallest rounded step (1, 2, 2.5 or 5 × 10^n) that covers `span` in at
+ * most `maxTicks` steps, and the decimal places that show its multiples exactly.
+ */
+function roundedStep(span: number, maxTicks: number): { step: number; decimals: number } {
+  const rawStep = span / Math.max(1, maxTicks);
+  let exponent = Math.floor(Math.log10(rawStep));
+  // The last mantissa, 10, always covers the raw step, so the fallback never applies.
+  let mantissa: number =
+    STEP_MANTISSAS.find((candidate) => candidate * 10 ** exponent >= rawStep) ?? 10;
+  if (mantissa === 10) {
+    mantissa = 1;
+    exponent += 1;
   }
 
-  return decimals;
+  // 2.5 has one decimal of its own; the other mantissas are whole numbers.
+  const decimals = Math.max(0, -exponent) + (mantissa === 2.5 ? 1 : 0);
+  return { step: mantissa * 10 ** exponent, decimals: Math.min(decimals, MAX_FRACTION_DIGITS) };
 }
 
 /**
@@ -81,10 +80,9 @@ export function tickScale(
     }
   }
 
-  const step = roundedStep(high - low, maxTicks);
-  const decimals = stepDecimals(step);
-  const first = Math.floor(low / step);
-  const last = Math.ceil(high / step);
+  const { step, decimals } = roundedStep(high - low, maxTicks);
+  const first = Math.floor(low / step + TICK_INDEX_TOLERANCE);
+  const last = Math.ceil(high / step - TICK_INDEX_TOLERANCE);
   const ticks: number[] = [];
 
   // Compute each tick from its index and round it, so float drift never shows as 0.30000000000000004.
