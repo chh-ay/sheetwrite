@@ -15,6 +15,12 @@ import {
 } from "../format-presets.js";
 import { createHyperlinkId, isSafeExternalHyperlink } from "../hyperlink.js";
 import type { IconName } from "../icons/icon-names.js";
+import {
+  insertChart,
+  insertPivot,
+  pivotsAvailable,
+  type PivotDestination,
+} from "../panels/panel-controller.js";
 import type { CellStyle } from "../types/cell.js";
 import type { CellAddress } from "../types/coordinates.js";
 import type { BorderPreset, Grid, GridCommandName } from "../types/grid.js";
@@ -109,6 +115,19 @@ export interface RibbonFormSpec {
   readonly submit: (grid: Grid, cell: CellAddress, value: string) => string | null;
 }
 
+/**
+ * A button that opens Excel's "Choose where to place" form: a new sheet, or a
+ * cell typed as A1 (Insert › Pivot table).
+ */
+export interface RibbonPlacementSpec {
+  readonly kind: "placement";
+  readonly label: string;
+  readonly icon: IconName;
+  /** Why the command cannot run at all here, shown as the tooltip; null when it can. */
+  readonly unavailable: (grid: Grid) => string | null;
+  /** Run the command; returns an error message to show, or null on success. */
+  readonly submit: (grid: Grid, destination: PivotDestination) => string | null;
+}
 /** Zoom out / current percent / zoom in, as in Excel's View > Zoom group. */
 interface RibbonZoomSpec {
   readonly kind: "zoom";
@@ -120,6 +139,7 @@ export type RibbonControlSpec =
   | RibbonComboSpec
   | RibbonColorSpec
   | RibbonFormSpec
+  | RibbonPlacementSpec
   | RibbonZoomSpec;
 
 /**
@@ -360,6 +380,16 @@ const note: RibbonFormSpec = {
   },
 };
 
+const PIVOT_NEEDS_FULL_ENGINE = "Pivot tables need the full engine (@sheetwrite/formulas).";
+
+const pivotTable: RibbonPlacementSpec = {
+  kind: "placement",
+  label: "PivotTable",
+  icon: "pivotTable",
+  unavailable: (grid) => (pivotsAvailable(grid) ? null : PIVOT_NEEDS_FULL_ENGINE),
+  submit: insertPivot,
+};
+
 function outline(group: boolean): (grid: Grid) => void {
   return (grid) => {
     for (const [start, end] of selectedRowSpans(grid)) {
@@ -573,7 +603,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   },
   {
     label: "Insert",
-    reduceOrder: ["notes", "links", "rowsColumns"],
+    reduceOrder: ["notes", "links", "charts", "tables", "rowsColumns"],
     groups: [
       {
         id: "rowsColumns",
@@ -598,6 +628,20 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
             items: DELETE_ITEMS,
           },
         ],
+      },
+      {
+        id: "tables",
+        label: "Tables",
+        icon: "pivotTable",
+        layout: "flow",
+        controls: [pivotTable],
+      },
+      {
+        id: "charts",
+        label: "Charts",
+        icon: "chart",
+        layout: "flow",
+        controls: [button("Chart", "chart", insertChart, "edit", { large: true })],
       },
       { id: "links", label: "Links", icon: "hyperlink", layout: "flow", controls: [hyperlink] },
       { id: "notes", label: "Notes", icon: "note", layout: "flow", controls: [note] },

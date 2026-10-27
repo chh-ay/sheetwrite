@@ -9,6 +9,10 @@ const VIEWPORT_MARGIN = 8;
 const NAVIGABLE =
   '[role="menuitem"]:not([aria-disabled="true"]), [role="option"], button:not(:disabled), input, textarea';
 
+/** Tab stops inside a dialog surface; of a radio group only the checked radio is one. */
+const DIALOG_TAB_STOPS =
+  'input:not(:disabled):not([type="radio"]), input[type="radio"]:checked:not(:disabled), textarea:not(:disabled), select:not(:disabled), button:not(:disabled)';
+
 export interface PopupOptions {
   /** ARIA role of the surface: "menu", "listbox", "dialog" or "group". */
   readonly role: string;
@@ -158,6 +162,17 @@ export class RibbonPopup {
     const surface = event.currentTarget;
     if (!(surface instanceof HTMLElement) || this.stack.at(-1)?.surface !== surface) return;
 
+    // A form keeps Tab inside itself, wrapping at the ends; menus and lists
+    // close on Tab, as Excel's do.
+    if (event.key === "Tab" && surface.getAttribute("role") === "dialog") {
+      const stops = [...surface.querySelectorAll<HTMLElement>(DIALOG_TAB_STOPS)];
+      const edge = event.shiftKey ? stops[0] : stops.at(-1);
+      if (document.activeElement === edge) {
+        event.preventDefault();
+        (event.shiftKey ? stops.at(-1) : stops[0])?.focus();
+      }
+      return;
+    }
     if (event.key === "Escape" || event.key === "Tab") {
       if (event.key === "Escape") event.preventDefault();
       this.closeAbove(this.stack.length - 1, true);

@@ -1386,6 +1386,15 @@ export class StoreDataEngine {
     };
   }
 
+  /**
+   * Whether the loaded engine computes pivots. The full engine does; the
+   * default engine only shows saved output. The ribbon needs this before any
+   * pivot exists, and `getPivotFields` cannot tell the engines apart without one.
+   */
+  get computesPivots(): boolean {
+    return this.wasm.pivotFields !== undefined;
+  }
+
   /** Source fields of one pivot; empty on the default engine or for an unknown pivot. */
   getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
     const index =

@@ -953,6 +953,314 @@ textarea.sheetwrite-ribbon-field {
   min-height: 72px;
 }
 
+/* The placement choice of Insert › PivotTable: radios in a borderless group. */
+.sheetwrite-ribbon-choices {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sheetwrite-ribbon-choices label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Side panel (Chart panel, pivot field list), docked to the grid's right edge
+   inside .sheetwrite-panel-host. It uses the ribbon's type scale: 13px body,
+   11px muted headings, 28px controls, 4px radii. */
+.sheetwrite-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-left: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: var(--sheetwrite-widget-fg, #111111);
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-sizing: border-box;
+}
+
+.sheetwrite-panel :focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: -2px;
+}
+
+.sheetwrite-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  background: var(--sheetwrite-toolbar-bg, var(--sheetwrite-header-bg, #f4ede1));
+  color: var(--sheetwrite-toolbar-fg, var(--sheetwrite-header-fg, #6b4a1f));
+  flex: none;
+}
+
+.sheetwrite-panel-title {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  font-size: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetwrite-panel-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* A drawn ×, so the close button needs no glyph from the icon sheet. */
+.sheetwrite-panel-close::before {
+  content: "\00d7";
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.sheetwrite-panel-close:hover,
+.sheetwrite-panel-menu-item:hover,
+.sheetwrite-panel-kind:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 12px 12px;
+}
+
+.sheetwrite-panel-section {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.sheetwrite-panel-section[hidden] {
+  display: none;
+}
+
+.sheetwrite-panel-heading {
+  margin: 4px 0 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.sheetwrite-panel-field {
+  display: grid;
+  gap: 4px;
+}
+
+.sheetwrite-panel-label {
+  padding: 0;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-control {
+  min-width: 0;
+  height: 28px;
+  padding: 4px 6px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  color: inherit;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.sheetwrite-panel-control[aria-invalid="true"] {
+  border-color: var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-panel-error {
+  color: var(--sheetwrite-widget-error, #b42318);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-note {
+  margin: 0 0 8px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+}
+
+.sheetwrite-panel-note[role="alert"] {
+  color: var(--sheetwrite-widget-error, #b42318);
+}
+
+.sheetwrite-panel-kinds {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.sheetwrite-panel-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sheetwrite-panel-kind[aria-checked="true"] {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
+.sheetwrite-panel-icon > :is(svg, .sheetwrite-icon) {
+  --sheetwrite-icon-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.sheetwrite-panel-series {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+}
+
+.sheetwrite-panel-fields,
+.sheetwrite-panel-area {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 4px;
+  list-style: none;
+}
+
+.sheetwrite-panel-area {
+  min-height: 36px;
+}
+
+.sheetwrite-panel-field-item,
+.sheetwrite-panel-area-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: grab;
+}
+
+.sheetwrite-panel-field-item[data-used] .sheetwrite-panel-field-name {
+  font-weight: 600;
+}
+
+.sheetwrite-panel-field-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetwrite-panel-badge {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-area-empty {
+  padding: 6px 4px;
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  font-size: 11px;
+}
+
+.sheetwrite-panel-area-item > .sheetwrite-panel-control,
+.sheetwrite-panel-filter {
+  flex-basis: 100%;
+}
+
+.sheetwrite-panel-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.sheetwrite-panel-menu-anchor {
+  position: relative;
+}
+
+.sheetwrite-panel-menu-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* A drawn chevron, so the menu button needs no glyph from the icon sheet. */
+.sheetwrite-panel-menu-button::before {
+  content: "\25be";
+}
+
+.sheetwrite-panel-menu {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  right: 0;
+  display: grid;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, #d0d0d0);
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.sheetwrite-panel-menu-item {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheetwrite-panel-menu-item[aria-disabled="true"] {
+  color: var(--sheetwrite-widget-muted, #6b7280);
+  cursor: default;
+}
+
+.sheetwrite-panel-menu-item:focus-visible {
+  background: var(--sheetwrite-widget-selection, #2563eb22);
+}
+
 /* Context menu: icon column, label, then shortcut or submenu chevron. Rows are
    inset with rounded highlights; hover and keyboard focus look the same. */
 .sheetwrite-context-menu {

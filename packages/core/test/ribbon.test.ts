@@ -315,3 +315,23 @@ it("replaces a glyph in every ribbon control that shows it, by glyph name", asyn
   expect(hideRows.querySelector(".sheetwrite-ribbon-icon")?.textContent).toBe("HR");
   expect(hideRows.querySelector(".sheetwrite-icon")).toBeNull();
 });
+
+it("keeps Tab inside a form popup, wrapping at both ends", async () => {
+  const { host, control, openTab, select, key, press } = await setup();
+  openTab("Insert");
+  select(0, 0);
+  press(control("Link"));
+  const field = host.querySelector<HTMLInputElement>(".sheetwrite-ribbon-popup input");
+  const ok = host.querySelector<HTMLButtonElement>(".sheetwrite-ribbon-form-button");
+  if (field === null || ok === null) throw new Error("the link form did not open");
+  expect(document.activeElement).toBe(field);
+
+  ok.focus();
+  key(ok, "Tab");
+  expect(document.activeElement).toBe(field);
+  field.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }),
+  );
+  expect(document.activeElement).toBe(ok);
+  expect(host.querySelector(".sheetwrite-ribbon-popup")).not.toBeNull();
+});
