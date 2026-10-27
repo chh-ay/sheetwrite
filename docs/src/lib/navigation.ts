@@ -34,11 +34,12 @@ export interface NavigationSection {
   items: readonly NavigationItem[];
 }
 
+/** Narrows a linkable entry without copying its authored metadata. */
 function isPage(item: NavigationItem): item is NavigationPage {
   return item.href !== undefined;
 }
 
-/** The one generated section; reading order and the sidebar both name it. */
+/** The one generated section; the authored sections leave it out. */
 const API_PACKAGES_LABEL = "API packages";
 
 /** Release whose pages carry New and Updated badges in this tree. */
@@ -294,14 +295,17 @@ export function navigationPages(items: readonly NavigationItem[]): NavigationPag
 }
 
 /**
- * Reading order for previous/next links: every authored page in sidebar
- * order. Generated API packages are excluded so a reader never gets a "Next"
- * that hops between hundreds of generated entry points.
+ * The authored sections, in sidebar order. The generated API packages are
+ * left out, so a reader never gets a "Next" link that hops between hundreds of
+ * generated entry points, and llms.txt lists only authored guides.
  */
+export const AUTHORED_NAVIGATION: readonly NavigationSection[] = DOCS_NAVIGATION.filter(
+  (section) => section.label !== API_PACKAGES_LABEL,
+);
+
+/** Reading order for previous/next links: every authored page in sidebar order. */
 const READING_ORDER: readonly NavigationPage[] = navigationPages(
-  DOCS_NAVIGATION.filter((section) => section.label !== API_PACKAGES_LABEL).flatMap(
-    (section) => section.items,
-  ),
+  AUTHORED_NAVIGATION.flatMap((section) => section.items),
 );
 
 export type NavigationBadge = "new" | "updated";

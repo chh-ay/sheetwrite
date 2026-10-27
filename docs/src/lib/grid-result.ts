@@ -1,3 +1,4 @@
+import { colToA1, labelToCol } from "../../../packages/core/src/a1.js";
 import { formatNumber } from "../../../packages/core/src/number-format.js";
 
 /**
@@ -38,43 +39,42 @@ const CELL_MARKERS = [
   ["dataLists", "dataList"],
 ] as const;
 const FORMAT_TAG = "sw-format";
-const FORMAT_PATTERN = /<sw-format\s+([^>]*)><\/sw-format>/g;
-
-/** Spreadsheet column letters: 0 → A, 25 → Z, 26 → AA. */
-export function columnLetters(index: number): string {
-  let rest = index + 1;
-  let letters = "";
-  while (rest > 0) {
-    const digit = (rest - 1) % 26;
-    letters = String.fromCharCode(65 + digit) + letters;
-    rest = Math.floor((rest - 1) / 26);
-  }
-  return letters;
-}
+const FORMAT_PATTERN = /<sw-format\b([^>]*)><\/sw-format>/g;
 
 /** HTML parsing decodes attributes once; plain-text output must do the same. */
 function attribute(source: string, name: string): string | undefined {
   const value = new RegExp(`${name}="([^"]*)"`).exec(source)?.[1];
-  return value?.replace(/&(quot|apos|amp|lt|gt|#\d+|#x[\da-f]+);/gi, (entity, name: string) => {
-    const named: Readonly<Record<string, string>> = {
-      quot: '"',
-      apos: "'",
-      amp: "&",
-      lt: "<",
-      gt: ">",
-    };
-    const normalized = name.toLowerCase();
-    if (normalized.startsWith("#")) {
-      const code = normalized.startsWith("#x")
-        ? Number.parseInt(normalized.slice(2), 16)
-        : Number.parseInt(normalized.slice(1), 10);
-      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "\uFFFD";
-    }
-    return named[normalized] ?? entity;
-  });
+  return value?.replace(
+    /&(quot|apos|amp|lt|gt|#\d+|#x[\da-f]+);/gi,
+    (entity, entityName: string) => {
+      const named: Readonly<Record<string, string>> = {
+        quot: '"',
+        apos: "'",
+        amp: "&",
+        lt: "<",
+        gt: ">",
+      };
+      const normalized = entityName.toLowerCase();
+      if (normalized.startsWith("#")) {
+        const code = normalized.startsWith("#x")
+          ? Number.parseInt(normalized.slice(2), 16)
+          : Number.parseInt(normalized.slice(1), 10);
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "\uFFFD";
+      }
+      return named[normalized] ?? entity;
+    },
+  );
 }
 
-function formatted(value: string, code: string | undefined, locale: string | undefined): string {
+function formatted(
+  value: string | undefined,
+  code: string | undefined,
+  locale: string | undefined,
+): string {
+  if (value === undefined || value.trim() === "") {
+    throw new Error(`${RESULT_CLASS}: ${FORMAT_TAG} requires a non-blank value`);
+  }
+
   const number = Number(value);
   return formatNumber(Number.isFinite(number) ? number : value, code, locale);
 }
@@ -83,7 +83,7 @@ function formatted(value: string, code: string | undefined, locale: string | und
 export function formatTokens(markdown: string): string {
   return markdown.replace(FORMAT_PATTERN, (_match, attributes: string) =>
     formatted(
-      attribute(attributes, "value") ?? "",
+      attribute(attributes, "value"),
       attribute(attributes, "code"),
       attribute(attributes, "locale"),
     ),
@@ -111,13 +111,6 @@ function textContent(node: HastNode): string {
   return node.value ?? (node.children ?? []).map(textContent).join("");
 }
 
-/** Spreadsheet column letters back to a 0-based index: A → 0, AA → 26. */
-function columnIndex(letters: string): number {
-  let index = 0;
-  for (const letter of letters) index = index * 26 + (letter.charCodeAt(0) - 64);
-  return index - 1;
-}
-
 interface SheetSize {
   rows: number;
   width: number;
@@ -132,7 +125,7 @@ function referencedCells(reference: string, size: SheetSize): Array<[number, num
     const match = CELL_REFERENCE.exec(part);
     if (match === null) throw new Error(`${RESULT_CLASS}: "${reference}" is not an A1 reference`);
     const [, letters = "", digits = ""] = match;
-    const cell: [number, number] = [Number(digits) - 1, columnIndex(letters)];
+    const cell: [number, number] = [Number(digits) - 1, labelToCol(letters)];
     if (cell[0] < 0 || cell[0] >= size.rows || cell[1] >= size.width) {
       throw new Error(
         `${RESULT_CLASS}: ${reference} is outside the ${size.rows} × ${size.width} table`,
@@ -162,9 +155,9 @@ function cellMarkers(
   size: SheetSize,
 ): Map<string, Record<string, string>> {
   const markers = new Map<string, Record<string, string>>();
-  const mark = ([row, col]: [number, number], attribute: string) => {
+  const mark = ([row, col]: [number, number], cellAttribute: string) => {
     const key = `${row}:${col}`;
-    markers.set(key, { ...markers.get(key), [attribute]: "true" });
+    markers.set(key, { ...markers.get(key), [cellAttribute]: "true" });
   };
   for (const [divAttribute, cellAttribute] of CELL_MARKERS) {
     for (const reference of references(properties[divAttribute])) {
@@ -210,7 +203,9 @@ function alignment(cell: HastNode): Record<string, string> {
  * of a sheet, not a closed table. They hold nothing, so assistive technology
  * skips them.
  */
-const EDGE = { className: ["sw-grid-result__edge"], ariaHidden: "true" };
+function edge(): Record<string, unknown> {
+  return { className: ["sw-grid-result__edge"], ariaHidden: "true" };
+}
 
 function sheetTable(table: HastNode, properties: Record<string, unknown>): HastNode {
   const rows = [
@@ -230,9 +225,9 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
   const letters = element("tr", [
     element("th", [], { className: ["sw-grid-result__corner"], ariaHidden: "true" }),
     ...Array.from({ length: width }, (_, index) =>
-      element("th", [{ type: "text", value: columnLetters(index) }], { scope: "col" }),
+      element("th", [{ type: "text", value: colToA1(index) }], { scope: "col" }),
     ),
-    element("th", [{ type: "text", value: columnLetters(width) }], EDGE),
+    element("th", [{ type: "text", value: colToA1(width) }], edge()),
   ]);
   const body = rows.map((row, rowIndex) =>
     element("tr", [
@@ -248,7 +243,7 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
             ...markers.get(`${rowIndex}:${colIndex}`),
           },
         })),
-      element("td", [], EDGE),
+      element("td", [], edge()),
     ]),
   );
   const edgeRow = element(
@@ -257,7 +252,7 @@ function sheetTable(table: HastNode, properties: Record<string, unknown>): HastN
       element("th", [{ type: "text", value: String(rows.length + 1) }]),
       ...Array.from({ length: width + 1 }, () => element("td", [])),
     ],
-    EDGE,
+    edge(),
   );
   return element("table", [element("thead", [letters]), element("tbody", [...body, edgeRow])], {
     className: ["sw-grid-result__sheet"],
@@ -300,7 +295,7 @@ function transform(node: HastNode): void {
       children[index] = {
         type: "text",
         value: formatted(
-          String(properties.value ?? ""),
+          properties.value === undefined ? undefined : String(properties.value),
           properties.code === undefined ? undefined : String(properties.code),
           properties.locale === undefined ? undefined : String(properties.locale),
         ),
@@ -309,8 +304,9 @@ function transform(node: HastNode): void {
     }
     if (child.tagName === "div" && classNames(child).includes(RESULT_CLASS)) {
       const table = (child.children ?? []).find((part) => part.tagName === "table");
-      if (table === undefined) throw new Error(`${RESULT_CLASS} must contain a Markdown table`);
-      transform(table);
+      if (table === undefined) throw new Error(`${RESULT_CLASS}: must contain a Markdown table`);
+      // Legends and captions can contain the same format tokens as sheet cells.
+      transform(child);
       const figcaption = caption(child);
       const { before, after } = extraBlocks(child, table);
       children[index] = element(

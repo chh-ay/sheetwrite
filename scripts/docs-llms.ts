@@ -3,7 +3,7 @@ import { join, relative, sep } from "node:path";
 
 import { formatTokens } from "../docs/src/lib/grid-result.js";
 import {
-  DOCS_NAVIGATION,
+  AUTHORED_NAVIGATION,
   type NavigationItem,
   type NavigationSection,
   navigationPages,
@@ -48,14 +48,6 @@ export interface LlmsGeneratedFile {
 
 const SITE_SUMMARY =
   "Sheetwrite is a framework-agnostic, high-performance spreadsheet grid: a canvas grid backed by a Rust/WASM columnar engine, with an imperative core and React, Vue, and Svelte adapters.";
-
-/** The sidebar sections whose pages are generated, not authored guides. */
-const GENERATED_SECTIONS: ReadonlySet<string> = new Set(["API packages"]);
-
-/** Authored sections of the sidebar, in reading order. */
-function authoredSections(): readonly NavigationSection[] {
-  return DOCS_NAVIGATION.filter((section) => !GENERATED_SECTIONS.has(section.label));
-}
 
 /** What an agent needs before it can pick an entry point without inventing one. */
 const AGENT_WORKFLOW: readonly string[] = [
@@ -202,14 +194,14 @@ async function generatedPage(
  */
 export function inNavigationOrder<T extends { readonly route: string }>(
   documents: readonly T[],
-  sections: readonly NavigationSection[] = authoredSections(),
+  sections: readonly NavigationSection[] = AUTHORED_NAVIGATION,
 ): T[] {
   const order = new Map(
     navigationPages(sections.flatMap((section) => section.items)).map(
       (page, index) => [page.href, index] as const,
     ),
   );
-  const rank = (document: T): number => order.get(document.route) ?? Number.POSITIVE_INFINITY;
+  const rank = (document: T): number => order.get(document.route) ?? order.size;
   return [...documents].sort(
     (left, right) => rank(left) - rank(right) || left.route.localeCompare(right.route),
   );
@@ -313,19 +305,28 @@ function renderIndex(
       listed.add(page.href);
       return [indexEntry(document)];
     });
-  for (const section of authoredSections()) {
-    const sectionLines: string[] = [];
+  for (const section of AUTHORED_NAVIGATION) {
+    // Each group starts a block; later standalone pages continue the current block.
+    const blocks: string[][] = [];
     for (const item of section.items) {
       if (item.items === undefined) {
-        sectionLines.push(...entries([item]));
+        const pageLines = entries([item]);
+        if (pageLines.length === 0) continue;
+
+        const currentBlock = blocks.at(-1);
+        if (currentBlock === undefined) blocks.push(pageLines);
+        else currentBlock.push(...pageLines);
         continue;
       }
+
       // A group keeps its name so a reader sees where its pages belong.
       const groupLines = entries([item]);
-      if (groupLines.length > 0) sectionLines.push("", `### ${item.label}`, "", ...groupLines);
+      if (groupLines.length > 0) blocks.push([`### ${item.label}`, "", ...groupLines]);
     }
-    if (sectionLines[0] === "") sectionLines.shift();
-    if (sectionLines.length > 0) lines.push("", `## ${section.label}`, "", ...sectionLines);
+    if (blocks.length > 0) {
+      const sectionText = blocks.map((block) => block.join("\n")).join("\n\n");
+      lines.push("", `## ${section.label}`, "", sectionText);
+    }
   }
 
   const remaining = documents.filter((document) => !listed.has(document.route));
@@ -381,6 +382,7 @@ function renderFullText(
   version: string,
 ): string {
   const anchors = uniqueAnchors(documents.map((document) => document.title));
+  const descriptions = new Map(documents.map((document) => [document.route, document.description]));
   const lines: string[] = [
     "# Sheetwrite — full documentation text",
     "",
@@ -401,11 +403,7 @@ function renderFullText(
   for (const document of documents) {
     lines.push("", `### ${document.title}`, "", `Source: ${siteUrl(document.route)}`, "");
     const body = document.body.replace(/<div class="sw-section-cards"><\/div>/g, () =>
-      sectionCardsMarkdown(
-        document.route,
-        (href) => documents.find((candidate) => candidate.route === href)?.description,
-        siteUrl,
-      ),
+      sectionCardsMarkdown(document.route, (href) => descriptions.get(href), siteUrl),
     );
     lines.push(convertDocumentBody(body));
   }
@@ -488,11 +486,11 @@ const LANGUAGE_PATTERN = /^[A-Za-z][A-Za-z0-9+#.-]*$/;
 function convertDocumentBody(body: string): string {
   const output: string[] = [];
   let fence: string | undefined;
-  for (const line of formatTokens(body).split("\n")) {
+  for (const line of body.split("\n")) {
     const match = FENCE_PATTERN.exec(line);
     if (fence === undefined) {
       if (match === null) {
-        output.push(convertProseLine(line));
+        output.push(convertProseLine(formatTokens(line)));
         continue;
       }
       const [, opener, info] = match;

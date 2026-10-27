@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import { formatNumber } from "@sheetwrite/core";
 
-import { columnLetters, formatTokens, renderGridResults } from "../src/lib/grid-result.js";
+import { colToA1 } from "../../packages/core/src/a1.js";
+import { formatTokens, renderGridResults } from "../src/lib/grid-result.js";
 
 type Node = {
   type: string;
@@ -24,8 +25,12 @@ function textOf(node: Node): string {
   return node.value ?? (node.children ?? []).map(textOf).join("");
 }
 
-/** A result div around a 2×2 table: Item/Total, then Pen/12. */
-function resultDiv(properties: Record<string, unknown>, ...extras: Node[]): Node {
+/** A result div around a 2×2 table, optionally replacing its final cell value. */
+function resultDiv(
+  properties: Record<string, unknown>,
+  value: Node = text("12"),
+  ...extras: Node[]
+): Node {
   return {
     type: "element",
     tagName: "div",
@@ -34,7 +39,7 @@ function resultDiv(properties: Record<string, unknown>, ...extras: Node[]): Node
       cell(
         "table",
         cell("thead", cell("tr", cell("th", text("Item")), cell("th", text("Total")))),
-        cell("tbody", cell("tr", cell("td", text("Pen")), cell("td", text("12")))),
+        cell("tbody", cell("tr", cell("td", text("Pen")), cell("td", value))),
       ),
       ...extras,
     ],
@@ -63,48 +68,28 @@ function marked(figure: Node, marker: string): string[] {
       .slice(1)
       .filter((sheetCell) => !isEdge(sheetCell))
       .flatMap((sheetCell, colIndex) =>
-        sheetCell.properties?.[marker] === "true"
-          ? [`${columnLetters(colIndex)}${rowIndex + 1}`]
-          : [],
+        sheetCell.properties?.[marker] === "true" ? [`${colToA1(colIndex)}${rowIndex + 1}`] : [],
       ),
   );
 }
 
 describe("grid result figures", () => {
-  it("names columns like a spreadsheet", () => {
-    expect([0, 25, 26, 51, 702].map(columnLetters)).toEqual(["A", "Z", "AA", "AZ", "AAA"]);
-  });
-
   it("turns an authored table into a sheet with letters, row numbers, and grid-formatted values", () => {
     const tree: Node = {
       type: "root",
       children: [
-        {
-          type: "element",
-          tagName: "div",
-          properties: { className: ["sw-grid-result"], dataCaption: "Totals" },
-          children: [
-            cell(
-              "table",
-              cell("thead", cell("tr", cell("th", text("Item")), cell("th", text("Total")))),
-              cell(
-                "tbody",
-                cell(
-                  "tr",
-                  cell("td", text("Pen")),
-                  cell("td", {
-                    type: "element",
-                    tagName: "sw-format",
-                    properties: { value: "1234.5", code: "#,##0.00", locale: "de-DE" },
-                    children: [],
-                  }),
-                ),
-              ),
-            ),
-          ],
-        },
+        resultDiv(
+          { dataCaption: "Totals" },
+          {
+            type: "element",
+            tagName: "sw-format",
+            properties: { value: "1234.5", code: "#,##0.00", locale: "de-DE" },
+            children: [],
+          },
+        ),
       ],
     };
+
     renderGridResults()(tree);
     const figure = tree.children?.[0];
     expect(figure?.tagName).toBe("figure");
@@ -165,6 +150,21 @@ describe("grid result figures", () => {
     );
   });
 
+  it("rejects missing and blank sw-format values instead of displaying zero", () => {
+    for (const value of [undefined, "", " \t "]) {
+      const properties = value === undefined ? { code: "0.00" } : { value, code: "0.00" };
+      const token: Node = { type: "element", tagName: "sw-format", properties, children: [] };
+      const attributes = value === undefined ? 'code="0.00"' : `value="${value}" code="0.00"`;
+
+      expect(() => render(cell("p", token))).toThrow(
+        "sw-grid-result: sw-format requires a non-blank value",
+      );
+      expect(() => formatTokens(`<sw-format ${attributes}></sw-format>`)).toThrow(
+        "sw-grid-result: sw-format requires a non-blank value",
+      );
+    }
+  });
+
   it("decodes quoted format sections once for plain-text output", () => {
     const code = '0.00;[Red](0.00);"none";"value: "@';
     for (const value of [-12.3, 0, "sample"]) {
@@ -200,7 +200,7 @@ describe("grid result figures", () => {
     const legend = cell("dl", cell("dt", text("A2 · note")), cell("dd", text("Checked")));
     const menu = cell("div", text("Copy value"));
     const caption = cell("figcaption", text("Result: "), cell("code", text("A2")));
-    const figure = render(resultDiv({}, text("\n"), legend, caption, menu));
+    const figure = render(resultDiv({}, undefined, text("\n"), legend, caption, menu));
     expect((figure.children ?? []).map((part) => part.tagName)).toEqual([
       "div",
       "dl",
