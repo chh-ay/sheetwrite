@@ -39,6 +39,7 @@ export type WorkbookTableId = string;
 <p class="api-consumers-label">Public exports naming <code>WorkbookTableId</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/core/pivot-source/"><code>PivotSource</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/workbook-table/"><code>WorkbookTable</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 </ul>
 </div>

@@ -7,6 +7,7 @@ mod descriptive;
 mod distributions;
 mod finance;
 mod groupby;
+pub(crate) use groupby::grouping;
 pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;

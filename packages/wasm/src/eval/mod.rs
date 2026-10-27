@@ -150,6 +150,59 @@ fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value 
     }
 }
 
+/// The calculated-slot encoding of a result value; text joins the pool.
+pub(crate) fn calculated_slot(strings: &mut StringStorage, value: &Value) -> (u8, u64) {
+    match value {
+        Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
+        Value::Text(text) => (KIND_STRING, encode_str_id(strings.intern(text))),
+        Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
+        Value::Blank => (KIND_EMPTY, 0),
+        Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
+    }
+}
+
+/// A cell's value as a formula reads it between passes: its literal source,
+/// or the stored result of its formula or of the spill that covers it.
+#[cfg(feature = "analysis")]
+pub(crate) fn settled_cell_value(
+    sheet: &SheetData,
+    strings: &StringStorage,
+    row: usize,
+    col: usize,
+) -> Value {
+    if !sheet.cells.contains_cell(row, col) {
+        return Value::Error(FormulaError::Ref);
+    }
+    if !sheet.cells.is_loaded(row, col) {
+        return Value::Error(FormulaError::Loading);
+    }
+
+    let index = sheet.cells.idx(row, col);
+    let source_kind = sheet.cells.source_kind_at(index);
+    let (kind, payload) = if source_kind == KIND_EMPTY {
+        sheet
+            .cells
+            .calculated_cell_at(index)
+            .unwrap_or((KIND_EMPTY, 0))
+    } else {
+        (source_kind, sheet.cells.source_payload_at(index))
+    };
+    if kind != KIND_FORMULA {
+        return literal_cell_value(strings, kind, payload);
+    }
+
+    if let Some(key) = cell_key(row, col) {
+        if let Some(entry) = sheet.formulas.get(key) {
+            let error = formula_error_with_entry(sheet, key, Some(entry));
+            return cached_formula_value(sheet, strings, index, error);
+        }
+    }
+    match sheet.cells.calculated_error_at(index) {
+        Some(error) => Value::Error(error),
+        None => Value::number(sheet.cells.num_at(index)),
+    }
+}
+
 /// Dense literal reads use one whole-grid source run; paged sources go through
 /// `eval_at`, which owns their load-state checks.
 #[derive(Clone, Copy)]
@@ -653,7 +706,36 @@ impl CellStore {
         self.recompute_at_volatile_serial(seeds);
     }
 
+    /// Recalculates the formulas of `seeds`, then the pivot tables whose
+    /// sources or outputs the pass changed (the default engine places saved
+    /// output). A workbook without pivots skips the pivot step entirely.
     fn recompute_at_volatile_serial(&mut self, seeds: &[usize]) {
+        self.recompute_formulas(seeds);
+
+        if self.pivots.is_some() {
+            self.settle_pivots();
+        }
+    }
+
+    /// Ends a pass for `sheets`. The pivot step first records which source
+    /// rows and output blockers the pass changed, because finishing clears
+    /// the dirty state that tells.
+    fn finish_recompute<I>(&mut self, sheets: I, affected: Option<&FxHashSet<AbsCellKey>>)
+    where
+        I: IntoIterator<Item = usize> + Clone,
+    {
+        if self.pivots.is_some() {
+            self.capture_pivot_changes(sheets.clone(), affected);
+        }
+
+        for sheet in sheets {
+            if let Some(data) = self.sheets.get_mut(sheet) {
+                data.finish_recompute();
+            }
+        }
+    }
+
+    pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
         if seeds.is_empty() {
             return;
         }
@@ -663,12 +745,7 @@ impl CellStore {
         let _iteration_pass = IterationPassGuard::begin(self.iteration.is_some());
 
         if self.sheets.iter().all(|sheet| sheet.formulas.is_empty()) {
-            for &sheet in seeds {
-                if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.finish_recompute();
-                }
-            }
-
+            self.finish_recompute(seeds.iter().copied(), None);
             return;
         }
 
@@ -705,12 +782,7 @@ impl CellStore {
         }
 
         if affected.is_empty() {
-            for &sheet in seeds {
-                if let Some(data) = self.sheets.get_mut(sheet) {
-                    data.finish_recompute();
-                }
-            }
-
+            self.finish_recompute(seeds.iter().copied(), None);
             return;
         }
 
@@ -742,9 +814,7 @@ impl CellStore {
                 }
             }
 
-            for &sheet in seeds {
-                self.sheets[sheet].finish_recompute();
-            }
+            self.finish_recompute(seeds.iter().copied(), Some(&affected));
 
             return;
         }
@@ -1093,9 +1163,7 @@ impl CellStore {
             }
         }
 
-        for seeded_sheet in seeded_sheets {
-            self.sheets[seeded_sheet].finish_recompute();
-        }
+        self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
     }
 
     fn install_spill_result(
@@ -1150,13 +1218,7 @@ impl CellStore {
         memo.insert(key, first);
         let strings = &mut self.strings;
         data.spill.install(range, &mut data.cells, |offset| {
-            match &matrix.values[offset] {
-                Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
-                Value::Text(text) => (KIND_STRING, encode_str_id(strings.intern(text))),
-                Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
-                Value::Blank => (KIND_EMPTY, 0),
-                Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
-            }
+            calculated_slot(strings, &matrix.values[offset])
         })
     }
 

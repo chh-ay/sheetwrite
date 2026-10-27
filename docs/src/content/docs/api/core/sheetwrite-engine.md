@@ -19,7 +19,7 @@ A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`.
 <summary><code>CellStore</code></summary>
 
 ```ts generated
-CellStore: typeof defaultEngine.CellStore;
+CellStore: defaultEngine.EngineInstance["CellStore"];
 ```
 
 </details>
@@ -68,7 +68,7 @@ functionNames?: () => string[];
 
 ```ts generated
 export interface SheetwriteEngine {
-  CellStore: typeof defaultEngine.CellStore;
+  CellStore: defaultEngine.EngineInstance["CellStore"];
   load: typeof defaultEngine.load;
   isLoaded: typeof defaultEngine.isLoaded;
   createEngine: typeof defaultEngine.createEngine;

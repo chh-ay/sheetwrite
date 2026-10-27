@@ -9,6 +9,12 @@ use super::super::EvalPass;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
+use grouping::{compare_fields, key_part, range_number, KeyPart, TOTAL_LABEL};
+
+/// Key and aggregate rules that `PIVOTBY` shares with saved pivot tables.
+/// It lives below this family so the formula contract does not read it as a
+/// function family.
+pub(crate) mod grouping;
 
 pub(crate) const NAMES: &[&str] = &["GROUPBY", "PERCENTOF", "PIVOTBY"];
 const AGGREGATORS: &[&str] = &[
@@ -74,14 +80,14 @@ impl Context<'_, '_> {
         self.charge(rows.len())?;
         let mut total = 0.0;
         for &row in rows {
-            match &values.values[row * values.cols + column] {
-                Value::Number(number) => total += number,
-                Value::Error(error) => {
-                    let result = Value::Error(*error);
+            match range_number(&values.values[row * values.cols + column]) {
+                Ok(Some(number)) => total += number,
+                Err(error) => {
+                    let result = Value::Error(error);
                     self.sums.insert(key, result.clone());
                     return Ok(result);
                 }
-                _ => {}
+                Ok(None) => {}
             }
         }
         let sum = Value::number(total);
@@ -105,27 +111,6 @@ impl Context<'_, '_> {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-enum KeyPart {
-    Zero,
-    Number(u64),
-    Text(String),
-    Bool(bool),
-}
-fn key_part(value: &Value) -> Result<KeyPart, FormulaError> {
-    Ok(match value {
-        // Blank compares equal to each of these values. Keep them in one bucket,
-        // then use compare_values to separate unequal nonblank keys.
-        Value::Blank | Value::Bool(false) => KeyPart::Zero,
-        Value::Number(number) if *number == 0.0 => KeyPart::Zero,
-        Value::Number(number) if number.is_finite() => KeyPart::Number(number.to_bits()),
-        Value::Number(_) => return Err(FormulaError::Num),
-        Value::Text(text) if text.is_empty() => KeyPart::Zero,
-        Value::Text(text) => KeyPart::Text(text.to_lowercase()),
-        Value::Bool(boolean) => KeyPart::Bool(*boolean),
-        Value::Error(error) => return Err(*error),
-    })
-}
 struct Group {
     fields: Vec<Value>,
     rows: Vec<usize>,
@@ -137,16 +122,6 @@ struct Axis {
     order: Vec<usize>,
     grand: usize,
     width: usize,
-}
-fn compare_fields(left: &[Value], right: &[Value]) -> Ordering {
-    for (left_value, right_value) in left.iter().zip(right) {
-        let order =
-            compare_values(left_value, right_value).expect("group keys are checked before sorting");
-        if order != Ordering::Equal {
-            return order;
-        }
-    }
-    Ordering::Equal
 }
 impl Axis {
     fn build(
@@ -789,7 +764,7 @@ pub(crate) fn evaluate_matrix(
                     .cloned()
                     .unwrap_or_else(|| {
                         if field == columns.groups[group].fields.len() {
-                            Value::text("Total")
+                            Value::text(TOTAL_LABEL)
                         } else {
                             Value::Blank
                         }
@@ -827,7 +802,7 @@ pub(crate) fn evaluate_matrix(
         for field in 0..rows.width {
             output[offset + field] = group.fields.get(field).cloned().unwrap_or_else(|| {
                 if field == group.fields.len() {
-                    Value::text("Total")
+                    Value::text(TOTAL_LABEL)
                 } else {
                     Value::Blank
                 }

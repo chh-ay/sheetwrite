@@ -22,6 +22,7 @@ import {
   UndoManager,
 } from "./history.js";
 import { cloneCellHyperlink } from "./hyperlink.js";
+import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
 import {
   encodeRestoreBlock,
   encodeMeasuredRestoreBlock,
@@ -229,7 +230,9 @@ export class DocumentController {
 
       // Custom stores without an engine retain their scalar snapshot contract.
       for (const patch of patches) {
-        if (!inverseByPatch.has(patch)) inverseByPatch.set(patch, this.inversePatch(patch));
+        if (!inverseByPatch.has(patch)) {
+          inverseByPatch.set(patch, [...this.inversePatch(patch), ...this.pivotRestores(patch)]);
+        }
       }
 
       outcome = this.storeApply(patches, reason, admittedPatches);
@@ -799,7 +802,39 @@ export class DocumentController {
           this.options.store.getWorkbook().calculation ?? DEFAULT_CALCULATION_SETTINGS;
         return [{ op: "setCalculation", calculation: { ...previous } }];
       }
+      case "setPivot": {
+        const previous = this.sheetById(patch.sheet)?.pivots?.find(
+          (pivot) => pivot.id === patch.pivot.id,
+        );
+        return previous
+          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
+          : [{ op: "removePivot", sheet: patch.sheet, id: patch.pivot.id }];
+      }
+      case "removePivot": {
+        const previous = this.sheetById(patch.sheet)?.pivots?.find(
+          (pivot) => pivot.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setPivot", sheet: patch.sheet, pivot: clonePivot(previous) }]
+          : [];
+      }
     }
+  }
+
+  /**
+   * Pivots an edit rewrites, restored with their definitions from before it.
+   * They follow the structural inverse, so anchors and sources are back in
+   * bounds when the restore is validated. The store applies the same plan.
+   */
+  private pivotRestores(patch: DocumentOp): DocumentOp[] {
+    const sheets = this.options.store.getWorkbook().sheets;
+    const plan = planPivotEdit(patch, sheets);
+    if (!plan) return [];
+    return pivotRewrites(sheets, plan).map((rewrite) => ({
+      op: "setPivot",
+      sheet: rewrite.owner,
+      pivot: clonePivot(rewrite.before),
+    }));
   }
 
   private compactHistoryPart(range: Range): HistoryPart | null {
@@ -1074,6 +1109,7 @@ export class DocumentController {
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(sheet.tables),
       charts: sheet.charts?.map(cloneChartDefinition),
+      pivots: sheet.pivots?.map(clonePivot),
       cells:
         cells.length === 0
           ? []

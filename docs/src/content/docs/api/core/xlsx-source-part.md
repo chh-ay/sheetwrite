@@ -9,7 +9,7 @@ One retained OOXML part, kept as its original compressed ZIP payload so a
 save copies it without inflating or recompressing. Runtime copies are frozen.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L388"><code>packages/core/src/types/document.ts#L388</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L403"><code>packages/core/src/types/document.ts#L403</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>6</span>

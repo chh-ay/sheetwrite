@@ -245,6 +245,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "updateTable":
     case "setSheetMeta":
     case "setChart":
+    case "setPivot":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -500,6 +501,36 @@ function transformDirectTarget(
         }
       }
       return null;
+    case "setPivot": {
+      const anchor = transformAddress(
+        {
+          sheet: operation.sheet,
+          row: operation.pivot.anchor.row,
+          col: operation.pivot.anchor.col,
+        },
+        change,
+      );
+      if (!anchor) return deletedTarget(operation.op);
+      operation.pivot.anchor = { row: anchor.row, col: anchor.col };
+
+      const source = operation.pivot.source;
+      if (source.invalid) return null;
+      if ("table" in source) {
+        // Field indices are table-column offsets, and the table's sheet is not
+        // known here, so a concurrent column edit may shift them.
+        return change.axis === "column"
+          ? {
+              code: "unsupported-structural",
+              message: "A table-sourced pivot cannot be rebased across a column edit",
+            }
+          : null;
+      }
+      // A range that straddles the edit changes size; one that moves whole keeps its fields.
+      const range = transformRange(source.range, change);
+      if (!range) return overlappingStructure(operation.op);
+      source.range = range;
+      return null;
+    }
     case "addSheet":
     case "removeSheet":
     case "renameSheet":
@@ -512,6 +543,7 @@ function transformDirectTarget(
     case "removeTable":
     case "setCalculation":
     case "removeChart":
+    case "removePivot":
       return null;
   }
 }
@@ -848,6 +880,13 @@ function operationTouchesSheet(
         (snapshot.charts?.some((chart) => chartTouchesSheet(chart, snapshot.id, sheet)) ?? false)
       );
     }
+    case "setPivot":
+      return (
+        operation.sheet === sheet ||
+        (!operation.pivot.source.invalid &&
+          "range" in operation.pivot.source &&
+          operation.pivot.source.range.sheet === sheet)
+      );
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }
@@ -910,6 +949,14 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.table.range];
     case "updateTable":
       return operation.patch.range ? [operation.patch.range] : [];
+    case "setPivot":
+      return [
+        {
+          sheet: operation.sheet,
+          start: { ...operation.pivot.anchor },
+          end: { ...operation.pivot.anchor },
+        },
+      ];
     default:
       return [];
   }
@@ -947,6 +994,10 @@ function operationIdentity(operation: DocumentOp): string {
     // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
     case "setCalculation":
       return "calculation";
+    case "setPivot":
+      return `pivot:${operation.pivot.id}`;
+    case "removePivot":
+      return `pivot:${operation.id}`;
     default:
       return "";
   }

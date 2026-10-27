@@ -140,7 +140,8 @@ export interface RowBridgeMetadataDelta<
     | "note"
     | "named-range"
     | "calculation"
-    | "chart";
+    | "chart"
+    | "pivot";
 }
 
 /** A document operation that needs a host-side action rather than row mutation. */
@@ -936,6 +937,9 @@ export class RowBridge<
       case "setChart":
       case "removeChart":
         return [this.metadata(transaction, operation, "chart", sheet)];
+      case "setPivot":
+      case "removePivot":
+        return [this.metadata(transaction, operation, "pivot", sheet)];
       default:
         return assertNever(operation);
     }

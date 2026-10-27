@@ -30,6 +30,16 @@ _Avoid_: dataset, trace
 The resolved plain data of one chart (`ChartView`): series values, categories and number formats. The renderer draws only from it.
 _Avoid_: chart data, chart state
 
+## Pivot tables
+
+**Pivot definition**:
+The document record of one pivot table: its source range or table, anchor cell, row, column and value fields, filters, sort and totals. It is saved, undone and synchronized like other sheet metadata.
+_Avoid_: pivot config, pivot spec
+
+**Pivot cache**:
+The remembered source-row contributions and group aggregates used to update a pivot table when its source changes.
+_Avoid_: pivot state, pivot data
+
 ## Release
 
 **Package assembly**:

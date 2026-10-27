@@ -8,7 +8,7 @@ description: "Result of module initialization: the instantiated exports plus the
 Result of module initialization: the instantiated exports plus the shared linear memory.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L524"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L524</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/formulas/pkg/sheetwrite_wasm.d.ts#L566"><code>packages/formulas/pkg/sheetwrite_wasm.d.ts#L566</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -17,6 +17,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbg-cellsnapshot-free"><code>__wbg_cellsnapshot_free</code></a>
 <a href="#init-output-wbg-cellstore-free"><code>__wbg_cellstore_free</code></a>
 <a href="#init-output-wbg-distinctcolumn-free"><code>__wbg_distinctcolumn_free</code></a>
+<a href="#init-output-wbg-pivotfields-free"><code>__wbg_pivotfields_free</code></a>
 <a href="#init-output-wbg-rangesnapshot-free"><code>__wbg_rangesnapshot_free</code></a>
 <a href="#init-output-wbg-sourcesnapshot-free"><code>__wbg_sourcesnapshot_free</code></a>
 <a href="#init-output-wbg-windowview-free"><code>__wbg_windowview_free</code></a>
@@ -82,6 +83,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-pin-range"><code>cellstore_pinRange</code></a>
 <a href="#init-output-cellstore-pin-read-window"><code>cellstore_pinReadWindow</code></a>
 <a href="#init-output-cellstore-pin-viewport-bands"><code>cellstore_pinViewportBands</code></a>
+<a href="#init-output-cellstore-pivot-fields"><code>cellstore_pivotFields</code></a>
+<a href="#init-output-cellstore-pivot-status"><code>cellstore_pivotStatus</code></a>
 <a href="#init-output-cellstore-pool-strings"><code>cellstore_poolStrings</code></a>
 <a href="#init-output-cellstore-query-resource-stats"><code>cellstore_queryResourceStats</code></a>
 <a href="#init-output-cellstore-range-fully-loaded"><code>cellstore_rangeFullyLoaded</code></a>
@@ -113,6 +116,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-cellstore-set-iterative-calculation"><code>cellstore_setIterativeCalculation</code></a>
 <a href="#init-output-cellstore-set-named-range"><code>cellstore_setNamedRange</code></a>
 <a href="#init-output-cellstore-set-number"><code>cellstore_setNumber</code></a>
+<a href="#init-output-cellstore-set-pivots"><code>cellstore_setPivots</code></a>
 <a href="#init-output-cellstore-set-sheet-name"><code>cellstore_setSheetName</code></a>
 <a href="#init-output-cellstore-set-sheet-order"><code>cellstore_setSheetOrder</code></a>
 <a href="#init-output-cellstore-set-sparse-block"><code>cellstore_setSparseBlock</code></a>
@@ -135,6 +139,8 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-distinctcolumn-take-numbers"><code>distinctcolumn_takeNumbers</code></a>
 <a href="#init-output-distinctcolumn-take-texts"><code>distinctcolumn_takeTexts</code></a>
 <a href="#init-output-function-names"><code>functionNames</code></a>
+<a href="#init-output-pivotfields-names"><code>pivotfields_names</code></a>
+<a href="#init-output-pivotfields-types"><code>pivotfields_types</code></a>
 <a href="#init-output-rangesnapshot-byte-length"><code>rangesnapshot_byteLength</code></a>
 <a href="#init-output-rangesnapshot-export-memory-state"><code>rangesnapshot_exportMemoryState</code></a>
 <a href="#init-output-rangesnapshot-formula-offsets"><code>rangesnapshot_formulaOffsets</code></a>
@@ -163,7 +169,7 @@ Result of module initialization: the instantiated exports plus the shared linear
 <a href="#init-output-wbindgen-start"><code>__wbindgen_start</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>149</span>
+## Members <span class="api-count" data-pagefind-ignore>155</span>
 
 <div class="api-member-list">
 
@@ -208,6 +214,15 @@ readonly __wbg_cellstore_free: (a: number, b: number) => void;
 
 ```ts generated
 readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
+```
+
+</details>
+
+<details class="api-member" id="init-output-wbg-pivotfields-free" data-pagefind-weight="1">
+<summary><code>__wbg_pivotfields_free</code></summary>
+
+```ts generated
+readonly __wbg_pivotfields_free: (a: number, b: number) => void;
 ```
 
 </details>
@@ -797,6 +812,24 @@ readonly cellstore_pinViewportBands: (a: number, b: number, c: number, d: number
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-pivot-fields" data-pagefind-weight="1">
+<summary><code>cellstore_pivotFields</code></summary>
+
+```ts generated
+readonly cellstore_pivotFields: (a: number, b: number, c: number) => number;
+```
+
+</details>
+
+<details class="api-member" id="init-output-cellstore-pivot-status" data-pagefind-weight="1">
+<summary><code>cellstore_pivotStatus</code></summary>
+
+```ts generated
+readonly cellstore_pivotStatus: (a: number, b: number) => [number, number];
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-pool-strings" data-pagefind-weight="1">
 <summary><code>cellstore_poolStrings</code></summary>
 
@@ -1076,6 +1109,15 @@ readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: nu
 
 </details>
 
+<details class="api-member" id="init-output-cellstore-set-pivots" data-pagefind-weight="1">
+<summary><code>cellstore_setPivots</code></summary>
+
+```ts generated
+readonly cellstore_setPivots: (a: number, b: number, c: number, d: number, e: number, f: number) => number;
+```
+
+</details>
+
 <details class="api-member" id="init-output-cellstore-set-sheet-name" data-pagefind-weight="1">
 <summary><code>cellstore_setSheetName</code></summary>
 
@@ -1270,6 +1312,24 @@ readonly distinctcolumn_takeTexts: (a: number) => [number, number];
 
 ```ts generated
 readonly functionNames: () => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-pivotfields-names" data-pagefind-weight="1">
+<summary><code>pivotfields_names</code></summary>
+
+```ts generated
+readonly pivotfields_names: (a: number) => [number, number];
+```
+
+</details>
+
+<details class="api-member" id="init-output-pivotfields-types" data-pagefind-weight="1">
+<summary><code>pivotfields_types</code></summary>
+
+```ts generated
+readonly pivotfields_types: (a: number) => [number, number];
 ```
 
 </details>
@@ -1521,6 +1581,7 @@ export interface InitOutput {
   readonly __wbg_cellsnapshot_free: (a: number, b: number) => void;
   readonly __wbg_cellstore_free: (a: number, b: number) => void;
   readonly __wbg_distinctcolumn_free: (a: number, b: number) => void;
+  readonly __wbg_pivotfields_free: (a: number, b: number) => void;
   readonly __wbg_rangesnapshot_free: (a: number, b: number) => void;
   readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void;
   readonly __wbg_windowview_free: (a: number, b: number) => void;
@@ -1838,6 +1899,8 @@ export interface InitOutput {
     c: number,
     d: number,
   ) => void;
+  readonly cellstore_pivotFields: (a: number, b: number, c: number) => number;
+  readonly cellstore_pivotStatus: (a: number, b: number) => [number, number];
   readonly cellstore_poolStrings: (
     a: number,
     b: number,
@@ -2070,6 +2133,14 @@ export interface InitOutput {
     e: number,
     f: number,
   ) => void;
+  readonly cellstore_setPivots: (
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => number;
   readonly cellstore_setSheetName: (
     a: number,
     b: number,
@@ -2210,6 +2281,8 @@ export interface InitOutput {
   readonly distinctcolumn_takeNumbers: (a: number) => [number, number];
   readonly distinctcolumn_takeTexts: (a: number) => [number, number];
   readonly functionNames: () => [number, number];
+  readonly pivotfields_names: (a: number) => [number, number];
+  readonly pivotfields_types: (a: number) => [number, number];
   readonly rangesnapshot_byteLength: (a: number) => number;
   readonly rangesnapshot_exportMemoryState: (
     a: number,
@@ -2263,6 +2336,7 @@ export interface InitOutput {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/formulas/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/formulas</span></li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 <li><a href="/docs/api/wasm/init-sync/"><code>initSync</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

@@ -95,6 +95,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-set-iterative-calculation"><code>setIterativeCalculation</code></a>
 <a href="#cell-store-set-named-range"><code>setNamedRange</code></a>
 <a href="#cell-store-set-number"><code>setNumber</code></a>
+<a href="#cell-store-set-saved-pivots"><code>setSavedPivots</code></a>
 <a href="#cell-store-set-sheet-name"><code>setSheetName</code></a>
 <a href="#cell-store-set-sheet-order"><code>setSheetOrder</code></a>
 <a href="#cell-store-set-sparse-block"><code>setSparseBlock</code></a>
@@ -116,7 +117,7 @@ The workbook-wide store: every sheet, one string pool.
 <a href="#cell-store-import-memory-state"><code>importMemoryState</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>102</span>
+## Members <span class="api-count" data-pagefind-ignore>103</span>
 
 <div class="api-member-list">
 
@@ -992,6 +993,28 @@ setNumber: (sheet: number, row: number, col: number, value: number, style: numbe
 
 </details>
 
+<details class="api-member" id="cell-store-set-saved-pivots" data-pagefind-weight="1">
+<summary><code>setSavedPivots</code> <span class="api-member-summary">Replaces the saved pivot output anchored on sheet.</span></summary>
+
+```ts generated
+setSavedPivots: (sheet: number, layout: Uint32Array, kinds: Uint8Array, numbers: Float64Array, text: string, text_lengths: Uint32Array) => boolean;
+```
+
+<p class="api-member-doc">Replaces the saved pivot output anchored on `sheet`. This engine
+computes no pivots: it shows output a file saved, from the anchor,
+at the next recalculation, and never recalculates it.
+
+- `layout`: per output `[anchorRow, anchorCol, rows, cols]`.
+- `kinds` and `numbers`: one entry per cell, row-major, output
+  after output. Kinds: 0 blank, 1 number, 2 text, 3 boolean
+  (`numbers` holds 0 or 1). Text cells take `numbers` 0.
+- `text` and `textLengths`: the text cells joined in order, and
+  each one's length in UTF-16 code units.
+
+An output that did not change stays installed. Returns `false`,
+changing nothing, for a malformed payload or a dead sheet.</p>
+</details>
+
 <details class="api-member" id="cell-store-set-sheet-name" data-pagefind-weight="1">
 <summary><code>setSheetName</code></summary>
 
@@ -1538,6 +1561,14 @@ class CellStore {
     value: number,
     style: number,
   ) => void;
+  setSavedPivots: (
+    sheet: number,
+    layout: Uint32Array,
+    kinds: Uint8Array,
+    numbers: Float64Array,
+    text: string,
+    text_lengths: Uint32Array,
+  ) => boolean;
   setSheetName: (sheet: number, id: string, name: string) => void;
   setSheetOrder: (order: Uint32Array) => boolean;
   setSparseBlock: (
@@ -1625,5 +1656,6 @@ class CellStore {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/sheetwrite-engine/"><code>SheetwriteEngine</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/wasm/engine-instance/"><code>EngineInstance</code></a><span class="api-consumer-kind">@sheetwrite/wasm</span></li>
 </ul>
 </div>

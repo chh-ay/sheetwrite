@@ -28,6 +28,11 @@ use crate::types::{
 };
 use crate::window::ConditionalRules;
 
+pub(crate) mod pivot_output;
+#[cfg(all(test, feature = "analysis"))]
+mod pivot_tests;
+#[cfg(feature = "analysis")]
+mod pivots;
 mod range_transfer;
 mod transfer;
 
@@ -282,6 +287,14 @@ pub struct CellStore {
     /// new Excel workbook, so circular references show `#CYCLE!`. Boxed so
     /// workbooks that never turn iteration on pay one pointer.
     pub(crate) iteration: Option<Box<IterationLimits>>,
+    /// Pivot tables: the full engine's definitions and caches, or the
+    /// default engine's saved output. `None` until a sheet gets a pivot (on
+    /// the default engine, one with saved output), so a workbook without
+    /// pivots pays one pointer and no pivot work.
+    #[cfg(feature = "analysis")]
+    pub(crate) pivots: Option<Box<pivots::PivotRegistry>>,
+    #[cfg(not(feature = "analysis"))]
+    pub(crate) pivots: Option<Box<pivot_output::SavedPivots>>,
     /// Formulas each recompute pass selected, summed over passes. Tests read
     /// it to bound recalculation work, which no value can show.
     #[cfg(test)]
@@ -365,6 +378,7 @@ impl CellStore {
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
             iteration: None,
+            pivots: None,
             tables: HashMap::new(),
             #[cfg(test)]
             recomputed_formulas: 0,
@@ -818,6 +832,7 @@ impl CellStore {
         self.sheets[sheet] = SheetData::new(0, 0);
         self.conditional_rules.remove_sheet(sheet);
         self.sheet_alive[sheet] = false;
+        self.forget_pivot_sheet(sheet);
         if let Some(order) = &mut self.sheet_order {
             order.retain(|&tab| tab != sheet as u32);
         }
@@ -2073,6 +2088,12 @@ impl CellStore {
         self.sheets[sheet].insert_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
+        self.shift_pivots(
+            sheet,
+            pivot_output::ShiftAxis::Rows,
+            at as u32,
+            count as i64,
+        );
     }
 
     #[wasm_bindgen(js_name = removeRows)]
@@ -2090,6 +2111,12 @@ impl CellStore {
         self.sheets[sheet].delete_rows(sheet as u32, at, count);
         self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
+        self.shift_pivots(
+            sheet,
+            pivot_output::ShiftAxis::Rows,
+            at as u32,
+            -(count as i64),
+        );
     }
 
     #[wasm_bindgen(js_name = insertCols)]
@@ -2107,6 +2134,12 @@ impl CellStore {
         self.sheets[sheet].insert_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
         self.graph.invalidate();
+        self.shift_pivots(
+            sheet,
+            pivot_output::ShiftAxis::Cols,
+            at as u32,
+            count as i64,
+        );
     }
 
     #[wasm_bindgen(js_name = removeCols)]
@@ -2124,6 +2157,12 @@ impl CellStore {
         self.sheets[sheet].delete_cols(sheet as u32, at, count);
         self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
         self.graph.invalidate();
+        self.shift_pivots(
+            sheet,
+            pivot_output::ShiftAxis::Cols,
+            at as u32,
+            -(count as i64),
+        );
     }
 
     /// Single-cell read for interactions/tests — never the render hot path.
@@ -2404,6 +2443,8 @@ impl CellStore {
         }
         self.tables.insert(name_key, definition);
         self.refresh_formula_entries();
+        #[cfg(feature = "analysis")]
+        self.invalidate_table_pivots();
         self.recompute_all_sheets();
         true
     }
@@ -2420,6 +2461,8 @@ impl CellStore {
         self.tables.remove(&key);
         self.rewrite_table_formula_entries(id, None);
         self.refresh_formula_entries();
+        #[cfg(feature = "analysis")]
+        self.invalidate_table_pivots();
         self.recompute_all_sheets();
         true
     }
@@ -3305,6 +3348,12 @@ impl CellStore {
 
         self.graph.add_memory_stats(&mut stats);
         self.conditional_rules.add_memory_stats(&mut stats);
+        if let Some(pivots) = &self.pivots {
+            let bytes = pivots.retained_bytes();
+            stats
+                .owner_mut(SHEET_INDEXES_METADATA)
+                .add_payload(bytes, bytes);
+        }
 
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         metadata.add_payload(

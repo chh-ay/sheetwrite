@@ -19,6 +19,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/cell.ts",
     "../types/coordinates.ts",
     "../types/document.ts",
+    "../types/pivot.ts",
     "ranges.ts",
   ],
   "ranges.ts": ["../types/cell.ts", "../types/coordinates.ts", "../types/document.ts"],
@@ -85,6 +86,22 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "WorkbookTableXmlElement",
     ],
   },
+  pivot: {
+    source: "packages/core/src/types/pivot.ts",
+    dependencies: ["cell", "coordinates", "table"],
+    exports: [
+      "PivotAggregation",
+      "PivotDefinition",
+      "PivotFieldType",
+      "PivotFilter",
+      "PivotLayout",
+      "PivotResultView",
+      "PivotSort",
+      "PivotSource",
+      "PivotSourceField",
+      "PivotValueField",
+    ],
+  },
   cell: {
     source: "packages/core/src/types/cell.ts",
     dependencies: ["coordinates"],
@@ -123,7 +140,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "chart", "coordinates", "table"],
+    dependencies: ["cell", "chart", "coordinates", "pivot", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",
@@ -232,7 +249,16 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
   },
   grid: {
     source: "packages/core/src/types/grid.ts",
-    dependencies: ["cell", "coordinates", "data", "document", "render", "store", "transaction"],
+    dependencies: [
+      "cell",
+      "coordinates",
+      "data",
+      "document",
+      "pivot",
+      "render",
+      "store",
+      "transaction",
+    ],
     exports: [
       "BorderPreset",
       "CellEditor",

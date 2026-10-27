@@ -8,7 +8,7 @@ description: "Workbook sheet schema used when creating a live grid."
 Workbook sheet schema used when creating a live grid.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L42"><code>packages/core/src/types/document.ts#L42</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L43"><code>packages/core/src/types/document.ts#L43</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -32,9 +32,10 @@ Workbook sheet schema used when creating a live grid.
 <a href="#sheet-frozen-cols"><code>frozenCols</code></a>
 <a href="#sheet-tables"><code>tables</code></a>
 <a href="#sheet-charts"><code>charts</code></a>
+<a href="#sheet-pivots"><code>pivots</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>20</span>
+## Members <span class="api-count" data-pagefind-ignore>21</span>
 
 <div class="api-member-list">
 
@@ -217,6 +218,15 @@ charts?: ChartDefinition[];
 ```
 
 </details>
+
+<details class="api-member" id="sheet-pivots" data-pagefind-weight="1">
+<summary><code>pivots</code> <span class="api-member-summary">Pivot tables anchored on this sheet; IDs are unique in the workbook.</span></summary>
+
+```ts generated
+pivots?: PivotDefinition[];
+```
+
+</details>
 </div>
 
 ## Declaration
@@ -246,6 +256,7 @@ export interface Sheet {
   frozenCols?: number;
   tables?: WorkbookTable[];
   charts?: ChartDefinition[];
+  pivots?: PivotDefinition[];
 }
 ```
 

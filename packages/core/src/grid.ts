@@ -37,6 +37,7 @@ import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { OverlayPainter } from "./overlay-painter.js";
+import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
 import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
@@ -112,6 +113,7 @@ import type {
   SelectionSummary,
   SheetLifecycleResult,
 } from "./types/grid.js";
+import type { PivotDefinition, PivotResultView, PivotSourceField } from "./types/pivot.js";
 import type { CellRenderer, Renderer, Theme } from "./types/render.js";
 import type { Store, VisibleWindowView } from "./types/store.js";
 import type {
@@ -1195,7 +1197,8 @@ export class GridImpl implements Grid {
       engine.isPaged(this.activeSheet) ||
       sheet.conditionalFormats?.length ||
       sheet.validationRules?.length ||
-      sheet.merges?.length,
+      sheet.merges?.length ||
+      sheet.pivots?.length,
     );
     let painted: PaintedCells | null = null;
     for (const patch of patches) {
@@ -2726,6 +2729,41 @@ export class GridImpl implements Grid {
       [{ op: "removeProtectedRange", sheet: this.activeSheet, id }],
       "api",
     );
+  }
+
+  getPivots(sheet?: SheetId): PivotDefinition[] {
+    return clonePivots(this.store.getWorkbook().sheets, sheet);
+  }
+
+  setPivot(pivot: PivotDefinition, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, pivot.id)?.id;
+    // Saved values do not match a definition the caller changed.
+    const changed = withoutSavedOutput(structuredClone(pivot));
+    return this.document.commit(
+      [{ op: "setPivot", sheet: owner ?? this.activeSheet, pivot: changed }],
+      "api",
+    );
+  }
+
+  removePivot(id: string, sheet?: SheetId): ApplyTransactionResult {
+    const owner = sheet ?? pivotOwner(this.store.getWorkbook().sheets, id)?.id ?? this.activeSheet;
+    return this.document.commit([{ op: "removePivot", sheet: owner, id }], "api");
+  }
+
+  getPivotFields(sheet: SheetId, id: string): PivotSourceField[] {
+    return storeEngine(this.store)?.getPivotFields(sheet, id) ?? [];
+  }
+
+  getPivotResult(sheet: SheetId, id: string): PivotResultView | null {
+    const engine = storeEngine(this.store);
+    if (engine) return engine.getPivotResult(sheet, id);
+
+    // A custom store has no pivot engine; its definitions still read normally.
+    const pivot = this.store
+      .getWorkbook()
+      .sheets.find((candidate) => candidate.id === sheet)
+      ?.pivots?.find((candidate) => candidate.id === id);
+    return pivot ? uncomputedPivotResult(sheet, pivot) : null;
   }
 
   setProtectionResolver(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void {

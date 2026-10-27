@@ -1,3 +1,4 @@
+import { type PivotEditPlan, pivotAxisPlan, rebasePivot } from "./pivot.js";
 import type { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
@@ -79,12 +80,18 @@ export class UndoManager {
 
   /** Rebase stored addresses after a row insert/delete in data space. */
   rebaseRows(sheet: SheetId, at: number, delta: number): void {
-    this.rebase((addr) => rebaseAddrRows(addr, sheet, at, delta));
+    this.rebase(
+      (addr) => rebaseAddrRows(addr, sheet, at, delta),
+      pivotAxisPlan({ sheet, axis: "row", remap: shiftIndex(at, delta), anchorFallback: at }),
+    );
   }
 
   /** Rebase stored addresses after a column insert/delete in data space. */
   rebaseCols(sheet: SheetId, at: number, delta: number): void {
-    this.rebase((addr) => rebaseAddrCols(addr, sheet, at, delta));
+    this.rebase(
+      (addr) => rebaseAddrCols(addr, sheet, at, delta),
+      pivotAxisPlan({ sheet, axis: "col", remap: shiftIndex(at, delta), anchorFallback: at }),
+    );
   }
 
   undo(): HistoryAction | null {
@@ -160,9 +167,12 @@ export class UndoManager {
     };
   }
 
-  private rebase(mapAddr: (addr: CellAddress) => CellAddress | null): void {
-    rebaseEntries(this.undoStack, mapAddr);
-    rebaseEntries(this.redoStack, mapAddr);
+  private rebase(
+    mapAddr: (addr: CellAddress) => CellAddress | null,
+    pivotPlan: PivotEditPlan,
+  ): void {
+    rebaseEntries(this.undoStack, mapAddr, pivotPlan);
+    rebaseEntries(this.redoStack, mapAddr, pivotPlan);
   }
 }
 
@@ -192,13 +202,14 @@ function disposeEntry(entry: UndoEntry): void {
 function rebaseEntries(
   entries: UndoEntry[],
   mapAddr: (addr: CellAddress) => CellAddress | null,
+  pivotPlan: PivotEditPlan,
 ): void {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i]!;
     const undo: HistoryAction = [];
     for (const part of entry.undo) {
       if (part.kind === "patches") {
-        const patches = rebasePatches(part.patches, mapAddr);
+        const patches = rebasePatches(part.patches, mapAddr, pivotPlan);
         if (patches.length > 0) undo.push({ kind: "patches", patches });
         continue;
       }
@@ -216,7 +227,7 @@ function rebaseEntries(
       }
     }
     entry.undo = undo;
-    entry.redo = rebasePatches(entry.redo, mapAddr);
+    entry.redo = rebasePatches(entry.redo, mapAddr, pivotPlan);
     if (entry.undo.length === 0 || entry.redo.length === 0) {
       disposeEntry(entry);
       entries.splice(i, 1);
@@ -227,6 +238,7 @@ function rebaseEntries(
 function rebasePatches(
   patches: DocumentOp[],
   mapAddr: (addr: CellAddress) => CellAddress | null,
+  pivotPlan: PivotEditPlan,
 ): DocumentOp[] {
   const out: DocumentOp[] = [];
   for (const patch of patches) {
@@ -303,9 +315,20 @@ function rebasePatches(
       }
       continue;
     }
+    if (patch.op === "setPivot") {
+      out.push({ ...patch, pivot: rebasePivot(patch.pivot, patch.sheet, pivotPlan) });
+      continue;
+    }
     out.push(patch);
   }
   return out;
+}
+
+/** Index remap for an insert (`delta > 0`) or delete (`delta < 0`) at `at`. */
+function shiftIndex(at: number, delta: number): (index: number) => number | null {
+  if (delta >= 0) return (index) => (index >= at ? index + delta : index);
+  const count = -delta;
+  return (index) => (index < at ? index : index < at + count ? null : index - count);
 }
 
 function rebaseAddrRows(

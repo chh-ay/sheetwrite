@@ -8,7 +8,7 @@ description: "Path-qualified schema failure found while validating an untrusted 
 Path-qualified schema failure found while validating an untrusted snapshot.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L427"><code>packages/core/src/document-protocol.ts#L427</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L433"><code>packages/core/src/document-protocol.ts#L433</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

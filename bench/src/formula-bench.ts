@@ -25,7 +25,8 @@ const engine: typeof defaultEngine =
         pathToFileURL(resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/loader-node.mjs`)).href
       );
 const { CellStore, initSync } = engine;
-type CellStore = defaultEngine.CellStore;
+// Fixtures run on either provider, so they use the store type both share.
+type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
 
 import {
   dependencyClosureFormulas,

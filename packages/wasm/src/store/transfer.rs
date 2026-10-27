@@ -335,6 +335,35 @@ impl CellStore {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "analysis")]
+    #[test]
+    fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
+        let mut original = CellStore::new();
+        original.add_sheet(2, 10);
+        original.add_sheet(4, 10);
+        original.set_string(0, 0, 0, "Key", 0);
+        original.set_string(0, 0, 1, "Value", 0);
+        original.set_string(0, 1, 0, "A", 0);
+        original.set_number(0, 1, 1, 7.0, 0);
+        let definition = [
+            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, -1.0, 0.0,
+            0.0, 3.0,
+        ];
+        assert!(original.set_pivots(1, &definition, vec!["pivot".into()]));
+        original.recompute_changed();
+        assert_eq!(original.get_cell(1, 1, 1).num(), 7.0);
+        let bytes = original.export_memory_state();
+        let mut replacement = CellStore::read_memory_state(&bytes).expect("same-build transfer");
+        assert!(replacement.sheets[1].formulas.is_empty());
+        assert_eq!(replacement.formula_source(1, 0, 0), None);
+        assert!(replacement.set_pivots(1, &definition, vec!["pivot".into()]));
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(1, 1, 1).num(), 7.0);
+        replacement.set_number(0, 1, 1, 11.0, 0);
+        replacement.recompute_changed();
+        assert_eq!(replacement.get_cell(1, 1, 1).num(), 11.0);
+    }
+
     #[test]
     fn memory_transfer_preserves_cached_results_and_rebuilds_dependencies() {
         let mut original = CellStore::new();

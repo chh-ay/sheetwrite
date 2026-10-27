@@ -8,7 +8,7 @@ description: "Excel's convergence threshold for a new workbook."
 Excel's convergence threshold for a new workbook.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L54"><code>packages/core/src/document-protocol.ts#L54</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L60"><code>packages/core/src/document-protocol.ts#L60</code></a></dd></div>
 </dl>
 
 ## Declaration

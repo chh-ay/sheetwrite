@@ -30,6 +30,28 @@ constants, checks the computed value after each edit, and reports ten samples
 after two warmups. The scalar `formula-constant-edit` workload remains available
 through `--sample formula-constant-edit 100000` for comparison.
 
+### Incremental pivot benchmark
+
+Build only the full engine with `bun run build:formulas`, then run
+`bun bench/src/pivot-bench.ts --output <artifact.json>` through the machine's
+benchmark runner. The fixture has 100,000 source rows, three row fields, one
+column field, and two value fields (SUM and AVERAGE), with totals and subtotals.
+Source loading is outside the timed build. Each build removes and reinstalls the
+definition. A value edit changes one numeric source cell without changing its
+keys. A key edit moves the first row field of the first source row out of its
+group and back. That row is the label row of one group at each row level, so
+each of those groups must find its next label row. A second pivot with the same
+axes and one MAX field measures extreme removal: each edit lowers or restores
+the largest value of one leaf group, so the cache must read the next largest
+value from its counted set. Outside the timed loop, the script checks the MAX
+with the extreme present and removed. After three warmups, fifteen samples
+compare each full cache build with batches of 100 edits of each kind. The JSON
+reports the timing distributions, the three speedups, output status, and the
+increase in retained engine bytes for the SUM/AVERAGE pivot (cache and output).
+The command exits unsuccessfully when any speedup is below the 100× target. It
+needs no core or XLSX build.
+
+
 ### Engine memory-release gate
 
 From the repository root, run `bun bench/src/engine-memory-release-bench.ts --compare <detached-base-worktree> --engine wasm --output <artifact.json>` under the machine's benchmark runner. Repeat with `--engine formulas`, keeping one CPU slot for all rounds. Both worktrees need release-built engines.

@@ -109,7 +109,10 @@ impl SheetData {
     }
 
     pub(crate) fn finish_recompute(&mut self) {
-        if self.formulas.is_empty() {
+        // A sheet without formulas drops stale results. Spill state on such a
+        // sheet belongs to a pivot table, whose output and blocked-anchor
+        // error are calculated values that must stay.
+        if self.formulas.is_empty() && self.spill.is_empty() {
             self.cells.invalidate_derived();
         }
 
