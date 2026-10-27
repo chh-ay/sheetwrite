@@ -4,6 +4,7 @@ import {
   markAtomicBatch,
   splitOversizedBlocks,
 } from "./atomic-batch.js";
+import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
 import {
   type AdmittedTransactionResources,
   admitTransactionResources,
@@ -48,6 +49,9 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+
+/** Shared result for workbooks without charts, so structural inverses allocate nothing for them. */
+const NO_CHART_RESTORES: readonly DocumentOp[] = [];
 
 export interface DocumentControllerOptions {
   store: Store;
@@ -441,11 +445,17 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
+        const charts = this.chartRestores(patch.sheet, true);
         return compact
-          ? [{ op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count }, compact]
+          ? [
+              { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
+              compact,
+              ...charts,
+            ]
           : [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
               ...this.snapshotRows(patch.sheet, patch.at, patch.count),
+              ...charts,
             ];
       }
       case "moveRows":
@@ -457,6 +467,8 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          // A partly moved source range does not map back exactly.
+          ...this.chartRestores(patch.sheet, true),
         ];
       case "addColumns":
         return [
@@ -478,6 +490,7 @@ export class DocumentController {
               }
             : null;
         const compact = range ? this.compactHistoryPart(range) : null;
+        const charts = this.chartRestores(patch.sheet, true);
         return compact
           ? [
               {
@@ -487,6 +500,7 @@ export class DocumentController {
                 columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
               },
               compact,
+              ...charts,
             ]
           : [
               {
@@ -496,6 +510,7 @@ export class DocumentController {
                 columns: this.snapshotColumns(patch.sheet, patch.at, patch.count),
               },
               ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
+              ...charts,
             ];
       }
       case "moveColumns":
@@ -507,6 +522,7 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          ...this.chartRestores(patch.sheet, true),
         ];
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
@@ -548,9 +564,11 @@ export class DocumentController {
       case "removeSheet": {
         const snapshot = this.snapshotSheet(patch.sheet);
         if (!snapshot) return [];
+        // The snapshot carries the sheet's own charts; other sheets' charts need theirs back.
         const restore: DocumentOp[] = [
           { op: "addSheet", sheet: snapshot },
           ...this.snapshotExternalFormulaAndRefs(patch.sheet),
+          ...this.chartRestores(patch.sheet, false),
         ];
         for (const namedRange of this.options.store.getWorkbook().namedRanges ?? []) {
           if (namedRange.range.sheet === patch.sheet || namedRange.scope === patch.sheet) {
@@ -676,6 +694,22 @@ export class DocumentController {
         );
         return previous
           ? [{ op: "setHyperlink", sheet: patch.sheet, hyperlink: cloneCellHyperlink(previous) }]
+          : [];
+      }
+      case "setChart": {
+        const previous = this.sheetById(patch.sheet)?.charts?.find(
+          (chart) => chart.id === patch.chart.id,
+        );
+        return previous
+          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
+          : [{ op: "removeChart", sheet: patch.sheet, id: patch.chart.id }];
+      }
+      case "removeChart": {
+        const previous = this.sheetById(patch.sheet)?.charts?.find(
+          (chart) => chart.id === patch.id,
+        );
+        return previous
+          ? [{ op: "setChart", sheet: patch.sheet, chart: cloneChartDefinition(previous) }]
           : [];
       }
       case "setValidationRule": {
@@ -966,6 +1000,27 @@ export class DocumentController {
     return this.snapshotSetBatch(sheet, patches);
   }
 
+  /**
+   * Pre-edit definitions of every chart a structural edit of `sheet` may rewrite,
+   * set back after the structure is restored so undo returns them exactly.
+   * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
+   */
+  private chartRestores(sheet: SheetId, includeOwned: boolean): readonly DocumentOp[] {
+    let restores: DocumentOp[] | null = null;
+    for (const owner of this.options.store.getWorkbook().sheets) {
+      const charts = owner.charts;
+      if (!charts || (!includeOwned && owner.id === sheet)) continue;
+
+      for (const chart of charts) {
+        if (chartTouchesSheet(chart, owner.id, sheet)) {
+          restores ??= [];
+          restores.push({ op: "setChart", sheet: owner.id, chart: cloneChartDefinition(chart) });
+        }
+      }
+    }
+    return restores ?? NO_CHART_RESTORES;
+  }
+
   private snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
@@ -1018,6 +1073,7 @@ export class DocumentController {
       filters: structuredClone(sheet.filters),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(sheet.tables),
+      charts: sheet.charts?.map(cloneChartDefinition),
       cells:
         cells.length === 0
           ? []

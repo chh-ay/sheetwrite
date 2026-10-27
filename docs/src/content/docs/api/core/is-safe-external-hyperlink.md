@@ -8,7 +8,7 @@ description: "Validate, but never activate or fetch, an external hyperlink targe
 Validate, but never activate or fetch, an external hyperlink target.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L72"><code>packages/core/src/hyperlink.ts#L72</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L74"><code>packages/core/src/hyperlink.ts#L74</code></a></dd></div>
 </dl>
 
 ## Declaration

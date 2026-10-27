@@ -8,7 +8,7 @@ description: "Revalidate at the final activation boundary; hosts never receive a
 Revalidate at the final activation boundary; hosts never receive an unsafe URL.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L306"><code>packages/core/src/hyperlink.ts#L306</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L309"><code>packages/core/src/hyperlink.ts#L309</code></a></dd></div>
 </dl>
 
 ## Declaration

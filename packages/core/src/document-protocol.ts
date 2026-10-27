@@ -6,6 +6,12 @@ import {
   MAX_NUMBER_FORMAT_LENGTH,
 } from "./cell-style-fields.js";
 import {
+  MAX_CHART_SERIES,
+  MAX_CHARTS_PER_SHEET,
+  sanitizeChartDefinition,
+  validSheetCharts,
+} from "./chart-definition.js";
+import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
   MAX_CONDITIONAL_FORMAT_RULES,
 } from "./conditional-format.js";
@@ -477,6 +483,7 @@ const SHEET_METADATA_ARRAY_KEYS = [
   "filters",
   "rowGroups",
   "tables",
+  "charts",
   "cells",
 ] as const;
 
@@ -973,6 +980,10 @@ export function assertWorkbookAllocationLimits(
         sheet.conditionalFormats!.length,
       );
     }
+    const chartCount = sheet.charts?.length ?? 0;
+    if (chartCount > MAX_CHARTS_PER_SHEET) {
+      throw new SnapshotResourceError("maxMetadataEntries", MAX_CHARTS_PER_SHEET, chartCount);
+    }
   }
 
   let denseCells = 0;
@@ -1027,7 +1038,8 @@ export function assertWorkbookAllocationLimits(
       (sheet.filters?.length ?? 0) +
       (sheet.rowGroups?.length ?? 0) +
       (sheet.tables?.length ?? 0) +
-      (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0);
+      (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0) +
+      (sheet.charts?.length ?? 0);
     if (metadataEntries > limits.maxMetadataEntries) {
       throw new SnapshotResourceError(
         "maxMetadataEntries",
@@ -1317,6 +1329,31 @@ function validateConditionalPredicate(
     }
   } else {
     invalid(errors, `${path}.kind`, "Conditional format predicate kind is invalid");
+  }
+}
+
+function validateChartShape(value: unknown, path: string, errors: DocumentValidationError[]): void {
+  const chart = recordAt(value, path, errors);
+  if (!chart) return;
+
+  // A series count over the bound is a resource rejection, not a malformed value.
+  const series = ownValue(chart, "series");
+  if (Array.isArray(series) && series.length > MAX_CHART_SERIES) {
+    invalid(
+      errors,
+      `${path}.series`,
+      `Chart series limit ${MAX_CHART_SERIES} exceeded`,
+      "resource-limit",
+    );
+    return;
+  }
+
+  if (!sanitizeChartDefinition(chart)) {
+    invalid(
+      errors,
+      path,
+      "Chart must have a valid ID, kind, anchor, bounded text, and series ranges or #REF!",
+    );
   }
 }
 
@@ -1801,6 +1838,20 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
   tables?.forEach((table, index) => {
     validateWorkbookTableShape(table, `${path}.tables[${index}]`, errors);
   });
+
+  const charts = optionalArray(sheet, "charts", path, errors);
+  if (charts && charts.length > MAX_CHARTS_PER_SHEET) {
+    invalid(
+      errors,
+      `${path}.charts`,
+      `Chart limit ${MAX_CHARTS_PER_SHEET} exceeded`,
+      "resource-limit",
+    );
+  } else {
+    charts?.forEach((chart, index) => {
+      validateChartShape(chart, `${path}.charts[${index}]`, errors);
+    });
+  }
 
   const blocks = arrayAt(ownValue(sheet, "cells"), `${path}.cells`, errors);
   blocks?.forEach((entry, blockIndex) => {
@@ -2373,6 +2424,14 @@ export function validateDocumentOperationShape(
       break;
     case "setCalculation":
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
+      break;
+    case "setChart":
+      validateOperationSheetId(operation, path, errors);
+      validateChartShape(ownValue(operation, "chart"), `${path}.chart`, errors);
+      break;
+    case "removeChart":
+      validateOperationSheetId(operation, path, errors);
+      requireString(operation, "id", path, errors, true);
       break;
     default: {
       const unsupported: never = operationKind;
@@ -3140,6 +3199,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
             .sort((a, b) => a.id.localeCompare(b.id))
             .map((table) => structuredClone(table))
         : undefined,
+      charts: sheet.charts
+        ? [...sheet.charts]
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .map((chart) => structuredClone(chart))
+        : undefined,
       cells: sheet.cells.map((block) => ({
         ...block,
         cells: [...block.cells].sort(
@@ -3156,6 +3220,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.filters === undefined) delete normalizedSheet.filters;
     if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
     if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
+    if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;
     normalizedSheets.push(normalizedSheet);
   }
 
@@ -3209,6 +3274,16 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
           "out-of-bounds",
         );
       }
+    }
+
+    // Chart sources may read other sheets, so bounds are checked once every sheet is known.
+    if (sheet.charts && !validSheetCharts(sheet.charts, sheet, validated.sheets)) {
+      invalid(
+        errors,
+        `sheets[${sheetIndex}].charts`,
+        "Charts must have unique IDs, an in-sheet anchor, and sources inside existing sheets",
+        "out-of-bounds",
+      );
     }
   }
 
@@ -3341,6 +3416,8 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "removeProtectedRange":
     case "updateTable":
     case "removeTable":
+    case "setChart":
+    case "removeChart":
       return operation.sheet;
     case "addSheet":
       return operation.sheet.id;

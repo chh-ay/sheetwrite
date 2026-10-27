@@ -10,7 +10,7 @@ without constructing a JSON string. Compact operation ranges are measured by
 their serialized fields; their logical cell area is deliberately irrelevant.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L148"><code>packages/core/src/document-protocol.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/document-protocol.ts#L154"><code>packages/core/src/document-protocol.ts#L154</code></a></dd></div>
 </dl>
 
 ## Declaration

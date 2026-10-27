@@ -9466,6 +9466,99 @@ Members:
 - `source` — Remote input is observable but never belongs in outgoing local persistence.
 - `transaction` — Operations that actually committed after policy and bounds filtering.
 
+##### `ChartAnchor` — interface
+
+```ts
+export interface ChartAnchor { row: number; col: number; offsetX: number; offsetY: number; width: number; height: number; }
+```
+
+Position in worksheet coordinates; dimensions and offsets use CSS pixels.
+
+##### `ChartChangeEvent` — interface
+
+```ts
+export interface ChartChangeEvent { readonly epoch: number | undefined; readonly charts: readonly ChartRef[]; }
+```
+
+Charts whose `ChartView` may differ after one store commit. Emitted at most
+once per commit, only when `charts` is not empty; each chart appears once.
+A chart that no longer exists resolves to `null`.
+
+Members:
+- `epoch` — Store epoch after the commit.
+
+##### `ChartChangeListener` — type
+
+```ts
+export type ChartChangeListener = (event: ChartChangeEvent) => void;
+```
+
+Listener for {@link subscribeChartChanges}.
+
+##### `ChartDefinition` — interface
+
+```ts
+export interface ChartDefinition { id: string; kind: ChartKind; title?: string; axes?: { xTitle?: string; yTitle?: string }; legend?: "none" | "top" | "right" | "bottom" | "left"; anchor: ChartAnchor; series: ChartSeries[]; }
+```
+
+Persisted chart definition; IDs are unique within the owning sheet.
+
+##### `ChartKind` — type
+
+```ts
+export type ChartKind = "column" | "bar" | "line" | "area" | "pie" | "doughnut" | "scatter";
+```
+
+Chart families supported by the 0.6 document model.
+
+##### `ChartRange` — type
+
+```ts
+export type ChartRange = Range | "#REF!";
+```
+
+A deleted source remains explicit instead of silently reading another cell.
+
+##### `ChartRef` — interface
+
+```ts
+export interface ChartRef { readonly sheet: SheetId; readonly id: string; }
+```
+
+Stable identity of one chart: the sheet that owns it and its ID on that sheet.
+
+##### `ChartSeries` — interface
+
+```ts
+export interface ChartSeries { name?: string; nameRange?: ChartRange; values: ChartRange; categories?: ChartRange; }
+```
+
+Sources are read in row-major order.
+
+##### `ChartSeriesView` — interface
+
+```ts
+export interface ChartSeriesView { name: string; values: Array<number | null>; categories: Array<string | number | boolean | null>; numberFormats: Array<string | null>; categoryFormats: Array<string | null>; numberLocale: string | null; truncated: boolean; referenceError: boolean; }
+```
+
+Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.
+
+Members:
+- `categoryFormats` — Format code per category; date categories are serial numbers and need it to show as dates.
+- `numberFormats` — Excel format code per value, as the grid paints it: cell style, then column style, then column format.
+- `numberLocale` — BCP 47 locale of the first value column, for separators; `null` keeps the default.
+- `referenceError` — A source was deleted; that source reads as empty.
+- `truncated` — A source had more than `MAX_CHART_POINTS` cells and its tail was dropped.
+- `values` — Numeric cells; text, booleans, errors and empty cells are `null` (a gap).
+
+##### `ChartView` — interface
+
+```ts
+export interface ChartView { chart: ChartDefinition; series: ChartSeriesView[]; }
+```
+
+One immutable-by-convention rendering input, refreshed on chart-change events.
+
 ##### `colToA1` — function
 
 ```ts
@@ -10067,7 +10160,7 @@ Diff two validated phases of the same operation by exclusive resource owner.
 ##### `DocumentOp` — type
 
 ```ts
-export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings };
+export type DocumentOp = | { op: "set"; addr: CellAddress; value: CellValue; style?: CellStyle } | { op: "setRange"; range: Range; cells: SnapshotCell[] } | { op: "setBlock"; range: Range; block: PackedCellBlock } | { op: "restoreBlock"; range: Range; encoding: "deflate-json-v1"; decodedBytes: number; data: string; } | { op: "setRangeStyle"; range: Range; style: Partial<CellStyle> | null } | { op: "clearRange"; range: Range; contents?: boolean; style?: boolean } | { op: "addRows"; sheet: SheetId; at: number; count: number } | { op: "removeRows"; sheet: SheetId; at: number; count: number } | { op: "moveRows"; sheet: SheetId; from: number; count: number; to: number } | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] } | { op: "removeColumns"; sheet: SheetId; at: number; count: number } | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number } | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> } | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null } | { op: "addMerge"; sheet: SheetId; merge: MergeRange } | { op: "removeMerge"; sheet: SheetId; merge: MergeRange } | { op: "addSheet"; sheet: SheetSnapshot } | { op: "removeSheet"; sheet: SheetId } | { op: "renameSheet"; sheet: SheetId; name: string } | { op: "moveSheet"; sheet: SheetId; to: number } | { op: "setSheetVisibility"; sheet: SheetId; visibility: SheetVisibility } | { op: "addTable"; table: WorkbookTable } | { op: "updateTable"; sheet: SheetId; tableId: string; patch: WorkbookTablePatch } | { op: "removeTable"; sheet: SheetId; tableId: string } | { op: "setSheetMeta"; sheet: SheetId; patch: { frozenRows?: number; frozenCols?: number; conditionalFormats?: ConditionalFormatRule[]; rowGroups?: RowGroup[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; }; } | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule } | { op: "removeValidationRule"; sheet: SheetId; id: string } | { op: "setHyperlink"; sheet: SheetId; hyperlink: CellHyperlink } | { op: "removeHyperlink"; sheet: SheetId; id: string } | { op: "setProtectedRange"; sheet: SheetId; protectedRange: ProtectedRange } | { op: "removeProtectedRange"; sheet: SheetId; id: string } | { op: "setNote"; addr: CellAddress; text: string | null } | { op: "setNamedRange"; namedRange: NamedRangeSnapshot } | { op: "removeNamedRange"; name: string; scope?: SheetId } | { op: "setCalculation"; calculation: CalculationSettings } | { op: "setChart"; sheet: SheetId; chart: ChartDefinition } | { op: "removeChart"; sheet: SheetId; id: string };
 ```
 
 Exhaustive serializable operation union for workbook mutations.
@@ -10831,6 +10924,15 @@ export interface LegacyRowPage { readonly start: number; readonly rows: readonly
 
 Row-only page shape accepted by the full-width compatibility adapter.
 
+##### `MAX_CHART_POINTS` — variable
+
+```ts
+10000
+```
+
+Most points resolved per series range. Cells are read in row-major order and
+cells past this count are dropped; the series view reports `truncated`.
+
 ##### `MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH` — variable
 
 ```ts
@@ -11383,6 +11485,19 @@ Members:
 - `replaced` — How many cells were rewritten.
 - `result` — Search state after the replacement (matches re-scanned against the new data).
 
+##### `resolveChartView` — function
+
+```ts
+(store: Store, sheet: SheetId, id: string): ChartView | null
+```
+
+Resolve one chart to plain data the renderer draws without reading cells.
+Values that are not numbers (text, booleans, errors, empty cells) become
+`null`. Each series range costs one bulk window read of at most
+`MAX_CHART_POINTS` cells. Returns `null` when the chart does not exist.
+
+Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
+
 ##### `ResolvedCell` — interface
 
 ```ts
@@ -11587,7 +11702,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "chart"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.
@@ -11841,12 +11956,13 @@ Registers the optional workbook XLSX implementation used by core.
 ##### `Sheet` — interface
 
 ```ts
-export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; }
+export interface Sheet { id: SheetId; name: string; visibility?: SheetVisibility; columns: Column[]; rowCount: number; rowHeights?: Map<number, number>; hiddenRows?: Set<number>; rowGroups?: RowGroup[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; merges?: MergeRange[]; frozenRows?: number; frozenCols?: number; tables?: WorkbookTable[]; charts?: ChartDefinition[]; }
 ```
 
 Workbook sheet schema used when creating a live grid.
 
 Members:
+- `charts` — Charts anchored to this sheet; series sources use stable sheet IDs.
 - `columns` — Ordered schema; array positions are the zero-based column coordinates.
 - `conditionalFormats` — Conditional styles folded into the bulk render-window style dictionary.
 - `filters` — Persisted column filters as JSON-safe index/value tuples.
@@ -11918,7 +12034,7 @@ Successful canonical name or an actionable validation failure.
 ##### `SheetSnapshot` — interface
 
 ```ts
-export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; cells: CellBlock[]; }
+export interface SheetSnapshot { id: SheetId; name: string; order: number; visibility?: SheetVisibility; rowCount: number; columns: Column[]; frozenRows?: number; frozenCols?: number; rowMeta?: Array<[row: number, meta: RowMetadata]>; merges?: MergeRange[]; conditionalFormats?: ConditionalFormatRule[]; hyperlinks?: CellHyperlink[]; validationRules?: DataValidationRule[]; protectedRanges?: ProtectedRange[]; notes?: CellNote[]; sortKeys?: SortKey[]; filters?: Array<[col: number, filter: ColumnFilter]>; rowGroups?: RowGroup[]; tables?: WorkbookTable[]; charts?: ChartDefinition[]; cells: CellBlock[]; }
 ```
 
 Serializable complete state for one workbook sheet.
@@ -12267,6 +12383,18 @@ Decoded, fail-closed retained-memory ownership report from the WASM store.
 Members:
 - `allocatorMarginBytes` — Allocator internals are intentionally not fabricated from `size_of_val`.
 - `wasmCommittedBytes` — Linear-memory pages are a runtime observation and are never summed into live payload.
+
+##### `subscribeChartChanges` — function
+
+```ts
+(store: Store, listener: ChartChangeListener): () => void
+```
+
+Listen for commits that change any chart's `ChartView`. Edited rectangles are
+matched against an index of series ranges, so edits outside every series
+range cost no chart work. Charts that read formulas, references or spills
+also change on any commit that changes cell values. Returns an unsubscribe
+function; the index is dropped with the last listener.
 
 ##### `SyncActivityState` — type
 
@@ -13516,7 +13644,7 @@ Context supplied when a canonical row insertion needs a host identity.
 ##### `RowBridgeMetadataDelta` — interface
 
 ```ts
-export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
+export interface RowBridgeMetadataDelta<Id extends RowBridgeId = RowBridgeId> { readonly kind: "metadata"; readonly metadata: | "column" | "row" | "sheet" | "merge" | "table" | "validation" | "hyperlink" | "protected-range" | "note" | "named-range" | "calculation" | "chart"; readonly transaction: RowBridgeTransaction; readonly transactionId: string; readonly source: OperationSource; readonly previous: unknown; readonly next: unknown; readonly operation: DocumentOp; readonly rowIds: readonly (Id | null)[]; }
 ```
 
 A document operation that changes workbook or column metadata.

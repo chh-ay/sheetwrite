@@ -229,6 +229,15 @@ export {
   validateSheetName,
 } from "./sheet-name.js";
 
+export {
+  type ChartChangeEvent,
+  type ChartChangeListener,
+  type ChartRef,
+  MAX_CHART_POINTS,
+  resolveChartView,
+  subscribeChartChanges,
+} from "./charts-live.js";
+
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
 
 export {
@@ -279,6 +288,13 @@ export type {
   CellValue,
   CellVerticalAlign,
   ChangeEvent,
+  ChartAnchor,
+  ChartDefinition,
+  ChartKind,
+  ChartRange,
+  ChartSeries,
+  ChartSeriesView,
+  ChartView,
   Column,
   ColumnarData,
   ColumnFilter,

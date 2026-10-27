@@ -1,4 +1,5 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
+import { chartSourceRanges } from "./chart-definition.js";
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
@@ -679,6 +680,9 @@ export class SheetwriteStore implements Store {
     const valuesTouched = new Set<SheetId>();
     const layoutTouched = new Set<SheetId>();
     for (const patch of patches) {
+      // A native chart reads cells but changes neither values nor layout, so retained
+      // drawings and charts stay valid beside it.
+      if (patch.op === "setChart" || patch.op === "removeChart") continue;
       if (
         patch.op === "setNamedRange" ||
         patch.op === "removeNamedRange" ||
@@ -823,6 +827,9 @@ export class SheetwriteStore implements Store {
           requiredSheets.push(entry.range.sheet);
         }
         for (const note of operation.sheet.notes ?? []) requiredSheets.push(note.addr.sheet);
+        for (const chart of operation.sheet.charts ?? []) {
+          for (const range of chartSourceRanges(chart)) requiredSheets.push(range.sheet);
+        }
       } else {
         const primarySheet = patchSheetId(operation);
         if (lifecycle === null && primarySheet !== null) requiredSheets.push(primarySheet);
@@ -860,6 +867,8 @@ export class SheetwriteStore implements Store {
           for (const rule of operation.patch.conditionalFormats ?? []) {
             requiredSheets.push(rule.range.sheet);
           }
+        } else if (operation.op === "setChart") {
+          for (const range of chartSourceRanges(operation.chart)) requiredSheets.push(range.sheet);
         }
       }
       const missingSheet = requiredSheets.find(

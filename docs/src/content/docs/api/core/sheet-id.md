@@ -39,6 +39,7 @@ export type SheetId = string;
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/cell-address/"><code>CellAddress</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/chart-ref/"><code>ChartRef</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/data-source-request/"><code>DataSourceRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/document-op/"><code>DocumentOp</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/grid/"><code>Grid</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -49,7 +50,6 @@ export type SheetId = string;
 <li><a href="/docs/api/core/named-range-snapshot/"><code>NamedRangeSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-overlay/"><code>PresenceOverlay</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/range/"><code>Range</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/row-bridge/"><code>RowBridge</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 28 more</li>
+<li class="api-consumer-more">and 30 more</li>
 </ul>
 </div>

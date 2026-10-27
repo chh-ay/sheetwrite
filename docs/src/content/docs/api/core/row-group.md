@@ -8,7 +8,7 @@ description: "A collapsible row group (data-row range, end-inclusive), Sheets-st
 A collapsible row group (data-row range, end-inclusive), Sheets-style.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L100"><code>packages/core/src/types/document.ts#L100</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L103"><code>packages/core/src/types/document.ts#L103</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>3</span>

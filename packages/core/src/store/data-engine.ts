@@ -2,6 +2,16 @@ import type { CellSnapshot, EngineInstance, RangeSnapshot } from "@sheetwrite/wa
 
 import { remapFormulaA1Refs } from "../a1.js";
 import { parseCellLiteralInput } from "../cell-input.js";
+import {
+  assertWorkbookCharts,
+  type ChartAxisEdit,
+  chartFitsSheets,
+  invalidateChartSheet,
+  MAX_CHARTS_PER_SHEET,
+  rebaseChartAxis,
+  sanitizeChartDefinition,
+  validSheetCharts,
+} from "../chart-definition.js";
 import { validConditionalRules } from "../conditional-format.js";
 import { dateToSerial } from "../date-serial.js";
 import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
@@ -43,6 +53,7 @@ import type {
   Column,
   ConditionalFormatRule,
 } from "../types/cell.js";
+import type { ChartDefinition } from "../types/chart.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
   AggregateOp,
@@ -404,6 +415,7 @@ export class StoreDataEngine {
       DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
       (workbook.namedRanges ?? []).map((range) => range.name),
     );
+    assertWorkbookCharts(workbook.sheets);
     this.workbook = workbook;
     this.storageOptions = options;
     this.wasm = new (getEngine().CellStore)() as RecomputingCellStore;
@@ -1230,6 +1242,33 @@ export class StoreDataEngine {
     };
   }
 
+  /**
+   * Whether any cell in the rectangle takes its value from elsewhere: a formula,
+   * a cross-reference or a spill child. Chart tracking calls it once per series
+   * range when its index is rebuilt, never per edit: the source capture walks
+   * every formula on the sheet. Callers clip the range to the sheet first.
+   */
+  chartSourcesComputed(range: Range): boolean {
+    // Spill children carry no source of their own, so the source capture cannot see them.
+    if (this.hasSpillChildren(range)) return true;
+
+    const bounds = normalizedRange(range);
+    // Include anchors above and left: an existing spill may grow into this range
+    // after a precedent changes. This conservatively follows those formulas too.
+    // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
+    const snapshot = this.wasm.captureSources(
+      this.handleOf(bounds.sheet),
+      0,
+      0,
+      bounds.end.row + 1,
+      bounds.end.col + 1,
+    );
+    if (!snapshot) return false;
+
+    const sources = consumeSourceSnapshot(snapshot, this.sheetIdsByHandle);
+    return sources.formulaOffsets.length > 0 || sources.referenceOffsets.length > 0;
+  }
+
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
     this.requireCompleteQuery(sheet);
     return this.wasm.aggregate(this.handleOf(sheet), col, AGG_OP[op]);
@@ -2028,6 +2067,13 @@ export class StoreDataEngine {
         this.wasm.addRows(this.handleOf(patch.sheet), patch.at, patch.count);
         meta.rowCount += patch.count;
         this.rebaseSheetRows(patch.sheet, (row) => (row >= patch.at ? row + patch.count : row));
+        this.rebaseCharts({
+          kind: "insert",
+          sheet: patch.sheet,
+          axis: "row",
+          at: patch.at,
+          count: patch.count,
+        });
         return true;
       }
       case "removeRows": {
@@ -2044,6 +2090,14 @@ export class StoreDataEngine {
         this.rebaseSheetRows(patch.sheet, (row) =>
           row < patch.at ? row : row < patch.at + patch.count ? null : row - patch.count,
         );
+        this.rebaseCharts({
+          kind: "delete",
+          sheet: patch.sheet,
+          axis: "row",
+          at: patch.at,
+          count: patch.count,
+          remaining: meta.rowCount,
+        });
         return true;
       }
       case "moveRows":
@@ -2065,6 +2119,13 @@ export class StoreDataEngine {
           (col) => (col >= patch.at ? col + patch.columns.length : col),
           { at: patch.at, delta: patch.columns.length, inserted: patch.columns },
         );
+        this.rebaseCharts({
+          kind: "insert",
+          sheet: patch.sheet,
+          axis: "column",
+          at: patch.at,
+          count: patch.columns.length,
+        });
         return true;
       }
       case "removeColumns": {
@@ -2084,6 +2145,14 @@ export class StoreDataEngine {
           (col) => (col < patch.at ? col : col < patch.at + patch.count ? null : col - patch.count),
           { at: patch.at, delta: -patch.count },
         );
+        this.rebaseCharts({
+          kind: "delete",
+          sheet: patch.sheet,
+          axis: "column",
+          at: patch.at,
+          count: patch.count,
+          remaining: meta.columns.length,
+        });
         return true;
       }
       case "moveColumns":
@@ -2164,6 +2233,31 @@ export class StoreDataEngine {
         if (!links.some((hyperlink) => hyperlink.id === patch.id)) return false;
         sheet.hyperlinks = links.filter((hyperlink) => hyperlink.id !== patch.id);
         this.view.metadataChanged(patch.sheet);
+        return true;
+      }
+      case "setChart": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const chart = sanitizeChartDefinition(patch.chart);
+        if (!chart || !chartFitsSheets(chart, sheet, this.workbook.sheets)) return false;
+
+        // Chart lists are replaced, never mutated, so captured definitions stay exact for undo.
+        const charts = sheet.charts ?? [];
+        const index = charts.findIndex((candidate) => candidate.id === chart.id);
+        if (index < 0) {
+          if (charts.length >= MAX_CHARTS_PER_SHEET) return false;
+          sheet.charts = [...charts, chart];
+        } else {
+          const next = [...charts];
+          next[index] = chart;
+          sheet.charts = next;
+        }
+        return true;
+      }
+      case "removeChart": {
+        const sheet = this.sheetMeta(patch.sheet);
+        const charts = sheet.charts ?? [];
+        if (!charts.some((chart) => chart.id === patch.id)) return false;
+        sheet.charts = charts.filter((chart) => chart.id !== patch.id);
         return true;
       }
       case "setValidationRule": {
@@ -2570,6 +2664,7 @@ export class StoreDataEngine {
     const movedHyperlinks = this.workbook.sheets.map(
       (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
     );
+    const movedCharts = this.captureCharts();
     const cells = this.snapshotCells(
       patch.sheet,
       patch.from,
@@ -2647,6 +2742,14 @@ export class StoreDataEngine {
         .map((hyperlink) => rebaseHyperlinkAxis(hyperlink, patch.sheet, "row", moveRow))
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
+    this.restoreMovedCharts(movedCharts, {
+      kind: "move",
+      sheet: patch.sheet,
+      axis: "row",
+      from: patch.from,
+      count: patch.count,
+      to: patch.to,
+    });
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.row, original.range.end.row, (row) =>
@@ -2698,6 +2801,7 @@ export class StoreDataEngine {
       (owner) => [owner.id, owner.hyperlinks?.map(cloneCellHyperlink) ?? []] as const,
     );
     const movedTables = structuredClone(sheet.tables ?? []);
+    const movedCharts = this.captureCharts();
     const columns = sheet.columns.slice(patch.from, patch.from + patch.count);
     const cells = this.snapshotCells(
       patch.sheet,
@@ -2759,6 +2863,14 @@ export class StoreDataEngine {
         .filter((hyperlink): hyperlink is CellHyperlink => hyperlink !== null);
     }
     this.restoreMovedTables(sheet, movedTables, moveCol);
+    this.restoreMovedCharts(movedCharts, {
+      kind: "move",
+      sheet: patch.sheet,
+      axis: "column",
+      from: patch.from,
+      count: patch.count,
+      to: patch.to,
+    });
     this.windowReader.conditionalRulesChanged(patch.sheet);
     for (const original of movedNamedRanges) {
       const span = remapSpan(original.range.start.col, original.range.end.col, (col) =>
@@ -2836,6 +2948,50 @@ export class StoreDataEngine {
     sheet.tables = tables;
   }
 
+  /** Rewrite every chart that is anchored on, or reads from, the edited sheet. */
+  private rebaseCharts(edit: ChartAxisEdit): void {
+    for (const owner of this.workbook.sheets) {
+      const charts = owner.charts;
+      if (!charts) continue;
+
+      let next: ChartDefinition[] | null = null;
+      for (let index = 0; index < charts.length; index++) {
+        const chart = charts[index];
+        if (chart === undefined) continue;
+        const rebased = rebaseChartAxis(chart, owner.id, edit);
+        if (rebased === chart) continue;
+        next ??= charts.slice();
+        next[index] = rebased;
+      }
+      if (next) owner.charts = next;
+    }
+  }
+
+  /**
+   * The live chart lists before a move. A move runs as remove then add, which
+   * would turn sources inside the moved block into `#REF!`; the lists are
+   * replaced rather than mutated, so these references keep the pre-move state.
+   */
+  private captureCharts(): Map<Sheet, readonly ChartDefinition[]> | null {
+    let captured: Map<Sheet, readonly ChartDefinition[]> | null = null;
+    for (const owner of this.workbook.sheets) {
+      if (!owner.charts?.length) continue;
+      captured ??= new Map();
+      captured.set(owner, owner.charts);
+    }
+    return captured;
+  }
+
+  private restoreMovedCharts(
+    originals: ReadonlyMap<Sheet, readonly ChartDefinition[]> | null,
+    edit: Extract<ChartAxisEdit, { kind: "move" }>,
+  ): void {
+    if (!originals) return;
+    for (const [owner, charts] of originals) {
+      owner.charts = charts.map((chart) => rebaseChartAxis(chart, owner.id, edit));
+    }
+  }
+
   private addSheetSnapshot(
     snapshot: SheetSnapshot,
     changes: ChangeEvent["changes"] | null,
@@ -2868,6 +3024,17 @@ export class StoreDataEngine {
       rowHeights: new Map(),
       hiddenRows: new Set(),
     };
+    // Charts may read sheets already present, so bounds are checked against every tab.
+    if (snapshot.charts) {
+      const charts: ChartDefinition[] = [];
+      for (const source of snapshot.charts) {
+        const chart = sanitizeChartDefinition(source);
+        if (!chart) return false;
+        charts.push(chart);
+      }
+      if (!validSheetCharts(charts, sheet, [...this.workbook.sheets, sheet])) return false;
+      sheet.charts = charts;
+    }
     try {
       assertWorkbookTables(
         [...this.workbook.sheets, sheet],
@@ -2947,6 +3114,13 @@ export class StoreDataEngine {
         (hyperlink) =>
           hyperlink.target.kind !== "internal" || hyperlink.target.range.sheet !== sheetId,
       );
+
+      // A chart keeps a source on a removed sheet as an explicit `#REF!`.
+      const charts = owner.charts;
+      if (charts?.length) {
+        const next = charts.map((chart) => invalidateChartSheet(chart, sheetId));
+        if (next.some((chart, index) => chart !== charts[index])) owner.charts = next;
+      }
     }
     return true;
   }

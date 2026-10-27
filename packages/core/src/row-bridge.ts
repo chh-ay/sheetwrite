@@ -139,7 +139,8 @@ export interface RowBridgeMetadataDelta<
     | "protected-range"
     | "note"
     | "named-range"
-    | "calculation";
+    | "calculation"
+    | "chart";
 }
 
 /** A document operation that needs a host-side action rather than row mutation. */
@@ -932,6 +933,9 @@ export class RowBridge<
         return [this.metadata(transaction, operation, "named-range", sheet)];
       case "setCalculation":
         return [this.metadata(transaction, operation, "calculation", null)];
+      case "setChart":
+      case "removeChart":
+        return [this.metadata(transaction, operation, "chart", sheet)];
       default:
         return assertNever(operation);
     }

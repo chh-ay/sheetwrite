@@ -1,6 +1,8 @@
 import { remapFormulaA1Refs } from "./a1.js";
+import { chartTouchesSheet } from "./chart-definition.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
 import type { CellValue } from "./types/cell.js";
+import type { ChartDefinition, ChartRange } from "./types/chart.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
 
@@ -242,6 +244,7 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
     case "addTable":
     case "updateTable":
     case "setSheetMeta":
+    case "setChart":
       return cloneJsonValue(operation);
     default:
       return { ...operation };
@@ -470,6 +473,8 @@ function transformDirectTarget(
       if (mapped) operation.patch.range = mapped;
       return null;
     }
+    case "setChart":
+      return transformChart(operation.chart, operation.sheet, change, operation.op);
     case "setSheetMeta":
       if (operation.sheet !== change.sheet) return null;
       if (
@@ -506,8 +511,45 @@ function transformDirectTarget(
     case "removeNamedRange":
     case "removeTable":
     case "setCalculation":
+    case "removeChart":
       return null;
   }
+}
+
+/**
+ * Shift a privately owned chart's anchor and live sources in place. A source
+ * that straddles the edit or an anchor whose cell was deleted is a conflict,
+ * like every other range-bearing metadata operation.
+ */
+function transformChart(
+  chart: ChartDefinition,
+  owner: string,
+  change: Exclude<AxisChange, { kind: "move" }>,
+  operation: string,
+): TransformFailure | null {
+  // Only a source on the edited sheet can come back null.
+  const mapSource = (source: ChartRange): ChartRange | null =>
+    source === "#REF!" ? source : transformRange(source, change);
+
+  for (const series of chart.series) {
+    const values = mapSource(series.values);
+    const nameRange = series.nameRange === undefined ? undefined : mapSource(series.nameRange);
+    const categories = series.categories === undefined ? undefined : mapSource(series.categories);
+    if (!values || nameRange === null || categories === null) {
+      return overlappingStructure(operation);
+    }
+
+    series.values = values;
+    if (nameRange !== undefined) series.nameRange = nameRange;
+    if (categories !== undefined) series.categories = categories;
+  }
+  if (owner !== change.sheet) return null;
+
+  const index = transformIndex(change.axis === "row" ? chart.anchor.row : chart.anchor.col, change);
+  if (index === null) return deletedTarget(operation);
+  if (change.axis === "row") chart.anchor.row = index;
+  else chart.anchor.col = index;
+  return null;
 }
 
 function transformEmbeddedReferences(
@@ -572,6 +614,10 @@ function transformSheetSnapshot(
     const mapped = transformRange(table.range, change);
     if (!mapped && table.range.sheet === change.sheet) return overlappingStructure("addTable");
     if (mapped) table.range = mapped;
+  }
+  for (const chart of sheet.charts ?? []) {
+    const failure = transformChart(chart, sheet.id, change, "addSheet");
+    if (failure) return failure;
   }
   return null;
 }
@@ -783,6 +829,8 @@ function operationTouchesSheet(
       return operation.range.sheet === sheet;
     case "addTable":
       return operation.table.range.sheet === sheet;
+    case "setChart":
+      return chartTouchesSheet(operation.chart, operation.sheet, sheet);
     case "setNamedRange":
       return operation.namedRange.range.sheet === sheet || operation.namedRange.scope === sheet;
     case "removeNamedRange":
@@ -889,6 +937,9 @@ function operationIdentity(operation: DocumentOp): string {
       return `table:${operation.tableId}`;
     case "setSheetMeta":
       return `sheet-meta:${operation.sheet}`;
+    case "setChart":
+    case "removeChart":
+      return `chart:${operation.sheet}:${operation.op === "setChart" ? operation.chart.id : operation.id}`;
     // Workbook-wide: concurrent calculation changes always conflict, nothing else does.
     case "setCalculation":
       return "calculation";

@@ -8,7 +8,7 @@ description: "One key of a multi-column sort, applied in array order (first = pr
 One key of a multi-column sort, applied in array order (first = primary).
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L83"><code>packages/core/src/types/document.ts#L83</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L86"><code>packages/core/src/types/document.ts#L86</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>2</span>

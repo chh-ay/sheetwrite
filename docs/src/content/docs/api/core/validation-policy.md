@@ -8,7 +8,7 @@ description: "Reject-or-warn policy attached to a data-validation rule."
 Reject-or-warn policy attached to a data-validation rule.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L148"><code>packages/core/src/types/document.ts#L148</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L151"><code>packages/core/src/types/document.ts#L151</code></a></dd></div>
 </dl>
 
 ## Declaration

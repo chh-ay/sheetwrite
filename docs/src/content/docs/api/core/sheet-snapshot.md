@@ -8,7 +8,7 @@ description: "Serializable complete state for one workbook sheet."
 Serializable complete state for one workbook sheet.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L355"><code>packages/core/src/types/document.ts#L355</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L358"><code>packages/core/src/types/document.ts#L358</code></a></dd></div>
 </dl>
 
 <nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>
@@ -31,10 +31,11 @@ Serializable complete state for one workbook sheet.
 <a href="#sheet-snapshot-filters"><code>filters</code></a>
 <a href="#sheet-snapshot-row-groups"><code>rowGroups</code></a>
 <a href="#sheet-snapshot-tables"><code>tables</code></a>
+<a href="#sheet-snapshot-charts"><code>charts</code></a>
 <a href="#sheet-snapshot-cells"><code>cells</code></a>
 </nav>
 
-## Members <span class="api-count" data-pagefind-ignore>20</span>
+## Members <span class="api-count" data-pagefind-ignore>21</span>
 
 <div class="api-member-list">
 
@@ -209,6 +210,15 @@ tables?: WorkbookTable[];
 
 </details>
 
+<details class="api-member" id="sheet-snapshot-charts" data-pagefind-weight="1">
+<summary><code>charts</code></summary>
+
+```ts generated
+charts?: ChartDefinition[];
+```
+
+</details>
+
 <details class="api-member" id="sheet-snapshot-cells" data-pagefind-weight="1">
 <summary><code>cells</code></summary>
 
@@ -245,6 +255,7 @@ export interface SheetSnapshot {
   filters?: Array<[col: number, filter: ColumnFilter]>;
   rowGroups?: RowGroup[];
   tables?: WorkbookTable[];
+  charts?: ChartDefinition[];
   cells: CellBlock[];
 }
 ```

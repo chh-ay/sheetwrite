@@ -8,7 +8,7 @@ description: "Serializable client UX policy."
 Serializable client UX policy. A host resolver decides whether a local mutation may proceed.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L201"><code>packages/core/src/types/document.ts#L201</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/types/document.ts#L204"><code>packages/core/src/types/document.ts#L204</code></a></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>4</span>

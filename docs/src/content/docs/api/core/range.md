@@ -82,6 +82,7 @@ export interface Range {
 
 <ul class="api-consumer-list">
 <li><a href="/docs/api/core/cell-hyperlink/"><code>CellHyperlink</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
+<li><a href="/docs/api/core/chart-range/"><code>ChartRange</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/comment-anchor/"><code>CommentAnchor</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/conditional-format-rule/"><code>ConditionalFormatRule</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/data-validation-rule/"><code>DataValidationRule</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -92,7 +93,6 @@ export interface Range {
 <li><a href="/docs/api/core/named-range-snapshot/"><code>NamedRangeSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-message/"><code>PresenceMessage</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-overlay/"><code>PresenceOverlay</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/protected-range/"><code>ProtectedRange</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 17 more</li>
+<li class="api-consumer-more">and 18 more</li>
 </ul>
 </div>

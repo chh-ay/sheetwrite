@@ -16,7 +16,8 @@ export const MAX_HYPERLINK_DISPLAY_LENGTH = 32_767;
 const ENCODED_CONTROL_CHARACTERS = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/iu;
 const NUL_CHARACTER = String.fromCharCode(0);
 
-function hasControlCharacters(value: string): boolean {
+/** Whether a string contains a C0 control character or DEL. */
+export function hasControlCharacters(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {
     const code = value.charCodeAt(index);
     if (code <= 0x1f || code === 0x7f) return true;
@@ -45,7 +46,8 @@ const TARGET_KEYS = new Set(["kind", "url", "range"]);
 const RANGE_KEYS = new Set(["sheet", "start", "end"]);
 const COORDINATE_KEYS = new Set(["row", "col"]);
 
-function dataProperties(
+/** Own enumerable data properties of a plain object restricted to `allowed`; null otherwise. */
+export function dataProperties(
   value: unknown,
   allowed: ReadonlySet<string>,
 ): Record<string, unknown> | null {
@@ -112,7 +114,8 @@ function validCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
-function sanitizeRange(value: unknown): Range | null {
+/** A fresh, normalized range from an untrusted plain-data value, or null. */
+export function sanitizeRange(value: unknown): Range | null {
   const range = dataProperties(value, RANGE_KEYS);
   const start = dataProperties(range?.start, COORDINATE_KEYS);
   const end = dataProperties(range?.end, COORDINATE_KEYS);

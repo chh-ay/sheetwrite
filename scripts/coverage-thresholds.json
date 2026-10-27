@@ -33,6 +33,10 @@
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },
     {
+      "path": "packages/core/src/types/chart.ts",
+      "reason": "Type-only modules are verified by package and consumer typechecks"
+    },
+    {
       "path": "packages/core/src/types/coordinates.ts",
       "reason": "Type-only modules are verified by package and consumer typechecks"
     },

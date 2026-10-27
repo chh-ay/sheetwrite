@@ -8,7 +8,7 @@ description: "Host-safe target resolved immediately before hyperlink activation.
 Host-safe target resolved immediately before hyperlink activation.
 
 <dl class="api-metadata" data-pagefind-ignore>
-<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L301"><code>packages/core/src/hyperlink.ts#L301</code></a></dd></div>
+<div><dt>Source</dt><dd><a href="https://github.com/chh-ay/sheetwrite/blob/main/packages/core/src/hyperlink.ts#L304"><code>packages/core/src/hyperlink.ts#L304</code></a></dd></div>
 </dl>
 
 ## Variants <span class="api-count" data-pagefind-ignore>2</span>

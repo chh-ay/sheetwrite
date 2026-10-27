@@ -104,9 +104,22 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "HyperlinkTarget",
     ],
   },
+  chart: {
+    source: "packages/core/src/types/chart.ts",
+    dependencies: ["coordinates"],
+    exports: [
+      "ChartAnchor",
+      "ChartDefinition",
+      "ChartKind",
+      "ChartRange",
+      "ChartSeries",
+      "ChartSeriesView",
+      "ChartView",
+    ],
+  },
   document: {
     source: "packages/core/src/types/document.ts",
-    dependencies: ["cell", "coordinates", "table"],
+    dependencies: ["cell", "chart", "coordinates", "table"],
     exports: [
       "AddSheetInput",
       "CalculationSettings",
