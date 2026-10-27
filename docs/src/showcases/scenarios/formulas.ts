@@ -1,11 +1,17 @@
 import type { ColumnarData, DocumentOp, Workbook } from "@sheetwrite/core";
 
-import { seededRandom } from "../../lib/random.js";
+import {
+  generateStoryOrders,
+  STORY_FIRST_YEAR,
+  STORY_REGIONS,
+  type StoryRegion,
+  STORY_MONTHS,
+} from "./orders-story.js";
 
 /**
- * Shared scenario for /showcases/formulas/: a deterministic sales ledger and a
- * dashboard of live full-engine formulas over it. The route, its browser
- * contract, and the docs all read these definitions.
+ * Shared scenario for /showcases/formulas/: the 2026 orders of the story
+ * dataset (orders-story.ts) and a dashboard of live full-engine formulas over
+ * them. The route, its browser contract, and the docs all read these definitions.
  */
 
 export const ORDERS_SHEET_ID = "orders";
@@ -14,29 +20,20 @@ export const ANALYSIS_SHEET_ID = "analysis";
 export const ANALYSIS_SHEET_NAME = "Analysis";
 export const ORDER_ROWS = 20_000;
 
-export const REGIONS = ["Americas", "EMEA", "APAC", "LATAM"] as const;
-const REGION_WEIGHTS = [0.34, 0.3, 0.24, 0.12] as const;
-const REGION_CODES = ["AMER", "EMEA", "APAC", "LATAM"] as const;
+export const REGIONS = STORY_REGIONS;
 
-const PRODUCTS = [
-  { name: "Atlas desk", price: 420 },
-  { name: "Beacon lamp", price: 65 },
-  { name: "Cobalt chair", price: 310 },
-  { name: "Delta shelf", price: 180 },
-  { name: "Echo stool", price: 95 },
-  { name: "Flux monitor arm", price: 140 },
-  { name: "Grove planter", price: 48 },
-  { name: "Halo screen", price: 260 },
-] as const;
+/** Short region codes that end every order code; the regex panel reads them. */
+const REGION_CODES: Readonly<Record<StoryRegion, string>> = {
+  Americas: "AMER",
+  EMEA: "EMEA",
+  APAC: "APAC",
+  LATAM: "LATAM",
+};
 
-const CHANNELS = ["Online", "Retail", "Partner"] as const;
-/** Channel mix per region, in the order of `REGIONS`. */
-const CHANNEL_MIX = [
-  [0.55, 0.3, 0.15],
-  [0.4, 0.35, 0.25],
-  [0.62, 0.18, 0.2],
-  [0.3, 0.25, 0.45],
-] as const;
+/** The ledger holds the second story year, 2026, so it shows one full year. */
+export const LEDGER_YEAR = STORY_FIRST_YEAR + 1;
+const LEDGER_MONTHS = 12;
+const LEDGER_FIRST_MONTH = STORY_MONTHS - LEDGER_MONTHS;
 
 /** Zero-based Orders columns; formulas below use the matching A1 letters. */
 export const ORDER_COLUMNS = {
@@ -50,15 +47,6 @@ export const ORDER_COLUMNS = {
   code: 7,
 } as const;
 
-function pick<T>(items: readonly T[], weights: readonly number[], roll: number): T {
-  let total = 0;
-  for (let index = 0; index < items.length; index++) {
-    total += weights[index] ?? 0;
-    if (roll < total) return items[index]!;
-  }
-  return items[items.length - 1]!;
-}
-
 export interface OrdersLedger {
   data: ColumnarData;
   units: Float64Array;
@@ -66,44 +54,40 @@ export interface OrdersLedger {
   region: readonly string[];
 }
 
-/** Fresh deterministic ledger: seasonality peaks in November, demand falls as price rises. */
+/**
+ * Fresh deterministic ledger from the story rules: a Q4 peak, a summer lull,
+ * the Halo screen ramp, and the EMEA dip after its March price change.
+ * Demand falls as price rises, because buyers order fewer expensive units.
+ */
 export function buildOrdersLedger(): OrdersLedger {
-  const random = seededRandom(2026);
-  const month: string[] = new Array(ORDER_ROWS);
-  const region: string[] = new Array(ORDER_ROWS);
-  const product: string[] = new Array(ORDER_ROWS);
-  const channel: string[] = new Array(ORDER_ROWS);
-  const code: string[] = new Array(ORDER_ROWS);
-  const units = new Float64Array(ORDER_ROWS);
-  const price = new Float64Array(ORDER_ROWS);
-  const revenue = new Float64Array(ORDER_ROWS);
+  const orders = generateStoryOrders({
+    firstMonth: LEDGER_FIRST_MONTH,
+    months: LEDGER_MONTHS,
+    rows: ORDER_ROWS,
+  });
 
-  for (let row = 0; row < ORDER_ROWS; row++) {
-    const monthIndex = Math.floor((row / ORDER_ROWS) * 12);
-    const regionIndex = REGIONS.indexOf(pick(REGIONS, REGION_WEIGHTS, random()));
-    const item = PRODUCTS[Math.floor(random() * PRODUCTS.length)]!;
-    const season = 1 + 0.45 * Math.max(0, Math.cos(((monthIndex - 10) / 12) * Math.PI * 2));
-    const unitPrice = Math.round(item.price * (0.82 + random() * 0.3));
-    const demand = 9 * season * (150 / unitPrice) ** 0.55 * (0.6 + random() * 0.8);
-
-    month[row] = `2026-${String(monthIndex + 1).padStart(2, "0")}`;
-    region[row] = REGIONS[regionIndex]!;
-    product[row] = item.name;
-    channel[row] = pick(CHANNELS, CHANNEL_MIX[regionIndex]!, random());
-    units[row] = Math.max(1, Math.round(demand));
-    price[row] = unitPrice;
-    revenue[row] = units[row]! * unitPrice;
-    code[row] = `SO-${month[row]}-${String(row + 1).padStart(5, "0")}-${REGION_CODES[regionIndex]}`;
-  }
+  const code = orders.month.map(
+    (month, row) =>
+      `SO-${month}-${String(row + 1).padStart(5, "0")}-${REGION_CODES[orders.region[row] ?? "Americas"]}`,
+  );
 
   return {
     data: {
       rowCount: ORDER_ROWS,
-      columns: { month, region, product, channel, units, price, revenue, code },
+      columns: {
+        month: orders.month,
+        region: orders.region,
+        product: orders.product,
+        channel: orders.channel,
+        units: orders.units,
+        price: orders.unitPrice,
+        revenue: orders.revenue,
+        code,
+      },
     },
-    units,
-    price,
-    region,
+    units: orders.units,
+    price: orders.unitPrice,
+    region: orders.region,
   };
 }
 

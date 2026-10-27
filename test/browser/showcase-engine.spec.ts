@@ -27,6 +27,9 @@ function bannerLiteral(key: string): unknown {
   return typeof value === "object" && value !== null && "value" in value ? value.value : value;
 }
 const BANNER_KEYS = ["period", "region", "product", "account"] as const;
+/** The first monthly record and the jump target, as the datasource serves them. */
+const FIRST_RECORD = engineLiveRow(1);
+const JUMP_RECORD = engineLiveRow(EDITED_ROW);
 
 interface EngineShowcaseStore {
   getCell(address: { sheet: string; row: number; col: number }): { resolved: unknown };
@@ -151,12 +154,13 @@ test("the paged ledger reads as a finance model with an off-screen plan band", a
       ).flat().length,
     };
   }, PLAN_COLUMN);
-  expect(model.period).toBe("Jan 2026");
-  expect(model.region).toBe("North America");
-  expect(model.product).toBe("Subscriptions");
-  expect(model.account).toBe("AC-0001");
-  expect(model.actual).toBeGreaterThan(0);
-  expect(model.plan).toBeGreaterThan(0);
+  expect(model.period).toBe(FIRST_RECORD.period);
+  expect(model.region).toBe(FIRST_RECORD.region);
+  expect(model.product).toBe(FIRST_RECORD.product);
+  expect(model.account).toBe(FIRST_RECORD.account);
+  // The Grid shows the story values that the datasource serves.
+  expect(model.actual).toBe(FIRST_RECORD.actual);
+  expect(model.plan).toBe(FIRST_RECORD.plan);
   // Variance compares the actual with the far-right plan column; attainment follows both.
   expect(model.variance).toBe(model.actual - model.plan);
   expect(model.varianceFormula).toBe("=C2-AA2");
@@ -192,7 +196,7 @@ test("direct route jumps, edits a live formula, and undoes in the same Grid", as
         ),
       { timeout: 20_000 },
     )
-    .toBe("Feb 2026");
+    .toBe(JUMP_RECORD.period);
   // The month label is a literal; its arrival does not settle the formulas.
   await expect
     .poll(
