@@ -212,6 +212,25 @@ describe("grid result figures", () => {
     expect(figure.properties?.ariaLabel).toBe("Result: A2");
   });
 
+  it("formats sw-format tokens in the legend and the caption, as on the rest of the page", () => {
+    const token = (value: string): Node => ({
+      type: "element",
+      tagName: "sw-format",
+      properties: { value, code: "#,##0.00", locale: "de-DE" },
+      children: [],
+    });
+    const legend = cell("dl", cell("dt", text("B2")), cell("dd", token("1234.5")));
+    const caption = cell("figcaption", text("Total: "), token("99"));
+    const figure = render(resultDiv({}, undefined, legend, caption));
+
+    const expected = formatNumber(1234.5, "#,##0.00", "de-DE");
+    expect(textOf(figure.children?.[1] ?? text(""))).toBe(`B2${expected}`);
+    expect(textOf(figure.children?.[2] ?? text(""))).toBe(
+      `Total: ${formatNumber(99, "#,##0.00", "de-DE")}`,
+    );
+    expect(figure.properties?.ariaLabel).toBe(`Total: ${formatNumber(99, "#,##0.00", "de-DE")}`);
+  });
+
   it("keeps a block written before the table above the sheet", () => {
     const div = resultDiv({});
     const widget = cell("div", text("Find"));
