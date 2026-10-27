@@ -299,9 +299,9 @@ describe("tick steps", () => {
   });
 
   it("adds no tick past data that ends on a tick", () => {
-    // In floating point, 0.7 / 0.1 is 6.999999999999999 and 1.1 / 0.1 is 11.000000000000002.
+    // In floating point, 0.7 / 0.1 is 6.999999999999999 and 0.07 / 0.01 is 7.000000000000001.
     expect(tickScale(0.7, 1, 4, false).min).toBe(0.7);
-    expect(tickScale(0.5, 1.1, 10, false).max).toBe(1.1);
+    expect(tickScale(0.03, 0.07, 5, false).max).toBe(0.07);
   });
 
   it("starts at zero unless the data is far from zero", () => {
