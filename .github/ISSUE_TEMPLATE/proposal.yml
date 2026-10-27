@@ -1,0 +1,39 @@
+name: Proposal
+description: A design decision or idea to settle before building.
+labels: [proposal, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Write the title as the decision to make, for example "One error and cancellation model for core".
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What forces a decision now.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Each option with its cost and risk.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision
+      description: The chosen option and why. Leave "Open" until decided.
+      value: Open
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract
+      description: Interfaces, ownership and limits other work depends on.
+  - type: textarea
+    id: questions
+    attributes:
+      label: Open questions (if any)

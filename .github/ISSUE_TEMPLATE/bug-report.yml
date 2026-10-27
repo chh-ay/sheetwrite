@@ -1,35 +1,78 @@
 name: Bug report
-description: Report a reproducible Sheetwrite defect
-title: "[Bug]: "
-labels: [bug]
+description: Something in Sheetwrite does not work as documented.
+labels: [bug, needs-triage]
 body:
   - type: markdown
     attributes:
-      value: Security vulnerabilities must use private vulnerability reporting, not this form.
+      value: |
+        Write the title as one plain sentence that states the problem, for example "Wrapped text splits emoji sequences".
+        Report security vulnerabilities privately, not here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happens, in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest steps or code that show the problem. A repository or a sandbox link is best.
+      placeholder: |
+        1. Create a grid with ...
+        2. Edit cell B2 to ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happens instead. Paste errors and console output.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Engine and recalculation
+        - Formula functions
+        - Grid, editing and interaction
+        - Ribbon, toolbar and status bar
+        - XLSX, CSV and file round trips
+        - Charts
+        - Pivot tables
+        - Persistence, sync and collaboration
+        - React, Vue or Svelte adapter
+        - Documentation
+        - Packaging and installation
+        - Other
+    validations:
+      required: true
   - type: input
     id: version
     attributes:
-      label: Sheetwrite version
-      placeholder: "@sheetwrite/core 0.1.0"
-    validations:
-      required: true
-  - type: textarea
-    id: reproduction
-    attributes:
-      label: Minimal reproduction
-      description: Link a repository or provide the smallest code sample that reproduces the issue.
-    validations:
-      required: true
-  - type: textarea
-    id: behavior
-    attributes:
-      label: Actual and expected behavior
+      label: Sheetwrite packages and versions
+      placeholder: "@sheetwrite/core 0.6.0, @sheetwrite/formulas 0.6.0"
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Browser, operating system, framework and version, Node version, and bundler.
+      description: Framework and version, browser or Node version, operating system, bundler.
     validations:
       required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround (if any)
