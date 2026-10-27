@@ -429,21 +429,29 @@ from `bench/` runs the same command unpinned. `READER_CASES=<regex>` narrows
 both sides to the matching readers when attributing one regression.
 
 The gate first calibrates each reader on both engines and runs both at the
-larger loop count, so every sample on either side does identical work and
-takes at least 120 ms. It then runs `--pairs` pairs (default and minimum: the
-pair count the noise floor was measured at, never fewer than 8) in ABBA order:
-even pairs run the base first, odd pairs the candidate. Each side of a pair is a
-fresh process that builds the fixtures untimed, then runs one warm-up and five
-timed samples per reader; its median sample is that side's time. The paired
-ratio is candidate / base, and each reader reports the median of its paired
-ratios. Every reader also folds its return values into a digest; both engines
+larger loop count, so every sample on either side does identical work. The
+calibration aims each sample at 120 ms but does not guarantee it: a reader
+whose first calls run slower than later ones can sample shorter (AVG D has
+sampled at 41 ms). It then runs `--pairs` pairs (default and minimum: 8) in
+ABBA order: even pairs run the base first, odd pairs the candidate. Each side
+of a pair is a fresh process that builds the fixtures untimed, checks that
+every formula computed a number, then runs one warm-up and five timed samples
+per reader; its median sample is that side's time. The paired ratio is
+candidate / base, and each reader reports the median of its paired ratios.
+
+After its timed samples, each side calls every reader for up to four more
+iterations, untimed, and hashes the full results: window bytes and strings,
+whole sort orders, every filter and search index, distinct values, `getCell`
+kinds, numbers and text, snapshot contents, persisted cell data and style ids.
+Numbers hash their IEEE bits, so NaN and the infinities count. Both engines
 must produce the same digest in every pair. Rebuilding either engine during a
-gate fails it.
+gate fails it; the engine hash covers the `.wasm` module and every `.js` glue
+file in `packages/wasm/pkg`.
 
 A reader fails when its digests differ in any pair (the readers disagree), or
-when its median paired ratio exceeds its limit **and** the candidate was slower
-in every pair. One faster pair is enough to call a high median noise. The gate
-exits non-zero when any reader fails.
+when its median paired ratio exceeds its limit. No single pair can excuse a
+high median, so more pairs only make the median steadier and never loosen the
+gate. The gate exits non-zero when any reader fails.
 
 The limits live in
 [`results/reader-noise-floor.json`](./results/reader-noise-floor.json):
@@ -451,46 +459,52 @@ The limits live in
 ```json
 {
   "measuredAt": "<ISO timestamp of the A/A run>",
-  "pairs": 8,
+  "source": { "sha": "<commit>", "engineSha256": "<engine hash>", "cpus": "8" },
+  "gatePairs": 8,
   "rows": {
-    "getWindow 40x8": { "aaMinRatio": 0.95, "aaMaxRatio": 1.07, "limit": 1.07 }
+    "getWindow 40x8": { "aaRatios": [0.98, 1.03, "... one per A/A pair"], "limit": 1.06 }
   }
 }
 ```
 
-Every harness reader needs a row and unknown rows are rejected. A row's limit
-is `max(1, aaMaxRatio)`. There is no extra percentage allowance or rounding.
-To refresh the floor after a harness or sampling change, run an A/A
-gate of one checkout against itself on a quiet machine, then convert its
-report:
+Every harness reader needs a row and unknown rows are rejected. A row keeps
+every A/A pair ratio, at least 24 of them. Its limit resamples those ratios
+20,000 times into 8-pair medians, the statistic the gate judges, with a fixed
+seed; takes the 99.9th percentile; widens its excess over 1 by 1.2, as the
+formula gate does; and rounds up to 0.01, never below 1. The loader recomputes
+every limit, so a loosened row does not load. With 24 or more A/A pairs one
+slow A/A pair cannot set a limit alone. To refresh the floor after a harness
+or sampling change, run an A/A gate of one checkout against itself on the
+bench slot, then convert its report:
 
 ```sh
 taskset -c <idle-core> bun bench/src/reader-gate.ts \
-  --base . --candidate . --pairs 8 --output <aa-report.json>
+  --base <base-checkout> --candidate <base-checkout> --pairs 24 --output <aa-report.json>
 bun bench/src/reader-gate.ts --write-floor <aa-report.json>
 ```
 
 An A/A run (`--base` and `--candidate` resolve to the same checkout) needs no
-floor and reports no verdict. `--write-floor` accepts any results file shaped
-`{ "meta": { "measuredAt"?: string }, "summary": [{ "name", "minRatio",
-"maxRatio", "medianRatio", "pairs" }] }` that covers every reader at one pair
-count of at least 8; without `meta.measuredAt` the file's modification time
-dates the floor.
+floor and reports no verdict. `--write-floor` accepts only such a report: one
+commit and one engine hash on both sides, no verdict, and no `READER_CASES`
+filter. The floor records that commit, engine hash and the CPUs the run was
+pinned to.
 
 [`results/reader-baseline-0.5.x.json`](./results/reader-baseline-0.5.x.json)
-records the immutable 0.5.x baseline commit and a reviewed comparison. The
-gate checks that `--base` names this exact commit. It then measures fresh
-paired ratios against that build and gates all selected readers, including
-aggregate SUM and COUNT, with their A/A limits. It prints the older reference
-ratios for context but never compares historical absolute milliseconds:
-those move with machine load.
+is the gate report of the reviewed tip against the immutable 0.5.x baseline.
+The gate checks that `--base` names that report's base commit. It then
+measures fresh paired ratios against that build and gates all selected
+readers with their A/A limits. It prints the reference ratios for context but
+never compares historical absolute milliseconds: those move with machine load.
+Because the base stays at 0.5.x, the gate catches a reader that falls behind
+0.5.x, not one that loses a speedup this branch gained over it.
 
 `--output` writes `{ meta, summary, verdict }`: `meta` holds the start time,
-both commits, both engine SHA-256s, Bun version, pair count, order, reader
-filter, calibrations and loop counts; `summary` holds one row per reader with
-base and candidate median ms, median/min/max paired ratio, candidate-slower
-pairs, digest agreement and every pair's samples; `verdict` is `null` for an
-A/A run.
+both commits, both engine SHA-256s, the CPUs the gate may run on (the bench
+slot under `taskset`), Bun version, pair count, order, reader filter,
+calibrations and loop counts; `summary` holds one row per reader with base
+and candidate median ms, median/min/max paired ratio, candidate-slower pairs,
+digest agreement and every pair's samples; `verdict` is `null` for an A/A
+run.
 
 ### Honest asymmetries (declared, not hidden)
 

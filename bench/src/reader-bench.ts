@@ -9,9 +9,11 @@
  *   bun bench/src/reader-bench.ts <checkout> run <iterations.json>
  *     -> {"results": [ReaderRunResult, ...]}
  *
- * `calibrate` sizes each reader's loop so one sample takes at least
- * TARGET_SAMPLE_MS on the engine it runs on; `run` reuses fixed loop counts so
- * both engines do identical work per sample. The harness always comes from
+ * `calibrate` sizes each reader's loop so one sample aims at TARGET_SAMPLE_MS
+ * on the engine it runs on; `run` reuses fixed loop counts so both engines do
+ * identical work per sample. After the timed samples, `run` calls each reader
+ * again, untimed, and hashes its full results into the digest that both
+ * engines must agree on. The harness always comes from
  * this checkout; `<checkout>` only supplies the built `packages/wasm/pkg`, so an
  * older base without this file can still be measured. The optional
  * `READER_CASES` regex narrows a run to the readers being attributed.
@@ -41,11 +43,19 @@ const ROW_START_STRIDE = 7_919;
 const TARGET_SAMPLE_MS = 120;
 const SAMPLES = 5;
 const WARMUP_SAMPLES = 1;
+/**
+ * Loop iterations the untimed digest pass hashes. Window readers move their
+ * start row each iteration, so a few iterations check several windows; the
+ * range readers recompute once per iteration, so more would add seconds.
+ */
+const DIGEST_ITERATIONS = 4;
 const COLUMN_A = 0;
 const COLUMN_B = 1;
 const COLUMN_C = 2;
 const COLUMN_D = 3;
 const COLUMN_E = 4;
+/** `CellOut.kind` of a formula with a numeric result; an error result reads as text instead. */
+const CELL_KIND_NUMERIC_FORMULA = 4;
 const AGGREGATE_SUM = 0;
 const AGGREGATE_AVERAGE = 1;
 const AGGREGATE_COUNT = 4;
@@ -80,12 +90,32 @@ const CENTS = 100;
 /** Boolean cells: rows ≡ 2 (mod 8) are TRUE, the other boolean rows FALSE. */
 const TRUE_EVERY_ROWS = 8;
 const TRUE_ROW_REMAINDER = 2;
-/** Calibration overshoots the target so candidate-side speedups still leave ≥ 50 ms samples. */
+/**
+ * Calibration overshoots the target so samples stay near it on a faster
+ * candidate. It is not a floor: a reader whose first loops run slower than
+ * later ones can still sample well below the target (41 ms for AVG D).
+ */
 const CALIBRATION_HEADROOM = 1.25;
 const MIN_MEASURABLE_MS = 0.01;
 const MAX_CALIBRATION_GROWTH = 100;
 const DEFAULT_STYLE = 0;
 const WASM_PACKAGE = "packages/wasm/pkg";
+/** filterRows needles: a label prefix shared by about 1 in 450 labels, and a mixed-column text. */
+const FILTER_LABEL_NEEDLE = "item-12";
+const FILTER_MIXED_NEEDLE = "x1";
+/** search queries: a label substring, and one mixed-column text that must match a whole cell. */
+const SEARCH_SUBSTRING = "item-123";
+const SEARCH_WHOLE_CELL = "x7";
+/** cyrb53 seeds, multipliers and output mask: a 53-bit hash fits a JSON number exactly. */
+const HASH_SEED_HIGH = 0xdeadbeef;
+const HASH_SEED_LOW = 0x41c6ce57;
+const HASH_MULTIPLIER_HIGH = 2_654_435_761;
+const HASH_MULTIPLIER_LOW = 1_597_334_677;
+const HASH_FINAL_A = 2_246_822_507;
+const HASH_FINAL_B = 3_266_489_909;
+const HASH_HIGH_BITS_MASK = 0x1f_ffff;
+const UINT32_SPAN = 2 ** 32;
+const WORDS_PER_FLOAT64 = 2;
 
 /**
  * Every reader the harness measures, in run order. `reader-gate.ts` validates
@@ -145,7 +175,7 @@ export interface ReaderRunResult {
   iterations: number;
   sampleMs: number[];
   medianSampleMs: number;
-  /** Sum of the reader's return values over one sample; both engines must agree. */
+  /** Hash of the reader's full results over DIGEST_ITERATIONS calls; both engines must agree. */
   digest: number;
 }
 
@@ -171,6 +201,7 @@ interface DistinctColumnHandle {
 interface CellHandle {
   readonly kind: number;
   readonly num: number;
+  readonly string: string | undefined;
   free(): void;
 }
 interface CellSnapshotHandle {
@@ -276,12 +307,88 @@ interface EngineModule {
   initSync(options: { module: Uint8Array }): unknown;
 }
 
-/** One measured reader: `run` does one call and returns a number folded into the digest. */
+/** Where a reader sends what it read. Timed samples discard it; the digest pass hashes it. */
+interface ResultSink {
+  number(value: number): void;
+  numbers(values: Float64Array): void;
+  integers(values: Uint8Array | Uint32Array): void;
+  text(value: string | undefined): void;
+  texts(values: readonly string[]): void;
+}
+
+/** One measured reader: `run` does one call and sends every result value to `sink`. */
 interface ReaderCase {
   name: string;
   group: ReaderGroup;
   fixture: string;
-  run(iteration: number): number;
+  run(iteration: number, sink: ResultSink): void;
+}
+
+const DISCARD: ResultSink = {
+  number() {},
+  numbers() {},
+  integers() {},
+  text() {},
+  texts() {},
+};
+
+/**
+ * cyrb53 over 32-bit words. Numbers hash their IEEE bits, so NaN and the
+ * infinities count, and every array hashes its length before its items.
+ */
+class ContentHash implements ResultSink {
+  readonly #float = new Float64Array(1);
+  readonly #floatWords = new Uint32Array(this.#float.buffer);
+  #high = HASH_SEED_HIGH;
+  #low = HASH_SEED_LOW;
+
+  number(value: number): void {
+    this.#float[0] = value;
+    this.#word(this.#floatWords[0] ?? 0);
+    this.#word(this.#floatWords[1] ?? 0);
+  }
+
+  numbers(values: Float64Array): void {
+    this.integers(
+      new Uint32Array(values.buffer, values.byteOffset, values.length * WORDS_PER_FLOAT64),
+    );
+  }
+
+  integers(values: Uint8Array | Uint32Array): void {
+    this.#word(values.length);
+    for (const value of values) this.#word(value);
+  }
+
+  text(value: string | undefined): void {
+    if (value === undefined) {
+      // Absent text and "" must differ, so absence hashes as length -1.
+      this.#word(-1);
+      return;
+    }
+
+    this.#word(value.length);
+    for (let index = 0; index < value.length; index++) this.#word(value.charCodeAt(index));
+  }
+
+  texts(values: readonly string[]): void {
+    this.#word(values.length);
+    for (const value of values) this.text(value);
+  }
+
+  digest(): number {
+    let high = this.#high;
+    let low = this.#low;
+    high = Math.imul(high ^ (high >>> 16), HASH_FINAL_A);
+    high ^= Math.imul(low ^ (low >>> 13), HASH_FINAL_B);
+    low = Math.imul(low ^ (low >>> 16), HASH_FINAL_A);
+    low ^= Math.imul(high ^ (high >>> 13), HASH_FINAL_B);
+    return UINT32_SPAN * (HASH_HIGH_BITS_MASK & low) + (high >>> 0);
+  }
+
+  #word(word: number): void {
+    this.#high = Math.imul(this.#high ^ word, HASH_MULTIPLIER_HIGH);
+    this.#low = Math.imul(this.#low ^ word, HASH_MULTIPLIER_LOW);
+  }
 }
 
 /** Deterministic LCG: both engines must see byte-identical fixtures. */
@@ -293,28 +400,65 @@ function createUnitRandom(): () => number {
   };
 }
 
-function sumOf(values: ArrayLike<number>): number {
-  let total = 0;
-  for (let index = 0; index < values.length; index++) {
-    const value = values[index] ?? 0;
-    if (Number.isFinite(value)) total += value;
-  }
-  return total;
-}
-
-function consumeWindow(view: WindowViewHandle): number {
+function consumeWindow(view: WindowViewHandle, sink: ResultSink): void {
   const packed = view.takePacked();
   const strings = view.takeStrings();
   view.free();
-  return packed.length + strings.length;
+  sink.integers(packed);
+  sink.texts(strings);
 }
 
-function consumeDistinct(column: DistinctColumnHandle): number {
+function consumeDistinct(column: DistinctColumnHandle, sink: ResultSink): void {
   const kinds = column.takeKinds();
   const numbers = column.takeNumbers();
   const texts = column.takeTexts();
   column.free();
-  return kinds.length + sumOf(numbers) + texts.length;
+  sink.integers(kinds);
+  sink.numbers(numbers);
+  sink.texts(texts);
+}
+
+/** Read one cell's kind, number and text; error results read as text. */
+function consumeCell(
+  store: Engine,
+  sheet: number,
+  row: number,
+  col: number,
+  sink: ResultSink,
+): void {
+  const cell = store.getCell(sheet, row, col);
+  sink.number(cell.kind);
+  sink.number(cell.num);
+  sink.text(cell.string);
+  cell.free();
+}
+
+/**
+ * Write a formula. A rejected write returns NaN; a parse failure returns 0,
+ * like a valid formula over an empty cell, so callers check the value after
+ * recompute.
+ */
+function writeFormula(
+  store: Engine,
+  sheet: number,
+  row: number,
+  col: number,
+  source: string,
+): void {
+  if (Number.isNaN(store.setFormula(sheet, row, col, source, DEFAULT_STYLE))) {
+    throw new Error(`setFormula rejected ${source}`);
+  }
+}
+
+/** A recomputed formula cell must hold a number; an error reads as text. */
+function recomputedNumber(store: Engine, sheet: number, row: number, col: number): number {
+  const cell = store.getCell(sheet, row, col);
+  const { kind, num, string } = cell;
+  cell.free();
+  if (kind !== CELL_KIND_NUMERIC_FORMULA || !Number.isFinite(num)) {
+    throw new Error(`formula at row ${row}, column ${col} computed ${string ?? num}, not a number`);
+  }
+  return num;
 }
 
 function rowStartFor(iteration: number): number {
@@ -341,7 +485,8 @@ class FixtureWriter {
   dataSheet(columns: number): number {
     const store = this.#store;
     const sheet = store.addSheet(columns, ROWS);
-    store.setColumnNumbers(sheet, COLUMN_A, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
+    const columnA = this.#randomNumbers(ROWS);
+    store.setColumnNumbers(sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
     this.#writeLabels(sheet, COLUMN_B);
     this.#writeMixed(sheet, COLUMN_C);
     this.#writeDoublingFormulas(sheet, COLUMN_D);
@@ -351,7 +496,9 @@ class FixtureWriter {
         store.setColumnNumbers(sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
       }
     }
+
     store.recompute(sheet);
+    this.#checkDoubling(sheet, COLUMN_D, columnA);
     return sheet;
   }
 
@@ -388,10 +535,17 @@ class FixtureWriter {
 
   /** Column D: `=A{r}*2`, so readers see calculated values. */
   #writeDoublingFormulas(sheet: number, col: number): void {
+    for (let row = 0; row < ROWS; row++)
+      writeFormula(this.#store, sheet, row, col, `=A${row + 1}*2`);
+  }
+
+  /** Every `=A{r}*2` cell must hold twice A after recompute, or readers would time error cells. */
+  #checkDoubling(sheet: number, col: number, columnA: Float64Array): void {
     for (let row = 0; row < ROWS; row++) {
-      const source = `=A${row + 1}*2`;
-      if (this.#store.setFormula(sheet, row, col, source, DEFAULT_STYLE) < 0) {
-        throw new Error(`setFormula rejected ${source}`);
+      const expected = (columnA[row] ?? Number.NaN) * 2;
+      const actual = recomputedNumber(this.#store, sheet, row, col);
+      if (actual !== expected) {
+        throw new Error(`row ${row}: =A${row + 1}*2 computed ${actual}, expected ${expected}`);
       }
     }
   }
@@ -462,17 +616,19 @@ function rangeScenario(
   store: Engine,
   fixtures: FixtureWriter,
   formulaFor: (index: number) => string,
-): (iteration: number) => number {
+): ReaderCase["run"] {
   const sheet = fixtures.dataSheet(RANGE_COLUMNS);
   for (let index = 0; index < RANGE_FORMULAS_PER_SCENARIO; index++) {
-    const source = formulaFor(index);
-    if (store.setFormula(sheet, index, RANGE_RESULT_COLUMN, source, DEFAULT_STYLE) < 0) {
-      throw new Error(`setFormula rejected ${source}`);
-    }
+    writeFormula(store, sheet, index, RANGE_RESULT_COLUMN, formulaFor(index));
   }
+
   store.recompute(sheet);
+  for (let row = 0; row < RANGE_FORMULAS_PER_SCENARIO; row++) {
+    recomputedNumber(store, sheet, row, RANGE_RESULT_COLUMN);
+  }
+
   const lastRow = ROWS - 1;
-  return (iteration) => {
+  return (iteration, sink) => {
     store.setNumber(sheet, lastRow, COLUMN_A, iteration % NUMBER_SCALE, DEFAULT_STYLE);
     store.setString(
       sheet,
@@ -483,13 +639,9 @@ function rangeScenario(
     );
     store.setNumber(sheet, lastRow, COLUMN_C, iteration % MIXED_TEXT_VARIANTS, DEFAULT_STYLE);
     store.recompute(sheet);
-    let total = 0;
     for (let row = 0; row < RANGE_FORMULAS_PER_SCENARIO; row++) {
-      const cell = store.getCell(sheet, row, RANGE_RESULT_COLUMN);
-      if (Number.isFinite(cell.num)) total += cell.num;
-      cell.free();
+      consumeCell(store, sheet, row, RANGE_RESULT_COLUMN, sink);
     }
-    return total;
   };
 }
 
@@ -566,7 +718,7 @@ function buildReaderCases(store: Engine): ReaderCase[] {
 
   const reader =
     (group: ReaderGroup, fixture: string) =>
-    (name: string, run: (iteration: number) => number): ReaderCase => ({
+    (name: string, run: ReaderCase["run"]): ReaderCase => ({
       name,
       group,
       fixture,
@@ -576,76 +728,76 @@ function buildReaderCases(store: Engine): ReaderCase[] {
   const conditionalWindowReader = reader("window", COND_FIXTURE);
   const queryReader = reader("query", MAIN_FIXTURE);
   const cellsReader = reader("cells", MAIN_FIXTURE);
-  const windowOf = (sheet: number, iteration: number, rows: number): number =>
+  const windowOf = (sheet: number, iteration: number, rows: number, sink: ResultSink): void =>
     consumeWindow(
       store.getWindow(sheet, rowStartFor(iteration), rowStartFor(iteration) + rows, allColumns),
+      sink,
     );
 
   const windowCases = [
-    windowReader("getWindow 40x8", (i) => windowOf(mainSheet, i, VIEWPORT_ROWS)),
-    windowReader("getWindow 1000x8", (i) => windowOf(mainSheet, i, LARGE_WINDOW_ROWS)),
-    conditionalWindowReader("getWindow 40x8 cond rules", (i) =>
-      windowOf(conditionalSheet, i, VIEWPORT_ROWS),
+    windowReader("getWindow 40x8", (i, sink) => windowOf(mainSheet, i, VIEWPORT_ROWS, sink)),
+    windowReader("getWindow 1000x8", (i, sink) => windowOf(mainSheet, i, LARGE_WINDOW_ROWS, sink)),
+    conditionalWindowReader("getWindow 40x8 cond rules", (i, sink) =>
+      windowOf(conditionalSheet, i, VIEWPORT_ROWS, sink),
     ),
-    conditionalWindowReader("getWindow 1000x8 cond rules", (i) =>
-      windowOf(conditionalSheet, i, LARGE_WINDOW_ROWS),
+    conditionalWindowReader("getWindow 1000x8 cond rules", (i, sink) =>
+      windowOf(conditionalSheet, i, LARGE_WINDOW_ROWS, sink),
     ),
-    windowReader("getWindowRows 40x8 sorted", () =>
-      consumeWindow(store.getWindowRows(mainSheet, sortedViewportRows, allColumns)),
+    windowReader("getWindowRows 40x8 sorted", (_, sink) =>
+      consumeWindow(store.getWindowRows(mainSheet, sortedViewportRows, allColumns), sink),
     ),
-    windowReader("getWindowRows 1000x8 sorted", () =>
-      consumeWindow(store.getWindowRows(mainSheet, sortedLargeRows, allColumns)),
+    windowReader("getWindowRows 1000x8 sorted", (_, sink) =>
+      consumeWindow(store.getWindowRows(mainSheet, sortedLargeRows, allColumns), sink),
     ),
   ];
 
   const queryCases = [
-    queryReader("aggregate SUM A", () => store.aggregate(mainSheet, COLUMN_A, AGGREGATE_SUM)),
-    queryReader("aggregate AVG D (formulas)", () =>
-      store.aggregate(mainSheet, COLUMN_D, AGGREGATE_AVERAGE),
+    queryReader("aggregate SUM A", (_, sink) =>
+      sink.number(store.aggregate(mainSheet, COLUMN_A, AGGREGATE_SUM)),
     ),
-    queryReader("aggregate COUNT C (mixed)", () =>
-      store.aggregate(mainSheet, COLUMN_C, AGGREGATE_COUNT),
+    queryReader("aggregate AVG D (formulas)", (_, sink) =>
+      sink.number(store.aggregate(mainSheet, COLUMN_D, AGGREGATE_AVERAGE)),
     ),
-    queryReader(
-      "sortRowsMulti A numeric",
-      () => store.sortRowsMulti(mainSheet, sortA, ascending, allRows)[0] ?? 0,
+    queryReader("aggregate COUNT C (mixed)", (_, sink) =>
+      sink.number(store.aggregate(mainSheet, COLUMN_C, AGGREGATE_COUNT)),
     ),
-    queryReader(
-      "sortRowsMulti B text",
-      () => store.sortRowsMulti(mainSheet, sortB, ascending, allRows)[0] ?? 0,
+    queryReader("sortRowsMulti A numeric", (_, sink) =>
+      sink.integers(store.sortRowsMulti(mainSheet, sortA, ascending, allRows)),
     ),
-    queryReader(
-      "sortRowsMulti D formulas",
-      () => store.sortRowsMulti(mainSheet, sortD, descending, allRows)[0] ?? 0,
+    queryReader("sortRowsMulti B text", (_, sink) =>
+      sink.integers(store.sortRowsMulti(mainSheet, sortB, ascending, allRows)),
     ),
-    queryReader(
-      "sortRowsMulti B,A all rows",
-      () =>
+    queryReader("sortRowsMulti D formulas", (_, sink) =>
+      sink.integers(store.sortRowsMulti(mainSheet, sortD, descending, allRows)),
+    ),
+    queryReader("sortRowsMulti B,A all rows", (_, sink) =>
+      sink.integers(
         store.sortRowsMulti(
           mainSheet,
           Uint32Array.of(COLUMN_B, COLUMN_A),
           Uint8Array.of(SORT_ASCENDING, SORT_DESCENDING),
           allRows,
-        )[0] ?? 0,
+        ),
+      ),
     ),
-    queryReader(
-      "sortRowsMulti C,D 50k candidates",
-      () =>
+    queryReader("sortRowsMulti C,D 50k candidates", (_, sink) =>
+      sink.integers(
         store.sortRowsMulti(
           mainSheet,
           Uint32Array.of(COLUMN_C, COLUMN_D),
           Uint8Array.of(SORT_ASCENDING, SORT_ASCENDING),
           evenRows,
-        )[0] ?? 0,
+        ),
+      ),
     ),
-    queryReader(
-      "filterRows B contains",
-      () => store.filterRows(mainSheet, COLUMN_B, "item-12").length,
+    queryReader("filterRows B contains", (_, sink) =>
+      sink.integers(store.filterRows(mainSheet, COLUMN_B, FILTER_LABEL_NEEDLE)),
     ),
-    queryReader("filterRows C mixed", () => store.filterRows(mainSheet, COLUMN_C, "x1").length),
-    queryReader(
-      "filterRowsMulti A>100,B~item-1,C set",
-      () =>
+    queryReader("filterRows C mixed", (_, sink) =>
+      sink.integers(store.filterRows(mainSheet, COLUMN_C, FILTER_MIXED_NEEDLE)),
+    ),
+    queryReader("filterRowsMulti A>100,B~item-1,C set", (_, sink) =>
+      sink.integers(
         store.filterRowsMulti(
           mainSheet,
           filterMulti.cols,
@@ -656,73 +808,76 @@ function buildReaderCases(store: Engine): ReaderCase[] {
           filterMulti.textCounts,
           filterMulti.valueNums,
           filterMulti.valueTexts,
-        ).length,
+        ),
+      ),
     ),
-    queryReader(
-      "search B,C,D substring",
-      () =>
+    queryReader("search B,C,D substring", (_, sink) =>
+      sink.integers(
         store.search(
           mainSheet,
           Uint32Array.of(COLUMN_B, COLUMN_C, COLUMN_D),
-          "item-123",
+          SEARCH_SUBSTRING,
           true,
           false,
-        ).length,
+        ),
+      ),
     ),
-    queryReader(
-      "search all cols whole-cell",
-      () => store.search(mainSheet, allColumns, "x7", true, true).length,
+    queryReader("search all cols whole-cell", (_, sink) =>
+      sink.integers(store.search(mainSheet, allColumns, SEARCH_WHOLE_CELL, true, true)),
     ),
-    queryReader("distinctValues B text", () =>
-      consumeDistinct(store.distinctValues(mainSheet, COLUMN_B, DISTINCT_LIMIT)),
+    queryReader("distinctValues B text", (_, sink) =>
+      consumeDistinct(store.distinctValues(mainSheet, COLUMN_B, DISTINCT_LIMIT), sink),
     ),
-    queryReader("distinctValues D formulas", () =>
-      consumeDistinct(store.distinctValues(mainSheet, COLUMN_D, DISTINCT_LIMIT)),
+    queryReader("distinctValues D formulas", (_, sink) =>
+      consumeDistinct(store.distinctValues(mainSheet, COLUMN_D, DISTINCT_LIMIT), sink),
     ),
-    queryReader("dataEdge E down to gap", (i) =>
-      store.dataEdge(mainSheet, rowStartFor(i) % FIRST_EDGE_GAP_ROW, COLUMN_E, 1, 0),
+    queryReader("dataEdge E down to gap", (i, sink) =>
+      sink.number(store.dataEdge(mainSheet, rowStartFor(i) % FIRST_EDGE_GAP_ROW, COLUMN_E, 1, 0)),
     ),
-    queryReader("dataEdge row right", (i) => store.dataEdge(mainSheet, rowStartFor(i), 0, 0, 1)),
-    queryReader("dataEdgeOrdered E by A order", (i) =>
-      store.dataEdgeOrdered(
-        mainSheet,
-        ascendingByA,
-        rowStartFor(i) % FIRST_EDGE_GAP_ROW,
-        COLUMN_E,
-        1,
-        0,
+    queryReader("dataEdge row right", (i, sink) =>
+      sink.number(store.dataEdge(mainSheet, rowStartFor(i), 0, 0, 1)),
+    ),
+    queryReader("dataEdgeOrdered E by A order", (i, sink) =>
+      sink.number(
+        store.dataEdgeOrdered(
+          mainSheet,
+          ascendingByA,
+          rowStartFor(i) % FIRST_EDGE_GAP_ROW,
+          COLUMN_E,
+          1,
+          0,
+        ),
       ),
     ),
   ];
 
   const cellCases = [
-    cellsReader("getCell 4096 scattered", () => {
-      let total = 0;
+    cellsReader("getCell 4096 scattered", (_, sink) => {
       for (let index = 0; index < SCATTERED_CELLS; index++) {
-        const cell = store.getCell(mainSheet, scatteredRows[index] ?? 0, scatteredCols[index] ?? 0);
-        total += cell.kind;
-        cell.free();
+        consumeCell(store, mainSheet, scatteredRows[index] ?? 0, scatteredCols[index] ?? 0, sink);
       }
-      return total;
     }),
-    cellsReader("cellSnapshots 4096 scattered", () => {
+    cellsReader("cellSnapshots 4096 scattered", (_, sink) => {
       const snapshot = store.cellSnapshots(mainSheet, scatteredRows, scatteredCols);
       if (snapshot === undefined) throw new Error("cellSnapshots returned nothing");
-      const total = snapshot.kinds.length + sumOf(snapshot.numbers) + snapshot.strings.length;
+      sink.integers(snapshot.kinds);
+      sink.numbers(snapshot.numbers);
+      sink.texts(snapshot.strings);
       snapshot.free();
-      return total;
     }),
-    cellsReader("captureRange 1000x8 + numbers", (i) => {
+    cellsReader("captureRange 1000x8 + numbers", (i, sink) => {
       const snapshot = store.captureRange(mainSheet, rowStartFor(i), 0, CAPTURE_ROWS, MAIN_COLUMNS);
       if (snapshot === undefined) throw new Error("captureRange returned nothing");
-      const total = snapshot.byteLength() + sumOf(store.snapshotNumbers(snapshot));
+      sink.number(snapshot.byteLength());
+      sink.integers(snapshot.kinds());
+      sink.numbers(store.snapshotNumbers(snapshot));
       snapshot.free();
-      return total;
     }),
-    cellsReader("persistedCellData whole sheet", () => store.persistedCellData(mainSheet).length),
-    cellsReader(
-      "rangeStyleIds whole sheet",
-      () => store.rangeStyleIds(mainSheet, 0, 0, lastRow, MAIN_COLUMNS - 1).length,
+    cellsReader("persistedCellData whole sheet", (_, sink) =>
+      sink.numbers(store.persistedCellData(mainSheet)),
+    ),
+    cellsReader("rangeStyleIds whole sheet", (_, sink) =>
+      sink.integers(store.rangeStyleIds(mainSheet, 0, 0, lastRow, MAIN_COLUMNS - 1)),
     ),
   ];
 
@@ -735,11 +890,19 @@ function buildReaderCases(store: Engine): ReaderCase[] {
   return cases;
 }
 
-function timeLoop(reader: ReaderCase, iterations: number): { elapsedMs: number; digest: number } {
-  let digest = 0;
+function timeLoop(reader: ReaderCase, iterations: number): number {
   const started = now();
-  for (let iteration = 0; iteration < iterations; iteration++) digest += reader.run(iteration);
-  return { elapsedMs: now() - started, digest };
+  for (let iteration = 0; iteration < iterations; iteration++) reader.run(iteration, DISCARD);
+  return now() - started;
+}
+
+/** Hash the first iterations' full results. Untimed, so hashing cost never dilutes a ratio. */
+function digestOf(reader: ReaderCase, iterations: number): number {
+  const hash = new ContentHash();
+  for (let iteration = 0; iteration < Math.min(iterations, DIGEST_ITERATIONS); iteration++) {
+    reader.run(iteration, hash);
+  }
+  return hash.digest();
 }
 
 function calibrate(reader: ReaderCase): number {
@@ -747,7 +910,7 @@ function calibrate(reader: ReaderCase): number {
   timeLoop(reader, 1);
   let iterations = 1;
   for (;;) {
-    const { elapsedMs } = timeLoop(reader, iterations);
+    const elapsedMs = timeLoop(reader, iterations);
     if (elapsedMs >= TARGET_SAMPLE_MS) return iterations;
     const scaled = Math.ceil(
       (iterations * TARGET_SAMPLE_MS * CALIBRATION_HEADROOM) /
@@ -759,11 +922,7 @@ function calibrate(reader: ReaderCase): number {
 
 function measure(reader: ReaderCase, iterations: number): ReaderRunResult {
   for (let warmup = 0; warmup < WARMUP_SAMPLES; warmup++) timeLoop(reader, iterations);
-  const samples = Array.from({ length: SAMPLES }, () => timeLoop(reader, iterations));
-  const digest = samples[0]?.digest ?? Number.NaN;
-  // A non-finite digest cannot be compared across engines, so it would hide disagreement.
-  if (!Number.isFinite(digest)) throw new Error(`${reader.name} produced a non-finite digest`);
-  const sampleMs = samples.map((sample) => sample.elapsedMs);
+  const sampleMs = Array.from({ length: SAMPLES }, () => timeLoop(reader, iterations));
   return {
     name: reader.name,
     group: reader.group,
@@ -771,7 +930,7 @@ function measure(reader: ReaderCase, iterations: number): ReaderRunResult {
     iterations,
     sampleMs,
     medianSampleMs: summarize(sampleMs).median,
-    digest,
+    digest: digestOf(reader, iterations),
   };
 }
 

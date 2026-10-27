@@ -1,21 +1,23 @@
 /**
  * Paired engine reader gate: times `reader-bench.ts` against two built engines
- * in alternating fresh processes and fails a reader only when the candidate is
- * slower in every pair and its median paired ratio exceeds that reader's
- * measured A/A noise limit.
+ * in alternating fresh processes and fails a reader when its median paired
+ * ratio exceeds that reader's limit, or when the two engines return different
+ * results. Each limit comes from A/A pair ratios resampled into medians of
+ * GATE_PAIRS pairs, the same statistic the gate judges.
  *
  *   bun bench/src/reader-gate.ts --base <checkout> [--candidate <checkout>]
  *     [--pairs <n>] [--output <report.json>]
- *   bun bench/src/reader-gate.ts --write-floor <aa-results.json>
+ *   bun bench/src/reader-gate.ts --write-floor <aa-report.json>
  *
  * When `--base` and `--candidate` name the same checkout the run is an A/A
  * noise measurement: it needs no noise floor and reports no verdict.
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { mulberry32 } from "./dataset.js";
 import { optionValue, validateExactMatrix } from "./gate-protocol.js";
 import {
   READER_CASE_NAMES,
@@ -26,9 +28,27 @@ import {
 } from "./reader-bench.js";
 import { summarize } from "./stats.js";
 
-/** Fewer pairs than the noise floor was measured at would make its limits too tight. */
-const MINIMUM_PAIRS = 8;
-/** Parity is the lower bound; there is no unmeasured percentage allowance. */
+/**
+ * The pair count each limit is resampled at. A gate run needs at least this
+ * many pairs. More pairs only make its median steadier, so they never loosen
+ * the gate: no single pair can excuse a slowdown.
+ */
+const GATE_PAIRS = 8;
+/**
+ * The fewest A/A pairs a floor needs. With 24 pairs, one slow A/A pair is
+ * drawn into four of eight resampled pairs less often than LIMIT_QUANTILE
+ * allows, so it cannot set the limit alone.
+ */
+const MINIMUM_AA_PAIRS = 24;
+const RESAMPLES = 20_000;
+const RESAMPLE_SEED = 0x5eed_0a0a;
+/** 39 readers at 1 in 1,000 each: an A/A run fails about 1 gate in 25 before LIMIT_MARGIN. */
+const LIMIT_QUANTILE = 0.999;
+/** The headroom over the A/A quantile, as in `formula-gate.ts`, for windows quieter than the floor's. */
+const LIMIT_MARGIN = 1.2;
+/** Limits round up to two decimals, so a written floor reads the same as the report. */
+const LIMIT_SCALE = 100;
+/** Parity is the lower bound; no limit lets the candidate be slower than an A/A median. */
 const PARITY_RATIO = 1;
 const HARNESS_ROOT = new URL("../../", import.meta.url).pathname;
 const HARNESS = new URL("./reader-bench.ts", import.meta.url).pathname;
@@ -36,7 +56,13 @@ const NOISE_FLOOR_PATH = new URL("../results/reader-noise-floor.json", import.me
 /** Stored baseline identity and prior ratios. Timing gates use fresh paired runs
  * of this exact baseline, not machine-dependent historical wall-clock times. */
 const REFERENCE_PATH = new URL("../results/reader-baseline-0.5.x.json", import.meta.url).pathname;
-const ENGINE_WASM = "packages/wasm/pkg/sheetwrite_wasm_bg.wasm";
+const ENGINE_PACKAGE = "packages/wasm/pkg";
+const ENGINE_MODULE = "sheetwrite_wasm_bg.wasm";
+/** The module and every glue file the harness loads; a change to any of them changes the engine. */
+const ENGINE_FILE = /\.(?:js|wasm)$/u;
+const PROC_STATUS = "/proc/self/status";
+const CPUS_FIELD = "Cpus_allowed_list:";
+const UNKNOWN_CPUS = "unknown";
 const RATIO_DIGITS = 3;
 const MS_DIGITS = 2;
 const LIMIT_DIGITS = 2;
@@ -44,15 +70,23 @@ const LIMIT_DIGITS = 2;
 type Side = "base" | "candidate";
 
 export interface ReaderNoiseFloorRow {
-  aaMinRatio: number;
-  aaMaxRatio: number;
+  /** Every A/A pair's candidate/base ratio, in pair order. */
+  aaRatios: number[];
   limit: number;
+}
+
+/** The A/A run a floor came from: one commit, one engine build, one CPU set. */
+export interface ReaderNoiseFloorSource {
+  sha: string;
+  engineSha256: string;
+  cpus: string;
 }
 
 /** bench/results/reader-noise-floor.json: per-reader limits from an A/A run. */
 export interface ReaderNoiseFloor {
   measuredAt: string;
-  pairs: number;
+  source: ReaderNoiseFloorSource;
+  gatePairs: number;
   rows: Record<string, ReaderNoiseFloorRow>;
 }
 
@@ -140,9 +174,30 @@ function median(values: readonly number[]): number {
   return summarize(values).median;
 }
 
-/** The measured A/A maximum, bounded below by parity. */
-export function noiseFloorLimit(aaMaxRatio: number): number {
-  return Math.max(PARITY_RATIO, aaMaxRatio);
+/**
+ * The limit for one reader: resample its A/A ratios into GATE_PAIRS-pair
+ * medians, take the LIMIT_QUANTILE median, widen its excess over parity by
+ * LIMIT_MARGIN and round up. The seed is fixed, so a floor file can be
+ * checked by recomputing every limit.
+ */
+export function noiseFloorLimit(aaRatios: readonly number[]): number {
+  const random = mulberry32(RESAMPLE_SEED);
+  const draw = new Float64Array(GATE_PAIRS);
+  const medians = new Float64Array(RESAMPLES);
+  const middle = GATE_PAIRS / 2;
+  for (let resample = 0; resample < RESAMPLES; resample++) {
+    for (let pair = 0; pair < GATE_PAIRS; pair++) {
+      draw[pair] = aaRatios[Math.floor(random() * aaRatios.length)] ?? Number.NaN;
+    }
+    draw.sort();
+    // GATE_PAIRS is even, so the median is the mean of the two middle draws, as in `summarize`.
+    medians[resample] = ((draw[middle - 1] ?? Number.NaN) + (draw[middle] ?? Number.NaN)) / 2;
+  }
+
+  medians.sort();
+  const quantile = medians[Math.ceil(RESAMPLES * LIMIT_QUANTILE) - 1] ?? Number.NaN;
+  const widened = PARITY_RATIO + LIMIT_MARGIN * (quantile - PARITY_RATIO);
+  return Math.max(PARITY_RATIO, Math.ceil(widened * LIMIT_SCALE) / LIMIT_SCALE);
 }
 
 /** Parse and validate the noise floor: one row per harness reader, no others. */
@@ -150,79 +205,98 @@ export function parseReaderNoiseFloor(value: unknown, path: string): ReaderNoise
   const floor = asRecord(value, path);
   const measuredAt = text(floor.measuredAt, `${path}.measuredAt`);
   if (Number.isNaN(Date.parse(measuredAt))) throw new Error(`${path}.measuredAt is not a date`);
-  const pairs = positiveInteger(floor.pairs, `${path}.pairs`);
-  if (pairs < MINIMUM_PAIRS) throw new Error(`${path}.pairs must be at least ${MINIMUM_PAIRS}`);
+
+  const rawSource = asRecord(floor.source, `${path}.source`);
+  const source = {
+    sha: text(rawSource.sha, `${path}.source.sha`),
+    engineSha256: text(rawSource.engineSha256, `${path}.source.engineSha256`),
+    cpus: text(rawSource.cpus, `${path}.source.cpus`),
+  };
+  const gatePairs = positiveInteger(floor.gatePairs, `${path}.gatePairs`);
+  if (gatePairs !== GATE_PAIRS) {
+    throw new Error(`${path}.gatePairs is ${gatePairs}; the gate resamples at ${GATE_PAIRS}`);
+  }
+
   const rawRows = asRecord(floor.rows, `${path}.rows`);
   validateExactMatrix(`${path} rows`, READER_CASE_NAMES, Object.keys(rawRows));
   const rows: Record<string, ReaderNoiseFloorRow> = {};
   for (const [name, rawRow] of Object.entries(rawRows)) {
     const rowPath = `${path}.rows[${JSON.stringify(name)}]`;
     const row = asRecord(rawRow, rowPath);
-    const aaMinRatio = positiveNumber(row.aaMinRatio, `${rowPath}.aaMinRatio`);
-    const aaMaxRatio = positiveNumber(row.aaMaxRatio, `${rowPath}.aaMaxRatio`);
-    const limit = positiveNumber(row.limit, `${rowPath}.limit`);
-    if (aaMinRatio > aaMaxRatio) throw new Error(`${rowPath}: aaMinRatio exceeds aaMaxRatio`);
-    if (limit !== noiseFloorLimit(aaMaxRatio)) {
-      throw new Error(
-        `${rowPath}.limit must equal the measured floor ${noiseFloorLimit(aaMaxRatio)}`,
-      );
+    const aaRatios = arrayOf(row.aaRatios, `${rowPath}.aaRatios`).map((ratio, index) =>
+      positiveNumber(ratio, `${rowPath}.aaRatios[${index}]`),
+    );
+    if (aaRatios.length < MINIMUM_AA_PAIRS) {
+      throw new Error(`${rowPath} has ${aaRatios.length} A/A pairs; it needs ${MINIMUM_AA_PAIRS}`);
     }
-    rows[name] = { aaMinRatio, aaMaxRatio, limit };
+
+    // Recompute the limit so a hand-edited or loosened row cannot load.
+    const limit = positiveNumber(row.limit, `${rowPath}.limit`);
+    const measured = noiseFloorLimit(aaRatios);
+    if (limit !== measured) {
+      throw new Error(`${rowPath}.limit must equal the resampled limit ${measured}`);
+    }
+    rows[name] = { aaRatios, limit };
   }
-  return { measuredAt, pairs, rows };
+  return { measuredAt, source, gatePairs, rows };
 }
 
 /**
- * Convert an A/A results file (`{meta, summary: [{name, minRatio, maxRatio,
- * medianRatio, pairs}]}`, as this gate's `--output` writes for an A/A run)
- * into a noise floor. `meta.measuredAt` dates it; without one, the file's
- * modification time does.
+ * Convert an A/A report (this gate's `--output` for one checkout against
+ * itself) into a noise floor. The report must compare one commit and one
+ * engine build with itself over every reader, so an A/B report cannot become
+ * the floor.
  */
-export function noiseFloorFromAaResults(
-  value: unknown,
-  path: string,
-  fileModifiedAt: Date,
-): ReaderNoiseFloor {
+export function noiseFloorFromAaResults(value: unknown, path: string): ReaderNoiseFloor {
   const results = asRecord(value, path);
-  const meta = results.meta === undefined ? {} : asRecord(results.meta, `${path}.meta`);
-  const measuredAt =
-    meta.measuredAt === undefined
-      ? fileModifiedAt.toISOString()
-      : text(meta.measuredAt, `${path}.meta.measuredAt`);
-  const entries = arrayOf(results.summary, `${path}.summary`).map((rawEntry, index) => {
+  if (results.verdict !== null) throw new Error(`${path} has a verdict; it is not an A/A report`);
+
+  const meta = asRecord(results.meta, `${path}.meta`);
+  const sha = text(meta.baseSha, `${path}.meta.baseSha`);
+  if (text(meta.candidateSha, `${path}.meta.candidateSha`) !== sha) {
+    throw new Error(`${path} compares two commits; a floor needs one commit against itself`);
+  }
+  const engines = asRecord(meta.engineSha256, `${path}.meta.engineSha256`);
+  const engineSha256 = text(engines.base, `${path}.meta.engineSha256.base`);
+  if (text(engines.candidate, `${path}.meta.engineSha256.candidate`) !== engineSha256) {
+    throw new Error(`${path} compares two engine builds; a floor needs one build against itself`);
+  }
+  if (meta.readerFilter !== null) {
+    throw new Error(`${path} ran a READER_CASES subset; a floor needs every reader`);
+  }
+
+  const summary = arrayOf(results.summary, `${path}.summary`).map((rawEntry, index) => {
     const entryPath = `${path}.summary[${index}]`;
     const entry = asRecord(rawEntry, entryPath);
-    positiveNumber(entry.medianRatio, `${entryPath}.medianRatio`);
-    return {
-      name: text(entry.name, `${entryPath}.name`),
-      aaMinRatio: positiveNumber(entry.minRatio, `${entryPath}.minRatio`),
-      aaMaxRatio: positiveNumber(entry.maxRatio, `${entryPath}.maxRatio`),
-      pairs: positiveInteger(entry.pairs, `${entryPath}.pairs`),
-    };
+    const aaRatios = arrayOf(entry.perPair, `${entryPath}.perPair`).map((pair, pairIndex) =>
+      positiveNumber(
+        asRecord(pair, `${entryPath}.perPair[${pairIndex}]`).ratio,
+        `${entryPath}.perPair[${pairIndex}].ratio`,
+      ),
+    );
+    if (positiveInteger(entry.pairs, `${entryPath}.pairs`) !== aaRatios.length) {
+      throw new Error(`${entryPath}.pairs does not match its per-pair ratios`);
+    }
+    return [text(entry.name, `${entryPath}.name`), aaRatios] as const;
   });
-  const pairs = entries[0]?.pairs;
-  if (pairs === undefined) throw new Error(`${path}.summary is empty`);
-  if (entries.some((entry) => entry.pairs !== pairs)) {
-    throw new Error(`${path}: every reader must have the same pair count`);
-  }
-  const byName = new Map(entries.map((entry) => [entry.name, entry]));
   validateExactMatrix(
     `${path} summary`,
     READER_CASE_NAMES,
-    entries.map((entry) => entry.name),
+    summary.map(([name]) => name),
   );
-  const rows: Record<string, ReaderNoiseFloorRow> = {};
-  for (const name of READER_CASE_NAMES) {
-    const entry = byName.get(name);
-    if (entry === undefined) throw new Error(`${path} has no ${name}`);
-    rows[name] = {
-      aaMinRatio: entry.aaMinRatio,
-      aaMaxRatio: entry.aaMaxRatio,
-      limit: noiseFloorLimit(entry.aaMaxRatio),
-    };
-  }
+
   // Round-trip through the loader so a written floor is always loadable.
-  return parseReaderNoiseFloor({ measuredAt, pairs, rows }, path);
+  return parseReaderNoiseFloor(
+    {
+      measuredAt: text(meta.measuredAt, `${path}.meta.measuredAt`),
+      source: { sha, engineSha256, cpus: text(meta.cpus, `${path}.meta.cpus`) },
+      gatePairs: GATE_PAIRS,
+      rows: Object.fromEntries(
+        summary.map(([name, aaRatios]) => [name, { aaRatios, limit: noiseFloorLimit(aaRatios) }]),
+      ),
+    },
+    path,
+  );
 }
 
 /** Median 0.5.x-vs-tip ratio per reader from the documentation-only reference summary. */
@@ -261,6 +335,7 @@ function parseRun(line: string, side: Side, names: readonly string[]): ReaderRun
     const result = asRecord(rawResult, path);
     const group = READER_GROUPS.find((readerGroup) => readerGroup === result.group);
     if (group === undefined) throw new Error(`${path}.group is not a reader group`);
+
     const digest = result.digest;
     if (typeof digest !== "number" || !Number.isFinite(digest)) {
       throw new Error(`${path}.digest must be finite`);
@@ -310,8 +385,10 @@ export function summarizeReaderPairs(
         digestsMatch: base.digest === candidate.digest,
       };
     });
+
     const first = pairs[0]?.base.find((result) => result.name === name);
     if (first === undefined) throw new Error(`Reader gate has no ${name}`);
+
     const ratios = perPair.map((entry) => entry.ratio);
     return {
       name,
@@ -323,7 +400,7 @@ export function summarizeReaderPairs(
       medianRatio: median(ratios),
       minRatio: Math.min(...ratios),
       maxRatio: Math.max(...ratios),
-      candidateSlowerPairs: ratios.filter((ratio) => ratio > 1).length,
+      candidateSlowerPairs: ratios.filter((ratio) => ratio > PARITY_RATIO).length,
       pairs: perPair.length,
       digestsMatch: perPair.every((entry) => entry.digestsMatch),
       perPair,
@@ -333,8 +410,9 @@ export function summarizeReaderPairs(
 
 /**
  * A reader fails when its digests disagree in any pair, or when its median
- * ratio exceeds the floor limit and the candidate was slower in every pair: a
- * single fast pair shows the excess is noise, not a regression.
+ * paired ratio exceeds its limit. The limit already bounds A/A medians of
+ * GATE_PAIRS pairs, so no single fast pair is needed to call a high median
+ * noise, and a run with more pairs is judged by the same limit.
  */
 export function judgeReaderRows(
   summary: readonly ReaderSummaryRow[],
@@ -344,12 +422,10 @@ export function judgeReaderRows(
   const rows = summary.map((row): ReaderRowVerdict => {
     const limit = floor.rows[row.name]?.limit;
     if (limit === undefined) throw new Error(`Noise floor has no limit for ${row.name}`);
-    if (row.pairs < floor.pairs) {
-      throw new Error(
-        `${row.name} ran ${row.pairs} pairs; the floor was measured at ${floor.pairs}`,
-      );
+    if (row.pairs < floor.gatePairs) {
+      throw new Error(`${row.name} ran ${row.pairs} pairs; its limit is for ${floor.gatePairs}`);
     }
-    const regressed = row.medianRatio > limit && row.candidateSlowerPairs === row.pairs;
+
     const referenceRatio = reference.get(row.name);
     return {
       name: row.name,
@@ -359,7 +435,7 @@ export function judgeReaderRows(
       pairs: row.pairs,
       digestsMatch: row.digestsMatch,
       ...(referenceRatio === undefined ? {} : { referenceRatio }),
-      passed: row.digestsMatch && !regressed,
+      passed: row.digestsMatch && row.medianRatio <= limit,
     };
   });
   return { passed: rows.every((row) => row.passed), rows };
@@ -374,6 +450,7 @@ function runHarness(checkout: string, args: readonly string[]): string {
       `Reader gate harness failed for ${checkout} (${args[0]}): exit ${child.exitCode}`,
     );
   }
+
   const line = child.stdout.toString().trim().split("\n").at(-1);
   if (line === undefined || line === "")
     throw new Error(`Reader harness printed nothing for ${checkout}`);
@@ -391,10 +468,26 @@ function gitHead(checkout: string): string {
   return child.stdout.toString().trim();
 }
 
-function engineSha256(checkout: string): string {
-  return createHash("sha256")
-    .update(readFileSync(resolve(checkout, ENGINE_WASM)))
-    .digest("hex");
+/** SHA-256 over the engine module and its JavaScript glue, file names included. */
+export function engineSha256(checkout: string): string {
+  const pkg = resolve(checkout, ENGINE_PACKAGE);
+  const files = readdirSync(pkg)
+    .filter((name) => ENGINE_FILE.test(name))
+    .sort();
+  if (!files.includes(ENGINE_MODULE)) throw new Error(`${pkg} has no ${ENGINE_MODULE}`);
+
+  const hash = createHash("sha256");
+  for (const name of files) hash.update(`${name}\0`).update(readFileSync(join(pkg, name)));
+  return hash.digest("hex");
+}
+
+/** The CPUs this process and its harness children may run on: the bench slot under taskset. */
+function cpuAffinity(): string {
+  if (!existsSync(PROC_STATUS)) return UNKNOWN_CPUS;
+  const field = readFileSync(PROC_STATUS, "utf8")
+    .split("\n")
+    .find((line) => line.startsWith(CPUS_FIELD));
+  return field?.slice(CPUS_FIELD.length).trim() ?? UNKNOWN_CPUS;
 }
 
 function formatRatio(ratio: number | undefined): string {
@@ -429,11 +522,10 @@ function writeFloor(aaResultsPath: string): void {
   const floor = noiseFloorFromAaResults(
     JSON.parse(readFileSync(aaResultsPath, "utf8")),
     aaResultsPath,
-    statSync(aaResultsPath).mtime,
   );
   writeFileSync(NOISE_FLOOR_PATH, `${JSON.stringify(floor, null, 2)}\n`);
   process.stdout.write(
-    `Wrote ${Object.keys(floor.rows).length} reader limits at ${floor.pairs} pairs.\n`,
+    `Wrote ${Object.keys(floor.rows).length} reader limits from ${floor.source.sha} at ${floor.gatePairs} pairs.\n`,
   );
 }
 
@@ -457,6 +549,7 @@ function capturePairs(
         outputs[side] = parseRun(runHarness(checkouts[side], ["run", iterationsPath]), side, names);
         process.stderr.write(`reader gate: pair ${index + 1}/${pairCount} ${side} done\n`);
       }
+
       if (outputs.base === undefined || outputs.candidate === undefined) {
         throw new Error(`Reader gate pair ${index} is missing a side`);
       }
@@ -464,6 +557,17 @@ function capturePairs(
     });
   } finally {
     rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+/** The stored 0.5.x reference names the only base an A/B run may use. */
+function assertReferenceBase(base: string): void {
+  const stored = asRecord(JSON.parse(readFileSync(REFERENCE_PATH, "utf8")), REFERENCE_PATH);
+  const meta = asRecord(stored.meta, `${REFERENCE_PATH}.meta`);
+  const expected = text(meta.baseSha, `${REFERENCE_PATH}.meta.baseSha`);
+  const actual = gitHead(base);
+  if (actual !== expected) {
+    throw new Error(`Reader gate needs the stored 0.5.x baseline ${expected}; --base is ${actual}`);
   }
 }
 
@@ -475,25 +579,16 @@ function runGate(args: readonly string[]): number {
     candidate: resolve(optionValue(args, "--candidate") ?? HARNESS_ROOT),
   };
   const isNoiseRun = checkouts.base === checkouts.candidate;
-  if (!isNoiseRun) {
-    const stored = asRecord(JSON.parse(readFileSync(REFERENCE_PATH, "utf8")), REFERENCE_PATH);
-    const meta = asRecord(stored.meta, `${REFERENCE_PATH}.meta`);
-    const expected = text(meta.baseSha, `${REFERENCE_PATH}.meta.baseSha`);
-    const actual = gitHead(checkouts.base);
-    if (actual !== expected) {
-      throw new Error(
-        `Reader gate needs the stored 0.5.x baseline ${expected}; --base is ${actual}`,
-      );
-    }
-  }
+  if (!isNoiseRun) assertReferenceBase(checkouts.base);
+
   const floor = isNoiseRun
     ? undefined
     : parseReaderNoiseFloor(JSON.parse(readFileSync(NOISE_FLOOR_PATH, "utf8")), NOISE_FLOOR_PATH);
-  const minimumPairs = Math.max(MINIMUM_PAIRS, floor?.pairs ?? MINIMUM_PAIRS);
-  const pairCount = Number(optionValue(args, "--pairs") ?? minimumPairs);
-  if (!Number.isInteger(pairCount) || pairCount < minimumPairs) {
-    throw new Error(`--pairs must be an integer of at least ${minimumPairs}`);
+  const pairCount = Number(optionValue(args, "--pairs") ?? GATE_PAIRS);
+  if (!Number.isInteger(pairCount) || pairCount < GATE_PAIRS) {
+    throw new Error(`--pairs must be an integer of at least ${GATE_PAIRS}`);
   }
+
   const outputPath = optionValue(args, "--output");
   const names = selectedReaderCaseNames();
   const measuredAt = new Date().toISOString();
@@ -514,6 +609,7 @@ function runGate(args: readonly string[]): number {
       Math.max(calibration.base[name] ?? 0, calibration.candidate[name] ?? 0),
     ]),
   );
+
   const pairs = capturePairs(checkouts, names, iterations, pairCount);
   for (const side of ["base", "candidate"] as const) {
     if (engineSha256(checkouts[side]) !== engines[side]) {
@@ -532,6 +628,7 @@ function runGate(args: readonly string[]): number {
       baseSha: gitHead(checkouts.base),
       candidateSha: gitHead(checkouts.candidate),
       engineSha256: engines,
+      cpus: cpuAffinity(),
       bun: Bun.version,
       pairs: pairCount,
       order:
@@ -545,6 +642,7 @@ function runGate(args: readonly string[]): number {
       `${JSON.stringify({ meta, summary, verdict: verdict ?? null }, null, 2)}\n`,
     );
   }
+
   process.stdout.write(report(summary, verdict));
   return verdict === undefined || verdict.passed ? 0 : 1;
 }
