@@ -1,10 +1,12 @@
-import { setChartViewProviderFactory } from "@sheetwrite/core";
+import { setChartRendererFactory, setChartViewProviderFactory } from "@sheetwrite/core";
 
+import { createChartRenderer } from "./chart-renderer.js";
 import { createChartViewCache } from "./view-cache.js";
 
 /**
  * Register the chart view cache as the core chart view provider, so
- * `openChartViews(store)` returns live chart views.
+ * `openChartViews(store)` returns live chart views, and the SVG chart renderer,
+ * so grids created after this call draw their charts.
  *
  * @example
  * ```ts
@@ -23,4 +25,5 @@ import { createChartViewCache } from "./view-cache.js";
  */
 export function registerChartsBackend(): void {
   setChartViewProviderFactory(createChartViewCache);
+  setChartRendererFactory(createChartRenderer);
 }
