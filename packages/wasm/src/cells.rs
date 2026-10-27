@@ -1636,6 +1636,14 @@ impl DenseColumn<'_> {
         let (kind, payload) = dense_resolved(self.kinds[row], self.payloads[row]);
         (kind, payload, self.styles[row])
     }
+
+    /// Source kind and literal payload of `row`. A calculated slot reads as its
+    /// formula or empty source, so column scans can skip non-numeric literals
+    /// before decoding a calculated value.
+    #[inline]
+    pub(crate) fn source(&self, row: usize) -> (u8, u64) {
+        dense_source(self.kinds[row], self.payloads[row])
+    }
 }
 
 /// A borrowed column segment bounded by its source page or column.

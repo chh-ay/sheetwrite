@@ -127,6 +127,38 @@ impl<'a> ValueSet<'a> {
     }
 }
 
+/// The `aggregate` op code for SUM; every other op also needs count and extrema.
+const AGGREGATE_SUM: u8 = 0;
+
+/// Running column aggregate. A sum skips the count and extrema updates.
+struct NumericAccumulator {
+    sum: f64,
+    count: u32,
+    min: f64,
+    max: f64,
+}
+
+impl NumericAccumulator {
+    fn new() -> Self {
+        Self {
+            sum: 0.0,
+            count: 0,
+            min: f64::INFINITY,
+            max: f64::NEG_INFINITY,
+        }
+    }
+
+    #[inline]
+    fn add(&mut self, value: f64, op: u8) {
+        self.sum += value;
+        if op != AGGREGATE_SUM {
+            self.count += 1;
+            self.min = self.min.min(value);
+            self.max = self.max.max(value);
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
@@ -150,51 +182,52 @@ impl CellStore {
             return 0.0;
         }
 
-        let base = col * s.cells.row_count();
-        let mut sum = 0.0;
-        let mut count = 0u32;
-        let mut min = f64::INFINITY;
-        let mut max = f64::NEG_INFINITY;
-        let end = base + s.cells.row_count();
-        let mut start = base;
-        while start < end {
-            let run = s.cells.run(start, end);
-            let value_at = |index| {
-                if s.cells.is_paged() {
-                    return numeric_cell_value(s, index);
-                }
-                let (kind, payload) = run.source(index);
-                match kind {
-                    KIND_NUMBER => Some(f64::from_bits(payload)),
-                    KIND_FORMULA => {
-                        let (_, payload) = run.resolved(index);
+        let row_count = s.cells.row_count();
+        let base = col * row_count;
+        let mut acc = NumericAccumulator::new();
+
+        // Dense columns scan their slices directly. A run read per cell adds a
+        // dirty-overlay probe, a payload load and bounds checks for cells that
+        // are not numbers, which made this scan 2.6-6x slower than 0.5.0.
+        if let Some(column) = s.cells.dense_column(col) {
+            for row in 0..row_count {
+                let value = match column.source(row) {
+                    (KIND_NUMBER, bits) => Some(f64::from_bits(bits)),
+                    (KIND_FORMULA, _) => {
+                        let (_, payload, _) = column.cell(row);
                         (!payload_is_str(payload)
-                            && key_for_index(s, index)
+                            && key_for_index(s, base + row)
                                 .is_some_and(|key| formula_error_at(s, key).is_none()))
                         .then(|| payload_num(payload))
                     }
                     _ => None,
-                }
-            };
-            // The common sum scan avoids maintaining unused extrema and counts.
-            if op == 0 {
-                for index in run.start..run.end {
-                    if let Some(value) = value_at(index) {
-                        sum += value;
-                    }
-                }
-            } else {
-                for index in run.start..run.end {
-                    if let Some(value) = value_at(index) {
-                        sum += value;
-                        count += 1;
-                        min = min.min(value);
-                        max = max.max(value);
-                    }
+                };
+                if let Some(value) = value {
+                    acc.add(value, op);
                 }
             }
-            start = run.end;
+        } else {
+            // Paged runs touch each source page once, keeping eviction order
+            // the same as a windowed read of this column.
+            let end = base + row_count;
+            let mut start = base;
+            while start < end {
+                let run = s.cells.run(start, end);
+                for index in run.start..run.end {
+                    if let Some(value) = numeric_cell_value(s, index) {
+                        acc.add(value, op);
+                    }
+                }
+                start = run.end;
+            }
         }
+        let NumericAccumulator {
+            sum,
+            count,
+            min,
+            max,
+        } = acc;
+
         match op {
             0 => sum,
             1 => {
