@@ -392,6 +392,7 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "shell.css",
   ],
   "@sheetwrite/xlsx": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
+  "@sheetwrite/charts": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js"],
   "@sheetwrite/react": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/vue": ["README.md", "LICENSE", "dist/index.d.ts", "dist/index.js", "styles.css"],
   "@sheetwrite/svelte": ["README.md", "LICENSE", "src/Grid.svelte", "src/index.ts", "styles.css"],

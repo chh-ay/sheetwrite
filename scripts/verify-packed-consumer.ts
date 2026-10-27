@@ -59,6 +59,10 @@ const mitCompatibleLicenses: Record<string, true> = {
 const auditedLicenseOverrides: Record<string, string> = {
   "buffers@0.1.1": "MIT",
 };
+/** Optional packages that core and the framework adapters must install and run without. */
+const OPTIONAL_PACKAGES = ["@sheetwrite/xlsx", "@sheetwrite/charts"] as const;
+/** Packages that ship only compiled `dist/` output, never their source or tests. */
+const DIST_ONLY_PACKAGES: ReadonlySet<string> = new Set(OPTIONAL_PACKAGES);
 const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/core",
@@ -150,6 +154,17 @@ const packageSpecs: PackageSpec[] = [
     ],
   },
   {
+    directory: "packages/charts",
+    requiredFiles: [
+      "LICENSE",
+      "README.md",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "dist/view-cache.d.ts",
+      "dist/view-cache.js",
+    ],
+  },
+  {
     directory: "packages/react",
     requiredFiles: ["LICENSE", "README.md", "dist/index.d.ts", "dist/index.js"],
   },
@@ -230,7 +245,7 @@ async function assertTarball(
     }
   }
 
-  if (manifest.name === "@sheetwrite/xlsx") {
+  if (DIST_ONLY_PACKAGES.has(manifest.name)) {
     for (const path of packedFiles) {
       if (path.startsWith("src/") || path.startsWith("test/") || path.startsWith("node_modules/")) {
         throw new Error(`${manifest.name} tarball contains forbidden path ${path}`);
@@ -293,13 +308,13 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function verifyNoExcelClosure(
+async function verifyNoOptionalPackageClosure(
   name: string,
   packageName: string,
   tarballs: ReadonlyMap<string, string>,
   temporaryRoot: string,
 ): Promise<void> {
-  const root = join(temporaryRoot, `without-xlsx-${name}`);
+  const root = join(temporaryRoot, `without-optional-${name}`);
   await cp(join(repositoryRoot, "test/release-locks", name), root, { recursive: true });
   const artifactRoot = join(root, "artifacts");
   await mkdir(artifactRoot, { recursive: true });
@@ -313,13 +328,15 @@ async function verifyNoExcelClosure(
   await bindCanonicalTarballIntegrities(join(root, "package-lock.json"), localTarballs);
   await run(["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"], root);
 
-  // Core and the adapters must install and run without the optional XLSX package.
+  // Core and the adapters must install and run without the optional packages.
   const lock = await readFile(join(root, "package-lock.json"), "utf8");
-  if (lock.includes("node_modules/@sheetwrite/xlsx")) {
-    throw new Error(`${packageName} package-lock unexpectedly contains @sheetwrite/xlsx`);
-  }
-  if (await pathExists(join(root, "node_modules", "@sheetwrite", "xlsx"))) {
-    throw new Error(`${packageName} node_modules unexpectedly contains @sheetwrite/xlsx`);
+  for (const optionalPackage of OPTIONAL_PACKAGES) {
+    if (lock.includes(`node_modules/${optionalPackage}`)) {
+      throw new Error(`${packageName} package-lock unexpectedly contains ${optionalPackage}`);
+    }
+    if (await pathExists(join(root, "node_modules", ...optionalPackage.split("/")))) {
+      throw new Error(`${packageName} node_modules unexpectedly contains ${optionalPackage}`);
+    }
   }
 
   const adapterProbe =
@@ -573,10 +590,10 @@ try {
   }
 
   await Promise.all([
-    verifyNoExcelClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
-    verifyNoExcelClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
-    verifyNoExcelClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
-    verifyNoExcelClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("core", "@sheetwrite/core", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("react", "@sheetwrite/react", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("vue", "@sheetwrite/vue", tarballs, temporaryRoot),
+    verifyNoOptionalPackageClosure("svelte", "@sheetwrite/svelte", tarballs, temporaryRoot),
   ]);
 
   await cp(fixtureRoot, consumerRoot, { recursive: true });

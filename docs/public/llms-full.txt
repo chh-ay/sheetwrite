@@ -9136,6 +9136,150 @@ The full list of changes is in each package's `CHANGELOG.md`.
 
 Every symbol below is compiler-verified from the declaration files the packages ship. Entry-point classification, signatures, and source JSDoc are the complete public surface; anything absent is not public API.
 
+### `@sheetwrite/charts`
+
+#### `@sheetwrite/charts` — supported
+
+Declaration target: `./dist/index.d.ts`
+Source entry: `src/index.ts`
+Page: https://sheetwrite.vercel.app/docs/api/charts/
+
+##### `ChartAnchor` — interface
+
+```ts
+export interface ChartAnchor { row: number; col: number; offsetX: number; offsetY: number; width: number; height: number; }
+```
+
+Position in worksheet coordinates; dimensions and offsets use CSS pixels.
+
+##### `ChartChangeEvent` — interface
+
+```ts
+export interface ChartChangeEvent { readonly epoch: number | undefined; readonly charts: readonly ChartRef[]; }
+```
+
+Charts whose `ChartView` may differ after one store commit. Emitted at most
+once per commit, only when `charts` is not empty; each chart appears once.
+A chart that no longer exists resolves to `null`.
+
+Members:
+- `epoch` — Store epoch after the commit.
+
+##### `ChartDefinition` — interface
+
+```ts
+export interface ChartDefinition { id: string; kind: ChartKind; title?: string; axes?: { xTitle?: string; yTitle?: string; }; legend?: "none" | "top" | "right" | "bottom" | "left"; anchor: ChartAnchor; series: ChartSeries[]; }
+```
+
+Persisted chart definition; IDs are unique within the owning sheet.
+
+##### `ChartKind` — type
+
+```ts
+export type ChartKind = "column" | "bar" | "line" | "area" | "pie" | "doughnut" | "scatter";
+```
+
+Chart families supported by the 0.6 document model.
+
+##### `ChartRange` — type
+
+```ts
+export type ChartRange = Range | "#REF!";
+```
+
+A deleted source remains explicit instead of silently reading another cell.
+
+##### `ChartRef` — interface
+
+```ts
+export interface ChartRef { readonly sheet: SheetId; readonly id: string; }
+```
+
+Stable identity of one chart: the sheet that owns it and its ID on that sheet.
+
+##### `ChartSeries` — interface
+
+```ts
+export interface ChartSeries { name?: string; nameRange?: ChartRange; values: ChartRange; categories?: ChartRange; }
+```
+
+Sources are read in row-major order.
+
+##### `ChartSeriesView` — interface
+
+```ts
+export interface ChartSeriesView { name: string; values: Array<number | null>; categories: Array<string | number | boolean | null>; numberFormats: Array<string | null>; categoryFormats: Array<string | null>; numberLocale: string | null; truncated: boolean; referenceError: boolean; }
+```
+
+Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.
+
+Members:
+- `categoryFormats` — Format code per category; date categories are serial numbers and need it to show as dates.
+- `numberFormats` — Excel format code per value, as the grid paints it: cell style, then column style, then column format.
+- `numberLocale` — BCP 47 locale of the first value column, for separators; `null` keeps the default.
+- `referenceError` — A source was deleted; that source reads as empty.
+- `truncated` — A source had more than `MAX_CHART_POINTS` cells and its tail was dropped.
+- `values` — Numeric cells; text, booleans, errors and empty cells are `null` (a gap).
+
+##### `ChartView` — interface
+
+```ts
+export interface ChartView { chart: ChartDefinition; series: ChartSeriesView[]; }
+```
+
+One immutable-by-convention rendering input, refreshed on chart-change events.
+
+##### `ChartViewCache` — interface
+
+```ts
+export interface ChartViewCache { get(chart: ChartRef): ChartView | null; subscribe(listener: (event: ChartChangeEvent) => void): () => void; dispose(): void; }
+```
+
+Resolved chart views for one store, refreshed only by chart-change events.
+
+Listeners run after the changed charts are invalidated, so `get` inside a
+listener always resolves the committed cell data.
+
+Members:
+- `dispose` — Stop observing the store and release every cached view.
+- `get` — Resolved view for the chart, or `null` when the sheet has no chart with that ID.
+- `subscribe` — Observe charts whose cached views were invalidated; returns the unsubscribe function.
+
+##### `createChartViewCache` — function
+
+```ts
+(store: Store): ChartViewCache
+```
+
+Creates the per-store chart view cache a chart renderer reads from.
+
+Views resolve lazily on first `get` and stay cached until a chart-change
+event names that chart, so repeated frames never reread cells.
+@example
+```ts
+import { createChartViewCache, type ChartView } from "@sheetwrite/charts";
+import type { SheetId, Store } from "@sheetwrite/core";
+
+function watchChart(
+ store: Store,
+ sheet: SheetId,
+ id: string,
+ render: (view: ChartView | null) => void,
+) {
+ const charts = createChartViewCache(store);
+ render(charts.get({ sheet, id }));
+ const unsubscribe = charts.subscribe((event) => {
+ if (event.charts.some((chart) => chart.sheet === sheet && chart.id === id)) {
+ render(charts.get({ sheet, id }));
+ }
+ });
+ return () => {
+ unsubscribe();
+ charts.dispose();
+ };
+}
+```
+
 ### `@sheetwrite/core`
 
 #### `@sheetwrite/core` — supported

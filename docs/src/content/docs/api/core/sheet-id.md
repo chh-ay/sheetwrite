@@ -28,6 +28,7 @@ export type SheetId = string;
 
 <ul class="api-consumer-list">
 <li><code>@sheetwrite/bench</code><span class="api-consumer-kind">dependency</span></li>
+<li><code>@sheetwrite/charts</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/docs-start</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/react</code><span class="api-consumer-kind">dependency</span></li>
 <li><code>@sheetwrite/svelte</code><span class="api-consumer-kind">dependency</span></li>
@@ -38,6 +39,7 @@ export type SheetId = string;
 <p class="api-consumers-label">Public exports naming <code>SheetId</code></p>
 
 <ul class="api-consumer-list">
+<li><a href="/docs/api/charts/chart-ref/"><code>ChartRef</code></a><span class="api-consumer-kind">@sheetwrite/charts</span></li>
 <li><a href="/docs/api/core/cell-address/"><code>CellAddress</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/chart-ref/"><code>ChartRef</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/data-source-request/"><code>DataSourceRequest</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
@@ -49,7 +51,6 @@ export type SheetId = string;
 <li><a href="/docs/api/core/mutation-issue/"><code>MutationIssue</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/named-range-snapshot/"><code>NamedRangeSnapshot</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
 <li><a href="/docs/api/core/presence-overlay/"><code>PresenceOverlay</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li><a href="/docs/api/core/range/"><code>Range</code></a><span class="api-consumer-kind">@sheetwrite/core</span></li>
-<li class="api-consumer-more">and 30 more</li>
+<li class="api-consumer-more">and 31 more</li>
 </ul>
 </div>

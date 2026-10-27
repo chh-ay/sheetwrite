@@ -4,6 +4,15 @@ description: "Generated reference for every classified Sheetwrite package entry 
 ---
 The package `exports` maps define this inventory. Supported, internal, asset, and testing-only entry points are classified explicitly; generated pages use declaration signatures and source JSDoc.
 
+## @sheetwrite/charts
+
+<table class="api-entry-table">
+<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>
+<tbody>
+<tr><td><a href="/docs/api/charts/"><code>@sheetwrite/charts</code></a></td><td><span class="api-status" data-status="supported">supported</span></td><td>11</td></tr>
+</tbody>
+</table>
+
 ## @sheetwrite/core
 
 <table class="api-entry-table">

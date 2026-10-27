@@ -2,6 +2,197 @@
   "formatVersion": 2,
   "packages": [
     {
+      "name": "@sheetwrite/charts",
+      "entryPoints": [
+        {
+          "subpath": ".",
+          "target": "./dist/index.d.ts",
+          "source": "src/index.ts",
+          "kind": "typescript",
+          "classification": "supported",
+          "exports": [
+            {
+              "name": "ChartAnchor",
+              "kind": "interface",
+              "signature": "export interface ChartAnchor { row: number; col: number; offsetX: number; offsetY: number; width: number; height: number; }",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L7",
+              "jsDocTags": [],
+              "documentation": "Position in worksheet coordinates; dimensions and offsets use CSS pixels.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartChangeEvent",
+              "kind": "interface",
+              "signature": "export interface ChartChangeEvent { readonly epoch: number | undefined; readonly charts: readonly ChartRef[]; }",
+              "owners": [
+                "../core/dist/charts-live.d.ts"
+              ],
+              "source": "../core/dist/charts-live.d.ts#L19",
+              "jsDocTags": [],
+              "documentation": "Charts whose `ChartView` may differ after one store commit. Emitted at most\nonce per commit, only when `charts` is not empty; each chart appears once.\nA chart that no longer exists resolves to `null`.",
+              "memberDocs": [
+                {
+                  "name": "epoch",
+                  "documentation": "Store epoch after the commit."
+                }
+              ]
+            },
+            {
+              "name": "ChartDefinition",
+              "kind": "interface",
+              "signature": "export interface ChartDefinition { id: string; kind: ChartKind; title?: string; axes?: { xTitle?: string; yTitle?: string; }; legend?: \"none\" | \"top\" | \"right\" | \"bottom\" | \"left\"; anchor: ChartAnchor; series: ChartSeries[]; }",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L23",
+              "jsDocTags": [],
+              "documentation": "Persisted chart definition; IDs are unique within the owning sheet.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartKind",
+              "kind": "type",
+              "signature": "export type ChartKind = \"column\" | \"bar\" | \"line\" | \"area\" | \"pie\" | \"doughnut\" | \"scatter\";",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L3",
+              "jsDocTags": [],
+              "documentation": "Chart families supported by the 0.6 document model.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartRange",
+              "kind": "type",
+              "signature": "export type ChartRange = Range | \"#REF!\";",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L5",
+              "jsDocTags": [],
+              "documentation": "A deleted source remains explicit instead of silently reading another cell.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartRef",
+              "kind": "interface",
+              "signature": "export interface ChartRef { readonly sheet: SheetId; readonly id: string; }",
+              "owners": [
+                "../core/dist/charts-live.d.ts"
+              ],
+              "source": "../core/dist/charts-live.d.ts#L10",
+              "jsDocTags": [],
+              "documentation": "Stable identity of one chart: the sheet that owns it and its ID on that sheet.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartSeries",
+              "kind": "interface",
+              "signature": "export interface ChartSeries { name?: string; nameRange?: ChartRange; values: ChartRange; categories?: ChartRange; }",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L16",
+              "jsDocTags": [],
+              "documentation": "Sources are read in row-major order.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartSeriesView",
+              "kind": "interface",
+              "signature": "export interface ChartSeriesView { name: string; values: Array<number | null>; categories: Array<string | number | boolean | null>; numberFormats: Array<string | null>; categoryFormats: Array<string | null>; numberLocale: string | null; truncated: boolean; referenceError: boolean; }",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L36",
+              "jsDocTags": [],
+              "documentation": "Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order.",
+              "memberDocs": [
+                {
+                  "name": "categoryFormats",
+                  "documentation": "Format code per category; date categories are serial numbers and need it to show as dates."
+                },
+                {
+                  "name": "numberFormats",
+                  "documentation": "Excel format code per value, as the grid paints it: cell style, then column style, then column format."
+                },
+                {
+                  "name": "numberLocale",
+                  "documentation": "BCP 47 locale of the first value column, for separators; `null` keeps the default."
+                },
+                {
+                  "name": "referenceError",
+                  "documentation": "A source was deleted; that source reads as empty."
+                },
+                {
+                  "name": "truncated",
+                  "documentation": "A source had more than `MAX_CHART_POINTS` cells and its tail was dropped."
+                },
+                {
+                  "name": "values",
+                  "documentation": "Numeric cells; text, booleans, errors and empty cells are `null` (a gap)."
+                }
+              ]
+            },
+            {
+              "name": "ChartView",
+              "kind": "interface",
+              "signature": "export interface ChartView { chart: ChartDefinition; series: ChartSeriesView[]; }",
+              "owners": [
+                "../core/dist/types/chart.d.ts"
+              ],
+              "source": "../core/dist/types/chart.d.ts#L53",
+              "jsDocTags": [],
+              "documentation": "One immutable-by-convention rendering input, refreshed on chart-change events.",
+              "memberDocs": []
+            },
+            {
+              "name": "ChartViewCache",
+              "kind": "interface",
+              "signature": "export interface ChartViewCache { get(chart: ChartRef): ChartView | null; subscribe(listener: (event: ChartChangeEvent) => void): () => void; dispose(): void; }",
+              "owners": [
+                "src/view-cache.ts"
+              ],
+              "source": "src/view-cache.ts#L16",
+              "jsDocTags": [],
+              "documentation": "Resolved chart views for one store, refreshed only by chart-change events.\n\nListeners run after the changed charts are invalidated, so `get` inside a\nlistener always resolves the committed cell data.",
+              "memberDocs": [
+                {
+                  "name": "dispose",
+                  "documentation": "Stop observing the store and release every cached view."
+                },
+                {
+                  "name": "get",
+                  "documentation": "Resolved view for the chart, or `null` when the sheet has no chart with that ID."
+                },
+                {
+                  "name": "subscribe",
+                  "documentation": "Observe charts whose cached views were invalidated; returns the unsubscribe function."
+                }
+              ]
+            },
+            {
+              "name": "createChartViewCache",
+              "kind": "function",
+              "signature": "(store: Store): ChartViewCache",
+              "owners": [
+                "src/view-cache.ts"
+              ],
+              "source": "src/view-cache.ts#L60",
+              "jsDocTags": [
+                "example"
+              ],
+              "documentation": "Creates the per-store chart view cache a chart renderer reads from.\n\nViews resolve lazily on first `get` and stay cached until a chart-change\nevent names that chart, so repeated frames never reread cells.\n@example\n```ts\nimport { createChartViewCache, type ChartView } from \"@sheetwrite/charts\";\nimport type { SheetId, Store } from \"@sheetwrite/core\";\n\nfunction watchChart(\n  store: Store,\n  sheet: SheetId,\n  id: string,\n  render: (view: ChartView | null) => void,\n) {\n  const charts = createChartViewCache(store);\n  render(charts.get({ sheet, id }));\n  const unsubscribe = charts.subscribe((event) => {\n    if (event.charts.some((chart) => chart.sheet === sheet && chart.id === id)) {\n      render(charts.get({ sheet, id }));\n    }\n  });\n  return () => {\n    unsubscribe();\n    charts.dispose();\n  };\n}\n```",
+              "memberDocs": []
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "@sheetwrite/core",
       "entryPoints": [
         {

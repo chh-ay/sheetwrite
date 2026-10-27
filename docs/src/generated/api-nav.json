@@ -1,5 +1,9 @@
 [
   {
+    "label": "@sheetwrite/charts",
+    "href": "/docs/api/charts/"
+  },
+  {
     "label": "@sheetwrite/core",
     "href": "/docs/api/core/"
   },

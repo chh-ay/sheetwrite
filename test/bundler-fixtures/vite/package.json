@@ -6,6 +6,7 @@
     "build": "npm ci --ignore-scripts --no-audit --no-fund && npm run bundle && node check.mjs"
   },
   "dependencies": {
+    "@sheetwrite/charts": "file:../.packed/sheetwrite-charts-0.5.4.tgz",
     "@sheetwrite/core": "file:../.packed/sheetwrite-core-0.5.4.tgz",
     "@sheetwrite/react": "file:../.packed/sheetwrite-react-0.5.4.tgz",
     "@sheetwrite/xlsx": "file:../.packed/sheetwrite-xlsx-0.5.4.tgz",

@@ -1,0 +1,10 @@
+{
+  "name": "sheetwrite-release-core-charts",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@sheetwrite/charts": "file:artifacts/sheetwrite-charts-0.5.4.tgz",
+    "@sheetwrite/core": "file:artifacts/sheetwrite-core-0.5.4.tgz",
+    "@sheetwrite/wasm": "file:artifacts/sheetwrite-wasm-0.5.4.tgz"
+  }
+}

@@ -17,6 +17,7 @@ export default defineConfig({
         vue: resolve(import.meta.dirname, "vue.html"),
         worker: resolve(import.meta.dirname, "worker.html"),
         xlsx: resolve(import.meta.dirname, "xlsx.html"),
+        charts: resolve(import.meta.dirname, "charts.html"),
       },
     },
   },

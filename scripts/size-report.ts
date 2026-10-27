@@ -210,8 +210,14 @@ const repositoryRoot = resolve(import.meta.dir, "..");
 const bundlerEvidenceRoot = join(repositoryRoot, "test-results/bundlers");
 const reportPath = join(import.meta.dir, "size-report.json");
 const historyPath = join(import.meta.dir, "size-history.json");
-/** The optional package that core and the framework adapters must not install. */
-const XLSX_PACKAGE = "@sheetwrite/xlsx";
+/**
+ * Optional packages that core and the framework adapters must not install.
+ * Only the closure named here may contain the package; `metric` names its isolation count.
+ */
+const OPTIONAL_PACKAGE_CLOSURES = [
+  { packageName: "@sheetwrite/xlsx", closure: "core-xlsx", metric: "xlsxPackageCount" },
+  { packageName: "@sheetwrite/charts", closure: "core-charts", metric: "chartsPackageCount" },
+] as const;
 const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]> = {
   vite: [
     "core-initial",
@@ -220,13 +226,14 @@ const requiredBundlerRoles: Record<BundlerEvidence["bundler"], readonly string[]
     "svelte-initial",
     "worker-async",
     "xlsx-async",
+    "charts-async",
     "chrome-async",
   ],
   webpack: ["core-initial", "worker-async", "chrome-async"],
   next: ["core-initial"],
 };
 /** Lazily loaded roles; an asset that also belongs to an initial entry defeats the split. */
-const ASYNC_ROLES = new Set(["worker-async", "xlsx-async", "chrome-async"]);
+const ASYNC_ROLES = new Set(["worker-async", "xlsx-async", "charts-async", "chrome-async"]);
 const ATTRIBUTION_METHOD = "source-map-generated-spans-with-explicit-opaque-assets-v2";
 const COMPARABLE_ENTRY = "core-first-paint";
 const SUBPATH_CANDIDATES = ["sync", "collaboration", "rebase", "persistence"] as const;
@@ -833,8 +840,12 @@ async function measureClosure(
     logicalBytes += await sumPackageFiles(packageRoot);
   }
   packageNames.sort();
-  if (name !== "core-xlsx") {
-    const leaked = packageNames.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`));
+  for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
+    if (name === optional.closure) continue;
+
+    const leaked = packageNames.filter((identity) =>
+      identity.startsWith(`${optional.packageName}@`),
+    );
     if (leaked.length > 0) throw new Error(`${name} runtime closure contains ${leaked.join(", ")}`);
   }
   return { name, packageCount: packageNames.length, logicalBytes, packages: packageNames };
@@ -977,6 +988,7 @@ async function buildSizeReport(
       ["vue", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/vue"]],
       ["svelte", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/svelte"]],
       ["core-xlsx", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/xlsx"]],
+      ["core-charts", ["@sheetwrite/wasm", "@sheetwrite/core", "@sheetwrite/charts"]],
     ];
     const closures = await Promise.all(
       closureSpecs.map(([name, names], index) =>
@@ -1037,11 +1049,14 @@ async function buildSizeReport(
         "install-closure",
         closure.name,
       );
-      if (closure.name !== "core-xlsx") {
+      for (const optional of OPTIONAL_PACKAGE_CLOSURES) {
+        if (closure.name === optional.closure) continue;
+
         addMetric(
           metrics,
-          `${prefix}.xlsxPackageCount`,
-          closure.packages.filter((identity) => identity.startsWith(`${XLSX_PACKAGE}@`)).length,
+          `${prefix}.${optional.metric}`,
+          closure.packages.filter((identity) => identity.startsWith(`${optional.packageName}@`))
+            .length,
           "count",
           "optional-dependency-isolation",
           closure.name,

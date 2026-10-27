@@ -1,0 +1,47 @@
+{
+  "name": "@sheetwrite/charts",
+  "version": "0.5.4",
+  "type": "module",
+  "description": "Optional live chart views for Sheetwrite.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chh-ay/sheetwrite.git",
+    "directory": "packages/charts"
+  },
+  "homepage": "https://sheetwrite.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/chh-ay/sheetwrite/issues"
+  },
+  "keywords": [
+    "spreadsheet",
+    "charts",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && bun ../../scripts/package-dist.ts .",
+    "prepublishOnly": "bun run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sheetwrite/core": "workspace:*"
+  }
+}

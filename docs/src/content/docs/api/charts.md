@@ -1,0 +1,42 @@
+---
+title: "@sheetwrite/charts"
+description: "API reference for @sheetwrite/charts."
+---
+<span class="api-status" data-status="supported">supported</span>
+
+**Supported public entry point.** Import this entry point as `@sheetwrite/charts`.
+
+<dl class="api-metadata" data-pagefind-ignore>
+<div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
+<div><dt>Exports</dt><dd>11</dd></div>
+</dl>
+
+Source entry: `packages/charts/src/index.ts`
+
+## Exported symbols
+
+### Functions <span class="api-count" data-pagefind-ignore>1</span>
+
+<div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/charts/create-chart-view-cache/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createChartViewCache</code></span><span class="api-symbol-card__desc">Creates the per-store chart view cache a chart renderer reads from.</span></a>
+</div>
+
+### Interfaces <span class="api-count" data-pagefind-ignore>8</span>
+
+<div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/charts/chart-anchor/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartAnchor</code></span><span class="api-symbol-card__desc">Position in worksheet coordinates; dimensions and offsets use CSS pixels.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-change-event/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartChangeEvent</code></span><span class="api-symbol-card__desc">Charts whose ChartView may differ after one store commit.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-definition/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartDefinition</code></span><span class="api-symbol-card__desc">Persisted chart definition; IDs are unique within the owning sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-ref/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartRef</code></span><span class="api-symbol-card__desc">Stable identity of one chart: the sheet that owns it and its ID on that sheet.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-series/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeries</code></span><span class="api-symbol-card__desc">Sources are read in row-major order.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-series-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartSeriesView</code></span><span class="api-symbol-card__desc">Resolved plain data; the renderer does not read cells.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-view/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartView</code></span><span class="api-symbol-card__desc">One immutable-by-convention rendering input, refreshed on chart-change events.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-view-cache/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="interface" aria-hidden="true">I</span><code>ChartViewCache</code></span><span class="api-symbol-card__desc">Resolved chart views for one store, refreshed only by chart-change events.</span></a>
+</div>
+
+### Types <span class="api-count" data-pagefind-ignore>2</span>
+
+<div class="api-symbol-grid">
+<a class="api-symbol-card" href="/docs/api/charts/chart-kind/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartKind</code></span><span class="api-symbol-card__desc">Chart families supported by the 0.6 document model.</span></a>
+<a class="api-symbol-card" href="/docs/api/charts/chart-range/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="type" aria-hidden="true">T</span><code>ChartRange</code></span><span class="api-symbol-card__desc">A deleted source remains explicit instead of silently reading another cell.</span></a>
+</div>

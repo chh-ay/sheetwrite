@@ -10,7 +10,8 @@ The orchestrator stages and packs publishable package contents, rewrites workspa
 
 Verified contracts:
 
-- Vite builds separate core, React, Vue, Svelte, Worker, and lazy XLSX entries; initializes core with `await initSheetwrite()`; and emits the co-located WASM asset.
+- Vite builds separate core, React, Vue, Svelte, Worker, lazy XLSX, and lazy charts entries; initializes core with `await initSheetwrite()`; and emits the co-located WASM asset.
+- The charts view cache must be in the lazy charts chunk and in no core or adapter initial chunk.
 - Vite's emitted browser JavaScript is scanned and fails if it contains `node:fs`, `node:fs/promises`, or `fs/promises`.
 - webpack 5 initializes with no explicit WASM URL and builds without `IgnorePlugin`.
 - Next.js initializes from a client component and builds without `IgnorePlugin`.
