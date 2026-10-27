@@ -175,9 +175,13 @@
   z-index: 10;
   inset: var(--sw-header-height) auto 0 0;
   width: var(--sw-sidebar-width);
-  padding: 1.75rem 1rem 2rem 1.25rem;
+  /* The gutter is reserved even before the list overflows, so expanding a
+     group never narrows the column and reflows its text. The right padding
+     is trimmed by the thin scrollbar's width to keep the same text column. */
+  padding: 1.75rem 0.5rem 2rem 1.25rem;
   border-right: 1px solid var(--sw-border);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
 .sw-sidebar__nav {
@@ -248,6 +252,73 @@
   color: var(--sw-accent-strong);
   background: color-mix(in srgb, var(--sw-accent) 8%, transparent);
   font-weight: 600;
+}
+/* Page links carry an optional badge on the right edge. */
+.sw-sidebar__nav .sw-nav-group a,
+.sw-nav-group summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sw-sidebar__nav .sw-nav-group a > span:first-child,
+.sw-nav-group summary > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A nested group reads as a quieter folder inside its section: same tree line,
+   one step in, label in the page-link weight. */
+.sw-nav-subgroup > summary {
+  display: flex;
+  align-items: center;
+  padding: 0.38rem 0.75rem 0.38rem 0.9rem;
+  color: var(--sw-fg);
+  font-size: 0.86rem;
+  font-weight: 550;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+.sw-nav-subgroup > summary::-webkit-details-marker {
+  display: none;
+}
+/* The chevron sits at the right edge, in the same column as the top-level groups'. */
+.sw-nav-subgroup > summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.32rem;
+  height: 0.32rem;
+  margin-left: auto;
+  margin-right: 0.2rem;
+  border-right: 1.5px solid var(--sw-fg-dim);
+  border-bottom: 1.5px solid var(--sw-fg-dim);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+.sw-nav-subgroup[open] > summary::after {
+  transform: rotate(45deg);
+}
+.sw-nav-subgroup > summary:hover {
+  background: var(--sw-surface-2);
+}
+.sw-nav-subgroup > div {
+  margin: 0.1rem 0 0.3rem 1.1rem;
+  border-left: 1px solid var(--sw-border);
+}
+.sw-nav-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  font: 700 0.6rem / 1.6 var(--sw-font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.sw-nav-badge[data-badge="new"] {
+  color: var(--sw-accent-ink);
+  background: var(--sw-accent);
+}
+.sw-nav-badge[data-badge="updated"] {
+  color: var(--sw-accent-strong);
+  background: color-mix(in srgb, var(--sw-accent) 14%, transparent);
 }
 .sw-sidebar__nav section {
   border-top: 1px solid var(--sw-border);
@@ -883,6 +954,7 @@ html:has(.sw-nav-dialog[open]) {
 }
 .sw-nav-dialog > .sw-sidebar__nav {
   overflow-y: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   min-height: 0;
   padding: 1rem;
@@ -912,6 +984,7 @@ html:has(.sw-nav-dialog[open]) {
     align-self: start;
     max-height: calc(100vh - var(--sw-header-height) - 4rem);
     overflow-y: auto;
+    scrollbar-gutter: stable;
     border-left: 1px solid var(--sw-border);
     padding-left: 0;
     scrollbar-width: thin;

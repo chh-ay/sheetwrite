@@ -1,15 +1,27 @@
 import apiNav from "../generated/api-nav.json";
 import { RELEASES, RELEASES_HREF, releaseDate, releaseHref } from "./releases.js";
 
+/**
+ * One sidebar entry. An entry with `items` is a group and nests to any depth;
+ * a group may also have its own page (`href`).
+ */
 export interface NavigationItem {
   label: string;
-  href: string;
+  href?: string;
+  items?: readonly NavigationItem[];
+  /** Release that added the page; it shows "New" while that release is the latest. */
+  added?: string;
+  /** Release that changed the page substantially; it shows "Updated" likewise. */
+  updated?: string;
 }
 
 export interface NavigationSection {
   label: string;
   items: readonly NavigationItem[];
 }
+
+/** An entry a link can point at: previous/next and cross-links need a page. */
+export type NavigationPage = NavigationItem & { readonly href: string };
 
 /** The one generated section; reading order and the sidebar both name it. */
 const API_PACKAGES_LABEL = "API packages";
@@ -88,18 +100,54 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   },
 ];
 
+/** Depth-first pages of a tree, in the order a reader sees them in the sidebar. */
+export function navigationPages(items: readonly NavigationItem[]): NavigationPage[] {
+  const pages: NavigationPage[] = [];
+  const visit = (item: NavigationItem): void => {
+    const { href } = item;
+    if (href !== undefined) pages.push({ ...item, href });
+    for (const child of item.items ?? []) visit(child);
+  };
+  for (const item of items) visit(item);
+  return pages;
+}
+
 /**
- * Reading order for previous/next links: every authored entry in sidebar
+ * Reading order for previous/next links: every authored page in sidebar
  * order. Generated API packages are excluded so a reader never gets a "Next"
  * that hops between hundreds of generated entry points.
  */
-const READING_ORDER: readonly NavigationItem[] = DOCS_NAVIGATION.filter(
-  (section) => section.label !== API_PACKAGES_LABEL,
-).flatMap((section) => section.items);
+const READING_ORDER: readonly NavigationPage[] = navigationPages(
+  DOCS_NAVIGATION.filter((section) => section.label !== API_PACKAGES_LABEL).flatMap(
+    (section) => section.items,
+  ),
+);
+
+export type NavigationBadge = "new" | "updated";
+
+/**
+ * Badge for an entry in the given release. A group shows the strongest badge
+ * of its pages, so a collapsed group still tells the reader something inside
+ * it changed. Badges compare against the latest published release, so they
+ * appear when that release ships and drop off at the next one by themselves.
+ */
+export function navigationBadge(
+  item: NavigationItem,
+  release: string,
+): NavigationBadge | undefined {
+  if (item.added === release) return "new";
+  let badge: NavigationBadge | undefined = item.updated === release ? "updated" : undefined;
+  for (const child of item.items ?? []) {
+    const childBadge = navigationBadge(child, release);
+    if (childBadge === "new") return "new";
+    badge ??= childBadge;
+  }
+  return badge;
+}
 
 export interface DocumentNeighbours {
-  previous?: NavigationItem;
-  next?: NavigationItem;
+  previous?: NavigationPage;
+  next?: NavigationPage;
 }
 
 /**
@@ -124,7 +172,7 @@ export function documentNeighbours(activeHref: string | undefined): DocumentNeig
  * instead; these power in-page cross-links (ShowcasePage next/prev) and the
  * landing/hub link graphs. Every href here is a preserved public URL.
  */
-export const SHOWCASE_NAVIGATION: readonly NavigationItem[] = [
+export const SHOWCASE_NAVIGATION: readonly NavigationPage[] = [
   { label: "Vanilla", href: "/vanilla/" },
   { label: "React", href: "/react/" },
   { label: "Vue", href: "/vue/" },
