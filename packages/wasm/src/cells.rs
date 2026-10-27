@@ -959,11 +959,16 @@ impl CellStorage {
 
             kind
         } else {
+            // Literals and plain empties are decided by the kind byte alone, so
+            // only calculated slots load (and bounds-check) their payload.
             let kind = self.kind[index];
+            if kind & CALCULATED == 0 {
+                return kind;
+            }
             return if kind & !CALCULATED == KIND_FORMULA {
                 KIND_FORMULA
             } else {
-                dense_resolved(kind, self.payload[index]).0
+                decode_cell(self.payload[index]).0
             };
         };
 
